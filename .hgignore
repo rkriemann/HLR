@@ -1,0 +1,29 @@
+# standard files to exclude
+syntax: glob
+
+*.o
+*.os
+*.obj
+*~
+*.a
+*.so
+*.dylib
+*.swp
+*.pdb
+.gdb_history
+*.eps
+
+.hlibpro.conf
+hlibpro
+
+# now some special things
+syntax: regexp
+
+^\.scons.*
+^.*\.cache
+^.*\.log
+
+^hlrtest$
+
+# gtags files
+^(GPATH|GRTAGS|GSYMS|GTAGS)$
