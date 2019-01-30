@@ -64,42 +64,7 @@ lu ( TMatrix *          A,
                                    {
                                        for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
                                        {
-                                           auto  A_ji = BA->block( j, i );
-                                           auto  A_il = BA->block( i, l );
-                                           auto  A_jl = BA->block( j, l );
-
-                                           update< value_t >( A_ji, A_il, A_jl, acc );
-                                           
-                                           // if ( is_lowrank( A_jl ) )
-                                           //     if ( is_lowrank( A_il ) )
-                                           //         if ( is_lowrank( A_ji ) ) update< value_t >( cptrcast( A_ji, TRkMatrix    ),
-                                           //                                                      cptrcast( A_il, TRkMatrix    ),
-                                           //                                                      ptrcast(  A_jl, TRkMatrix    ), acc );
-                                           //         else                      update< value_t >( cptrcast( A_ji, TDenseMatrix ),
-                                           //                                                      cptrcast( A_il, TRkMatrix    ),
-                                           //                                                      ptrcast(  A_jl, TRkMatrix    ), acc );
-                                           //     else
-                                           //         if ( is_lowrank( A_ji ) ) update< value_t >( cptrcast( A_ji, TRkMatrix    ),
-                                           //                                                      cptrcast( A_il, TDenseMatrix ),
-                                           //                                                      ptrcast(  A_jl, TRkMatrix    ), acc );
-                                           //         else                      update< value_t >( cptrcast( A_ji, TDenseMatrix ),
-                                           //                                                      cptrcast( A_il, TDenseMatrix ),
-                                           //                                                      ptrcast(  A_jl, TRkMatrix    ), acc );
-                                           // else
-                                           //     if ( is_lowrank( A_il ) )
-                                           //         if ( is_lowrank( A_ji ) ) update< value_t >( cptrcast( A_ji, TRkMatrix    ),
-                                           //                                                      cptrcast( A_il, TRkMatrix    ),
-                                           //                                                      ptrcast(  A_jl, TDenseMatrix ) );
-                                           //         else                      update< value_t >( cptrcast( A_ji, TDenseMatrix ),
-                                           //                                                      cptrcast( A_il, TRkMatrix    ),
-                                           //                                                      ptrcast(  A_jl, TDenseMatrix ) );
-                                           //     else
-                                           //         if ( is_lowrank( A_ji ) ) update< value_t >( cptrcast( A_ji, TRkMatrix    ),
-                                           //                                                      cptrcast( A_il, TDenseMatrix ),
-                                           //                                                      ptrcast(  A_jl, TDenseMatrix ) );
-                                           //         else                      update< value_t >( cptrcast( A_ji, TDenseMatrix ),
-                                           //                                                      cptrcast( A_il, TDenseMatrix ),
-                                           //                                                      ptrcast(  A_jl, TDenseMatrix ) );
+                                           update< value_t >( BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
                                        }// for
                                    }// for
                                } );

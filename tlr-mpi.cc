@@ -46,13 +46,75 @@ lu ( TMatrix *          A,
     
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
-    
+
     if ( is_blocked( A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  nbr = BA->nblock_rows();
         auto  nbc = BA->nblock_cols();
 
+        //
+        // set up communicators for rows/cols
+        //
+
+        list< mpi::communicator >    comms;
+        vector< mpi::communicator >  row_comms;
+        vector< list< int > >        row_procs( nbr ), col_procs( nbc );
+
+        std::cout << "rows" << std::endl;
+        for ( uint  i = 0; i < nbr; ++i )
+        {
+            list< int >  procs;
+            
+            for ( uint  j = 0; j < nbc; ++j )
+                procs.push_back( BA->block( i, j )->procs().master() );
+
+            procs.sort();
+            procs.unique();
+
+            std::cout << i << " : "; for ( auto  p : procs ) std::cout << p << ", "; std::cout << std::endl;
+
+            for ( uint  l = 0; l < i; ++l )
+            {
+                if ( procs == row_procs[l] )
+                {
+                    std::cout << i << " : " << l << std::endl;
+                    break;
+                }// if
+            }// for
+            
+            row_procs[i] = std::move( procs );
+        }// for
+
+        std::cout << "columns" << std::endl;
+        for ( uint  j = 0; j < nbc; ++j )
+        {
+            list< int >  procs;
+            
+            for ( uint  i = 0; i < nbr; ++i )
+                procs.push_back( BA->block( i, j )->procs().master() );
+
+            procs.sort();
+            procs.unique();
+
+            std::cout << j << " : "; for ( auto  p : procs ) std::cout << p << ", "; std::cout << std::endl;
+
+            for ( uint  l = 0; l < j; ++l )
+            {
+                if ( procs == col_procs[l] )
+                {
+                    std::cout << j << " : " << l << std::endl;
+                    break;
+                }// if
+            }// for
+            
+            col_procs[j] = std::move( procs );
+        }// for
+
+
+
+
+        
         for ( uint  i = 0; i < nbr; ++i )
         {
             auto  A_ii = BA->block( i, i );
@@ -106,40 +168,7 @@ lu ( TMatrix *          A,
             //                        {
             //                            for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
             //                            {
-            //                                auto  A_ji = BA->block( j, i );
-            //                                auto  A_il = BA->block( i, l );
-            //                                auto  A_jl = BA->block( j, l );
-
-            //                                if ( is_lowrank( A_jl ) )
-            //                                    if ( is_lowrank( A_il ) )
-            //                                        if ( is_lowrank( A_ji ) ) update( cptrcast( A_ji, TRkMatrix    ),
-            //                                                                          cptrcast( A_il, TRkMatrix    ),
-            //                                                                          ptrcast(  A_jl, TRkMatrix    ), acc );
-            //                                        else                      update( cptrcast( A_ji, TDenseMatrix ),
-            //                                                                          cptrcast( A_il, TRkMatrix    ),
-            //                                                                          ptrcast(  A_jl, TRkMatrix    ), acc );
-            //                                    else
-            //                                        if ( is_lowrank( A_ji ) ) update( cptrcast( A_ji, TRkMatrix    ),
-            //                                                                          cptrcast( A_il, TDenseMatrix ),
-            //                                                                          ptrcast(  A_jl, TRkMatrix    ), acc );
-            //                                        else                      update( cptrcast( A_ji, TDenseMatrix ),
-            //                                                                          cptrcast( A_il, TDenseMatrix ),
-            //                                                                          ptrcast(  A_jl, TRkMatrix    ), acc );
-            //                                else
-            //                                    if ( is_lowrank( A_il ) )
-            //                                        if ( is_lowrank( A_ji ) ) update( cptrcast( A_ji, TRkMatrix    ),
-            //                                                                          cptrcast( A_il, TRkMatrix    ),
-            //                                                                          ptrcast(  A_jl, TDenseMatrix ) );
-            //                                        else                      update( cptrcast( A_ji, TDenseMatrix ),
-            //                                                                          cptrcast( A_il, TRkMatrix    ),
-            //                                                                          ptrcast(  A_jl, TDenseMatrix ) );
-            //                                    else
-            //                                        if ( is_lowrank( A_ji ) ) update( cptrcast( A_ji, TRkMatrix    ),
-            //                                                                          cptrcast( A_il, TDenseMatrix ),
-            //                                                                          ptrcast(  A_jl, TDenseMatrix ) );
-            //                                        else                      update( cptrcast( A_ji, TDenseMatrix ),
-            //                                                                          cptrcast( A_il, TDenseMatrix ),
-            //                                                                          ptrcast(  A_jl, TDenseMatrix ) );
+            //                                update< value_t >( BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
             //                            }// for
             //                        }// for
             //                    } );

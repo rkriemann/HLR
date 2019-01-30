@@ -65,6 +65,7 @@ main ( int argc, char ** argv )
     boost::mpi::environment   env{ argc, argv };
     boost::mpi::communicator  world;
     const auto                my_proc = world.rank();
+    const auto                nprocs  = world.size();
     
     size_t  n         = 512;
     size_t  ntile     = 64;
@@ -154,7 +155,7 @@ main ( int argc, char ** argv )
 
         if ( my_proc == 0 )
             std::cout << "━━ " << Mach::hostname() << std::endl
-                      << "    CPU cores : " << Mach::cpuset() << std::endl
+                      << "    CPU cores : " << Mach::cpuset()
                       << std::endl;
         
         CFG::set_verbosity( verbosity );
@@ -162,6 +163,8 @@ main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
+        std::cout << "━━ Problem Setup ( " << appl << " )" << std::endl;
+        
         unique_ptr< ProblemBase >  problem;
         
         if      ( appl == "logkernel" ) problem = make_unique< LogKernel::Problem >();
@@ -176,6 +179,20 @@ main ( int argc, char ** argv )
         
         if      ( arith.substr( 0, 6 ) == "hodlr-" ) std::tie( ct, bct ) = HODLR::cluster( coord.get(), ntile );
         else if ( arith.substr( 0, 4 ) == "tlr-"   ) std::tie( ct, bct ) = TLR::cluster( coord.get(), ntile );
+
+        if ( arith.find( "-mpi" ) != string::npos )
+        {
+            TBlockCyclicDistrBC  distr;
+            
+            distr.distribute( nprocs, bct->root(), nullptr );
+        }// if
+        
+        if (( my_proc == 0 ) && verbose( 3 ))
+        {
+            TPSBlockClusterVis   bc_vis;
+            
+            bc_vis.id( true ).procs( true ).print( bct->root(), "bct" );
+        }// if
         
         auto  A = problem->build_matrix( bct.get(), fixed_rank( k ) );
         
@@ -192,7 +209,7 @@ main ( int argc, char ** argv )
         if (( my_proc == 0 ) && verbose( 3 ))
             mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
 
-        if ( ! nostd )
+        if ( arith == "std" )
         {
             if ( my_proc == 0 )
                 std::cout << "━━ LU facorisation ( Std )" << std::endl;

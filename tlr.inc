@@ -123,7 +123,8 @@ template < typename value_t >
 void
 update ( const TRkMatrix *  A,
          const TRkMatrix *  B,
-         TDenseMatrix *     C )
+         TDenseMatrix *     C,
+         const TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "updated( %d, %d, %d )", A->id(), B->id(), C->id() );
@@ -139,7 +140,8 @@ template < typename value_t >
 void
 update ( const TDenseMatrix *  A,
          const TRkMatrix *     B,
-         TDenseMatrix *        C )
+         TDenseMatrix *        C,
+         const TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "updated( %d, %d, %d )", A->id(), B->id(), C->id() );
@@ -154,7 +156,8 @@ template < typename value_t >
 void
 update ( const TRkMatrix *     A,
          const TDenseMatrix *  B,
-         TDenseMatrix *        C )
+         TDenseMatrix *        C,
+         const TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "updated( %d, %d, %d )", A->id(), B->id(), C->id() );
@@ -169,7 +172,8 @@ template < typename value_t >
 void
 update ( const TDenseMatrix *  A,
          const TDenseMatrix *  B,
-         TDenseMatrix *        C )
+         TDenseMatrix *        C,
+         const TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "updated( %d, %d, %d )", A->id(), B->id(), C->id() );
@@ -177,6 +181,10 @@ update ( const TDenseMatrix *  A,
     // C = C + A B
     B::prod( value_t(-1), blas_mat< value_t >( A ), blas_mat< value_t >( B ), value_t(1), blas_mat< value_t >( C ) );
 }
+
+//
+// semi-automatic deduction of optimal "update" function
+//
 
 template < typename T_value,
            typename T_matrix1,
@@ -188,7 +196,9 @@ update ( const T_matrix1 *        A,
          const HLIB::TTruncAcc &  acc )
 {
     if      ( HLIB::is_dense(   C ) ) update< T_value >( A, B, ptrcast( C, HLIB::TDenseMatrix ), acc );
-    else if ( HLIB::is_lowrank( C ) ) update< T_value >( A, B, ptrcast( C, HLIB::TRkMatrix ), acc );
+    else if ( HLIB::is_lowrank( C ) ) update< T_value >( A, B, ptrcast( C, HLIB::TRkMatrix ),    acc );
+    else
+        HERROR( ERR_NOT_IMPL, "", "" );
 }
 
 template < typename T_value,
@@ -200,7 +210,9 @@ update ( const T_matrix1 *        A,
          const HLIB::TTruncAcc &  acc )
 {
     if      ( HLIB::is_dense(   B ) ) update< T_value, T_matrix1, HLIB::TDenseMatrix >( A, cptrcast( B, HLIB::TDenseMatrix ), C, acc );
-    else if ( HLIB::is_lowrank( B ) ) update< T_value, T_matrix1, HLIB::TRkMatrix >( A, cptrcast( B, HLIB::TRkMatrix ), C, acc );
+    else if ( HLIB::is_lowrank( B ) ) update< T_value, T_matrix1, HLIB::TRkMatrix >(    A, cptrcast( B, HLIB::TRkMatrix ),    C, acc );
+    else
+        HERROR( ERR_NOT_IMPL, "", "" );
 }
 
 template < typename T_value >
@@ -211,7 +223,9 @@ update ( const HLIB::TMatrix *    A,
          const HLIB::TTruncAcc &  acc )
 {
     if      ( HLIB::is_dense(   A ) ) update< T_value, HLIB::TDenseMatrix >( cptrcast( A, HLIB::TDenseMatrix ), B, C, acc );
-    else if ( HLIB::is_lowrank( A ) ) update< T_value, HLIB::TRkMatrix >( cptrcast( A, HLIB::TRkMatrix ), B, C, acc );
+    else if ( HLIB::is_lowrank( A ) ) update< T_value, HLIB::TRkMatrix >(    cptrcast( A, HLIB::TRkMatrix ),    B, C, acc );
+    else
+        HERROR( ERR_NOT_IMPL, "", "" );
 }
 
 }// namespace TLR
