@@ -13,7 +13,7 @@
 #include <blas/Matrix.hh>
 #include <blas/Algebra.hh>
 
-#include "approx.hh"
+//#include "approx.hh"
 
 namespace LR
 {
@@ -30,8 +30,8 @@ approx_svd ( HLIB::BLAS::Matrix< T > &  M,
     // perform SVD of M
     //
 
-    const HLIB::idx_t              n   = idx_t( M.nrows() );
-    const HLIB::idx_t              m   = idx_t( M.ncols() );
+    const HLIB::idx_t              n   = HLIB::idx_t( M.nrows() );
+    const HLIB::idx_t              m   = HLIB::idx_t( M.ncols() );
     const HLIB::idx_t              mrc = std::min(n,m);
     HLIB::BLAS::Vector< real_t >   S( mrc );
     HLIB::BLAS::Matrix< value_t >  V( m, mrc );
@@ -39,7 +39,7 @@ approx_svd ( HLIB::BLAS::Matrix< T > &  M,
     HLIB::BLAS::svd( M, S, V );
         
     // determine truncated rank based on singular values
-    const idx_t  k = idx_t( acc.trunc_rank( S ) );
+    const HLIB::idx_t  k = HLIB::idx_t( acc.trunc_rank( S ) );
 
     //
     // u_i -> a_i, v_i -> b_i
@@ -73,17 +73,17 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
     using  real_t  = typename HLIB::real_type< value_t >::type_t;
 
     if ( A.ncols() != B.ncols() )
-        HERROR( ERR_MAT_SIZE, "(BLAS) truncate_svd", "rank in A and B differs" );
+        HERROR( HLIB::ERR_MAT_SIZE, "(BLAS) truncate_svd", "rank in A and B differs" );
 
-    const idx_t  n     = idx_t( A.nrows() );
-    const idx_t  m     = idx_t( B.nrows() );
-    const idx_t  irank = idx_t( A.ncols() );
+    const HLIB::idx_t  n     = HLIB::idx_t( A.nrows() );
+    const HLIB::idx_t  m     = HLIB::idx_t( B.nrows() );
+    const HLIB::idx_t  irank = HLIB::idx_t( A.ncols() );
 
     //
     // don't increase rank
     //
 
-    const idx_t  acc_rank = idx_t( acc.rank() );
+    const HLIB::idx_t  acc_rank = HLIB::idx_t( acc.rank() );
 
     HLIB::BLAS::Matrix< T >  OA, OB;
     
@@ -96,8 +96,8 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
 
     if ( irank <= acc_rank )
     {
-        OA = std::move( HLIB::BLAS::Matrix< value_t >( A, copy_value ) );
-        OB = std::move( HLIB::BLAS::Matrix< value_t >( B, copy_value ) );
+        OA = std::move( HLIB::BLAS::Matrix< value_t >( A, HLIB::copy_value ) );
+        OB = std::move( HLIB::BLAS::Matrix< value_t >( B, HLIB::copy_value ) );
     }// if
 
     //
@@ -106,8 +106,8 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
     // via full SVD
     //
 
-    const idx_t  mrc   = std::min(n, m);
-    idx_t        orank = 0;
+    const HLIB::idx_t  mrc   = std::min(n, m);
+    HLIB::idx_t        orank = 0;
         
     if ( acc_rank >= mrc )
     {
@@ -168,7 +168,7 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
         HLIB::BLAS::svd( U, S, V );
         
         // determine truncated rank based on singular values
-        orank = idx_t( acc.trunc_rank( S ) );
+        orank = HLIB::idx_t( acc.trunc_rank( S ) );
 
         //
         // only build new vectors, if rank is decreased
@@ -197,8 +197,8 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
         }// if
         else
         {
-            OA = std::move( HLIB::BLAS::Matrix< value_t >( A, copy_value ) );
-            OB = std::move( HLIB::BLAS::Matrix< value_t >( B, copy_value ) );
+            OA = std::move( HLIB::BLAS::Matrix< value_t >( A, HLIB::copy_value ) );
+            OB = std::move( HLIB::BLAS::Matrix< value_t >( B, HLIB::copy_value ) );
         }// else
     }// else
 
@@ -212,7 +212,7 @@ template< typename T >
 std::pair< HLIB::BLAS::Matrix< T >, HLIB::BLAS::Matrix< T > >
 approx_sum_svd ( const std::list< HLIB::BLAS::Matrix< T > > &  U,
                  const std::list< HLIB::BLAS::Matrix< T > > &  V,
-                 const TTruncAcc &                             acc )
+                 const HLIB::TTruncAcc &                       acc )
 {
     using  value_t = T;
 

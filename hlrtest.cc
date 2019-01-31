@@ -12,8 +12,6 @@
 using namespace std;
 
 #include <boost/mpi.hpp>
-#include <boost/format.hpp>
-#include <boost/program_options.hpp>
 
 using boost::format;
 using namespace boost::program_options;

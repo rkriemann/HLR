@@ -11,8 +11,6 @@
 
 using namespace std;
 
-#include <boost/mpi.hpp>
-
 #include "logkernel.hh"
 
 using namespace HLIB;
@@ -127,90 +125,5 @@ Problem::build_matrix ( const TBlockClusterTree *  bct,
     
     return h_builder.build( bct, unsymmetric, acc );
 }
-
-// //
-// // build matrix using Matern kernel function
-// //
-// std::unique_ptr< TMatrix >
-// logkernel ( const size_t         n,
-//             const size_t         ntile,
-//             const size_t         k,
-//             const std::string &  arith )
-// {
-//     boost::mpi::communicator  world;
-//     const auto                my_proc = world.rank();
-//     const auto                nprocs  = world.size();
-
-        
-//     //
-//     // build cluster tree and block cluster tree
-//     //
-
-//     unique_ptr< TClusterTree >       ct;
-//     unique_ptr< TBlockClusterTree >  bct;
-
-//     if ( arith == "std" )
-//     {
-//         TCardBSPPartStrat    part_strat;
-//         TBSPCTBuilder        ct_builder( & part_strat, ntile );
-
-//         ct = ct_builder.build( coord.get() );
-
-//         TWeakStdGeomAdmCond  adm_cond( 4.0 );
-//         TBCBuilder           bct_builder( 3 );
-
-//         bct = bct_builder.build( ct.get(), ct.get(), & adm_cond );
-//     }// if
-//     else if ( arith.substr( 0, 6 ) == "hodlr-" )
-//     {
-//         TCardBSPPartStrat    part_strat;
-//         TBSPCTBuilder        ct_builder( & part_strat, ntile );
-
-//         ct = ct_builder.build( coord.get() );
-
-//         TOffDiagAdmCond      adm_cond;
-//         TBCBuilder           bct_builder;
-
-//         bct = bct_builder.build( ct.get(), ct.get(), & adm_cond );
-//     }// if
-//     else if ( arith.substr( 0, 4 ) == "tlr-" )
-//     {
-//         TCardBSPPartStrat    part_strat;
-//         TMBLRCTBuilder       ct_builder( 1, & part_strat, ntile );
-
-//         ct = ct_builder.build( coord.get() );
-
-//         TWeakStdGeomAdmCond  adm_cond( 4.0 );
-//         TBCBuilder           bct_builder;
-
-//         bct = bct_builder.build( ct.get(), ct.get(), & adm_cond );
-//     }// if
-//     else
-//         throw "unknown arithmetic";
-    
-//     if ( arith.find( "-mpi" ) != string::npos )
-//     {
-//         TBlockCyclicDistrBC  distr;
-
-//         distr.distribute( nprocs, bct->root(), nullptr );
-    
-//         if (( my_proc == 0 ) && verbose( 3 ))
-//         {
-//             TPSClusterVis        c_vis;
-//             TPSBlockClusterVis   bc_vis;
-            
-//             c_vis.print( ct->root(), "logkernel_ct" );
-//             bc_vis.id( true ).procs( true ).print( bct->root(), "logkernel_bct" );
-//         }// if
-//     }// if
-    
-//     //
-//     // build matrix
-//     //
-
-//     if ( my_proc == 0 )
-//         std::cout << "━━ building H-matrix ( k = " << k << " )" << std::endl;
-
-// }
 
 }// namespace LogKernel

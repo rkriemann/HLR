@@ -8,11 +8,9 @@
 
 #include <hlib.hh>
 
-using namespace HLIB;
-
-namespace B = HLIB::BLAS;
-
 #include "approx.hh"
+#include "common.inc"
+#include "hodlr.hh"
 #include "hodlr.inc"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -114,11 +112,58 @@ lu ( TMatrix *          A,
     }// else
 }
 
-template
-void
-lu< HLIB::real > ( TMatrix *          A,
-                   const TTruncAcc &  acc );
-
 }// namespace SEQ
 
 }// namespace HODLR
+
+//
+// main function
+//
+void
+mymain ( int argc, char ** argv )
+{
+    std::cout << "━━ " << Mach::hostname() << std::endl;
+    
+    auto  tic        = Time::Wall::now();
+    auto  problem    = gen_problem();
+    auto  coord      = problem->build_coord( n );
+    auto [ ct, bct ] = HODLR::cluster( coord.get(), ntile );
+    
+    if ( verbose( 3 ) )
+    {
+        TPSBlockClusterVis   bc_vis;
+        
+        bc_vis.id( true ).print( bct->root(), "bct" );
+    }// if
+    
+    auto  A   = problem->build_matrix( bct.get(), fixed_rank( k ) );
+    auto  toc = Time::Wall::since( tic );
+    
+    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
+    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    
+    
+    if ( verbose( 3 ) )
+    {
+        TPSMatrixVis  mvis;
+        
+        mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
+    }// if
+    
+    {
+        std::cout << "━━ LU facorisation ( HODLR SEQ )" << std::endl;
+        
+        auto  C = A->copy();
+        
+        tic = Time::Wall::now();
+        
+        HODLR::SEQ::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        
+        toc = Time::Wall::since( tic );
+        
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+    }
+}
