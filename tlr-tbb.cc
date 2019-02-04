@@ -84,9 +84,6 @@ lu ( TMatrix *          A,
 void
 mymain ( int argc, char ** argv )
 {
-    std::cout << "━━ " << Mach::hostname() << std::endl
-              << "    CPU cores : " << Mach::cpuset() << std::endl;
-    
     auto  tic        = Time::Wall::now();
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
@@ -113,7 +110,7 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << "━━ LU facorisation ( TLR TBB )" << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR TBB )" << term::reset << std::endl;
         
         auto  C = A->copy();
         

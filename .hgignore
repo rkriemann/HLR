@@ -12,6 +12,8 @@ syntax: glob
 *.pdb
 .gdb_history
 *.eps
+*.out
+*.log
 
 .hlibpro.conf
 hlibpro
@@ -24,6 +26,8 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
+^((hodlr|tlr)-(seq|tbb|tf|hpx|mpi))$
+
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

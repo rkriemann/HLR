@@ -5,7 +5,7 @@ import os
 # set up compilation environment
 #
 
-debug   = False
+debug   = True
 fullmsg = False
 
 CXXFLAGS  = '-O3 -march=native'
@@ -20,34 +20,62 @@ env = Environment( ENV        = os.environ,
                    CXXFLAGS   = Split( CXXFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
                    )
-
-mpi = Environment( ENV        = os.environ,
-                   CXX        = 'mpic++ -std=c++17',
-                   CXXFLAGS   = Split( CXXFLAGS ),
-                   LINKFLAGS  = Split( LINKFLAGS + ' -lboost_mpi' ),
-                   )
-
 env.ParseConfig( 'hlibpro/bin/hlib-config --cflags --lflags' )
-mpi.ParseConfig( 'hlibpro/bin/hlib-config --cflags --lflags' )
 
 if not fullmsg :
     env.Replace( CCCOMSTR   = " CC     $SOURCES" )
     env.Replace( CXXCOMSTR  = " C++    $SOURCES" )
     env.Replace( LINKCOMSTR = " Link   $TARGET"  )
-    mpi.Replace( CCCOMSTR   = " CC     $SOURCES" )
-    mpi.Replace( CXXCOMSTR  = " C++    $SOURCES" )
-    mpi.Replace( LINKCOMSTR = " Link   $TARGET"  )
-
-common = env.StaticLibrary( 'common', [ 'logkernel.cc', 'matern.cc', 'tlr.cc', 'hodlr.cc' ] )
 
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
-mpi.Prepend( LIBS    = [ "common" ] )
-mpi.Prepend( LIBPATH = [ "." ] )
 
-env.Program( 'tlr-seq', [ 'tlr-seq.cc' ] )
-env.Program( 'tlr-tbb', [ 'tlr-tbb.cc' ] )
+common = env.StaticLibrary( 'common', [ 'logkernel.cc', 'matern.cc', 'tlr.cc', 'hodlr.cc' ] )
+
+#
+# default C++ environment
+#
+
+env.Program( 'tlr-seq',   [ 'tlr-seq.cc' ] )
+env.Program( 'hodlr-seq', [ 'hodlr-seq.cc' ] )
+
+#
+# TBB
+#
+
+tbb = env.Clone()
+
+tbb.Program( 'tlr-tbb',   [ 'tlr-tbb.cc' ] )
+tbb.Program( 'hodlr-tbb', [ 'hodlr-tbb.cc' ] )
+
+#
+# MPI
+#
+
+mpi = env.Clone()
+mpi.Append( LINKFLAGS = "-lboost_mpi" )
+mpi.ParseConfig( 'mpic++ --showme:compile' )
+mpi.ParseConfig( 'mpic++ --showme:link' )
+
 mpi.Program( 'tlr-mpi', [ 'tlr-mpi.cc' ] )
 
-env.Program( 'hodlr-seq', [ 'hodlr-seq.cc' ] )
-env.Program( 'hodlr-tbb', [ 'hodlr-tbb.cc' ] )
+#
+# HPX
+#
+
+hpx = env.Clone()
+hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
+hpx.MergeFlags( "-lhpx_iostreams" )
+
+hpx.Program( 'tlr-hpx',   [ 'tlr-hpx.cc' ] )
+hpx.Program( 'hodlr-hpx', [ 'hodlr-hpx.cc' ] )
+
+#
+# TaskFlow
+#
+
+tf = env.Clone()
+tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
+
+tf.Program( 'tlr-tf',   [ 'tlr-tf.cc' ] )
+tf.Program( 'hodlr-tf', [ 'hodlr-tf.cc' ] )

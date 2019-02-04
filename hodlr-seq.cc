@@ -100,7 +100,7 @@ lu ( TMatrix *          A,
         auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
         auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
-        HODLR::SEQ::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), BA->block( 1, 1 ), acc );
+        HODLR::SEQ::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         
         HODLR::SEQ::lu< value_t >( A11, acc );
     }// if
@@ -122,8 +122,6 @@ lu ( TMatrix *          A,
 void
 mymain ( int argc, char ** argv )
 {
-    std::cout << "━━ " << Mach::hostname() << std::endl;
-    
     auto  tic        = Time::Wall::now();
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
@@ -151,7 +149,7 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << "━━ LU facorisation ( HODLR SEQ )" << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( HODLR SEQ )" << term::reset << std::endl;
         
         auto  C = A->copy();
         

@@ -1,15 +1,17 @@
 //
 // Project     : HLib
-// File        : hodlr-lu.cc
-// Description : HODLR arithmetic with TBB
+// File        : tlr-hpx.cc
+// Description : TLR arithmetic with HPX
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <tbb/parallel_invoke.h>
+#include <hpx/hpx_init.hpp>
+#include <hpx/include/lcos.hpp>
 
 #include "approx.hh"
-#include "common.inc"
+#include "cmdline.inc"
+#include "problem.inc"
 #include "hodlr.hh"
 #include "hodlr.inc"
 
@@ -21,7 +23,7 @@
 namespace HODLR
 {
 
-namespace TBB
+namespace HPX
 {
 
 template < typename value_t >
@@ -41,30 +43,35 @@ addlr ( B::Matrix< value_t > &  U,
         auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
-
+        
         B::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), B::Range::all );
         B::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), B::Range::all );
         B::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), B::Range::all );
         B::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), B::Range::all );
 
-        tbb::parallel_invoke( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); },
-                              [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); },
-                              [&U0,&V1,A01,&acc] () { auto [ U01, V01 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
-                                                                                                         { blas_mat_B< value_t >( A01 ), V1 },
-                                                                                                         acc );
-                                                      A01->set_rank( U01, V01 );
-                              },
-                              [&U1,&V0,A10,&acc] () { auto [ U10, V10 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
-                                                                                                         { blas_mat_B< value_t >( A10 ), V0 },
-                                                                                                         acc );
-                                                      A10->set_rank( U10, V10 );
-                              } );
+        auto  task_00 = hpx::async( [&,A00] () { addlr( U0, V0, A00, acc ); } );
+        auto  task_11 = hpx::async( [&,A11] () { addlr( U1, V1, A11, acc ); } );
+        auto  task_01 = hpx::async( [&,A01] ()
+                        {
+                            auto [ U01, V01 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
+                                                                               { blas_mat_B< value_t >( A01 ), V1 },
+                                                                               acc );
+                            A01->set_rank( U01, V01 );
+                        } );
+        auto  task_10 = hpx::async( [&,A10] ()
+                        {
+                            auto [ U10, V10 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
+                                                                               { blas_mat_B< value_t >( A10 ), V0 },
+                                                                               acc );
+                            A10->set_rank( U10, V10 );
+                        } );
+        auto  all = hpx::when_all( task_00, task_01, task_10, task_11 );
+
+        all.wait();
     }// if
     else
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
-
-        B::prod( value_t(1), U, B::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
+        B::prod( value_t(1), U, B::adjoint( V ), value_t(1), blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
     }// else
 }
 
@@ -84,31 +91,31 @@ lu ( TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        HODLR::TBB::lu< value_t >( A00, acc );
+        HODLR::HPX::lu< value_t >( A00, acc );
 
-        tbb::parallel_invoke( [A00,A01] () { trsml(  A00, blas_mat_A< value_t >( A01 ) ); },
-                              [A00,A10] () { trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+        auto  solve_01 = hpx::async( [A00,A01] () { trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
+        auto  solve_10 = hpx::async( [A00,A10] () { trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+        auto  solve    = hpx::when_all( solve_01, solve_10 );
 
+        solve.wait();
+        
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
         auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
         auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
-        HODLR::TBB::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
+        HODLR::HPX::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         
-        HODLR::TBB::lu< value_t >( A11, acc );
+        HODLR::HPX::lu< value_t >( A11, acc );
     }// if
     else
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
-        
-        B::invert( DA->blas_rmat() );
+        BLAS::invert( blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
     }// else
 }
 
-}// namespace TBB
+}// namespace HPX
 
-}// namespace HODLR
-
+}// namespace TLR
 
 //
 // main function
@@ -134,7 +141,6 @@ mymain ( int argc, char ** argv )
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
     
-    
     if ( verbose( 3 ) )
     {
         TPSMatrixVis  mvis;
@@ -143,13 +149,13 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( HODLR TBB )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( HODLR HPX )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
         
-        HODLR::TBB::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        HODLR::HPX::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         
@@ -158,4 +164,35 @@ mymain ( int argc, char ** argv )
         std::cout << "    done in " << toc << std::endl;
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
+
+}
+
+int
+hpx_main ( int argc, char ** argv )
+{
+    parse_cmdline( argc, argv );
+    
+    try
+    {
+        INIT();
+
+        CFG::set_verbosity( verbosity );
+
+        if ( nthreads != 0 )
+            CFG::set_nthreads( nthreads );
+
+        mymain( argc, argv );
+
+        DONE();
+    }// try
+    catch ( char const *  e ) { std::cout << e << std::endl; }
+    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
+    
+    return hpx::finalize();
+}
+
+int
+main ( int argc, char ** argv )
+{
+    return hpx::init( argc, argv );
 }

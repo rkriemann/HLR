@@ -24,37 +24,6 @@ std::pair< std::unique_ptr< HLIB::TClusterTree >,
 cluster ( HLIB::TCoordinate *  coords,
           const size_t         ntile );
 
-//
-// LU factorization
-//
-
-namespace SEQ
-{
-
-template < typename value_t >
-void lu ( HLIB::TMatrix *          A,
-          const HLIB::TTruncAcc &  acc );
-
-}// namespace SEQ
-
-namespace TBB
-{
-
-template < typename value_t >
-void lu ( HLIB::TMatrix *          A,
-          const HLIB::TTruncAcc &  acc );
-
-}// namespace TBB
-
-namespace MPI
-{
-
-template < typename value_t >
-void lu ( HLIB::TMatrix *          A,
-          const HLIB::TTruncAcc &  acc );
-
-}// namespace MPI
-
 }// namespace TLR
 
 #endif // __HLR_TLR_HH
