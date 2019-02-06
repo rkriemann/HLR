@@ -86,3 +86,7 @@ trsmuh ( const TMatrix *         U,
 }
 
 }// namespace HODLR
+
+// Local Variables:
+// mode: c++
+// End:

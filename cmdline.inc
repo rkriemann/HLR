@@ -87,3 +87,7 @@ parse_cmdline ( int argc, char ** argv )
 }
 
 #endif // __HLR_CMDLINE_INC
+
+// Local Variables:
+// mode: c++
+// End:

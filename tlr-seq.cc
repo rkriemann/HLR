@@ -116,6 +116,8 @@ mymain ( int argc, char ** argv )
         
         std::cout << "    done in " << toc << std::endl;
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+
+        write_matrix( C.get(), "LU.hm" );
     }
 
 }

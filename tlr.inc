@@ -229,3 +229,7 @@ update ( const HLIB::TMatrix *    A,
 }
 
 }// namespace TLR
+
+// Local Variables:
+// mode: c++
+// End:

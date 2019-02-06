@@ -22,3 +22,7 @@ gen_problem ()
 }
 
 #endif // __HLR_PROBLEM_INC
+
+// Local Variables:
+// mode: c++
+// End:
