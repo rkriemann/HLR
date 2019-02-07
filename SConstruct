@@ -5,7 +5,7 @@ import os
 # set up compilation environment
 #
 
-debug   = True
+debug   = False
 fullmsg = False
 
 CXXFLAGS  = '-O3 -march=native'
@@ -38,6 +38,17 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc', 'matern.cc', 'tlr.cc', '
 
 env.Program( 'tlr-seq',   [ 'tlr-seq.cc' ] )
 env.Program( 'hodlr-seq', [ 'hodlr-seq.cc' ] )
+
+#
+# OpenMP
+#
+
+omp = env.Clone()
+omp.Append( CXXFLAGS  = "-fopenmp" )
+omp.Append( LINKFLAGS = "-fopenmp" )
+
+omp.Program( 'tlr-omp',   [ 'tlr-omp.cc' ] )
+omp.Program( 'hodlr-omp', [ 'hodlr-omp.cc' ] )
 
 #
 # TBB

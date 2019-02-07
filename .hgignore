@@ -14,6 +14,7 @@ syntax: glob
 *.eps
 *.out
 *.log
+*.hm
 
 .hlibpro.conf
 hlibpro
@@ -26,7 +27,7 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^((hodlr|tlr)-(seq|tbb|tf|hpx|mpi))$
+^((hodlr|tlr)-(seq|omp|tbb|tf|hpx|mpi))$
 
 
 # gtags files
