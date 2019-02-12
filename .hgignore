@@ -28,7 +28,7 @@ syntax: regexp
 
 ^hlrtest$
 ^((hodlr|tlr)-(seq|omp|tbb|tf|hpx|mpi))$
-
+^tlr-mpi-(bcast|ibcast|rdma)$
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

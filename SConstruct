@@ -5,7 +5,7 @@ import os
 # set up compilation environment
 #
 
-debug   = False
+debug   = True
 fullmsg = False
 
 CXXFLAGS  = '-O3 -march=native'
@@ -64,11 +64,14 @@ tbb.Program( 'hodlr-tbb', [ 'hodlr-tbb.cc' ] )
 #
 
 mpi = env.Clone()
-mpi.Append( LINKFLAGS = "-lboost_mpi" )
+#mpi.Append( LINKFLAGS = "-lboost_mpi" )
 mpi.ParseConfig( 'mpic++ --showme:compile' )
 mpi.ParseConfig( 'mpic++ --showme:link' )
 
-mpi.Program( 'tlr-mpi', [ 'tlr-mpi.cc' ] )
+mpi.Program( 'tlr-mpi-bcast.cc' )
+mpi.Program( 'tlr-mpi-tbb.cc' )
+mpi.Program( 'tlr-mpi-ibcast.cc' )
+mpi.Program( 'tlr-mpi-rdma.cc' )
 
 #
 # HPX

@@ -18,9 +18,9 @@ using namespace HLIB;
 
 namespace B = HLIB::BLAS;
 
-size_t  n         = 512;
-size_t  ntile     = 64;
-size_t  k         = 5;
+size_t  n         = 1024;
+size_t  ntile     = 128;
+size_t  k         = 16;
 string  appl      = "logkernel";
 uint    nthreads  = 0;
 uint    verbosity = 1;
