@@ -5,7 +5,7 @@ import os
 # set up compilation environment
 #
 
-debug   = True
+debug   = False
 fullmsg = False
 
 CXXFLAGS  = '-O3 -march=native'

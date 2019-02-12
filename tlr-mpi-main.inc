@@ -1,3 +1,7 @@
+#include <boost/filesystem.hpp>
+
+namespace fs = boost::filesystem;
+
 //
 // main function
 //
@@ -57,32 +61,42 @@ mymain ( int argc, char ** argv )
         std::cout << "    done in " << toc << std::endl;
 
         // compare with otherwise computed result
-        auto  D  = read_matrix( "LU.hm" );
-        auto  BC = ptrcast( C.get(), TBlockMatrix );
-        auto  BD = ptrcast( D.get(), TBlockMatrix );
-        bool  correct = true;
-        
-        D->set_procs( ps_single( pid ), recursive );
-        
-        for ( uint i = 0; i < BC->nblock_rows(); ++i )
+        if ( fs::exists( "LU.hm" ) )
         {
-            for ( uint j = 0; j < BC->nblock_cols(); ++j )
+            auto  D  = read_matrix( "LU.hm" );
+            auto  BC = ptrcast( C.get(), TBlockMatrix );
+            auto  BD = ptrcast( D.get(), TBlockMatrix );
+
+            if (( BC->nrows() == BD->nrows() ) &&
+                ( BC->ncols() == BD->ncols() ) &&
+                ( BC->nblock_rows() == BD->nblock_rows() ) &&
+                ( BC->nblock_cols() == BD->nblock_cols() ))
             {
-                if ( ! is_ghost( BC->block( i, j ) ) )
+                bool  correct = true;
+                
+                D->set_procs( ps_single( pid ), recursive );
+        
+                for ( uint i = 0; i < BC->nblock_rows(); ++i )
                 {
-                    const auto  f = diff_norm_F( BD->block( i, j ), BC->block( i, j ) );
-
-                    if ( f > 1e-10 )
+                    for ( uint j = 0; j < BC->nblock_cols(); ++j )
                     {
-                        DBG::printf( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BC->block( i, j ) ) );
-                        correct = false;
-                    }// if
-                }// if
-            }// for
-        }// for
+                        if ( ! is_ghost( BC->block( i, j ) ) )
+                        {
+                            const auto  f = diff_norm_F( BD->block( i, j ), BC->block( i, j ) );
 
-        if ( correct )
-            std::cout << "    no error" << std::endl;
+                            if ( f > 1e-10 )
+                            {
+                                DBG::printf( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BC->block( i, j ) ) );
+                                correct = false;
+                            }// if
+                        }// if
+                    }// for
+                }// for
+
+                if ( correct )
+                    std::cout << "    no error" << std::endl;
+            }// if
+        }// if
         
         // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         

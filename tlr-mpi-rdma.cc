@@ -226,10 +226,10 @@ lu ( TBlockMatrix *     A,
             bool   have_diag = ( pid == p_ii );
             mutex  req_mtx;
             
-            tbb::parallel_for(
-                i+1, nbr,
-                [&,A,H_ii,i,pid,p_ii] ( uint  j )
-                // for ( uint  j = i+1; j < nbr; ++j )
+            // tbb::parallel_for(
+            //     i+1, nbr,
+            //     [&,A,H_ii,i,pid,p_ii] ( uint  j )
+            for ( uint  j = i+1; j < nbr; ++j )
                 {
                     // L is unit diagonal !!! Only solve with U
                     auto        A_ji = A->block( j, i );
@@ -242,6 +242,7 @@ lu ( TBlockMatrix *     A,
                         
                             if ( ! have_diag )
                             {
+                                // DBG::printf( "waiting for %d", H_ii->id() );
                                 wait_rdma( diag_reqs );
                                 have_diag = true;
                                 
@@ -249,10 +250,11 @@ lu ( TBlockMatrix *     A,
                                     add_mem += H_ii->byte_size();
                             }// if
                         }
-                        
-                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A->block( j, i ) );
+
+                        // DBG::printf( "solving %d", A_ji->id() );
+                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
                     }// if
-                } );
+                }// );
             
             finish_rdma( diag_wins );
         }
@@ -328,18 +330,26 @@ lu ( TBlockMatrix *     A,
         vector< mutex >  row_mtx( nbr );         // mutices for access to requests
         vector< mutex >  col_mtx( nbc );
         
-        tbb::parallel_for(
-            tbb::blocked_range2d< uint >( i+1, nbr,
-                                          i+1, nbc ),
-            [&,A,i,pid] ( const tbb::blocked_range2d< uint > & r )
-            {
-                for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+        // tbb::parallel_for(
+        //     tbb::blocked_range2d< uint >( i+1, nbr,
+        //                                   i+1, nbc ),
+        //     [&,A,i,pid] ( const tbb::blocked_range2d< uint > & r )
+        //     {
+        //         for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+        //         {
+        //             const auto  p_ji = A->block( j, i )->procs().master();
+                    
+        //             for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
+        //             {
+        //                 const auto  p_il = A->block( i, l )->procs().master();
+                for ( uint  j = i+1; j < nbr; ++j )
                 {
                     const auto  p_ji = A->block( j, i )->procs().master();
                     
-                    for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
+                    for ( uint  l = i+1; l < nbc; ++l )
                     {
                         const auto  p_il = A->block( i, l )->procs().master();
+                        
                         //
                         // update local matrix block
                         //
@@ -381,11 +391,12 @@ lu ( TBlockMatrix *     A,
                             // finally compute update
                             //
                     
+                            // DBG::printf( "updating %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() );
                             update< value_t >( row_i[j], col_i[l], A_jl, acc );
                         }// if
                     }// for
                 }// for
-            } );
+                // } );
 
         max_add_mem = std::max( max_add_mem, add_mem );
         

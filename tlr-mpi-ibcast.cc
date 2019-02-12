@@ -186,7 +186,7 @@ lu ( TBlockMatrix *     A,
                         }
                     
                         // DBG::printf( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() );
-                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A->block( j, i ) );
+                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
                     }// if
                 } );
         }
