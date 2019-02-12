@@ -69,7 +69,6 @@ mpi.ParseConfig( 'mpic++ --showme:compile' )
 mpi.ParseConfig( 'mpic++ --showme:link' )
 
 mpi.Program( 'tlr-mpi-bcast.cc' )
-mpi.Program( 'tlr-mpi-tbb.cc' )
 mpi.Program( 'tlr-mpi-ibcast.cc' )
 mpi.Program( 'tlr-mpi-rdma.cc' )
 

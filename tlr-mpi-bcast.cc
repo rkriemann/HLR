@@ -9,6 +9,9 @@
 #include <memory>
 #include <fstream>
 
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range2d.h>
+
 using namespace std;
 
 #include "mpi.hh"
@@ -132,6 +135,7 @@ lu ( TBlockMatrix *     A,
             B::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
+        if ( contains( col_procs[i], pid ) )
         {
             //
             // broadcast diagonal block
@@ -146,31 +150,31 @@ lu ( TBlockMatrix *     A,
                 H_ii = T_ii.get();
             }// if
             
-            if ( contains( col_procs[i], pid ) )
-            {
-                // DBG::printf( "broadcast( %d ) from %d", A_ii->id(), p_ii );
-                broadcast< value_t >( col_comms[i], H_ii, col_maps[i][p_ii] );
-
-                if ( pid != p_ii )
-                    add_mem += H_ii->byte_size();
-            }// if
+            // DBG::printf( "broadcast( %d ) from %d", A_ii->id(), p_ii );
+            broadcast< value_t >( col_comms[i], H_ii, col_maps[i][p_ii] );
+            
+            if ( pid != p_ii )
+                add_mem += H_ii->byte_size();
             
             //
             // off-diagonal solve
             //
             
-            for ( uint  j = i+1; j < nbr; ++j )
-            {
-                // L is unit diagonal !!! Only solve with U
-                auto        A_ji = A->block( j, i );
-                const auto  p_ji = A_ji->procs().master();
-                
-                if ( pid == p_ji )
+            tbb::parallel_for(
+                i+1, nbr,
+                [A,H_ii,i,pid] ( uint  j )
+                // for ( uint  j = i+1; j < nbr; ++j )
                 {
-                    // DBG::printf( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() );
-                    trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A->block( j, i ) );
-                }// if
-            }// for
+                    // L is unit diagonal !!! Only solve with U
+                    auto        A_ji = A->block( j, i );
+                    const auto  p_ji = A_ji->procs().master();
+                    
+                    if ( pid == p_ji )
+                    {
+                        // DBG::printf( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() );
+                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A->block( j, i ) );
+                    }// if
+                } );
         }
         
         //
@@ -234,25 +238,31 @@ lu ( TBlockMatrix *     A,
         // update of trailing sub-matrix
         //
         
-        for ( uint  j = i+1; j < nbr; ++j )
-        {
-            const auto  A_ji = row_i[j];
-            
-            for ( uint  l = i+1; l < nbc; ++l )
+        tbb::parallel_for(
+            tbb::blocked_range2d< uint >( i+1, nbr,
+                                          i+1, nbc ),
+            [A,i,pid,&row_i,&col_i,&acc] ( const tbb::blocked_range2d< uint > & r )
             {
-                const auto  A_il = col_i[l];
+                for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                {
+                    const auto  A_ji = row_i[j];
+                    
+                    for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
+                    {
+                        const auto  A_il = col_i[l];
                 
-                //
-                // update local matrix block
-                //
-                
-                auto        A_jl = A->block( j, l );
-                const auto  p_jl = A_jl->procs().master();
-                
-                if ( pid == p_jl )
-                    update< value_t >( A_ji, A_il, A_jl, acc );
-            }// for
-        }// for
+                        //
+                        // update local matrix block
+                        //
+                        
+                        auto        A_jl = A->block( j, l );
+                        const auto  p_jl = A_jl->procs().master();
+                        
+                        if ( pid == p_jl )
+                            update< value_t >( A_ji, A_il, A_jl, acc );
+                    }// for
+                }// for
+            } );
     }// for
 
     std::cout << "  time in MPI : " << format( "%.2fs" ) % time_mpi << std::endl;
@@ -274,134 +284,4 @@ lu ( TMatrix *          A,
 
 }// namespace TLR
 
-//
-// main function
-//
-void
-mymain ( int argc, char ** argv )
-{
-    mpi::communicator  world;
-    const auto         pid    = world.rank();
-    const auto         nprocs = world.size();
-
-    auto  tic        = Time::Wall::now();
-    auto  problem    = gen_problem();
-    auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = TLR::cluster( coord.get(), ntile );
-    
-    {
-        TBlockCyclicDistrBC  distr;
-        
-        distr.distribute( nprocs, bct->root(), nullptr );
-    }
-    
-    if (( pid == 0 ) && verbose( 3 ))
-    {
-        TPSBlockClusterVis   bc_vis;
-        
-        bc_vis.id( true ).procs( false ).print( bct->root(), "tlrmpi_bct" );
-        bc_vis.id( false ).procs( true ).print( bct->root(), "tlrmpi_bct_distr" );
-    }// if
-    
-    auto  A = problem->build_matrix( bct.get(), fixed_rank( k ) );
-    
-    auto  toc = Time::Wall::since( tic );
-    
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
-    
-    if ( verbose( 3 ) )
-    {
-        TPSMatrixVis  mvis;
-    
-        mvis.svd( false ).id( true ).print( A.get(), to_string( "tlrmpi_A_%03d", pid ) );
-    }// if
-    
-    {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
-        
-        auto  C = A->copy();
-        
-        tic = Time::Wall::now();
-        
-        TLR::MPI::lu< HLIB::real >( C.get(), fixed_rank( k ) );
-        
-        toc = Time::Wall::since( tic );
-        
-        std::cout << "    done in " << toc << std::endl;
-
-        // compare with otherwise computed result
-        auto  D  = read_matrix( "LU.hm" );
-        auto  BC = ptrcast( C.get(), TBlockMatrix );
-        auto  BD = ptrcast( D.get(), TBlockMatrix );
-        bool  correct = true;
-        
-        D->set_procs( ps_single( pid ), recursive );
-        
-        for ( uint i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint j = 0; j < BC->nblock_cols(); ++j )
-            {
-                if ( ! is_ghost( BC->block( i, j ) ) )
-                {
-                    const auto  f = diff_norm_F( BD->block( i, j ), BC->block( i, j ) );
-
-                    if ( f > 1e-10 )
-                    {
-                        DBG::printf( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BC->block( i, j ) ) );
-                        correct = false;
-                    }// if
-                }// if
-            }// for
-        }// for
-
-        if ( correct )
-            std::cout << "    no error" << std::endl;
-        
-        // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
-        
-        // std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-    }
-}
-
-int
-main ( int argc, char ** argv )
-{
-    // init MPI before anything else
-    mpi::environment   env{ argc, argv };
-    mpi::communicator  world;
-    const auto         pid    = world.rank();
-    const auto         nprocs = world.size();
-    
-    // redirect output for all except proc 0
-    unique_ptr< RedirectOutput >  redir_out = ( pid != 0
-                                                ? make_unique< RedirectOutput >( to_string( "tlrmpi_%03d.out", pid ) )
-                                                : nullptr );
-
-    parse_cmdline( argc, argv );
-    
-    try
-    {
-        INIT();
-
-        // adjust HLIB network data
-        NET::set_nprocs( nprocs );
-        NET::set_pid( pid );
-    
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
-                  << "    CPU cores : " << Mach::cpuset() << std::endl;
-        
-        CFG::set_verbosity( verbosity );
-
-        if ( nthreads != 0 )
-            CFG::set_nthreads( nthreads );
-
-        mymain( argc, argv );
-
-        DONE();
-    }// try
-    catch ( char const *  e ) { std::cout << e << std::endl; }
-    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
-
-    return 0;
-}
+#include "tlr-mpi-main.inc"
