@@ -10,9 +10,6 @@
 
 #include <vector>
 
-namespace HLIB
-{
-
 template < typename T >
 struct tensor2
 {
@@ -126,7 +123,5 @@ public:
     const value_type  operator ()  ( const size_type  i, const size_type  j, const size_type  k ) const { return data[ (k*dim1 + j)*dim0 + i ]; }
     value_type &      operator ()  ( const size_type  i, const size_type  j, const size_type  k )       { return data[ (k*dim1 + j)*dim0 + i ]; }
 };
-         
-}// namespace HLIB
 
 #endif   // __HLIB_TENSOR_HH

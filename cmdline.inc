@@ -22,6 +22,7 @@ size_t  n         = 1024;
 size_t  ntile     = 128;
 size_t  k         = 16;
 string  appl      = "logkernel";
+string  distr     = "cyclic2d";
 uint    nthreads  = 0;
 uint    verbosity = 1;
 
@@ -42,6 +43,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "app",         value<string>(), ": application type (logkernel,matern)" )
+        ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
@@ -84,6 +86,10 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "ntile"     ) ) ntile     = vm["ntile"].as<int>();
     if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();
     if ( vm.count( "app"       ) ) appl      = vm["app"].as<string>();
+    if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
+
+    assert( ( appl == "logkernel" ) || ( appl == "matern" ) );
+    assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }
 
 #endif // __HLR_CMDLINE_INC

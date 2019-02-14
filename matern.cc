@@ -60,7 +60,8 @@ Problem::build_matrix ( const TBlockClusterTree *  bct,
     TPermCoeffFn< real_t >        coefffn( & matern_coeff, bct->row_ct()->perm_i2e(), bct->row_ct()->perm_i2e() );
     TACAPlus< real_t >            aca( & coefffn );
     TDenseMBuilder< real_t >      h_builder( & coefffn, & aca );
-    TPSMatrixVis                  mvis;
+    
+    h_builder.set_build_ghosts( true );
     
     return h_builder.build( bct, unsymmetric, acc );
 }

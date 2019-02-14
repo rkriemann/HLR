@@ -15,6 +15,7 @@ syntax: glob
 *.out
 *.log
 *.hm
+*.vtk
 
 .hlibpro.conf
 hlibpro
@@ -27,8 +28,9 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^((hodlr|tlr)-(seq|omp|tbb|tf|hpx|mpi))$
+^((hodlr|tlr|tiledh)-(seq|omp|tbb|tf|hpx|mpi))$
 ^tlr-mpi-(bcast|ibcast|rdma)$
+^tiledh-mpi-(bcast|ibcast|rdma)$
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

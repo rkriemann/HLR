@@ -20,7 +20,6 @@ using namespace std;
 #include "cmdline.inc"
 #include "problem.inc"
 #include "tlr.hh"
-#include "tlr.inc"
 #include "tlr-mpi.inc"
 #include "tensor.hh"
 #include "RedirectOutput.hh"

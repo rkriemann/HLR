@@ -11,7 +11,6 @@
 
 #include "common.inc"
 #include "tlr.hh"
-#include "tlr.inc"
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -29,9 +28,6 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
-    
     if ( is_blocked( A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );

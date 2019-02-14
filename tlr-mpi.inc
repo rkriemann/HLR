@@ -1,4 +1,5 @@
 #include "tensor.hh"
+#include "tools.hh"
 
 namespace TLR
 {
@@ -9,25 +10,6 @@ namespace MPI
 typeid_t  type_dense, type_lr, type_ghost;
 double    time_mpi = 0;
 int       RANK     = 0;
-
-//
-// simplifies test if <val> is in <cont>
-//
-template < typename T_container >
-bool
-contains ( T_container const &                    cont,
-           typename T_container::const_reference  val )
-{
-    for ( const auto &  c : cont )
-    {
-        if ( c == val )
-            return true;
-    }// for
-
-    return false;
-    
-    return std::find( cont.begin(), cont.end(), val ) != cont.end();
-}
 
 std::unique_ptr< TMatrix >
 create_matrix ( const TMatrix *  A,

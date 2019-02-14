@@ -30,14 +30,20 @@ if not fullmsg :
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
-common = env.StaticLibrary( 'common', [ 'logkernel.cc', 'matern.cc', 'tlr.cc', 'hodlr.cc' ] )
+common = env.StaticLibrary( 'common', [ 'logkernel.cc',
+                                        'matern.cc',
+                                        'tlr.cc',
+                                        'hodlr.cc',
+                                        'tiledh.cc',
+                                        'distr.cc' ] )
 
 #
 # default C++ environment
 #
 
-env.Program( 'tlr-seq',   [ 'tlr-seq.cc' ] )
-env.Program( 'hodlr-seq', [ 'hodlr-seq.cc' ] )
+env.Program( 'tlr-seq.cc' )
+env.Program( 'hodlr-seq.cc' )
+env.Program( 'tiledh-seq.cc' )
 
 #
 # OpenMP
@@ -47,8 +53,8 @@ omp = env.Clone()
 omp.Append( CXXFLAGS  = "-fopenmp" )
 omp.Append( LINKFLAGS = "-fopenmp" )
 
-omp.Program( 'tlr-omp',   [ 'tlr-omp.cc' ] )
-omp.Program( 'hodlr-omp', [ 'hodlr-omp.cc' ] )
+omp.Program( 'tlr-omp.cc' )
+omp.Program( 'hodlr-omp.cc' )
 
 #
 # TBB
@@ -56,8 +62,9 @@ omp.Program( 'hodlr-omp', [ 'hodlr-omp.cc' ] )
 
 tbb = env.Clone()
 
-tbb.Program( 'tlr-tbb',   [ 'tlr-tbb.cc' ] )
-tbb.Program( 'hodlr-tbb', [ 'hodlr-tbb.cc' ] )
+tbb.Program( 'tlr-tbb.cc' )
+tbb.Program( 'hodlr-tbb.cc' )
+tbb.Program( 'tiledh-tbb.cc' )
 
 #
 # MPI
@@ -72,6 +79,8 @@ mpi.Program( 'tlr-mpi-bcast.cc' )
 mpi.Program( 'tlr-mpi-ibcast.cc' )
 mpi.Program( 'tlr-mpi-rdma.cc' )
 
+mpi.Program( 'tiledh-mpi-bcast.cc' )
+
 #
 # HPX
 #
@@ -80,8 +89,8 @@ hpx = env.Clone()
 hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
 hpx.MergeFlags( "-lhpx_iostreams" )
 
-hpx.Program( 'tlr-hpx',   [ 'tlr-hpx.cc' ] )
-hpx.Program( 'hodlr-hpx', [ 'hodlr-hpx.cc' ] )
+hpx.Program( 'tlr-hpx.cc' )
+hpx.Program( 'hodlr-hpx.cc' )
 
 #
 # TaskFlow
@@ -90,5 +99,5 @@ hpx.Program( 'hodlr-hpx', [ 'hodlr-hpx.cc' ] )
 tf = env.Clone()
 tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
 
-tf.Program( 'tlr-tf',   [ 'tlr-tf.cc' ] )
-tf.Program( 'hodlr-tf', [ 'hodlr-tf.cc' ] )
+tf.Program( 'tlr-tf.cc' )
+tf.Program( 'hodlr-tf.cc' )

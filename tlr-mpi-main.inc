@@ -2,6 +2,8 @@
 
 namespace fs = boost::filesystem;
 
+#include "distr.hh"
+
 //
 // main function
 //
@@ -16,12 +18,9 @@ mymain ( int argc, char ** argv )
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
     auto [ ct, bct ] = TLR::cluster( coord.get(), ntile );
-    
-    {
-        TBlockCyclicDistrBC  distr;
-        
-        distr.distribute( nprocs, bct->root(), nullptr );
-    }
+
+    // assign blocks to nodes
+    distribution::cyclic_2d( nprocs, bct->root() );
     
     if (( pid == 0 ) && verbose( 3 ))
     {
