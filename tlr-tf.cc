@@ -93,7 +93,7 @@ lu ( TBlockMatrix *     A,
                                                        {
                                                            TScopedLock  lock( *A_jl );
                                                            
-                                                           TLR::update< value_t >( A_ji, A_il, A_jl, acc );
+                                                           multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc );
                                                        } );
                 has_u_task(i,j,l) = true;
                 

@@ -12,6 +12,7 @@
 
 #include "cmdline.inc"
 #include "problem.inc"
+#include "multiply.hh"
 #include "tlr.hh"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@ lu ( TBlockMatrix *     A,
                         auto  A_il = A->block( i, l );
                         auto  A_jl = A->block( j, l );
                                        
-                        tb.run( [A_ji,A_il,A_jl,&acc] { TLR::update< value_t >( A_ji, A_il, A_jl, acc ); } );
+                        tb.run( [A_ji,A_il,A_jl,&acc] { multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc ); } );
                     }// for
                 }// for
             } );

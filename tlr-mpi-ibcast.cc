@@ -19,6 +19,7 @@ using namespace std;
 
 #include "cmdline.inc"
 #include "problem.inc"
+#include "multiply.hh"
 #include "tlr.hh"
 #include "tlr-mpi.inc"
 #include "tensor.hh"
@@ -322,7 +323,7 @@ lu ( TBlockMatrix *     A,
                             // finally compute update
                             //
                     
-                            update< value_t >( row_i[j], col_i[l], A_jl, acc );
+                            multiply< value_t >( value_t(-1), row_i[j], col_i[l], A_jl, acc );
                         }// if
                     }// for
                 }// for

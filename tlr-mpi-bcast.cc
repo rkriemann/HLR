@@ -18,6 +18,7 @@ using namespace std;
 
 #include "cmdline.inc"
 #include "problem.inc"
+#include "multiply.hh"
 #include "tlr.hh"
 #include "tlr-mpi.inc"
 #include "tensor.hh"
@@ -258,7 +259,7 @@ lu ( TBlockMatrix *     A,
                         const auto  p_jl = A_jl->procs().master();
                         
                         if ( pid == p_jl )
-                            update< value_t >( A_ji, A_il, A_jl, acc );
+                            multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc );
                     }// for
                 }// for
             } );

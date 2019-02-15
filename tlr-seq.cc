@@ -51,7 +51,7 @@ lu ( TMatrix *          A,
             {
                 for ( uint  l = i+1; l < nbc; ++l )
                 {
-                    update< value_t >( BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
+                    multiply< value_t >( value_t(-1), BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
                 }// for
             }// for
         }// for

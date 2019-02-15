@@ -56,7 +56,7 @@ lu ( TMatrix *          A,
                                    {
                                        for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
                                        {
-                                           update< value_t >( BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
+                                           multiply< value_t >( value_t(-1), BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
                                        }// for
                                    }// for
                                } );
