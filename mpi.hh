@@ -68,6 +68,12 @@ public:
         mpi_request = req;
         return *this;
     }
+
+    ~request ()
+    {
+        if ( mpi_request != MPI_REQUEST_NULL )
+            wait();
+    }
     
     // access MPI communicator
     operator MPI_Request () const { return mpi_request; }
@@ -78,6 +84,7 @@ public:
     {
         MPI_CHECK_RESULT( MPI_Wait,
                           ( & mpi_request, MPI_STATUSES_IGNORE ) );
+        mpi_request = MPI_REQUEST_NULL;
     }
 };
 

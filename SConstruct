@@ -80,6 +80,7 @@ mpi.Program( 'tlr-mpi-ibcast.cc' )
 mpi.Program( 'tlr-mpi-rdma.cc' )
 
 mpi.Program( 'tiledh-mpi-bcast.cc' )
+mpi.Program( 'tiledh-mpi-ibcast.cc' )
 
 #
 # HPX
