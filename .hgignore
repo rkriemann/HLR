@@ -12,10 +12,12 @@ syntax: glob
 *.pdb
 .gdb_history
 *.eps
+*.pdf
 *.out
 *.log
 *.hm
 *.vtk
+*.dot
 
 .hlibpro.conf
 hlibpro
@@ -28,7 +30,7 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^((hodlr|tlr|tiledh)-(seq|omp|tbb|tf|hpx|mpi))$
+^((hodlr|tlr|tiledh|dag)-(seq|omp|tbb|tf|hpx|mpi))$
 ^tlr-mpi-(bcast|ibcast|rdma)$
 ^tiledh-mpi-(bcast|ibcast|rdma)$
 

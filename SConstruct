@@ -34,9 +34,14 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc',
                                         'matern.cc',
                                         'tlr.cc',
                                         'hodlr.cc',
+                                        'stdh.cc',
                                         'tiledh.cc',
                                         'distr.cc',
-                                        'dag.cc' ] )
+                                        'dag/Node.cc',
+                                        'dag/Graph.cc',
+                                        'dag/seq_run.cc',
+                                        'dag/tbb_run.cc',
+                                        'dag/lu.cc' ] )
 
 #
 # default C++ environment
@@ -45,6 +50,7 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc',
 env.Program( 'tlr-seq.cc' )
 env.Program( 'hodlr-seq.cc' )
 env.Program( 'tiledh-seq.cc' )
+env.Program( 'dag-seq.cc' )
 
 #
 # OpenMP

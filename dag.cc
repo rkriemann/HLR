@@ -849,28 +849,4 @@ Graph::test ()
             succ->inc_dep_cnt();
 }
 
-// // try to reduce number of edges
-// void
-// Graph::sparsify ()
-// {
-//     // now test reachability
-//     for ( auto  node : _nodes )
-//     {
-//         auto  descendants = reachable_indirect( node, {}, 4 );
-
-//         // if a direct edge to otherwise reachable node exists, remove it
-//         for ( auto  succ_iter = node->successors().begin(); succ_iter != node->successors().end(); )
-//         {
-//             if ( descendants.find( *succ_iter ) != descendants.end() )
-//             {
-//                 LOG( "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
-//                 (*succ_iter)->dec_dep_cnt();
-//                 succ_iter = node->successors().erase( succ_iter );
-//             }// if
-//             else
-//                 ++succ_iter;
-//         }// for
-//     }// for
-// }
-
 }// namespace DAG

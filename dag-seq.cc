@@ -1,0 +1,78 @@
+//
+// Project     : HLib
+// File        : tlr-seq.cc
+// Description : Implements sequential TLR arithmetic
+// Author      : Ronald Kriemann
+// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+//
+
+#include "common.inc"
+#include "dag.hh"
+#include "stdh.hh"
+
+//
+// main function
+//
+void
+mymain ( int argc, char ** argv )
+{
+    auto  tic        = Time::Wall::now();
+    auto  problem    = gen_problem();
+    auto  coord      = problem->build_coord( n );
+    auto [ ct, bct ] = StdH::cluster( coord.get(), ntile );
+    
+    if ( verbose( 3 ) )
+    {
+        TPSBlockClusterVis   bc_vis;
+        
+        bc_vis.id( true ).print( bct->root(), "bct" );
+    }// if
+    
+    auto  A   = problem->build_matrix( bct.get(), fixed_rank( k ) );
+    auto  toc = Time::Wall::since( tic );
+    
+    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
+    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    
+    
+    if ( verbose( 3 ) )
+    {
+        TPSMatrixVis  mvis;
+        
+        mvis.svd( false ).id( true ).print( A.get(), "A" );
+    }// if
+    
+    {
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG SEQ )" << term::reset << std::endl;
+        
+        auto  C = A->copy();
+        
+        tic = Time::Wall::now();
+
+        auto  dag = ::DAG::LU::gen_dag( C.get() );
+        
+        toc = Time::Wall::since( tic );
+
+        if ( verbose( 2 ) )
+        {
+            std::cout << "  dag in      " << toc << std::endl;
+            std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
+            std::cout << "    #edges  = " << dag.nedges() << std::endl;
+        }// if
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "lu.dot" );
+
+        tic = Time::Wall::now();
+        
+        ::DAG::SEQ::run( dag, fixed_rank( k ) );
+        
+        toc = Time::Wall::since( tic );
+        
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+    }
+
+}
