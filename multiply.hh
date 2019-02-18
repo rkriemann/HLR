@@ -107,7 +107,7 @@ multiply ( const value_t            alpha,
            const HLIB::TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
-        HLIB::DBG::printf( "multiplyd( %d, %d, %d )", A->id(), B->id(), C->id() );
+        HLIB::DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
     
     // C = C + U(A) ( V(A)^H U(B) ) V(B)^H
     auto  T  = HLIB::BLAS::prod( value_t(1), HLIB::BLAS::adjoint( HLIB::blas_mat_B< value_t >( A ) ), HLIB::blas_mat_A< value_t >( B ) );
@@ -125,7 +125,7 @@ multiply ( const value_t               alpha,
            const HLIB::TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
-        HLIB::DBG::printf( "multiplyd( %d, %d, %d )", A->id(), B->id(), C->id() );
+        HLIB::DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
     
     // C = C + ( A U(B) ) V(B)^H
     auto  AU = HLIB::BLAS::prod( value_t(1), HLIB::blas_mat< value_t >( A ), HLIB::blas_mat_A< value_t >( B ) );
@@ -142,7 +142,7 @@ multiply ( const value_t               alpha,
            const HLIB::TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
-        HLIB::DBG::printf( "multiplyd( %d, %d, %d )", A->id(), B->id(), C->id() );
+        HLIB::DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
     
     // C = C + U(A) ( V(A)^H B )
     auto  VB = HLIB::BLAS::prod( value_t(1), HLIB::BLAS::adjoint( HLIB::blas_mat_B< value_t >( A ) ), HLIB::blas_mat< value_t >( B ) );
@@ -159,7 +159,7 @@ multiply ( const value_t               alpha,
            const HLIB::TTruncAcc & )
 {
     if ( HLIB::verbose( 4 ) )
-        HLIB::DBG::printf( "multiplyd( %d, %d, %d )", A->id(), B->id(), C->id() );
+        HLIB::DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
     
     // C = C + A B
     HLIB::BLAS::prod( alpha, HLIB::blas_mat< value_t >( A ), HLIB::blas_mat< value_t >( B ), value_t(1), HLIB::blas_mat< value_t >( C ) );

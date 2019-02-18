@@ -35,7 +35,8 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc',
                                         'tlr.cc',
                                         'hodlr.cc',
                                         'tiledh.cc',
-                                        'distr.cc' ] )
+                                        'distr.cc',
+                                        'dag.cc' ] )
 
 #
 # default C++ environment
