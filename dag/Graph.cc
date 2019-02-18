@@ -235,7 +235,7 @@ refine ( Node *  root )
                 LOCK( mtx_sub );
                 subnodes.push_back( node );
             }// if
-            else                            // neither node nore dependencies have changed: will not be touched
+            else                            // neither node nor dependencies have changed: will not be touched
             { 
                 LOCK( mtx_tasks );
                 tasks.push_back( node );
@@ -246,7 +246,7 @@ refine ( Node *  root )
         {
             for ( auto  node : nodes ) node_refine( node );      // first refine nodes
             for ( auto  node : nodes ) node_refine_deps( node ); // then refine dependencies between sub nodes
-            for ( auto  node : nodes ) node_collect( node );     // collect new (and delete refined) nodes
+            for ( auto  node : nodes ) node_collect( node );     // collect new nodes
             for ( auto  node : nodes ) node_delete( node );      // delete all refined nodes
                                                                  // (only after "collect" since accessed in "collect>refine_deps")
         }// if
@@ -274,8 +274,6 @@ refine ( Node *  root )
     
     for ( auto  t : tasks )
     {
-        // t->dep_cnt = t->in.size();
-
         if ( t->dep_cnt() == 0 )
             start.push_back( t );
 
