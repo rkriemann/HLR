@@ -38,6 +38,11 @@ frameworks).
 Install the frameworks according to the corresponding installation
 instructions. 
 
+HLIBpro can be downloaded from hlibpro.com. Afterwards set the
+"prefix" variable in the file "bin/hlib-config" to the directory where
+you have installed HLIBpro and modify the call to "hlib-config" in the
+file SConstruct such that it points to the correct location.
+
 For MPI, it is assumed that at least MPI_THREAD_SERIALIZED is
 supported (optimal is MPI_THREAD_MULTIPLE).
 
