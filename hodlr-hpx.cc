@@ -56,14 +56,14 @@ addlr ( B::Matrix< value_t > &  U,
                             auto [ U01, V01 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
                                                                                { blas_mat_B< value_t >( A01 ), V1 },
                                                                                acc );
-                            A01->set_rank( U01, V01 );
+                            A01->set_lrmat( U01, V01 );
                         } );
         auto  task_10 = hpx::async( [&,A10] ()
                         {
                             auto [ U10, V10 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
                                                                                { blas_mat_B< value_t >( A10 ), V0 },
                                                                                acc );
-                            A10->set_rank( U10, V10 );
+                            A10->set_lrmat( U10, V10 );
                         } );
         auto  all = hpx::when_all( task_00, task_01, task_10, task_11 );
 

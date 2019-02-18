@@ -9,6 +9,7 @@
 //
 
 #include <list>
+#include <cassert>
 
 #include <blas/Matrix.hh>
 #include <blas/Algebra.hh>
@@ -72,8 +73,7 @@ truncate_svd ( const HLIB::BLAS::Matrix< T > &  A,
     using  value_t = T;
     using  real_t  = typename HLIB::real_type< value_t >::type_t;
 
-    if ( A.ncols() != B.ncols() )
-        HERROR( HLIB::ERR_MAT_SIZE, "(BLAS) truncate_svd", "rank in A and B differs" );
+    assert( A.ncols() == B.ncols() );
 
     const HLIB::idx_t  n     = HLIB::idx_t( A.nrows() );
     const HLIB::idx_t  m     = HLIB::idx_t( B.nrows() );
@@ -260,13 +260,7 @@ approx_sum_svd ( const std::list< HLIB::BLAS::Matrix< T > > &  U,
     // truncate and return result
     //
     
-    auto [ U_tr, V_tr ] = HLIB::BLAS::truncate2_svd( U_all, V_all, acc );
-
-    return { std::move( U_tr ), std::move( V_tr ) };
-
-    // HLIB::BLAS::truncate( U_all, V_all, acc );
-
-    // return { std::move( U_all ), std::move( V_all ) };
+    return LR::truncate_svd( U_all, V_all, acc );
 }
 
 }// namespace LR

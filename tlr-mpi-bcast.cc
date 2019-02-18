@@ -66,7 +66,7 @@ broadcast ( mpi::communicator &  comm,
         comm.broadcast( blas_mat_B< value_t >( R ).data(), R->ncols() * k, root_proc );
     }// if
     else
-        HERROR( ERR_MAT_TYPE, "broadcast", "" );
+        assert( false );
 
     auto  toc = Time::Wall::since( tic );
 
@@ -274,8 +274,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    if ( ! is_blocked( A ) )
-        HERROR( ERR_ARG, "", "" );
+    assert( is_blocked( A ) );
 
     lu< value_t >( ptrcast( A, TBlockMatrix ), acc );
 }

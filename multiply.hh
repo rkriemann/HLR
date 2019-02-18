@@ -32,7 +32,7 @@ multiply ( const value_t            alpha,
                                                    { HLIB::blas_mat_B< value_t >( C ), HLIB::blas_mat_B< value_t >( B ) },
                                                    acc );
         
-    C->set_rank( U, V );
+    C->set_lrmat( U, V );
 }
 
 template < typename value_t >
@@ -53,7 +53,7 @@ multiply ( const value_t               alpha,
                                                    { HLIB::blas_mat_B< value_t >( C ), VB },
                                                    acc );
         
-    C->set_rank( U, V );
+    C->set_lrmat( U, V );
 }
 
 template < typename value_t >
@@ -74,7 +74,7 @@ multiply ( const value_t               alpha,
                                                    { HLIB::blas_mat_B< value_t >( C ), HLIB::blas_mat_B< value_t >( B ) },
                                                    acc );
         
-    C->set_rank( U, V );
+    C->set_lrmat( U, V );
 }
 
 template < typename value_t >
@@ -95,7 +95,7 @@ multiply ( const value_t               alpha,
 
     auto [ U, V ] = LR::approx_svd< value_t >( AB, acc );
         
-    C->set_rank( U, V );
+    C->set_lrmat( U, V );
 }
 
 template < typename value_t >
@@ -182,7 +182,7 @@ multiply ( const value_t            alpha,
     if      ( HLIB::is_dense(   C ) ) multiply< value_t >( alpha, A, B, ptrcast( C, HLIB::TDenseMatrix ), acc );
     else if ( HLIB::is_lowrank( C ) ) multiply< value_t >( alpha, A, B, ptrcast( C, HLIB::TRkMatrix ),    acc );
     else
-        HERROR( HLIB::ERR_NOT_IMPL, "", "" );
+        assert( false );
 }
 
 template < typename value_t,
@@ -197,7 +197,7 @@ multiply ( const value_t            alpha,
     if      ( HLIB::is_dense(   B ) ) multiply< value_t, matrix1_t, HLIB::TDenseMatrix >( alpha, A, cptrcast( B, HLIB::TDenseMatrix ), C, acc );
     else if ( HLIB::is_lowrank( B ) ) multiply< value_t, matrix1_t, HLIB::TRkMatrix >(    alpha, A, cptrcast( B, HLIB::TRkMatrix ),    C, acc );
     else
-        HERROR( HLIB::ERR_NOT_IMPL, "", "" );
+        assert( false );
 }
 
 template < typename value_t >
@@ -211,7 +211,7 @@ multiply ( const value_t            alpha,
     if      ( HLIB::is_dense(   A ) ) multiply< value_t, HLIB::TDenseMatrix >( alpha, cptrcast( A, HLIB::TDenseMatrix ), B, C, acc );
     else if ( HLIB::is_lowrank( A ) ) multiply< value_t, HLIB::TRkMatrix >(    alpha, cptrcast( A, HLIB::TRkMatrix ),    B, C, acc );
     else
-        HERROR( HLIB::ERR_NOT_IMPL, "", "" );
+        assert( false );
 }
 
 #endif // __HLR_MULTIPLY_HH

@@ -185,26 +185,27 @@ private:
     // private functions used by above public wrappers
     //
     
-    virtual void  run_ ( const HLIB::TTruncAcc & )
-    {
-        HERROR( HLIB::ERR_NOT_IMPL, "", "" );
-    }
+    virtual
+    void
+    run_ ( const HLIB::TTruncAcc & ) = 0;
 
-    virtual const block_list_t  in_blocks_ () const
+    virtual
+    const block_list_t
+    in_blocks_ () const
     {
         return block_list_t();
     }
     
-    virtual const block_list_t  out_blocks_ () const
+    virtual
+    const block_list_t
+    out_blocks_ () const
     {
         return block_list_t();
     }
 
-    virtual void
-    refine_ ( node_list_t & )
-    {
-        HERROR( HLIB::ERR_NOT_IMPL, "", "" );
-    }
+    virtual
+    void
+    refine_ ( node_list_t & ) = 0;
 };
 
 //

@@ -82,7 +82,7 @@ setup_rdma ( mpi::communicator &  comm,
         wins[1].fence( MPI_MODE_NOPUT | MPI_MODE_NOPRECEDE );
     }// if
     else
-        HERROR( ERR_MAT_TYPE, "setup_rdma", "unsupported matrix type" );
+        assert( false );
 
     return wins;
 }
@@ -107,7 +107,7 @@ request_rdma ( std::vector< mpi::window > &  wins,
         reqs.push_back( rget( wins[1], blas_mat_B< value_t >( ptrcast( A, TRkMatrix ) ), root ) );
     }// if
     else
-        HERROR( ERR_MAT_TYPE, "request_rdma", "unsupported matrix type" );
+        assert( false );
 
     return reqs;
 }
@@ -420,8 +420,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    if ( ! is_blocked( A ) )
-        HERROR( ERR_ARG, "", "" );
+    assert( is_blocked( A ) );
 
     lu< value_t >( ptrcast( A, TBlockMatrix ), acc );
 }

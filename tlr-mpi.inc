@@ -17,13 +17,13 @@ create_matrix ( const TMatrix *  A,
                 const int        proc )
 {
     std::unique_ptr< TMatrix >  T;
+
+    assert(( type == type_dense ) || ( type == type_lr ));
     
     if ( type == type_dense )
         T = make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     else if ( type == type_lr )
         T = make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
-    else
-        HERROR( ERR_MAT_TYPE, "create_matrix", "" );
 
     T->set_id( A->id() );
     T->set_procs( ps_single( proc ) );

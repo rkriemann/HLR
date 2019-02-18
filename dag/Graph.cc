@@ -9,6 +9,7 @@
 #include <fstream>
 #include <deque>
 #include <unordered_set>
+#include <cassert>
 
 #include <tbb/mutex.h>
 #include <tbb/parallel_do.h>
@@ -173,9 +174,8 @@ Graph::test ()
 
             if ( nsuccs == 0 )
                 scheduled.push_front( succ );
-            
-            if ( nsuccs < 0 )
-                HERROR( ERR_CONSISTENCY, "test_dag", "negative deps in " + succ->to_string() );
+
+            assert( nsuccs >= 0 );
         }// for
     }// while
 
@@ -207,8 +207,7 @@ refine ( Node *  root )
     using  mutex_t       = tbb::mutex;
     using  scoped_lock_t = mutex_t::scoped_lock;
     
-    if ( root == nullptr )
-        HERROR( ERR_ARG, "refine", "root node is NULL" );
+    assert( root != nullptr );
     
     std::deque< Node * >  nodes;
     std::list< Node * >   tasks, start, end;

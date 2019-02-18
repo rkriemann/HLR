@@ -13,6 +13,8 @@ Clustering:
 
   - TLR:    BSP clustering with single level nxn block structure
   - HODLR:  off-diagonal admissibility with standard BSP clustering
+  - TiledH: flatten upper level of standard hierarchy to have nxn
+            blocks, each being an H-matrix
 
 Parallelization Frameworks:
 

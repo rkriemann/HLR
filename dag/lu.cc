@@ -7,6 +7,7 @@
 //
 
 #include <list>
+#include <cassert>
 
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
@@ -155,8 +156,7 @@ LUNode::refine_ ( list< Node * > &  subnodes )
             
             auto  A_ii  = B->block( i, i );
 
-            if ( A_ii == nullptr )
-                HERROR( ERR_NULL, "(LUNode) refine", "diagonal block is nullptr" );
+            assert( A_ii != nullptr );
 
             auto  lu_ii = ::DAG::alloc_node< LUNode >( subnodes, A_ii );
 
