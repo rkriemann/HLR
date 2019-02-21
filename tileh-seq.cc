@@ -8,6 +8,7 @@
 
 #include "common.inc"
 #include "tileh.hh"
+#include "matrixbuild.hh"
 
 namespace TileH
 {
@@ -75,7 +76,7 @@ mymain ( int argc, char ** argv )
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
     auto [ ct, bct ] = TileH::cluster( coord.get(), ntile, 4 );
-    
+
     if ( verbose( 3 ) )
     {
         TPSBlockClusterVis   bc_vis;

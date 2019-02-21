@@ -30,9 +30,9 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^((hodlr|tlr|tiledh|dag)-(seq|omp|tbb|tf|hpx|mpi))$
+^((hodlr|tlr|tileh|dag)-(seq|omp|tbb|tf|hpx|mpi))$
 ^tlr-mpi-(bcast|ibcast|rdma)$
-^tiledh-mpi-(bcast|ibcast|rdma)$
+^tileh-mpi-(bcast|ibcast|rdma)$
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

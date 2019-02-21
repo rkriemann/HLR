@@ -17,6 +17,8 @@ using namespace HLIB;
 
 using real_t = HLIB::real;
 
+#include "matrixbuild.hh"
+
 namespace LogKernel
 {
 
@@ -121,6 +123,10 @@ Problem::build_matrix ( const TBlockClusterTree *  bct,
     TACAPlus< real_t >            aca( & coefffn );
     TDenseMBuilder< real_t >      h_builder( & coefffn, & aca );
 
+    {
+        return  SEQ::build( bct->root(), coefffn, aca, acc );
+    }    
+    
     h_builder.set_build_ghosts( true );
     
     return h_builder.build( bct, unsymmetric, acc );
