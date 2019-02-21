@@ -1,7 +1,7 @@
 //
 // Project     : HLib
 // File        : th-mpi-bcast.cc
-// Description : Tiled-H arithmetic with MPI broadcast
+// Description : Tile-H arithmetic with MPI broadcast
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -23,35 +23,33 @@ using namespace std;
 #include "RedirectOutput.hh"
 #include "distr.hh"
 #include "tools.hh"
-#include "tiledh.hh"
+#include "tileh.hh"
 
-namespace TiledH
+namespace TileH
 {
 
 namespace MPI
 {
 
-#define LOG( verbosity, msg )  if ( HLIB::verbose( verbosity ) ) DBG::print( msg )
-
 double  time_mpi = 0;
 
-void
-broadcast ( mpi::communicator &  comm,
-            TByteStream &        bs,
-            const int            root_proc )
+mpi::request
+ibroadcast ( mpi::communicator &  comm,
+             TByteStream &        bs,
+             const int            root_proc )
 {
     // first exchange size information
     size_t  size = bs.size();
 
     comm.broadcast( size, root_proc );
 
-    LOG( 5, to_string( "bs size = %d", size ) );
+    log( 5, to_string( "bs size = %d", size ) );
     
     if ( bs.size() != size )
         bs.set_size( size );
 
     // then the actual data
-    comm.broadcast( bs.data(), size, root_proc );
+    return comm.ibroadcast( bs.data(), size, root_proc );
 }
 
 size_t  max_add_mem = 0;
@@ -65,7 +63,7 @@ lu ( TBlockMatrix *     A,
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    LOG( 4, to_string( "lu( %d )", A->id() ) );
+    log( 4, to_string( "lu( %d )", A->id() ) );
 
     auto  nbr = A->nblock_rows();
     auto  nbc = A->nblock_cols();
@@ -90,8 +88,8 @@ lu ( TBlockMatrix *     A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        LOG( 4, "────────────────────────────────────────────────" );
-        LOG( 4, to_string( "step %d", i ) );
+        log( 4, "────────────────────────────────────────────────" );
+        log( 4, to_string( "step %d", i ) );
         
         auto  A_ii = A->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -100,7 +98,7 @@ lu ( TBlockMatrix *     A,
         
         if ( pid == p_ii )
         {
-            LOG( 4, to_string( "lu( %d )", A_ii->id() ) );
+            log( 4, to_string( "lu( %d )", A_ii->id() ) );
             HLIB::LU::factorise_rec( A_ii, acc );
         }// if
 
@@ -110,15 +108,14 @@ lu ( TBlockMatrix *     A,
             // broadcast diagonal block
             //
 
-            auto  tic = Time::Wall::now();
-            
             unique_ptr< TMatrix >  T_ii;        // temporary storage with auto-delete
             TMatrix *              H_ii = A_ii; // handle for A_ii/T_ii
             TByteStream            bs;
+            mpi::request           col_req_ii, row_req_ii;
 
             if ( pid == p_ii )
             {
-                LOG( 4, to_string( "serialization of %d ", A_ii->id() ) );
+                log( 4, to_string( "serialization of %d ", A_ii->id() ) );
                 
                 bs.set_size( A_ii->bs_size() );
                 A_ii->write( bs );
@@ -127,37 +124,42 @@ lu ( TBlockMatrix *     A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                LOG( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( col_procs[i] ) );
-                broadcast( col_comms[i], bs, col_maps[i][p_ii] );
+                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( col_procs[i] ) );
+                col_req_ii = ibroadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                LOG( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( row_procs[i] ) );
-                broadcast( row_comms[i], bs, row_maps[i][p_ii] );
+                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( row_procs[i] ) );
+                row_req_ii = ibroadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
-            
-            // and reconstruct matrix
-            if ( pid != p_ii )
-            {
-                LOG( 4, to_string( "construction of %d ", A_ii->id() ) );
-                
-                TBSHMBuilder  bs_hbuild;
-
-                T_ii = bs_hbuild.build( bs );
-                T_ii->set_procs( ps_single( pid ) );
-                H_ii = T_ii.get();
-
-                add_mem += H_ii->bs_size();
-            }// if
-            
-            auto  toc = Time::Wall::since( tic );
-
-            time_mpi += toc.seconds();
             
             //
             // off-diagonal solves
             //
+
+            bool  recv_ii = false;
+
+            auto  wait_ii =
+                [&,A_ii,i,pid] ()
+                {
+                    if ( ! recv_ii )
+                    {
+                        log( 4, to_string( "construction of %d ", A_ii->id() ) );
+
+                        if ( contains( col_procs[i], pid ) ) col_req_ii.wait();
+                        else                                 row_req_ii.wait();
+                        
+                        TBSHMBuilder  bs_hbuild;
+
+                        T_ii    = bs_hbuild.build( bs );
+                        T_ii->set_procs( ps_single( pid ) );
+                        H_ii    = T_ii.get();
+                        recv_ii = true;
+                        
+                        add_mem += H_ii->bs_size();
+                    }// if
+                };
             
             for ( uint  j = i+1; j < nbr; ++j )
             {
@@ -169,7 +171,10 @@ lu ( TBlockMatrix *     A,
                 
                 if ( pid == p_ji )
                 {
-                    LOG( 4, to_string( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() ) );
+                    if ( pid != p_ii )
+                        wait_ii();
+            
+                    log( 4, to_string( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() ) );
                     solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
                 }// if
             }// for
@@ -184,7 +189,10 @@ lu ( TBlockMatrix *     A,
                 
                 if ( pid == p_il )
                 {
-                    LOG( 4, to_string( "solve_L( %d, %d )", H_ii->id(), A->block( i, l )->id() ) );
+                    if ( pid != p_ii )
+                        wait_ii();
+                    
+                    log( 4, to_string( "solve_L( %d, %d )", H_ii->id(), A->block( i, l )->id() ) );
                     solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
                 }// if
             }// for
@@ -194,10 +202,14 @@ lu ( TBlockMatrix *     A,
         // broadcast blocks in row/column for update phase
         //
 
+        vector< TByteStream >            row_i_bs( nbr );       // bytestreams for communication
+        vector< TByteStream >            col_i_bs( nbc );       // 
         vector< unique_ptr< TMatrix > >  row_i_mat( nbr );      // for autodeletion
         vector< unique_ptr< TMatrix > >  col_i_mat( nbc );
         vector< TMatrix * >              row_i( nbr, nullptr ); // matrix handles
         vector< TMatrix * >              col_i( nbc, nullptr );
+        vector< mpi::request >           row_reqs( nbr );       // holds MPI requests for matrices
+        vector< mpi::request >           col_reqs( nbc );
         
         for ( uint  j = i+1; j < nbr; ++j )
         {
@@ -207,32 +219,19 @@ lu ( TBlockMatrix *     A,
             // broadcast A_ji to all processors in row j
             if ( contains( row_procs[j], pid ) )
             {
-                TByteStream  bs;
-                
                 if ( pid == p_ji )
                 {
-                    LOG( 4, to_string( "serialisation of %d ", A_ji->id() ) );
+                    log( 4, to_string( "serialisation of %d ", A_ji->id() ) );
                     
-                    bs.set_size( A_ji->bs_size() );
-                    A_ji->write( bs );
+                    row_i_bs[j].set_size( A_ji->bs_size() );
+                    A_ji->write( row_i_bs[j] );
                     row_i[j] = A_ji;
                 }// if
                 
-                LOG( 4, to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + to_string( row_procs[j] ) );
-                
-                broadcast( row_comms[j], bs, row_maps[j][p_ji] );
+                log( 4, to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + to_string( row_procs[j] ) );
 
-                if ( pid != p_ji )
-                {
-                    LOG( 4, to_string( "construction of %d ", A_ji->id() ) );
-                    
-                    TBSHMBuilder  bs_hbuild;
-
-                    row_i_mat[j] = bs_hbuild.build( bs );
-                    row_i_mat[j]->set_procs( ps_single( pid ) );
-                    row_i[j]     = row_i_mat[j].get();
-                    add_mem     += row_i[j]->byte_size();
-                }// if
+                row_reqs[j] = ibroadcast( row_comms[j], row_i_bs[j], row_maps[j][p_ji] );
+                add_mem    += row_i_bs[j].size();
             }// if
         }
         
@@ -244,64 +243,90 @@ lu ( TBlockMatrix *     A,
             // broadcast A_il to all processors in column l
             if ( contains( col_procs[l], pid ) )
             {
-                TByteStream  bs;
-                
                 if ( pid == p_il )
                 {
-                    LOG( 4, to_string( "serialisation of %d ", A_il->id() ) );
+                    log( 4, to_string( "serialisation of %d ", A_il->id() ) );
                     
-                    bs.set_size( A_il->bs_size() );
-                    A_il->write( bs );
+                    col_i_bs[l].set_size( A_il->bs_size() );
+                    A_il->write( col_i_bs[l] );
                     col_i[l] = A_il;
                 }// if
                 
-                LOG( 4, to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + to_string( col_procs[l] ) );
+                log( 4, to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + to_string( col_procs[l] ) );
                 
-                broadcast( col_comms[l], bs, col_maps[l][p_il] );
-
-                if ( pid != p_il )
-                {
-                    LOG( 4, to_string( "construction of %d ", A_il->id() ) );
-                    
-                    TBSHMBuilder  bs_hbuild;
-
-                    col_i_mat[l] = bs_hbuild.build( bs );
-                    col_i_mat[l]->set_procs( ps_single( pid ) );
-                    col_i[l]     = col_i_mat[l].get();
-                    add_mem     += col_i[l]->byte_size();
-                }// if
+                col_reqs[l] = ibroadcast( col_comms[l], col_i_bs[l], col_maps[l][p_il] );
+                add_mem    += col_i_bs[l].size();
             }// if
         }// for
-
-        max_add_mem = std::max( max_add_mem, add_mem );
         
         //
         // update of trailing sub-matrix
         //
         
+        vector< bool >   row_done( nbr, false );  // signals finished broadcast
+        vector< bool >   col_done( nbc, false );
+
         for ( uint  j = i+1; j < nbr; ++j )
         {
-            const auto  A_ji = row_i[j];
+            const auto  p_ji = A->block( j, i )->procs().master();
             
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                const auto  A_il = col_i[l];
-                
-                //
-                // update local matrix block
-                //
+                const auto  p_il = A->block( i, l )->procs().master();
                 
                 auto        A_jl = A->block( j, l );
                 const auto  p_jl = A_jl->procs().master();
                 
                 if ( pid == p_jl )
                 {
-                    LOG( 4, to_string( "update of %d with %d × %d", A_jl->id(), A_ji->id(), A_il->id() ) );
+                    //
+                    // ensure broadcasts fir A_ji and A_il have finished
+                    //
                     
-                    multiply( -1.0, A_ji, A_il, 1.0, A_jl, acc );
+                    if (( p_ji != pid ) && ! row_done[j] )
+                    {
+                        // DBG::printf( "waiting for %d", A->block(j,i)->id() );
+                        row_reqs[j].wait();
+                        
+                        log( 4, to_string( "construction of %d ", A->block( j, i )->id() ) );
+                        
+                        TBSHMBuilder  bs_hbuild;
+                        
+                        row_i_mat[j] = bs_hbuild.build( row_i_bs[j] );
+                        row_i_mat[j]->set_procs( ps_single( pid ) );
+                        row_i[j]     = row_i_mat[j].get();
+                        row_done[j]  = true;
+                        add_mem     += row_i[j]->byte_size();
+                    }// if
+
+                    if (( p_il != pid ) && ! col_done[l] )
+                    {
+                        // DBG::printf( "waiting for %d", A->block(i,l)->id() );
+                        col_reqs[l].wait();
+
+                        log( 4, to_string( "construction of %d ", A->block( i, l )->id() ) );
+                    
+                        TBSHMBuilder  bs_hbuild;
+
+                        col_i_mat[l] = bs_hbuild.build( col_i_bs[l] );
+                        col_i_mat[l]->set_procs( ps_single( pid ) );
+                        col_i[l]     = col_i_mat[l].get();
+                        col_done[l]  = true;
+                        add_mem     += col_i[l]->byte_size();
+                    }// if
+
+                    //
+                    // update local matrix block
+                    //
+                
+                    log( 4, to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
+                    
+                    multiply( -1.0, row_i[j], col_i[l], 1.0, A_jl, acc );
                 }// if
             }// for
         }// for
+
+        max_add_mem = std::max( max_add_mem, add_mem );
     }// for
 
     std::cout << "  time in MPI : " << format( "%.2fs" ) % time_mpi << std::endl;
@@ -320,7 +345,7 @@ lu ( TMatrix *          A,
 
 }// namespace MPI
 
-}// namespace TiledH
+}// namespace TileH
 
 //
 // main function
@@ -335,7 +360,7 @@ mymain ( int argc, char ** argv )
     auto  tic        = Time::Wall::now();
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = TiledH::cluster( coord.get(), ntile, nprocs );
+    auto [ ct, bct ] = TileH::cluster( coord.get(), ntile, nprocs );
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) distribution::cyclic_2d( nprocs, bct->root() );
@@ -364,13 +389,13 @@ mymain ( int argc, char ** argv )
     }// if
 
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tiled-H MPI )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tile-H MPI )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
         
-        TiledH::MPI::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        TileH::MPI::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         

@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : tiledh.cc
-// Description : common Tiled-H functions
+// File        : tileh.cc
+// Description : common Tile-H functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -13,9 +13,9 @@
 #include <cluster/TBCBuilder.hh>
 #include <cluster/TGeomAdmCond.hh>
 
-#include "tiledh.hh"
+#include "tileh.hh"
 
-namespace TiledH
+namespace TileH
 {
 
 using namespace HLIB;
@@ -109,7 +109,7 @@ cluster ( TCoordinate *  coords,
 
     auto  ct = ct_builder.build( coords );
 
-    // flatten top levels to set up Tiled-H
+    // flatten top levels to set up Tile-H
     flatten( ct->root(), std::max<uint>( 3, std::ceil( std::log2( nprocs )+1 ) ) );
     
     TWeakStdGeomAdmCond  adm_cond;
@@ -120,4 +120,4 @@ cluster ( TCoordinate *  coords,
     return { std::move( ct ), std::move( bct ) };
 }
 
-}// namespace TiledH
+}// namespace TileH

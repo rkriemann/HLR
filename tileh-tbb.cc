@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : tiledh-tbb.cc
-// Description : Tiled-H arithmetic with TBB
+// File        : tileh-tbb.cc
+// Description : Tile-H arithmetic with TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -11,9 +11,9 @@
 #include <tbb/blocked_range2d.h>
 
 #include "common.inc"
-#include "tiledh.hh"
+#include "tileh.hh"
 
-namespace TiledH
+namespace TileH
 {
 
 namespace TBB
@@ -84,7 +84,7 @@ lu ( TMatrix *          A,
 
 }// namespace TBB
 
-}// namespace TILEDH
+}// namespace TILEH
 
 //
 // main function
@@ -95,7 +95,7 @@ mymain ( int argc, char ** argv )
     auto  tic        = Time::Wall::now();
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = TiledH::cluster( coord.get(), ntile, 4 );
+    auto [ ct, bct ] = TileH::cluster( coord.get(), ntile, 4 );
     
     if ( verbose( 3 ) )
     {
@@ -114,17 +114,17 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "tiledh_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "tileh_A" );
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tiled-H TBB )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tile-H TBB )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
         
-        TiledH::TBB::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        TileH::TBB::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         

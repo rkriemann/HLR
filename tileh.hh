@@ -1,9 +1,9 @@
-#ifndef __HLR_TILEDH_HH
-#define __HLR_TILEDH_HH
+#ifndef __HLR_TILEH_HH
+#define __HLR_TILEH_HH
 //
 // Project     : HLib
-// File        : tiledh.hh
-// Description : common Tiled-H functions
+// File        : TileH.hh
+// Description : common Tile-H functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -14,7 +14,7 @@
 #include <cluster/TClusterTree.hh>
 #include <cluster/TBlockClusterTree.hh>
 
-namespace TiledH
+namespace TileH
 {
 
 //
@@ -33,6 +33,6 @@ cluster ( HLIB::TCoordinate *  coords,
           const size_t         ntile,
           const int            nprocs );
 
-}// namespace TiledH
+}// namespace TileH
 
-#endif // __HLR_TILEDH_HH
+#endif // __HLR_TILEH_HH

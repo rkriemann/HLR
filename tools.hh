@@ -8,7 +8,22 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <iostream>
 #include <sstream>
+
+#include <base/config.hh>
+
+//
+// logging function
+//
+template < typename msg_t >
+void
+log ( const int      lvl,
+      const msg_t &  msg )
+{
+    if ( HLIB::verbose( lvl ) )
+        std::cout << msg << std::endl;
+}
 
 //
 // simplifies test if <val> is in <cont>

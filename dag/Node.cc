@@ -10,15 +10,13 @@
 #include <deque>
 #include <unordered_set>
 
+#include "../tools.hh"
 #include "Node.hh"
 
 namespace DAG
 {
 
 using namespace HLIB;
-
-// enables some debug output
-#define  LOG( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
 
 // controls edge sparsification
 const bool  sparsify = true;
@@ -63,7 +61,7 @@ Node::init ()
     _in_blk_deps  = in_blocks_();
     _out_blk_deps = out_blocks_();
 
-    LOG( 5, to_string() );
+    log( 5, to_string() );
 }
     
 //
@@ -72,7 +70,7 @@ Node::init ()
 void
 Node::run ( const TTruncAcc & acc )
 {
-    LOG( 4, "run( " + this->to_string() + " )" );
+    log( 4, "run( " + this->to_string() + " )" );
     
     run_( acc );
 }
@@ -84,7 +82,7 @@ Node::run ( const TTruncAcc & acc )
 void
 Node::refine ()
 {
-    LOG( 5, "refine( " + to_string() + " )" );
+    log( 5, "refine( " + to_string() + " )" );
 
     //
     // create subnodes
@@ -163,7 +161,7 @@ reachable_indirect ( Node *                                root,
 void
 Node::refine_sub_deps ()
 {
-    LOG( 5, "refine_sub_deps( " + to_string() + " )" );
+    log( 5, "refine_sub_deps( " + to_string() + " )" );
     
     if ( _sub_nodes.size() == 0 )
         return;
@@ -197,7 +195,7 @@ Node::refine_sub_deps ()
     for ( auto  node : locked )
     {
         node->lock();
-        LOG( 6, "locked: " + node->to_string() + " by " + this->to_string() );
+        log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
     }// for
                 
     //
@@ -214,7 +212,7 @@ Node::refine_sub_deps ()
                 {
                     if ( is_intersecting( node->out_blocks(), succ_sub->in_blocks() ) )
                     {
-                        LOG( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
+                        log( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
                         node->successors().push_back( succ_sub );
                     }// if
                 }// for
@@ -226,7 +224,7 @@ Node::refine_sub_deps ()
             {
                 if ( is_intersecting( node->out_blocks(), succ->in_blocks() ) )
                 {
-                    LOG( 6, node->to_string() + " ⟶ " + succ->to_string() );
+                    log( 6, node->to_string() + " ⟶ " + succ->to_string() );
                     node->successors().push_back( succ );
                 }// if
             }// for
@@ -266,7 +264,7 @@ Node::refine_sub_deps ()
             {
                 if ( descendants.find( *succ_iter ) != descendants.end() )
                 {
-                    LOG( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
+                    log( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
                     succ_iter = node->successors().erase( succ_iter );
                     // node->print();
                 }// if
@@ -293,7 +291,7 @@ Node::refine_sub_deps ()
     for ( auto  node : locked )
     {
         node->unlock();
-        LOG( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
+        log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
     }// for
 }
     
@@ -303,7 +301,7 @@ Node::refine_sub_deps ()
 bool
 Node::refine_deps ()
 {
-    LOG( 5, "refine_deps( " + to_string() + " )" );
+    log( 5, "refine_deps( " + to_string() + " )" );
 
     //
     // first lock all nodes
@@ -334,7 +332,7 @@ Node::refine_deps ()
     for ( auto  node : locked )
     {
         node->lock();
-        LOG( 6, "locked: " + node->to_string() + " by " + this->to_string() );
+        log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
     }// for
 
     //
@@ -354,7 +352,7 @@ Node::refine_deps ()
             // insert succendencies for subnodes (intersection test neccessary???)
             for ( auto  succ_sub : (*succ)->sub_nodes() )
             {
-                LOG( 6, to_string() + " ⟶ " + succ_sub->to_string() );
+                log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
                 new_out.push_back( succ_sub );
             }// for
 
@@ -391,7 +389,7 @@ Node::refine_deps ()
         {
             if ( descendants.find( *succ_iter ) != descendants.end() )
             {
-                LOG( 6, "  removing " + to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + to_string() );
+                log( 6, "  removing " + to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + to_string() );
                 succ_iter = successors().erase( succ_iter );
                 // node->print();
             }// if
@@ -407,7 +405,7 @@ Node::refine_deps ()
     for ( auto  node : locked )
     {
         node->unlock();
-        LOG( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
+        log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
     }// for
     
     return changed;

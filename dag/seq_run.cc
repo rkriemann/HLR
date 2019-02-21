@@ -18,9 +18,6 @@ namespace DAG
 namespace SEQ
 {
 
-// enables some debug output
-#define  LOG( lvl, msg )  if ( HLIB::verbose( lvl ) ) HLIB::DBG::print( msg )
-
 //
 // execute DAG <dag>
 //
@@ -38,7 +35,7 @@ run ( Graph &                  dag,
     {
         auto  t = behead( worklist );
 
-        LOG( 4, t->to_string() );
+        log( 4, t->to_string() );
         
         t->run( acc );
 

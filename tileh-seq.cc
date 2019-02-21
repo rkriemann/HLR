@@ -1,15 +1,15 @@
 //
 // Project     : HLib
-// File        : tiledh-seq.cc
-// Description : sequential Tiled-H arithmetic
+// File        : tileh-seq.cc
+// Description : sequential Tile-H arithmetic
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include "common.inc"
-#include "tiledh.hh"
+#include "tileh.hh"
 
-namespace TiledH
+namespace TileH
 {
 
 namespace SEQ
@@ -63,7 +63,7 @@ lu ( TMatrix *          A,
 
 }// namespace SEQ
 
-}// namespace TILEDH
+}// namespace TILEH
 
 //
 // main function
@@ -74,7 +74,7 @@ mymain ( int argc, char ** argv )
     auto  tic        = Time::Wall::now();
     auto  problem    = gen_problem();
     auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = TiledH::cluster( coord.get(), ntile, 4 );
+    auto [ ct, bct ] = TileH::cluster( coord.get(), ntile, 4 );
     
     if ( verbose( 3 ) )
     {
@@ -93,17 +93,17 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "tiledh_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "tileh_A" );
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tiled-H SEQ )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( Tile-H SEQ )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
         
-        TiledH::SEQ::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        TileH::SEQ::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         

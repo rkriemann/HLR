@@ -35,7 +35,7 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc',
                                         'tlr.cc',
                                         'hodlr.cc',
                                         'stdh.cc',
-                                        'tiledh.cc',
+                                        'tileh.cc',
                                         'distr.cc',
                                         'dag/Node.cc',
                                         'dag/Graph.cc',
@@ -49,7 +49,7 @@ common = env.StaticLibrary( 'common', [ 'logkernel.cc',
 
 env.Program( 'tlr-seq.cc' )
 env.Program( 'hodlr-seq.cc' )
-env.Program( 'tiledh-seq.cc' )
+env.Program( 'tileh-seq.cc' )
 env.Program( 'dag-seq.cc' )
 
 #
@@ -71,7 +71,7 @@ tbb = env.Clone()
 
 tbb.Program( 'tlr-tbb.cc' )
 tbb.Program( 'hodlr-tbb.cc' )
-tbb.Program( 'tiledh-tbb.cc' )
+tbb.Program( 'tileh-tbb.cc' )
 
 #
 # MPI
@@ -86,8 +86,8 @@ mpi.Program( 'tlr-mpi-bcast.cc' )
 mpi.Program( 'tlr-mpi-ibcast.cc' )
 mpi.Program( 'tlr-mpi-rdma.cc' )
 
-mpi.Program( 'tiledh-mpi-bcast.cc' )
-mpi.Program( 'tiledh-mpi-ibcast.cc' )
+mpi.Program( 'tileh-mpi-bcast.cc' )
+mpi.Program( 'tileh-mpi-ibcast.cc' )
 
 #
 # HPX

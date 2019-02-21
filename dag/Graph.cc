@@ -22,9 +22,6 @@ namespace DAG
 
 using namespace HLIB;
 
-// enables some debug output
-#define  LOG( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
-
 // abbrv. for locking
 #define  LOCK( mtx )  scoped_lock_t  lock( mtx )
 
@@ -164,7 +161,7 @@ Graph::test ()
     {
         auto  t = behead( scheduled );
 
-        // LOG::print( t->to_string() );
+        // log( 6, t->to_string() );
 
         executed.insert( t );
 
@@ -186,7 +183,7 @@ Graph::test ()
     for ( auto  node : _nodes )
     {
         if ( executed.find( node ) == executed.end() )
-            LOG::print( "  not executed : " + node->to_string() );
+            std::cout << "  not executed : " + node->to_string() << std::endl;
     }// for
     
     //
@@ -221,7 +218,7 @@ refine ( Node *  root )
 
         auto  node_refine      = []  ( Node * node ) { node->refine(); };
         auto  node_refine_deps = []  ( Node * node ) { node->refine_sub_deps(); };
-        auto  node_delete      = []  ( Node * node ) { if ( node->is_refined() ) { LOG( 5, "delete : " + node->to_string() ); delete node; } };
+        auto  node_delete      = []  ( Node * node ) { if ( node->is_refined() ) { log( 5, "delete : " + node->to_string() ); delete node; } };
         auto  node_collect     = [&] ( Node * node )
         {
             if ( node->is_refined() )       // node was refined; collect all subs

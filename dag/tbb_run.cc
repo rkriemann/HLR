@@ -53,7 +53,7 @@ namespace TBB
 {
 
 // enables some debug output
-#define  LOG( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
+#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
 
 //////////////////////////////////////////////
 //
@@ -92,7 +92,7 @@ run ( Graph &                  dag,
 
     if ( dag.end().size() > 1 )
     {
-        LOG( 5, "DAG::TBB::run : multiple end nodes" );
+        log( 5, "DAG::TBB::run : multiple end nodes" );
 
         multiple_end = true;
         
