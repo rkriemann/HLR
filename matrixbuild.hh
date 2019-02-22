@@ -22,12 +22,50 @@ namespace SEQ
 template < typename coeff_t,
            typename lrapx_t >
 std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
-        const coeff_t &              coeff,
-        const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc );
+build_matrix ( const HLIB::TBlockCluster *  bct,
+               const coeff_t &              coeff,
+               const lrapx_t &              lrapx,
+               const HLIB::TTruncAcc &      acc );
 
 }// namespace SEQ
+
+namespace TBB
+{
+
+//
+// build representation of dense matrix with
+// matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and
+// low-rank blocks computed by <lrapx>
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< HLIB::TMatrix >
+build_matrix ( const HLIB::TBlockCluster *  bct,
+               const coeff_t &              coeff,
+               const lrapx_t &              lrapx,
+               const HLIB::TTruncAcc &      acc );
+
+}// namespace TBB
+
+namespace HPX
+{
+
+//
+// build representation of dense matrix with
+// matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and
+// low-rank blocks computed by <lrapx>
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< HLIB::TMatrix >
+build_matrix ( const HLIB::TBlockCluster *  bct,
+               const coeff_t &              coeff,
+               const lrapx_t &              lrapx,
+               const HLIB::TTruncAcc &      acc );
+
+}// namespace HPX
 
 //
 // include implementation

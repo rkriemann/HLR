@@ -119,13 +119,13 @@ Problem::build_matrix ( const TBlockClusterTree *  bct,
 {
     // unique_ptr< TProgressBar >    progress( ( verbose(2) && my_proc == 0 ) ? new TConsoleProgressBar( cout ) : nullptr );
     TLogCoeffFn                   log_coeff( h );
-    TPermCoeffFn< real_t >        coefffn( & log_coeff, bct->row_ct()->perm_i2e(), bct->row_ct()->perm_i2e() );
+    TPermCoeffFn< real_t >        coefffn( & log_coeff, bct->row_ct()->perm_i2e(), bct->col_ct()->perm_i2e() );
     TACAPlus< real_t >            aca( & coefffn );
     TDenseMBuilder< real_t >      h_builder( & coefffn, & aca );
 
-    {
-        return  SEQ::build( bct->root(), coefffn, aca, acc );
-    }    
+    // {
+    //     return  HPX::build_matrix( bct->root(), coefffn, aca, acc );
+    // }    
     
     h_builder.set_build_ghosts( true );
     
