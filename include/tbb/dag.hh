@@ -1,4 +1,4 @@
-#ifndef __HLR_TBB_RUN_HH
+#ifndef __HLR_TBB_DAG_HH
 #define __HLR_TBB_RUN_HH
 //
 // Project     : HLib
@@ -8,23 +8,26 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "Graph.hh"
+#include "dag/Graph.hh"
 
-namespace DAG
+namespace HLR
 {
 
 namespace TBB
 {
 
-//
-// execute DAG <dag>
-//
-void
-run ( Graph &                  dag,
-      const HLIB::TTruncAcc &  acc );
+struct DAGExecution
+{
+    //
+    // execute DAG <dag>
+    //
+    void
+    run ( DAG::Graph &             dag,
+          const HLIB::TTruncAcc &  acc ) const;
+};
 
 }// namespace TBB
 
-}// namespace DAG
+}// namespace HLR
 
-#endif // __HLR_TBB_RUN_HH
+#endif // __HLR_TBB_DAG_HH

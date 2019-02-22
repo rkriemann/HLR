@@ -10,8 +10,11 @@
 #include <deque>
 #include <unordered_set>
 
-#include "../tools.hh"
-#include "Node.hh"
+#include "utils/tools.hh"
+#include "dag/Node.hh"
+
+namespace HLR
+{
 
 namespace DAG
 {
@@ -425,5 +428,6 @@ Node::print () const
         std::cout << "      " << succ->to_string() << std::endl;
 }
     
-
 }// namespace DAG
+
+}// namespace HLR

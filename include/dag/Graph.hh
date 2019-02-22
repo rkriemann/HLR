@@ -1,5 +1,5 @@
-#ifndef __HLR_GRAPH_HH
-#define __HLR_GRAPH_HH
+#ifndef __HLR_DAG_GRAPH_HH
+#define __HLR_DAG_GRAPH_HH
 //
 // Project     : HLib
 // File        : Graph.hh
@@ -9,6 +9,9 @@
 //
 
 #include "Node.hh"
+
+namespace HLR
+{
 
 namespace DAG
 {
@@ -67,4 +70,6 @@ refine  ( Node *  node );
 
 }// namespace DAG
 
-#endif // __HLR_GRAPH_HH
+}// namespace HLR
+
+#endif // __HLR_DAG_GRAPH_HH

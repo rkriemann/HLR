@@ -14,9 +14,11 @@ using namespace HLIB;
 
 namespace B = HLIB::BLAS;
 
-#include "multiply.hh"
+#include "common/multiply.hh"
 #include "cmdline.inc"
 #include "problem.inc"
+
+using namespace HLR;
 
 // main function specific to arithmetic
 void

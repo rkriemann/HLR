@@ -13,20 +13,20 @@
 
 #include "Graph.hh"
 
-namespace DAG
+namespace HLR
 {
 
-namespace LU
+namespace DAG
 {
 
 //
 // return graph representing compute DAG for LU of <A>
 //
 Graph
-gen_dag ( HLIB::TMatrix *  A );
-
-}// namespace LU
+gen_LU_dag ( HLIB::TMatrix *  A );
 
 }// namespace DAG
+
+}// namespace HLR
 
 #endif // __HLR_DAG_LU_HH

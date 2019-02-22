@@ -11,21 +11,23 @@
 
 using namespace std;
 
-#include "logkernel.hh"
+#include "apps/logkernel.hh"
 
 using namespace HLIB;
 
-using real_t = HLIB::real;
+namespace HLR
+{
 
-#include "matrixbuild.hh"
+namespace Apps
+{
 
-namespace LogKernel
+namespace
 {
 
 //
 // coefficient function for log|x-y| in [0,1]
 //
-class TLogCoeffFn : public TCoeffFn< real_t >
+class TLogCoeffFn : public TCoeffFn< HLIB::real >
 {
 private:
     // stepwidth
@@ -42,7 +44,7 @@ public:
     //
     virtual void eval  ( const std::vector< idx_t > &  rowidxs,
                          const std::vector< idx_t > &  colidxs,
-                         real_t *                      matrix ) const
+                         HLIB::real *                  matrix ) const
     {
         const size_t  n = rowidxs.size();
         const size_t  m = colidxs.size();
@@ -70,11 +72,11 @@ public:
                         value += 0.5*dist*dist*std::log(dist);
                 }
         
-                matrix[ j*n + i ] = real_t(-value);
+                matrix[ j*n + i ] = HLIB::real(-value);
             }// for
         }// for
     }
-    using TCoeffFn< real_t >::eval;
+    using TCoeffFn< HLIB::real >::eval;
 
     //
     // return format of matrix, e.g. symmetric or hermitian
@@ -83,53 +85,70 @@ public:
     
 };
 
+}// namespace anonymous
+
+//
+// ctor
+//
+LogKernel::LogKernel ( const size_t  n )
+        : _n( n )
+        , _h( 1.0 / value_t(n) )
+{}
+
 //
 // set up coordinates
 //
 std::unique_ptr< TCoordinate >
-Problem::build_coord ( const size_t  n )
+LogKernel::coordinates () const
 {
-    h = 1.0 / double(n);
-    
-    vector< double * >  vertices( n, nullptr );
-    vector< double * >  bbmin( n, nullptr );
-    vector< double * >  bbmax( n, nullptr );
+    vector< double * >  vertices( _n, nullptr );
+    vector< double * >  bbmin( _n, nullptr );
+    vector< double * >  bbmax( _n, nullptr );
 
-    for ( size_t i = 0; i < n; i++ )
+    for ( size_t i = 0; i < _n; i++ )
     {
         vertices[i]    = new double;
-        vertices[i][0] = h * double(i) + ( h / 2.0 ); // center of [i/h,(i+1)/h]
+        vertices[i][0] = _h * double(i) + ( _h / 2.0 ); // center of [i/h,(i+1)/h]
 
         // set bounding box (support) to [i/h,(i+1)/h]
         bbmin[i]       = new double;
-        bbmin[i][0]    = h * double(i);
+        bbmin[i][0]    = _h * double(i);
         bbmax[i]       = new double;
-        bbmax[i][0]    = h * double(i+1);
+        bbmax[i][0]    = _h * double(i+1);
     }// for
 
     return make_unique< TCoordinate >( vertices, 1, bbmin, bbmax, copy_coord_data );
 }
 
 //
-// build matrix
+// return coefficient function to evaluate matrix entries
 //
-std::unique_ptr< TMatrix >
-Problem::build_matrix ( const TBlockClusterTree *  bct,
-                        const TTruncAcc &          acc )
+std::unique_ptr< HLIB::TCoeffFn< LogKernel::value_t > >
+LogKernel::coeff_func () const
 {
-    // unique_ptr< TProgressBar >    progress( ( verbose(2) && my_proc == 0 ) ? new TConsoleProgressBar( cout ) : nullptr );
-    TLogCoeffFn                   log_coeff( h );
-    TPermCoeffFn< real_t >        coefffn( & log_coeff, bct->row_ct()->perm_i2e(), bct->col_ct()->perm_i2e() );
-    TACAPlus< real_t >            aca( & coefffn );
-    TDenseMBuilder< real_t >      h_builder( & coefffn, & aca );
+    return std::make_unique< TLogCoeffFn >( _h );
 
-    // {
-    //     return  HPX::build_matrix( bct->root(), coefffn, aca, acc );
-    // }    
-    
-    h_builder.set_build_ghosts( true );
-    
-    return h_builder.build( bct, unsymmetric, acc );
+    // return make_unique< TPermCoeffFn< value_t > >( log_coeff, bct->row_ct()->perm_i2e(), bct->col_ct()->perm_i2e() );
 }
+    
+// //
+// // build matrix
+// //
+// std::unique_ptr< TMatrix >
+// LogKernel::build_matrix ( const TBlockClusterTree *  bct,
+//                           const TTruncAcc &          acc )
+// {
+//     // unique_ptr< TProgressBar >    progress( ( verbose(2) && my_proc == 0 ) ? new TConsoleProgressBar( cout ) : nullptr );
+//     TLogCoeffFn                   log_coeff( h );
+//     TPermCoeffFn< value_t >        coefffn( & log_coeff, bct->row_ct()->perm_i2e(), bct->col_ct()->perm_i2e() );
+//     TACAPlus< value_t >            aca( & coefffn );
+//     TDenseMBuilder< value_t >      h_builder( & coefffn, & aca );
+    
+//     h_builder.set_build_ghosts( true );
+    
+//     return h_builder.build( bct, unsymmetric, acc );
+// }
 
 }// namespace LogKernel
+
+}// namespace HLR

@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : dag.cc
-// Description : classes and functions for compute DAGs
+// File        : Graph.cc
+// Description : represents a Graph in a DAG
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -11,19 +11,16 @@
 #include <unordered_set>
 #include <cassert>
 
-#include <tbb/mutex.h>
-#include <tbb/parallel_do.h>
+#include "utils/tools.hh"
+#include "dag/Graph.hh"
 
-#include "../tools.hh"
-#include "Graph.hh"
+namespace HLR
+{
 
 namespace DAG
 {
 
 using namespace HLIB;
-
-// abbrv. for locking
-#define  LOCK( mtx )  scoped_lock_t  lock( mtx )
 
 //////////////////////////////////////////////
 //
@@ -201,14 +198,10 @@ Graph::test ()
 Graph
 refine ( Node *  root )
 {
-    using  mutex_t       = tbb::mutex;
-    using  scoped_lock_t = mutex_t::scoped_lock;
-    
     assert( root != nullptr );
     
     std::deque< Node * >  nodes;
     std::list< Node * >   tasks, start, end;
-    mutex_t               mtx_tasks, mtx_sub;
     
     nodes.push_back( root );
 
@@ -223,38 +216,24 @@ refine ( Node *  root )
         {
             if ( node->is_refined() )       // node was refined; collect all subs
             {
-                LOCK( mtx_sub );
                 for ( auto  sub : node->sub_nodes() )
                     subnodes.push_back( sub );
             }// if
             else if ( node->refine_deps() ) // node was not refined but dependencies were
             {
-                LOCK( mtx_sub );
                 subnodes.push_back( node );
             }// if
             else                            // neither node nor dependencies have changed: will not be touched
             { 
-                LOCK( mtx_tasks );
                 tasks.push_back( node );
             }// else
         };
 
-        if ( true )
-        {
-            for ( auto  node : nodes ) node_refine( node );      // first refine nodes
-            for ( auto  node : nodes ) node_refine_deps( node ); // then refine dependencies between sub nodes
-            for ( auto  node : nodes ) node_collect( node );     // collect new nodes
-            for ( auto  node : nodes ) node_delete( node );      // delete all refined nodes
-                                                                 // (only after "collect" since accessed in "collect>refine_deps")
-        }// if
-        else
-        {
-            // same as above put in parallel
-            tbb::parallel_do( nodes, node_refine );
-            tbb::parallel_do( nodes, node_refine_deps );
-            tbb::parallel_do( nodes, node_collect );
-            tbb::parallel_do( nodes, node_delete );
-        }// else
+        for ( auto  node : nodes ) node_refine( node );      // first refine nodes
+        for ( auto  node : nodes ) node_refine_deps( node ); // then refine dependencies between sub nodes
+        for ( auto  node : nodes ) node_collect( node );     // collect new nodes
+        for ( auto  node : nodes ) node_delete( node );      // delete all refined nodes
+                                                             // (only after "collect" since accessed in "collect>refine_deps")
         
         nodes = std::move( subnodes );
     }// while
@@ -282,3 +261,5 @@ refine ( Node *  root )
 }
 
 }// namespace DAG
+
+}// namespace HLR

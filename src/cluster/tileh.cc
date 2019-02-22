@@ -1,7 +1,7 @@
 //
 // Project     : HLib
 // File        : tileh.cc
-// Description : common Tile-H functions
+// Description : Tile-H specific clustering functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -13,12 +13,21 @@
 #include <cluster/TBCBuilder.hh>
 #include <cluster/TGeomAdmCond.hh>
 
-#include "tileh.hh"
+#include "cluster/tileh.hh"
+
+namespace HLR
+{
+
+using namespace HLIB;
+
+namespace Cluster
+{
 
 namespace TileH
 {
 
-using namespace HLIB;
+namespace
+{
 
 //
 // flatten top <n> levels of cluster tree
@@ -95,29 +104,42 @@ flatten ( TCluster *  cl,
         cl->set_son( pos++, node );
 }
 
+}// namespace anonymous
+
 //
-// set up cluster and block cluster tree
+// cluster set of coordinates with minimal block size <ntile>
 //
-std::pair< std::unique_ptr< TClusterTree >,
-           std::unique_ptr< TBlockClusterTree > >
-cluster ( TCoordinate *  coords,
-          const size_t   ntile,
-          const int      nprocs )
+std::unique_ptr< HLIB::TClusterTree >
+cluster ( HLIB::TCoordinate *   coords,
+          const size_t          ntile,
+          const size_t          nlvl )
 {
-    TCardBSPPartStrat    part_strat;
-    TBSPCTBuilder        ct_builder( & part_strat, ntile );
+    TCardBSPPartStrat  part_strat;
+    TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
     auto  ct = ct_builder.build( coords );
 
     // flatten top levels to set up Tile-H
-    flatten( ct->root(), std::max<uint>( 3, std::ceil( std::log2( nprocs )+1 ) ) );
+    flatten( ct->root(), nlvl );
     
+    return ct;
+}
+
+//
+// build block cluster tree based on given row/column cluster trees
+//
+std::unique_ptr< HLIB::TBlockClusterTree >
+blockcluster ( HLIB::TClusterTree *  rowct,
+               HLIB::TClusterTree *  colct )
+{
     TWeakStdGeomAdmCond  adm_cond;
     TBCBuilder           bct_builder;
 
-    auto  bct = bct_builder.build( ct.get(), ct.get(), & adm_cond );
-
-    return { std::move( ct ), std::move( bct ) };
+    return bct_builder.build( rowct, colct, & adm_cond );
 }
 
 }// namespace TileH
+
+}// namespace Cluster
+
+}// namespace HLR

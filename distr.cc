@@ -9,7 +9,7 @@
 #include <list>
 #include <cassert>
 
-#include "tensor.hh"
+#include "utils/tensor.hh"
 
 #include "distr.hh"
 

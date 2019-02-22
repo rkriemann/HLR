@@ -1,5 +1,5 @@
-#ifndef __HLR_NODE_HH
-#define __HLR_NODE_HH
+#ifndef __HLR_DAG_NODE_HH
+#define __HLR_DAG_NODE_HH
 //
 // Project     : HLib
 // File        : Node.hh
@@ -16,6 +16,9 @@
 
 #include <cluster/TIndexSet.hh>
 #include <base/TTruncAcc.hh>
+
+namespace HLR
+{
 
 namespace DAG
 {
@@ -226,4 +229,6 @@ alloc_node ( std::list< Node * > & subnodes,
 
 }// namespace DAG
 
-#endif // __HLR_NODE_HH
+}// namespace HLR
+
+#endif // __HLR_DAG_NODE_HH

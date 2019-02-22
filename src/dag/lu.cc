@@ -13,16 +13,16 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "../tensor.hh"
-#include "lu.hh"
+#include "utils/tensor.hh"
+#include "dag/lu.hh"
 
 using std::list;
 using namespace HLIB;
 
-namespace DAG
+namespace HLR
 {
 
-namespace LU
+namespace DAG
 {
 
 namespace
@@ -158,7 +158,7 @@ LUNode::refine_ ( list< Node * > &  subnodes )
 
             assert( A_ii != nullptr );
 
-            auto  lu_ii = ::DAG::alloc_node< LUNode >( subnodes, A_ii );
+            auto  lu_ii = HLR::DAG::alloc_node< LUNode >( subnodes, A_ii );
 
             nodes(i,i) = lu_ii;
 
@@ -166,7 +166,7 @@ LUNode::refine_ ( list< Node * > &  subnodes )
             {
                 if ( B->block( j, i ) != nullptr )
                 {
-                    auto solve_ji = ::DAG::alloc_node< SolveUNode >( subnodes, A_ii, B->block( j, i ) );
+                    auto solve_ji = HLR::DAG::alloc_node< SolveUNode >( subnodes, A_ii, B->block( j, i ) );
 
                     solve_ji->after( lu_ii );
                     nodes(j,i) = solve_ji;
@@ -177,7 +177,7 @@ LUNode::refine_ ( list< Node * > &  subnodes )
             {
                 if ( B->block( i, j ) != nullptr )
                 {
-                    auto solve_ij = ::DAG::alloc_node< SolveLNode >( subnodes, A_ii, B->block( i, j ) );
+                    auto solve_ij = HLR::DAG::alloc_node< SolveLNode >( subnodes, A_ii, B->block( i, j ) );
 
                     solve_ij->after( lu_ii );
                     nodes(i,j) = solve_ij;
@@ -199,7 +199,7 @@ LUNode::refine_ ( list< Node * > &  subnodes )
                         ( B->block( i, l ) != nullptr ) &&
                         ( B->block( j, l ) != nullptr ))
                     {
-                        auto update_jl = ::DAG::alloc_node< UpdateNode >( subnodes, B->block( j, i ), B->block( i, l ), B->block( j, l ) );
+                        auto update_jl = HLR::DAG::alloc_node< UpdateNode >( subnodes, B->block( j, i ), B->block( i, l ), B->block( j, l ) );
                         
                         update_jl->after( nodes(j,i) );
                         update_jl->after( nodes(i,l) );
@@ -255,7 +255,7 @@ SolveLNode::refine_ ( list< Node * > &  subnodes )
                 {
                     if ( BA->block( i, j ) != nullptr )
                     {
-                        auto  solve_ij = ::DAG::alloc_node< SolveLNode >( subnodes, L_ii, BA->block( i, j ) );
+                        auto  solve_ij = HLR::DAG::alloc_node< SolveLNode >( subnodes, L_ii, BA->block( i, j ) );
 
                         nodes(i,j) = solve_ij;
                     }// if
@@ -277,7 +277,7 @@ SolveLNode::refine_ ( list< Node * > &  subnodes )
                         ( BA->block(i,j) != nullptr ) &&
                         ( BL->block(k,i) != nullptr ))
                     {
-                        auto  update_kj = ::DAG::alloc_node< UpdateNode >( subnodes, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ) );
+                        auto  update_kj = HLR::DAG::alloc_node< UpdateNode >( subnodes, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ) );
 
                         update_kj->after( nodes(i,j) );
 
@@ -328,7 +328,7 @@ SolveUNode::refine_ ( list< Node * > &  subnodes )
                 {
                     if ( BA->block(i,j) != nullptr )
                     {
-                        auto solve_ij = ::DAG::alloc_node< SolveUNode >( subnodes, U_jj, BA->block( i, j ) );
+                        auto solve_ij = HLR::DAG::alloc_node< SolveUNode >( subnodes, U_jj, BA->block( i, j ) );
                         
                         nodes(i,j) = solve_ij;
                     }// if
@@ -350,7 +350,7 @@ SolveUNode::refine_ ( list< Node * > &  subnodes )
                         ( BA->block(i,j) != nullptr ) &&
                         ( BU->block(j,k) != nullptr ))
                     {
-                        auto  update_ik = ::DAG::alloc_node< UpdateNode >( subnodes, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ) );
+                        auto  update_ik = HLR::DAG::alloc_node< UpdateNode >( subnodes, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ) );
 
                         update_ik->after( nodes(i,j) );
 
@@ -399,10 +399,10 @@ UpdateNode::refine_ ( list< Node * > &  subnodes )
                 {
                     if (( BA->block( i, k ) != nullptr ) && ( BB->block( k, j ) != nullptr ))
                     {
-                        ::DAG::alloc_node< UpdateNode >( subnodes,
-                                                         BA->block( i, k ),
-                                                         BB->block( k, j ),
-                                                         BC->block( i, j ) );
+                        HLR::DAG::alloc_node< UpdateNode >( subnodes,
+                                                            BA->block( i, k ),
+                                                            BB->block( k, j ),
+                                                            BC->block( i, j ) );
                     }// if
                 }// for
             }// for
@@ -422,9 +422,9 @@ UpdateNode::run_ ( const TTruncAcc &  acc )
 // public function to generate DAG for LU
 //
 Graph
-gen_dag ( TMatrix *  A )
+gen_LU_dag ( TMatrix *  A )
 {
-    return ::DAG::refine( new LUNode( A ) );
+    return HLR::DAG::refine( new LUNode( A ) );
 }
 
 }// namespace LU

@@ -27,85 +27,85 @@ if not fullmsg :
     env.Replace( CXXCOMSTR  = " C++    $SOURCES" )
     env.Replace( LINKCOMSTR = " Link   $TARGET"  )
 
+env.Append(  CPPPATH = [ '#include' ] )
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
-common = env.StaticLibrary( 'common', [ 'logkernel.cc',
-                                        'matern.cc',
-                                        'tlr.cc',
-                                        'hodlr.cc',
-                                        'stdh.cc',
-                                        'tileh.cc',
+common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
+                                        'src/apps/matern.cc',
+                                        'src/cluster/H.cc',
+                                        'src/cluster/hodlr.cc',
+                                        'src/cluster/tileh.cc',
+                                        'src/cluster/tlr.cc',
                                         'distr.cc',
-                                        'dag/Node.cc',
-                                        'dag/Graph.cc',
-                                        'dag/seq_run.cc',
-                                        'dag/tbb_run.cc',
-                                        'dag/lu.cc' ] )
+                                        'src/dag/Node.cc',
+                                        'src/dag/Graph.cc',
+                                        'src/seq/dag.cc',
+                                        'src/tbb/dag.cc',
+                                        'src/dag/lu.cc' ] )
 
 #
 # default C++ environment
 #
 
 env.Program( 'tlr-seq.cc' )
-env.Program( 'hodlr-seq.cc' )
+# env.Program( 'hodlr-seq.cc' )
 env.Program( 'tileh-seq.cc' )
-env.Program( 'dag-seq.cc' )
+# env.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
 #
 
-omp = env.Clone()
-omp.Append( CXXFLAGS  = "-fopenmp" )
-omp.Append( LINKFLAGS = "-fopenmp" )
+# omp = env.Clone()
+# omp.Append( CXXFLAGS  = "-fopenmp" )
+# omp.Append( LINKFLAGS = "-fopenmp" )
 
-omp.Program( 'tlr-omp.cc' )
-omp.Program( 'hodlr-omp.cc' )
+# omp.Program( 'tlr-omp.cc' )
+# omp.Program( 'hodlr-omp.cc' )
 
 #
 # TBB
 #
 
-tbb = env.Clone()
+# tbb = env.Clone()
 
-tbb.Program( 'tlr-tbb.cc' )
-tbb.Program( 'hodlr-tbb.cc' )
-tbb.Program( 'tileh-tbb.cc' )
+# tbb.Program( 'tlr-tbb.cc' )
+# tbb.Program( 'hodlr-tbb.cc' )
+# tbb.Program( 'tileh-tbb.cc' )
 
 #
 # MPI
 #
 
-mpi = env.Clone()
-#mpi.Append( LINKFLAGS = "-lboost_mpi" )
-mpi.ParseConfig( 'mpic++ --showme:compile' )
-mpi.ParseConfig( 'mpic++ --showme:link' )
+# mpi = env.Clone()
+# mpi.ParseConfig( 'mpic++ --showme:compile' )
+# mpi.ParseConfig( 'mpic++ --showme:link' )
 
-mpi.Program( 'tlr-mpi-bcast.cc' )
-mpi.Program( 'tlr-mpi-ibcast.cc' )
-mpi.Program( 'tlr-mpi-rdma.cc' )
+# mpi.Program( 'tlr-mpi-bcast.cc' )
+# mpi.Program( 'tlr-mpi-ibcast.cc' )
+# mpi.Program( 'tlr-mpi-rdma.cc' )
 
-mpi.Program( 'tileh-mpi-bcast.cc' )
-mpi.Program( 'tileh-mpi-ibcast.cc' )
+# mpi.Program( 'tileh-mpi-bcast.cc' )
+# mpi.Program( 'tileh-mpi-ibcast.cc' )
 
 #
 # HPX
 #
 
-hpx = env.Clone()
-hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
-hpx.MergeFlags( "-lhpx_iostreams" )
+# hpx = env.Clone()
+# hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
+# hpx.MergeFlags( "-lhpx_iostreams" )
 
-hpx.Program( 'tlr-hpx.cc' )
-hpx.Program( 'hodlr-hpx.cc' )
+# hpx.Program( 'tlr-hpx.cc' )
+# hpx.Program( 'hodlr-hpx.cc' )
 
 #
 # TaskFlow
 #
 
-tf = env.Clone()
-tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
+# tf = env.Clone()
+# tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
 
-tf.Program( 'tlr-tf.cc' )
-tf.Program( 'hodlr-tf.cc' )
+# tf.Program( 'tlr-tf.cc' )
+# tf.Program( 'hodlr-tf.cc' )

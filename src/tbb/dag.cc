@@ -1,6 +1,6 @@
 //
 // Project     : HLib
-// File        : tbb_run.cc
+// File        : dag.cc
 // Description : execute DAG using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
@@ -8,9 +8,15 @@
 
 #include <tbb/task.h>
 
-#include "tbb_run.hh"
+#include "tbb/dag.hh"
 
 using namespace HLIB;
+
+// enables some debug output
+#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
+
+namespace HLR
+{
 
 namespace DAG
 {
@@ -21,11 +27,11 @@ namespace DAG
 class RuntimeTask : public tbb::task
 {
 private:
-    Node *             _node;
+    DAG::Node *        _node;
     const TTruncAcc &  _acc;
     
 public:
-    RuntimeTask ( Node *             anode,
+    RuntimeTask ( DAG::Node *        anode,
                   const TTruncAcc &  aacc )
             : _node( anode )
             , _acc( aacc )
@@ -49,9 +55,6 @@ public:
     }
 };
 
-namespace TBB
-{
-
 // enables some debug output
 #define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
 
@@ -62,7 +65,7 @@ namespace TBB
 //
 //////////////////////////////////////////////
 
-struct EmptyNode : public Node
+struct EmptyNode : public DAG::Node
 {
     // return text version of node
     virtual std::string  to_string () const { return "Empty"; }
@@ -75,20 +78,27 @@ private:
     virtual void  run_    ( const TTruncAcc & ) {}
     virtual void  refine_ ( node_list_t & )     {}
 };
-    
+
+}// namespace DAG
+
+
+
+namespace TBB
+{
+
 //
 // execute DAG <dag>
 //
 void
-run ( Graph &                  dag,
-      const HLIB::TTruncAcc &  acc )
+DAGExecution::run ( DAG::Graph &             dag,
+                    const HLIB::TTruncAcc &  acc ) const
 {
     //
     // TBB needs single end node
     //
     
-    Node *  final        = nullptr;
-    bool    multiple_end = false;
+    DAG::Node *  final        = nullptr;
+    bool         multiple_end = false;
 
     if ( dag.end().size() > 1 )
     {
@@ -100,18 +110,18 @@ run ( Graph &                  dag,
         // create single special end node
         //
 
-        final = new EmptyNode();
+        final = new DAG::EmptyNode();
 
         for ( auto  node : dag.end() )
             final->after( node );
 
         final->set_dep_cnt( dag.end().size() ); // final->in.size();
-        final->set_task( new ( tbb::task::allocate_root() ) RuntimeTask( final, acc ) );
+        final->set_task( new ( tbb::task::allocate_root() ) DAG::RuntimeTask( final, acc ) );
     }// if
 
     // create tbb tasks for all nodes
     for ( auto  node : dag.nodes() )
-        node->set_task( new ( tbb::task::allocate_root() ) RuntimeTask( node, acc ) );
+        node->set_task( new ( tbb::task::allocate_root() ) DAG::RuntimeTask( node, acc ) );
     
     // if DAG has single end node, get pointer to it
     if ( final == nullptr )
@@ -145,4 +155,4 @@ run ( Graph &                  dag,
 
 }// namespace TBB
 
-}// namespace DAG
+}// namespace HLR

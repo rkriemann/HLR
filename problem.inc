@@ -1,11 +1,11 @@
 #ifndef __HLR_PROBLEM_INC
 #define __HLR_PROBLEM_INC
 
-#include "problem.hh"
-#include "logkernel.hh"
-#include "matern.hh"
+#include "apps/problem.hh"
+#include "apps/logkernel.hh"
+#include "apps/matern.hh"
 
-#include "termcolor.hpp"
+#include "utils/termcolor.hpp"
 
 namespace term = termcolor;
 

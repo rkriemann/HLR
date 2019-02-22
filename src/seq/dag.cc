@@ -1,6 +1,6 @@
 //
 // Project     : HLib
-// File        : seq_run.hh
+// File        : dag.cc
 // Description : execute DAG sequentially
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
@@ -8,11 +8,11 @@
 
 #include <cassert>
 
-#include "../tools.hh"
+#include "utils/tools.hh"
 
-#include "Graph.hh"
+#include "seq/dag.hh"
 
-namespace DAG
+namespace HLR
 {
 
 namespace SEQ
@@ -22,11 +22,11 @@ namespace SEQ
 // execute DAG <dag>
 //
 void
-run ( Graph &                  dag,
-      const HLIB::TTruncAcc &  acc )
+DAGExecution::run ( DAG::Graph &             dag,
+                    const HLIB::TTruncAcc &  acc ) const
 {
     // holds pending tasks
-    node_list_t  worklist;
+    std::list< DAG::Node * >  worklist;
 
     for ( auto  t : dag.start() )
         worklist.push_back( t );
