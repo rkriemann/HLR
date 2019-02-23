@@ -1,5 +1,5 @@
-#ifndef __HLR_CMDLINE_INC
-#define __HLR_CMDLINE_INC
+#ifndef __HLR_CMDLINE_HH
+#define __HLR_CMDLINE_HH
 
 #include <iostream>
 #include <string>
@@ -92,7 +92,7 @@ parse_cmdline ( int argc, char ** argv )
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }
 
-#endif // __HLR_CMDLINE_INC
+#endif // __HLR_CMDLINE_HH
 
 // Local Variables:
 // mode: c++

@@ -11,8 +11,14 @@
 #include <cluster/TCoordinate.hh>
 #include <matrix/TCoeffFn.hh>
 
+namespace HLR
+{
+
+namespace Apps
+{
+
 template < typename T_value >
-class ProblemBase
+class Application
 {
 public:
     using  value_t = T_value;
@@ -39,5 +45,9 @@ public:
     // build_matrix ( const HLIB::TBlockClusterTree *  bct,
     //                const HLIB::TTruncAcc &          acc ) = 0;
 };
+
+}// namespace Apps
+
+}// namespace HLR
 
 #endif // __HLR_APPS_PROBLEM_HH

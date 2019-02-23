@@ -134,8 +134,8 @@ public:
     bool  is_refined  () const { return ! _sub_nodes.empty(); }
 
     // give access to sub nodes
-    auto        sub_nodes ()       -> decltype(_sub_nodes) { return _sub_nodes; };
-    const auto  sub_nodes () const -> decltype(_sub_nodes) { return _sub_nodes; };
+    auto  sub_nodes ()       -> decltype(_sub_nodes) { return _sub_nodes; };
+    auto  sub_nodes () const -> decltype(_sub_nodes) { return _sub_nodes; };
     
     // split node into subnodes and update dependencies
     // if retval is empty, no refinement was done

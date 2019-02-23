@@ -79,9 +79,6 @@ private:
     virtual void  refine_ ( node_list_t & )     {}
 };
 
-}// namespace DAG
-
-
 
 namespace TBB
 {
@@ -90,8 +87,8 @@ namespace TBB
 // execute DAG <dag>
 //
 void
-DAGExecution::run ( DAG::Graph &             dag,
-                    const HLIB::TTruncAcc &  acc ) const
+run ( DAG::Graph &             dag,
+      const HLIB::TTruncAcc &  acc )
 {
     //
     // TBB needs single end node
@@ -154,5 +151,7 @@ DAGExecution::run ( DAG::Graph &             dag,
 }
 
 }// namespace TBB
+
+}// namespace DAG
 
 }// namespace HLR

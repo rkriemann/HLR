@@ -20,9 +20,6 @@ namespace HLR
 
 using namespace HLIB;
 
-namespace Cluster
-{
-
 namespace TileH
 {
 
@@ -139,7 +136,5 @@ blockcluster ( HLIB::TClusterTree *  rowct,
 }
 
 }// namespace TileH
-
-}// namespace Cluster
 
 }// namespace HLR

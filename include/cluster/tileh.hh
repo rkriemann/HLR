@@ -15,9 +15,6 @@
 namespace HLR
 {
 
-namespace Cluster
-{
-
 namespace TileH
 {
 
@@ -38,8 +35,6 @@ blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct );
 
 }// namespace TileH
-
-}// namespace Cluster
 
 }// namespace HLR
 

@@ -15,27 +15,24 @@
 namespace HLR
 {
 
-namespace Cluster
+namespace H
 {
 
-struct H
-{
-    //
-    // cluster set of coordinates with minimal block size <ntile>
-    //
-    std::unique_ptr< HLIB::TClusterTree >
-    cluster      ( HLIB::TCoordinate *   coords,
-                   const size_t          ntile ) const;
+//
+// cluster set of coordinates with minimal block size <ntile>
+//
+std::unique_ptr< HLIB::TClusterTree >
+cluster      ( HLIB::TCoordinate *   coords,
+               const size_t          ntile );
 
-    //
-    // build block cluster tree based on given row/column cluster trees
-    //
-    std::unique_ptr< HLIB::TBlockClusterTree >
-    blockcluster ( HLIB::TClusterTree *  rowct,
-                   HLIB::TClusterTree *  colct ) const;
-};
+//
+// build block cluster tree based on given row/column cluster trees
+//
+std::unique_ptr< HLIB::TBlockClusterTree >
+blockcluster ( HLIB::TClusterTree *  rowct,
+               HLIB::TClusterTree *  colct );
 
-}// namespace Cluster
+}// namespace H
 
 }// namespace HLR
 

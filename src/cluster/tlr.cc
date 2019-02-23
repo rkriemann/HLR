@@ -18,9 +18,6 @@ namespace HLR
 
 using namespace HLIB;
 
-namespace Cluster
-{
-
 namespace TLR
 {
 
@@ -51,7 +48,5 @@ blockcluster ( HLIB::TClusterTree *  rowct,
 }
 
 }// namespace TLR
-
-}// namespace Cluster
 
 }// namespace HLR

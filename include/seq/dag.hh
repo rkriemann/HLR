@@ -15,20 +15,22 @@
 namespace HLR
 {
 
-namespace SEQ
+namespace DAG
 {
 
-struct DAGExecution
+namespace Seq
 {
-    //
-    // execute DAG <dag>
-    //
-    void
-    run ( DAG::Graph &             dag,
-          const HLIB::TTruncAcc &  acc ) const;
-};
 
-}// namespace SEQ
+//
+// execute DAG <dag>
+//
+void
+run ( DAG::Graph &             dag,
+      const HLIB::TTruncAcc &  acc );
+
+}// namespace Seq
+
+}// namespace DAG
 
 }// namespace HLR
 

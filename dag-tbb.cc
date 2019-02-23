@@ -1,17 +1,16 @@
 //
 // Project     : HLib
-// File        : hodlr-seq.cc
-// Description : sequential HODLR arithmetic
+// File        : dag-tbb.cc
+// Description : sequential H-LU using DAG
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
-
 #include "common.inc"
-#include "cluster/hodlr.hh"
-#include "seq/matrix.hh"
-#include "seq/arith.hh"
+#include "cluster/H.hh"
+#include "tbb/matrix.hh"
+#include "tbb/dag.hh"
+#include "dag/lu.hh"
 
 //
 // main function
@@ -25,8 +24,8 @@ mymain ( int argc, char ** argv )
     auto  tic     = Time::Wall::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = HODLR::cluster( coord.get(), ntile );
-    auto  bct     = HODLR::blockcluster( ct.get(), ct.get() );
+    auto  ct      = H::cluster( coord.get(), ntile );
+    auto  bct     = H::blockcluster( ct.get(), ct.get() );
     
     if ( verbose( 3 ) )
     {
@@ -38,7 +37,7 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  A      = Matrix::TBB::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
@@ -48,17 +47,33 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( HODLR Seq )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG SEQ )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
+
+        auto  dag = HLR::DAG::gen_LU_dag( C.get() );
         
-        HODLR::Seq::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        toc = Time::Wall::since( tic );
+
+        if ( verbose( 2 ) )
+        {
+            std::cout << "  dag in      " << toc << std::endl;
+            std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
+            std::cout << "    #edges  = " << dag.nedges() << std::endl;
+        }// if
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "lu.dot" );
+
+        tic = Time::Wall::now();
+        
+        HLR::DAG::TBB::run( dag, fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         
@@ -66,7 +81,6 @@ mymain ( int argc, char ** argv )
         
         std::cout << "    done in " << toc << std::endl;
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-
-        write_matrix( C.get(), "LU.hm" );
     }
+
 }

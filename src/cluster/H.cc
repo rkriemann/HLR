@@ -16,7 +16,7 @@
 namespace HLR
 {
 
-namespace Cluster
+namespace H
 {
 
 using namespace HLIB;
@@ -25,8 +25,8 @@ using namespace HLIB;
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< HLIB::TClusterTree >
-H::cluster ( HLIB::TCoordinate *   coords,
-             const size_t          ntile ) const
+cluster ( HLIB::TCoordinate *   coords,
+          const size_t          ntile )
 {
     TCardBSPPartStrat  part_strat;
     TBSPCTBuilder      ct_builder( & part_strat, ntile );
@@ -38,8 +38,8 @@ H::cluster ( HLIB::TCoordinate *   coords,
 // build block cluster tree based on given row/column cluster trees
 //
 std::unique_ptr< HLIB::TBlockClusterTree >
-H::blockcluster ( HLIB::TClusterTree *  rowct,
-                  HLIB::TClusterTree *  colct ) const
+blockcluster ( HLIB::TClusterTree *  rowct,
+               HLIB::TClusterTree *  colct )
 {
     TWeakStdGeomAdmCond  adm_cond;
     TBCBuilder           bct_builder;
@@ -47,6 +47,6 @@ H::blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace Cluster
+}// namespace H
 
 }// namespace HLR

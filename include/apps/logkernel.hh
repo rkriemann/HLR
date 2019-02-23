@@ -16,7 +16,7 @@ namespace HLR
 namespace Apps
 {
 
-class LogKernel : public ProblemBase< HLIB::real >
+class LogKernel : public Application< HLIB::real >
 {
 public:
     //

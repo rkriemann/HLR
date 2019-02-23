@@ -1,25 +1,31 @@
 //
 // Project     : HLib
-// File        : tlr-seq.cc
-// Description : Implements sequential TLR arithmetic
+// File        : dag-seq.cc
+// Description : sequential H-LU using DAG
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include "common.inc"
-#include "dag.hh"
-#include "stdh.hh"
+#include "cluster/H.hh"
+#include "seq/matrix.hh"
+#include "seq/dag.hh"
+#include "dag/lu.hh"
 
 //
 // main function
 //
+template < typename problem_t >
 void
 mymain ( int argc, char ** argv )
 {
-    auto  tic        = Time::Wall::now();
-    auto  problem    = gen_problem();
-    auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = StdH::cluster( coord.get(), ntile );
+    using value_t = typename problem_t::value_t;
+    
+    auto  tic     = Time::Wall::now();
+    auto  problem = gen_problem< problem_t >();
+    auto  coord   = problem->coordinates();
+    auto  ct      = H::cluster( coord.get(), ntile );
+    auto  bct     = H::blockcluster( ct.get(), ct.get() );
     
     if ( verbose( 3 ) )
     {
@@ -28,12 +34,14 @@ mymain ( int argc, char ** argv )
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
     
-    auto  A   = problem->build_matrix( bct.get(), fixed_rank( k ) );
-    auto  toc = Time::Wall::since( tic );
+    auto  coeff  = problem->coeff_func();
+    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
-    
     
     if ( verbose( 3 ) )
     {
@@ -49,7 +57,7 @@ mymain ( int argc, char ** argv )
         
         tic = Time::Wall::now();
 
-        auto  dag = ::DAG::LU::gen_dag( C.get() );
+        auto  dag = HLR::DAG::gen_LU_dag( C.get() );
         
         toc = Time::Wall::since( tic );
 
@@ -65,7 +73,7 @@ mymain ( int argc, char ** argv )
 
         tic = Time::Wall::now();
         
-        ::DAG::SEQ::run( dag, fixed_rank( k ) );
+        HLR::DAG::Seq::run( dag, fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         

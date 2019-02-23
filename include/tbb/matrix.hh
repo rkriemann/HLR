@@ -23,12 +23,12 @@
 namespace HLR
 {
 
+namespace Matrix
+{
+    
 namespace TBB
 {
 
-namespace MatrixConstr
-{
-    
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -60,8 +60,8 @@ build ( const HLIB::TBlockCluster *  bct,
     const auto                  colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
-    if ( std::max( rowis.size(), colis.size() ) <= 1000 )
-        return SEQ::build_matrix( bct, coeff, lrapx, acc );
+    if ( std::max( rowis.size(), colis.size() ) <= 100 )
+        return Matrix::Seq::build( bct, coeff, lrapx, acc );
         
     if ( bct->is_leaf() )
     {
@@ -95,7 +95,7 @@ build ( const HLIB::TBlockCluster *  bct,
                     {
                         if ( bct->son( i, j ) != nullptr )
                         {
-                            auto  B_ij = build_matrix( bct->son( i, j ), coeff, lrapx, acc );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -113,9 +113,9 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
-}// namespace MatrixConstr
-
 }// namespace TBB
+
+}// namespace Matrix
 
 }// namespace HLR
 

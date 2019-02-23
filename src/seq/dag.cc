@@ -15,15 +15,18 @@
 namespace HLR
 {
 
-namespace SEQ
+namespace DAG
+{
+
+namespace Seq
 {
 
 //
 // execute DAG <dag>
 //
 void
-DAGExecution::run ( DAG::Graph &             dag,
-                    const HLIB::TTruncAcc &  acc ) const
+run ( DAG::Graph &             dag,
+      const HLIB::TTruncAcc &  acc )
 {
     // holds pending tasks
     std::list< DAG::Node * >  worklist;
@@ -51,6 +54,8 @@ DAGExecution::run ( DAG::Graph &             dag,
     }// while
 }
 
-}// namespace SEQ
+}// namespace Seq
+
+}// namespace DAG
 
 }// namespace DAG

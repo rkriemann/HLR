@@ -15,12 +15,13 @@ using namespace HLIB;
 namespace B = HLIB::BLAS;
 
 #include "common/multiply.hh"
-#include "cmdline.inc"
-#include "problem.inc"
+#include "cmdline.hh"
+#include "gen_problem.hh"
 
 using namespace HLR;
 
 // main function specific to arithmetic
+template < typename problem_t >
 void
 mymain ( int argc, char ** argv );
 
@@ -41,7 +42,12 @@ main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        mymain( argc, argv );
+        if ( appl == "logkernel" )
+            mymain< HLR::Apps::LogKernel >( argc, argv );
+        else if ( appl == "matern"    )
+            mymain< HLR::Apps::MaternCov >( argc, argv );
+        else
+            throw "unknown application";
 
         DONE();
     }// try

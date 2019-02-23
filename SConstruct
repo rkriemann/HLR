@@ -5,7 +5,7 @@ import os
 # set up compilation environment
 #
 
-debug   = False
+debug   = True
 fullmsg = False
 
 CXXFLAGS  = '-O3 -march=native'
@@ -49,9 +49,9 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
 #
 
 env.Program( 'tlr-seq.cc' )
-# env.Program( 'hodlr-seq.cc' )
+env.Program( 'hodlr-seq.cc' )
 env.Program( 'tileh-seq.cc' )
-# env.Program( 'dag-seq.cc' )
+env.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
@@ -68,11 +68,12 @@ env.Program( 'tileh-seq.cc' )
 # TBB
 #
 
-# tbb = env.Clone()
+tbb = env.Clone()
 
-# tbb.Program( 'tlr-tbb.cc' )
-# tbb.Program( 'hodlr-tbb.cc' )
-# tbb.Program( 'tileh-tbb.cc' )
+tbb.Program( 'tlr-tbb.cc' )
+tbb.Program( 'hodlr-tbb.cc' )
+tbb.Program( 'tileh-tbb.cc' )
+tbb.Program( 'dag-tbb.cc' )
 
 #
 # MPI

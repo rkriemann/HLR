@@ -16,7 +16,7 @@ namespace HLR
 namespace Apps
 {
 
-class MaternCov : public ProblemBase< HLIB::real >
+class MaternCov : public Application< HLIB::real >
 {
 public:
     //

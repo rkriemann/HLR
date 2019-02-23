@@ -18,12 +18,12 @@
 namespace HLR
 {
 
-namespace SEQ
-{
-
-namespace MatrixConstr
+namespace Matrix
 {
     
+namespace Seq
+{
+
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -39,7 +39,7 @@ build ( const HLIB::TBlockCluster *  bct,
         const HLIB::TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
-                   typename lrapx_t::value_t >::value,
+                                 typename lrapx_t::value_t >::value,
                    "coefficient function and low-rank approximation must have equal value type" );
     
     assert( bct != nullptr );
@@ -82,7 +82,7 @@ build ( const HLIB::TBlockCluster *  bct,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    auto  B_ij = build_matrix( bct->son( i, j ), coeff, lrapx, acc );
+                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if
@@ -95,9 +95,9 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
-}// namespace MatrixConstr
+}// namespace Seq
 
-}// namespace SEQ
+}// namespace Matrix
 
 }// namespace HLR
 

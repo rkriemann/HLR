@@ -208,7 +208,7 @@ truncate_svd ( const BLAS::Matrix< T > &  A,
         }// else
     }// else
 
-    return { OA, OB };
+    return { std::move( OA ), std::move( OB ) };
 }
 
 //
@@ -223,7 +223,8 @@ approx_sum_svd ( const std::list< BLAS::Matrix< T > > &  U,
     using  value_t = T;
 
     if ( U.empty() || V.empty() )
-        return { BLAS::Matrix< value_t >(), BLAS::Matrix< value_t >() };
+        return { std::move( BLAS::Matrix< value_t >() ),
+                 std::move( BLAS::Matrix< value_t >() ) };
     
     //
     // determine maximal rank
