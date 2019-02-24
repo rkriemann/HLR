@@ -46,11 +46,11 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR Seq )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR TBB )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
@@ -64,8 +64,6 @@ mymain ( int argc, char ** argv )
         
         std::cout << "    done in " << toc << std::endl;
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-
-        write_matrix( C.get(), "LU.hm" );
     }
 
 }

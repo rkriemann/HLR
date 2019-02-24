@@ -46,7 +46,7 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
     
     {

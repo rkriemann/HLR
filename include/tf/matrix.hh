@@ -1,5 +1,5 @@
-#ifndef __HLR_TBB_MATRIX_HH
-#define __HLR_TBB_MATRIX_HH
+#ifndef __HLR_TF_MATRIX_HH
+#define __HLR_TF_MATRIX_HH
 //
 // Project     : HLib
 // File        : matrix.hh
@@ -11,13 +11,13 @@
 #include <cassert>
 #include <type_traits>
 
-#include <tbb/blocked_range2d.h>
-#include <tbb/parallel_for.h>
+#include <taskflow/taskflow.hpp>
 
 #include <matrix/TMatrix.hh>
 #include <matrix/TBlockMatrix.hh>
 #include <base/TTruncAcc.hh>
 
+#include "utils/tensor.hh"
 #include "seq/matrix.hh"
 
 namespace HLR
@@ -26,7 +26,7 @@ namespace HLR
 namespace Matrix
 {
     
-namespace TBB
+namespace TF
 {
 
 //
@@ -41,7 +41,8 @@ std::unique_ptr< HLIB::TMatrix >
 build ( const HLIB::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+        const HLIB::TTruncAcc &      acc,
+        tf::SubflowBuilder &         sf )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -84,24 +85,26 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        tbb::parallel_for(
-            tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                          0, B->nblock_cols() ),
-            [&,bct] ( const tbb::blocked_range2d< uint > &  r )
+        auto                 nbr = B->nblock_rows();
+        auto                 nbc = B->nblock_cols();
+        tensor2< tf::Task >  sub_tasks( nbr, nbc );
+
+        for ( uint  i = 0; i < nbr; ++i )
+        {
+            for ( uint  j = 0; j < nbc; ++j )
             {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                if ( bct->son( i, j ) != nullptr )
                 {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        if ( bct->son( i, j ) != nullptr )
+                    sub_tasks(i,j) = sf.silent_emplace(
+                        [bct,i,j,&coeff,&lrapx,&acc,&B] ( auto &  sf )
                         {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, sf );
                             
                             B->set_block( i, j, B_ij.release() );
-                        }// if
-                    }// for
-                }// for
-            } );
+                        } );
+                }// if
+            }// for
+        }// for
 
         M = std::move( B );
     }// else
@@ -113,10 +116,28 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
-}// namespace TBB
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< HLIB::TMatrix >
+build ( const HLIB::TBlockCluster *  bct,
+        const coeff_t &              coeff,
+        const lrapx_t &              lrapx,
+        const HLIB::TTruncAcc &      acc )
+{
+    tf::Taskflow                tf( 1 );
+    std::unique_ptr< TMatrix >  M;
+
+    auto  build_task = tf.silent_emplace( [bct,&coeff,&lrapx,&acc,&M] ( auto &  sf ) { M = build( bct, coeff, lrapx, acc, sf ); } );
+
+    tf.wait_for_all();
+
+    return M;
+}
+
+}// namespace TF
 
 }// namespace Matrix
 
 }// namespace HLR
 
-#endif // __HLR_TBB_MATRIX_HH
+#endif // __HLR_TF_MATRIX_HH

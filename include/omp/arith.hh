@@ -1,5 +1,5 @@
-#ifndef __HLR_SEQ_ARITH_HH
-#define __HLR_SEQ_ARITH_HH
+#ifndef __HLR_OMP_ARITH_HH
+#define __HLR_OMP_ARITH_HH
 //
 // Project     : HLib
 // File        : arith.hh
@@ -12,6 +12,7 @@
 
 #include "common/multiply.hh"
 #include "common/solve.hh"
+#include "seq/arith.hh"
 
 namespace HLR
 {
@@ -27,7 +28,7 @@ using namespace HLIB;
 namespace TLR
 {
 
-namespace Seq
+namespace OMP
 {
 
 //
@@ -53,6 +54,7 @@ lu ( TMatrix *          A,
             
         B::invert( blas_mat< value_t >( A_ii ) );
 
+        #pragma omp parallel for
         for ( uint  j = i+1; j < nbc; ++j )
         {
             // L is unit diagonal !!!
@@ -60,6 +62,7 @@ lu ( TMatrix *          A,
             trsmuh< value_t >( A_ii, BA->block( j, i ) ); // A10->blas_rmat_B() );
         }// for
 
+        #pragma omp parallel for collapse(2)
         for ( uint  j = i+1; j < nbr; ++j )
         {
             for ( uint  l = i+1; l < nbc; ++l )
@@ -70,7 +73,7 @@ lu ( TMatrix *          A,
     }// for
 }
 
-}// namespace Seq
+}// namespace OMP
 
 }// namespace TLR
 
@@ -83,92 +86,8 @@ lu ( TMatrix *          A,
 namespace HODLR
 {
 
-namespace Seq
+namespace OMP
 {
-
-//
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *         L,
-        B::Matrix< value_t > &  X )
-{
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "trsml( %d )", L->id() );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        B::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), B::Range::all );
-        B::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), B::Range::all );
-            
-        trsml( L00, X0 );
-
-        auto  T = B::prod( value_t(1), B::adjoint( blas_mat_B< value_t >( L10 ) ), X0 );
-        
-        B::prod( value_t(-1), blas_mat_A< value_t >( L10 ), T, value_t(1), X1 );
-
-        trsml( L11, X1 );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
-        
-        // auto  DL = cptrcast( L, TDenseMatrix );
-        
-        // B::Matrix< value_t >  Y( X, copy_value );
-
-        // B::prod( value_t(1), blas_mat< value_t >( DL ), Y, value_t(0), X );
-    }// else
-}
-
-//
-// solve X U = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsmuh ( const TMatrix *         U,
-         B::Matrix< value_t > &  X )
-{
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "trsmuh( %d )", U->id() );
-    
-    if ( is_blocked( U ) )
-    {
-        auto  BU  = cptrcast( U, TBlockMatrix );
-        auto  U00 = BU->block( 0, 0 );
-        auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
-        auto  U11 = BU->block( 1, 1 );
-
-        B::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), B::Range::all );
-        B::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), B::Range::all );
-            
-        trsmuh( U00, X0 );
-
-        auto  T = B::prod( value_t(1), B::adjoint( blas_mat_A< value_t >( U01 ) ), X0 );
-        
-        B::prod( value_t(-1), blas_mat_B< value_t >( U01 ), T, value_t(1), X1 );
-
-        trsmuh( U11, X1 );
-    }// if
-    else
-    {
-        auto  DU = cptrcast( U, TDenseMatrix );
-        
-        B::Matrix< value_t >  Y( X, copy_value );
-
-        B::prod( value_t(1), B::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
-    }// else
-}
 
 //
 // add U·V' to matrix A
@@ -196,22 +115,30 @@ addlr ( B::Matrix< value_t > &  U,
         B::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), B::Range::all );
         B::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), B::Range::all );
 
-        addlr( U0, V0, A00, acc );
-        addlr( U1, V1, A11, acc );
-
+        #pragma omp parallel sections
         {
-            auto [ U01, V01 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
-                                                                { blas_mat_B< value_t >( A01 ), V1 },
-                                                                acc );
+            #pragma omp section
+            { addlr( U0, V0, A00, acc ); }
 
-            A01->set_lrmat( U01, V01 );
-        }
+            #pragma omp section
+            { addlr( U1, V1, A11, acc ); }
 
-        {
-            auto [ U10, V10 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
-                                                                { blas_mat_B< value_t >( A10 ), V0 },
-                                                                acc );
-            A10->set_lrmat( U10, V10 );
+            #pragma omp section
+            {
+                auto [ U01, V01 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
+                                                                    { blas_mat_B< value_t >( A01 ), V1 },
+                                                                    acc );
+                
+                A01->set_lrmat( U01, V01 );
+            }
+            
+            #pragma omp section
+            {
+                auto [ U10, V10 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
+                                                                    { blas_mat_B< value_t >( A10 ), V0 },
+                                                                    acc );
+                A10->set_lrmat( U10, V10 );
+            }
         }
     }// if
     else
@@ -241,18 +168,24 @@ lu ( TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        HODLR::Seq::lu< value_t >( A00, acc );
-        
-        trsml(  A00, blas_mat_A< value_t >( A01 ) );
-        trsmuh( A00, blas_mat_B< value_t >( A10 ) );
+        HODLR::OMP::lu< value_t >( A00, acc );
+
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            { HLR::HODLR::Seq::trsml(  A00, blas_mat_A< value_t >( A01 ) ); }
+            
+            #pragma omp section
+            { HLR::HODLR::Seq::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); }
+        }
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
         auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
         auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
-        HODLR::Seq::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
+        HODLR::OMP::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         
-        HODLR::Seq::lu< value_t >( A11, acc );
+        HODLR::OMP::lu< value_t >( A11, acc );
     }// if
     else
     {
@@ -262,7 +195,7 @@ lu ( TMatrix *          A,
     }// else
 }
 
-}// namespace Seq
+}// namespace OMP
 
 }// namespace HODLR
 
@@ -275,7 +208,7 @@ lu ( TMatrix *          A,
 namespace TileH
 {
 
-namespace Seq
+namespace OMP
 {
 
 //
@@ -296,20 +229,32 @@ lu ( TMatrix *          A,
     {
         LU::factorise_rec( BA->block( i, i ), acc );
 
-        for ( uint j = i+1; j < nbr; ++j )
+        // #pragma omp parallel sections
         {
-            solve_upper_right( BA->block( j, i ),
-                               BA->block( i, i ), nullptr, acc,
-                               solve_option_t( block_wise, general_diag, store_inverse ) );
-        }// for
+        //     #pragma omp section
+            {
+                #pragma omp parallel for
+                for ( uint j = i+1; j < nbr; ++j )
+                {
+                    solve_upper_right( BA->block( j, i ),
+                                       BA->block( i, i ), nullptr, acc,
+                                       solve_option_t( block_wise, general_diag, store_inverse ) );
+                }// for
+            }
             
-        for ( uint  l = i+1; l < nbc; ++l )
-        {
-            solve_lower_left( apply_normal, BA->block( i, i ), nullptr,
-                              BA->block( i, l ), acc,
-                              solve_option_t( block_wise, unit_diag, store_inverse ) );
-        }// for
+            // #pragma omp section
+            {
+                #pragma omp parallel for
+                for ( uint  l = i+1; l < nbc; ++l )
+                {
+                    solve_lower_left( apply_normal, BA->block( i, i ), nullptr,
+                                      BA->block( i, l ), acc,
+                                      solve_option_t( block_wise, unit_diag, store_inverse ) );
+                }// for
+            }
+        }
             
+        #pragma omp parallel for collapse(2)
         for ( uint  j = i+1; j < nbr; ++j )
         {
             for ( uint  l = i+1; l < nbc; ++l )
@@ -320,10 +265,10 @@ lu ( TMatrix *          A,
     }// for
 }
 
-}// namespace Seq
+}// namespace OMP
 
 }// namespace TileH
 
 }// namespace HLR
 
-#endif // __HLR_SEQ_ARITH_HH
+#endif // __HLR_OMP_ARITH_HH

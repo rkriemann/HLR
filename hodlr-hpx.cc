@@ -1,132 +1,35 @@
 //
 // Project     : HLib
 // File        : tlr-hpx.cc
-// Description : TLR arithmetic with HPX
+// Description : HODLR LU with HPX
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include <hpx/hpx_init.hpp>
-#include <hpx/include/lcos.hpp>
 
-#include "approx.hh"
-#include "cmdline.inc"
-#include "problem.inc"
-#include "hodlr.hh"
-#include "hodlr.inc"
+#include "cmdline.hh"
+#include "gen_problem.hh"
+#include "cluster/hodlr.hh"
+#include "hpx/matrix.hh"
+#include "hpx/arith.hh"
 
-///////////////////////////////////////////////////////////////////////////////
-//
-// recursive approach
-//
-
-namespace HODLR
-{
-
-namespace HPX
-{
-
-template < typename value_t >
-void
-addlr ( B::Matrix< value_t > &  U,
-        B::Matrix< value_t > &  V,
-        TMatrix *               A,
-        const TTruncAcc &       acc )
-{
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "addlr( %d )", A->id() );
-    
-    if ( is_blocked( A ) )
-    {
-        auto  BA  = ptrcast( A, TBlockMatrix );
-        auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
-        auto  A11 = BA->block( 1, 1 );
-        
-        B::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), B::Range::all );
-        B::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), B::Range::all );
-        B::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), B::Range::all );
-        B::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), B::Range::all );
-
-        auto  task_00 = hpx::async( [&,A00] () { addlr( U0, V0, A00, acc ); } );
-        auto  task_11 = hpx::async( [&,A11] () { addlr( U1, V1, A11, acc ); } );
-        auto  task_01 = hpx::async( [&,A01] ()
-                        {
-                            auto [ U01, V01 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
-                                                                               { blas_mat_B< value_t >( A01 ), V1 },
-                                                                               acc );
-                            A01->set_lrmat( U01, V01 );
-                        } );
-        auto  task_10 = hpx::async( [&,A10] ()
-                        {
-                            auto [ U10, V10 ] = LR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
-                                                                               { blas_mat_B< value_t >( A10 ), V0 },
-                                                                               acc );
-                            A10->set_lrmat( U10, V10 );
-                        } );
-        auto  all = hpx::when_all( task_00, task_01, task_10, task_11 );
-
-        all.wait();
-    }// if
-    else
-    {
-        B::prod( value_t(1), U, B::adjoint( V ), value_t(1), blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
-    }// else
-}
-
-template < typename value_t >
-void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
-{
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
-    
-    if ( is_blocked( A ) )
-    {
-        auto  BA  = ptrcast( A, TBlockMatrix );
-        auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
-        auto  A11 = BA->block( 1, 1 );
-
-        HODLR::HPX::lu< value_t >( A00, acc );
-
-        auto  solve_01 = hpx::async( [A00,A01] () { trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
-        auto  solve_10 = hpx::async( [A00,A10] () { trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
-        auto  solve    = hpx::when_all( solve_01, solve_10 );
-
-        solve.wait();
-        
-        // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
-        auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
-
-        HODLR::HPX::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
-        
-        HODLR::HPX::lu< value_t >( A11, acc );
-    }// if
-    else
-    {
-        BLAS::invert( blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
-    }// else
-}
-
-}// namespace HPX
-
-}// namespace TLR
+using namespace HLR;
 
 //
 // main function
 //
+template < typename problem_t >
 void
 mymain ( int argc, char ** argv )
 {
-    auto  tic        = Time::Wall::now();
-    auto  problem    = gen_problem();
-    auto  coord      = problem->build_coord( n );
-    auto [ ct, bct ] = HODLR::cluster( coord.get(), ntile );
+    using value_t = typename problem_t::value_t;
+    
+    auto  tic     = Time::Wall::now();
+    auto  problem = gen_problem< problem_t >();
+    auto  coord   = problem->coordinates();
+    auto  ct      = HODLR::cluster( coord.get(), ntile );
+    auto  bct     = HODLR::blockcluster( ct.get(), ct.get() );
     
     if ( verbose( 3 ) )
     {
@@ -135,8 +38,11 @@ mymain ( int argc, char ** argv )
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
     
-    auto  A   = problem->build_matrix( bct.get(), fixed_rank( k ) );
-    auto  toc = Time::Wall::since( tic );
+    auto  coeff  = problem->coeff_func();
+    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  A      = Matrix::HPX::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
@@ -145,7 +51,7 @@ mymain ( int argc, char ** argv )
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "hlrtest_A" );
+        mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
     
     {
@@ -176,12 +82,18 @@ hpx_main ( int argc, char ** argv )
     {
         INIT();
 
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
+                  << "    CPU cores : " << Mach::cpuset() << std::endl;
+        
         CFG::set_verbosity( verbosity );
 
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        mymain( argc, argv );
+        if      ( appl == "logkernel" ) mymain< HLR::Apps::LogKernel >( argc, argv );
+        else if ( appl == "matern"    ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        else
+            throw "unknown application";
 
         DONE();
     }// try

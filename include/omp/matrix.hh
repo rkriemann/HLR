@@ -1,5 +1,5 @@
-#ifndef __HLR_TBB_MATRIX_HH
-#define __HLR_TBB_MATRIX_HH
+#ifndef __HLR_OMP_MATRIX_HH
+#define __HLR_OMP_MATRIX_HH
 //
 // Project     : HLib
 // File        : matrix.hh
@@ -10,9 +10,6 @@
 
 #include <cassert>
 #include <type_traits>
-
-#include <tbb/blocked_range2d.h>
-#include <tbb/parallel_for.h>
 
 #include <matrix/TMatrix.hh>
 #include <matrix/TBlockMatrix.hh>
@@ -26,7 +23,7 @@ namespace HLR
 namespace Matrix
 {
     
-namespace TBB
+namespace OMP
 {
 
 //
@@ -84,24 +81,19 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        tbb::parallel_for(
-            tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                          0, B->nblock_cols() ),
-            [&,bct] ( const tbb::blocked_range2d< uint > &  r )
+        #pragma omp parallel for collapse(2)
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                if ( bct->son( i, j ) != nullptr )
                 {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        if ( bct->son( i, j ) != nullptr )
-                        {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
-                            
-                            B->set_block( i, j, B_ij.release() );
-                        }// if
-                    }// for
-                }// for
-            } );
+                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                    
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
 
         M = std::move( B );
     }// else
@@ -113,10 +105,10 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
-}// namespace TBB
+}// namespace OMP
 
 }// namespace Matrix
 
 }// namespace HLR
 
-#endif // __HLR_TBB_MATRIX_HH
+#endif // __HLR_OMP_MATRIX_HH

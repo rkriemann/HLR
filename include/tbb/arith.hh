@@ -14,6 +14,7 @@
 
 #include <hlib.hh>
 
+#include "common/multiply.hh"
 #include "common/solve.hh"
 #include "seq/arith.hh"
 

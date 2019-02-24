@@ -59,8 +59,8 @@ build ( const HLIB::TBlockCluster *  bct,
     const auto                  colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
-    if ( std::max( rowis.size(), colis.size() ) <= 1000 )
-        return Seq::build_matrix( bct, coeff, lrapx, acc );
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return Matrix::Seq::build( bct, coeff, lrapx, acc );
         
     if ( bct->is_leaf() )
     {
@@ -92,11 +92,12 @@ build ( const HLIB::TBlockCluster *  bct,
                     {
                         if ( bct->son( i, j ) != nullptr )
                         {
-                            std::unique_ptr< TMatrix >  B_ij;
+                            tb.run( [bct,i,j,&B,&coeff,&lrapx,&acc]
+                                    {
+                                        auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
 
-                            tb.run( [&,bct,i,j] { build_matrix( bct->son( i, j ), coeff, lrapx, acc ); } );
-                            
-                            B->set_block( i, j, B_ij.release() );
+                                        B->set_block( i, j, B_ij.release() );
+                                    } );
                         }// if
                     }// for
                 }// for

@@ -57,12 +57,13 @@ env.Program( 'dag-seq.cc' )
 # OpenMP
 #
 
-# omp = env.Clone()
-# omp.Append( CXXFLAGS  = "-fopenmp" )
-# omp.Append( LINKFLAGS = "-fopenmp" )
+omp = env.Clone()
+omp.Append( CXXFLAGS  = "-fopenmp" )
+omp.Append( LINKFLAGS = "-fopenmp" )
 
-# omp.Program( 'tlr-omp.cc' )
-# omp.Program( 'hodlr-omp.cc' )
+omp.Program( 'tlr-omp.cc' )
+omp.Program( 'hodlr-omp.cc' )
+omp.Program( 'tileh-omp.cc' )
 
 #
 # TBB
@@ -94,19 +95,19 @@ tbb.Program( 'dag-tbb.cc' )
 # HPX
 #
 
-# hpx = env.Clone()
-# hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
-# hpx.MergeFlags( "-lhpx_iostreams" )
+hpx = env.Clone()
+hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags --libs hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
+hpx.MergeFlags( "-lhpx_iostreams" )
 
-# hpx.Program( 'tlr-hpx.cc' )
-# hpx.Program( 'hodlr-hpx.cc' )
+hpx.Program( 'tlr-hpx.cc' )
+hpx.Program( 'hodlr-hpx.cc' )
 
 #
 # TaskFlow
 #
 
-# tf = env.Clone()
-# tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
+tf = env.Clone()
+tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
 
-# tf.Program( 'tlr-tf.cc' )
-# tf.Program( 'hodlr-tf.cc' )
+tf.Program( 'tlr-tf.cc' )
+tf.Program( 'hodlr-tf.cc' )

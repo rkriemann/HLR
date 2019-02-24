@@ -14,7 +14,6 @@ using namespace HLIB;
 
 namespace B = HLIB::BLAS;
 
-#include "common/multiply.hh"
 #include "cmdline.hh"
 #include "gen_problem.hh"
 
