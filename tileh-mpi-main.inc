@@ -4,7 +4,7 @@ namespace fs = boost::filesystem;
 
 #include "mpi/mpi.hh"
 #include "mpi/distr.hh"
-#include "cluster/tlr.hh"
+#include "cluster/tileh.hh"
 #include "cmdline.hh"
 #include "gen_problem.hh"
 #include "utils/RedirectOutput.hh"
@@ -71,8 +71,8 @@ mymain ( int argc, char ** argv )
     auto  tic     = Time::Wall::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = TLR::cluster( coord.get(), ntile );
-    auto  bct     = TLR::blockcluster( ct.get(), ct.get() );
+    auto  ct      = TileH::cluster( coord.get(), ntile, std::max< uint >( 3, std::log2( nprocs )+2 ) );
+    auto  bct     = TileH::blockcluster( ct.get(), ct.get() );
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) distribution::cyclic_2d( nprocs, bct->root() );

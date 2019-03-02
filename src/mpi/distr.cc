@@ -11,7 +11,7 @@
 
 #include "utils/tensor.hh"
 
-#include "distr.hh"
+#include "mpi/distr.hh"
 
 namespace distribution
 {
@@ -82,9 +82,6 @@ cyclic_2d ( const uint       nprocs,
     block_rows.sort( [] ( const TIndexSet & is1, const TIndexSet & is2 ) { return is1.is_strictly_left_of( is2 ); } );
     block_cols.sort( [] ( const TIndexSet & is1, const TIndexSet & is2 ) { return is1.is_strictly_left_of( is2 ); } );
 
-    const uint  nrows = block_rows.size();
-    const uint  ncols = block_cols.size();
-    
     //
     // set processor based on index in block grid
     //

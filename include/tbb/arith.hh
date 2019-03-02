@@ -3,7 +3,7 @@
 //
 // Project     : HLib
 // File        : arith.hh
-// Description : sequential arithmetic functions
+// Description : arithmetic functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

@@ -18,6 +18,8 @@
 namespace HLR
 {
 
+using namespace HLIB;
+
 namespace Matrix
 {
     
@@ -43,8 +45,6 @@ build ( const HLIB::TBlockCluster *  bct,
                    "coefficient function and low-rank approximation must have equal value type" );
     
     assert( bct != nullptr );
-    
-    using  value_t = typename coeff_t::value_t;
     
     //
     // decide upon cluster type, how to construct matrix

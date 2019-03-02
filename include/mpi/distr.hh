@@ -1,5 +1,5 @@
-#ifndef __DISTR_HH
-#define __DISTR_HH
+#ifndef __HLR_DISTR_HH
+#define __HLR_DISTR_HH
 //
 // Project     : HLR-HPC
 // File        : distr.cc
@@ -29,4 +29,4 @@ shifted_cyclic_1d ( const uint             nprocs,
 
 }// namespace distribution
 
-#endif  // __DISTR_HH
+#endif  // __HLR_DISTR_HH
