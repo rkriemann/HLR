@@ -5,8 +5,8 @@ debug   = True
 warn    = False
 fullmsg = False
 
-CXX      = 'g++-9'
-CXXFLAGS = '-std=c++2a'
+CXX      = 'g++'
+CXXFLAGS = '-std=c++17'
 
 ######################################################################
 #
