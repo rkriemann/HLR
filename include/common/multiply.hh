@@ -8,7 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "approx.hh"
+#include "common/approx.hh"
+#include "utils/log.hh"
 
 namespace HLR
 {
@@ -202,7 +203,7 @@ multiply ( const value_t      alpha,
     if      ( is_dense(   B ) ) multiply< value_t, matrix1_t, TDenseMatrix >( alpha, A, cptrcast( B, TDenseMatrix ), C, acc );
     else if ( is_lowrank( B ) ) multiply< value_t, matrix1_t, TRkMatrix >(    alpha, A, cptrcast( B, TRkMatrix ),    C, acc );
     else
-        assert( false );
+        HLR::error( "unsupported matrix type : " + B->typestr() );
 }
 
 template < typename value_t >
@@ -216,7 +217,7 @@ multiply ( const value_t      alpha,
     if      ( is_dense(   A ) ) multiply< value_t, TDenseMatrix >( alpha, cptrcast( A, TDenseMatrix ), B, C, acc );
     else if ( is_lowrank( A ) ) multiply< value_t, TRkMatrix >(    alpha, cptrcast( A, TRkMatrix ),    B, C, acc );
     else
-        assert( false );
+        HLR::error( "unsupported matrix type : " + B->typestr() );
 }
 
 }// namespace HLR

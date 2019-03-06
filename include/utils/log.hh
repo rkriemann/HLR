@@ -20,6 +20,17 @@ namespace HLR
 //
 template < typename msg_t >
 void
+error ( const msg_t &  msg )
+{
+    std::cout << msg << std::endl;
+    std::exit( 1 );
+}
+
+//
+// logging function
+//
+template < typename msg_t >
+void
 log ( const int      lvl,
       const msg_t &  msg )
 {

@@ -160,6 +160,10 @@ lu ( TMatrix *          A,
             BLAS::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
+        // nothing to solve/update at last step
+        if ( i == nbr-1 )
+            break;
+        
         if ( contains( col_procs[i], pid ) )
         {
             //
@@ -481,8 +485,7 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        log( 4, "────────────────────────────────────────────────" );
-        log( 4, HLIB::to_string( "step %d", i ) );
+        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = BA->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -495,6 +498,10 @@ lu ( TMatrix *          A,
             HLIB::LU::factorise_rec( A_ii, acc );
         }// if
 
+        // nothing to solve/update at last step
+        if ( i == nbr-1 )
+            break;
+        
         if ( contains( col_procs[i], pid ) || contains( row_procs[i], pid ) )
         {
             //
@@ -589,6 +596,13 @@ lu ( TMatrix *          A,
                     solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
                 }// if
             }// for
+
+            if ( pid == p_ii )
+            {
+                col_req_ii.wait();
+                if ( col_procs[i] != row_procs[i] )
+                    row_req_ii.wait();
+            }// if
         }
         
         //
@@ -720,6 +734,36 @@ lu ( TMatrix *          A,
         }// for
 
         max_add_mem = std::max( max_add_mem, add_mem );
+
+        //
+        // wait also on sending processor
+        //
+        
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            if ( pid == BA->block( j, i )->procs().master() )
+                row_reqs[j].wait();
+        }
+        
+        for ( uint  l = i+1; l < nbc; ++l )
+        {
+            if ( pid == BA->block( i, l )->procs().master() )
+                col_reqs[l].wait();
+        }// for
+        
+        max_add_mem = std::max( max_add_mem, add_mem );
+
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            if ( row_reqs[j].mpi_request != MPI_REQUEST_NULL )
+                HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+        }// for
+
+        for ( uint  l = i+1; l < nbc; ++l )
+        {
+            if ( col_reqs[l].mpi_request != MPI_REQUEST_NULL )
+                HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+        }// for
     }// for
 
     // std::cout << "  time in MPI : " << HLIB::to_string( "%.2fs", time_mpi ) << std::endl;

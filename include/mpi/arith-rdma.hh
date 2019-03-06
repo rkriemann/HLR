@@ -52,6 +52,8 @@ rget ( mpi::window &                    win,
        HLIB::BLAS::Matrix< value_t > &  M,
        const int                        root )
 {
+    HLR::log( 5, HLIB::to_string( "rget: %d × %d from %d", M.nrows(), M.ncols(), root ) );
+    
     mpi::request  req;
     const size_t  count = M.nrows() * M.ncols() * sizeof(value_t);
     
@@ -61,7 +63,7 @@ rget ( mpi::window &                    win,
                         0, count, MPI_BYTE,        // offset in root buffer
                         MPI_Win( win ), & req.mpi_request ) );
 
-    return req;
+    return std::move( req );
 }
 
 template < typename value_t >
@@ -74,24 +76,28 @@ setup_rdma ( mpi::communicator &  comm,
     
     if ( is_dense( A ) )
     {
+        HLR::log( 5, HLIB::to_string( "setup_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
+                  
         wins.reserve( 1 );
         wins[0] = mpi::window( comm, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols() );
         wins[0].fence( MPI_MODE_NOPUT | MPI_MODE_NOPRECEDE );
     }// if
     else if ( is_lowrank( A ) )
     {
+        HLR::log( 5, HLIB::to_string( "setup_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), rank ) );
+        
         auto  R = ptrcast( A, TRkMatrix );
         
         R->set_rank( rank );
         
         wins.reserve( 2 );
-        wins[0] = mpi::window( comm, blas_mat_A< value_t >( R ).data(), A->nrows() * rank );
+        wins[0] = mpi::window( comm, blas_mat_A< value_t >( R ).data(), R->nrows() * rank );
         wins[0].fence( MPI_MODE_NOPUT | MPI_MODE_NOPRECEDE );
-        wins[1] = mpi::window( comm, blas_mat_B< value_t >( R ).data(), A->ncols() * rank );
+        wins[1] = mpi::window( comm, blas_mat_B< value_t >( R ).data(), R->ncols() * rank );
         wins[1].fence( MPI_MODE_NOPUT | MPI_MODE_NOPRECEDE );
     }// if
     else
-        assert( false );
+        HLR::error( "(setup_rdma) unsupported matrix type : " + A->typestr() ) ;
 
     return wins;
 }
@@ -108,17 +114,21 @@ request_rdma ( std::vector< mpi::window > &  wins,
 
     if ( is_dense( A ) )
     {
+        HLR::log( 5, HLIB::to_string( "request_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
+        
         reqs.push_back( rget( wins[0], blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ), root ) );
     }// if
     else if ( is_lowrank( A ) )
     {
+        HLR::log( 5, HLIB::to_string( "request_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
+        
         reqs.push_back( rget( wins[0], blas_mat_A< value_t >( ptrcast( A, TRkMatrix ) ), root ) );
         reqs.push_back( rget( wins[1], blas_mat_B< value_t >( ptrcast( A, TRkMatrix ) ), root ) );
     }// if
     else
-        assert( false );
+        HLR::error( "(request_rdma) unsupported matrix type : " + A->typestr() ) ;
 
-    return reqs;
+    return std::move( reqs );
 }
 
 void
@@ -131,7 +141,10 @@ void
 finish_rdma( std::vector< mpi::window > &  wins )
 {
     for ( auto &  win : wins )
+    {
         win.fence( MPI_MODE_NOSUCCEED );
+        win.free();
+    }// for
 }
 
 template < typename value_t >
@@ -187,15 +200,14 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        // DBG::print(  "────────────────────────────────────────────────" );
-        // DBG::printf( "step %d", i );
+        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
 
         if ( pid == p_ii )
         {
-            // DBG::printf( "invert( %d )", A_ii->id() );
+            HLR::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
             BLAS::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
@@ -207,7 +219,6 @@ lu ( TMatrix *          A,
 
             std::unique_ptr< TMatrix >   T_ii;        // temporary storage with auto-delete
             TMatrix *                    H_ii = A_ii; // handle for A_ii/T_ii
-            std::vector< mpi::window >   diag_wins;
             std::vector< mpi::request >  diag_reqs;
             
             if ( pid != p_ii )
@@ -217,7 +228,7 @@ lu ( TMatrix *          A,
             }// if
 
             // set up windows/attached memory 
-            diag_wins = setup_rdma< value_t >( col_comms[i], H_ii, rank );
+            auto  diag_wins = setup_rdma< value_t >( col_comms[i], H_ii, rank );
 
             // and start get requests
             if ( pid != p_ii )
@@ -238,6 +249,8 @@ lu ( TMatrix *          A,
                     // L is unit diagonal !!! Only solve with U
                     auto        A_ji = BA->block( j, i );
                     const auto  p_ji = A_ji->procs().master();
+
+                    std::cout << "solve : " << A_ji->id() << ", " << pid << ", " << p_ji << std::endl;
                     
                     if ( pid == p_ji )
                     {

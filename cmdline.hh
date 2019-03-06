@@ -25,6 +25,7 @@ string  appl      = "logkernel";
 string  distr     = "cyclic2d";
 uint    nthreads  = 0;
 uint    verbosity = 1;
+bool    noredir   = false;
 
 void
 parse_cmdline ( int argc, char ** argv )
@@ -47,6 +48,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
+        ( "noredir",                      ": do not redirect output (MPI only)" )
         ;
 
     //
@@ -87,6 +89,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();
     if ( vm.count( "app"       ) ) appl      = vm["app"].as<string>();
     if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
+    if ( vm.count( "noredir"   ) ) noredir   = true;
 
     assert( ( appl == "logkernel" ) || ( appl == "matern" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );

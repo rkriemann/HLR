@@ -278,15 +278,16 @@ public:
         win._mpi_window = MPI_WIN_NULL;
     }
 
-    window ( const window &  win )
-            : _mpi_window( win._mpi_window )
-    {}
+    // window ( const window &  win )
+    //         : _mpi_window( win._mpi_window )
+    // {}
 
     ~window ()
     {
         if ( _mpi_window != MPI_WIN_NULL )
-            MPI_CHECK_RESULT( MPI_Win_free,
-                              ( & _mpi_window ) );
+            HLR::log( 0, "window is not free" );
+            // MPI_CHECK_RESULT( MPI_Win_free,
+            //                   ( & _mpi_window ) );
     }
 
     operator MPI_Win () const { return _mpi_window; }
@@ -300,13 +301,13 @@ public:
         return *this;
     }
     
-    window &
-    operator = ( const window &  win )
-    {
-        _mpi_window = win._mpi_window;
+    // window &
+    // operator = ( const window &  win )
+    // {
+    //     _mpi_window = win._mpi_window;
 
-        return *this;
-    }
+    //     return *this;
+    // }
 
     void
     fence ( int mode )
@@ -351,6 +352,16 @@ public:
                             _mpi_window, & req ) );
 
         return req;
+    }
+
+    void free ()
+    {
+        assert( _mpi_window != MPI_WIN_NULL );
+        
+        MPI_CHECK_RESULT( MPI_Win_free,
+                          ( & _mpi_window ) );
+
+        _mpi_window = MPI_WIN_NULL;
     }
 };
 

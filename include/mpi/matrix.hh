@@ -161,7 +161,8 @@ build_row_comms ( const TBlockMatrix *                             A,
             }// if
         }// for
 
-        std::cout << i << " : " << to_string( procs ) << " (" << ( pos == nbr ? i : pos ) << ")" << std::endl;
+        if ( HLIB::verbose( 4 ) )
+            std::cout << i << " : " << to_string( procs ) << " (" << ( pos == nbr ? i : pos ) << ")" << std::endl;
             
         // use previously created communicator or create new if none found
         if ( pos < nbr )
@@ -218,8 +219,9 @@ build_col_comms ( const TBlockMatrix *                             A,
                 break;
             }// if
         }// for
-            
-        std::cout << j << " : " << to_string( procs ) << " (" << ( pos == nbc ? j : pos ) << ")" << std::endl;
+
+        if ( HLIB::verbose( 4 ) )
+            std::cout << j << " : " << to_string( procs ) << " (" << ( pos == nbc ? j : pos ) << ")" << std::endl;
 
         // use previously created communicator or create new if none found
         if ( pos < nbc )

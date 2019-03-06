@@ -89,13 +89,13 @@ main ( int argc, char ** argv )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
+    parse_cmdline( argc, argv );
+    
     // redirect output for all except proc 0
-    std::unique_ptr< RedirectOutput >  redir_out = ( pid != 0
+    std::unique_ptr< RedirectOutput >  redir_out = ( ! noredir && (pid != 0)
                                                      ? std::make_unique< RedirectOutput >( to_string( "tlr-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
-    parse_cmdline( argc, argv );
-    
     try
     {
         INIT();

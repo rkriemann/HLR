@@ -13,6 +13,7 @@
 #include <matrix/TGhostMatrix.hh>
 
 #include <utils/tensor.hh>
+#include <utils/log.hh>
 
 namespace HLR
 {
@@ -47,8 +48,16 @@ create_matrix ( const TMatrix *  A,
     
     std::unique_ptr< TMatrix >  T;
 
-    if      ( type == TYPE_DENSE ) T = std::make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
-    else if ( type == TYPE_LR )    T = std::make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
+    if ( type == TYPE_DENSE )
+    {
+        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
+        T = std::make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
+    }// if
+    else if ( type == TYPE_LR )
+    {
+        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
+        T = std::make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
+    }// if
 
     T->set_id( A->id() );
     T->set_procs( ps_single( proc ) );
