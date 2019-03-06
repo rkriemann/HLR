@@ -51,7 +51,7 @@ build ( const HLIB::TBlockCluster *  bct,
                    typename lrapx_t::value_t >::value,
                    "coefficient function and low-rank approximation must have equal value type" );
 
-    using  value_t = coeff_t::value_t;
+    using  value_t = typename coeff_t::value_t;
     
     assert( bct != nullptr );
 

@@ -105,6 +105,8 @@ public:
     void
     wait ()
     {
+        assert( mpi_request != MPI_REQUEST_NULL );
+        
         MPI_CHECK_RESULT( MPI_Wait,
                           ( & mpi_request, MPI_STATUSES_IGNORE ) );
         mpi_request = MPI_REQUEST_NULL;
@@ -117,7 +119,11 @@ wait_all ( std::vector< request > &  reqs )
     std::vector< MPI_Request >  requests( reqs.size() );
     
     for ( int  i = 0; i < reqs.size(); ++i )
+    {
+        assert( reqs[i].mpi_request != MPI_REQUEST_NULL );
+        
         requests[i] = reqs[i].mpi_request;
+    }// for
 
     MPI_CHECK_RESULT( MPI_Waitall,
                       ( reqs.size(), & requests[0], MPI_STATUSES_IGNORE ) );

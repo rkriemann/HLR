@@ -91,7 +91,7 @@ main ( int argc, char ** argv )
     
     // redirect output for all except proc 0
     std::unique_ptr< RedirectOutput >  redir_out = ( pid != 0
-                                                     ? make_unique< RedirectOutput >( to_string( "tlrmpi_%03d.out", pid ) )
+                                                     ? std::make_unique< RedirectOutput >( to_string( "tileh-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
     parse_cmdline( argc, argv );

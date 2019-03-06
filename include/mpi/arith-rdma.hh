@@ -124,15 +124,7 @@ request_rdma ( std::vector< mpi::window > &  wins,
 void
 wait_rdma ( std::vector< mpi::request > &  reqs )
 {
-    std::vector< MPI_Request >  requests;
-    
-    requests.reserve( reqs.size() );
-    
-    for ( auto  req : reqs )
-        requests.push_back( MPI_Request(req) );
-
-    MPI_CHECK_RESULT( MPI_Waitall,
-                      ( reqs.size(), & requests[0], MPI_STATUSES_IGNORE ) );
+    wait_all( reqs );
 }
 
 void
