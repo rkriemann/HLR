@@ -88,10 +88,10 @@ public:
 
     ~request ()
     {
-        assert( mpi_request == MPI_REQUEST_NULL );
+        // assert( mpi_request == MPI_REQUEST_NULL );
         if ( mpi_request != MPI_REQUEST_NULL )
         {
-            HLR::log( 4, "break" );
+            HLR::log( 0, "open request" );
         }// if
         
         // if ( mpi_request != MPI_REQUEST_NULL )

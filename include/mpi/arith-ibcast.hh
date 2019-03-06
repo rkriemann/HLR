@@ -57,7 +57,7 @@ ibroadcast ( mpi::communicator &  comm,
              const int            root_proc,
              const int            rank )
 {
-    log( 4, HLIB::to_string( "START broadcast( %d ) from %d", A->id(), root_proc ) );
+    log( 4, HLIB::to_string( "broadcast( %d ) from %d", A->id(), root_proc ) );
 
     std::vector< mpi::request >  reqs;
     
@@ -87,10 +87,8 @@ ibroadcast ( mpi::communicator &  comm,
     }// if
     else
         assert( false );
-
-    log( 4, HLIB::to_string( "END broadcast( %d ) from %d", A->id(), root_proc ) );
     
-    return reqs;
+    return std::move( reqs );
 }
 
 //
@@ -132,7 +130,7 @@ lu ( TMatrix *          A,
     // set up communicators for rows/cols
     //
 
-    std::vector< mpi::communicator >              row_comms( nbr ), col_comms( nbc );  // communicators for rows/columns
+    std::vector< mpi::communicator >               row_comms( nbr ), col_comms( nbc );  // communicators for rows/columns
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
@@ -151,8 +149,7 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        // DBG::print(  "────────────────────────────────────────────────" );
-        // DBG::printf( "step %d", i );
+        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
@@ -178,7 +175,6 @@ lu ( TMatrix *          A,
                 H_ii = T_ii.get();
             }// if
             
-            // DBG::printf( "broadcast( %d ) from %d", A_ii->id(), p_ii );
             auto  diag_reqs{ ibroadcast< value_t >( col_comms[i], H_ii, col_maps[i][p_ii], rank ) };
 
             //
@@ -188,10 +184,10 @@ lu ( TMatrix *          A,
             bool        have_diag = ( pid == p_ii );
             std::mutex  req_mtx;
             
-            tbb::parallel_for(
-                i+1, nbr,
-                [&,A,H_ii,i,pid,p_ii] ( uint  j )
-                // for ( uint  j = i+1; j < nbr; ++j )
+            // tbb::parallel_for(
+            //     i+1, nbr,
+            //     [&,A,H_ii,i,pid,p_ii] ( uint  j )
+                for ( uint  j = i+1; j < nbr; ++j )
                 {
                     // L is unit diagonal !!! Only solve with U
                     auto        A_ji = BA->block( j, i );
@@ -212,14 +208,19 @@ lu ( TMatrix *          A,
                             }// if
                         }
                     
-                        // DBG::printf( "solve_U( %d, %d )", H_ii->id(), A->block( j, i )->id() );
                         trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
                     }// if
-                } );
+                } // );
 
             // wait also on sending processor
             if ( pid == p_ii )
                 wait_all( diag_reqs );
+
+            for ( auto & req : diag_reqs )
+            {
+                if ( req.mpi_request != MPI_REQUEST_NULL )
+                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+            }// for
         }
         
         //
@@ -279,21 +280,21 @@ lu ( TMatrix *          A,
         // update of trailing sub-matrix
         //
         
-        std::vector< bool >        row_done( nbr, false );  // signals finished broadcast
-        std::vector< bool >        col_done( nbc, false );
-        std::vector< std::mutex >  row_mtx( nbr );          // mutices for access to requests
-        std::vector< std::mutex >  col_mtx( nbc );
+        std::vector< bool >           row_done( nbr, false );  // signals finished broadcast
+        std::vector< bool >           col_done( nbc, false );
+        std::vector< std::mutex >     row_mtx( nbr );          // mutices for access to requests
+        std::vector< std::mutex >     col_mtx( nbc );
+        tbb::blocked_range2d< uint >  range( i+1, nbr,
+                                             i+1, nbc );
         
-        tbb::parallel_for(
-            tbb::blocked_range2d< uint >( i+1, nbr,
-                                          i+1, nbc ),
-            [&,BA,i,pid] ( const tbb::blocked_range2d< uint > & r )
+        // tbb::parallel_for( blocks,
+        //     [&,BA,i,pid] ( const tbb::blocked_range2d< uint > & range )
             {
-                for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                for ( auto  j = range.rows().begin(); j != range.rows().end(); ++j )
                 {
                     const auto  p_ji = BA->block( j, i )->procs().master();
                     
-                    for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
+                    for ( uint  l = range.cols().begin(); l != range.cols().end(); ++l )
                     {
                         const auto  p_il = BA->block( i, l )->procs().master();
                 
@@ -342,7 +343,7 @@ lu ( TMatrix *          A,
                         }// if
                     }// for
                 }// for
-            } );
+            } // );
 
         //
         // wait also on sending processor
@@ -361,6 +362,24 @@ lu ( TMatrix *          A,
         }// for
         
         max_add_mem = std::max( max_add_mem, add_mem );
+
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            for ( auto & req : row_reqs[j] )
+            {
+                if ( req.mpi_request != MPI_REQUEST_NULL )
+                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+            }// for
+        }// for
+
+        for ( uint  l = i+1; l < nbc; ++l )
+        {
+            for ( auto & req : col_reqs[l] )
+            {
+                if ( req.mpi_request != MPI_REQUEST_NULL )
+                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+            }// for
+        }// for
     }// for
 
     // std::cout << "  time in MPI : " << to_string( "%.2fs", time_mpi ) << std::endl;
