@@ -330,7 +330,7 @@ broadcast ( mpi::communicator &  comm,
 
     comm.broadcast( size, root_proc );
 
-    log( 5, to_string( "bs size = %d", size ) );
+    log( 5, HLIB::to_string( "bs size = %d", size ) );
     
     if ( bs.size() != size )
         bs.set_size( size );
@@ -353,7 +353,7 @@ lu ( TMatrix *          A,
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    log( 4, to_string( "lu( %d )", A->id() ) );
+    log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
 
     auto  BA  = ptrcast( A, TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -382,7 +382,7 @@ lu ( TMatrix *          A,
         size_t  add_mem = 0;
         
         log( 4, "────────────────────────────────────────────────" );
-        log( 4, to_string( "step %d", i ) );
+        log( 4, HLIB::to_string( "step %d", i ) );
         
         auto  A_ii = BA->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -391,7 +391,7 @@ lu ( TMatrix *          A,
         
         if ( pid == p_ii )
         {
-            log( 4, to_string( "lu( %d )", A_ii->id() ) );
+            log( 4, HLIB::to_string( "lu( %d )", A_ii->id() ) );
             HLIB::LU::factorise_rec( A_ii, acc );
         }// if
 
@@ -409,7 +409,7 @@ lu ( TMatrix *          A,
 
             if ( pid == p_ii )
             {
-                log( 4, to_string( "serialization of %d ", A_ii->id() ) );
+                log( 4, HLIB::to_string( "serialization of %d ", A_ii->id() ) );
                 
                 bs.set_size( A_ii->bs_size() );
                 A_ii->write( bs );
@@ -418,20 +418,20 @@ lu ( TMatrix *          A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( col_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( col_procs[i] ) );
                 broadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( row_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( row_procs[i] ) );
                 broadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
             
             // and reconstruct matrix
             if ( pid != p_ii )
             {
-                log( 4, to_string( "construction of %d ", A_ii->id() ) );
+                log( 4, HLIB::to_string( "construction of %d ", A_ii->id() ) );
                 
                 TBSHMBuilder  bs_hbuild;
 
@@ -460,7 +460,7 @@ lu ( TMatrix *          A,
                 
                 if ( pid == p_ji )
                 {
-                    log( 4, to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
+                    log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
                     solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
                 }// if
             }// for
@@ -475,7 +475,7 @@ lu ( TMatrix *          A,
                 
                 if ( pid == p_il )
                 {
-                    log( 4, to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
+                    log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
                     solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
                 }// if
             }// for
@@ -502,20 +502,20 @@ lu ( TMatrix *          A,
                 
                 if ( pid == p_ji )
                 {
-                    log( 4, to_string( "serialisation of %d ", A_ji->id() ) );
+                    log( 4, HLIB::to_string( "serialisation of %d ", A_ji->id() ) );
                     
                     bs.set_size( A_ji->bs_size() );
                     A_ji->write( bs );
                     row_i[j] = A_ji;
                 }// if
                 
-                log( 4, to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + to_string( row_procs[j] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + HLR::to_string( row_procs[j] ) );
                 
                 broadcast( row_comms[j], bs, row_maps[j][p_ji] );
 
                 if ( pid != p_ji )
                 {
-                    log( 4, to_string( "construction of %d ", A_ji->id() ) );
+                    log( 4, HLIB::to_string( "construction of %d ", A_ji->id() ) );
                     
                     TBSHMBuilder  bs_hbuild;
 
@@ -539,20 +539,20 @@ lu ( TMatrix *          A,
                 
                 if ( pid == p_il )
                 {
-                    log( 4, to_string( "serialisation of %d ", A_il->id() ) );
+                    log( 4, HLIB::to_string( "serialisation of %d ", A_il->id() ) );
                     
                     bs.set_size( A_il->bs_size() );
                     A_il->write( bs );
                     col_i[l] = A_il;
                 }// if
                 
-                log( 4, to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + to_string( col_procs[l] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + HLR::to_string( col_procs[l] ) );
                 
                 broadcast( col_comms[l], bs, col_maps[l][p_il] );
 
                 if ( pid != p_il )
                 {
-                    log( 4, to_string( "construction of %d ", A_il->id() ) );
+                    log( 4, HLIB::to_string( "construction of %d ", A_il->id() ) );
                     
                     TBSHMBuilder  bs_hbuild;
 
@@ -587,7 +587,7 @@ lu ( TMatrix *          A,
                 
                 if ( pid == p_jl )
                 {
-                    log( 4, to_string( "update of %d with %d × %d", A_jl->id(), A_ji->id(), A_il->id() ) );
+                    log( 4, HLIB::to_string( "update of %d with %d × %d", A_jl->id(), A_ji->id(), A_il->id() ) );
                     
                     multiply( -1.0, A_ji, A_il, 1.0, A_jl, acc );
                 }// if
@@ -595,7 +595,7 @@ lu ( TMatrix *          A,
         }// for
     }// for
 
-    // std::cout << "  time in MPI : " << to_string( "%.2fs", time_mpi ) << std::endl;
+    // std::cout << "  time in MPI : " << HLIB::to_string( "%.2fs", time_mpi ) << std::endl;
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 

@@ -12,11 +12,14 @@
 #include <cassert>
 #include <vector>
 
+#include <utils/log.hh>
+
 namespace mpi
 {
 
 #define MPI_CHECK_RESULT( MPIFunc, Args )                               \
     {                                                                   \
+        HLR::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #MPIFunc ); \
         int _check_result = MPIFunc Args;                               \
         assert(_check_result == MPI_SUCCESS);                           \
     }
@@ -62,6 +65,12 @@ public:
             : mpi_request( req )
     {}
 
+    request ( request &&  req )
+            : mpi_request( req.mpi_request )
+    {
+        req.mpi_request = MPI_REQUEST_NULL;
+    }
+
     request &
     operator = ( MPI_Request  req )
     {
@@ -69,10 +78,24 @@ public:
         return *this;
     }
 
+    request &
+    operator = ( request &&  req )
+    {
+        mpi_request     = req.mpi_request;
+        req.mpi_request = MPI_REQUEST_NULL;
+        return *this;
+    }
+
     ~request ()
     {
+        assert( mpi_request == MPI_REQUEST_NULL );
         if ( mpi_request != MPI_REQUEST_NULL )
-            wait();
+        {
+            HLR::log( 4, "break" );
+        }// if
+        
+        // if ( mpi_request != MPI_REQUEST_NULL )
+        //     wait();
     }
     
     // access MPI communicator
@@ -98,6 +121,9 @@ wait_all ( std::vector< request > &  reqs )
 
     MPI_CHECK_RESULT( MPI_Waitall,
                       ( reqs.size(), & requests[0], MPI_STATUSES_IGNORE ) );
+
+    for ( auto &  req : reqs )
+        req.mpi_request = MPI_REQUEST_NULL;
 }
 
 //

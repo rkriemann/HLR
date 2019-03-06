@@ -8,22 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <iostream>
 #include <sstream>
 
 #include <base/config.hh>
 
-//
-// logging function
-//
-template < typename msg_t >
-void
-log ( const int      lvl,
-      const msg_t &  msg )
+namespace HLR
 {
-    if ( HLIB::verbose( lvl ) )
-        std::cout << msg << std::endl;
-}
 
 //
 // simplifies test if <val> is in <cont>
@@ -72,5 +62,7 @@ to_string ( container_t< value_t > const &  cont )
 
     return out.str();
 }
+
+}// namespace HLR
 
 #endif // __HLR_TOOLS_HH

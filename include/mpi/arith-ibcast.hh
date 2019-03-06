@@ -22,6 +22,7 @@
 #include <algebra/mat_mul.hh>
 
 #include "utils/tools.hh"
+#include "utils/log.hh"
 #include "common/multiply.hh"
 #include "common/solve.hh"
 #include "mpi/arith.hh"
@@ -56,7 +57,7 @@ ibroadcast ( mpi::communicator &  comm,
              const int            root_proc,
              const int            rank )
 {
-    // DBG::printf( "broadcast( %d ) from %d", A->id(), root_proc );
+    log( 4, HLIB::to_string( "START broadcast( %d ) from %d", A->id(), root_proc ) );
 
     std::vector< mpi::request >  reqs;
     
@@ -66,7 +67,8 @@ ibroadcast ( mpi::communicator &  comm,
     {
         auto  D = ptrcast( A, TDenseMatrix );
         
-        reqs = { comm.ibroadcast( blas_mat< value_t >( D ).data(), D->nrows() * D->ncols(), root_proc ) };
+        reqs.reserve( 1 );
+        reqs.push_back( comm.ibroadcast( blas_mat< value_t >( D ).data(), D->nrows() * D->ncols(), root_proc ) );
     }// if
     else if ( is_lowrank( A ) )
     {
@@ -86,6 +88,8 @@ ibroadcast ( mpi::communicator &  comm,
     else
         assert( false );
 
+    log( 4, HLIB::to_string( "END broadcast( %d ) from %d", A->id(), root_proc ) );
+    
     return reqs;
 }
 
@@ -175,7 +179,7 @@ lu ( TMatrix *          A,
             }// if
             
             // DBG::printf( "broadcast( %d ) from %d", A_ii->id(), p_ii );
-            auto  diag_reqs = ibroadcast< value_t >( col_comms[i], H_ii, col_maps[i][p_ii], rank );
+            auto  diag_reqs{ ibroadcast< value_t >( col_comms[i], H_ii, col_maps[i][p_ii], rank ) };
 
             //
             // off-diagonal solve
@@ -212,6 +216,10 @@ lu ( TMatrix *          A,
                         trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
                     }// if
                 } );
+
+            // wait also on sending processor
+            if ( pid == p_ii )
+                wait_all( diag_reqs );
         }
         
         //
@@ -336,6 +344,22 @@ lu ( TMatrix *          A,
                 }// for
             } );
 
+        //
+        // wait also on sending processor
+        //
+        
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            if ( contains( row_procs[j], pid ) && ( pid == BA->block( j, i )->procs().master() ))
+                wait_all( row_reqs[j] );
+        }
+        
+        for ( uint  l = i+1; l < nbc; ++l )
+        {
+            if ( contains( col_procs[l], pid ) && ( pid == BA->block( i, l )->procs().master() ))
+                wait_all( col_reqs[l] );
+        }// for
+        
         max_add_mem = std::max( max_add_mem, add_mem );
     }// for
 
@@ -390,7 +414,7 @@ ibroadcast ( mpi::communicator &  comm,
 
     comm.broadcast( size, root_proc );
 
-    log( 5, to_string( "bs size = %d", size ) );
+    log( 5, HLIB::to_string( "bs size = %d", size ) );
     
     if ( bs.size() != size )
         bs.set_size( size );
@@ -412,7 +436,7 @@ lu ( TMatrix *          A,
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    log( 4, to_string( "lu( %d )", A->id() ) );
+    log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
 
     auto  BA  = ptrcast( A, TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -439,7 +463,7 @@ lu ( TMatrix *          A,
         size_t  add_mem = 0;
         
         log( 4, "────────────────────────────────────────────────" );
-        log( 4, to_string( "step %d", i ) );
+        log( 4, HLIB::to_string( "step %d", i ) );
         
         auto  A_ii = BA->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -448,7 +472,7 @@ lu ( TMatrix *          A,
         
         if ( pid == p_ii )
         {
-            log( 4, to_string( "lu( %d )", A_ii->id() ) );
+            log( 4, HLIB::to_string( "lu( %d )", A_ii->id() ) );
             HLIB::LU::factorise_rec( A_ii, acc );
         }// if
 
@@ -465,7 +489,7 @@ lu ( TMatrix *          A,
 
             if ( pid == p_ii )
             {
-                log( 4, to_string( "serialization of %d ", A_ii->id() ) );
+                log( 4, HLIB::to_string( "serialization of %d ", A_ii->id() ) );
                 
                 bs.set_size( A_ii->bs_size() );
                 A_ii->write( bs );
@@ -474,13 +498,13 @@ lu ( TMatrix *          A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( col_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( col_procs[i] ) );
                 col_req_ii = ibroadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                log( 4, to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + to_string( row_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( row_procs[i] ) );
                 row_req_ii = ibroadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
             
@@ -495,7 +519,7 @@ lu ( TMatrix *          A,
                 {
                     if ( ! recv_ii )
                     {
-                        log( 4, to_string( "construction of %d ", A_ii->id() ) );
+                        log( 4, HLIB::to_string( "construction of %d ", A_ii->id() ) );
 
                         if ( contains( col_procs[i], pid ) ) col_req_ii.wait();
                         else                                 row_req_ii.wait();
@@ -524,7 +548,7 @@ lu ( TMatrix *          A,
                     if ( pid != p_ii )
                         wait_ii();
             
-                    log( 4, to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
+                    log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
                     solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
                 }// if
             }// for
@@ -542,7 +566,7 @@ lu ( TMatrix *          A,
                     if ( pid != p_ii )
                         wait_ii();
                     
-                    log( 4, to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
+                    log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
                     solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
                 }// if
             }// for
@@ -571,14 +595,14 @@ lu ( TMatrix *          A,
             {
                 if ( pid == p_ji )
                 {
-                    log( 4, to_string( "serialisation of %d ", A_ji->id() ) );
+                    log( 4, HLIB::to_string( "serialisation of %d ", A_ji->id() ) );
                     
                     row_i_bs[j].set_size( A_ji->bs_size() );
                     A_ji->write( row_i_bs[j] );
                     row_i[j] = A_ji;
                 }// if
                 
-                log( 4, to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + to_string( row_procs[j] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + HLR::to_string( row_procs[j] ) );
 
                 row_reqs[j] = ibroadcast( row_comms[j], row_i_bs[j], row_maps[j][p_ji] );
                 add_mem    += row_i_bs[j].size();
@@ -595,14 +619,14 @@ lu ( TMatrix *          A,
             {
                 if ( pid == p_il )
                 {
-                    log( 4, to_string( "serialisation of %d ", A_il->id() ) );
+                    log( 4, HLIB::to_string( "serialisation of %d ", A_il->id() ) );
                     
                     col_i_bs[l].set_size( A_il->bs_size() );
                     A_il->write( col_i_bs[l] );
                     col_i[l] = A_il;
                 }// if
                 
-                log( 4, to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + to_string( col_procs[l] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + HLR::to_string( col_procs[l] ) );
                 
                 col_reqs[l] = ibroadcast( col_comms[l], col_i_bs[l], col_maps[l][p_il] );
                 add_mem    += col_i_bs[l].size();
@@ -638,7 +662,7 @@ lu ( TMatrix *          A,
                         // DBG::printf( "waiting for %d", A->block(j,i)->id() );
                         row_reqs[j].wait();
                         
-                        log( 4, to_string( "construction of %d ", BA->block( j, i )->id() ) );
+                        log( 4, HLIB::to_string( "construction of %d ", BA->block( j, i )->id() ) );
                         
                         TBSHMBuilder  bs_hbuild;
                         
@@ -654,7 +678,7 @@ lu ( TMatrix *          A,
                         // DBG::printf( "waiting for %d", A->block(i,l)->id() );
                         col_reqs[l].wait();
 
-                        log( 4, to_string( "construction of %d ", BA->block( i, l )->id() ) );
+                        log( 4, HLIB::to_string( "construction of %d ", BA->block( i, l )->id() ) );
                     
                         TBSHMBuilder  bs_hbuild;
 
@@ -669,7 +693,7 @@ lu ( TMatrix *          A,
                     // update local matrix block
                     //
                 
-                    log( 4, to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
+                    log( 4, HLIB::to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
                     
                     multiply( -1.0, row_i[j], col_i[l], 1.0, A_jl, acc );
                 }// if
@@ -679,7 +703,7 @@ lu ( TMatrix *          A,
         max_add_mem = std::max( max_add_mem, add_mem );
     }// for
 
-    // std::cout << "  time in MPI : " << to_string( "%.2fs", time_mpi ) << std::endl;
+    // std::cout << "  time in MPI : " << HLIB::to_string( "%.2fs", time_mpi ) << std::endl;
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 

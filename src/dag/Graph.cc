@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <cassert>
 
+#include "utils/log.hh"
 #include "utils/tools.hh"
 #include "dag/Graph.hh"
 

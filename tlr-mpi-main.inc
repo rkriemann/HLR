@@ -1,6 +1,3 @@
-#include <boost/filesystem.hpp>
-
-namespace fs = boost::filesystem;
 
 #include "mpi/mpi.hh"
 #include "mpi/distr.hh"
@@ -8,52 +5,9 @@ namespace fs = boost::filesystem;
 #include "cmdline.hh"
 #include "gen_problem.hh"
 #include "utils/RedirectOutput.hh"
+#include "utils/compare.hh"
 
 using namespace HLR;
-
-void
-compare_ref ( TMatrix *  A )
-{
-    mpi::communicator  world;
-    const auto         pid    = world.rank();
-
-    if ( fs::exists( "LU.hm" ) )
-    {
-        auto  D  = read_matrix( "LU.hm" );
-        auto  BA = ptrcast( A,       TBlockMatrix );
-        auto  BD = ptrcast( D.get(), TBlockMatrix );
-
-        if (( BA->nrows() == BD->nrows() ) &&
-            ( BA->ncols() == BD->ncols() ) &&
-            ( BA->nblock_rows() == BD->nblock_rows() ) &&
-            ( BA->nblock_cols() == BD->nblock_cols() ))
-        {
-            bool  correct = true;
-                
-            D->set_procs( ps_single( pid ), recursive );
-        
-            for ( uint i = 0; i < BA->nblock_rows(); ++i )
-            {
-                for ( uint j = 0; j < BA->nblock_cols(); ++j )
-                {
-                    if ( ! is_ghost( BA->block( i, j ) ) )
-                    {
-                        const auto  f = diff_norm_F( BD->block( i, j ), BA->block( i, j ) );
-
-                        if ( f > 1e-10 )
-                        {
-                            DBG::printf( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BA->block( i, j ) ) );
-                            correct = false;
-                        }// if
-                    }// if
-                }// for
-            }// for
-
-            if ( correct )
-                std::cout << "    no error" << std::endl;
-        }// if
-    }// if
-}
 
 //
 // main function
@@ -118,7 +72,7 @@ mymain ( int argc, char ** argv )
         std::cout << "    done in " << toc << std::endl;
 
         // compare with otherwise computed result
-        compare_ref( C.get() );
+        compare_ref_file( C.get(), "LU.hm" );
         
         // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         

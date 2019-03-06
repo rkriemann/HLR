@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "utils/tools.hh"
+#include "utils/log.hh"
 
 #include "seq/dag.hh"
 

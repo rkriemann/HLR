@@ -68,12 +68,13 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',
                                         'src/cluster/tlr.cc',
-                                        'src/mpi/distr.cc',
-                                        'src/dag/Node.cc',
                                         'src/dag/Graph.cc',
+                                        'src/dag/Node.cc',
+                                        'src/dag/lu.cc',
+                                        'src/mpi/distr.cc',
                                         'src/seq/dag.cc',
                                         'src/tbb/dag.cc',
-                                        'src/dag/lu.cc' ] )
+                                        'src/utils/compare.cc' ] )
 
 #
 # default C++ environment

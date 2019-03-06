@@ -10,7 +10,7 @@
 #include <deque>
 #include <unordered_set>
 
-#include "utils/tools.hh"
+#include "utils/log.hh"
 #include "dag/Node.hh"
 
 namespace HLR

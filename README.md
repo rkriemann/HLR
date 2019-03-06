@@ -4,19 +4,26 @@ HLR-HPC
 Testing of various HLR clustering and arithmetic algorithms for
 different problems with different parallelization frameworks.
 
-Implemented problems:
+Implemented problems
+--------------------
 
   - logkernel:  1d logarithmic kernel example from HLIB
   - matern:     Matern covariance problem with random coordinates
   
-Clustering:
+Clustering
+----------
 
   - TLR:    BSP clustering with single level nxn block structure
   - HODLR:  off-diagonal admissibility with standard BSP clustering
-  - TiledH: flatten upper level of standard hierarchy to have nxn
+  - TiledH: flatten upper <p> levels of standard hierarchy to have nxn
             blocks, each being an H-matrix
+  - H:      standard H-matrix clustering
 
-Parallelization Frameworks:
+All clustering is cardinality balanced. If not defined otherwise, e.g., HODLR,
+weak admissibility is used.
+
+Parallelization Frameworks
+--------------------------
 
   - seq:       standard sequential arithmetic
   - omp:       uses OpenMP loop parallelization
@@ -27,10 +34,14 @@ Parallelization Frameworks:
     - rdma:    using non-blocking RDMA
   - hpx:       HPX C++ library (https://github.com/STEllAR-GROUP/hpx)
   - tf:        C++-TaskFlow library (https://github.com/cpp-taskflow/cpp-taskflow)
+  - dag:       uses task parallelism for arithmetic; execution of DAG is
+               available for various frameworks (seq, tbb).
 
+Special functions are stored in the corresponding modules in the sub directories, e.g.,
+"include/tbb/arith.hh" with arithmetical functions implemented with TBB.
 
 Prerequisites
--------------
+=============
     
 A C++17 compiler is needed for compiling HLR-HPC (and some of the
 frameworks).
@@ -51,7 +62,7 @@ For compilation, the *scons* make replacement is needed
 
 
 Compilation
------------
+===========
 
 Modify the paths to the various frameworks in the file
 *SConstruct*. If a framework is not installed, just comment out the
@@ -67,7 +78,9 @@ to compile all examples.
 
 
 Remarks
--------
+=======
 
-HPX performs thread affinity setting. Add "-t <n>" to the command
-line flags where *n* is the number of threads.
+HPX: - HPX has its own set of command line arguments. Arguments for the user program have
+       to be provided after "--", e.g., "tlr-hpx -- -n 1024".
+     - HPX performs thread affinity setting. Add "-t <n>" to the command line flags where
+       *n* is the number of threads, e.g., "tlr-hpx -t 4 -- -n 1024"
