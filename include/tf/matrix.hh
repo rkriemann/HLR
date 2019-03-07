@@ -41,8 +41,7 @@ std::unique_ptr< HLIB::TMatrix >
 build ( const HLIB::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc,
-        tf::SubflowBuilder &         sf )
+        const HLIB::TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -85,9 +84,9 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        auto                 nbr = B->nblock_rows();
-        auto                 nbc = B->nblock_cols();
-        tensor2< tf::Task >  sub_tasks( nbr, nbc );
+        auto          nbr = B->nblock_rows();
+        auto          nbc = B->nblock_cols();
+        tf::Taskflow  tf;
 
         for ( uint  i = 0; i < nbr; ++i )
         {
@@ -95,10 +94,10 @@ build ( const HLIB::TBlockCluster *  bct,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    sub_tasks(i,j) = sf.silent_emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,&B] ( auto &  sf )
+                    tf.silent_emplace(
+                        [bct,i,j,&coeff,&lrapx,&acc,&B] ()
                         {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, sf );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
                             
                             B->set_block( i, j, B_ij.release() );
                         } );
@@ -106,30 +105,14 @@ build ( const HLIB::TBlockCluster *  bct,
             }// for
         }// for
 
+        tf.wait_for_all();
+
         M = std::move( B );
     }// else
 
     // copy properties from the cluster
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
-
-    return M;
-}
-
-template < typename coeff_t,
-           typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
-        const coeff_t &              coeff,
-        const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
-{
-    tf::Taskflow                tf( 1 );
-    std::unique_ptr< TMatrix >  M;
-
-    auto  build_task = tf.silent_emplace( [bct,&coeff,&lrapx,&acc,&M] ( auto &  sf ) { M = build( bct, coeff, lrapx, acc, sf ); } );
-
-    tf.wait_for_all();
 
     return M;
 }

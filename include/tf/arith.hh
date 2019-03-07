@@ -150,8 +150,7 @@ void
 addlr ( const B::Matrix< value_t > &  U,
         const B::Matrix< value_t > &  V,
         TMatrix *                     A,
-        const TTruncAcc &             acc,
-        tf::SubflowBuilder &          sf )
+        const TTruncAcc &             acc )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "addlr( %d )", A->id() );
@@ -169,22 +168,26 @@ addlr ( const B::Matrix< value_t > &  U,
         B::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), B::Range::all );
         B::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), B::Range::all );
 
-        auto  add_00 = sf.silent_emplace( [&U0,&V0,A00,&acc] ( auto &  sf ) { addlr( U0, V0, A00, acc, sf ); } );
-        auto  add_11 = sf.silent_emplace( [&U1,&V1,A11,&acc] ( auto &  sf ) { addlr( U1, V1, A11, acc, sf ); } );
-        auto  add_01 = sf.silent_emplace( [&U0,&V1,A01,&acc] ()
+        tf::Taskflow  tf;
+        
+        auto  add_00 = tf.silent_emplace( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); } );
+        auto  add_11 = tf.silent_emplace( [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); } );
+        auto  add_01 = tf.silent_emplace( [&U0,&V1,A01,&acc] ()
                                           {
                                               auto [ U01, V01 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
                                                                                                   { blas_mat_B< value_t >( A01 ), V1 },
                                                                                                   acc );
                                               A01->set_lrmat( U01, V01 );
                                           } );
-        auto  add_10 = sf.silent_emplace( [&U1,&V0,A10,&acc] ()
+        auto  add_10 = tf.silent_emplace( [&U1,&V0,A10,&acc] ()
                                           {
                                               auto [ U10, V10 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
                                                                                                   { blas_mat_B< value_t >( A10 ), V0 },
                                                                                                   acc );
                                               A10->set_lrmat( U10, V10 );
                                           } );
+
+        tf.wait_for_all();
     }// if
     else
     {
@@ -200,8 +203,7 @@ addlr ( const B::Matrix< value_t > &  U,
 template < typename value_t >
 void
 lu ( TMatrix *             A,
-     const TTruncAcc &     acc,
-     tf::SubflowBuilder &  sf )
+     const TTruncAcc &     acc )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
@@ -214,28 +216,32 @@ lu ( TMatrix *             A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        auto  task_00 = sf.silent_emplace( [A00,&acc] ( auto &  sf ) { HODLR::TF::lu< value_t >( A00, acc, sf ); } );
-        auto  task_01 = sf.silent_emplace( [A00,A01] () { HODLR::Seq::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
-        auto  task_10 = sf.silent_emplace( [A00,A10] () { HODLR::Seq::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+        tf::Taskflow  tf;
+        
+        auto  task_00 = tf.silent_emplace( [A00,&acc] () { HODLR::TF::lu< value_t >( A00, acc ); } );
+        auto  task_01 = tf.silent_emplace( [A00,A01]  () { HODLR::Seq::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
+        auto  task_10 = tf.silent_emplace( [A00,A10]  () { HODLR::Seq::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
 
         task_00.precede( { task_01, task_10 } );
         
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  [ task_T,   T ] = sf.emplace( [A10,A01] () { return B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); } );
-        auto  [ task_UT, UT ] = sf.emplace( [A10,&T]  () { return B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T.get() ); } );
+        auto  [ task_T,   T ] = tf.emplace( [A10,A01] () { return B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); } );
+        auto  [ task_UT, UT ] = tf.emplace( [A10,&T]  () { return B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T.get() ); } );
 
         task_01.precede( task_T );
         task_10.precede( task_T );
         task_T.precede( task_UT );
         
-        auto  task_add11      = sf.silent_emplace( [A01,A11,&UT,&acc] ( auto &  sf )
-                                                   { HODLR::TF::addlr< value_t >( UT.get(), blas_mat_B< value_t >( A01 ), A11, acc, sf ); } );
+        auto  task_add11      = tf.silent_emplace( [A01,A11,&UT,&acc] ()
+                                                   { HODLR::TF::addlr< value_t >( UT.get(), blas_mat_B< value_t >( A01 ), A11, acc ); } );
 
         task_UT.precede( task_add11 );
         
-        auto  task_11         = sf.silent_emplace( [A11,&acc] ( auto &  sf ) { HODLR::TF::lu< value_t >( A11, acc, sf ); } );
+        auto  task_11         = tf.silent_emplace( [A11,&acc] () { HODLR::TF::lu< value_t >( A11, acc ); } );
 
         task_add11.precede( task_11 );
+
+        tf.wait_for_all();
     }// if
     else
     {
@@ -243,18 +249,6 @@ lu ( TMatrix *             A,
         
         B::invert( DA->blas_rmat() );
     }// else
-}
-
-template < typename value_t >
-void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
-{
-    tf::Taskflow  tf( 1 );
-
-    auto  lu_A  = tf.silent_emplace( [A,&acc] ( auto &  sf ) { lu< value_t >( A, acc, sf ); } );
-
-    tf.wait_for_all();
 }
 
 }// namespace TF
