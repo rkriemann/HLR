@@ -1,7 +1,7 @@
 
 import os
 
-debug   = True
+debug   = False
 warn    = False
 fullmsg = False
 

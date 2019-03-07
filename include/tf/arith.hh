@@ -216,6 +216,12 @@ lu ( TMatrix *             A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
+        #if  0
+
+        //
+        // all function calls wrapped in tasks
+        //
+        
         tf::Taskflow  tf;
         
         auto  task_00 = tf.silent_emplace( [A00,&acc] () { HODLR::TF::lu< value_t >( A00, acc ); } );
@@ -242,6 +248,32 @@ lu ( TMatrix *             A,
         task_add11.precede( task_11 );
 
         tf.wait_for_all();
+
+        #else
+
+        //
+        // only tasks for the two parallel calls
+        //
+        
+        HODLR::TF::lu< value_t >( A00, acc );
+
+        {
+            tf::Taskflow  tf;
+        
+            auto  task_01 = tf.silent_emplace( [A00,A01]  () { HODLR::Seq::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
+            auto  task_10 = tf.silent_emplace( [A00,A10]  () { HODLR::Seq::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+
+            tf.wait_for_all();
+        }
+        
+        // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
+        auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) );
+        auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
+
+        HODLR::TF::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
+        HODLR::TF::lu< value_t >( A11, acc );
+
+        #endif
     }// if
     else
     {
