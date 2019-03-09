@@ -109,6 +109,17 @@ tbb.Program( 'tileh-tbb.cc' )
 tbb.Program( 'dag-tbb.cc' )
 
 #
+# TaskFlow
+#
+
+tf = env.Clone()
+tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
+tf.Append( LIBS     = [ "pthread" ] )
+
+tf.Program( 'tlr-tf.cc' )
+tf.Program( 'hodlr-tf.cc' )
+
+#
 # MPI
 #
 
@@ -136,12 +147,13 @@ hpx.Program( 'tlr-hpx.cc' )
 hpx.Program( 'hodlr-hpx.cc' )
 
 #
-# TaskFlow
+# GASPI
 #
 
-tf = env.Clone()
-tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
-tf.Append( LIBS     = [ "pthread" ] )
+gpi = env.Clone()
+gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
+gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
+gpi.Append( LIBS = [ "pthread" ] )
 
-tf.Program( 'tlr-tf.cc' )
-tf.Program( 'hodlr-tf.cc' )
+gpi.Program( 'tlr-gaspi.cc' )
+# gpi.Program( 'hodlr-gpi.cc' )

@@ -22,6 +22,8 @@ syntax: glob
 .hlibpro.conf
 hlibpro
 
+machines.gpi
+
 # now some special things
 syntax: regexp
 
@@ -31,8 +33,8 @@ syntax: regexp
 
 ^hlrtest$
 ^((hodlr|tlr|tileh|dag)-(seq|omp|tbb|tf|hpx|mpi))$
-^tlr-mpi-(bcast|ibcast|rdma)$
-^tileh-mpi-(bcast|ibcast|rdma)$
+^(tlr|tileh)-mpi-(bcast|ibcast|rdma)$
+^(tlr|tileh)-gaspi$
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

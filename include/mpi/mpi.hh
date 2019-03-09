@@ -1,5 +1,5 @@
-#ifndef  __MPI_HH
-#define  __MPI_HH
+#ifndef  __HLR_MPI_HH
+#define  __HLR_MPI_HH
 //
 // Project     : HLib
 // File        : mpi.hh
@@ -367,4 +367,4 @@ public:
 
 }// namespace mpi
 
-#endif //  __MPI_HH
+#endif //  __HLR_MPI_HH
