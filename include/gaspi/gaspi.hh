@@ -31,6 +31,17 @@ namespace GASPI
     }
 
 //
+// import types
+//
+using  number_t          = gaspi_number_t;
+using  size_t            = gaspi_size_t;
+using  rank_t            = gaspi_rank_t;
+using  group_t           = gaspi_group_t;
+using  notification_id_t = gaspi_notification_id_t;
+using  notification_t    = gaspi_notification_t;
+using  segment_id_t      = gaspi_segment_id_t;
+
+//
 // general GASPI environment for initialization/finalization
 //
 class environment
@@ -56,10 +67,10 @@ class process
 {
 public:
     // return number of processes
-    gaspi_rank_t
+    rank_t
     size () const
     {
-        gaspi_rank_t  n = 0;
+        rank_t  n = 0;
 
         GASPI_CHECK_RESULT( gaspi_proc_num,
                             ( & n ) );
@@ -68,77 +79,237 @@ public:
     }
 
     // return rank of calling process
-    gaspi_rank_t
+    rank_t
     rank () const
     {
-        gaspi_rank_t  n = 0;
+        rank_t  n = 0;
 
         GASPI_CHECK_RESULT( gaspi_proc_rank,
                             ( & n ) );
 
         return n;
     }
+
+    // return maximal number of simultaneous requests per queue
+    number_t
+    nmax_requests ()
+    {
+        number_t  n = 0;
+        
+        GASPI_CHECK_RESULT( gaspi_queue_size_max, ( & n ) );
+
+        return n;
+    }
+
+    // return number of allocated segments
+    number_t
+    nalloc_segments ()
+    {
+        number_t  n = 0;
+        
+        GASPI_CHECK_RESULT( gaspi_segment_num, ( & n ) );
+
+        return n;
+    }
+
+    // return maximal number of segments
+    number_t
+    nmax_segments ()
+    {
+        number_t  n = 0;
+        
+        GASPI_CHECK_RESULT( gaspi_segment_max, ( & n ) );
+
+        return n;
+    }
 };
+
+//
+// group of processes
+//
+class group
+{
+private:
+    group_t  _gaspi_group;
     
-// //
-// // group of processes
-// //
-// class group
-// {
-// private:
-//     std::shared_ptr< gaspi_group_t >  _gaspi_group;
+public:
+    group ()
+            : _gaspi_group( GASPI_GROUP_ALL )
+    {
+        GASPI_CHECK_RESULT( gaspi_group_commit, ( _gaspi_group, GASPI_BLOCK ) );
+    }
 
-//     struct free_group
-//     {
-//         void
-//         operator () ( gaspi_group_t *  group ) const
-//         {
-//             // GASPI_CHECK_RESULT( MPI_Group_free,
-//             //                   ( group ) );
-//         }
-//     };
+    group ( const gaspi_group_t &  group )
+            : _gaspi_group( group )
+    {}
+
+    // access MPI groupunicator
+    operator gaspi_group_t () const { return _gaspi_group; }
+
+};
+
+//
+// segment representing global memory area
+//
+class segment
+{
+private:
+    segment_id_t  _id;
+    size_t        _size;
     
-// public:
-//     groupunicator ()
-//             : _gaspi_group( new gaspi_group_t( GASPI_GROUP_ALL ) )
-//     {}
+public:
+    template < typename value_t >
+    segment ( const segment_id_t  sid,
+              value_t *           base,
+              const size_t        asize,
+              group &             grp )
+            : _id( sid )
+            , _size( asize * sizeof(value_t) )
+    {
+        GASPI_CHECK_RESULT( gaspi_segment_use, ( _id, base, _size, gaspi_group_t( grp ), GASPI_BLOCK, 0 ) );
+    }
 
-//     groupunicator ( const gaspi_group_t &  group )
-//             : _gaspi_group( new gaspi_group_t( group ), free_group() )
-//     {}
+    segment ( segment &&  seg )
+            : _id(   seg._id )
+            , _size( seg._size )
+    {
+        seg._id   = 0;
+        seg._size = 0;
+    }
 
-//     // return number of processes in groupunicator
-//     int
-//     size () const
-//     {
-//         int  n = 0;
+    // segment ( const segment &  win )
+    //         : _mpi_segment( win._mpi_segment )
+    // {}
 
-//         GASPI_CHECK_RESULT( gaspi_group_t_size,
-//                           ( gaspi_group_t( *this ), & n ) );
+    ~segment ()
+    {
+        if ( _size > 0 )
+            HLR::log( 0, "segment is not free" );
+    }
 
-//         return n;
-//     }
+    segment &
+    operator = ( segment &&  seg )
+    {
+        _id   = seg._id;
+        _size = seg._size;
 
-//     // return rank of calling process
-//     int
-//     rank () const
-//     {
-//         int  n = 0;
+        seg._id   = 0;
+        seg._size = 0;
 
-//         GASPI_CHECK_RESULT( gaspi_group_t_rank,
-//                           ( gaspi_group_t( *this ), & n ) );
+        return *this;
+    }
+    
+    // segment &
+    // operator = ( const segment &  win )
+    // {
+    //     _mpi_segment = win._mpi_segment;
 
-//         return n;
-//     }
+    //     return *this;
+    // }
 
-//     // access MPI groupunicator
-//     operator gaspi_group_t () const
-//     {
-//         if ( _gaspi_group.get() != nullptr ) return *_gaspi_group;
-//         else                              return MPI_GROUP_NULL;
-//     }
+    void delete ()
+    {
+        assert( _mpi_segment != MPI_WIN_NULL );
+        
+        GASPI_CHECK_RESULT( gaspi_segment_delete,
+                            ( & _id ) );
 
-// };
+        _id   = 0;
+        _size = 0;
+    }
+
+    segment_id_t  id   () const { return _id; }
+    size_t        size () const { return _size; }
+};
+
+//
+// queue
+//
+class queue
+{
+private:
+    gaspi_queue_id_t  _id;
+
+public:
+    queue ()
+    {
+        GASPI_CHECK_RESULT( gaspi_queue_create, ( & _id, GASPI_BLOCK ) );
+    }
+
+    ~queue ()
+    {
+        GASPI_CHECK_RESULT( gaspi_queue_delete, ( _id ) );
+    }
+
+    // send local data to remove rank
+    // - local and remove data offset are assumed to be zero
+    void
+    write_notify ( const segment &            src_seg,            // source segment to send
+                   const rank_t               dest_rank,          // destination rank to sent to
+                   const segment &            dest_seg,           // destination segment to write to
+                   const notification_id_t &  rem_note_id,        // notification id to signal on remote rank
+                   const number_t &           rem_note_val = 1 )  // (optional) value of notification
+    {
+        notification  n;
+        
+        GASPI_CHECK_RESULT( gaspi_write_notify, ( src_seg.id(),                 
+                                                  0,                 // source offset
+                                                  dest_rank,
+                                                  dest_seg.id(),
+                                                  0,                 // destination offset
+                                                  src_seg.size(),    // data size
+                                                  rem_note_id,       
+                                                  1,       
+                                                  _id,               // queue to submit request to
+                                                  GASPI_BLOCK ) );
+    }
+    
+    // wait for all communication request in queue to finish
+    void
+    wait () const
+    {
+        GASPI_CHECK_RESULT( gaspi_wait, ( _id, GASPI_BLOCK ) );
+    }
+
+    // return number of open communication requests in queue
+    void
+    size () const
+    {
+        number_t  n;
+        
+        GASPI_CHECK_RESULT( gaspi_queue_size, ( _id, & n ) );
+
+        return n;
+    }
+};
+
+//
+// wait for notification to finish
+//
+notification_t
+notify_wait ( const segment &            seg,       // local segment affected by communication
+              const notification_id_t &  note_id )  // local notification id
+{
+    notification_id_t  first;
+    
+    GASPI_CHECK_RESULT( gaspi_notify_waitsome, ( seg.id(),      // local segment
+                                                 note_id,       // local notification to wait for
+                                                 1,             // wait for 1 notification
+                                                 & first,       // first that have been received
+                                                 GASPI_BLOCK ) );
+
+    assert( frist != note_id );
+        
+    notification_t  old_val;
+    
+    GASPI_CHECK_RESULT( gaspi_notify_reset,    ( seg.id(),       // local segment
+                                                 note_id,        // local notification to reset
+                                                 & old_val ) );  // old notification value
+
+    return old_val;
+}
+              
+              
 
 }// namespace GASPI
 

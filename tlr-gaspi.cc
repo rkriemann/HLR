@@ -103,6 +103,55 @@ main ( int argc, char ** argv )
                                                      ? std::make_unique< RedirectOutput >( to_string( "tlr-gaspi_%03d.out", pid ) )
                                                      : nullptr );
 
+
+    {
+        vector< GASPI::queue >  queues( nprocs );  // one queue to each remote processor
+
+        GASPI::group  world;
+
+        int               n = 10;
+        vector< double >  v( n );
+        vector< double >  u( n );
+
+        for ( int  i = 0; i < n; ++i )
+            u[i] = v[i] = (pid+1) * i;
+        
+        auto  id_v = [] ( const gaspi_rank_t  p ) -> gaspi_segment_id_t { return 2*p; };
+        auto  id_u = [] ( const gaspi_rank_t  p ) -> gaspi_segment_id_t { return 2*p+1; };
+
+        GASPI::segment  seg_v( id_v(pid), & v[0], n, world );
+        GASPI::segment  seg_u( id_u(pid), & u[0], n, world );
+
+        std::cout << '[' << pid << ']' << " before ";
+        for ( uint i = 0; i < n; ++i )
+            std::cout << v[i] << ", ";
+        std::cout << std::endl;
+
+
+        const auto                dest  = ( pid + 1 ) % nprocs;
+        GASPI::notification_id_t  first = dest;
+
+        queue[dest].write_notify( seg_u, dest, seg_v, id_v(dest) );
+
+        GASPI::notify_wait( seg_v, id_v(pid) );
+
+        queue[dest].wait();
+
+        std::cout << '[' << pid << ']' << " after  ";
+        for ( uint i = 0; i < n; ++i )
+            std::cout << v[i] << ", ";
+        std::cout << std::endl;
+        
+        for ( int  p = 0; p < nprocs; ++p )
+        {
+            if ( p != pid )
+                queue[p].wait();
+        }// for
+
+        return 0;
+    }
+
+    
     try
     {
         INIT();
