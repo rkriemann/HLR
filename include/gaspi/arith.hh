@@ -143,38 +143,37 @@ create_matrix ( const TMatrix *  A,
 //
 template < typename value_t >
 std::vector< GASPI::segment >
-setup_segments ( GASPI::group &  group,
-                 TMatrix *       A,
-                 const uint      rank )
+create_segments ( const segment_id_t  sid,
+                  TMatrix *           A,
+                  const uint          rank,
+                  GASPI::group &      group )
 {
     std::vector< GASPI::segment >  segs;
+
+    // we need space for low-rank blocks
+    assert( sid % 2 == 0 );
     
     if ( is_dense( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "setup_segments: dense, %d, %d × %d", A->id(), A->nrows(), A->ncols() ) );
+        HLR::log( 5, HLIB::to_string( "create_segments: dense, %d, %d × %d", A->id(), A->nrows(), A->ncols() ) );
 
-        {
-            GASPI::process  process;
-            DBG::write( blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ), HLIB::to_string( "A_%d_%d.mat", process.rank(), A->id() ), "A" );
-        }
-        
         segs.reserve( 1 );
-        segs.push_back( GASPI::segment( ID_DENSE, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
+        segs.push_back( GASPI::segment( sid, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "setup_segments: lowrank, %d, %d × %d, %d", A->id(), A->nrows(), A->ncols(), rank ) );
+        HLR::log( 5, HLIB::to_string( "create_segments: lowrank, %d, %d × %d, %d", A->id(), A->nrows(), A->ncols(), rank ) );
         
         auto  R = ptrcast( A, TRkMatrix );
         
         R->set_rank( rank );
         
         segs.reserve( 2 );
-        segs[0] = GASPI::segment( ID_LR_A, blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group );
-        segs[1] = GASPI::segment( ID_LR_B, blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group );
+        segs[0] = GASPI::segment( sid,   blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group );
+        segs[1] = GASPI::segment( sid+1, blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group );
     }// if
     else
-        HLR::error( "(setup_segments) unsupported matrix type : " + A->typestr() ) ;
+        HLR::error( "(create_segments) unsupported matrix type : " + A->typestr() ) ;
 
     return segs;
 }
@@ -193,14 +192,14 @@ read_matrix ( std::vector< GASPI::segment > &  segs,
     {
         HLR::log( 5, HLIB::to_string( "read_matrix: dense, %d × %d", A->nrows(), A->ncols() ) );
 
-        queue.read( segs[0], source, ID_DENSE );
+        queue.read( segs[0], source, segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
         HLR::log( 5, HLIB::to_string( "read_matrix: lowrank, %d × %d, %d", A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
         
-        queue.read( segs[0], source, ID_LR_A );
-        queue.read( segs[1], source, ID_LR_B );
+        queue.read( segs[0], source, segs[0].id() );
+        queue.read( segs[1], source, segs[1].id() );
     }// if
     else
         HLR::error( "(request_rdma) unsupported matrix type : " + A->typestr() ) ;
@@ -379,13 +378,34 @@ lu ( TMatrix *          A,
 
     build_row_groups( BA, row_groups, row_procs );
     build_col_groups( BA, col_groups, col_procs );
+
+    //
+    // set up IDs for blocks in A
+    //
+
+    tensor2< segment_id_t >  id( nbr, nbc );
+    segment_id_t             nid = 0;
+
+    for ( uint  i = 0; i < nbr; ++i )
+        for ( uint  j = 0; j < nbc; ++j )
+            id(i,j) = ( nid += 2 );
+
+    HLR::log( 4, HLIB::to_string( "maximal ID: %d", nid ) );
     
     //
     // LU factorization
+    // - GASPI segment Ids are given for blocks (i,j) as i-j for blocks in current column
+    //   and j-i+(n-i) for blocks in current row
     //
 
     const int  rank        = acc.rank();
     size_t     max_add_mem = 0;
+    // auto       id          =
+    //     [nbr] ( const uint  i, const uint  j )
+    //     {
+    //         if ( j <= i ) return i-j;
+    //         else          return j-i+(nbr-i);
+    //     };
 
     for ( uint  i = 0; i < nbr; ++i )
     {
@@ -414,8 +434,6 @@ lu ( TMatrix *          A,
         // (since L is identity, no solving in block row)
         //
 
-        std::cout << to_string( col_procs[i] ) << std::endl;
-        
         if ( contains( col_procs[i], pid ) )
         {
             //
@@ -432,7 +450,7 @@ lu ( TMatrix *          A,
             }// if
 
             // set up windows/attached memory 
-            auto  diag_seg = setup_segments< value_t >( col_groups[i], H_ii, rank );
+            auto  diag_seg = create_segments< value_t >( id(i,i), H_ii, rank, col_groups[i] );
 
             // and initiate reading remote memory
             if ( pid != p_ii )
@@ -485,157 +503,157 @@ lu ( TMatrix *          A,
         world.barrier();
         
         continue;
-        
-        // //
-        // // set up MPI RDMA for row/column matrices
-        // //
 
-        // std::vector< std::unique_ptr< TMatrix > >   row_i_mat( nbr );        // for autodeletion of temp. matrices
-        // std::vector< std::unique_ptr< TMatrix > >   col_i_mat( nbc );
-        // std::vector< TMatrix * >                    row_i( nbr, nullptr );   // actual matrix handles
-        // std::vector< TMatrix * >                    col_i( nbc, nullptr );
-        // std::vector< std::vector< mpi::window > >   row_wins( nbr );         // holds MPI windows for matrices
-        // std::vector< std::vector< mpi::window > >   col_wins( nbc );
-        // std::vector< std::vector< mpi::request > >  row_reqs( nbr );         // holds MPI RDMA requests for matrices
-        // std::vector< std::vector< mpi::request > >  col_reqs( nbc );
-        
-        // for ( uint  j = i+1; j < nbr; ++j )
-        // {
-        //     const auto  A_ji = BA->block( j, i );
-        //     const auto  p_ji = A_ji->procs().master();
+        //
+        // set up MPI RDMA for row/column matrices
+        //
 
-        //     if ( contains( row_procs[j], pid ) )
-        //     {
-        //         row_i[j] = A_ji;
+        std::vector< std::unique_ptr< TMatrix > >     row_i_mat( nbr );        // for autodeletion of temp. matrices
+        std::vector< std::unique_ptr< TMatrix > >     col_i_mat( nbc );
+        std::vector< TMatrix * >                      row_i( nbr, nullptr );   // actual matrix handles
+        std::vector< TMatrix * >                      col_i( nbc, nullptr );
+        std::vector< std::vector< GASPI::segment > >  row_segs( nbr );         // holds MPI windows for matrices
+        std::vector< std::vector< GASPI::segment > >  col_segs( nbc );
+
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            const auto  A_ji = BA->block( j, i );
+            const auto  p_ji = A_ji->procs().master();
+
+            if ( contains( row_procs[j], pid ) )
+            {
+                row_i[j] = A_ji;
             
-        //         if ( pid != p_ji )
-        //         {
-        //             row_i_mat[j] = create_matrix( A_ji, mat_types(j,i), pid );
-        //             row_i[j]     = row_i_mat[j].get();
-        //         }// if
+                if ( pid != p_ji )
+                {
+                    row_i_mat[j] = create_matrix( A_ji, mat_types(j,i), pid );
+                    row_i[j]     = row_i_mat[j].get();
+                }// if
                 
-        //         // set up windows/attached memory 
-        //         row_wins[j] = setup_rdma< value_t >( row_comms[j], row_i[j], rank );
+                // set up windows/attached memory 
+                row_segs[j] = create_segments< value_t >( id(j,i), row_i[j], rank, row_groups[j] );
 
-        //         // and start get requests
-        //         if ( pid != p_ji )
-        //             row_reqs[j] = request_rdma< value_t >( row_wins[j], row_i[j], row_maps[j][p_ji] );
-        //     }// if
-        // }// for
+                // and start get requests
+                if ( pid != p_ji )
+                    read_matrix< value_t >( row_segs[j], row_i[j], p_ji, queues[ p_ji ] );
+            }// if
+        }// for
         
-        // for ( uint  l = i+1; l < nbc; ++l )
-        // {
-        //     const auto  A_il = BA->block( i, l );
-        //     const auto  p_il = A_il->procs().master();
+        for ( uint  l = i+1; l < nbc; ++l )
+        {
+            const auto  A_il = BA->block( i, l );
+            const auto  p_il = A_il->procs().master();
             
-        //     // broadcast A_il to all processors in column l
-        //     if ( contains( col_procs[l], pid ) )
+            // broadcast A_il to all processors in column l
+            if ( contains( col_procs[l], pid ) )
+            {
+                col_i[l] = A_il;
+                
+                if ( pid != p_il )
+                {
+                    col_i_mat[l] = create_matrix( A_il, mat_types(i,l), pid );
+                    col_i[l]     = col_i_mat[l].get();
+                }// if
+                
+                // set up windows/attached memory 
+                col_segs[l] = create_segments< value_t >( id(i,l), col_i[l], rank, col_groups[l] );
+
+                // and start get requests
+                if ( pid != p_il )
+                    read_matrix< value_t >( col_segs[l], col_i[l], p_il, queues[ p_il ] );
+            }// if
+        }// for
+
+        //
+        // update of trailing sub-matrix
+        //
+        
+        std::vector< bool >        row_done( nbr, false );  // signals received matrix
+        std::vector< bool >        col_done( nbc, false );
+        std::vector< std::mutex >  row_mtx( nbr );         // mutices for access to requests
+        std::vector< std::mutex >  col_mtx( nbc );
+        
+        // tbb::parallel_for(
+        //     tbb::blocked_range2d< uint >( i+1, nbr,
+        //                                   i+1, nbc ),
+        //     [&,BA,i,pid] ( const tbb::blocked_range2d< uint > & r )
         //     {
-        //         col_i[l] = A_il;
-                
-        //         if ( pid != p_il )
-        //         {
-        //             col_i_mat[l] = create_matrix( A_il, mat_types(i,l), pid );
-        //             col_i[l]     = col_i_mat[l].get();
-        //         }// if
-                
-        //         // set up windows/attached memory 
-        //         col_wins[l] = setup_rdma< value_t >( col_comms[l], col_i[l], rank );
-
-        //         // and start get requests
-        //         if ( pid != p_il )
-        //             col_reqs[l] = request_rdma< value_t >( col_wins[l], col_i[l], col_maps[l][p_il] );
-        //     }// if
-        // }// for
-
-        // //
-        // // update of trailing sub-matrix
-        // //
-        
-        // std::vector< bool >        row_done( nbr, false );  // signals received matrix
-        // std::vector< bool >        col_done( nbc, false );
-        // std::vector< std::mutex >  row_mtx( nbr );         // mutices for access to requests
-        // std::vector< std::mutex >  col_mtx( nbc );
-        
-        // // tbb::parallel_for(
-        // //     tbb::blocked_range2d< uint >( i+1, nbr,
-        // //                                   i+1, nbc ),
-        // //     [&,BA,i,pid] ( const tbb::blocked_range2d< uint > & r )
-        // //     {
-        // //         for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
-        // //         {
-        // //             const auto  p_ji = BA->block( j, i )->procs().master();
-                    
-        // //             for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
-        // //             {
-        // //                 const auto  p_il = BA->block( i, l )->procs().master();
-        //         for ( uint  j = i+1; j < nbr; ++j )
+        //         for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
         //         {
         //             const auto  p_ji = BA->block( j, i )->procs().master();
                     
-        //             for ( uint  l = i+1; l < nbc; ++l )
+        //             for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
         //             {
         //                 const auto  p_il = BA->block( i, l )->procs().master();
-                        
-        //                 //
-        //                 // update local matrix block
-        //                 //
-                
-        //                 auto        A_jl = BA->block( j, l );
-        //                 const auto  p_jl = A_jl->procs().master();
-                
-        //                 if ( pid == p_jl )
-        //                 {
-        //                     //
-        //                     // ensure broadcasts fir A_ji and A_il have finished
-        //                     //
-
-        //                     {
-        //                         std::lock_guard< std::mutex >  lock( row_mtx[j] );
-                        
-        //                         if (( p_ji != pid ) && ! row_done[j] )
-        //                         {
-        //                             // DBG::printf( "waiting for %d", BA->block(j,i)->id() );
-        //                             wait_rdma( row_reqs[j] );
-        //                             row_done[j] = true;
-        //                             add_mem += row_i[j]->byte_size();
-        //                         }// if
-        //                     }
-                            
-        //                     {
-        //                         std::lock_guard< std::mutex >  lock( col_mtx[l] );
-                        
-        //                         if (( p_il != pid ) && ! col_done[l] )
-        //                         {
-        //                             // DBG::printf( "waiting for %d", BA->block(i,l)->id() );
-        //                             wait_rdma( col_reqs[l] );
-        //                             col_done[l] = true;
-        //                             add_mem += col_i[l]->byte_size();
-        //                         }// if
-        //                     }
-
-        //                     //
-        //                     // finally compute update
-        //                     //
+                for ( uint  j = i+1; j < nbr; ++j )
+                {
+                    const auto  p_ji = BA->block( j, i )->procs().master();
                     
-        //                     // DBG::printf( "updating %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() );
-        //                     multiply< value_t >( value_t(-1), row_i[j], col_i[l], A_jl, acc );
-        //                 }// if
-        //             }// for
-        //         }// for
-        //         // } );
+                    for ( uint  l = i+1; l < nbc; ++l )
+                    {
+                        const auto  p_il = BA->block( i, l )->procs().master();
+                        
+                        //
+                        // update local matrix block
+                        //
+                
+                        auto        A_jl = BA->block( j, l );
+                        const auto  p_jl = A_jl->procs().master();
+                
+                        if ( pid == p_jl )
+                        {
+                            //
+                            // ensure broadcasts fir A_ji and A_il have finished
+                            //
 
-        // max_add_mem = std::max( max_add_mem, add_mem );
+                            {
+                                std::lock_guard< std::mutex >  lock( row_mtx[j] );
+                        
+                                if (( p_ji != pid ) && ! row_done[j] )
+                                {
+                                    // DBG::printf( "waiting for %d", BA->block(j,i)->id() );
+                                    queues[p_ji].wait();
+                                    row_done[j] = true;
+                                    add_mem += row_i[j]->byte_size();
+                                }// if
+                            }
+                            
+                            {
+                                std::lock_guard< std::mutex >  lock( col_mtx[l] );
+                        
+                                if (( p_il != pid ) && ! col_done[l] )
+                                {
+                                    // DBG::printf( "waiting for %d", BA->block(i,l)->id() );
+                                    queues[p_il].wait();
+                                    col_done[l] = true;
+                                    add_mem += col_i[l]->byte_size();
+                                }// if
+                            }
+
+                            //
+                            // finally compute update
+                            //
+                    
+                            // DBG::printf( "updating %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() );
+                            multiply< value_t >( value_t(-1), row_i[j], col_i[l], A_jl, acc );
+                        }// if
+                    }// for
+                }// for
+                // } );
+
+        max_add_mem = std::max( max_add_mem, add_mem );
         
-        // //
-        // // finish epoch (started in "setup_rdma")
-        // //
+        //
+        // finish epoch (started in "setup_rdma")
+        //
 
-        // for ( uint  j = i+1; j < nbr; ++j )
-        //     finish_rdma( row_wins[j] );
+        for ( uint  j = i+1; j < nbr; ++j )
+            for ( auto & seg : row_segs[j] )
+                seg.release();
 
-        // for ( uint  l = i+1; l < nbc; ++l )
-        //     finish_rdma( col_wins[l] );
+        for ( uint  l = i+1; l < nbc; ++l )
+            for ( auto & seg : col_segs[l] )
+                seg.release();
     }// for
 
     // std::cout << "  time in MPI : " << to_string( "%.2fs", time_mpi ) << std::endl;
