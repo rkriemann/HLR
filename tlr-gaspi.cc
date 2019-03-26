@@ -1,6 +1,7 @@
 
 #include "gaspi/gaspi.hh"
 #include "gaspi/matrix.hh"
+#include "gaspi/arith.hh"
 #include "mpi/distr.hh"
 #include "cluster/tlr.hh"
 #include "cmdline.hh"
@@ -65,26 +66,26 @@ mymain ( int argc, char ** argv )
         mvis.svd( false ).id( true ).print( A.get(), to_string( "A_%03d", pid ) );
     }// if
 
-    // {
-    //     std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
+    {
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
         
-    //     auto  C = A->copy();
+        auto  C = A->copy();
         
-    //     tic = Time::Wall::now();
+        tic = Time::Wall::now();
         
-    //     ARITH::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        GASPI::TLR::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
-    //     toc = Time::Wall::since( tic );
+        toc = Time::Wall::since( tic );
         
-    //     std::cout << "    done in " << toc << std::endl;
+        std::cout << "    done in " << toc << std::endl;
 
-    //     // compare with otherwise computed result
-    //     compare_ref_file( C.get(), "LU.hm" );
+        // compare with otherwise computed result
+        compare_ref_file( C.get(), "LU.hm" );
         
-    //     // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-    //     // std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-    // }
+        // std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+    }
 }
 
 int
@@ -104,23 +105,23 @@ main ( int argc, char ** argv )
                                                      : nullptr );
 
 
+    if ( false )
     {
-        vector< GASPI::queue >  queues( nprocs );  // one queue to each remote processor
-
-        GASPI::group  world;
-
-        int               n = 10;
-        vector< double >  v( n );
-        vector< double >  u( n );
+        CFG::set_verbosity( verbosity );
+        
+        std::cout << '[' << pid << ']' << "  setting up queues" << std::endl;
+        
+        int                    n = 10;
+        std::vector< double >  v( n );
+        std::vector< double >  u( n );
 
         for ( int  i = 0; i < n; ++i )
-            u[i] = v[i] = (pid+1) * i;
+            u[i] = v[i] = pid;
+        
+        std::cout << '[' << pid << ']' << "defining segments" << std::endl;
         
         auto  id_v = [] ( const gaspi_rank_t  p ) -> gaspi_segment_id_t { return 2*p; };
         auto  id_u = [] ( const gaspi_rank_t  p ) -> gaspi_segment_id_t { return 2*p+1; };
-
-        GASPI::segment  seg_v( id_v(pid), & v[0], n, world );
-        GASPI::segment  seg_u( id_u(pid), & u[0], n, world );
 
         std::cout << '[' << pid << ']' << " before ";
         for ( uint i = 0; i < n; ++i )
@@ -128,26 +129,53 @@ main ( int argc, char ** argv )
         std::cout << std::endl;
 
 
-        const auto                dest  = ( pid + 1 ) % nprocs;
-        GASPI::notification_id_t  first = dest;
+        if ( true )
+        {
+            if (( pid == 0 ) || ( pid == 1 ))
+            {
+                GASPI::queue    queue;
+                GASPI::group    grp( { 0, 1 } );
+                GASPI::segment  seg_v( id_v(pid), & v[0], n, grp );
+                GASPI::segment  seg_u( id_u(pid), & u[0], n, grp );
+                const auto      source = ( pid == 0 ? 1 : 0 );
 
-        queue[dest].write_notify( seg_u, dest, seg_v, id_v(dest) );
+                queue.read( seg_v, source, id_u(source) );
+                queue.wait();
+            }// if
+        }// if
+        else
+        {
+            std::vector< GASPI::queue >  queues( nprocs );  // one queue to each remote processor
 
-        GASPI::notify_wait( seg_v, id_v(pid) );
+            GASPI::group    world;
+            GASPI::segment  seg_v( id_v(pid), & v[0], n, world );
+            GASPI::segment  seg_u( id_u(pid), & u[0], n, world );
 
-        queue[dest].wait();
+            const auto                dest  = ( pid + 1 ) % nprocs;
+            GASPI::notification_id_t  first = dest;
+            
+            queues[dest].write_notify( seg_u, dest, id_v(dest), id_v(dest) );
+            
+            GASPI::notify_wait( seg_v, id_v(pid) );
+            
+            queues[dest].wait();
 
+            for ( int  p = 0; p < nprocs; ++p )
+            {
+                if ( p != pid )
+                    queues[p].wait();
+            }// for
+
+            seg_v.release();
+            seg_u.release();
+        }// else
+
+        
         std::cout << '[' << pid << ']' << " after  ";
         for ( uint i = 0; i < n; ++i )
             std::cout << v[i] << ", ";
         std::cout << std::endl;
         
-        for ( int  p = 0; p < nprocs; ++p )
-        {
-            if ( p != pid )
-                queue[p].wait();
-        }// for
-
         return 0;
     }
 

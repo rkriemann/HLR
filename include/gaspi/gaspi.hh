@@ -1,5 +1,5 @@
-#ifndef  __HLR_GASPI_HH
-#define  __HLR_GASPI_HH
+#ifndef __HLR_GASPI_HH
+#define __HLR_GASPI_HH
 //
 // Project     : HLib
 // File        : gaspi.hh
@@ -9,6 +9,7 @@
 //
 
 #include <cassert>
+#include <initializer_list>
 
 #include <GASPI.h>
 
@@ -26,8 +27,13 @@ namespace GASPI
 #define GASPI_CHECK_RESULT( Func, Args )                                \
     {                                                                   \
         HLR::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
-        auto _check_result = Func Args;                                 \
-        assert( _check_result == GASPI_SUCCESS );                       \
+        auto  check_result = Func Args;                                 \
+        if ( check_result != GASPI_SUCCESS ) {                          \
+            gaspi_string_t  err_msg;                                    \
+            gaspi_print_error( check_result, & err_msg );               \
+            HLR::log( 0, std::string( " in " ) + #Func + " : " + err_msg ); \
+            std::exit( 1 );                                             \
+        }                                                               \
     }
 
 //
@@ -67,8 +73,8 @@ class process
 {
 public:
     // return number of processes
-    rank_t
-    size () const
+    static rank_t
+    size ()
     {
         rank_t  n = 0;
 
@@ -79,8 +85,8 @@ public:
     }
 
     // return rank of calling process
-    rank_t
-    rank () const
+    static rank_t
+    rank ()
     {
         rank_t  n = 0;
 
@@ -91,7 +97,7 @@ public:
     }
 
     // return maximal number of simultaneous requests per queue
-    number_t
+    static number_t
     nmax_requests ()
     {
         number_t  n = 0;
@@ -102,7 +108,7 @@ public:
     }
 
     // return number of allocated segments
-    number_t
+    static number_t
     nalloc_segments ()
     {
         number_t  n = 0;
@@ -113,7 +119,7 @@ public:
     }
 
     // return maximal number of segments
-    number_t
+    static number_t
     nmax_segments ()
     {
         number_t  n = 0;
@@ -121,6 +127,14 @@ public:
         GASPI_CHECK_RESULT( gaspi_segment_max, ( & n ) );
 
         return n;
+    }
+
+    // process-wide barrier
+    static void
+    barrier ()
+    {
+        GASPI_CHECK_RESULT( gaspi_barrier,
+                            ( GASPI_GROUP_ALL, GASPI_BLOCK ) );
     }
 };
 
@@ -131,7 +145,7 @@ class group
 {
 private:
     group_t  _gaspi_group;
-    
+
 public:
     group ()
             : _gaspi_group( GASPI_GROUP_ALL )
@@ -139,12 +153,74 @@ public:
         GASPI_CHECK_RESULT( gaspi_group_commit, ( _gaspi_group, GASPI_BLOCK ) );
     }
 
-    group ( const gaspi_group_t &  group )
-            : _gaspi_group( group )
+    group ( const gaspi_group_t &  g )
+            : _gaspi_group( g )
     {}
 
-    // access MPI groupunicator
+    group ( group &&  g )
+            : _gaspi_group( g._gaspi_group )
+    {
+        g._gaspi_group = GASPI_GROUP_ALL;
+    }
+
+    group ( const group &  g )
+            : _gaspi_group( g._gaspi_group )
+    {}
+
+    group ( std::initializer_list< rank_t >  ranks )
+    {
+        GASPI_CHECK_RESULT( gaspi_group_create, ( & _gaspi_group ) );
+
+        for ( auto  rank : ranks )
+            GASPI_CHECK_RESULT( gaspi_group_add, ( _gaspi_group, rank ) );
+            
+        GASPI_CHECK_RESULT( gaspi_group_commit, ( _gaspi_group, GASPI_BLOCK ) );
+    }
+
+    template < typename T_container >
+    group ( const T_container &  ranks )
+    {
+        GASPI_CHECK_RESULT( gaspi_group_create, ( & _gaspi_group ) );
+
+        for ( auto  rank : ranks )
+            GASPI_CHECK_RESULT( gaspi_group_add, ( _gaspi_group, rank ) );
+            
+        GASPI_CHECK_RESULT( gaspi_group_commit, ( _gaspi_group, GASPI_BLOCK ) );
+    }
+
+    ~group ()
+    {
+        if ( _gaspi_group != GASPI_GROUP_ALL )
+        {
+            HLR::log( 5, "active group" );
+            // GASPI_CHECK_RESULT( gaspi_group_delete, ( _gaspi_group ) );
+        }// if
+    }
+    
+    group &  operator = ( group &&  g )
+    {
+        _gaspi_group   = g._gaspi_group;
+        g._gaspi_group = GASPI_GROUP_ALL;
+
+        return *this;
+    }
+
+    group &  operator = ( const group &  g )
+    {
+        _gaspi_group = g._gaspi_group;
+        
+        return *this;
+    }
+    
     operator gaspi_group_t () const { return _gaspi_group; }
+
+    // group-wide barrier
+    void
+    barrier () const
+    {
+        GASPI_CHECK_RESULT( gaspi_barrier,
+                            ( _gaspi_group, GASPI_BLOCK ) );
+    }
 
 };
 
@@ -166,6 +242,7 @@ public:
             : _id( sid )
             , _size( asize * sizeof(value_t) )
     {
+        assert( sid < process::nmax_segments() );
         GASPI_CHECK_RESULT( gaspi_segment_use, ( _id, base, _size, gaspi_group_t( grp ), GASPI_BLOCK, 0 ) );
     }
 
@@ -177,14 +254,17 @@ public:
         seg._size = 0;
     }
 
-    // segment ( const segment &  win )
-    //         : _mpi_segment( win._mpi_segment )
+    // segment ( const segment &  seg )
+    //         : _id( seg._id )
     // {}
 
     ~segment ()
     {
         if ( _size > 0 )
+        {
             HLR::log( 0, "segment is not free" );
+            // release();
+        }// if
     }
 
     segment &
@@ -200,19 +280,19 @@ public:
     }
     
     // segment &
-    // operator = ( const segment &  win )
+    // operator = ( const segment &  seg )
     // {
-    //     _mpi_segment = win._mpi_segment;
+    //     _id = win._id;
 
     //     return *this;
     // }
 
-    void delete ()
+    void release ()
     {
-        assert( _mpi_segment != MPI_WIN_NULL );
+        assert( _size > 0 );
         
         GASPI_CHECK_RESULT( gaspi_segment_delete,
-                            ( & _id ) );
+                            ( _id ) );
 
         _id   = 0;
         _size = 0;
@@ -246,22 +326,37 @@ public:
     void
     write_notify ( const segment &            src_seg,            // source segment to send
                    const rank_t               dest_rank,          // destination rank to sent to
-                   const segment &            dest_seg,           // destination segment to write to
+                   const segment_id_t &       dest_seg,           // id of destination segment to write to
                    const notification_id_t &  rem_note_id,        // notification id to signal on remote rank
                    const number_t &           rem_note_val = 1 )  // (optional) value of notification
     {
-        notification  n;
-        
         GASPI_CHECK_RESULT( gaspi_write_notify, ( src_seg.id(),                 
                                                   0,                 // source offset
                                                   dest_rank,
-                                                  dest_seg.id(),
+                                                  dest_seg,
                                                   0,                 // destination offset
                                                   src_seg.size(),    // data size
                                                   rem_note_id,       
                                                   1,       
                                                   _id,               // queue to submit request to
                                                   GASPI_BLOCK ) );
+    }
+    
+    // read remote data from remove rank
+    // - local and remove data offset are assumed to be zero
+    void
+    read ( const segment &       dest_seg,           // local destination segment to write to
+           const rank_t          src_rank,           // source rank to read from
+           const segment_id_t &  src_seg )           // id of source segment to read from
+    {
+        GASPI_CHECK_RESULT( gaspi_read, ( dest_seg.id(),                 
+                                          0,                 // source offset
+                                          src_rank,
+                                          src_seg,
+                                          0,                 // destination offset
+                                          dest_seg.size(),   // data size
+                                          _id,               // queue to submit request to
+                                          GASPI_BLOCK ) );
     }
     
     // wait for all communication request in queue to finish
@@ -272,7 +367,7 @@ public:
     }
 
     // return number of open communication requests in queue
-    void
+    number_t
     size () const
     {
         number_t  n;
@@ -298,7 +393,7 @@ notify_wait ( const segment &            seg,       // local segment affected by
                                                  & first,       // first that have been received
                                                  GASPI_BLOCK ) );
 
-    assert( frist != note_id );
+    assert( first == note_id );
         
     notification_t  old_val;
     
@@ -315,4 +410,4 @@ notify_wait ( const segment &            seg,       // local segment affected by
 
 }// namespace HLR
 
-#endif //  __HLR_GASPI_HH
+#endif // __HLR_GASPI_HH
