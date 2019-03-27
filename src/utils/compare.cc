@@ -75,6 +75,8 @@ compare_ref_file ( TMatrix *            A,
                 std::cout << "    no error" << std::endl;
         }// if
     }// if
+    else
+        std::cout << "    no reference matrix found" << std::endl;
 }
 
 }// namespace HLR

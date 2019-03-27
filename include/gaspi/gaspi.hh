@@ -10,10 +10,12 @@
 
 #include <cassert>
 #include <initializer_list>
+#include <vector>
 
 #include <GASPI.h>
 
 #include "utils/log.hh"
+#include "utils/tools.hh"
 
 namespace HLR
 {
@@ -26,9 +28,15 @@ namespace GASPI
 //
 #define GASPI_CHECK_RESULT( Func, Args )                                \
     {                                                                   \
-        HLR::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
+        if ( HLIB::verbose( 6 ) )                                       \
+            HLR::log( 6, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
+        else if ( HLIB::verbose( 5 ) )                                  \
+            HLR::log( 5, #Func );                                       \
+                                                                        \
         auto  check_result = Func Args;                                 \
-        if ( check_result != GASPI_SUCCESS ) {                          \
+                                                                        \
+        if ( check_result != GASPI_SUCCESS )                            \
+        {                                                               \
             gaspi_string_t  err_msg;                                    \
             gaspi_print_error( check_result, & err_msg );               \
             HLR::log( 0, std::string( " in " ) + #Func + " : " + err_msg ); \
@@ -218,10 +226,23 @@ public:
     void
     barrier () const
     {
-        GASPI_CHECK_RESULT( gaspi_barrier,
-                            ( _gaspi_group, GASPI_BLOCK ) );
+        GASPI_CHECK_RESULT( gaspi_barrier, ( _gaspi_group, GASPI_BLOCK ) );
     }
 
+    // return string representation of group (list of members)
+    std::string
+    to_string () const
+    {
+        number_t  n = 0;
+        
+        GASPI_CHECK_RESULT( gaspi_group_size, ( _gaspi_group, & n ) );
+
+        std::vector< rank_t >  ranks( n );
+        
+        GASPI_CHECK_RESULT( gaspi_group_ranks, ( _gaspi_group, & ranks[0] ) );
+
+        return HLR::to_string( ranks );
+    }
 };
 
 //

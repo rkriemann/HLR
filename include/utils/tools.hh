@@ -56,9 +56,16 @@ std::string
 to_string ( container_t< value_t > const &  cont )
 {
     std::ostringstream  out;
+    size_t              pos  = 0;
+    const size_t        size = cont.size();
 
     for ( auto &&  e : cont )
-        out << e << ",";
+    {
+        out << e;
+
+        if ( ++pos < size )
+            out << ",";
+    }// for
 
     return out.str();
 }
