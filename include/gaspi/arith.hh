@@ -190,19 +190,65 @@ read_matrix ( std::vector< GASPI::segment > &  segs,
 {
     if ( is_dense( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "read_matrix: dense, %d × %d", A->nrows(), A->ncols() ) );
+        HLR::log( 5, HLIB::to_string( "read_matrix: dense, %d, %d × %d", A->id(), A->nrows(), A->ncols() ) );
 
         queue.read( segs[0], source, segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "read_matrix: lowrank, %d × %d, %d", A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
+        HLR::log( 5, HLIB::to_string( "read_matrix: lowrank, %d, %d × %d, %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
         
         queue.read( segs[0], source, segs[0].id() );
         queue.read( segs[1], source, segs[1].id() );
     }// if
     else
-        HLR::error( "(request_rdma) unsupported matrix type : " + A->typestr() ) ;
+        HLR::error( "(read_matrix) unsupported matrix type : " + A->typestr() ) ;
+}
+
+//
+// enqueue send requests for matrix data
+//
+template < typename value_t >
+void
+send_matrix ( std::vector< GASPI::segment > &  segs,
+              TMatrix *                        A,
+              const int                        dest,
+              GASPI::queue &                   queue )
+{
+    if ( is_dense( A ) )
+    {
+        HLR::log( 5, HLIB::to_string( "send_matrix: dense, %d, %d × %d", A->id(), A->nrows(), A->ncols() ) );
+
+        queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
+    }// if
+    else if ( is_lowrank( A ) )
+    {
+        HLR::log( 5, HLIB::to_string( "send_matrix: lowrank, %d, %d × %d, %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
+        
+        queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
+        queue.write_notify( segs[1], dest, segs[1].id(), segs[1].id() );
+    }// if
+    else
+        HLR::error( "(send_matrix) unsupported matrix type : " + A->typestr() ) ;
+}
+
+//
+// wait for matrix communication to finish 
+//
+void
+wait_matrix ( std::vector< GASPI::segment > &  segs )
+{
+    if ( segs.size() == 1 )
+    {
+        GASPI::notify_wait( segs[0], segs[0].id() );
+    }// if
+    else if ( segs.size() == 2 )
+    {
+        GASPI::notify_wait( segs[0], segs[0].id() );
+        GASPI::notify_wait( segs[1], segs[1].id() );
+    }// if
+    else
+        HLR::error( "(wait_matrix) unsupported number of segments" );
 }
 
 //
@@ -434,10 +480,10 @@ lu ( TMatrix *          A,
         // (since L is identity, no solving in block row)
         //
 
-        if ( contains( col_procs[i], pid ) )
+        if ( contains( col_procs[i], pid ) && ( col_procs[i].size() > 1 ))
         {
             //
-            // set up destination matrices
+            // set up destination matrices and GASPI segments
             //
 
             std::unique_ptr< TMatrix >   T_ii;        // temporary storage with auto-delete
@@ -452,9 +498,15 @@ lu ( TMatrix *          A,
             // set up windows/attached memory 
             auto  diag_seg = create_segments< value_t >( id(i,i), H_ii, rank, col_groups[i] );
 
-            // and initiate reading remote memory
-            if ( pid != p_ii )
-                read_matrix< value_t >( diag_seg, H_ii, p_ii, queues[p_ii] );
+            //
+            // start sending matrices
+            //
+            
+            if ( pid == p_ii )
+            {
+                for ( auto  dest : col_procs[i] )
+                    send_matrix< value_t >( diag_seg, H_ii, dest, queues[dest] );
+            }// if
             
             //
             // off-diagonal solve
@@ -482,7 +534,7 @@ lu ( TMatrix *          A,
                             if ( ! have_diag )
                             {
                                 DBG::printf( "waiting for %d", H_ii->id() );
-                                queues[p_ii].wait();
+                                wait_matrix( diag_seg );
                                 have_diag = true;
                                 
                                 if ( pid != p_ii )

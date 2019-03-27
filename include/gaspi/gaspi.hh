@@ -324,20 +324,20 @@ public:
     // send local data to remove rank
     // - local and remove data offset are assumed to be zero
     void
-    write_notify ( const segment &            src_seg,            // source segment to send
-                   const rank_t               dest_rank,          // destination rank to sent to
-                   const segment_id_t &       dest_seg,           // id of destination segment to write to
-                   const notification_id_t &  rem_note_id,        // notification id to signal on remote rank
-                   const number_t &           rem_note_val = 1 )  // (optional) value of notification
+    write_notify ( const segment &            src_seg,             // source segment to send
+                   const rank_t               dest_rank,           // destination rank to sent to
+                   const segment_id_t &       dest_seg_id,         // id of destination segment to write to
+                   const notification_id_t &  dest_note_id,        // notification id to signal on remote rank
+                   const number_t &           dest_note_val = 1 )  // (optional) value of notification
     {
         GASPI_CHECK_RESULT( gaspi_write_notify, ( src_seg.id(),                 
                                                   0,                 // source offset
                                                   dest_rank,
-                                                  dest_seg,
+                                                  dest_seg_id,
                                                   0,                 // destination offset
                                                   src_seg.size(),    // data size
-                                                  rem_note_id,       
-                                                  1,       
+                                                  dest_note_id,       
+                                                  dest_note_val,       
                                                   _id,               // queue to submit request to
                                                   GASPI_BLOCK ) );
     }
