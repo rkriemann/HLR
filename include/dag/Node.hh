@@ -17,6 +17,8 @@
 #include <cluster/TIndexSet.hh>
 #include <base/TTruncAcc.hh>
 
+#include "dag/LocalGraph.hh"
+
 namespace HLR
 {
 
@@ -26,7 +28,7 @@ namespace DAG
 //
 // forward declarations
 //
-struct Node;
+class  Node;
 class  RuntimeTask;
 
 //
@@ -42,8 +44,22 @@ struct mem_block_t
 // list of memory blocks
 using  block_list_t = std::vector< mem_block_t >;
 
-// list of nodes
-using  node_list_t  = std::list< Node * >;
+//
+// return true if any of the indexsets in vis0 intersects
+// with any of the indexsets in vis1
+//
+template < typename T_container >
+bool
+is_intersecting ( const T_container &  vblk0,
+                  const T_container &  vblk1 )
+{
+    for ( auto &  blk0 : vblk0 )
+        for ( auto &  blk1 : vblk1 )
+            if (( blk0.id == blk1.id ) && is_intersecting( blk0.is, blk1.is ) )
+                return true;
+
+    return false;
+}
 
 //!
 //! @class Node
@@ -207,8 +223,8 @@ private:
     }
 
     virtual
-    void
-    refine_ ( node_list_t & ) = 0;
+    LocalGraph
+    refine_ () = 0;
 };
 
 //
@@ -223,6 +239,19 @@ alloc_node ( std::list< Node * > & subnodes,
     auto  node = new T( std::forward< Args >( args ) ... );
 
     subnodes.push_back( node );
+
+    return node;
+}
+
+template < typename T,
+           typename ... Args >
+T *
+alloc_node ( LocalGraph &  g,
+             Args && ...   args )
+{
+    auto  node = new T( std::forward< Args >( args ) ... );
+
+    g.push_back( node );
 
     return node;
 }

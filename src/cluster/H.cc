@@ -41,8 +41,8 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct )
 {
-    TWeakStdGeomAdmCond  adm_cond;
-    TBCBuilder           bct_builder;
+    TStdGeomAdmCond  adm_cond;
+    TBCBuilder       bct_builder;
 
     return bct_builder.build( rowct, colct, & adm_cond );
 }

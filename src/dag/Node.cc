@@ -24,23 +24,6 @@ using namespace HLIB;
 // controls edge sparsification
 const bool  sparsify = true;
 
-//
-// return true if any of the indexsets in vis0 intersects
-// with and of the indexsets in vis1
-//
-template < typename T_container >
-bool
-is_intersecting ( const T_container &  vblk0,
-                  const T_container &  vblk1 )
-{
-    for ( auto &  blk0 : vblk0 )
-        for ( auto &  blk1 : vblk1 )
-            if (( blk0.id == blk1.id ) && is_intersecting( blk0.is, blk1.is ) )
-                return true;
-
-    return false;
-}
-
 //////////////////////////////////////////////
 //
 // Node
@@ -91,22 +74,20 @@ Node::refine ()
     // create subnodes
     //
 
-    std::list< Node * >  subnodes;
-        
-    refine_( subnodes );
+    auto  g = refine_();
 
+    g.set_dependencies();
+
+    g.print_dot( "g.dot" );
+        
     //
     // copy nodes to local array
     //
 
-    size_t  pos = 0;
-        
-    _sub_nodes.resize( subnodes.size() );
+    _sub_nodes.reserve( g.size() );
 
-    for ( auto  node : subnodes )
-    {
-        _sub_nodes[pos++] = node;
-    }// for
+    for ( auto  node : g )
+        _sub_nodes.push_back( node );
 }
 
 namespace

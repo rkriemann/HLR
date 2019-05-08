@@ -46,6 +46,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "app",         value<string>(), ": application type (logkernel,matern)" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
+        ( "accu",                         ": use accumulator arithmetic" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
         ( "noredir",                      ": do not redirect output (MPI only)" )
@@ -84,6 +85,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "threads"   ) ) nthreads  = vm["threads"].as<int>();
     if ( vm.count( "verbosity" ) ) verbosity = vm["verbosity"].as<int>();
     if ( vm.count( "nodag"     ) ) HLIB::CFG::Arith::use_dag = false;
+    if ( vm.count( "accu"      ) ) HLIB::CFG::Arith::use_accu = true;
     if ( vm.count( "nprob"     ) ) n         = vm["nprob"].as<int>();
     if ( vm.count( "ntile"     ) ) ntile     = vm["ntile"].as<int>();
     if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();

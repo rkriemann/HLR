@@ -75,8 +75,8 @@ struct EmptyNode : public DAG::Node
 
 private:
 
-    virtual void  run_    ( const TTruncAcc & ) {}
-    virtual void  refine_ ( node_list_t & )     {}
+    virtual void        run_    ( const TTruncAcc & ) {}
+    virtual LocalGraph  refine_ ()                    { return {}; }
 };
 
 

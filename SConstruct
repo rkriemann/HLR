@@ -1,7 +1,7 @@
 
 import os
 
-debug   = False
+debug   = True
 warn    = False
 fullmsg = False
 
@@ -69,6 +69,7 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
                                         'src/cluster/tileh.cc',
                                         'src/cluster/tlr.cc',
                                         'src/dag/Graph.cc',
+                                        'src/dag/LocalGraph.cc',
                                         'src/dag/Node.cc',
                                         'src/dag/lu.cc',
                                         'src/mpi/distr.cc',
