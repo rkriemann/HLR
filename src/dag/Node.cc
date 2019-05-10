@@ -31,14 +31,6 @@ const bool  sparsify = true;
 //////////////////////////////////////////////
 
 //
-// ctor
-//
-Node::Node ()
-        : _dep_cnt( 0 )
-        , _task( nullptr )
-{}
-
-//
 // per node initialization
 //
 void

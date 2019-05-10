@@ -8,6 +8,7 @@
 
 #include <list>
 #include <vector>
+#include <unordered_map>
 
 #include <hpx/async.hpp>
 #include <hpx/dataflow.hpp>
@@ -25,7 +26,7 @@ using namespace HLIB;
 
 // HPX types for tasks and dependencies
 using  task_t         = hpx::shared_future< void >;
-using  dependencies_t = std::vector< hpx::shared_future< void > >;
+using  dependencies_t = std::list< hpx::shared_future< void > >;
 
 namespace HLR
 {
@@ -54,57 +55,12 @@ run_node ( Node *             node,
 void
 run_node_dep ( Node *             node,
                const TTruncAcc &  acc,
-               task_t             dep )
+               dependencies_t     dep )
 {
     log( 4, "run_node_dep : " + node->to_string() );
     
     node->run( acc );
 }
-
-//
-// return vector with tasks corresponding to dependencies
-//
-dependencies_t
-gen_dependencies ( Node *                                   node,
-                   std::map< Node *, task_t >               taskmap,
-                   std::map< Node *, std::list< Node * > >  nodedeps )
-{
-    dependencies_t  deps;
-    
-    deps.reserve( nodedeps[ node ].size() );
-    
-    for ( auto  dep : nodedeps[ node ] )
-        deps.push_back( taskmap[ dep ] );
-    
-    // not needed anymore
-    nodedeps[ node ].clear();
-
-    return deps;
-}
-
-// enables some debug output
-#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
-
-//////////////////////////////////////////////
-//
-// node for collecting dependencies
-// without any computation
-//
-//////////////////////////////////////////////
-
-struct EmptyNode : public DAG::Node
-{
-    // return text version of node
-    virtual std::string  to_string () const { return "Empty"; }
-
-    // (optional) color for DAG visualization (format: RRGGBB)
-    virtual std::string  color     () const { return "888A85"; }
-
-private:
-
-    virtual void        run_    ( const TTruncAcc & ) {}
-    virtual LocalGraph  refine_ ()                    { return {}; }
-};
 
 }// namespace anonymous
 
@@ -127,7 +83,8 @@ run ( DAG::Graph &             dag,
     // use single end node to not wait sequentially for all
     // original end nodes (and purely use HPX framework)
     //
-    
+
+    auto         tic          = Time::Wall::now();
     DAG::Node *  final        = nullptr;
     bool         multiple_end = false;
 
@@ -150,60 +107,65 @@ run ( DAG::Graph &             dag,
     }// if
 
     // map of DAG nodes to tasks
-    std::map< Node *, task_t >               taskmap;
+    std::unordered_map< Node *, task_t >          taskmap;
 
     // keep track of dependencies for a node
-    std::map< Node *, std::list< Node * > >  nodedeps;
+    std::unordered_map< Node *, dependencies_t >  nodedeps;
+
+    //
+    // Go through DAG, decrement dependency counter for each successor of
+    // current node and if this reaches zero, add node to list of nodes
+    // to be visited. Since now all dependencies are met, all tasks for
+    // nodes exist and "when_all( dependency-set )" can be constructed.
+    //
+    // For start nodes, dependency set is empty, so use "async".
+    //
     
-    // go in BFS style through dag and create the tasks with dependencies
     std::list< Node * >  nodes;
 
-    // start nodes do not have dependencies, therefore create futures using "async"
     for ( auto  node : dag.start() )
     {
-        taskmap[ node ] = async( run_node, node, acc );
+        log( 4, "async( " + node->to_string() + " )" );
+
+        task_t  task = async( run_node, node, acc );
+        
+        taskmap[ node ] = task;
 
         for ( auto  succ : node->successors() )
         {
-            nodedeps[ succ ].push_back( node );
-            nodes.push_back( succ );
+            nodedeps[ succ ].push_back( task );
+
+            if ( succ->dec_dep_cnt() == 0 )
+                nodes.push_back( succ );
         }// for
     }// for
 
     while ( ! nodes.empty() )
     {
-        std::list< Node * >  succs;
-
-        while ( ! nodes.empty() )
+        auto  node = behead( nodes );
+        
+        log( 4, "dataflow( " + node->to_string() + " )" );
+        
+        task_t  task = hpx::dataflow( unwrapping( run_node_dep ), node, acc, when_all( nodedeps[ node ] ) );
+        
+        taskmap[ node ] = task;
+        
+        for ( auto  succ : node->successors() )
         {
-            auto  node = behead( nodes );
-            auto  deps = gen_dependencies( node, taskmap, nodedeps );
-                
-            taskmap[ node ] = hpx::dataflow( unwrapping( run_node_dep ), node, acc, when_all( deps ) );
-
-            for ( auto  succ : node->successors() )
-            {
-                nodedeps[ succ ].push_back( node );
-                succs.push_back( succ );
-            }// for
-        }// while
-
-        nodes = std::move( succs );
+            nodedeps[ succ ].push_back( task );
+            
+            if ( succ->dec_dep_cnt() == 0 )
+                nodes.push_back( succ );
+        }// for
     }// while
 
-    //
     // if DAG originally had single end node, get pointer to it
-    // otherwise set up task (if not a start node [not possible, or?])
-    //
-    
     if ( final == nullptr )
         final = dag.end().front();
-    else if ( final->dep_cnt() > 0 )
-    {
-        auto  deps = gen_dependencies( final, taskmap, nodedeps );
-        
-        taskmap[ final ] = dataflow( unwrapping( run_node_dep ), final, acc, when_all( deps ) );
-    }// else
+    
+    auto  toc = Time::Wall::since( tic );
+
+    log( 3, "time for setting up HPX DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
     
     //
     // start execution by requesting future result for end node
@@ -212,7 +174,7 @@ run ( DAG::Graph &             dag,
     taskmap[ final ].get();
 
     //
-    // remove auxiliary ende node from DAG
+    // remove auxiliary end node from DAG
     //
     
     if ( multiple_end )

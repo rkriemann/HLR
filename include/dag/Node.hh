@@ -26,12 +26,6 @@ namespace DAG
 {
 
 //
-// forward declarations
-//
-class  Node;
-class  RuntimeTask;
-
-//
 // defines a memory block by an Id and a block index set
 // (memory block as used within a matrix)
 //
@@ -89,13 +83,12 @@ private:
 
     // mutex to handle concurrent access to internal data
     tbb::spin_mutex        _mutex;
-    
-    // corresponding runtime task for DAG execution
-    RuntimeTask *          _task;
 
 public:
     // ctor
-    Node ();
+    Node ()
+            : _dep_cnt( 0 )
+    {}
 
     // dtor
     virtual ~Node () {}
@@ -176,16 +169,6 @@ public:
     void unlock () { _mutex.unlock(); }
 
     //
-    // Node execution (internal)
-    //
-
-    // givess access to runtime task
-    RuntimeTask *        task       ()                   { return _task; }
-
-    // set runtime task
-    void                 set_task   ( RuntimeTask *  t ) { _task = t; }
-    
-    //
     // output and visualization
     //
     
@@ -255,6 +238,24 @@ alloc_node ( LocalGraph &  g,
 
     return node;
 }
+
+//
+// special class for an empty node without anything to
+// compute and without refinement
+//
+class EmptyNode : public Node
+{
+    // return text version of node
+    virtual std::string  to_string () const { return "Empty"; }
+
+    // (optional) color for DAG visualization (format: RRGGBB)
+    virtual std::string  color     () const { return "888A85"; }
+
+private:
+
+    virtual void        run_    ( const HLIB::TTruncAcc & ) {}
+    virtual LocalGraph  refine_ ()                          { return {}; }
+};
 
 }// namespace DAG
 

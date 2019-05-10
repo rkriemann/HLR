@@ -6,6 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <unordered_map>
+#include <cassert>
+
 #include <tbb/task.h>
 
 #include "tbb/dag.hh"
@@ -21,6 +24,14 @@ namespace HLR
 namespace DAG
 {
 
+namespace
+{
+
+class RuntimeTask;
+
+// mapping of Node to TBB task
+using  taskmap_t = std::unordered_map< Node *, tbb::task * >;
+
 //
 // helper class for executing Node via TBB
 //
@@ -29,12 +40,15 @@ class RuntimeTask : public tbb::task
 private:
     DAG::Node *        _node;
     const TTruncAcc &  _acc;
+    taskmap_t &        _taskmap;
     
 public:
     RuntimeTask ( DAG::Node *        anode,
-                  const TTruncAcc &  aacc )
+                  const TTruncAcc &  aacc,
+                  taskmap_t &        ataskmap )
             : _node( anode )
             , _acc( aacc )
+            , _taskmap( ataskmap )
     {
         set_ref_count( _node->dep_cnt() );
     }
@@ -45,7 +59,10 @@ public:
 
         for ( auto  succ : _node->successors() )
         {
-            auto  succ_task = static_cast< tbb::task * >( succ->task() );
+            // auto  succ_task = static_cast< tbb::task * >( succ->task() );
+            auto  succ_task = _taskmap[ succ ];
+
+            assert( succ_task != nullptr );
             
             if ( succ_task->decrement_ref_count() == 0 )
                 spawn( * succ_task );
@@ -55,30 +72,7 @@ public:
     }
 };
 
-// enables some debug output
-#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
-
-//////////////////////////////////////////////
-//
-// node for collecting dependencies
-// without any computation
-//
-//////////////////////////////////////////////
-
-struct EmptyNode : public DAG::Node
-{
-    // return text version of node
-    virtual std::string  to_string () const { return "Empty"; }
-
-    // (optional) color for DAG visualization (format: RRGGBB)
-    virtual std::string  color     () const { return "888A85"; }
-
-private:
-
-    virtual void        run_    ( const TTruncAcc & ) {}
-    virtual LocalGraph  refine_ ()                    { return {}; }
-};
-
+}// namespace anonymous
 
 namespace TBB
 {
@@ -94,8 +88,10 @@ run ( DAG::Graph &             dag,
     // TBB needs single end node
     //
     
+    auto         tic          = Time::Wall::now();
     DAG::Node *  final        = nullptr;
     bool         multiple_end = false;
+    taskmap_t    taskmap;
 
     if ( dag.end().size() > 1 )
     {
@@ -113,12 +109,13 @@ run ( DAG::Graph &             dag,
             final->after( node );
 
         final->set_dep_cnt( dag.end().size() ); // final->in.size();
-        final->set_task( new ( tbb::task::allocate_root() ) DAG::RuntimeTask( final, acc ) );
+
+        taskmap[ final ] = new ( tbb::task::allocate_root() ) DAG::RuntimeTask( final, acc, taskmap );
     }// if
 
     // create tbb tasks for all nodes
     for ( auto  node : dag.nodes() )
-        node->set_task( new ( tbb::task::allocate_root() ) DAG::RuntimeTask( node, acc ) );
+        taskmap[ node ] = new ( tbb::task::allocate_root() ) DAG::RuntimeTask( node, acc, taskmap );
     
     // if DAG has single end node, get pointer to it
     if ( final == nullptr )
@@ -129,13 +126,27 @@ run ( DAG::Graph &             dag,
     for ( auto  node : dag.start() )
     {
         if ( node != final )
-            work_queue.push_back( * node->task() );
+        {
+            auto  task = taskmap[ node ];
+
+            assert( task != nullptr );
+            
+            work_queue.push_back( * task );
+        }// if
     }// for
     
-    final->task()->increment_ref_count();                // for "tbb::wait" to actually wait for final node
-    final->task()->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
-    final->task()->execute();                            // and the final node explicitly
-    tbb::task::destroy( * static_cast< tbb::task * >( final->task() ) ); // not done by TBB since executed manually
+    auto  toc = Time::Wall::since( tic );
+
+    log( 3, "time for TBB DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+
+    auto  final_task = taskmap[ final ];
+    
+    assert( final_task != nullptr );
+    
+    final_task->increment_ref_count();                // for "tbb::wait" to actually wait for final node
+    final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
+    final_task->execute();                            // and the final node explicitly
+    tbb::task::destroy( * final_task );               // not done by TBB since executed manually
 
     if ( multiple_end )
     {
