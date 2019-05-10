@@ -1,9 +1,9 @@
-#ifndef __HLR_APPROX_HH
-#define __HLR_APPROX_HH
+#ifndef __HLR_APPROX_SVD_HH
+#define __HLR_APPROX_SVD_HH
 //
 // Project     : HLib
-// File        : approx.hh
-// Description : low-rank approximation functions
+// File        : approx_svd.hh
+// Description : low-rank approximation functions using SVD
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -232,44 +232,65 @@ approx_sum_svd ( const std::list< BLAS::Matrix< T > > &  U,
 
     const size_t  nrows   = U.front().nrows();
     const size_t  ncols   = V.front().nrows();
-    uint    in_rank = 0;
+    uint          in_rank = 0;
 
     for ( auto &  U_i : U )
         in_rank += U_i.ncols();
 
-    //
-    // concatenate matrices
-    //
-
-    BLAS::Matrix< value_t >  U_all( nrows, in_rank );
-    BLAS::Matrix< value_t >  V_all( ncols, in_rank );
-    idx_t                    ofs = 0;
-
-    for ( auto &  U_i : U )
+    if ( in_rank >= std::min( nrows, ncols ) )
     {
-        BLAS::Matrix< value_t > U_all_i( U_all, BLAS::Range::all, BLAS::Range( ofs, ofs + U_i.ncols() - 1 ) );
+        //
+        // perform dense approximation
+        //
 
-        BLAS::copy( U_i, U_all_i );
-        ofs += U_i.ncols();
-    }// for
+        BLAS::Matrix< value_t >  D( nrows, ncols );
 
-    ofs = 0;
-    
-    for ( auto &  V_i : V )
+        auto  u_i = U.cbegin();
+        auto  v_i = V.cbegin();
+        
+        for ( ; u_i != U.cend(); ++u_i, ++v_i )
+            BLAS::prod( value_t(1), *u_i, BLAS::adjoint( *v_i ), value_t(1), D );
+
+        auto [ U_tr, V_tr ] = BLAS::approx_svd( D, acc );
+
+        return { std::move( U_tr ), std::move( V_tr ) };
+    }// if
+    else
     {
-        BLAS::Matrix< value_t > V_all_i( V_all, BLAS::Range::all, BLAS::Range( ofs, ofs + V_i.ncols() - 1 ) );
+        //
+        // concatenate matrices
+        //
 
-        BLAS::copy( V_i, V_all_i );
-        ofs += V_i.ncols();
-    }// for
+        BLAS::Matrix< value_t >  U_all( nrows, in_rank );
+        BLAS::Matrix< value_t >  V_all( ncols, in_rank );
+        idx_t                    ofs = 0;
 
-    //
-    // truncate and return result
-    //
+        for ( auto &  U_i : U )
+        {
+            BLAS::Matrix< value_t > U_all_i( U_all, BLAS::Range::all, BLAS::Range( ofs, ofs + U_i.ncols() - 1 ) );
+
+            BLAS::copy( U_i, U_all_i );
+            ofs += U_i.ncols();
+        }// for
+
+        ofs = 0;
     
-    return HLR::truncate_svd( U_all, V_all, acc );
+        for ( auto &  V_i : V )
+        {
+            BLAS::Matrix< value_t > V_all_i( V_all, BLAS::Range::all, BLAS::Range( ofs, ofs + V_i.ncols() - 1 ) );
+
+            BLAS::copy( V_i, V_all_i );
+            ofs += V_i.ncols();
+        }// for
+
+        //
+        // truncate and return result
+        //
+    
+        return HLR::truncate_svd( U_all, V_all, acc );
+    }// else
 }
 
 }// namespace HLR
 
-#endif // __HLR_APPROX_HH
+#endif // __HLR_APPROX_SVD_HH

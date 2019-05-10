@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 //
 // redirect stdout/stderr
