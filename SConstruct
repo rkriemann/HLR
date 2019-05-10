@@ -74,7 +74,6 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
                                         'src/dag/lu.cc',
                                         'src/mpi/distr.cc',
                                         'src/seq/dag.cc',
-                                        'src/tbb/dag.cc',
                                         'src/utils/compare.cc' ] )
 
 #
@@ -107,7 +106,7 @@ tbb = env.Clone()
 tbb.Program( 'tlr-tbb.cc' )
 tbb.Program( 'hodlr-tbb.cc' )
 tbb.Program( 'tileh-tbb.cc' )
-tbb.Program( 'dag-tbb.cc' )
+tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
 
 #
 # TaskFlow
@@ -146,6 +145,7 @@ hpx.Append( LIBS = [ "hpx_iostreams" ] )
 
 hpx.Program( 'tlr-hpx.cc' )
 hpx.Program( 'hodlr-hpx.cc' )
+hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
 
 #
 # GASPI
