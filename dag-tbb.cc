@@ -51,7 +51,7 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG SEQ )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG TBB )" << term::reset << std::endl;
         
         auto  C = A->copy();
         

@@ -5,6 +5,7 @@
 
 #include "apps/logkernel.hh"
 #include "apps/matern.hh"
+#include "apps/Laplace.hh"
 
 #include "utils/termcolor.hpp"
 
@@ -35,6 +36,16 @@ gen_problem ()
               << "    Matern Covariance, n = " << n << ", ntile = " << ntile << ", k = " << k << std::endl;
         
     return std::make_unique< HLR::Apps::MaternCov >( n );
+}
+
+template <>
+std::unique_ptr< HLR::Apps::LaplaceSLP >
+gen_problem ()
+{
+    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
+              << "    Laplace SLP, grid = " << grid << ", n = " << n << ", ntile = " << ntile << ", k = " << k << std::endl;
+        
+    return std::make_unique< HLR::Apps::LaplaceSLP >( n, grid );
 }
 
 #endif // __HLR_GEN_PROBLEM_HH

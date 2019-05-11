@@ -26,7 +26,8 @@ string  distr     = "cyclic2d";
 uint    nthreads  = 0;
 uint    verbosity = 1;
 bool    noredir   = false;
-
+string  grid      = "sphere";
+    
 void
 parse_cmdline ( int argc, char ** argv )
 {
@@ -93,7 +94,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
     if ( vm.count( "noredir"   ) ) noredir   = true;
 
-    assert( ( appl == "logkernel" ) || ( appl == "matern" ) );
+    assert( ( appl == "logkernel" ) || ( appl == "matern" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }
 

@@ -64,6 +64,7 @@ env.Prepend( LIBPATH = [ "." ] )
 
 common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
                                         'src/apps/matern.cc',
+                                        'src/apps/Laplace.cc',
                                         'src/cluster/H.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',

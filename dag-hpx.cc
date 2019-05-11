@@ -56,7 +56,7 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG SEQ )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG HPX )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
@@ -107,8 +107,9 @@ hpx_main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel" ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        if      ( appl == "logkernel"  ) mymain< HLR::Apps::LogKernel >( argc, argv );
+        else if ( appl == "matern"     ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        else if ( appl == "laplaceslp" ) mymain< HLR::Apps::LaplaceSLP >( argc, argv );
         else
             throw "unknown application";
 

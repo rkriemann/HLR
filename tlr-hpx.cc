@@ -90,8 +90,9 @@ hpx_main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel" ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        if      ( appl == "logkernel"  ) mymain< HLR::Apps::LogKernel >( argc, argv );
+        else if ( appl == "matern"     ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        else if ( appl == "laplaceslp" ) mymain< HLR::Apps::LaplaceSLP >( argc, argv );
         else
             throw "unknown application";
 
