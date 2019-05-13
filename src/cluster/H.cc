@@ -28,7 +28,7 @@ std::unique_ptr< HLIB::TClusterTree >
 cluster ( HLIB::TCoordinate *   coords,
           const size_t          ntile )
 {
-    TCardBSPPartStrat  part_strat;
+    TCardBSPPartStrat  part_strat( adaptive_split_axis );
     TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
     return ct_builder.build( coords );
@@ -41,7 +41,7 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct )
 {
-    TStdGeomAdmCond  adm_cond;
+    TStdGeomAdmCond  adm_cond( 2.0, use_min_diam );
     TBCBuilder       bct_builder;
 
     return bct_builder.build( rowct, colct, & adm_cond );

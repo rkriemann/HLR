@@ -45,12 +45,12 @@ make_grid ( const size_t         n,
     else if ( name == "cube"    ) grid = make_cube();
     else if ( name == "square"  ) grid = make_square();
 
-    while ( grid->n_vertices() < n )
+    while ( grid->n_triangles() < n )
     {
         auto  rgrid = grid->refine();
 
         // do not exceed given upper limit
-        if ( rgrid->n_vertices() > n )
+        if ( rgrid->n_triangles() > n )
             break;
         
         grid = std::move( rgrid );

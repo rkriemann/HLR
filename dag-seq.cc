@@ -30,14 +30,15 @@ mymain ( int argc, char ** argv )
     if ( verbose( 3 ) )
     {
         TPSBlockClusterVis   bc_vis;
-        
+
+        print_ps( ct->root(), "ct" );
         bc_vis.id( true ).print( bct->root(), "bct" );
         print_vtk( coord.get(), "coord" );
     }// if
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  acc    = gen_accuracy();
     auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
@@ -45,8 +46,6 @@ mymain ( int argc, char ** argv )
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
 
-    DBG::write( A.get(), "A.hm", "A" );
-    
     if ( verbose( 3 ) )
     {
         TPSMatrixVis  mvis;
@@ -80,8 +79,6 @@ mymain ( int argc, char ** argv )
         HLR::DAG::Seq::run( dag, acc );
         
         toc = Time::Wall::since( tic );
-        
-        DBG::write( C.get(), "C.hm", "C" );
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         

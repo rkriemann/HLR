@@ -52,7 +52,7 @@ mymain ( int argc, char ** argv )
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  A      = Matrix::GASPI::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
     auto  toc    = Time::Wall::since( tic );
     

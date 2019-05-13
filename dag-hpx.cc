@@ -40,7 +40,7 @@ mymain ( int argc, char ** argv )
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  acc    = gen_accuracy();
     auto  A      = Matrix::HPX::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );

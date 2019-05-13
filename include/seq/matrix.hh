@@ -56,7 +56,7 @@ build ( const HLIB::TBlockCluster *  bct,
     {
         if ( bct->is_adm() )
         {
-            M.reset( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< TMatrix >( lrapx.build( bct, acc ) );
         }// if
         else
         {

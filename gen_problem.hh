@@ -18,13 +18,22 @@ gen_problem ()
     assert( false );
 }
 
+void
+print_problem_desc ( const std::string &  name )
+{
+    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
+              << "    " << name
+              << ", n = " << n
+              << ", ntile = " << ntile
+              << ( eps > 0 ? HLIB::to_string( ", ε = %.2e", eps ) : HLIB::to_string( ", k = %d", k ) )
+              << std::endl;
+}
+
 template <>
 std::unique_ptr< HLR::Apps::LogKernel >
 gen_problem< HLR::Apps::LogKernel > ()
 {
-    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
-              << "    LogKernel, n = " << n << ", ntile = " << ntile << ", k = " << k << std::endl;
-        
+    print_problem_desc( "LogKernel" );
     return std::make_unique< HLR::Apps::LogKernel >( n );
 }
 
@@ -32,9 +41,7 @@ template <>
 std::unique_ptr< HLR::Apps::MaternCov >
 gen_problem ()
 {
-    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
-              << "    Matern Covariance, n = " << n << ", ntile = " << ntile << ", k = " << k << std::endl;
-        
+    print_problem_desc( "Matern Covariance" );
     return std::make_unique< HLR::Apps::MaternCov >( n );
 }
 
@@ -42,9 +49,7 @@ template <>
 std::unique_ptr< HLR::Apps::LaplaceSLP >
 gen_problem ()
 {
-    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
-              << "    Laplace SLP, grid = " << grid << ", n = " << n << ", ntile = " << ntile << ", k = " << k << std::endl;
-        
+    print_problem_desc( "Laplace SLP" );
     return std::make_unique< HLR::Apps::LaplaceSLP >( n, grid );
 }
 
