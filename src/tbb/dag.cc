@@ -11,12 +11,10 @@
 
 #include <tbb/task.h>
 
+#include "utils/log.hh"
 #include "tbb/dag.hh"
 
 using namespace HLIB;
-
-// enables some debug output
-#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
 
 namespace HLR
 {

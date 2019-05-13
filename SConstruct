@@ -119,6 +119,7 @@ tf.Append( LIBS     = [ "pthread" ] )
 
 tf.Program( 'tlr-tf.cc' )
 tf.Program( 'hodlr-tf.cc' )
+tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
 
 #
 # MPI

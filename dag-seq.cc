@@ -21,26 +21,44 @@ mymain ( int argc, char ** argv )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic     = Time::Wall::now();
-    auto  problem = gen_problem< problem_t >();
-    auto  coord   = problem->coordinates();
-    auto  ct      = H::cluster( coord.get(), ntile );
-    auto  bct     = H::blockcluster( ct.get(), ct.get() );
-    
-    if ( verbose( 3 ) )
-    {
-        TPSBlockClusterVis   bc_vis;
+    auto  tic = Time::Wall::now();
+    auto  acc = gen_accuracy();
+    auto  A   = std::unique_ptr< TMatrix >();
 
-        print_ps( ct->root(), "ct" );
-        bc_vis.id( true ).print( bct->root(), "bct" );
-        print_vtk( coord.get(), "coord" );
-    }// if
+    if ( matrix == "" )
+    {
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = H::cluster( coord.get(), ntile );
+        auto  bct     = H::blockcluster( ct.get(), ct.get() );
     
-    auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
-    auto  acc    = gen_accuracy();
-    auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, acc );
+        if ( verbose( 3 ) )
+        {
+            TPSBlockClusterVis   bc_vis;
+
+            print_ps( ct->root(), "ct" );
+            bc_vis.id( true ).print( bct->root(), "bct" );
+            print_vtk( coord.get(), "coord" );
+        }// if
+    
+        auto  coeff  = problem->coeff_func();
+        auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+        auto  acc    = gen_accuracy();
+
+        A = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, acc );
+    }// if
+    else
+    {
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    matrix = " << matrix
+                  << ( eps > 0 ? HLIB::to_string( ", ε = %.2e", eps ) : HLIB::to_string( ", k = %d", k ) )
+                  << std::endl;
+
+        A = read_matrix( matrix );
+        A = A->copy(); // for spreading memory usage
+    }// else
+
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;

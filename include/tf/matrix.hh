@@ -18,6 +18,7 @@
 #include <base/TTruncAcc.hh>
 
 #include "utils/tensor.hh"
+#include "utils/log.hh"
 #include "seq/matrix.hh"
 
 namespace HLR
@@ -114,6 +115,8 @@ build ( const HLIB::TBlockCluster *  bct,
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
+    log( 3, HLIB::to_string( "%d", M->id() ) );
+    
     return M;
 }
 

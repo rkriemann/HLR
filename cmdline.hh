@@ -28,6 +28,7 @@ uint    nthreads  = 0;
 uint    verbosity = 1;
 bool    noredir   = false;
 string  grid      = "sphere";
+string  matrix    = "";
     
 void
 parse_cmdline ( int argc, char ** argv )
@@ -45,7 +46,9 @@ parse_cmdline ( int argc, char ** argv )
         ( "ntile",       value<int>(),    ": set tile size" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "nodag",                        ": do not use DAG in arithmetic" )
-        ( "app",         value<string>(), ": application type (logkernel,matern)" )
+        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
+        ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
+        ( "matrix",      value<string>(), ": matrix file use" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
@@ -94,6 +97,8 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();
     if ( vm.count( "eps"       ) ) eps       = vm["eps"].as<double>();
     if ( vm.count( "app"       ) ) appl      = vm["app"].as<string>();
+    if ( vm.count( "grid"      ) ) grid      = vm["grid"].as<string>();
+    if ( vm.count( "matrix"    ) ) matrix    = vm["matrix"].as<string>();
     if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
     if ( vm.count( "noredir"   ) ) noredir   = true;
 

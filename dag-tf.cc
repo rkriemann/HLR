@@ -1,15 +1,15 @@
 //
 // Project     : HLib
-// File        : dag-tbb.cc
-// Description : DAG based H-LU using TBB
+// File        : dag-tf.cc
+// Description : DAG based H-LU using TF
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include "common.inc"
 #include "cluster/H.hh"
-#include "tbb/matrix.hh"
-#include "tbb/dag.hh"
+#include "tf/matrix.hh"
+#include "tf/dag.hh"
 #include "dag/lu.hh"
 
 //
@@ -31,20 +31,20 @@ mymain ( int argc, char ** argv )
         auto  coord   = problem->coordinates();
         auto  ct      = H::cluster( coord.get(), ntile );
         auto  bct     = H::blockcluster( ct.get(), ct.get() );
-    
+        
         if ( verbose( 3 ) )
         {
             TPSBlockClusterVis   bc_vis;
-        
+            
             bc_vis.id( true ).print( bct->root(), "bct" );
         }// if
-    
+        
         auto  coeff  = problem->coeff_func();
         auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
         auto  acc    = gen_accuracy();
 
-        A = Matrix::TBB::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = Matrix::TF::build( bct->root(), *pcoeff, *lrapx, acc );
     }// if
     else
     {
@@ -56,9 +56,8 @@ mymain ( int argc, char ** argv )
         A = read_matrix( matrix );
         A = A->copy(); // for spreading memory usage
     }// else
-
-auto  toc    = Time::Wall::since( tic );
     
+    auto  toc    = Time::Wall::since( tic );
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
     
@@ -70,7 +69,7 @@ auto  toc    = Time::Wall::since( tic );
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG TBB )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG TF )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
@@ -92,7 +91,7 @@ auto  toc    = Time::Wall::since( tic );
 
         tic = Time::Wall::now();
         
-        HLR::DAG::TBB::run( dag, acc );
+        HLR::DAG::TF::run( dag, acc );
         
         toc = Time::Wall::since( tic );
         
