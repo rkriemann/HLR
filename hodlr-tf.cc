@@ -66,3 +66,10 @@ mymain ( int argc, char ** argv )
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 }
+
+int
+main ( int argc, char ** argv )
+{
+    return hlrmain( argc, argv );
+}
+

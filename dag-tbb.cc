@@ -37,7 +37,8 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = Matrix::TBB::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  acc    = gen_accuracy();
+    auto  A      = Matrix::TBB::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
@@ -73,7 +74,7 @@ mymain ( int argc, char ** argv )
 
         tic = Time::Wall::now();
         
-        HLR::DAG::TBB::run( dag, fixed_rank( k ) );
+        HLR::DAG::TBB::run( dag, acc );
         
         toc = Time::Wall::since( tic );
         
@@ -83,4 +84,10 @@ mymain ( int argc, char ** argv )
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 
+}
+
+int
+main ( int argc, char ** argv )
+{
+    return hlrmain( argc, argv );
 }

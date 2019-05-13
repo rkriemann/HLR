@@ -70,7 +70,7 @@ Node::refine ()
 
     g.set_dependencies();
 
-    g.print_dot( "g.dot" );
+    // g.print_dot( "g.dot" );
         
     //
     // copy nodes to local array

@@ -324,7 +324,10 @@ LUNode::refine_ ()
 void
 LUNode::run_ ( const TTruncAcc &  acc )
 {
-    HLIB::LU::factorise_rec( A, acc );
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
+    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -463,6 +466,9 @@ SolveLNode::refine_ ()
 void
 SolveLNode::run_ ( const TTruncAcc &  acc )
 {
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
     solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 }
 
@@ -594,6 +600,9 @@ SolveUNode::refine_ ()
 void
 SolveUNode::run_ ( const TTruncAcc &  acc )
 {
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
     solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
 }
 
@@ -652,7 +661,13 @@ UpdateNode::refine_ ()
 void
 UpdateNode::run_ ( const TTruncAcc &  acc )
 {
-    multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    if ( CFG::Arith::use_accu )
+        add_product( real(-1),
+                     apply_normal, A,
+                     apply_normal, B,
+                     C, acc );
+    else
+        multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

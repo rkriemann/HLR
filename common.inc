@@ -25,7 +25,7 @@ void
 mymain ( int, char ** );
 
 int
-main ( int argc, char ** argv )
+hlrmain ( int argc, char ** argv )
 {
     parse_cmdline( argc, argv );
     
@@ -53,6 +53,18 @@ main ( int argc, char ** argv )
     catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
     
     return 0;
+}
+
+//
+// generate accuracy
+//
+TTruncAcc
+gen_accuracy ()
+{
+    if ( eps < 0 )
+        return fixed_rank( k );
+    else
+        return fixed_prec( eps );
 }
 
 // Local Variables:

@@ -8,8 +8,7 @@
 
 #include <hpx/hpx_init.hpp>
 
-#include "cmdline.hh"
-#include "gen_problem.hh"
+#include "common.inc"
 #include "cluster/tlr.hh"
 #include "hpx/matrix.hh"
 #include "hpx/arith.hh"
@@ -76,30 +75,7 @@ mymain ( int argc, char ** argv )
 int
 hpx_main ( int argc, char ** argv )
 {
-    parse_cmdline( argc, argv );
-    
-    try
-    {
-        INIT();
-
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
-                  << "    CPU cores : " << Mach::cpuset() << std::endl;
-        
-        CFG::set_verbosity( verbosity );
-
-        if ( nthreads != 0 )
-            CFG::set_nthreads( nthreads );
-
-        if      ( appl == "logkernel"  ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"     ) mymain< HLR::Apps::MaternCov >( argc, argv );
-        else if ( appl == "laplaceslp" ) mymain< HLR::Apps::LaplaceSLP >( argc, argv );
-        else
-            throw "unknown application";
-
-        DONE();
-    }// try
-    catch ( char const *  e ) { std::cout << e << std::endl; }
-    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
+    hlrmain( argc, argv );
     
     return hpx::finalize();
 }

@@ -38,11 +38,14 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  acc    = gen_accuracy();
+    auto  A      = Matrix::Seq::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+
+    DBG::write( A.get(), "A.hm", "A" );
     
     if ( verbose( 3 ) )
     {
@@ -74,9 +77,11 @@ mymain ( int argc, char ** argv )
 
         tic = Time::Wall::now();
         
-        HLR::DAG::Seq::run( dag, fixed_rank( k ) );
+        HLR::DAG::Seq::run( dag, acc );
         
         toc = Time::Wall::since( tic );
+        
+        DBG::write( C.get(), "C.hm", "C" );
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
@@ -84,4 +89,10 @@ mymain ( int argc, char ** argv )
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 
+}
+
+int
+main ( int argc, char ** argv )
+{
+    return hlrmain( argc, argv );
 }

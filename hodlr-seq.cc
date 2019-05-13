@@ -70,3 +70,10 @@ mymain ( int argc, char ** argv )
         write_matrix( C.get(), "LU.hm" );
     }
 }
+
+int
+main ( int argc, char ** argv )
+{
+    return hlrmain( argc, argv );
+}
+

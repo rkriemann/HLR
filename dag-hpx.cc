@@ -8,8 +8,7 @@
 
 #include <hpx/hpx_init.hpp>
 
-#include "cmdline.hh"
-#include "gen_problem.hh"
+#include "common.inc"
 #include "cluster/H.hh"
 #include "hpx/matrix.hh"
 #include "hpx/dag.hh"
@@ -42,7 +41,8 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = Matrix::HPX::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  acc    = gen_accuracy();
+    auto  A      = Matrix::HPX::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
@@ -78,7 +78,7 @@ mymain ( int argc, char ** argv )
 
         tic = Time::Wall::now();
         
-        HLR::DAG::HPX::run( dag, fixed_rank( k ) );
+        HLR::DAG::HPX::run( dag, acc );
         
         toc = Time::Wall::since( tic );
         
@@ -93,30 +93,7 @@ mymain ( int argc, char ** argv )
 int
 hpx_main ( int argc, char ** argv )
 {
-    parse_cmdline( argc, argv );
-    
-    try
-    {
-        INIT();
-
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
-                  << "    CPU cores : " << Mach::cpuset() << std::endl;
-        
-        CFG::set_verbosity( verbosity );
-
-        if ( nthreads != 0 )
-            CFG::set_nthreads( nthreads );
-
-        if      ( appl == "logkernel"  ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"     ) mymain< HLR::Apps::MaternCov >( argc, argv );
-        else if ( appl == "laplaceslp" ) mymain< HLR::Apps::LaplaceSLP >( argc, argv );
-        else
-            throw "unknown application";
-
-        DONE();
-    }// try
-    catch ( char const *  e ) { std::cout << e << std::endl; }
-    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
+    hlrmain( argc, argv );
     
     return hpx::finalize();
 }

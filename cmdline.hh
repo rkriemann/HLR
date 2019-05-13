@@ -21,6 +21,7 @@ namespace B = HLIB::BLAS;
 size_t  n         = 1024;
 size_t  ntile     = 128;
 size_t  k         = 16;
+double  eps       = -1;
 string  appl      = "logkernel";
 string  distr     = "cyclic2d";
 uint    nthreads  = 0;
@@ -47,6 +48,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "app",         value<string>(), ": application type (logkernel,matern)" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
+        ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
         ( "accu",                         ": use accumulator arithmetic" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
@@ -90,6 +92,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "nprob"     ) ) n         = vm["nprob"].as<int>();
     if ( vm.count( "ntile"     ) ) ntile     = vm["ntile"].as<int>();
     if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();
+    if ( vm.count( "eps"       ) ) eps       = vm["eps"].as<double>();
     if ( vm.count( "app"       ) ) appl      = vm["app"].as<string>();
     if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
     if ( vm.count( "noredir"   ) ) noredir   = true;
