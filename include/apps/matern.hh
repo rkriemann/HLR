@@ -27,16 +27,21 @@ public:
 
 private:
     // problem size
-    const size_t                  _n;
+    size_t                        _n;
     
     // coordinates
     std::vector< HLIB::T3Point >  _vertices;
 
 public:
     //
-    // ctor
+    // ctor: generate random coordinates
     //
     MaternCov ( const size_t  n );
+
+    //
+    // ctor: use coordinates from given grid
+    //
+    MaternCov ( const std::string &  grid );
     
     //
     // set up coordinates

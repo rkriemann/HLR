@@ -81,22 +81,22 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
 # default C++ environment
 #
 
-env.Program( 'tlr-seq.cc' )
-env.Program( 'hodlr-seq.cc' )
-env.Program( 'tileh-seq.cc' )
+# env.Program( 'tlr-seq.cc' )
+# env.Program( 'hodlr-seq.cc' )
+# env.Program( 'tileh-seq.cc' )
 env.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
 #
 
-omp = env.Clone()
-omp.Append( CXXFLAGS  = "-fopenmp" )
-omp.Append( LINKFLAGS = "-fopenmp" )
+# omp = env.Clone()
+# omp.Append( CXXFLAGS  = "-fopenmp" )
+# omp.Append( LINKFLAGS = "-fopenmp" )
 
-omp.Program( 'tlr-omp.cc' )
-omp.Program( 'hodlr-omp.cc' )
-omp.Program( 'tileh-omp.cc' )
+# omp.Program( 'tlr-omp.cc' )
+# omp.Program( 'hodlr-omp.cc' )
+# omp.Program( 'tileh-omp.cc' )
 
 #
 # TBB
@@ -104,9 +104,9 @@ omp.Program( 'tileh-omp.cc' )
 
 tbb = env.Clone()
 
-tbb.Program( 'tlr-tbb.cc' )
-tbb.Program( 'hodlr-tbb.cc' )
-tbb.Program( 'tileh-tbb.cc' )
+# tbb.Program( 'tlr-tbb.cc' )
+# tbb.Program( 'hodlr-tbb.cc' )
+# tbb.Program( 'tileh-tbb.cc' )
 tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
 
 #
@@ -117,24 +117,24 @@ tf = env.Clone()
 tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
 tf.Append( LIBS     = [ "pthread" ] )
 
-tf.Program( 'tlr-tf.cc' )
-tf.Program( 'hodlr-tf.cc' )
+# tf.Program( 'tlr-tf.cc' )
+# tf.Program( 'hodlr-tf.cc' )
 tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
 
 #
 # MPI
 #
 
-mpi = env.Clone()
-mpi.ParseConfig( 'mpic++ --showme:compile' )
-mpi.ParseConfig( 'mpic++ --showme:link' )
+# mpi = env.Clone()
+# mpi.ParseConfig( 'mpic++ --showme:compile' )
+# mpi.ParseConfig( 'mpic++ --showme:link' )
 
-mpi.Program( 'tlr-mpi-bcast.cc' )
-mpi.Program( 'tlr-mpi-ibcast.cc' )
-mpi.Program( 'tlr-mpi-rdma.cc' )
+# mpi.Program( 'tlr-mpi-bcast.cc' )
+# mpi.Program( 'tlr-mpi-ibcast.cc' )
+# mpi.Program( 'tlr-mpi-rdma.cc' )
 
-mpi.Program( 'tileh-mpi-bcast.cc' )
-mpi.Program( 'tileh-mpi-ibcast.cc' )
+# mpi.Program( 'tileh-mpi-bcast.cc' )
+# mpi.Program( 'tileh-mpi-ibcast.cc' )
 
 #
 # HPX
@@ -145,18 +145,18 @@ hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( "/
 hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
 hpx.Append( LIBS = [ "hpx_iostreams" ] )
 
-hpx.Program( 'tlr-hpx.cc' )
-hpx.Program( 'hodlr-hpx.cc' )
+# hpx.Program( 'tlr-hpx.cc' )
+# hpx.Program( 'hodlr-hpx.cc' )
 hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
 
 #
 # GASPI
 #
 
-gpi = env.Clone()
-gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
-gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
-gpi.Append( LIBS = [ "pthread" ] )
+# gpi = env.Clone()
+# gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
+# gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
+# gpi.Append( LIBS = [ "pthread" ] )
 
-gpi.Program( 'tlr-gaspi.cc' )
-# gpi.Program( 'hodlr-gpi.cc' )
+# gpi.Program( 'tlr-gaspi.cc' )
+# # gpi.Program( 'hodlr-gpi.cc' )

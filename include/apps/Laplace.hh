@@ -41,11 +41,9 @@ private:
 
 public:
     //
-    // ctor
-    // - problem dimension n is upper limit (depends on grid refinement)
+    // ctor with grid name (plus refinement levels)
     //
-    LaplaceSLP ( const size_t         n,
-                 const std::string &  grid );
+    LaplaceSLP ( const std::string &  grid );
     
     //
     // return coordinates for problem indices

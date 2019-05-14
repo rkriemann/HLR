@@ -37,6 +37,7 @@ mymain ( int argc, char ** argv )
             TPSBlockClusterVis   bc_vis;
             
             bc_vis.id( true ).print( bct->root(), "bct" );
+            print_vtk( coord.get(), "coord" );
         }// if
         
         auto  coeff  = problem->coeff_func();

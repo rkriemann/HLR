@@ -13,6 +13,7 @@
 using namespace std;
 
 #include <misc/TMaternCovCoeffFn.hh>
+#include <io/TGridIO.hh>
 
 #include "apps/matern.hh"
 
@@ -22,7 +23,13 @@ namespace HLR
 namespace Apps
 {
 
-using  point_t = HLIB::T3Point;
+using namespace HLIB;
+
+using  point_t = T3Point;
+
+// external grid generation function (see Laplace.cc)
+std::unique_ptr< TGrid >
+make_grid ( const std::string &  grid );
 
 //
 // ctor
@@ -39,30 +46,50 @@ MaternCov::MaternCov ( const size_t  n )
     std::mt19937_64                   generator{ 1 };
     std::uniform_real_distribution<>  distr{ 0, 1 };
 
-    _vertices.resize( n );
+    _vertices.reserve( n );
     
     for ( size_t i = 0; i < n; i++ )
-        _vertices[i] = HLIB::spherical( 2.0 * M_PI * distr( generator ),
+        _vertices.push_back( spherical( 2.0 * M_PI * distr( generator ),
                                         2.0 * M_PI * distr( generator ) - M_PI,
-                                        1.0 ); // point_t( distr( generator ), distr( generator ) );
+                                        1.0 ) ); // point_t( distr( generator ), distr( generator ) );
+}
+
+//
+// ctor
+//
+MaternCov::MaternCov ( const std::string &  gridfile )
+{
+    //
+    // read grid and copy coordinates
+    //
+
+    auto  grid = make_grid( gridfile );
+
+    _n = grid->n_vertices();
+    _vertices.reserve( _n );
+
+    for ( size_t  i = 0; i < _n; ++i )
+    {
+        _vertices.push_back( grid->vertex( i ) );
+    }// for
 }
 
 //
 // set up coordinates
 //
-std::unique_ptr< HLIB::TCoordinate >
+std::unique_ptr< TCoordinate >
 MaternCov::coordinates () const
 {
-    return  std::make_unique< HLIB::TCoordinate >( _vertices );
+    return  std::make_unique< TCoordinate >( _vertices );
 }
 
 //
 // return coefficient function to evaluate matrix entries
 //
-std::unique_ptr< HLIB::TCoeffFn< MaternCov::value_t > >
+std::unique_ptr< TCoeffFn< MaternCov::value_t > >
 MaternCov::coeff_func () const
 {
-    return std::make_unique< HLIB::TMaternCovCoeffFn< point_t > >( 1.0, 1.29, 0.325, _vertices );
+    return std::make_unique< TMaternCovCoeffFn< point_t > >( 1.0, 1.29, 0.325, _vertices );
     
     // return std::make_unique< TPermCoeffFn< real_t >( matern_coeff, bct->row_ct()->perm_i2e(), bct->row_ct()->perm_i2e() );
 }

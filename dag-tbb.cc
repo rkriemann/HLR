@@ -37,6 +37,7 @@ mymain ( int argc, char ** argv )
             TPSBlockClusterVis   bc_vis;
         
             bc_vis.id( true ).print( bct->root(), "bct" );
+            print_vtk( coord.get(), "coord" );
         }// if
     
         auto  coeff  = problem->coeff_func();
@@ -57,7 +58,7 @@ mymain ( int argc, char ** argv )
         A = Matrix::TBB::copy( *A ); // for spreading memory usage
     }// else
 
-auto  toc    = Time::Wall::since( tic );
+    auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
     std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;

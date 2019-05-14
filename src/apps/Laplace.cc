@@ -30,8 +30,8 @@ namespace
 {
 
 std::unique_ptr< TGrid >
-make_grid ( const size_t         n,
-            const std::string &  name )
+make_hlib_grid ( const std::string &  name,
+                 const uint           lvl )
 {
     assert( ( name == "sphere"  ) ||
             ( name == "sphere2" ) ||
@@ -45,13 +45,9 @@ make_grid ( const size_t         n,
     else if ( name == "cube"    ) grid = make_cube();
     else if ( name == "square"  ) grid = make_square();
 
-    while ( grid->n_triangles() < n )
+    for ( uint  i = 0; i < lvl; ++i )
     {
         auto  rgrid = grid->refine();
-
-        // do not exceed given upper limit
-        if ( rgrid->n_triangles() > n )
-            break;
         
         grid = std::move( rgrid );
     }// while
@@ -61,17 +57,37 @@ make_grid ( const size_t         n,
 
 }// namespace anonymous
 
+std::unique_ptr< TGrid >
+make_grid ( const std::string &  grid )
+{
+    const auto  dashpos = grid.find( '-' );
+
+    if ( dashpos != std::string::npos )
+    {
+        const auto  basename = grid.substr( 0, dashpos );
+        const auto  lvl      = grid.substr( dashpos+1, grid.length() );
+
+        if (( basename == "sphere" ) || ( basename == "sphere2" ) || ( basename == "cube" ) || ( basename == "square" ))
+            return make_hlib_grid( basename, atoi( lvl.c_str() ) );
+        else
+            return read_grid( grid );
+    }// if
+    else
+    {
+        if (( grid == "sphere" ) || ( grid == "sphere2" ) || ( grid == "cube" ) || ( grid == "square" ))
+            return make_hlib_grid( grid, 0 );
+        else
+            return read_grid( grid );
+    }// else
+}
+
 //
 // ctor
 //
-LaplaceSLP::LaplaceSLP ( const size_t         n,
-                         const std::string &  grid )
+LaplaceSLP::LaplaceSLP ( const std::string &  grid )
 {
-    if (( grid == "sphere" ) || ( grid == "sphere2" ) || ( grid == "cube" ) || ( grid == "square" ))
-        _grid = make_grid( n, grid );
-    else
-        _grid = read_grid( grid );
-
+    _grid = make_grid( grid );
+        
     auto  fnspace = std::make_unique< TConstFnSpace >( _grid.get() );
     auto  bf      = std::make_unique< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > >( fnspace.get(), fnspace.get() );
 

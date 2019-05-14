@@ -36,7 +36,6 @@ mymain ( int argc, char ** argv )
         {
             TPSBlockClusterVis   bc_vis;
 
-            print_ps( ct->root(), "ct" );
             bc_vis.id( true ).print( bct->root(), "bct" );
             print_vtk( coord.get(), "coord" );
         }// if

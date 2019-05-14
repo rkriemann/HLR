@@ -27,7 +27,7 @@ string  distr     = "cyclic2d";
 uint    nthreads  = 0;
 uint    verbosity = 1;
 bool    noredir   = false;
-string  grid      = "sphere";
+string  grid      = "";
 string  matrix    = "";
     
 void
