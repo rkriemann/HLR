@@ -16,13 +16,11 @@
 #include <hpx/util/unwrap.hpp>
 
 #include "utils/tools.hh"
+#include "utils/log.hh"
 
 #include "hpx/dag.hh"
 
 using namespace HLIB;
-
-// enables some debug output
-#define  log( lvl, msg )  if ( HLIB::verbose( lvl ) ) DBG::print( msg )
 
 // HPX types for tasks and dependencies
 using  task_t         = hpx::shared_future< void >;
@@ -165,7 +163,7 @@ run ( DAG::Graph &             dag,
     
     auto  toc = Time::Wall::since( tic );
 
-    log( 3, "time for setting up HPX DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "time for HPX DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
     
     //
     // start execution by requesting future result for end node

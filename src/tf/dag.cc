@@ -59,7 +59,7 @@ run ( DAG::Graph &             dag,
     
     auto  toc = Time::Wall::since( tic );
 
-    log( 3, "time for TF DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "time for TF DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 
     // run tasks
     tf.wait_for_all();
