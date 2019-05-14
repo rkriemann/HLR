@@ -39,10 +39,11 @@ namespace TF
 template < typename coeff_t,
            typename lrapx_t >
 std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
-        const coeff_t &              coeff,
-        const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+build_helper ( tf::SubflowBuilder &         tf,
+               const HLIB::TBlockCluster *  bct,
+               const coeff_t &              coeff,
+               const lrapx_t &              lrapx,
+               const HLIB::TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -85,9 +86,8 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        auto          nbr = B->nblock_rows();
-        auto          nbc = B->nblock_cols();
-        tf::Taskflow  tf;
+        auto  nbr = B->nblock_rows();
+        auto  nbc = B->nblock_cols();
 
         for ( uint  i = 0; i < nbr; ++i )
         {
@@ -96,9 +96,9 @@ build ( const HLIB::TBlockCluster *  bct,
                 if ( bct->son( i, j ) != nullptr )
                 {
                     tf.silent_emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,&B] ()
+                        [bct,i,j,&coeff,&lrapx,&acc,&B] ( auto &  sf )
                         {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                            auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc );
                             
                             B->set_block( i, j, B_ij.release() );
                         } );
@@ -106,18 +106,31 @@ build ( const HLIB::TBlockCluster *  bct,
             }// for
         }// for
 
-        tf.wait_for_all();
-
         M = std::move( B );
     }// else
 
     // copy properties from the cluster
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
-
-    log( 3, HLIB::to_string( "%d", M->id() ) );
     
     return M;
+}
+
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< HLIB::TMatrix >
+build ( const HLIB::TBlockCluster *  bct,
+        const coeff_t &              coeff,
+        const lrapx_t &              lrapx,
+        const HLIB::TTruncAcc &      acc )
+{
+    tf::Taskflow                tf;
+    std::unique_ptr< TMatrix >  res;
+    
+    tf.silent_emplace( [&,bct] ( auto &  sf ) { res = build_helper( sf, bct, coeff, lrapx, acc ); } );
+    tf.wait_for_all();
+
+    return res;
 }
 
 //
@@ -125,7 +138,8 @@ build ( const HLIB::TBlockCluster *  bct,
 // - copy operation is performed in parallel for sub blocks
 //
 std::unique_ptr< TMatrix >
-copy ( const TMatrix &  M )
+copy_helper ( tf::SubflowBuilder &  tf,
+              const TMatrix &       M )
 {
     if ( is_blocked( M ) )
     {
@@ -135,8 +149,6 @@ copy ( const TMatrix &  M )
 
         B->copy_struct_from( BM );
         
-        tf::Taskflow  tf;
-
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
@@ -144,9 +156,9 @@ copy ( const TMatrix &  M )
                 if ( BM->block( i, j ) != nullptr )
                 {
                     tf.silent_emplace(
-                        [B,BM,i,j] ()
+                        [B,BM,i,j] ( auto &  sf )
                         {
-                            auto  B_ij = copy( * BM->block( i, j ) );
+                            auto  B_ij = copy_helper( sf, * BM->block( i, j ) );
                             
                             B_ij->set_parent( B );
                             B->set_block( i, j, B_ij.release() );
@@ -155,7 +167,7 @@ copy ( const TMatrix &  M )
             }// for
         }// for
 
-        tf.wait_for_all();
+        // tf.wait_for_all();
         
         return N;
     }// if
@@ -164,6 +176,18 @@ copy ( const TMatrix &  M )
         // assuming non-structured block and hence no parallel copy needed
         return M.copy();
     }// else
+}
+
+std::unique_ptr< TMatrix >
+copy ( const TMatrix &  M )
+{
+    tf::Taskflow                tf;
+    std::unique_ptr< TMatrix >  res;
+    
+    tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = copy_helper( sf, M ); } );
+    tf.wait_for_all();
+
+    return res;
 }
 
 }// namespace TF
