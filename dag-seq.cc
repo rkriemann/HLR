@@ -56,7 +56,7 @@ mymain ( int argc, char ** argv )
                   << std::endl;
 
         A = read_matrix( matrix );
-        A = A->copy(); // for spreading memory usage
+        A = Matrix::Seq::copy( *A ); // for spreading memory usage
     }// else
 
     auto  toc    = Time::Wall::since( tic );

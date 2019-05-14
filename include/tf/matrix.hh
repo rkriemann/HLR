@@ -120,6 +120,52 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
+//
+// return copy of matrix
+// - copy operation is performed in parallel for sub blocks
+//
+std::unique_ptr< TMatrix >
+copy ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        tf::Taskflow  tf;
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    tf.silent_emplace(
+                        [B,BM,i,j] ()
+                        {
+                            auto  B_ij = copy( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        } );
+                }// if
+            }// for
+        }// for
+
+        tf.wait_for_all();
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block and hence no parallel copy needed
+        return M.copy();
+    }// else
+}
+
 }// namespace TF
 
 }// namespace Matrix

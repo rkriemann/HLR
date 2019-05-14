@@ -13,6 +13,7 @@
 
 #include <matrix/TMatrix.hh>
 #include <matrix/TBlockMatrix.hh>
+#include <matrix/structure.hh>
 #include <base/TTruncAcc.hh>
 
 namespace HLR
@@ -93,6 +94,43 @@ build ( const HLIB::TBlockCluster *  bct,
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// return copy of matrix
+//
+std::unique_ptr< TMatrix >
+copy ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
 }
 
 }// namespace Seq

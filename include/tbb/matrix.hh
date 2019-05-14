@@ -16,12 +16,15 @@
 
 #include <matrix/TMatrix.hh>
 #include <matrix/TBlockMatrix.hh>
+#include <matrix/structure.hh>
 #include <base/TTruncAcc.hh>
 
 #include "seq/matrix.hh"
 
 namespace HLR
 {
+
+using namespace HLIB;
 
 namespace Matrix
 {
@@ -37,11 +40,11 @@ namespace TBB
 //
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
-        const coeff_t &              coeff,
-        const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+std::unique_ptr< TMatrix >
+build ( const TBlockCluster *  bct,
+        const coeff_t &        coeff,
+        const lrapx_t &        lrapx,
+        const TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -109,6 +112,50 @@ build ( const HLIB::TBlockCluster *  bct,
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// return copy of matrix
+// - copy operation is performed in parallel for sub blocks
+//
+std::unique_ptr< TMatrix >
+copy ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        tbb::parallel_for(
+            tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                          0, B->nblock_cols() ),
+            [B,BM] ( const tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = copy( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block and hence no parallel copy needed
+        return M.copy();
+    }// else
 }
 
 }// namespace TBB
