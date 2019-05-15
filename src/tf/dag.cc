@@ -44,7 +44,7 @@ run ( DAG::Graph &             dag,
     // TF needs single end node
     //
     
-    auto          tic          = Time::Wall::now();
+    auto          tic = Time::Wall::now();
     taskmap_t     taskmap;
     tf::Taskflow  tf;
     
@@ -59,10 +59,19 @@ run ( DAG::Graph &             dag,
     
     auto  toc = Time::Wall::since( tic );
 
-    log( 2, "time for TF DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "time for TF DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 
+    //
     // run tasks
+    //
+    
+    tic = Time::Wall::now();
+    
     tf.wait_for_all();
+
+    toc = Time::Wall::since( tic );
+
+    log( 2, "time for TF DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 }
 
 }// namespace TF

@@ -51,15 +51,13 @@ build_helper ( tf::SubflowBuilder &         tf,
 
     assert( bct != nullptr );
 
-    using  value_t = typename coeff_t::value_t;
-    
     //
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< TMatrix >  M;
-    const auto                  rowis = bct->is().row_is();
-    const auto                  colis = bct->is().col_is();
+    auto        M     = std::unique_ptr< TMatrix >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
@@ -69,7 +67,7 @@ build_helper ( tf::SubflowBuilder &         tf,
     {
         if ( bct->is_adm() )
         {
-            M.reset( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< TMatrix >( lrapx.build( bct, acc ) );
         }// if
         else
         {
@@ -78,7 +76,9 @@ build_helper ( tf::SubflowBuilder &         tf,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -96,7 +96,7 @@ build_helper ( tf::SubflowBuilder &         tf,
                 if ( bct->son( i, j ) != nullptr )
                 {
                     tf.silent_emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,&B] ( auto &  sf )
+                        [bct,i,j,&coeff,&lrapx,&acc,B] ( auto &  sf )
                         {
                             auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc );
                             
@@ -105,8 +105,6 @@ build_helper ( tf::SubflowBuilder &         tf,
                 }// if
             }// for
         }// for
-
-        M = std::move( B );
     }// else
 
     // copy properties from the cluster
@@ -167,8 +165,6 @@ copy_helper ( tf::SubflowBuilder &  tf,
             }// for
         }// for
 
-        // tf.wait_for_all();
-        
         return N;
     }// if
     else

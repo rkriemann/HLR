@@ -56,9 +56,9 @@ build ( const TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< TMatrix >  M;
-    const auto                  rowis = bct->is().row_is();
-    const auto                  colis = bct->is().col_is();
+    auto        M     = std::unique_ptr< TMatrix >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
@@ -77,7 +77,9 @@ build ( const TBlockCluster *  bct,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -88,7 +90,7 @@ build ( const TBlockCluster *  bct,
         tbb::parallel_for(
             tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
                                           0, B->nblock_cols() ),
-            [&,bct] ( const tbb::blocked_range2d< uint > &  r )
+            [&,B,bct] ( const tbb::blocked_range2d< uint > &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -103,8 +105,6 @@ build ( const TBlockCluster *  bct,
                     }// for
                 }// for
             } );
-
-        M = std::move( B );
     }// else
 
     // copy properties from the cluster

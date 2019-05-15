@@ -163,14 +163,20 @@ run ( DAG::Graph &             dag,
     
     auto  toc = Time::Wall::since( tic );
 
-    log( 2, "time for HPX DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "time for HPX DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
     
     //
     // start execution by requesting future result for end node
     //
 
+    tic = Time::Wall::now();
+    
     taskmap[ final ].get();
 
+    toc = Time::Wall::since( tic );
+
+    log( 2, "time for HPX DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    
     //
     // remove auxiliary end node from DAG
     //

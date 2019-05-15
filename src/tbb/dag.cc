@@ -135,8 +135,10 @@ run ( DAG::Graph &             dag,
     
     auto  toc = Time::Wall::since( tic );
 
-    log( 2, "time for TBB DAG runtime = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "time for TBB DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 
+    tic = Time::Wall::now();
+    
     auto  final_task = taskmap[ final ];
     
     assert( final_task != nullptr );
@@ -146,6 +148,10 @@ run ( DAG::Graph &             dag,
     final_task->execute();                            // and the final node explicitly
     tbb::task::destroy( * final_task );               // not done by TBB since executed manually
 
+    toc = Time::Wall::since( tic );
+
+    log( 2, "time for TBB DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    
     if ( multiple_end )
     {
         //

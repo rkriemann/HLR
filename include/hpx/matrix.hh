@@ -54,9 +54,9 @@ build ( const HLIB::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< TMatrix >  M;
-    const auto                  rowis = bct->is().row_is();
-    const auto                  colis = bct->is().col_is();
+    auto        M     = std::unique_ptr< TMatrix >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
@@ -75,7 +75,9 @@ build ( const HLIB::TBlockCluster *  bct,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -84,7 +86,7 @@ build ( const HLIB::TBlockCluster *  bct,
 
         // recurse
         hpx::parallel::v2::define_task_block(
-            [&,bct] ( auto &  tb )
+            [&,B,bct] ( auto &  tb )
             {
                 for ( uint  i = 0; i < B->nblock_rows(); ++i )
                 {
@@ -92,7 +94,7 @@ build ( const HLIB::TBlockCluster *  bct,
                     {
                         if ( bct->son( i, j ) != nullptr )
                         {
-                            tb.run( [bct,i,j,&B,&coeff,&lrapx,&acc]
+                            tb.run( [bct,i,j,B,&coeff,&lrapx,&acc]
                                     {
                                         auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
 
@@ -102,8 +104,6 @@ build ( const HLIB::TBlockCluster *  bct,
                     }// for
                 }// for
             } );
-
-        M = std::move( B );
     }// else
 
     // copy properties from the cluster

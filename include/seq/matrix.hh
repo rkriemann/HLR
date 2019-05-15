@@ -66,7 +66,9 @@ build ( const HLIB::TBlockCluster *  bct,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -86,8 +88,6 @@ build ( const HLIB::TBlockCluster *  bct,
                 }// if
             }// for
         }// for
-
-        M = std::move( B );
     }// else
 
     M->set_id( bct->id() );

@@ -1,7 +1,7 @@
 
 import os
 
-debug   = False
+debug   = True
 warn    = False
 fullmsg = False
 
@@ -90,13 +90,14 @@ env.Program( 'dag-seq.cc' )
 # OpenMP
 #
 
-# omp = env.Clone()
-# omp.Append( CXXFLAGS  = "-fopenmp" )
-# omp.Append( LINKFLAGS = "-fopenmp" )
+omp = env.Clone()
+omp.Append( CXXFLAGS  = "-fopenmp" )
+omp.Append( LINKFLAGS = "-fopenmp" )
 
 # omp.Program( 'tlr-omp.cc' )
 # omp.Program( 'hodlr-omp.cc' )
 # omp.Program( 'tileh-omp.cc' )
+omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] )
 
 #
 # TBB
