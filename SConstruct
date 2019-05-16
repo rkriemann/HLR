@@ -1,12 +1,35 @@
 
 import os
 
-debug   = True
-warn    = False
-fullmsg = False
+######################################################################
+#
+# general settings
+#
+######################################################################
 
-CXX      = 'g++'
-CXXFLAGS = '-std=c++17'
+debug        = True
+warn         = False
+fullmsg      = False
+
+CXX          = 'g++'
+CXXFLAGS     = '-std=c++17'
+
+OPTFLAGS     = '-O3 -march=native'
+WARNFLAGS    = '-Wall'
+LINKFLAGS    = ''
+
+# set of programs to build: dag, tlr, hodlr, tileh
+BUILD        = [ 'dag' ]
+
+# set of frameworks to use: seq, openmp, tbb, taskflow, hpx, mpi, gpi2
+FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow' ]
+
+# directories for the various external libraries
+HPRO_DIR     = 'hlibpro'
+TBB_DIR      = '/usr'
+TASKFLOW_DIR = '/opt/local/cpp-taskflow'
+HPX_DIR      = '/opt/local/hpx'
+GPI2_DIR     = '/opt/local/gpi2'
 
 ######################################################################
 #
@@ -35,23 +58,19 @@ def readln ( prog ):
 #
 ######################################################################
 
-OPTFLAGS  = '-O3 -march=native'
-WARNFLAGS = ''
-LINKFLAGS = ''
-
 if debug :
     OPTFLAGS  = '-g -march=native'
     LINKFLAGS = '-g'
 
 if warn :
-    WARNFLAGS = readln( '/home/rok/bin/cpuflags --comp %s --warn' % CXX )
+    WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
     
 env = Environment( ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
                    )
-env.ParseConfig( 'hlibpro/bin/hlib-config --cflags --lflags' )
+env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
 
 if not fullmsg :
     env.Replace( CCCOMSTR   = " CC     $SOURCES" )
@@ -78,86 +97,97 @@ common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
                                         'src/utils/compare.cc' ] )
 
 #
-# default C++ environment
+# default sequential environment
 #
 
-# env.Program( 'tlr-seq.cc' )
-# env.Program( 'hodlr-seq.cc' )
-# env.Program( 'tileh-seq.cc' )
-env.Program( 'dag-seq.cc' )
+if 'seq' in FRAMEWORKS :
+    if 'tlr'   in BUILD : env.Program( 'tlr-seq.cc' )
+    if 'hodlr' in BUILD : env.Program( 'hodlr-seq.cc' )
+    if 'tileh' in BUILD : env.Program( 'tileh-seq.cc' )
+    if 'dag'   in BUILD : env.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
 #
 
-omp = env.Clone()
-omp.Append( CXXFLAGS  = "-fopenmp" )
-omp.Append( LINKFLAGS = "-fopenmp" )
+if 'openmp' in FRAMEWORKS :
+    omp = env.Clone()
+    omp.Append( CXXFLAGS  = "-fopenmp" )
+    omp.Append( LINKFLAGS = "-fopenmp" )
 
-# omp.Program( 'tlr-omp.cc' )
-# omp.Program( 'hodlr-omp.cc' )
-# omp.Program( 'tileh-omp.cc' )
-omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] )
+    if 'tlr'   in BUILD : omp.Program( 'tlr-omp.cc' )
+    if 'hodlr' in BUILD : omp.Program( 'hodlr-omp.cc' )
+    if 'tileh' in BUILD : omp.Program( 'tileh-omp.cc' )
+    if 'dag'   in BUILD : omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] )
 
 #
 # TBB
 #
 
-tbb = env.Clone()
+if 'tbb' in FRAMEWORKS :
+    tbb = env.Clone()
+    tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
+    tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
 
-# tbb.Program( 'tlr-tbb.cc' )
-# tbb.Program( 'hodlr-tbb.cc' )
-# tbb.Program( 'tileh-tbb.cc' )
-tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
+    if 'tlr'   in BUILD : tbb.Program( 'tlr-tbb.cc' )
+    if 'hodlr' in BUILD : tbb.Program( 'hodlr-tbb.cc' )
+    if 'tileh' in BUILD : tbb.Program( 'tileh-tbb.cc' )
+    if 'dag'   in BUILD : tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
 
 #
 # TaskFlow
 #
 
-tf = env.Clone()
-tf.Append( CXXFLAGS = "-I/opt/local/cpp-taskflow/include" )
-tf.Append( LIBS     = [ "pthread" ] )
-
-# tf.Program( 'tlr-tf.cc' )
-# tf.Program( 'hodlr-tf.cc' )
-tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
+if 'taskflow' in FRAMEWORKS :
+    tf = env.Clone()
+    tf.Append( CPPPATH = os.path.join( TASKFLOW_DIR, "include" ) )
+    tf.Append( LIBS    = [ "pthread" ] )
+    
+    if 'tlr'   in BUILD : tf.Program( 'tlr-tf.cc' )
+    if 'hodlr' in BUILD : tf.Program( 'hodlr-tf.cc' )
+    if 'dag'   in BUILD : tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
 
 #
 # MPI
 #
 
-# mpi = env.Clone()
-# mpi.ParseConfig( 'mpic++ --showme:compile' )
-# mpi.ParseConfig( 'mpic++ --showme:link' )
-
-# mpi.Program( 'tlr-mpi-bcast.cc' )
-# mpi.Program( 'tlr-mpi-ibcast.cc' )
-# mpi.Program( 'tlr-mpi-rdma.cc' )
-
-# mpi.Program( 'tileh-mpi-bcast.cc' )
-# mpi.Program( 'tileh-mpi-ibcast.cc' )
+if 'mpi' in FRAMEWORKS :
+    mpi = env.Clone()
+    mpi.ParseConfig( 'mpic++ --showme:compile' )
+    mpi.ParseConfig( 'mpic++ --showme:link' )
+    
+    if 'tlr'   in BUILD :
+        mpi.Program( 'tlr-mpi-bcast.cc' )
+        mpi.Program( 'tlr-mpi-ibcast.cc' )
+        mpi.Program( 'tlr-mpi-rdma.cc' )
+    
+    if 'tileh' in BUILD :
+        mpi.Program( 'tileh-mpi-bcast.cc' )
+        mpi.Program( 'tileh-mpi-ibcast.cc' )
 
 #
 # HPX
 #
 
-hpx = env.Clone()
-hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
-hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( "/opt/local/hpx/lib/pkgconfig" ) )
-hpx.Append( LIBS = [ "hpx_iostreams" ] )
-
-# hpx.Program( 'tlr-hpx.cc' )
-# hpx.Program( 'hodlr-hpx.cc' )
-hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
+if 'hpx' in FRAMEWORKS :
+    hpx = env.Clone()
+    hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
+    hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
+    hpx.Append( LIBS = [ "hpx_iostreams" ] )
+    
+    if 'tlr'   in BUILD : hpx.Program( 'tlr-hpx.cc' )
+    if 'hodlr' in BUILD : hpx.Program( 'hodlr-hpx.cc' )
+    if 'dag'   in BUILD : hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
 
 #
 # GASPI
 #
 
-# gpi = env.Clone()
-# gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
-# gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( "/opt/local/gpi2/lib64/pkgconfig" ) )
-# gpi.Append( LIBS = [ "pthread" ] )
-
-# gpi.Program( 'tlr-gaspi.cc' )
-# # gpi.Program( 'hodlr-gpi.cc' )
+if 'gpi2' in FRAMEWORKS :
+    gpi = env.Clone()
+    gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
+    gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
+    gpi.Append( LIBS = [ "pthread" ] )
+    
+    if 'tlr'   in BUILD : gpi.Program( 'tlr-gaspi.cc' )
+    if 'hodlr' in BUILD : gpi.Program( 'hodlr-gpi.cc' )

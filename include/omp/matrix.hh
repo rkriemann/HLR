@@ -46,8 +46,6 @@ build_task ( const HLIB::TBlockCluster *  bct,
 
     assert( bct != nullptr );
 
-    using  value_t = typename coeff_t::value_t;
-    
     //
     // decide upon cluster type, how to construct matrix
     //
