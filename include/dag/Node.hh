@@ -12,6 +12,7 @@
 #include <list>
 #include <string>
 #include <mutex>
+#include <atomic>
 
 #include <cluster/TIndexSet.hh>
 #include <base/TTruncAcc.hh>
@@ -71,7 +72,7 @@ private:
     node_list_t            _successors;
 
     // dependency counter (#incoming edges)
-    int                    _dep_cnt;
+    std::atomic< int >     _dep_cnt;
 
     // block index set dependencies for automatic dependency refinement
     block_list_t           _in_blk_deps;
