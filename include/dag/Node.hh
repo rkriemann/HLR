@@ -11,8 +11,7 @@
 #include <vector>
 #include <list>
 #include <string>
-
-#include <tbb/spin_mutex.h>
+#include <mutex>
 
 #include <cluster/TIndexSet.hh>
 #include <base/TTruncAcc.hh>
@@ -82,7 +81,7 @@ private:
     std::vector< Node * >  _sub_nodes;
 
     // mutex to handle concurrent access to internal data
-    tbb::spin_mutex        _mutex;
+    std::mutex             _mutex;
 
 public:
     // ctor
@@ -151,16 +150,22 @@ public:
     void  refine ();
 
     //
-    // refine dependencies for sub nodes
-    //
-    void  refine_sub_deps ();
-    
-    //
-    // refine local dependencies, e.g., if destinations were refined
-    // - return true, if dependencies were refined
+    // refine dependencies, either local or of sub nodes
+    // - return true, if local node changed (modified dependencies)
     //
     bool  refine_deps  ();
 
+    //
+    // refine local dependencies, e.g., if successors were refined
+    // - return true, if dependencies were refined
+    //
+    bool  refine_loc_deps ();
+
+    //
+    // refine dependencies of sub nodes
+    //
+    void  refine_sub_deps ();
+    
     //
     // mutex functions
     //

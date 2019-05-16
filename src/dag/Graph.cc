@@ -10,6 +10,9 @@
 #include <deque>
 #include <unordered_set>
 #include <cassert>
+#include <mutex>
+
+#include <tbb/parallel_for_each.h>
 
 #include "utils/log.hh"
 #include "utils/tools.hh"
@@ -203,38 +206,58 @@ refine ( Node *  root )
     
     std::deque< Node * >  nodes;
     std::list< Node * >   tasks, start, end;
+    std::mutex            mtx;
     
     nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
-        std::deque< Node * >  subnodes;
+        std::deque< Node * >  subnodes, del_nodes;
 
-        auto  node_refine      = []  ( Node * node ) { node->refine(); };
-        auto  node_refine_deps = []  ( Node * node ) { node->refine_sub_deps(); };
-        auto  node_delete      = []  ( Node * node ) { if ( node->is_refined() ) { log( 5, "delete : " + node->to_string() ); delete node; } };
-        auto  node_collect     = [&] ( Node * node )
+        auto  node_dep_refine = [&] ( Node * node )
         {
-            if ( node->is_refined() )       // node was refined; collect all subs
+            const bool  node_changed = node->refine_deps();
+
+            if ( node->is_refined() )       // node was refined; collect all sub nodes
             {
+                std::scoped_lock  lock( mtx );
+                    
                 for ( auto  sub : node->sub_nodes() )
                     subnodes.push_back( sub );
+                    
+                del_nodes.push_back( node );
             }// if
-            else if ( node->refine_deps() ) // node was not refined but dependencies were
+            else if ( node_changed )        // node was not refined but dependencies were
             {
+                std::scoped_lock  lock( mtx );
+                    
                 subnodes.push_back( node );
             }// if
-            else                            // neither node nor dependencies have changed: will not be touched
-            { 
-                tasks.push_back( node );
+            else                            // neither node nor dependencies changed: reached final state
+            {
+                {
+                    std::scoped_lock  lock( mtx );
+                    
+                    tasks.push_back( node );
+                }
+
+                // adjust dependency counter of successors (which were NOT refined!)
+                for ( auto  succ : node->successors() )
+                    succ->inc_dep_cnt();
             }// else
         };
 
-        for ( auto  node : nodes ) node_refine( node );      // first refine nodes
-        for ( auto  node : nodes ) node_refine_deps( node ); // then refine dependencies between sub nodes
-        for ( auto  node : nodes ) node_collect( node );     // collect new nodes
-        for ( auto  node : nodes ) node_delete( node );      // delete all refined nodes
-                                                             // (only after "collect" since accessed in "collect>refine_deps")
+        // first refine nodes
+        tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                [] ( Node * node ) { node->refine(); } );
+
+        // then refine dependencies and collect new nodes
+        tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                node_dep_refine );
+
+        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+        tbb::parallel_for_each( del_nodes.begin(), del_nodes.end(),
+                                [] ( Node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -243,20 +266,34 @@ refine ( Node *  root )
     // adjust dependency counter
     //
     
-    for ( auto  t : tasks )
-    {
-        for ( auto  succ : t->successors() )
-            succ->inc_dep_cnt();
-    }// for
-    
-    for ( auto  t : tasks )
-    {
-        if ( t->dep_cnt() == 0 )
-            start.push_back( t );
+    // for ( auto  t : tasks )
+    // {
+    //     for ( auto  succ : t->successors() )
+    //         succ->inc_dep_cnt();
+    // }// for
 
-        if ( t->successors().empty() )
-            end.push_back( t );
-    }// for
+    //
+    // collect start and end nodes
+    //
+    
+    // for ( auto  t : tasks )
+    tbb::parallel_do( tasks,
+                      [&] ( Node * node )
+                      {
+                          if ( node->dep_cnt() == 0 )
+                          {
+                              std::scoped_lock  lock( mtx );
+                              
+                              start.push_back( node );
+                          }// if
+                          
+                          if ( node->successors().empty() )
+                          {
+                              std::scoped_lock  lock( mtx );
+                              
+                              end.push_back( node );
+                          }// if
+                      } );
 
     return Graph( tasks, start, end );
 }

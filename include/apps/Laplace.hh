@@ -46,6 +46,12 @@ public:
     LaplaceSLP ( const std::string &  grid );
     
     //
+    // dtor
+    //
+    
+    virtual ~LaplaceSLP () {}
+    
+    //
     // return coordinates for problem indices
     //
     std::unique_ptr< HLIB::TCoordinate >

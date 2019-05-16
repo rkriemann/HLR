@@ -9,6 +9,7 @@
 //
 
 #include <sstream>
+#include <algorithm>
 
 #include <base/config.hh>
 
@@ -23,15 +24,19 @@ bool
 contains ( container_t const &                    cont,
            typename container_t::const_reference  val )
 {
-    for ( const auto &  c : cont )
-    {
-        if ( c == val )
-            return true;
-    }// for
-
-    return false;
-    
     return std::find( cont.begin(), cont.end(), val ) != cont.end();
+}
+
+//
+// apply for_each to container instead of iterators
+//
+template < typename container_t,
+           typename function_t >
+void
+for_each ( container_t const &  cont,
+           function_t           f )
+{
+    std::for_each( cont.begin(), cont.end(), f );
 }
 
 //

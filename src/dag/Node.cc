@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "utils/log.hh"
+#include "utils/tools.hh"
 #include "dag/Node.hh"
 
 namespace HLR
@@ -22,7 +23,10 @@ namespace DAG
 using namespace HLIB;
 
 // controls edge sparsification
-const bool  sparsify = true;
+const bool  sparsify   = true;
+
+// controls edge sparsification
+const bool  lock_nodes = true;
 
 //////////////////////////////////////////////
 //
@@ -132,7 +136,151 @@ reachable_indirect ( Node *                                root,
 }// namespace anonymous
 
 //
-// refine dependencies for sub nodes
+// refine dependencies of local node or of sub nodes
+//
+bool
+Node::refine_deps ()
+{
+    log( 5, "refine_deps( " + to_string() + " )" );
+
+    //
+    // first lock all nodes
+    //
+
+    node_list_t  locked;
+    
+    if ( lock_nodes )
+    {
+        locked.push_back( this );
+
+        for ( auto  node : _sub_nodes )
+            locked.push_back( node );
+    
+        for ( auto  succ : successors() )
+        {
+            if ( succ->is_refined() )
+            {
+                for ( auto  succ_sub : succ->sub_nodes() )
+                    locked.push_back( succ_sub );
+            }// if
+            else
+                locked.push_back( succ );
+        }// for
+
+        // remove duplicates
+        locked.sort();
+        locked.unique();
+    
+        for ( auto  node : locked )
+        {
+            node->lock();
+            // log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
+        }// for
+    }// if
+
+    //
+    // decide to refine local node or sub node dependencies
+    //
+
+    bool  changed = false;
+
+    if ( is_refined() )
+        refine_sub_deps();
+    else
+        changed = refine_loc_deps();
+    
+    //
+    // finally unlock nodes
+    //
+    
+    if ( lock_nodes )
+    {
+         for ( auto  node : locked )
+         {
+             node->unlock();
+             // log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
+         }// for
+    }// if
+         
+    return changed;
+}
+
+//
+// refine dependencies of local node
+//
+bool
+Node::refine_loc_deps ()
+{
+    log( 5, "refine_loc_deps( " + to_string() + " )" );
+
+    //
+    // replace successor by refined successors if available
+    //
+    
+    bool         changed = false;
+    node_list_t  new_out;
+    auto         succ = successors().begin();
+            
+    while ( succ != successors().end() )
+    {
+        if ( (*succ)->is_refined() )
+        {
+            changed = true;
+                
+            // insert succendencies for subnodes (intersection test neccessary???)
+            for ( auto  succ_sub : (*succ)->sub_nodes() )
+            {
+                // log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
+                new_out.push_back( succ_sub );
+            }// for
+
+            // remove previous succendency
+            succ = successors().erase( succ );
+        }// if
+        else
+            ++succ;
+    }// for
+
+    successors().splice( successors().end(), new_out );
+
+    // remove duplicates
+    successors().sort();
+    successors().unique();
+    
+    //
+    // remove direct outgoing edges if reachable otherwise
+    //
+    
+    if ( changed && sparsify )
+    {
+        // restrict search to local nodes and neighbouring nodes
+        std::unordered_set< Node * >  neighbourhood{ this };
+        
+        for ( auto  node : successors() )
+            neighbourhood.insert( node );
+        
+        // now test reachability
+        auto  descendants = reachable_indirect( this, neighbourhood );
+
+        // if a direct edge to otherwise reachable node exists, remove it
+        for ( auto  succ_iter = successors().begin(); succ_iter != successors().end(); )
+        {
+            if ( descendants.find( *succ_iter ) != descendants.end() )
+            {
+                // log( 6, "  removing " + to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + to_string() );
+                succ_iter = successors().erase( succ_iter );
+                // node->print();
+            }// if
+            else
+                ++succ_iter;
+        }// for
+    }// if
+    
+    return changed;
+}
+
+//
+// refine dependencies of sub nodes
 //
 void
 Node::refine_sub_deps ()
@@ -143,64 +291,29 @@ Node::refine_sub_deps ()
         return;
 
     //
-    // first lock all nodes
-    //
-
-    node_list_t  locked;
-    
-    locked.push_back( this );
-
-    for ( auto  node : _sub_nodes )
-        locked.push_back( node );
-    
-    for ( auto  succ : successors() )
-    {
-        if ( succ->is_refined() )
-        {
-            for ( auto  succ_sub : succ->sub_nodes() )
-                locked.push_back( succ_sub );
-        }// if
-        else
-            locked.push_back( succ );
-    }// for
-
-    // remove duplicates
-    locked.sort();
-    locked.unique();
-    
-    for ( auto  node : locked )
-    {
-        node->lock();
-        log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
-    }// for
-                
-    //
     // add dependencies for all sub nodes to old or refined successors
     //
     
-    for ( auto  succ : successors() )
+    for ( auto  node : _sub_nodes )
     {
-        if ( succ->is_refined() )
+        for ( auto  succ : successors() )
         {
-            for ( auto  succ_sub : succ->sub_nodes() )
+            if ( succ->is_refined() )
             {
-                for ( auto  node : _sub_nodes )
+                for ( auto  succ_sub : succ->sub_nodes() )
                 {
                     if ( is_intersecting( node->out_blocks(), succ_sub->in_blocks() ) )
                     {
-                        log( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
+                        // log( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
                         node->successors().push_back( succ_sub );
                     }// if
                 }// for
-            }// for
-        }// if
-        else
-        {
-            for ( auto  node : _sub_nodes )
+            }// if
+            else
             {
                 if ( is_intersecting( node->out_blocks(), succ->in_blocks() ) )
                 {
-                    log( 6, node->to_string() + " ⟶ " + succ->to_string() );
+                    // log( 6, node->to_string() + " ⟶ " + succ->to_string() );
                     node->successors().push_back( succ );
                 }// if
             }// for
@@ -240,9 +353,8 @@ Node::refine_sub_deps ()
             {
                 if ( descendants.find( *succ_iter ) != descendants.end() )
                 {
-                    log( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
+                    // log( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
                     succ_iter = node->successors().erase( succ_iter );
-                    // node->print();
                 }// if
                 else
                     ++succ_iter;
@@ -259,134 +371,8 @@ Node::refine_sub_deps ()
         node->successors().sort();
         node->successors().unique();
     }// for
-
-    //
-    // finally unlock nodes
-    //
-    
-    for ( auto  node : locked )
-    {
-        node->unlock();
-        log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
-    }// for
 }
     
-//
-// check local dependencies for refinement
-//
-bool
-Node::refine_deps ()
-{
-    log( 5, "refine_deps( " + to_string() + " )" );
-
-    //
-    // first lock all nodes
-    //
-
-    node_list_t  locked;
-    
-    locked.push_back( this );
-
-    for ( auto  node : _sub_nodes )
-        locked.push_back( node );
-    
-    for ( auto  succ : successors() )
-    {
-        if ( succ->is_refined() )
-        {
-            for ( auto  succ_sub : succ->sub_nodes() )
-                locked.push_back( succ_sub );
-        }// if
-        else
-            locked.push_back( succ );
-    }// for
-
-    // remove duplicates
-    locked.sort();
-    locked.unique();
-    
-    for ( auto  node : locked )
-    {
-        node->lock();
-        log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
-    }// for
-
-    //
-    // replace successor by refined successors if available
-    //
-    
-    bool         changed = false;
-    node_list_t  new_out;
-    auto         succ = successors().begin();
-            
-    while ( succ != successors().end() )
-    {
-        if ( (*succ)->is_refined() )
-        {
-            changed = true;
-                
-            // insert succendencies for subnodes (intersection test neccessary???)
-            for ( auto  succ_sub : (*succ)->sub_nodes() )
-            {
-                log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
-                new_out.push_back( succ_sub );
-            }// for
-
-            // remove previous succendency
-            succ = successors().erase( succ );
-        }// if
-        else
-            ++succ;
-    }// for
-
-    successors().splice( successors().end(), new_out );
-
-    // remove duplicates
-    successors().sort();
-    successors().unique();
-    
-    //
-    // remove direct outgoing edges if reachable otherwise
-    //
-    
-    if ( changed && sparsify )
-    {
-        // restrict search to local nodes and neighbouring nodes
-        std::unordered_set< Node * >  neighbourhood{ this };
-        
-        for ( auto  node : successors() )
-            neighbourhood.insert( node );
-        
-        // now test reachability
-        auto  descendants = reachable_indirect( this, neighbourhood );
-
-        // if a direct edge to otherwise reachable node exists, remove it
-        for ( auto  succ_iter = successors().begin(); succ_iter != successors().end(); )
-        {
-            if ( descendants.find( *succ_iter ) != descendants.end() )
-            {
-                log( 6, "  removing " + to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + to_string() );
-                succ_iter = successors().erase( succ_iter );
-                // node->print();
-            }// if
-            else
-                ++succ_iter;
-        }// for
-    }// if
-    
-    //
-    // finally unlock nodes
-    //
-    
-    for ( auto  node : locked )
-    {
-        node->unlock();
-        log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
-    }// for
-    
-    return changed;
-}
-
 //
 // print node with full edge information
 //

@@ -42,6 +42,12 @@ public:
     // ctor: use coordinates from given grid
     //
     MaternCov ( const std::string &  grid );
+
+    //
+    // dtor
+    //
+    
+    virtual ~MaternCov () {}
     
     //
     // set up coordinates

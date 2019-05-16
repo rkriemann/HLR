@@ -37,6 +37,12 @@ public:
     // ctor
     //
     LogKernel ( const size_t  n );
+
+    //
+    // dtor
+    //
+    
+    virtual ~LogKernel () {}
     
     //
     // return coordinates for problem indices

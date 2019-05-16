@@ -18,7 +18,7 @@ public:
     using  pointer         = value_type *;
     using  const_pointer   = const pointer;
     using  reference       = value_type &;
-    using  const_reference = const reference;
+    using  const_reference = reference;
     using  size_type       = size_t;
     using  difference_type = ptrdiff_t;
 
@@ -71,7 +71,7 @@ public:
     using  pointer         = value_type *;
     using  const_pointer   = const pointer;
     using  reference       = value_type &;
-    using  const_reference = const reference;
+    using  const_reference = reference;
     using  size_type       = size_t;
     using  difference_type = ptrdiff_t;
 
