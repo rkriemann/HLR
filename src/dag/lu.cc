@@ -22,8 +22,6 @@
 
 using namespace HLIB;
 
-#define USE_AUTO_DEPENDENCIES  1
-
 namespace HLR
 {
 
@@ -158,7 +156,11 @@ private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual LocalGraph          refine_      () { return {}; } // not needed because of direct DAG generation
     virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const
+    {
+        if ( is_leaf( A ) ) return { { id_A, A->block_is() } };
+        else                return { };
+    }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -171,8 +173,6 @@ LocalGraph
 LUNode::refine_ ()
 {
     LocalGraph  g;
-
-    #if USE_AUTO_DEPENDENCIES == 1
 
     if ( is_blocked( A ) && ! is_small( A ) )
     {
@@ -228,96 +228,6 @@ LUNode::refine_ ()
         apply->before( this );
     }// if
 
-    #else
-    
-    if ( is_blocked( A ) && ! is_small( A ) )
-    {
-        //
-        // generate sub nodes assuming 2x2 block structure
-        //
-
-        auto        B   = ptrcast( A, TBlockMatrix );
-        const auto  nbr = B->block_rows();
-        const auto  nbc = B->block_cols();
-
-        //
-        // then create factorise/solve nodes for all blocks
-        //
-
-        tensor2< Node * >  nodes( nbr, nbc );
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
-            //
-            // factorise diagonal block
-            //
-            
-            auto  A_ii  = B->block( i, i );
-
-            assert( A_ii != nullptr );
-
-            auto  lu_ii = HLR::DAG::alloc_node< LUNode >( g, A_ii, apply_nodes );
-
-            nodes(i,i) = lu_ii;
-
-            for ( uint j = i+1; j < nbr; j++ )
-            {
-                if ( ! is_null( B->block( j, i ) ) )
-                {
-                    auto solve_ji = HLR::DAG::alloc_node< SolveUNode >( g, A_ii, B->block( j, i ), apply_nodes );
-
-                    solve_ji->after( lu_ii );
-                    nodes(j,i) = solve_ji;
-                }// if
-            }// for
-
-            for ( uint j = i+1; j < nbc; j++ )
-            {
-                if ( ! is_null( B->block( i, j ) ) )
-                {
-                    auto solve_ij = HLR::DAG::alloc_node< SolveLNode >( g, A_ii, B->block( i, j ), apply_nodes );
-
-                    solve_ij->after( lu_ii );
-                    nodes(i,j) = solve_ij;
-                }// if
-            }// for
-        }// for
-
-        //
-        // now create update nodes with dependencies
-        //
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
-            for ( uint j = i+1; j < nbr; j++ )
-            {
-                for ( uint l = i+1; l < nbc; l++ )
-                {
-                    if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) != nullptr ) )
-                    {
-                        auto update_jl = HLR::DAG::alloc_node< UpdateNode >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ), apply_nodes );
-                        
-                        update_jl->after( nodes(j,i) );
-                        update_jl->after( nodes(i,l) );
-
-                        if ( ! CFG::Arith::use_accu )
-                            update_jl->before( nodes(j,l) );
-                    }// if
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    #endif
-
     return g;
 }
 
@@ -340,8 +250,6 @@ LocalGraph
 SolveLNode::refine_ ()
 {
     LocalGraph  g;
-
-    #if USE_AUTO_DEPENDENCIES == 1
 
     if ( is_blocked_all( A, L ) && ! is_small_any( A, L ) )
     {
@@ -389,77 +297,6 @@ SolveLNode::refine_ ()
         apply->before( this );
     }// if
 
-    #else
-    
-    if ( is_blocked_all( A, L ) && ! is_small_any( A, L ) )
-    {
-        auto        BL  = cptrcast( L, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
-
-        tensor2< Node * >  nodes( nbr, nbc );
-
-        //
-        // first create all solve nodes
-        //
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            const auto  L_ii = BL->block( i, i );
-        
-            //
-            // solve in current block row
-            //
-
-            if ( L_ii != nullptr )
-            {
-                for ( uint j = 0; j < nbc; ++j )
-                {
-                    if ( ! is_null( BA->block( i, j ) ) )
-                    {
-                        auto  solve_ij = HLR::DAG::alloc_node< SolveLNode >( g, L_ii, BA->block( i, j ), apply_nodes );
-
-                        nodes(i,j) = solve_ij;
-                    }// if
-                }// for
-            }// if
-        }// for
-
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            for ( uint  k = i+1; k < nbr; ++k )
-            {
-                for ( uint  j = 0; j < nbc; ++j )
-                {
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                    {
-                        auto  update_kj = HLR::DAG::alloc_node< UpdateNode >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ), apply_nodes );
-
-                        update_kj->after( nodes(i,j) );
-
-                        if ( ! CFG::Arith::use_accu )
-                            update_kj->before( nodes(k,j) );
-                    }// if
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    #endif
-
     return g;
 }
 
@@ -482,8 +319,6 @@ LocalGraph
 SolveUNode::refine_ ()
 {
     LocalGraph  g;
-
-    #if USE_AUTO_DEPENDENCIES == 1
 
     if ( is_blocked_all( A, U ) && ! is_small_any( A, U ) )
     {
@@ -526,73 +361,6 @@ SolveUNode::refine_ ()
 
         apply->before( this );
     }// if
-
-    #else
-    
-    if ( is_blocked_all( A, U ) && ! is_small_any( A, U ) )
-    {
-        auto        BU  = cptrcast( U, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
-
-        tensor2< Node * >  nodes( nbr, nbc );
-
-        //
-        // first create all solve nodes
-        //
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            const auto  U_jj = BU->block( j, j );
-        
-            if ( ! is_null( U_jj ) )
-            {
-                for ( uint i = 0; i < nbr; ++i )
-                {
-                    if ( ! is_null( BA->block(i,j) ) )
-                    {
-                        auto solve_ij = HLR::DAG::alloc_node< SolveUNode >( g, U_jj, BA->block( i, j ), apply_nodes );
-                        
-                        nodes(i,j) = solve_ij;
-                    }// if
-                }// for
-            }// if
-        }// for
-
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            for ( uint  k = j+1; k < nbc; ++k )
-            {
-                for ( uint  i = 0; i < nbr; ++i )
-                {
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                    {
-                        auto  update_ik = HLR::DAG::alloc_node< UpdateNode >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ), apply_nodes );
-
-                        update_ik->after( nodes(i,j) );
-
-                        if ( ! CFG::Arith::use_accu )
-                            update_ik->before( nodes(i,k) );
-                    }// if
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    #endif
 
     return g;
 }
