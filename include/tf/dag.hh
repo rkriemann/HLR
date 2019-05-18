@@ -20,6 +20,12 @@ namespace TF
 {
 
 //
+// construct DAG using refinement of given node
+//
+DAG::Graph
+refine ( DAG::Node *  root );
+
+//
 // execute DAG <dag>
 //
 void

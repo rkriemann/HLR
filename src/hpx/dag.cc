@@ -14,6 +14,7 @@
 #include <hpx/dataflow.hpp>
 #include <hpx/lcos/when_all.hpp>
 #include <hpx/util/unwrap.hpp>
+#include <hpx/include/parallel_for_each.hpp>
 
 #include "utils/tools.hh"
 #include "utils/log.hh"
@@ -22,18 +23,116 @@
 
 using namespace HLIB;
 
-// HPX types for tasks and dependencies
-using  task_t         = hpx::shared_future< void >;
-using  dependencies_t = std::list< hpx::shared_future< void > >;
-
 namespace HLR
 {
 
 namespace DAG
 {
 
+namespace HPX
+{
+
+//
+// construct DAG using refinement of given node
+//
+Graph
+refine ( Node *  root )
+{
+    assert( root != nullptr );
+    
+    std::deque< Node * >  nodes;
+    std::list< Node * >   tasks, start, end;
+    std::mutex            mtx;
+    
+    nodes.push_back( root );
+
+    while ( ! nodes.empty() )
+    {
+        std::deque< Node * >  subnodes, del_nodes;
+
+        auto  node_dep_refine = [&] ( Node * node )
+        {
+            const bool  node_changed = node->refine_deps();
+
+            if ( node->is_refined() )       // node was refined; collect all sub nodes
+            {
+                std::scoped_lock  lock( mtx );
+                    
+                for ( auto  sub : node->sub_nodes() )
+                    subnodes.push_back( sub );
+                    
+                del_nodes.push_back( node );
+            }// if
+            else if ( node_changed )        // node was not refined but dependencies were
+            {
+                std::scoped_lock  lock( mtx );
+                    
+                subnodes.push_back( node );
+            }// if
+            else                            // neither node nor dependencies changed: reached final state
+            {
+                {
+                    std::scoped_lock  lock( mtx );
+                    
+                    tasks.push_back( node );
+                }
+
+                // adjust dependency counter of successors (which were NOT refined!)
+                for ( auto  succ : node->successors() )
+                    succ->inc_dep_cnt();
+            }// else
+        };
+
+        // first refine nodes
+        hpx::parallel::for_each( hpx::parallel::execution::par,
+                                 nodes.begin(), nodes.end(),
+                                 [] ( Node * node ) { node->refine(); } );
+
+        // then refine dependencies and collect new nodes
+        hpx::parallel::for_each( hpx::parallel::execution::par,
+                                 nodes.begin(), nodes.end(),
+                                 node_dep_refine );
+
+        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+        hpx::parallel::for_each( hpx::parallel::execution::par,
+                                 del_nodes.begin(), del_nodes.end(),
+                                 [] ( Node * node ) { delete node; } );
+        
+        nodes = std::move( subnodes );
+    }// while
+
+    //
+    // collect start and end nodes
+    //
+    
+    std::for_each( tasks.begin(), tasks.end(),
+        //tbb::parallel_do( tasks,
+                   [&] ( Node * node )
+                   {
+                       if ( node->dep_cnt() == 0 )
+                       {
+                           std::scoped_lock  lock( mtx );
+                           
+                           start.push_back( node );
+                       }// if
+                       
+                       if ( node->successors().empty() )
+                       {
+                           std::scoped_lock  lock( mtx );
+                           
+                           end.push_back( node );
+                       }// if
+                   } );
+
+    return Graph( tasks, start, end );
+}
+
 namespace
 {
+
+// HPX types for tasks and dependencies
+using  task_t         = hpx::shared_future< void >;
+using  dependencies_t = std::list< hpx::shared_future< void > >;
 
 //
 // execute node without dependencies
@@ -61,9 +160,6 @@ run_node_dep ( Node *             node,
 }
 
 }// namespace anonymous
-
-namespace HPX
-{
 
 //
 // execute DAG <dag>
@@ -103,12 +199,8 @@ run ( DAG::Graph &             dag,
 
         final->set_dep_cnt( dag.end().size() );
     }// if
-
-    // map of DAG nodes to tasks
-    std::unordered_map< Node *, task_t >          taskmap;
-
-    // keep track of dependencies for a node
-    std::unordered_map< Node *, dependencies_t >  nodedeps;
+    else
+        final = dag.end().front();
 
     //
     // Go through DAG, decrement dependency counter for each successor of
@@ -119,7 +211,14 @@ run ( DAG::Graph &             dag,
     // For start nodes, dependency set is empty, so use "async".
     //
     
-    std::list< Node * >  nodes;
+    // map of DAG nodes to tasks
+    std::unordered_map< Node *, task_t >          taskmap;
+
+    // keep track of dependencies for a node
+    std::unordered_map< Node *, dependencies_t >  nodedeps;
+
+    // list of "active" nodes
+    std::list< Node * >                           nodes;
 
     for ( auto  node : dag.start() )
     {
@@ -157,10 +256,6 @@ run ( DAG::Graph &             dag,
         }// for
     }// while
 
-    // if DAG originally had single end node, get pointer to it
-    if ( final == nullptr )
-        final = dag.end().front();
-    
     auto  toc = Time::Wall::since( tic );
 
     log( 2, "time for HPX DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );

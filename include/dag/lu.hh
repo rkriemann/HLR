@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <functional>
+
 #include <matrix/TMatrix.hh>
 #include <algebra/mat_fac.hh>
 
@@ -23,7 +25,8 @@ namespace DAG
 // return graph representing compute DAG for LU of <A>
 //
 Graph
-gen_LU_dag ( HLIB::TMatrix *  A );
+gen_LU_dag ( HLIB::TMatrix *                              A,
+             std::function< DAG::Graph ( DAG::Node * ) >  refine );
 
 }// namespace DAG
 

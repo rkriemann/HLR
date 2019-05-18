@@ -76,7 +76,7 @@ mymain ( int argc, char ** argv )
         
         tic = Time::Wall::now();
 
-        auto  dag = HLR::DAG::gen_LU_dag( C.get() );
+        auto  dag = HLR::DAG::gen_LU_dag( C.get(), HLR::DAG::OMP::refine );
         
         toc = Time::Wall::since( tic );
 

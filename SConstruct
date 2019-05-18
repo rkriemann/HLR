@@ -17,12 +17,13 @@ CXXFLAGS     = '-std=c++17'
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
+DEFINES      = ''
 
 # set of programs to build: dag, tlr, hodlr, tileh
 BUILD        = [ 'dag' ]
 
 # set of frameworks to use: seq, openmp, tbb, taskflow, hpx, mpi, gpi2
-FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow' ]
+FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx' ]
 
 # directories for the various external libraries
 HPRO_DIR     = 'hlibpro'
@@ -61,6 +62,7 @@ def readln ( prog ):
 if debug :
     OPTFLAGS  = '-g -march=native'
     LINKFLAGS = '-g'
+    DEFINES   = ''
 
 if warn :
     WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
@@ -69,6 +71,7 @@ env = Environment( ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
+                   CPPDEFINES = Split( DEFINES ),
                    )
 env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
 
@@ -142,6 +145,8 @@ if 'taskflow' in FRAMEWORKS :
     tf = env.Clone()
     tf.Append( CPPPATH = os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS    = [ "pthread" ] )
+    if not debug :
+        tf.Append( CPPDEFINES = [ "NDEBUG" ] )
     
     if 'tlr'   in BUILD : tf.Program( 'tlr-tf.cc' )
     if 'hodlr' in BUILD : tf.Program( 'hodlr-tf.cc' )

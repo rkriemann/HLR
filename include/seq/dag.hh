@@ -22,10 +22,16 @@ namespace Seq
 {
 
 //
+// construct DAG using refinement of given node
+//
+DAG::Graph
+refine ( DAG::Node *  root );
+
+//
 // execute DAG <dag>
 //
 void
-run ( DAG::Graph &             dag,
+run ( Graph &                  dag,
       const HLIB::TTruncAcc &  acc );
 
 }// namespace Seq

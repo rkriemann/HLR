@@ -498,7 +498,8 @@ build_apply_dag ( TMatrix *              A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 Graph
-gen_LU_dag ( TMatrix *  A )
+gen_LU_dag ( TMatrix *                                    A,
+             std::function< DAG::Graph ( DAG::Node * ) >  refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -514,7 +515,7 @@ gen_LU_dag ( TMatrix *  A )
     // construct DAG for LU
     //
     
-    auto  dag = HLR::DAG::refine( new LUNode( A, apply_map ) );
+    auto  dag = refine( new LUNode( A, apply_map ) );
 
     if ( ! CFG::Arith::use_accu )
         return dag;

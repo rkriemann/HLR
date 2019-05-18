@@ -8,8 +8,10 @@
 
 #include <unordered_map>
 #include <cassert>
+#include <deque>
 
 #include <tbb/task.h>
+#include <tbb/parallel_for_each.h>
 
 #include "utils/log.hh"
 #include "tbb/dag.hh"
@@ -22,10 +24,103 @@ namespace HLR
 namespace DAG
 {
 
-namespace
+namespace TBB
 {
 
-class RuntimeTask;
+//
+// construct DAG using refinement of given node
+//
+Graph
+refine ( Node *  root )
+{
+    assert( root != nullptr );
+    
+    std::deque< Node * >  nodes;
+    std::list< Node * >   tasks, start, end;
+    std::mutex            mtx;
+    
+    nodes.push_back( root );
+
+    while ( ! nodes.empty() )
+    {
+        std::deque< Node * >  subnodes, del_nodes;
+
+        auto  node_dep_refine = [&] ( Node * node )
+        {
+            const bool  node_changed = node->refine_deps();
+
+            if ( node->is_refined() )       // node was refined; collect all sub nodes
+            {
+                std::scoped_lock  lock( mtx );
+                    
+                for ( auto  sub : node->sub_nodes() )
+                    subnodes.push_back( sub );
+                    
+                del_nodes.push_back( node );
+            }// if
+            else if ( node_changed )        // node was not refined but dependencies were
+            {
+                std::scoped_lock  lock( mtx );
+                    
+                subnodes.push_back( node );
+            }// if
+            else                            // neither node nor dependencies changed: reached final state
+            {
+                {
+                    std::scoped_lock  lock( mtx );
+                    
+                    tasks.push_back( node );
+                }
+
+                // adjust dependency counter of successors (which were NOT refined!)
+                for ( auto  succ : node->successors() )
+                    succ->inc_dep_cnt();
+            }// else
+        };
+
+        // first refine nodes
+        tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                [] ( Node * node ) { node->refine(); } );
+
+        // then refine dependencies and collect new nodes
+        tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                node_dep_refine );
+
+        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+        tbb::parallel_for_each( del_nodes.begin(), del_nodes.end(),
+                                [] ( Node * node ) { delete node; } );
+        
+        nodes = std::move( subnodes );
+    }// while
+
+    //
+    // collect start and end nodes
+    //
+    
+    // for ( auto  t : tasks )
+    tbb::parallel_do( tasks,
+                      [&] ( Node * node )
+                      {
+                          if ( node->dep_cnt() == 0 )
+                          {
+                              std::scoped_lock  lock( mtx );
+                              
+                              start.push_back( node );
+                          }// if
+                          
+                          if ( node->successors().empty() )
+                          {
+                              std::scoped_lock  lock( mtx );
+                              
+                              end.push_back( node );
+                          }// if
+                      } );
+
+    return Graph( tasks, start, end );
+}
+
+namespace
+{
 
 // mapping of Node to TBB task
 using  taskmap_t = std::unordered_map< Node *, tbb::task * >;
@@ -57,7 +152,6 @@ public:
 
         for ( auto  succ : _node->successors() )
         {
-            // auto  succ_task = static_cast< tbb::task * >( succ->task() );
             auto  succ_task = _taskmap[ succ ];
 
             assert( succ_task != nullptr );
@@ -72,9 +166,6 @@ public:
 
 }// namespace anonymous
 
-namespace TBB
-{
-
 //
 // execute DAG <dag>
 //
@@ -82,42 +173,43 @@ void
 run ( DAG::Graph &             dag,
       const HLIB::TTruncAcc &  acc )
 {
-    //
-    // TBB needs single end node
-    //
-    
     auto         tic          = Time::Wall::now();
     DAG::Node *  final        = nullptr;
     bool         multiple_end = false;
     taskmap_t    taskmap;
 
+    //
+    // ensure only single end node
+    //
+    
     if ( dag.end().size() > 1 )
     {
         log( 5, "DAG::TBB::run : multiple end nodes" );
 
         multiple_end = true;
         
-        //
-        // create single special end node
-        //
-
         final = new DAG::EmptyNode();
 
         for ( auto  node : dag.end() )
             final->after( node );
 
-        final->set_dep_cnt( dag.end().size() ); // final->in.size();
+        final->set_dep_cnt( dag.end().size() );
 
-        taskmap[ final ] = new ( tbb::task::allocate_root() ) DAG::RuntimeTask( final, acc, taskmap );
+        taskmap[ final ] = new ( tbb::task::allocate_root() ) RuntimeTask( final, acc, taskmap );
     }// if
-
-    // create tbb tasks for all nodes
-    for ( auto  node : dag.nodes() )
-        taskmap[ node ] = new ( tbb::task::allocate_root() ) DAG::RuntimeTask( node, acc, taskmap );
-    
-    // if DAG has single end node, get pointer to it
-    if ( final == nullptr )
+    else
         final = dag.end().front();
+
+    //
+    // create tbb tasks for all nodes
+    //
+    
+    for ( auto  node : dag.nodes() )
+        taskmap[ node ] = new ( tbb::task::allocate_root() ) RuntimeTask( node, acc, taskmap );
+
+    //
+    // set up start tasks
+    //
     
     tbb::task_list  work_queue;
     
@@ -132,6 +224,10 @@ run ( DAG::Graph &             dag,
             work_queue.push_back( * task );
         }// if
     }// for
+
+    //
+    // run DAG
+    //
     
     auto  toc = Time::Wall::since( tic );
 
@@ -152,12 +248,12 @@ run ( DAG::Graph &             dag,
 
     log( 2, "time for TBB DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
     
+    //
+    // remove auxiliary node from DAG
+    //
+        
     if ( multiple_end )
     {
-        //
-        // remove node from DAG
-        //
-        
         for ( auto  node : dag.end() )
             node->successors().remove( final );
         
