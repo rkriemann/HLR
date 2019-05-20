@@ -84,16 +84,16 @@ env.Append(  CPPPATH = [ '#include' ] )
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
-common = env.StaticLibrary( 'common', [ 'src/apps/logkernel.cc',
-                                        'src/apps/matern.cc',
-                                        'src/apps/Laplace.cc',
-                                        'src/cluster/H.cc',
+common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
+                                        'src/apps/matern_cov.cc',
+                                        'src/apps/laplace.cc',
+                                        'src/cluster/h.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',
                                         'src/cluster/tlr.cc',
-                                        'src/dag/Graph.cc',
-                                        'src/dag/LocalGraph.cc',
-                                        'src/dag/Node.cc',
+                                        'src/dag/graph.cc',
+                                        'src/dag/local_graph.cc',
+                                        'src/dag/node.cc',
                                         'src/dag/lu.cc',
                                         'src/mpi/distr.cc',
                                         'src/seq/dag.cc',

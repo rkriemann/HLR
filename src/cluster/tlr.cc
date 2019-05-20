@@ -11,14 +11,14 @@
 #include <cluster/TBCBuilder.hh>
 #include <cluster/TGeomAdmCond.hh>
 
-#include "cluster/tlr.hh"
+#include "hlr/cluster/tlr.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
 
-namespace TLR
+namespace tlr
 {
 
 //
@@ -47,6 +47,6 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace TLR
+}// namespace tlr
 
-}// namespace HLR
+}// namespace hlr

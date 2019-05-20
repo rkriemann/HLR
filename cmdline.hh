@@ -18,17 +18,17 @@ using namespace HLIB;
 
 namespace B = HLIB::BLAS;
 
-size_t  n         = 1024;
-size_t  ntile     = 128;
-size_t  k         = 16;
-double  eps       = -1;
-string  appl      = "logkernel";
-string  distr     = "cyclic2d";
-uint    nthreads  = 0;
-uint    verbosity = 1;
-bool    noredir   = false;
-string  grid      = "";
-string  matrix    = "";
+size_t  n          = 1024;
+size_t  ntile      = 128;
+size_t  k          = 16;
+double  eps        = -1;
+string  appl       = "logkernel";
+string  distr      = "cyclic2d";
+uint    nthreads   = 0;
+uint    verbosity  = 1;
+bool    noredir    = false;
+string  gridfile   = "";
+string  matrixfile = "";
     
 void
 parse_cmdline ( int argc, char ** argv )
@@ -88,21 +88,21 @@ parse_cmdline ( int argc, char ** argv )
         exit( 1 );
     }// if
 
-    if ( vm.count( "threads"   ) ) nthreads  = vm["threads"].as<int>();
-    if ( vm.count( "verbosity" ) ) verbosity = vm["verbosity"].as<int>();
     if ( vm.count( "nodag"     ) ) HLIB::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"      ) ) HLIB::CFG::Arith::use_accu = true;
-    if ( vm.count( "nprob"     ) ) n         = vm["nprob"].as<int>();
-    if ( vm.count( "ntile"     ) ) ntile     = vm["ntile"].as<int>();
-    if ( vm.count( "rank"      ) ) k         = vm["rank"].as<uint>();
-    if ( vm.count( "eps"       ) ) eps       = vm["eps"].as<double>();
-    if ( vm.count( "app"       ) ) appl      = vm["app"].as<string>();
-    if ( vm.count( "grid"      ) ) grid      = vm["grid"].as<string>();
-    if ( vm.count( "matrix"    ) ) matrix    = vm["matrix"].as<string>();
-    if ( vm.count( "distr"     ) ) distr     = vm["distr"].as<string>();
-    if ( vm.count( "noredir"   ) ) noredir   = true;
+    if ( vm.count( "threads"   ) ) nthreads   = vm["threads"].as<int>();
+    if ( vm.count( "verbosity" ) ) verbosity  = vm["verbosity"].as<int>();
+    if ( vm.count( "nprob"     ) ) n          = vm["nprob"].as<int>();
+    if ( vm.count( "ntile"     ) ) ntile      = vm["ntile"].as<int>();
+    if ( vm.count( "rank"      ) ) k          = vm["rank"].as<uint>();
+    if ( vm.count( "eps"       ) ) eps        = vm["eps"].as<double>();
+    if ( vm.count( "app"       ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "grid"      ) ) gridfile   = vm["grid"].as<string>();
+    if ( vm.count( "matrix"    ) ) matrixfile = vm["matrix"].as<string>();
+    if ( vm.count( "distr"     ) ) distr      = vm["distr"].as<string>();
+    if ( vm.count( "noredir"   ) ) noredir    = true;
 
-    assert( ( appl == "logkernel" ) || ( appl == "matern" ) || ( appl == "laplaceslp" ) );
+    assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }
 

@@ -15,36 +15,36 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "utils/tensor.hh"
-#include "utils/checks.hh"
-#include "utils/tools.hh"
-#include "dag/lu.hh"
+#include "hlr/utils/tensor.hh"
+#include "hlr/utils/checks.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/dag/lu.hh"
+
+namespace hlr
+{
 
 using namespace HLIB;
 
-namespace HLR
-{
-
-namespace DAG
+namespace dag
 {
 
 namespace
 {
 
-// map for ApplyUpdatesNode nodes
-using  apply_map_t = std::unordered_map< HLIB::id_t, Node * >;
+// map for apply_node nodes
+using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
 
 // identifiers for memory blocks
 const HLIB::id_t  id_A = 'A';
 const HLIB::id_t  id_U = 'U';
 
-struct LUNode : public Node
+struct lu_node : public node
 {
     TMatrix *      A;
     apply_map_t &  apply_nodes;
     
-    LUNode ( TMatrix *      aA,
-             apply_map_t &  aapply_nodes )
+    lu_node ( TMatrix *      aA,
+              apply_map_t &  aapply_nodes )
             : A( aA )
             , apply_nodes( aapply_nodes )
     { init(); }
@@ -54,20 +54,20 @@ struct LUNode : public Node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual LocalGraph          refine_      ();
+    virtual local_graph         refine_      ();
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
 
-struct SolveUNode : public Node
+struct solve_upper_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
     
-    SolveUNode ( const TMatrix *  aU,
-                 TMatrix *        aA,
-                 apply_map_t &    aapply_nodes )
+    solve_upper_node ( const TMatrix *  aU,
+                       TMatrix *        aA,
+                       apply_map_t &    aapply_nodes )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
@@ -79,20 +79,20 @@ struct SolveUNode : public Node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual LocalGraph          refine_      ();
+    virtual local_graph         refine_      ();
     virtual const block_list_t  in_blocks_   () const { return { { id_A, U->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
 
-struct SolveLNode : public Node
+struct solve_lower_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
 
-    SolveLNode ( const TMatrix *  aL,
-                 TMatrix *        aA,
-                 apply_map_t &    aapply_nodes )
+    solve_lower_node ( const TMatrix *  aL,
+                       TMatrix *        aA,
+                       apply_map_t &    aapply_nodes )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )
@@ -104,22 +104,22 @@ struct SolveLNode : public Node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual LocalGraph          refine_      ();
+    virtual local_graph         refine_      ();
     virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
     
-struct UpdateNode : public Node
+struct update_node : public node
 {
     const TMatrix *  A;
     const TMatrix *  B;
     TMatrix *        C;
     apply_map_t &    apply_nodes;
 
-    UpdateNode ( const TMatrix *  aA,
-                 const TMatrix *  aB,
-                 TMatrix *        aC,
-                 apply_map_t &    aapply_nodes )
+    update_node ( const TMatrix *  aA,
+                  const TMatrix *  aB,
+                  TMatrix *        aC,
+                  apply_map_t &    aapply_nodes )
             : A( aA )
             , B( aB )
             , C( aC )
@@ -132,7 +132,7 @@ struct UpdateNode : public Node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual LocalGraph          refine_      ();
+    virtual local_graph         refine_      ();
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_A, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -141,11 +141,11 @@ private:
     }
 };
 
-struct ApplyUpdatesNode : public Node
+struct apply_node : public node
 {
     TMatrix *  A;
     
-    ApplyUpdatesNode ( TMatrix *  aA )
+    apply_node ( TMatrix *  aA )
             : A( aA )
     { init(); }
 
@@ -154,7 +154,7 @@ struct ApplyUpdatesNode : public Node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual LocalGraph          refine_      () { return {}; } // not needed because of direct DAG generation
+    virtual local_graph         refine_      () { return {}; } // not needed because of direct DAG generation
     virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -165,14 +165,14 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// LUNode
+// lu_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-LocalGraph
-LUNode::refine_ ()
+local_graph
+lu_node::refine_ ()
 {
-    LocalGraph  g;
+    local_graph  g;
 
     if ( is_blocked( A ) && ! is_small( A ) )
     {
@@ -198,15 +198,15 @@ LUNode::refine_ ()
 
             assert( A_ii != nullptr );
 
-            HLR::DAG::alloc_node< LUNode >( g, A_ii, apply_nodes );
+            hlr::dag::alloc_node< lu_node >( g, A_ii, apply_nodes );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
-                    HLR::DAG::alloc_node< SolveUNode >( g, A_ii, B->block( j, i ), apply_nodes );
+                    hlr::dag::alloc_node< solve_upper_node >( g, A_ii, B->block( j, i ), apply_nodes );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
-                    HLR::DAG::alloc_node< SolveLNode >( g, A_ii, B->block( i, j ), apply_nodes );
+                    hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ), apply_nodes );
         }// for
 
         //
@@ -217,7 +217,7 @@ LUNode::refine_ ()
             for ( uint j = i+1; j < nbr; j++ )
                 for ( uint l = i+1; l < nbc; l++ )
                     if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
-                        HLR::DAG::alloc_node< UpdateNode >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ), apply_nodes );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -232,7 +232,7 @@ LUNode::refine_ ()
 }
 
 void
-LUNode::run_ ( const TTruncAcc &  acc )
+lu_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
@@ -242,14 +242,14 @@ LUNode::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// SolveLNode
+// solve_lower_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-LocalGraph
-SolveLNode::refine_ ()
+local_graph
+solve_lower_node::refine_ ()
 {
-    LocalGraph  g;
+    local_graph  g;
 
     if ( is_blocked_all( A, L ) && ! is_small_any( A, L ) )
     {
@@ -274,7 +274,7 @@ SolveLNode::refine_ ()
             {
                 for ( uint j = 0; j < nbc; ++j )
                     if ( ! is_null( BA->block( i, j ) ) )
-                        HLR::DAG::alloc_node< SolveLNode >( g, L_ii, BA->block( i, j ), apply_nodes );
+                        hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ), apply_nodes );
             }// if
         }// for
 
@@ -286,7 +286,7 @@ SolveLNode::refine_ ()
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        HLR::DAG::alloc_node< UpdateNode >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ), apply_nodes );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -301,7 +301,7 @@ SolveLNode::refine_ ()
 }
 
 void
-SolveLNode::run_ ( const TTruncAcc &  acc )
+solve_lower_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
@@ -311,14 +311,14 @@ SolveLNode::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// SolveUNode
+// solve_upper_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-LocalGraph
-SolveUNode::refine_ ()
+local_graph
+solve_upper_node::refine_ ()
 {
-    LocalGraph  g;
+    local_graph  g;
 
     if ( is_blocked_all( A, U ) && ! is_small_any( A, U ) )
     {
@@ -339,7 +339,7 @@ SolveUNode::refine_ ()
             {
                 for ( uint i = 0; i < nbr; ++i )
                     if ( ! is_null( BA->block(i,j) ) )
-                        HLR::DAG::alloc_node< SolveUNode >( g, U_jj, BA->block( i, j ), apply_nodes );
+                        hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ), apply_nodes );
             }// if
         }// for
 
@@ -351,7 +351,7 @@ SolveUNode::refine_ ()
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        HLR::DAG::alloc_node< UpdateNode >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ), apply_nodes );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -366,7 +366,7 @@ SolveUNode::refine_ ()
 }
 
 void
-SolveUNode::run_ ( const TTruncAcc &  acc )
+solve_upper_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
@@ -376,14 +376,14 @@ SolveUNode::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// UpdateNode
+// update_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-LocalGraph
-UpdateNode::refine_ ()
+local_graph
+update_node::refine_ ()
 {
-    LocalGraph  g;
+    local_graph  g;
 
     if ( is_blocked_all( A, B, C ) && ! is_small_any( A, B, C ) )
     {
@@ -405,11 +405,11 @@ UpdateNode::refine_ ()
                 for ( uint  k = 0; k < BA->block_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        HLR::DAG::alloc_node< UpdateNode >( g,
-                                                            BA->block( i, k ),
-                                                            BB->block( k, j ),
-                                                            BC->block( i, j ),
-                                                            apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g,
+                                                             BA->block( i, k ),
+                                                             BB->block( k, j ),
+                                                             BC->block( i, j ),
+                                                             apply_nodes );
                 }// for
             }// for
         }// for
@@ -427,7 +427,7 @@ UpdateNode::refine_ ()
 }
 
 void
-UpdateNode::run_ ( const TTruncAcc &  acc )
+update_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         add_product( real(-1),
@@ -440,12 +440,12 @@ UpdateNode::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// ApplyUpdatesNode
+// apply_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-ApplyUpdatesNode::run_ ( const TTruncAcc &  acc )
+apply_node::run_ ( const TTruncAcc &  acc )
 {
     if ( is_blocked( A ) && ! is_small( A ) )
         A->apply_updates( acc, nonrecursive );
@@ -458,16 +458,16 @@ ApplyUpdatesNode::run_ ( const TTruncAcc &  acc )
 //
 void
 build_apply_dag ( TMatrix *              A,
-                  Node *                 parent,
+                  node *                 parent,
                   apply_map_t &          apply_map,
-                  std::list< Node * > &  apply_nodes )
+                  std::list< node * > &  apply_nodes )
 {
     if ( is_null( A ) )
         return;
     
     // DBG::printf( "apply( %d )", A->id() );
     
-    auto  apply = DAG::alloc_node< ApplyUpdatesNode >( apply_nodes, A );
+    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
 
     apply_map[ A->id() ] = apply;
 
@@ -497,16 +497,16 @@ build_apply_dag ( TMatrix *              A,
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-Graph
-gen_LU_dag ( TMatrix *                                    A,
-             std::function< DAG::Graph ( DAG::Node * ) >  refine )
+graph
+gen_lu_dag ( TMatrix *                          A,
+             std::function< graph ( node * ) >  refine )
 {
     //
     // generate DAG for shifting and applying updates
     //
     
     apply_map_t       apply_map;
-    DAG::node_list_t  apply_nodes;
+    dag::node_list_t  apply_nodes;
 
     if ( CFG::Arith::use_accu )
         build_apply_dag( A, nullptr, apply_map, apply_nodes );
@@ -515,7 +515,7 @@ gen_LU_dag ( TMatrix *                                    A,
     // construct DAG for LU
     //
     
-    auto  dag = refine( new LUNode( A, apply_map ) );
+    auto  dag = refine( new lu_node( A, apply_map ) );
 
     if ( ! CFG::Arith::use_accu )
         return dag;
@@ -526,9 +526,9 @@ gen_LU_dag ( TMatrix *                                    A,
     // remove apply update nodes without updates
     //
 
-    using  node_set_t = std::unordered_set< Node * >;
+    using  node_set_t = std::unordered_set< node * >;
 
-    DAG::node_list_t  work;
+    dag::node_list_t  work;
     node_set_t        deleted;
 
     for ( auto  node : dag.start() )
@@ -536,13 +536,13 @@ gen_LU_dag ( TMatrix *                                    A,
 
     while ( ! work.empty() )
     {
-        DAG::node_list_t  succ;
+        dag::node_list_t  succ;
         
         while ( ! work.empty() )
         {
             auto  node = behead( work );
 
-            if ( dynamic_cast< ApplyUpdatesNode * >( node ) != nullptr )
+            if ( dynamic_cast< apply_node * >( node ) != nullptr )
             {
                 if ( node->dep_cnt() == 0 )
                 {
@@ -560,7 +560,7 @@ gen_LU_dag ( TMatrix *                                    A,
         work = std::move( succ );
     }// while
 
-    DAG::node_list_t  nodes, start, end;
+    dag::node_list_t  nodes, start, end;
 
     for ( auto  node : dag.nodes() )
     {
@@ -581,9 +581,9 @@ gen_LU_dag ( TMatrix *                                    A,
         }// else
     }// for
     
-    return  DAG::Graph( nodes, start, end );
+    return  dag::graph( nodes, start, end );
 }
 
-}// namespace LU
+}// namespace dag
 
-}// namespace DAG
+}// namespace hlr

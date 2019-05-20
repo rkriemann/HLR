@@ -13,14 +13,14 @@
 #include <cluster/TBCBuilder.hh>
 #include <cluster/TGeomAdmCond.hh>
 
-#include "cluster/tileh.hh"
+#include "hlr/cluster/tileh.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
 
-namespace TileH
+namespace tileh
 {
 
 namespace
@@ -135,6 +135,6 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace TileH
+}// namespace tileh
 
-}// namespace HLR
+}// namespace hlr

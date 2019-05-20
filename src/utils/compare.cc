@@ -21,9 +21,9 @@ namespace fs = boost::filesystem;
 #include <matrix/structure.hh>
 #include <io/TMatrixIO.hh>
 
-#include "utils/compare.hh"
+#include "hlr/utils/compare.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
@@ -79,4 +79,4 @@ compare_ref_file ( TMatrix *            A,
         std::cout << "    no reference matrix found" << std::endl;
 }
 
-}// namespace HLR
+}// namespace hlr

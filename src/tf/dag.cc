@@ -13,40 +13,43 @@
 
 #include <taskflow/taskflow.hpp>
 
-#include "utils/log.hh"
-#include "tf/dag.hh"
+#include "hlr/utils/log.hh"
+#include "hlr/tf/dag.hh"
 
 using namespace HLIB;
 
-namespace HLR
+namespace hlr
 {
 
-namespace DAG
+namespace tf
 {
 
-namespace TF
+namespace dag
 {
+
+using hlr::dag::node;
+using hlr::dag::graph;
 
 //
 // construct DAG using refinement of given node
 //
-Graph
-refine ( Node *  root )
+graph
+refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< Node * >  nodes;
-    std::list< Node * >   tasks, start, end;
+    std::deque< node * >  nodes;
+    std::list< node * >   tasks, start, end;
     std::mutex            mtx;
-    tf::Taskflow          tf;
+    ::tf::Taskflow        tf;
     
     nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
-        std::deque< Node * >  subnodes, del_nodes;
+        std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( Node * node )
+        auto  node_dep_refine = [&] ( node * node )
         {
             const bool  node_changed = node->refine_deps();
 
@@ -81,7 +84,7 @@ refine ( Node *  root )
 
         // first refine nodes
         tf.parallel_for( nodes.begin(), nodes.end(),
-                         [] ( Node * node ) { node->refine(); } );
+                         [] ( node * node ) { node->refine(); } );
         tf.wait_for_all();
 
         // then refine dependencies and collect new nodes
@@ -91,7 +94,7 @@ refine ( Node *  root )
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         tf.parallel_for( del_nodes.begin(), del_nodes.end(),
-                         [] ( Node * node ) { delete node; } );
+                         [] ( node * node ) { delete node; } );
         tf.wait_for_all();
         
         nodes = std::move( subnodes );
@@ -102,7 +105,7 @@ refine ( Node *  root )
     //
     
     std::for_each( tasks.begin(), tasks.end(),
-                   [&] ( Node * node )
+                   [&] ( node * node )
                    {
                        if ( node->dep_cnt() == 0 )
                        {
@@ -119,26 +122,26 @@ refine ( Node *  root )
                        }// if
                    } );
 
-    return Graph( tasks, start, end );
+    return graph( tasks, start, end );
 }
 
-// mapping of Node to TF task
-using  taskmap_t = std::unordered_map< Node *, tf::Task >;
+// mapping of node to TF task
+using  taskmap_t = std::unordered_map< node *, ::tf::Task >;
 
 //
 // execute DAG <dag>
 //
 void
-run ( DAG::Graph &             dag,
+run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
     //
     // TF needs single end node
     //
     
-    auto          tic = Time::Wall::now();
-    taskmap_t     taskmap;
-    tf::Taskflow  tf;
+    auto            tic = Time::Wall::now();
+    taskmap_t       taskmap;
+    ::tf::Taskflow  tf;
 
     // auto          observer = tf.share_executor()->make_observer< tf::ExecutorObserver >();
     

@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : hodlr.cc
-// Description : HODLR specific clustering functions
+// File        : H.cc
+// Description : H specific clustering functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -11,15 +11,15 @@
 #include <cluster/TBCBuilder.hh>
 #include <cluster/TGeomAdmCond.hh>
 
-#include "hlr/cluster/hodlr.hh"
+#include "hlr/cluster/h.hh"
 
 namespace hlr
 {
 
-using namespace HLIB;
-
-namespace hodlr
+namespace h
 {
+
+using namespace HLIB;
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -28,7 +28,7 @@ std::unique_ptr< HLIB::TClusterTree >
 cluster ( HLIB::TCoordinate *   coords,
           const size_t          ntile )
 {
-    TCardBSPPartStrat  part_strat;
+    TCardBSPPartStrat  part_strat( adaptive_split_axis );
     TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
     return ct_builder.build( coords );
@@ -41,12 +41,12 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct )
 {
-    TOffDiagAdmCond    adm_cond;
-    TBCBuilder         bct_builder;
+    TStdGeomAdmCond  adm_cond( 2.0, use_min_diam );
+    TBCBuilder       bct_builder;
 
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace hodlr
+}// namespace h
 
 }// namespace hlr

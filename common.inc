@@ -17,7 +17,7 @@ namespace B = HLIB::BLAS;
 #include "cmdline.hh"
 #include "gen_problem.hh"
 
-using namespace HLR;
+using namespace hlr;
 
 // main function specific to arithmetic
 template < typename problem_t >
@@ -41,9 +41,9 @@ hlrmain ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel"  ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"     ) mymain< HLR::Apps::MaternCov >( argc, argv );
-        else if ( appl == "laplaceslp" ) mymain< HLR::Apps::LaplaceSLP >( argc, argv );
+        if      ( appl == "logkernel"  ) mymain< hlr::apps::log_kernel >( argc, argv );
+        else if ( appl == "matern"     ) mymain< hlr::apps::matern_cov >( argc, argv );
+        else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
             throw "unknown application";
 

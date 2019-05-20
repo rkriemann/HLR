@@ -16,41 +16,44 @@
 #include <hpx/util/unwrap.hpp>
 #include <hpx/include/parallel_for_each.hpp>
 
-#include "utils/tools.hh"
-#include "utils/log.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/utils/log.hh"
 
-#include "hpx/dag.hh"
+#include "hlr/hpx/dag.hh"
+
+namespace hlr
+{
 
 using namespace HLIB;
 
-namespace HLR
+namespace hpx
 {
 
-namespace DAG
+namespace dag
 {
 
-namespace HPX
-{
+using hlr::dag::node;
+using hlr::dag::graph;
 
 //
 // construct DAG using refinement of given node
 //
-Graph
-refine ( Node *  root )
+graph
+refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< Node * >  nodes;
-    std::list< Node * >   tasks, start, end;
+    std::deque< node * >  nodes;
+    std::list< node * >   tasks, start, end;
     std::mutex            mtx;
     
     nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
-        std::deque< Node * >  subnodes, del_nodes;
+        std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( Node * node )
+        auto  node_dep_refine = [&] ( node * node )
         {
             const bool  node_changed = node->refine_deps();
 
@@ -84,19 +87,19 @@ refine ( Node *  root )
         };
 
         // first refine nodes
-        hpx::parallel::for_each( hpx::parallel::execution::par,
+        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                  nodes.begin(), nodes.end(),
-                                 [] ( Node * node ) { node->refine(); } );
+                                 [] ( node * node ) { node->refine(); } );
 
         // then refine dependencies and collect new nodes
-        hpx::parallel::for_each( hpx::parallel::execution::par,
+        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                  nodes.begin(), nodes.end(),
                                  node_dep_refine );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-        hpx::parallel::for_each( hpx::parallel::execution::par,
+        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                  del_nodes.begin(), del_nodes.end(),
-                                 [] ( Node * node ) { delete node; } );
+                                 [] ( node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -107,7 +110,7 @@ refine ( Node *  root )
     
     std::for_each( tasks.begin(), tasks.end(),
         //tbb::parallel_do( tasks,
-                   [&] ( Node * node )
+                   [&] ( node * node )
                    {
                        if ( node->dep_cnt() == 0 )
                        {
@@ -124,21 +127,21 @@ refine ( Node *  root )
                        }// if
                    } );
 
-    return Graph( tasks, start, end );
+    return graph( tasks, start, end );
 }
 
 namespace
 {
 
 // HPX types for tasks and dependencies
-using  task_t         = hpx::shared_future< void >;
-using  dependencies_t = std::list< hpx::shared_future< void > >;
+using  task_t         = ::hpx::shared_future< void >;
+using  dependencies_t = std::list< ::hpx::shared_future< void > >;
 
 //
 // execute node without dependencies
 //
 void
-run_node ( Node *             node,
+run_node ( node *             node,
            const TTruncAcc &  acc )
 {
     log( 4, "run_node : " + node->to_string() );
@@ -150,7 +153,7 @@ run_node ( Node *             node,
 // execute node with dependencies
 //
 void
-run_node_dep ( Node *             node,
+run_node_dep ( node *             node,
                const TTruncAcc &  acc,
                dependencies_t     dep )
 {
@@ -165,26 +168,26 @@ run_node_dep ( Node *             node,
 // execute DAG <dag>
 //
 void
-run ( DAG::Graph &             dag,
+run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
-    using hpx::async;
-    using hpx::dataflow;
-    using hpx::when_all;
-    using hpx::util::unwrapping;
+    using ::hpx::async;
+    using ::hpx::dataflow;
+    using ::hpx::when_all;
+    using ::hpx::util::unwrapping;
     
     //
     // use single end node to not wait sequentially for all
     // original end nodes (and purely use HPX framework)
     //
 
-    auto         tic          = Time::Wall::now();
-    DAG::Node *  final        = nullptr;
-    bool         multiple_end = false;
+    auto    tic          = Time::Wall::now();
+    node *  final        = nullptr;
+    bool    multiple_end = false;
 
     if ( dag.end().size() > 1 )
     {
-        log( 5, "DAG::HPX::run : multiple end nodes" );
+        log( 5, "dag::hpx::run : multiple end nodes" );
 
         multiple_end = true;
         
@@ -192,7 +195,7 @@ run ( DAG::Graph &             dag,
         // create single special end node
         //
 
-        final = new DAG::EmptyNode();
+        final = new hlr::dag::empty_node();
 
         for ( auto  node : dag.end() )
             final->after( node );
@@ -212,13 +215,13 @@ run ( DAG::Graph &             dag,
     //
     
     // map of DAG nodes to tasks
-    std::unordered_map< Node *, task_t >          taskmap;
+    std::unordered_map< node *, task_t >          taskmap;
 
     // keep track of dependencies for a node
-    std::unordered_map< Node *, dependencies_t >  nodedeps;
+    std::unordered_map< node *, dependencies_t >  nodedeps;
 
     // list of "active" nodes
-    std::list< Node * >                           nodes;
+    std::list< node * >                           nodes;
 
     for ( auto  node : dag.start() )
     {
@@ -243,7 +246,7 @@ run ( DAG::Graph &             dag,
         
         log( 4, "dataflow( " + node->to_string() + " )" );
         
-        task_t  task = hpx::dataflow( unwrapping( run_node_dep ), node, acc, when_all( nodedeps[ node ] ) );
+        task_t  task = ::hpx::dataflow( unwrapping( run_node_dep ), node, acc, when_all( nodedeps[ node ] ) );
         
         taskmap[ node ] = task;
         

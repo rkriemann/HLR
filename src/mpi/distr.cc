@@ -9,9 +9,12 @@
 #include <list>
 #include <cassert>
 
-#include "utils/tensor.hh"
+#include "hlr/utils/tensor.hh"
 
-#include "mpi/distr.hh"
+#include "hlr/mpi/distr.hh"
+
+namespace hlr
+{
 
 namespace distribution
 {
@@ -216,3 +219,5 @@ shifted_cyclic_1d ( const uint       nprocs,
 }
 
 }// namespace distribution
+
+}// namespace hlr

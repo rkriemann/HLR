@@ -3,11 +3,11 @@
 
 #include <memory>
 
-#include "apps/logkernel.hh"
-#include "apps/matern.hh"
-#include "apps/Laplace.hh"
+#include "hlr/apps/log_kernel.hh"
+#include "hlr/apps/matern_cov.hh"
+#include "hlr/apps/laplace.hh"
 
-#include "utils/termcolor.hpp"
+#include "hlr/utils/termcolor.hpp"
 
 namespace term = termcolor;
 
@@ -23,42 +23,42 @@ print_problem_desc ( const std::string &  name )
 {
     std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << name
-              << ( grid == "" ? HLIB::to_string( ", n = %d", n ) : ", grid = " + grid )
+              << ( gridfile == "" ? HLIB::to_string( ", n = %d", n ) : ", grid = " + gridfile )
               << ", ntile = " << ntile
               << ( eps > 0 ? HLIB::to_string( ", ε = %.2e", eps ) : HLIB::to_string( ", k = %d", k ) )
               << std::endl;
 }
 
 template <>
-std::unique_ptr< HLR::Apps::LogKernel >
-gen_problem< HLR::Apps::LogKernel > ()
+std::unique_ptr< hlr::apps::log_kernel >
+gen_problem< hlr::apps::log_kernel > ()
 {
     print_problem_desc( "LogKernel" );
 
-    return std::make_unique< HLR::Apps::LogKernel >( n );
+    return std::make_unique< hlr::apps::log_kernel >( n );
 }
 
 template <>
-std::unique_ptr< HLR::Apps::MaternCov >
+std::unique_ptr< hlr::apps::matern_cov >
 gen_problem ()
 {
     print_problem_desc( "Matern Covariance" );
 
-    if ( grid != "" )
-        return std::make_unique< HLR::Apps::MaternCov >( grid );
+    if ( gridfile != "" )
+        return std::make_unique< hlr::apps::matern_cov >( gridfile );
     else
-        return std::make_unique< HLR::Apps::MaternCov >( n );
+        return std::make_unique< hlr::apps::matern_cov >( n );
 }
 
 template <>
-std::unique_ptr< HLR::Apps::LaplaceSLP >
+std::unique_ptr< hlr::apps::laplace_slp >
 gen_problem ()
 {
     print_problem_desc( "Laplace SLP" );
 
-    assert( grid != "" );
+    assert( gridfile != "" );
     
-    return std::make_unique< HLR::Apps::LaplaceSLP >( grid );
+    return std::make_unique< hlr::apps::laplace_slp >( gridfile );
 }
 
 #endif // __HLR_GEN_PROBLEM_HH

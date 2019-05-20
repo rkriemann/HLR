@@ -12,40 +12,43 @@
 #include <deque>
 #include <cassert>
 
-#include "utils/tools.hh"
-#include "utils/log.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/utils/log.hh"
 
-#include "omp/dag.hh"
+#include "hlr/omp/dag.hh"
+
+namespace hlr 
+{
 
 using namespace HLIB;
 
-namespace HLR 
+namespace omp
 {
 
-namespace DAG
+namespace dag
 {
 
-namespace OMP
-{
+using hlr::dag::node;
+using hlr::dag::graph;
 
 //
 // construct DAG using refinement of given node
 //
-Graph
-refine ( Node *  root )
+graph
+refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< Node * >  nodes;
-    std::list< Node * >   tasks, start, end;
+    std::deque< node * >  nodes;
+    std::list< node * >   tasks, start, end;
     
     nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
-        std::deque< Node * >  subnodes, del_nodes;
+        std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( Node * node )
+        auto  node_dep_refine = [&] ( node * node )
         {
             const bool  node_changed = node->refine_deps();
 
@@ -72,7 +75,7 @@ refine ( Node *  root )
 
         // first refine nodes
         std::for_each( nodes.begin(), nodes.end(),
-                       [] ( Node * node ) { node->refine(); } );
+                       [] ( node * node ) { node->refine(); } );
 
         // then refine dependencies and collect new nodes
         std::for_each( nodes.begin(), nodes.end(),
@@ -80,7 +83,7 @@ refine ( Node *  root )
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         std::for_each( del_nodes.begin(), del_nodes.end(),
-                       [] ( Node * node ) { delete node; } );
+                       [] ( node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -91,7 +94,7 @@ refine ( Node *  root )
     
     // for ( auto  t : tasks )
     std::for_each( tasks.begin(), tasks.end(),
-                   [&] ( Node * node )
+                   [&] ( node * node )
                    {
                        if ( node->dep_cnt() == 0 )
                            start.push_back( node );
@@ -100,24 +103,24 @@ refine ( Node *  root )
                            end.push_back( node );
                    } );
 
-    return Graph( tasks, start, end );
+    return graph( tasks, start, end );
 }
 
 //
 // execute DAG <dag>
 //
 void
-run ( DAG::Graph &             dag,
+run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
     auto tic = Time::Wall::now();
 
     // keep track of dependencies for a node
-    using  dep_list_t = std::list< Node * >;
-    using  dep_vec_t  = std::vector< Node * >;
+    using  dep_list_t = std::list< node * >;
+    using  dep_vec_t  = std::vector< node * >;
 
-    std::unordered_map< Node *, dep_list_t >  dep_lists;
-    std::unordered_map< Node *, dep_vec_t  >  dep_vecs;
+    std::unordered_map< node *, dep_list_t >  dep_lists;
+    std::unordered_map< node *, dep_vec_t  >  dep_vecs;
 
     //
     // add node to dependency list of successors
@@ -174,8 +177,8 @@ run ( DAG::Graph &             dag,
     log( 2, "time for OMP DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 }
 
-}// namespace OMP
+}// namespace dag
 
-}// namespace DAG
+}// namespace omp
 
-}// namespace HLR
+}// namespace hlr

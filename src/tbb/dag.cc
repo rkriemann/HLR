@@ -13,39 +13,42 @@
 #include <tbb/task.h>
 #include <tbb/parallel_for_each.h>
 
-#include "utils/log.hh"
-#include "tbb/dag.hh"
+#include "hlr/utils/log.hh"
+#include "hlr/tbb/dag.hh"
 
 using namespace HLIB;
 
-namespace HLR
+namespace hlr
 {
 
-namespace DAG
+namespace tbb
 {
 
-namespace TBB
+namespace dag
 {
+
+using hlr::dag::node;
+using hlr::dag::graph;
 
 //
 // construct DAG using refinement of given node
 //
-Graph
-refine ( Node *  root )
+graph
+refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< Node * >  nodes;
-    std::list< Node * >   tasks, start, end;
+    std::deque< node * >  nodes;
+    std::list< node * >   tasks, start, end;
     std::mutex            mtx;
     
     nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
-        std::deque< Node * >  subnodes, del_nodes;
+        std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( Node * node )
+        auto  node_dep_refine = [&] ( node * node )
         {
             const bool  node_changed = node->refine_deps();
 
@@ -79,16 +82,16 @@ refine ( Node *  root )
         };
 
         // first refine nodes
-        tbb::parallel_for_each( nodes.begin(), nodes.end(),
-                                [] ( Node * node ) { node->refine(); } );
+        ::tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                  [] ( node * node ) { node->refine(); } );
 
         // then refine dependencies and collect new nodes
-        tbb::parallel_for_each( nodes.begin(), nodes.end(),
-                                node_dep_refine );
+        ::tbb::parallel_for_each( nodes.begin(), nodes.end(),
+                                  node_dep_refine );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-        tbb::parallel_for_each( del_nodes.begin(), del_nodes.end(),
-                                [] ( Node * node ) { delete node; } );
+        ::tbb::parallel_for_each( del_nodes.begin(), del_nodes.end(),
+                                  [] ( node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -98,45 +101,45 @@ refine ( Node *  root )
     //
     
     // for ( auto  t : tasks )
-    tbb::parallel_do( tasks,
-                      [&] ( Node * node )
-                      {
-                          if ( node->dep_cnt() == 0 )
-                          {
-                              std::scoped_lock  lock( mtx );
-                              
-                              start.push_back( node );
-                          }// if
-                          
-                          if ( node->successors().empty() )
-                          {
-                              std::scoped_lock  lock( mtx );
-                              
-                              end.push_back( node );
-                          }// if
-                      } );
+    ::tbb::parallel_do( tasks,
+                        [&] ( node * node )
+                        {
+                            if ( node->dep_cnt() == 0 )
+                            {
+                                std::scoped_lock  lock( mtx );
+                                
+                                start.push_back( node );
+                            }// if
+                            
+                            if ( node->successors().empty() )
+                            {
+                                std::scoped_lock  lock( mtx );
+                                
+                                end.push_back( node );
+                            }// if
+                        } );
 
-    return Graph( tasks, start, end );
+    return graph( tasks, start, end );
 }
 
 namespace
 {
 
-// mapping of Node to TBB task
-using  taskmap_t = std::unordered_map< Node *, tbb::task * >;
+// mapping of node to TBB task
+using  taskmap_t = std::unordered_map< node *, ::tbb::task * >;
 
 //
-// helper class for executing Node via TBB
+// helper class for executing node via TBB
 //
-class RuntimeTask : public tbb::task
+class runtime_task : public ::tbb::task
 {
 private:
-    DAG::Node *        _node;
+    node *             _node;
     const TTruncAcc &  _acc;
     taskmap_t &        _taskmap;
     
 public:
-    RuntimeTask ( DAG::Node *        anode,
+    runtime_task ( node *             anode,
                   const TTruncAcc &  aacc,
                   taskmap_t &        ataskmap )
             : _node( anode )
@@ -146,7 +149,7 @@ public:
         set_ref_count( _node->dep_cnt() );
     }
 
-    tbb::task *  execute ()
+    ::tbb::task *  execute ()
     {
         _node->run( _acc );
 
@@ -170,13 +173,13 @@ public:
 // execute DAG <dag>
 //
 void
-run ( DAG::Graph &             dag,
+run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
-    auto         tic          = Time::Wall::now();
-    DAG::Node *  final        = nullptr;
-    bool         multiple_end = false;
-    taskmap_t    taskmap;
+    auto       tic          = Time::Wall::now();
+    node *     final        = nullptr;
+    bool       multiple_end = false;
+    taskmap_t  taskmap;
 
     //
     // ensure only single end node
@@ -184,18 +187,18 @@ run ( DAG::Graph &             dag,
     
     if ( dag.end().size() > 1 )
     {
-        log( 5, "DAG::TBB::run : multiple end nodes" );
+        log( 5, "tbb::dag::run : multiple end nodes" );
 
         multiple_end = true;
         
-        final = new DAG::EmptyNode();
+        final = new hlr::dag::empty_node();
 
         for ( auto  node : dag.end() )
             final->after( node );
 
         final->set_dep_cnt( dag.end().size() );
 
-        taskmap[ final ] = new ( tbb::task::allocate_root() ) RuntimeTask( final, acc, taskmap );
+        taskmap[ final ] = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, taskmap );
     }// if
     else
         final = dag.end().front();
@@ -205,13 +208,13 @@ run ( DAG::Graph &             dag,
     //
     
     for ( auto  node : dag.nodes() )
-        taskmap[ node ] = new ( tbb::task::allocate_root() ) RuntimeTask( node, acc, taskmap );
+        taskmap[ node ] = new ( ::tbb::task::allocate_root() ) runtime_task( node, acc, taskmap );
 
     //
     // set up start tasks
     //
     
-    tbb::task_list  work_queue;
+    ::tbb::task_list  work_queue;
     
     for ( auto  node : dag.start() )
     {
@@ -242,7 +245,7 @@ run ( DAG::Graph &             dag,
     final_task->increment_ref_count();                // for "tbb::wait" to actually wait for final node
     final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
     final_task->execute();                            // and the final node explicitly
-    tbb::task::destroy( * final_task );               // not done by TBB since executed manually
+    ::tbb::task::destroy( * final_task );             // not done by TBB since executed manually
 
     toc = Time::Wall::since( tic );
 
@@ -261,8 +264,8 @@ run ( DAG::Graph &             dag,
     }// if
 }
 
-}// namespace TBB
+}// namespace dag
 
-}// namespace DAG
+}// namespace tbb
 
-}// namespace HLR
+}// namespace hlr
