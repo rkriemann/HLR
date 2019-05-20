@@ -113,35 +113,25 @@ void
 run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
+    const int  MAX_DEPS = 15;
+    
     auto tic = Time::Wall::now();
 
-    // keep track of dependencies for a node
-    using  dep_list_t = std::list< node * >;
-    using  dep_vec_t  = std::vector< node * >;
-
-    std::unordered_map< node *, dep_list_t >  dep_lists;
-    std::unordered_map< node *, dep_vec_t  >  dep_vecs;
-
     //
-    // add node to dependency list of successors
-    //
-    
-    for ( auto  node : dag.nodes() )
-        for ( auto  succ : node->successors() )
-            dep_lists[ succ ].push_back( node );
-
-    //
-    // convert lists to vectors
+    // associate each task with an array position
     //
 
+    const size_t                       nnodes = dag.nnodes();
+    std::vector< int >                 task_no( nnodes );  // just dummy array
+    int *                              d   = task_no.data(); // C-style and short name
+    std::unordered_map< node *, int >  taskmap;
+    size_t                             pos = 0;
+        
     for ( auto  node : dag.nodes() )
     {
-        dep_list_t &  dep_list = dep_lists[ node ];
-
-        dep_vecs[ node ].reserve( dep_list.size() );
-
-        for ( auto  dep : dep_list )
-            dep_vecs[ node ].push_back( dep );
+        log( 0, HLIB::to_string( "%d : ", pos ) + node->to_string() );
+        d[ pos ] = pos;
+        taskmap[ node ] = pos++;
     }// for
     
     auto  toc = Time::Wall::since( tic );
@@ -160,14 +150,51 @@ run ( graph &                  dag,
         {
             for ( auto  node : dag.nodes() )
             {
-                dep_vec_t &  deps  = dep_vecs[ node ];
-                auto         cdeps = & deps[0];
-                const auto   ndeps = deps.size();
-                
-                #pragma omp task depend( in : cdeps[0:ndeps] ) depend( out : node )
+                //
+                // fill dependency positions in above array
+                //
+
+                const int  task_pos = taskmap[ node ];
+                int        s[ MAX_DEPS ]; // also short name!
+                int        dpos = 0;
+
+                for ( auto  succ : node->successors() )
                 {
-                    node->run( acc );
-                }// omp task
+                    assert( dpos < MAX_DEPS );
+                    s[ dpos++ ] = taskmap[ succ ];
+                }// for
+
+                if ( dpos == 0 )
+                {
+                    #pragma omp task depend( in : d[ task_pos ] )
+                    {
+                        node->run( acc );
+                    }// omp task
+                }// if
+                else if ( dpos <= 5 ) // should cover most cases
+                {
+                    for ( int  i = dpos; i < 5; ++i )
+                        s[ i ] = s[ i-1 ];
+                    
+                    log( 0, node->to_string() );
+                    for ( int  i = 0; i < dpos; ++i )
+                        log( 0, HLIB::to_string( "%d -> %d", task_pos, s[i] ) );
+                    
+                    #pragma omp task depend( in : d[ task_pos ] ) depend( out : d[s[0]], d[s[1]], d[s[2]], d[s[3]], d[s[4]] )
+                    {
+                        node->run( acc );
+                    }// omp task
+                }// else
+                else 
+                {
+                    for ( int  i = dpos; i < MAX_DEPS; ++i )
+                        s[ i ] = s[ i-1 ];
+                    
+                    #pragma omp task depend( in : d[ task_pos ] ) depend( out : d[s[0]], d[s[1]], d[s[2]], d[s[3]], d[s[4]], d[s[5]], d[s[6]], d[s[7]], d[s[8]], d[s[10]] )
+                    {
+                        node->run( acc );
+                    }// omp task
+                }// else
             }// for
         }// omp single
     }// omp parallel

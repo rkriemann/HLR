@@ -55,7 +55,11 @@ dag_main ( int                  argc,
                   << std::endl;
 
         A = read_matrix( matrixfile );
-        A = impl::matrix::copy( *A ); // for spreading memory usage
+
+        std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
+
+        // for spreading memory usage
+        A = impl::matrix::copy( *A );
     }// else
 
     auto  toc    = Time::Wall::since( tic );

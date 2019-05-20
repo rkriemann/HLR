@@ -118,6 +118,27 @@ void
 run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
+    // uint    max_deps = 0;
+    // uint    avg_deps = 0;
+    // node *  max_node = nullptr;
+    
+    // for ( auto  t : dag.nodes() )
+    // {
+    //     const auto ndeps = t->dep_cnt();
+        
+    //     avg_deps += ndeps;
+
+    //     if ( ndeps > max_deps )
+    //     {
+    //         max_deps = ndeps;
+    //         max_node = t;
+    //     }// if
+    // }// for
+
+    // log( 0, HLIB::to_string( "max dependencies = %d", max_deps ) );
+    // log( 0, HLIB::to_string( "avg dependencies = %.1f", double(avg_deps) / double(dag.nnodes()) ) );
+    // log( 0, "max node : " + max_node->to_string() );
+    
     // holds pending tasks
     std::list< dag::node * >  worklist;
 

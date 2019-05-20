@@ -9,9 +9,9 @@ import os
 
 debug        = False
 warn         = False
-fullmsg      = False
+fullmsg      = True
 
-CXX          = 'g++'
+CXX          = 'icpc'
 CXXFLAGS     = '-std=c++17'
 
 OPTFLAGS     = '-O3 -march=native'
@@ -115,8 +115,8 @@ if 'seq' in FRAMEWORKS :
 
 if 'openmp' in FRAMEWORKS :
     omp = env.Clone()
-    omp.Append( CXXFLAGS  = "-fopenmp" )
-    omp.Append( LINKFLAGS = "-fopenmp" )
+    omp.Append( CXXFLAGS  = "-qopenmp" )
+    omp.Append( LINKFLAGS = "-qopenmp" )
 
     if 'tlr'   in BUILD : omp.Program( 'tlr-omp.cc' )
     if 'hodlr' in BUILD : omp.Program( 'hodlr-omp.cc' )
