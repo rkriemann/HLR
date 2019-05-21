@@ -208,17 +208,18 @@ run ( graph &                  dag,
                 node *  task = nullptr;
 
                 {
+                    std::scoped_lock  wlock( wmtx );
+                        
+                    if ( ! workset.empty() )
+                        task = behead( workset );
+                }
+
+                if ( task == nullptr )
+                {
                     std::unique_lock  lock( cmtx );
 
                     cv.wait_for( lock, std::chrono::microseconds( 10 ) );
-
-                    {
-                        std::scoped_lock  wlock( wmtx );
-                        
-                        if ( ! workset.empty() )
-                            task = behead( workset );
-                    }
-                }
+                }// if
 
                 if ( task == nullptr )
                     continue;
