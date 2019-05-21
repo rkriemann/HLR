@@ -177,13 +177,14 @@ run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
     auto       tic          = Time::Wall::now();
-    node *     final        = nullptr;
-    bool       multiple_end = false;
-    taskmap_t  taskmap;
 
     //
     // ensure only single end node
     //
+    
+    node *     final        = nullptr;
+    bool       multiple_end = false;
+    taskmap_t  taskmap;
     
     if ( dag.end().size() > 1 )
     {
@@ -228,14 +229,14 @@ run ( graph &                  dag,
         }// if
     }// for
 
-    //
-    // run DAG
-    //
-    
     auto  toc = Time::Wall::since( tic );
 
     log( 2, "time for TBB DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 
+    //
+    // run DAG
+    //
+    
     tic = Time::Wall::now();
     
     auto  final_task = taskmap[ final ];
