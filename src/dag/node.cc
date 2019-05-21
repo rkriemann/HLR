@@ -10,6 +10,7 @@
 #include <deque>
 #include <unordered_set>
 
+
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tools.hh"
 #include "hlr/dag/node.hh"
@@ -82,8 +83,8 @@ node::refine ()
 
     _sub_nodes.reserve( g.size() );
 
-    for ( auto  node : g )
-        _sub_nodes.push_back( node );
+    for ( auto  n : g )
+        _sub_nodes.push_back( n );
 }
 
 namespace
@@ -153,8 +154,8 @@ node::refine_deps ()
     {
         locked.push_back( this );
 
-        for ( auto  node : _sub_nodes )
-            locked.push_back( node );
+        for ( auto  sub : _sub_nodes )
+            locked.push_back( sub );
     
         for ( auto  succ : successors() )
         {
@@ -171,9 +172,9 @@ node::refine_deps ()
         locked.sort();
         locked.unique();
     
-        for ( auto  node : locked )
+        for ( auto  n : locked )
         {
-            node->lock();
+            n->lock();
             // log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
         }// for
     }// if
@@ -195,9 +196,9 @@ node::refine_deps ()
     
     if ( lock_nodes )
     {
-         for ( auto  node : locked )
+         for ( auto  n : locked )
          {
-             node->unlock();
+             n->unlock();
              // log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
          }// for
     }// if
@@ -217,35 +218,38 @@ node::refine_loc_deps ()
     // replace successor by refined successors if available
     //
     
-    bool         changed = false;
-    node_list_t  new_out;
-    auto         succ = successors().begin();
-            
-    while ( succ != successors().end() )
+    bool  changed = false;
+
     {
-        if ( (*succ)->is_refined() )
+        node_list_t  new_out;
+        auto         succ = successors().begin();
+            
+        while ( succ != successors().end() )
         {
-            changed = true;
-                
-            // insert succendencies for subnodes (intersection test neccessary???)
-            for ( auto  succ_sub : (*succ)->sub_nodes() )
+            if ( (*succ)->is_refined() )
             {
-                // log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
-                new_out.push_back( succ_sub );
-            }// for
+                changed = true;
+                
+                // insert succendencies for subnodes (intersection test neccessary???)
+                for ( auto  succ_sub : (*succ)->sub_nodes() )
+                {
+                    // log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
+                    new_out.push_back( succ_sub );
+                }// for
 
-            // remove previous succendency
-            succ = successors().erase( succ );
-        }// if
-        else
-            ++succ;
-    }// for
+                // remove previous succendency
+                succ = successors().erase( succ );
+            }// if
+            else
+                ++succ;
+        }// for
 
-    successors().splice( successors().end(), new_out );
+        successors().splice( successors().end(), new_out );
 
-    // remove duplicates
-    successors().sort();
-    successors().unique();
+        // remove duplicates
+        successors().sort();
+        successors().unique();
+    }
     
     //
     // remove direct outgoing edges if reachable otherwise
@@ -256,8 +260,8 @@ node::refine_loc_deps ()
         // restrict search to local nodes and neighbouring nodes
         std::unordered_set< node * >  neighbourhood{ this };
         
-        for ( auto  node : successors() )
-            neighbourhood.insert( node );
+        for ( auto  succ : successors() )
+            neighbourhood.insert( succ );
         
         // now test reachability
         auto  descendants = reachable_indirect( this, neighbourhood );
@@ -294,7 +298,7 @@ node::refine_sub_deps ()
     // add dependencies for all sub nodes to old or refined successors
     //
     
-    for ( auto  node : _sub_nodes )
+    for ( auto  sub : _sub_nodes )
     {
         for ( auto  succ : successors() )
         {
@@ -302,19 +306,19 @@ node::refine_sub_deps ()
             {
                 for ( auto  succ_sub : succ->sub_nodes() )
                 {
-                    if ( is_intersecting( node->out_blocks(), succ_sub->in_blocks() ) )
+                    if ( is_intersecting( sub->out_blocks(), succ_sub->in_blocks() ) )
                     {
-                        // log( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
-                        node->successors().push_back( succ_sub );
+                        // log( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
+                        sub->successors().push_back( succ_sub );
                     }// if
                 }// for
             }// if
             else
             {
-                if ( is_intersecting( node->out_blocks(), succ->in_blocks() ) )
+                if ( is_intersecting( sub->out_blocks(), succ->in_blocks() ) )
                 {
-                    // log( 6, node->to_string() + " ⟶ " + succ->to_string() );
-                    node->successors().push_back( succ );
+                    // log( 6, sub->to_string() + " ⟶ " + succ->to_string() );
+                    sub->successors().push_back( succ );
                 }// if
             }// for
         }// else
@@ -329,32 +333,32 @@ node::refine_sub_deps ()
         std::unordered_set< node * >  neighbourhood;
 
         // restrict search to local nodes and neighbouring nodes
-        for ( auto  node : _sub_nodes )
-            neighbourhood.insert( node );
+        for ( auto  sub : _sub_nodes )
+            neighbourhood.insert( sub );
         
-        for ( auto  node : _successors )
+        for ( auto  succ : _successors )
         {
-            if ( node->is_refined() )
+            if ( succ->is_refined() )
             {
-                for ( auto  node_sub : node->sub_nodes() )
-                    neighbourhood.insert( node_sub );
+                for ( auto  succ_sub : succ->sub_nodes() )
+                    neighbourhood.insert( succ_sub );
             }// if
             else
-                neighbourhood.insert( node );
+                neighbourhood.insert( succ );
         }// for
         
         // now test reachability
-        for ( auto  node : _sub_nodes )
+        for ( auto  sub : _sub_nodes )
         {
-            auto  descendants = reachable_indirect( node, neighbourhood );
+            auto  descendants = reachable_indirect( sub, neighbourhood );
 
             // if a direct edge to otherwise reachable node exists, remove it
-            for ( auto  succ_iter = node->successors().begin(); succ_iter != node->successors().end(); )
+            for ( auto  succ_iter = sub->successors().begin(); succ_iter != sub->successors().end(); )
             {
                 if ( descendants.find( *succ_iter ) != descendants.end() )
                 {
                     // log( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
-                    succ_iter = node->successors().erase( succ_iter );
+                    succ_iter = sub->successors().erase( succ_iter );
                 }// if
                 else
                     ++succ_iter;
@@ -366,10 +370,10 @@ node::refine_sub_deps ()
     // remove duplicates
     //
 
-    for ( auto  node : _sub_nodes )
+    for ( auto  sub : _sub_nodes )
     {
-        node->successors().sort();
-        node->successors().unique();
+        sub->successors().sort();
+        sub->successors().unique();
     }// for
 }
     

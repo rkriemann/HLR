@@ -115,15 +115,7 @@ refine ( node *  root )
 
                 // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
                 std::for_each( del_nodes.begin(), del_nodes.end(),
-                               [] ( node * node )
-                               {
-                                   #pragma omp task firstprivate( node )
-                                   {
-                                       delete node;
-                                   }// omp task
-                               } );
-        
-                #pragma omp taskwait
+                               [] ( node * node ) { delete node; } );
 
                 nodes = std::move( subnodes );
             }// while

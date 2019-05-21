@@ -184,10 +184,13 @@ copy ( const TMatrix &  M )
     // spawn parallel region for tasks
     #pragma omp parallel
     {
-        #pragma omp task
+        #pragma omp single
         {
-            res = copy_task( M );
-        }// omp task
+            #pragma omp task
+            {
+                res = copy_task( M );
+            }// omp task
+        }// omp single
     }// omp parallel
 
     return res;

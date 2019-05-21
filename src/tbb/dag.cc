@@ -91,8 +91,8 @@ refine ( node *  root )
                                   node_dep_refine );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-        ::tbb::parallel_for_each( del_nodes.begin(), del_nodes.end(),
-                                  [] ( node * node ) { delete node; } );
+        std::for_each( del_nodes.begin(), del_nodes.end(),
+                       [] ( node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -102,23 +102,23 @@ refine ( node *  root )
     //
     
     // for ( auto  t : tasks )
-    ::tbb::parallel_do( tasks,
-                        [&] ( node * node )
-                        {
-                            if ( node->dep_cnt() == 0 )
-                            {
-                                std::scoped_lock  lock( mtx );
-                                
-                                start.push_back( node );
-                            }// if
-                            
-                            if ( node->successors().empty() )
-                            {
-                                std::scoped_lock  lock( mtx );
-                                
-                                end.push_back( node );
-                            }// if
-                        } );
+    std::for_each( tasks.begin(), tasks.end(),
+                   [&] ( node * node )
+                   {
+                       if ( node->dep_cnt() == 0 )
+                       {
+                           std::scoped_lock  lock( mtx );
+                           
+                           start.push_back( node );
+                       }// if
+                       
+                       if ( node->successors().empty() )
+                       {
+                           std::scoped_lock  lock( mtx );
+                           
+                           end.push_back( node );
+                       }// if
+                   } );
 
     return graph( tasks, start, end );
 }

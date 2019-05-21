@@ -116,9 +116,41 @@ if not fullmsg :
     env.Replace( CXXCOMSTR  = " C++    $SOURCES" )
     env.Replace( LINKCOMSTR = " Link   $TARGET"  )
 
+if not debug :
+    env.Append(  CPPDEFINES = [ "NDEBUG" ] )
+    
 env.Append(  CPPPATH = [ '#include' ] )
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
+
+######################################################################
+#
+# target "options"
+#
+######################################################################
+
+# def show_options ( target, source, env ):
+#     print() 
+#     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
+#     print()
+#     print( '  Option   │ Description               │ Value' )
+#     print( ' ──────────┼───────────────────────────┼──────' )
+#     print( '  fullmsg  │ full command line output  │', opt_env['fullmsg'] )
+#     print( '  debug    │ debug informations        │', opt_env['debug'] )
+#     print( '  profile  │ profile informations      │', opt_env['profile'] )
+#     print( '  optimise │ compiler optimisation     │', opt_env['optimise'] )
+#     print( '  warn     │ compiler warnings         │', opt_env['warn'] )
+#     print() 
+
+# options_cmd = env.Command( 'phony-target-options', None, show_options )
+
+# env.Alias( 'options', options_cmd )
+
+######################################################################
+#
+# common library and framework dependent targets
+#
+######################################################################
 
 common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/apps/matern_cov.cc',
@@ -141,8 +173,6 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
 
 if 'seq' in FRAMEWORKS :
     seq = env.Clone()
-    if not debug :
-        seq.Append( CPPDEFINES = [ "NDEBUG" ] )
         
     if 'tlr'   in BUILD : seq.Program( 'tlr-seq.cc' )
     if 'hodlr' in BUILD : seq.Program( 'hodlr-seq.cc' )
@@ -157,8 +187,6 @@ if 'openmp' in FRAMEWORKS :
     omp = env.Clone()
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
-    if not debug :
-        omp.Append( CPPDEFINES = [ "NDEBUG" ] )
 
     if 'tlr'   in BUILD : omp.Program( 'tlr-omp.cc' )
     if 'hodlr' in BUILD : omp.Program( 'hodlr-omp.cc' )
@@ -187,8 +215,6 @@ if 'taskflow' in FRAMEWORKS :
     tf = env.Clone()
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
-    if not debug :
-        tf.Append( CPPDEFINES = [ "NDEBUG" ] )
     
     if 'tlr'   in BUILD : tf.Program( 'tlr-tf.cc' )
     if 'hodlr' in BUILD : tf.Program( 'hodlr-tf.cc' )
@@ -221,8 +247,6 @@ if 'hpx' in FRAMEWORKS :
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.Append( LIBS = [ "hpx_iostreams" ] )
-    if not debug :
-        hpx.Append( CPPDEFINES = [ "NDEBUG" ] )
     
     if 'tlr'   in BUILD : hpx.Program( 'tlr-hpx.cc' )
     if 'hodlr' in BUILD : hpx.Program( 'hodlr-hpx.cc' )
@@ -240,29 +264,5 @@ if 'gpi2' in FRAMEWORKS :
     
     if 'tlr'   in BUILD : gpi.Program( 'tlr-gaspi.cc' )
     if 'hodlr' in BUILD : gpi.Program( 'hodlr-gpi.cc' )
-
-
-######################################################################
-#
-# Target: options
-#
-######################################################################
-
-def show_options ( target, source, env ):
-    print() 
-    print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
-    print()
-    print( '  Option   │ Description               │ Value' )
-    print( ' ──────────┼───────────────────────────┼──────' )
-    print( '  fullmsg  │ full command line output  │', opt_env['fullmsg'] )
-    print( '  debug    │ debug informations        │', opt_env['debug'] )
-    print( '  profile  │ profile informations      │', opt_env['profile'] )
-    print( '  optimise │ compiler optimisation     │', opt_env['optimise'] )
-    print( '  warn     │ compiler warnings         │', opt_env['warn'] )
-    print() 
-
-options_cmd = env.Command( 'phony-target-options', None, show_options )
-
-env.Alias( 'options', options_cmd )
 
     

@@ -88,18 +88,18 @@ refine ( node *  root )
 
         // first refine nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                 nodes.begin(), nodes.end(),
-                                 [] ( node * node ) { node->refine(); } );
+                                   nodes.begin(), nodes.end(),
+                                   [] ( node * node ) { node->refine(); } );
 
         // then refine dependencies and collect new nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                 nodes.begin(), nodes.end(),
-                                 node_dep_refine );
+                                   nodes.begin(), nodes.end(),
+                                   node_dep_refine );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                 del_nodes.begin(), del_nodes.end(),
-                                 [] ( node * node ) { delete node; } );
+                                   del_nodes.begin(), del_nodes.end(),
+                                   [] ( node * node ) { delete node; } );
         
         nodes = std::move( subnodes );
     }// while
@@ -109,7 +109,6 @@ refine ( node *  root )
     //
     
     std::for_each( tasks.begin(), tasks.end(),
-        //tbb::parallel_do( tasks,
                    [&] ( node * node )
                    {
                        if ( node->dep_cnt() == 0 )

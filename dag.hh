@@ -94,6 +94,9 @@ dag_main ( int,
         if ( verbose( 3 ) )
             dag.print_dot( "lu.dot" );
 
+        if ( onlydag )
+            return;
+        
         tic = Time::Wall::now();
         
         impl::dag::run( dag, acc );

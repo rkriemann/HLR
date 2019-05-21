@@ -29,7 +29,8 @@ uint    verbosity  = 1;
 bool    noredir    = false;
 string  gridfile   = "";
 string  matrixfile = "";
-    
+bool    onlydag    = false;
+
 void
 parse_cmdline ( int argc, char ** argv )
 {
@@ -56,6 +57,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
         ( "noredir",                      ": do not redirect output (MPI only)" )
+        ( "onlydag",                      ": only compute DAG but do not execute it" )
         ;
 
     //
@@ -101,6 +103,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "matrix"    ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "distr"     ) ) distr      = vm["distr"].as<string>();
     if ( vm.count( "noredir"   ) ) noredir    = true;
+    if ( vm.count( "onlydag"   ) ) onlydag    = true;
 
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
