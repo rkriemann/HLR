@@ -1,4 +1,7 @@
 
+# to enable print() syntax with python2
+from __future__ import print_function
+
 import os
 
 ######################################################################
@@ -7,9 +10,14 @@ import os
 #
 ######################################################################
 
-debug        = True
-warn         = False
 fullmsg      = False
+debug        = False
+profile      = False
+optimise     = True
+warn         = True
+
+# cache file storing SCons settings
+opts_file    = '.scons.options'
 
 CXX          = 'g++'
 CXXFLAGS     = '-std=c++17'
@@ -55,6 +63,28 @@ def readln ( prog ):
 
 ######################################################################
 #
+# eval options
+#
+######################################################################
+
+opts = Variables( opts_file )
+opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
+opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
+opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
+opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
+opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
+
+# read options from options file
+opt_env = Environment( options = opts )
+
+fullmsg  = opt_env['fullmsg']
+debug    = opt_env['debug']
+profile  = opt_env['profile']
+optimise = opt_env['optimise']
+warn     = opt_env['warn']
+
+######################################################################
+#
 # set up compilation environment
 #
 ######################################################################
@@ -64,10 +94,16 @@ if debug :
     LINKFLAGS = '-g'
     DEFINES   = ''
 
+if profile :
+    OPTFLAGS  = '-g -march=native'
+    LINKFLAGS = '-g'
+    DEFINES   = ''
+
 if warn :
     WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
     
-env = Environment( ENV        = os.environ,
+env = Environment( options    = opts,
+                   ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
@@ -104,10 +140,14 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
 #
 
 if 'seq' in FRAMEWORKS :
-    if 'tlr'   in BUILD : env.Program( 'tlr-seq.cc' )
-    if 'hodlr' in BUILD : env.Program( 'hodlr-seq.cc' )
-    if 'tileh' in BUILD : env.Program( 'tileh-seq.cc' )
-    if 'dag'   in BUILD : env.Program( 'dag-seq.cc' )
+    seq = env.Clone()
+    if not debug :
+        seq.Append( CPPDEFINES = [ "NDEBUG" ] )
+        
+    if 'tlr'   in BUILD : seq.Program( 'tlr-seq.cc' )
+    if 'hodlr' in BUILD : seq.Program( 'hodlr-seq.cc' )
+    if 'tileh' in BUILD : seq.Program( 'tileh-seq.cc' )
+    if 'dag'   in BUILD : seq.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
@@ -117,6 +157,8 @@ if 'openmp' in FRAMEWORKS :
     omp = env.Clone()
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
+    if not debug :
+        omp.Append( CPPDEFINES = [ "NDEBUG" ] )
 
     if 'tlr'   in BUILD : omp.Program( 'tlr-omp.cc' )
     if 'hodlr' in BUILD : omp.Program( 'hodlr-omp.cc' )
@@ -143,8 +185,8 @@ if 'tbb' in FRAMEWORKS :
 
 if 'taskflow' in FRAMEWORKS :
     tf = env.Clone()
-    tf.Append( CPPPATH = os.path.join( TASKFLOW_DIR, "include" ) )
-    tf.Append( LIBS    = [ "pthread" ] )
+    tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
+    tf.Append( LIBS = [ "pthread" ] )
     if not debug :
         tf.Append( CPPDEFINES = [ "NDEBUG" ] )
     
@@ -179,6 +221,8 @@ if 'hpx' in FRAMEWORKS :
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.Append( LIBS = [ "hpx_iostreams" ] )
+    if not debug :
+        hpx.Append( CPPDEFINES = [ "NDEBUG" ] )
     
     if 'tlr'   in BUILD : hpx.Program( 'tlr-hpx.cc' )
     if 'hodlr' in BUILD : hpx.Program( 'hodlr-hpx.cc' )
@@ -196,3 +240,29 @@ if 'gpi2' in FRAMEWORKS :
     
     if 'tlr'   in BUILD : gpi.Program( 'tlr-gaspi.cc' )
     if 'hodlr' in BUILD : gpi.Program( 'hodlr-gpi.cc' )
+
+
+######################################################################
+#
+# Target: options
+#
+######################################################################
+
+def show_options ( target, source, env ):
+    print() 
+    print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
+    print()
+    print( '  Option   │ Description               │ Value' )
+    print( ' ──────────┼───────────────────────────┼──────' )
+    print( '  fullmsg  │ full command line output  │', opt_env['fullmsg'] )
+    print( '  debug    │ debug informations        │', opt_env['debug'] )
+    print( '  profile  │ profile informations      │', opt_env['profile'] )
+    print( '  optimise │ compiler optimisation     │', opt_env['optimise'] )
+    print( '  warn     │ compiler warnings         │', opt_env['warn'] )
+    print() 
+
+options_cmd = env.Command( 'phony-target-options', None, show_options )
+
+env.Alias( 'options', options_cmd )
+
+    

@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <cassert>
 #include <deque>
+#include <mutex>
 
 #include <tbb/task.h>
 #include <tbb/parallel_for_each.h>

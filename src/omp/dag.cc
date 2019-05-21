@@ -43,52 +43,92 @@ refine ( node *  root )
     
     std::deque< node * >  nodes;
     std::list< node * >   tasks, start, end;
+    std::mutex            mtx;
     
     nodes.push_back( root );
 
-    while ( ! nodes.empty() )
+    #pragma omp parallel
     {
-        std::deque< node * >  subnodes, del_nodes;
-
-        auto  node_dep_refine = [&] ( node * node )
+        #pragma omp single
         {
-            const bool  node_changed = node->refine_deps();
-
-            if ( node->is_refined() )       // node was refined; collect all sub nodes
+            while ( ! nodes.empty() )
             {
-                for ( auto  sub : node->sub_nodes() )
-                    subnodes.push_back( sub );
-                    
-                del_nodes.push_back( node );
-            }// if
-            else if ( node_changed )        // node was not refined but dependencies were
-            {
-                subnodes.push_back( node );
-            }// if
-            else                            // neither node nor dependencies changed: reached final state
-            {
-                tasks.push_back( node );
+                std::deque< node * >  subnodes, del_nodes;
 
-                // adjust dependency counter of successors (which were NOT refined!)
-                for ( auto  succ : node->successors() )
-                    succ->inc_dep_cnt();
-            }// else
-        };
+                auto  node_dep_refine =
+                    [&] ( node * node )
+                    {
+                        const bool  node_changed = node->refine_deps();
+                        
+                        if ( node->is_refined() )       // node was refined; collect all sub nodes
+                        {
+                            std::scoped_lock  lock( mtx );
+                            
+                            for ( auto  sub : node->sub_nodes() )
+                                subnodes.push_back( sub );
+                            
+                            del_nodes.push_back( node );
+                        }// if
+                        else if ( node_changed )        // node was not refined but dependencies were
+                        {
+                            std::scoped_lock  lock( mtx );
+                            
+                            subnodes.push_back( node );
+                        }// if
+                        else                            // neither node nor dependencies changed: reached final state
+                        {
+                            {
+                                std::scoped_lock  lock( mtx );
+                            
+                                tasks.push_back( node );
+                            }
+                            
+                            // adjust dependency counter of successors (which were NOT refined!)
+                            for ( auto  succ : node->successors() )
+                                succ->inc_dep_cnt();
+                        }// else
+                    };
 
-        // first refine nodes
-        std::for_each( nodes.begin(), nodes.end(),
-                       [] ( node * node ) { node->refine(); } );
+                // first refine nodes
+                std::for_each( nodes.begin(), nodes.end(),
+                               [] ( node * node )
+                               {
+                                   #pragma omp task firstprivate( node )
+                                   {
+                                       node->refine();
+                                   }// omp task
+                               } );
 
-        // then refine dependencies and collect new nodes
-        std::for_each( nodes.begin(), nodes.end(),
-                       node_dep_refine );
+                #pragma omp taskwait
 
-        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-        std::for_each( del_nodes.begin(), del_nodes.end(),
-                       [] ( node * node ) { delete node; } );
+                // then refine dependencies and collect new nodes
+                std::for_each( nodes.begin(), nodes.end(),
+                               [node_dep_refine] ( node * node )
+                               {
+                                   #pragma omp task firstprivate( node )
+                                   {
+                                       node_dep_refine( node );
+                                   }// omp task
+                               } );
+
+                #pragma omp taskwait
+
+                // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+                std::for_each( del_nodes.begin(), del_nodes.end(),
+                               [] ( node * node )
+                               {
+                                   #pragma omp task firstprivate( node )
+                                   {
+                                       delete node;
+                                   }// omp task
+                               } );
         
-        nodes = std::move( subnodes );
-    }// while
+                #pragma omp taskwait
+
+                nodes = std::move( subnodes );
+            }// while
+        }// omp single
+    }// omp parallel
 
     //
     // collect start and end nodes
@@ -115,8 +155,6 @@ void
 run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
-    const int  MAX_DEPS = 15;
-    
     auto tic = Time::Wall::now();
 
     //
@@ -175,16 +213,11 @@ run ( graph &                  dag,
                     cv.wait_for( lock, std::chrono::microseconds( 10 ) );
 
                     {
-                        std::unique_lock  lock( wmtx );
+                        std::scoped_lock  wlock( wmtx );
                         
                         if ( ! workset.empty() )
                             task = behead( workset );
                     }
-
-                    if ( task != nullptr )
-                        std::cout << "work : " << task->to_string() << std::endl;
-                    else
-                        std::cout << "no work" << std::endl;
                 }
 
                 if ( task == nullptr )
@@ -199,13 +232,10 @@ run ( graph &                  dag,
 
                     for ( auto  succ : task->successors() )
                     {
-                        std::cout << "succ : " << succ->to_string() << std::endl;
-                        
                         if ( succ->dec_dep_cnt() == 0 )
                         {
                             std::scoped_lock  lock( wmtx );
 
-                            std::cout << "  into workset" << std::endl;
                             workset.push_back( succ );
                             cv.notify_one();
                         }// if
@@ -256,6 +286,8 @@ run ( graph &                  dag,
     // // loop through nodes and create OpenMP task with dependencies from dep_vecs
     // //
 
+    // const int  MAX_DEPS = 15;
+    
     // tic = Time::Wall::now();
     
     // #pragma omp parallel

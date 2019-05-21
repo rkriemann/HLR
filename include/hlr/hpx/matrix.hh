@@ -135,10 +135,13 @@ copy ( const TMatrix &  M )
                     {
                         if ( BM->block( i, j ) != nullptr )
                         {
-                            auto  B_ij = copy( * BM->block( i, j ) );
+                            tb.run( [BM,B,i,j]
+                                    {
+                                        auto  B_ij = copy( * BM->block( i, j ) );
                             
-                            B_ij->set_parent( B );
-                            B->set_block( i, j, B_ij.release() );
+                                        B_ij->set_parent( B );
+                                        B->set_block( i, j, B_ij.release() );
+                                    } );
                         }// if
                     }// for
                 }// for

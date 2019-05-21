@@ -155,7 +155,7 @@ run_node ( node *             node,
 void
 run_node_dep ( node *             node,
                const TTruncAcc &  acc,
-               dependencies_t     dep )
+               dependencies_t )
 {
     log( 4, "run_node_dep : " + node->to_string() );
     
