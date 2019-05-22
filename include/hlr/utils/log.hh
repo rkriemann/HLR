@@ -38,6 +38,15 @@ log ( const int      lvl,
         std::cout << msg << std::endl;
 }
 
+//
+// logging enabled/disabled via NDEBUG
+//
+#ifdef NDEBUG
+#  define HLR_LOG( lvl, msg ) 
+#else
+#  define HLR_LOG( lvl, msg ) hlr::log( lvl, msg )
+#endif
+
 }// namespace hlr
 
 #endif // __HLR_UTILS_LOG_HH

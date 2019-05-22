@@ -68,6 +68,8 @@ refine ( node *  root )
             }// else
         };
 
+        log( 4, HLIB::to_string( "no. of nodes in refinement step    = %d", nodes.size() ) );
+        
         // first refine nodes
         std::for_each( nodes.begin(), nodes.end(),
                        [] ( node * node ) { node->refine(); } );

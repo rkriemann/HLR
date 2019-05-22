@@ -83,6 +83,8 @@ profile  = opt_env['profile']
 optimise = opt_env['optimise']
 warn     = opt_env['warn']
 
+opts.Save( opts_file, opt_env )
+
 ######################################################################
 #
 # set up compilation environment

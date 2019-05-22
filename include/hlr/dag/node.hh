@@ -13,10 +13,12 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <cassert>
 
 #include <cluster/TIndexSet.hh>
 #include <base/TTruncAcc.hh>
 
+#include "hlr/utils/log.hh"
 #include "hlr/dag/local_graph.hh"
 
 namespace hlr
@@ -108,10 +110,22 @@ public:
     //
     
     // run <this> before <t>
-    void  before   ( node *  t ) { _successors.push_back( t ); }
+    void  before   ( node *  t )
+    {
+        assert( t != nullptr );
+        HLR_LOG( 6, this->to_string() + " → " + t->to_string() );
+                     
+        _successors.push_back( t );
+    }
     
     // run <this> after <t>
-    void  after    ( node *  t ) { t->_successors.push_back( this ); }
+    void  after    ( node *  t )
+    {
+        assert( t != nullptr );
+        HLR_LOG( 6, t->to_string() + " → " + this->to_string() );
+                     
+        t->_successors.push_back( this );
+    }
 
     // return dependency counter
     int   dep_cnt      () const   { return _dep_cnt; }

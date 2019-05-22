@@ -84,3 +84,11 @@ HPX: - HPX has its own set of command line arguments. Arguments for the user pro
        to be provided after "--", e.g., "tlr-hpx -- -n 1024".
      - HPX performs thread affinity setting. Add "-t <n>" to the command line flags where
        *n* is the number of threads, e.g., "tlr-hpx -t 4 -- -n 1024"
+     - CPU core binding is performed with HPX:
+
+         -t 64 --hpx:bind="thread:0-63=core:0-63.pu:0"
+
+       or (really equivalent???)
+
+         htnumactl -N 0,1,2,3,4,5,6,7 -i ./dag-hpx -t 64 --hpx:bind=none
+

@@ -24,10 +24,13 @@ namespace dag
 using namespace HLIB;
 
 // controls edge sparsification
-const bool  sparsify   = true;
+constexpr bool  sparsify        = true;
 
+// default maximal path distance in reachability test
+constexpr int   def_path_length = 2;
+    
 // controls edge sparsification
-const bool  lock_nodes = true;
+constexpr bool  lock_nodes      = true;
 
 //////////////////////////////////////////////
 //
@@ -65,7 +68,7 @@ node::run ( const TTruncAcc & acc )
 void
 node::refine ()
 {
-    log( 5, "refine( " + to_string() + " )" );
+    HLR_LOG( 5, "refine( " + to_string() + " )" );
 
     //
     // create subnodes
@@ -98,7 +101,7 @@ namespace
 std::unordered_set< node * >
 reachable_indirect ( node *                                root,
                      const std::unordered_set< node * > &  neighbourhood = {},
-                     const uint                            steps         = 2 )
+                     const uint                            steps         = def_path_length )
 {
     const bool                    no_neigh = ( neighbourhood.size() == 0 );
     std::deque< node * >          nodes;
@@ -133,7 +136,30 @@ reachable_indirect ( node *                                root,
 
     return descendants;
 }
-                     
+
+//
+// compute reachable nodes from <n> in <neighbourhood> and
+// remove edges (n,m) if m is reachable otherwise
+//
+void
+remove_redundant ( node *                                n,
+                   const std::unordered_set< node * > &  neighbourhood )
+{
+    auto  descendants = reachable_indirect( n, neighbourhood );
+    
+    // if a direct edge to otherwise reachable node exists, remove it
+    for ( auto  succ_iter = n->successors().begin(); succ_iter != n->successors().end(); )
+    {
+        if ( descendants.find( *succ_iter ) != descendants.end() )
+        {
+            HLR_LOG( 6, "  removing " + n->to_string() + " → " + (*succ_iter)->to_string() + " from " + n->to_string() );
+            succ_iter = n->successors().erase( succ_iter );
+        }// if
+        else
+            ++succ_iter;
+    }// for
+}
+
 }// namespace anonymous
 
 //
@@ -175,7 +201,7 @@ node::refine_deps ()
         for ( auto  n : locked )
         {
             n->lock();
-            // log( 6, "locked: " + node->to_string() + " by " + this->to_string() );
+            HLR_LOG( 7, "locked: " + n->to_string() + " by " + this->to_string() );
         }// for
     }// if
 
@@ -199,7 +225,7 @@ node::refine_deps ()
          for ( auto  n : locked )
          {
              n->unlock();
-             // log( 6, "unlocked: " + node->to_string() + " by " + this->to_string() );
+             HLR_LOG( 7, "unlocked: " + n->to_string() + " by " + this->to_string() );
          }// for
     }// if
          
@@ -233,7 +259,7 @@ node::refine_loc_deps ()
                 // insert succendencies for subnodes (intersection test neccessary???)
                 for ( auto  succ_sub : (*succ)->sub_nodes() )
                 {
-                    // log( 6, to_string() + " ⟶ " + succ_sub->to_string() );
+                    HLR_LOG( 6, to_string() + " ⟶ " + succ_sub->to_string() );
                     new_out.push_back( succ_sub );
                 }// for
 
@@ -262,22 +288,8 @@ node::refine_loc_deps ()
         
         for ( auto  succ : successors() )
             neighbourhood.insert( succ );
-        
-        // now test reachability
-        auto  descendants = reachable_indirect( this, neighbourhood );
 
-        // if a direct edge to otherwise reachable node exists, remove it
-        for ( auto  succ_iter = successors().begin(); succ_iter != successors().end(); )
-        {
-            if ( descendants.find( *succ_iter ) != descendants.end() )
-            {
-                // log( 6, "  removing " + to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + to_string() );
-                succ_iter = successors().erase( succ_iter );
-                // node->print();
-            }// if
-            else
-                ++succ_iter;
-        }// for
+        remove_redundant( this, neighbourhood );
     }// if
     
     return changed;
@@ -308,7 +320,7 @@ node::refine_sub_deps ()
                 {
                     if ( is_intersecting( sub->out_blocks(), succ_sub->in_blocks() ) )
                     {
-                        // log( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
+                        HLR_LOG( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
                         sub->successors().push_back( succ_sub );
                     }// if
                 }// for
@@ -317,7 +329,7 @@ node::refine_sub_deps ()
             {
                 if ( is_intersecting( sub->out_blocks(), succ->in_blocks() ) )
                 {
-                    // log( 6, sub->to_string() + " ⟶ " + succ->to_string() );
+                    HLR_LOG( 6, sub->to_string() + " → " + succ->to_string() );
                     sub->successors().push_back( succ );
                 }// if
             }// for
@@ -330,12 +342,38 @@ node::refine_sub_deps ()
     
     if ( sparsify )
     {
+        #if 0
+
+        //
+        // search for each sub node individually (less code, slightly slower)
+        //
+        
+        for ( auto  sub : _sub_nodes )
+        {
+            std::unordered_set< node * >  neighbourhood;
+
+            neighbourhood.insert( sub );
+
+            for ( auto  succ : sub->successors() )
+                neighbourhood.insert( succ );
+
+            remove_redundant( sub, neighbourhood );
+        }// for
+        
+        #else
+        
+        //
+        // build common neighbourhood and then sparsify for each node (more code, slightly faster)
+        //
+        
         std::unordered_set< node * >  neighbourhood;
 
-        // restrict search to local nodes and neighbouring nodes
         for ( auto  sub : _sub_nodes )
             neighbourhood.insert( sub );
-        
+
+        // go through local successors and their sub nodes instead of
+        // successors of own sub nodes for efficiency (successor sets 
+        // of sub nodes are not disjoint)
         for ( auto  succ : _successors )
         {
             if ( succ->is_refined() )
@@ -346,24 +384,15 @@ node::refine_sub_deps ()
             else
                 neighbourhood.insert( succ );
         }// for
-        
-        // now test reachability
-        for ( auto  sub : _sub_nodes )
-        {
-            auto  descendants = reachable_indirect( sub, neighbourhood );
 
-            // if a direct edge to otherwise reachable node exists, remove it
-            for ( auto  succ_iter = sub->successors().begin(); succ_iter != sub->successors().end(); )
-            {
-                if ( descendants.find( *succ_iter ) != descendants.end() )
-                {
-                    // log( 6, "  removing " + node->to_string() + " ⟶ " + (*succ_iter)->to_string() + " from " + node->to_string() );
-                    succ_iter = sub->successors().erase( succ_iter );
-                }// if
-                else
-                    ++succ_iter;
-            }// for
-        }// for
+        //
+        // now remove redundant edges
+        //
+        
+        for ( auto  sub : _sub_nodes )
+            remove_redundant( sub, neighbourhood );
+        
+        #endif
     }// if
 
     //
