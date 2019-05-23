@@ -86,26 +86,20 @@ refine ( node *  root )
                     };
 
                 // first refine nodes
-                std::for_each( nodes.begin(), nodes.end(),
-                               [] ( node * node )
-                               {
-                                   #pragma omp task firstprivate( node )
-                                   {
-                                       node->refine();
-                                   }// omp task
-                               } );
+                #pragma omp taskloop
+                for ( size_t  i = 0; i < nodes.size(); ++i )
+                {
+                    nodes[i]->refine();
+                }// for
 
                 #pragma omp taskwait
 
                 // then refine dependencies and collect new nodes
-                std::for_each( nodes.begin(), nodes.end(),
-                               [node_dep_refine] ( node * node )
-                               {
-                                   #pragma omp task firstprivate( node )
-                                   {
-                                       node_dep_refine( node );
-                                   }// omp task
-                               } );
+                #pragma omp taskloop
+                for ( size_t  i = 0; i < nodes.size(); ++i )
+                {
+                    node_dep_refine( nodes[i] );
+                }// for
 
                 #pragma omp taskwait
 
