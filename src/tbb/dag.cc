@@ -11,7 +11,7 @@
 #include <deque>
 
 #include <tbb/task.h>
-#include <tbb/parallel_for_each.h>
+#include <tbb/parallel_for.h>
 #include <tbb/mutex.h>
 
 #include "hlr/utils/log.hh"
@@ -47,48 +47,53 @@ refine ( node *  root )
     {
         std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( node * node )
-        {
-            const bool  node_changed = node->refine_deps();
-
-            if ( node->is_refined() )       // node was refined; collect all sub nodes
-            {
-                ::tbb::mutex::scoped_lock  lock( mtx );
-                    
-                for ( auto  sub : node->sub_nodes() )
-                    subnodes.push_back( sub );
-                    
-                del_nodes.push_back( node );
-            }// if
-            else if ( node_changed )        // node was not refined but dependencies were
-            {
-                ::tbb::mutex::scoped_lock  lock( mtx );
-                    
-                subnodes.push_back( node );
-            }// if
-            else                            // neither node nor dependencies changed: reached final state
-            {
-                // adjust dependency counter of successors (which were NOT refined!)
-                for ( auto  succ : node->successors() )
-                    succ->inc_dep_cnt();
-
-                ::tbb::mutex::scoped_lock  lock( mtx );
-                    
-                tasks.push_back( node );
-            }// else
-        };
-
         // first refine nodes
-        ::tbb::parallel_for_each( nodes.begin(), nodes.end(),
-                                  [] ( node * node ) { node->refine(); } );
+        ::tbb::parallel_for< size_t >( 0, nodes.size(),
+                                       [&nodes] ( const size_t  i )
+                                       {
+                                           nodes[i]->refine();
+                                       } );
 
         // then refine dependencies and collect new nodes
-        ::tbb::parallel_for_each( nodes.begin(), nodes.end(),
-                                  node_dep_refine );
+        ::tbb::parallel_for< size_t >( 0, nodes.size(),
+                                       [&] ( const size_t  i )
+                                       {
+                                           auto        node         = nodes[i];
+                                           const bool  node_changed = node->refine_deps();
+
+                                           if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                           {
+                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                    
+                                               for ( auto  sub : node->sub_nodes() )
+                                                   subnodes.push_back( sub );
+                    
+                                               del_nodes.push_back( node );
+                                           }// if
+                                           else if ( node_changed )        // node was not refined but dependencies were
+                                           {
+                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                    
+                                               subnodes.push_back( node );
+                                           }// if
+                                           else                            // neither node nor dependencies changed: reached final state
+                                           {
+                                               // adjust dependency counter of successors (which were NOT refined!)
+                                               for ( auto  succ : node->successors() )
+                                                   succ->inc_dep_cnt();
+
+                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                    
+                                               tasks.push_back( node );
+                                           }// else
+                                       } );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         std::for_each( del_nodes.begin(), del_nodes.end(),
-                       [] ( node * node ) { delete node; } );
+                       [] ( node * node )
+                       {
+                           delete node;
+                       } );
 
         nodes = std::move( subnodes );
     }// while

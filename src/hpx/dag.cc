@@ -51,46 +51,47 @@ refine ( node *  root )
     {
         std::deque< node * >  subnodes, del_nodes;
 
-        auto  node_dep_refine = [&] ( node * node )
-        {
-            const bool  node_changed = node->refine_deps();
-
-            if ( node->is_refined() )       // node was refined; collect all sub nodes
-            {
-                std::scoped_lock  lock( mtx );
-                    
-                for ( auto  sub : node->sub_nodes() )
-                    subnodes.push_back( sub );
-                    
-                del_nodes.push_back( node );
-            }// if
-            else if ( node_changed )        // node was not refined but dependencies were
-            {
-                std::scoped_lock  lock( mtx );
-                    
-                subnodes.push_back( node );
-            }// if
-            else                            // neither node nor dependencies changed: reached final state
-            {
-                // adjust dependency counter of successors (which were NOT refined!)
-                for ( auto  succ : node->successors() )
-                    succ->inc_dep_cnt();
-
-                std::scoped_lock  lock( mtx );
-                    
-                tasks.push_back( node );
-            }// else
-        };
-
         // first refine nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                    nodes.begin(), nodes.end(),
-                                   [] ( node * node ) { node->refine(); } );
+                                   [] ( node * node )
+                                   {
+                                       node->refine();
+                                   } );
 
         // then refine dependencies and collect new nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                    nodes.begin(), nodes.end(),
-                                   node_dep_refine );
+                                   [&] ( node * node )
+                                   {
+                                       const bool  node_changed = node->refine_deps();
+
+                                       if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                       {
+                                           std::scoped_lock  lock( mtx );
+                    
+                                           for ( auto  sub : node->sub_nodes() )
+                                               subnodes.push_back( sub );
+                    
+                                           del_nodes.push_back( node );
+                                       }// if
+                                       else if ( node_changed )        // node was not refined but dependencies were
+                                       {
+                                           std::scoped_lock  lock( mtx );
+                    
+                                           subnodes.push_back( node );
+                                       }// if
+                                       else                            // neither node nor dependencies changed: reached final state
+                                       {
+                                           // adjust dependency counter of successors (which were NOT refined!)
+                                           for ( auto  succ : node->successors() )
+                                               succ->inc_dep_cnt();
+
+                                           std::scoped_lock  lock( mtx );
+                    
+                                           tasks.push_back( node );
+                                       }// else
+                                   } );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
