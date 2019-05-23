@@ -43,11 +43,9 @@ refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< node * >  nodes;
+    std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
     std::mutex            mtx;
-    
-    nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {
@@ -74,15 +72,13 @@ refine ( node *  root )
             }// if
             else                            // neither node nor dependencies changed: reached final state
             {
-                {
-                    std::scoped_lock  lock( mtx );
-                    
-                    tasks.push_back( node );
-                }
-
                 // adjust dependency counter of successors (which were NOT refined!)
                 for ( auto  succ : node->successors() )
                     succ->inc_dep_cnt();
+
+                std::scoped_lock  lock( mtx );
+                    
+                tasks.push_back( node );
             }// else
         };
 
@@ -112,18 +108,10 @@ refine ( node *  root )
                    [&] ( node * node )
                    {
                        if ( node->dep_cnt() == 0 )
-                       {
-                           std::scoped_lock  lock( mtx );
-                           
                            start.push_back( node );
-                       }// if
                        
                        if ( node->successors().empty() )
-                       {
-                           std::scoped_lock  lock( mtx );
-                           
                            end.push_back( node );
-                       }// if
                    } );
 
     return graph( tasks, start, end );

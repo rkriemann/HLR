@@ -22,6 +22,8 @@ syntax: glob
 .hlibpro.conf
 hlibpro
 
+.hpx.ini
+
 machines.gpi
 
 # now some special things

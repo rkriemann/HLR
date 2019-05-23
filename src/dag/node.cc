@@ -24,13 +24,19 @@ namespace dag
 using namespace HLIB;
 
 // controls edge sparsification
-constexpr bool  sparsify        = true;
+constexpr bool         sparsify     = true;
 
 // default maximal path distance in reachability test
-constexpr int   def_path_length = 2;
+constexpr int          def_path_len = 2;
     
 // controls edge sparsification
-constexpr bool  lock_nodes      = true;
+constexpr bool         lock_nodes   = true;
+
+// activates collision counting
+constexpr bool         count_coll   = true;
+
+// counter for lock collisions
+std::atomic< size_t >  collisions;
 
 //////////////////////////////////////////////
 //
@@ -101,7 +107,7 @@ namespace
 std::unordered_set< node * >
 reachable_indirect ( node *                                root,
                      const std::unordered_set< node * > &  neighbourhood = {},
-                     const uint                            steps         = def_path_length )
+                     const uint                            steps         = def_path_len )
 {
     const bool                    no_neigh = ( neighbourhood.size() == 0 );
     std::deque< node * >          nodes;
@@ -200,7 +206,17 @@ node::refine_deps ()
     
         for ( auto  n : locked )
         {
-            n->lock();
+            if ( count_coll )
+            {
+                if ( ! n->try_lock() )
+                {
+                    ++collisions;
+                    n->lock();
+                }// if
+            }// if
+            else
+                n->lock();
+            
             HLR_LOG( 7, "locked: " + n->to_string() + " by " + this->to_string() );
         }// for
     }// if

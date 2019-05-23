@@ -34,10 +34,8 @@ refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< node * >  nodes;
+    std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
-    
-    nodes.push_back( root );
 
     while ( ! nodes.empty() )
     {

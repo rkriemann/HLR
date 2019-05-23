@@ -185,8 +185,9 @@ public:
     // mutex functions
     //
 
-    void lock   () { _mutex.lock(); }
-    void unlock () { _mutex.unlock(); }
+    void lock      () { _mutex.lock(); }
+    void unlock    () { _mutex.unlock(); }
+    bool try_lock  () { return _mutex.try_lock(); }
 
     //
     // output and visualization

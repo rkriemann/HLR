@@ -42,7 +42,7 @@ hlrmain ( int argc, char ** argv )
             CFG::set_nthreads( nthreads );
 
         if      ( appl == "logkernel"  ) mymain< hlr::apps::log_kernel >( argc, argv );
-        else if ( appl == "matern"     ) mymain< hlr::apps::matern_cov >( argc, argv );
+        else if ( appl == "materncov"  ) mymain< hlr::apps::matern_cov >( argc, argv );
         else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
             throw "unknown application";

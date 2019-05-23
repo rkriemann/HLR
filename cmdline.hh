@@ -105,6 +105,32 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "noredir"   ) ) noredir    = true;
     if ( vm.count( "onlydag"   ) ) onlydag    = true;
 
+    if ( appl == "help" )
+    {
+        std::cout << "Applications:" << std::endl
+                  << "  - logkernel  : 1D integral equation over [0,1] with log |x-y| kernel;" << std::endl
+                  << "                 n defines number of DoFs" << std::endl
+                  << "  - materncov  : Matérn covariance over given number of spatial points;" << std::endl
+                  << "                 if grid is defined, use grid points otherwise n random points in 3D" << std::endl
+                  << "  - laplaceslp : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( gridfile == "help" )
+    {
+        std::cout << "Internal Grids:" << std::endl
+                  << "  - sphere, sphere2 : spherical grid with radius 1 (different initial grid)" << std::endl
+                  << "  - cube            : unit cube" << std::endl
+                  << "  - square          : unit square in 3D" << std::endl
+                  << std::endl
+                  << "Refinement level l is defined by appending \"-l\", e.g. sphere-3" << std::endl
+                  << std::endl
+                  << "If grid is not an internal grid, it is assumed to be a file name" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }

@@ -41,11 +41,9 @@ refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< node * >  nodes;
+    std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
     std::mutex            mtx;
-    
-    nodes.push_back( root );
 
     #pragma omp parallel
     {
@@ -77,15 +75,13 @@ refine ( node *  root )
                         }// if
                         else                            // neither node nor dependencies changed: reached final state
                         {
-                            {
-                                std::scoped_lock  lock( mtx );
-                            
-                                tasks.push_back( node );
-                            }
-                            
                             // adjust dependency counter of successors (which were NOT refined!)
                             for ( auto  succ : node->successors() )
                                 succ->inc_dep_cnt();
+
+                            std::scoped_lock  lock( mtx );
+                            
+                            tasks.push_back( node );
                         }// else
                     };
 
@@ -126,7 +122,6 @@ refine ( node *  root )
     // collect start and end nodes
     //
     
-    // for ( auto  t : tasks )
     std::for_each( tasks.begin(), tasks.end(),
                    [&] ( node * node )
                    {

@@ -10,6 +10,12 @@
 #include "hlr/cluster/h.hh"
 #include "hlr/dag/lu.hh"
 
+namespace hlr { namespace dag {
+
+extern std::atomic< size_t >  collisions;
+
+} }// namespace hlr::dag
+
 //
 // main function
 //
@@ -45,12 +51,14 @@ dag_main ( int,
         auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+
+        if ( A->nrows() != n )
+            std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     }// if
     else
     {
         std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
                   << "    matrix = " << matrixfile
-                  << ( eps > 0 ? HLIB::to_string( ", ε = %.2e", eps ) : HLIB::to_string( ", k = %d", k ) )
                   << std::endl;
 
         A = read_matrix( matrixfile );
@@ -74,7 +82,8 @@ dag_main ( int,
     }// if
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG " << name << " )" << term::reset << std::endl;
+        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG " << name
+                  << ", " << acc.to_string() << " )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
@@ -89,6 +98,7 @@ dag_main ( int,
             std::cout << "  dag in      " << toc << std::endl;
             std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
             std::cout << "    #edges  = " << dag.nedges() << std::endl;
+            std::cout << "    #coll   = " << hlr::dag::collisions << std::endl;
         }// if
         
         if ( verbose( 3 ) )
