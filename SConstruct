@@ -14,7 +14,7 @@ fullmsg      = False
 debug        = False
 profile      = False
 optimise     = True
-warn         = True
+warn         = False
 
 # cache file storing SCons settings
 opts_file    = '.scons.options'
@@ -25,7 +25,7 @@ CXXFLAGS     = '-std=c++17'
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
-DEFINES      = ''
+DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # set of programs to build: dag, tlr, hodlr, tileh
 BUILD        = [ 'dag' ]
@@ -34,11 +34,13 @@ BUILD        = [ 'dag' ]
 FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx' ]
 
 # directories for the various external libraries
-HPRO_DIR     = 'hlibpro'
+HPRO_DIR     = '/home/rok/programming/hlibpro/main'
 TBB_DIR      = '/usr'
 TASKFLOW_DIR = '/opt/local/cpp-taskflow'
 HPX_DIR      = '/opt/local/hpx'
 GPI2_DIR     = '/opt/local/gpi2'
+
+JEMALLOC_DIR = '/opt/local/jemalloc/5.0.1'
 
 ######################################################################
 #
@@ -97,8 +99,8 @@ if debug :
     DEFINES   = ''
 
 if profile :
-    OPTFLAGS  = '-g -march=native'
-    LINKFLAGS = '-g'
+    OPTFLAGS  = '-g -pg -O3 -march=native'
+    LINKFLAGS = '-g -pg'
     DEFINES   = ''
 
 if warn :
@@ -124,6 +126,9 @@ if not debug :
 env.Append(  CPPPATH = [ '#include' ] )
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
+
+if JEMALLOC_DIR != '' :
+    env.Append( LINKFLAGS = os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
 
 ######################################################################
 #

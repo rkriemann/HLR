@@ -95,7 +95,7 @@ dag_main ( int,
 
         if ( verbose( 2 ) )
         {
-            std::cout << "  dag in      " << toc << std::endl;
+            std::cout << "  dag in      " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
             std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
             std::cout << "    #edges  = " << dag.nedges() << std::endl;
             std::cout << "    #coll   = " << hlr::dag::collisions << std::endl;
