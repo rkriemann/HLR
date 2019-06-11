@@ -13,13 +13,9 @@
 
 #include "hlr/cluster/hodlr.hh"
 
-namespace hlr
-{
+namespace hlr { namespace cluster { namespace hodlr {
 
 using namespace HLIB;
-
-namespace hodlr
-{
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -47,6 +43,4 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace hodlr
-
-}// namespace hlr
+}}}// namespace hlr::cluster::hodlr

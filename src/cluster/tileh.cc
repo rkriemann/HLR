@@ -15,13 +15,9 @@
 
 #include "hlr/cluster/tileh.hh"
 
-namespace hlr
-{
+namespace hlr { namespace cluster { namespace tileh {
 
 using namespace HLIB;
-
-namespace tileh
-{
 
 namespace
 {
@@ -135,6 +131,4 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace tileh
-
-}// namespace hlr
+}}}// namespace hlr::cluster::tileh

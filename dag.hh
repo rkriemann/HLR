@@ -8,6 +8,7 @@
 
 #include "common.inc"
 #include "hlr/cluster/h.hh"
+#include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 
 namespace hlr { namespace dag {
@@ -35,8 +36,8 @@ dag_main ( int,
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = h::cluster( coord.get(), ntile );
-        auto  bct     = h::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::h::cluster( coord.get(), ntile );
+        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
         if ( verbose( 3 ) )
         {
@@ -57,7 +58,7 @@ dag_main ( int,
     }// if
     else
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
                   << "    matrix = " << matrixfile
                   << std::endl;
 
@@ -80,9 +81,15 @@ dag_main ( int,
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
+
+    {
+        std::cout << term::bullet << term::bold << "Level Sets" << term::reset << std::endl;
+
+        auto  L = matrix::construct_lvlhier( *A );
+    }
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( DAG " << name
+        std::cout << term::bullet << term::bold << "LU ( DAG " << name
                   << ", " << acc.to_string() << " )" << term::reset << std::endl;
         
         auto  C = A->copy();

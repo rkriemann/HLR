@@ -13,11 +13,7 @@
 
 #include "hlr/cluster/h.hh"
 
-namespace hlr
-{
-
-namespace h
-{
+namespace hlr { namespace cluster { namespace h {
 
 using namespace HLIB;
 
@@ -47,6 +43,4 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace h
-
-}// namespace hlr
+}}}// namespace hlr::cluster::h

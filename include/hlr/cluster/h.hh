@@ -12,11 +12,7 @@
 #include <cluster/TClusterTree.hh>
 #include <cluster/TBlockClusterTree.hh>
 
-namespace hlr
-{
-
-namespace h
-{
+namespace hlr { namespace cluster { namespace h {
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -32,8 +28,6 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct );
 
-}// namespace h
-
-}// namespace hlr
+}}}// namespace hlr::cluster::h
 
 #endif // __HLR_CLUSTER_H_HH

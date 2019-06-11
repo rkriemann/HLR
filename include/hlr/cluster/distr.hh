@@ -1,7 +1,7 @@
-#ifndef __HLR_DISTR_HH
-#define __HLR_DISTR_HH
+#ifndef __HLR_CLUSTER_DISTR_HH
+#define __HLR_CLUSTER_DISTR_HH
 //
-// Project     : HLR-HPC
+// Project     : HLR
 // File        : distr.cc
 // Description : cluster tree distribution functions
 // Author      : Ronald Kriemann
@@ -10,11 +10,7 @@
 
 #include <cluster/TBlockCluster.hh>
 
-namespace hlr
-{
-
-namespace distribution
-{
+namespace hlr { namespace cluster { namespace distribution {
 
 //
 // assigns 2d cyclic distribution
@@ -30,8 +26,6 @@ void
 shifted_cyclic_1d ( const uint             nprocs,
                     HLIB::TBlockCluster *  bct );
 
-}// namespace distribution
-
-}// namespace hlr
+}}}// namespace hlr::cluster::distribution
 
 #endif  // __HLR_DISTR_HH

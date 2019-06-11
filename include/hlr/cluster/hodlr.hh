@@ -1,7 +1,7 @@
 #ifndef __HLR_CLUSTER_HODLR_HH
 #define __HLR_CLUSTER_HODLR_HH
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr.hh
 // Description : HODLR related clustering functions
 // Author      : Ronald Kriemann
@@ -12,11 +12,7 @@
 #include <cluster/TClusterTree.hh>
 #include <cluster/TBlockClusterTree.hh>
 
-namespace hlr
-{
-
-namespace hodlr
-{
+namespace hlr { namespace cluster { namespace hodlr {
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -32,8 +28,6 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct );
 
-}// namespace hodlr
-
-}// namespace hlr
+}}}// namespace hlr::cluster::hodlr
 
 #endif // __HLR_CLUSTER_HODLR_HH

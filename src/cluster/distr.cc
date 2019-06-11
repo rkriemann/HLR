@@ -11,13 +11,9 @@
 
 #include "hlr/utils/tensor.hh"
 
-#include "hlr/mpi/distr.hh"
+#include "hlr/cluster/distr.hh"
 
-namespace hlr
-{
-
-namespace distribution
-{
+namespace hlr { namespace cluster { namespace distribution {
 
 using namespace HLIB;
 
@@ -218,6 +214,4 @@ shifted_cyclic_1d ( const uint       nprocs,
             blocks2d( i, j )->set_procs( ps_single( ( j + i ) % nprocs ), true );
 }
 
-}// namespace distribution
-
-}// namespace hlr
+}}}// namespace hlr::cluster::distribution

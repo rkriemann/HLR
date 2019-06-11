@@ -13,13 +13,9 @@
 
 #include "hlr/cluster/tlr.hh"
 
-namespace hlr
-{
+namespace hlr { namespace cluster { namespace tlr {
 
 using namespace HLIB;
-
-namespace tlr
-{
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -47,6 +43,4 @@ blockcluster ( HLIB::TClusterTree *  rowct,
     return bct_builder.build( rowct, colct, & adm_cond );
 }
 
-}// namespace tlr
-
-}// namespace hlr
+}}}// namespace hlr::cluster::tlr

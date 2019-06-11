@@ -34,7 +34,7 @@ BUILD        = [ 'dag' ]
 FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx' ]
 
 # directories for the various external libraries
-HPRO_DIR     = '/home/rok/programming/hlibpro/main'
+HPRO_DIR     = 'hlibpro'
 TBB_DIR      = '/usr'
 TASKFLOW_DIR = '/opt/local/cpp-taskflow'
 HPX_DIR      = '/opt/local/hpx'
@@ -162,6 +162,7 @@ if JEMALLOC_DIR != '' :
 common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/apps/matern_cov.cc',
                                         'src/apps/laplace.cc',
+                                        'src/cluster/distr.cc',
                                         'src/cluster/h.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',
@@ -170,7 +171,7 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/dag/local_graph.cc',
                                         'src/dag/node.cc',
                                         'src/dag/lu.cc',
-                                        'src/mpi/distr.cc',
+                                        'src/matrix/level_matrix.cc',
                                         'src/seq/dag.cc',
                                         'src/utils/compare.cc' ] )
 

@@ -1,7 +1,7 @@
 #ifndef __HLR_CLUSTER_TILEH_HH
 #define __HLR_CLUSTER_TILEH_HH
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh.hh
 // Description : TileH related clustering functions
 // Author      : Ronald Kriemann
@@ -12,11 +12,7 @@
 #include <cluster/TClusterTree.hh>
 #include <cluster/TBlockClusterTree.hh>
 
-namespace hlr
-{
-
-namespace tileh
-{
+namespace hlr { namespace cluster { namespace tileh {
 
 //
 // cluster set of coordinates with minimal block size <ntile>
@@ -34,8 +30,6 @@ std::unique_ptr< HLIB::TBlockClusterTree >
 blockcluster ( HLIB::TClusterTree *  rowct,
                HLIB::TClusterTree *  colct );
 
-}// namespace tileh
-
-}// namespace hlr
+}}}// namespace hlr::cluster::tileh
 
 #endif // __HLR_CLUSTER_TILEH_HH

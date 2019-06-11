@@ -434,6 +434,14 @@ namespace termcolor
         return stream;
     }
 
+    inline
+    std::ostream& bullet(std::ostream& stream)
+    {
+        stream << yellow << bold << "∙ " << reset;
+
+        return stream;
+    }
+
 
 
     //! Since C++ hasn't a way to hide something in the header from
