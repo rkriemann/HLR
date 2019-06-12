@@ -10,6 +10,7 @@
 #include "hlr/cluster/h.hh"
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
+#include "hlr/arith/lu.hh"
 
 namespace hlr { namespace dag {
 
@@ -86,6 +87,8 @@ dag_main ( int,
         std::cout << term::bullet << term::bold << "Level Sets" << term::reset << std::endl;
 
         auto  L = matrix::construct_lvlhier( *A );
+
+        hlr::arith::lu( *( L[0] ), acc );
     }
     
     {

@@ -8,7 +8,7 @@
 
 #include <iostream>
 #include <list>
-#include <unordered_set>
+#include <unordered_map>
 
 #include <matrix/structure.hh>
 
@@ -37,7 +37,7 @@ struct hash< HLIB::TIndexSet >
 namespace hlr { namespace matrix {
 
 using std::list;
-using std::unordered_set;
+using std::unordered_map;
 
 using namespace HLIB;
 
@@ -76,11 +76,13 @@ level_matrix::level_matrix ( const uint         nrows,
 // construct set of level matrices for given H-matrix
 // - do BFS in A and create level matrices starting at first level with leaves
 //
-std::unique_ptr< level_matrix >
+std::vector< std::shared_ptr< level_matrix > >
 construct_lvlhier ( TMatrix &  A )
 {
     list< TMatrix * >  matrices{ & A };
     bool               reached_leaves = ! is_blocked( A );
+    auto               L_hier = list< std::shared_ptr< level_matrix > >{};
+    auto               L_prev = std::shared_ptr< level_matrix >{};
 
     while ( ! matrices.empty() )
     {
@@ -97,7 +99,7 @@ construct_lvlhier ( TMatrix &  A )
             //
 
             list< TIndexSet >  rowis, colis;
-            uint               nrowis, ncolis;
+            uint               nrowis = 0, ncolis = 0;
 
             for ( auto  M : matrices )
             {
@@ -114,11 +116,50 @@ construct_lvlhier ( TMatrix &  A )
                 }// if
             }// for
 
+            //
+            // set up index positions of row/col indexsets
+            //
+            
+            unordered_map< TIndexSet, uint >  rowmap, colmap;
+            
             rowis.sort( cmp_is );
             colis.sort( cmp_is );
 
             std::cout << "rowis : " << to_string( rowis ) << std::endl;
             std::cout << "colis : " << to_string( colis ) << std::endl;
+            
+            uint  pos = 0;
+            
+            for ( auto  is : rowis )
+                rowmap[ is ] = pos++;
+
+            pos = 0;
+            
+            for ( auto  is : colis )
+                colmap[ is ] = pos++;
+
+            //
+            // construct level matrix
+            //
+
+            auto  L = std::make_shared< level_matrix >( nrowis, ncolis, A.row_is(), A.col_is() );
+
+            for ( auto  M : matrices )
+            {
+                const auto  i = rowmap[ M->row_is() ];
+                const auto  j = colmap[ M->col_is() ];
+
+                L->set_block( i, j, M );
+            }// for
+
+            L_hier.push_back( L );
+            
+            L->set_above( L_prev );
+            
+            if ( L_prev.get() != nullptr )
+                L_prev->set_below( L );
+
+            L_prev = L;
         }// if
         
         ////////////////////////////////////////////////////
@@ -158,7 +199,18 @@ construct_lvlhier ( TMatrix &  A )
         matrices = std::move( subs );
     }// while
 
-    return nullptr;
+    //
+    // convert list to vector
+    //
+
+    std::vector< std::shared_ptr< level_matrix > >  L_vec;
+
+    L_vec.reserve( L_hier.size() );
+
+    for ( auto  L : L_hier )
+        L_vec.push_back( L );
+    
+    return L_vec;
 }
 
 }}// namespace hlr::matrix

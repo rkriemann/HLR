@@ -15,45 +15,37 @@ namespace hlr
 //! return true, if pointer is null
 //!
 template < typename T >
-bool
-is_null ( T *  p ) noexcept
-{
-    return (p == nullptr);
-}
+bool is_null      ( T *  p )               noexcept { return (p == nullptr); }
 
-//!
-//! return true, if all given pointers are null
-//!
 template < typename T >
-bool
-is_null_all  ( T *  p ) noexcept
-{
-    return is_null( p );
-}
+bool is_null_all  ( T *  p )               noexcept { return is_null( p ); }
 
 template < typename T1, typename... T2 >
-bool
-is_null_all  ( T1 *  p, T2...  ptrs )
-{
-    return is_null( p ) && is_null_all( ptrs... );
-}
+bool is_null_all  ( T1 *  p, T2...  ptrs ) noexcept { return is_null( p ) && is_null_all( ptrs... ); }
 
-//!
-//! return true, if any given matrix pointers is null
-//!
 template < typename T >
-bool
-is_null_any  ( T *  p ) noexcept
-{
-    return is_null( p );
-}
+bool is_null_any  ( T *  p )               noexcept { return is_null( p ); }
 
 template < typename T1, typename... T2 >
-bool
-is_null_any  ( T1 *  p, T2...  ptrs )
-{
-    return is_null( p ) || is_null_any( ptrs... );
-}
+bool is_null_any  ( T1 *  p, T2...  ptrs ) noexcept { return is_null( p ) || is_null_any( ptrs... ); }
+
+//
+// return true if A is corresponding to leaf matrix block
+//
+template < typename T >
+bool is_leaf      ( T *  A )               noexcept { return ! is_null( A ) && ! A->is_blocked(); }
+
+template < typename T >
+bool is_leaf_any  ( T *  A )               noexcept { return is_leaf( A ); }
+
+template < typename T1, typename... T2 >
+bool is_leaf_any  ( T1 *  A, T2...  mtrs ) noexcept { return is_leaf( A ) || is_leaf_any( mtrs... ); }
+
+template < typename T >
+bool is_leaf_all  ( T *  A )               noexcept { return is_leaf( A ); }
+
+template < typename T1, typename... T2 >
+bool is_leaf_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_leaf( A ) && is_leaf_all( mtrs... ); }
 
 }// namespace hlr
 
