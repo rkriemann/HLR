@@ -8,6 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <cassert>
 #include <memory>
 #include <vector>
 
@@ -49,6 +50,28 @@ public:
     void  set_above ( std::shared_ptr< level_matrix > &  M ) { _above = M; }
     void  set_below ( std::shared_ptr< level_matrix > &  M ) { _below = M; }
 
+    //
+    // index functions
+    //
+
+    // return block row/column of A
+    std::pair< uint, uint >
+    get_index ( const TMatrix &  A ) const
+    {
+        for ( uint  i = 0; i < nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < nblock_cols(); ++j )
+            {
+                auto  A_ij = block( i, j );
+                
+                if ( A_ij == & A )
+                    return { i, j };
+            }// for
+        }// for
+
+        return { nblock_rows(), nblock_cols() };
+    }
+    
     //
     // RTTI
     //
