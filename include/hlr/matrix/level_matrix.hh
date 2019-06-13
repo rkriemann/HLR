@@ -35,6 +35,8 @@ public:
     // ctor
     //
 
+    level_matrix () {}
+    
     level_matrix ( const uint               nrows,
                    const uint               ncols,
                    const HLIB::TIndexSet &  rowis,
@@ -78,6 +80,17 @@ public:
 
     HLIB_RTTI_DERIVED( level_matrix, TBlockMatrix )
 
+    //! return matrix of same class (but no content)
+    virtual auto create () const -> std::unique_ptr< TMatrix >
+    {
+        return std::make_unique< level_matrix >();
+    }
+
+    //! return size in bytes used by this object
+    virtual size_t byte_size () const
+    {
+        return HLIB::TBlockMatrix::byte_size() + sizeof( _above ) + sizeof( _below );
+    }
 };
 
 //

@@ -86,9 +86,17 @@ dag_main ( int,
     {
         std::cout << term::bullet << term::bold << "Level Sets" << term::reset << std::endl;
 
-        auto  L = matrix::construct_lvlhier( *A );
+        auto  C = A->copy();
+        auto  L = matrix::construct_lvlhier( *C );
 
         hlr::arith::lu( *( L[0] ), acc );
+
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+
+        return;
     }
     
     {

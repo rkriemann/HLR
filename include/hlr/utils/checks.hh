@@ -47,6 +47,56 @@ bool is_leaf_all  ( T *  A )               noexcept { return is_leaf( A ); }
 template < typename T1, typename... T2 >
 bool is_leaf_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_leaf( A ) && is_leaf_all( mtrs... ); }
 
+
+template < typename T >
+bool is_leaf      ( T &  A )               noexcept { return ! A.is_blocked(); }
+
+template < typename T >
+bool is_leaf_any  ( T &  A )               noexcept { return is_leaf( A ); }
+
+template < typename T1, typename... T2 >
+bool is_leaf_any  ( T1 &  A, T2...  mtrs ) noexcept { return is_leaf( A ) || is_leaf_any( mtrs... ); }
+
+template < typename T >
+bool is_leaf_all  ( T &  A )               noexcept { return is_leaf( A ); }
+
+template < typename T1, typename... T2 >
+bool is_leaf_all  ( T1 &  A, T2...  mtrs ) noexcept { return is_leaf( A ) && is_leaf_all( mtrs... ); }
+
+//
+// return true if A is corresponding to a small matrix block
+//
+template < typename T >
+bool is_small      ( T *  A )               noexcept { return ! is_null( A ) && HLIB::is_small( A ); }
+
+template < typename T >
+bool is_small_any  ( T *  A )               noexcept { return is_small( A ); }
+
+template < typename T1, typename... T2 >
+bool is_small_any  ( T1 *  A, T2...  mtrs ) noexcept { return is_small( A ) || is_small_any( mtrs... ); }
+
+template < typename T >
+bool is_small_all  ( T *  A )               noexcept { return is_small( A ); }
+
+template < typename T1, typename... T2 >
+bool is_small_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_small( A ) && is_small_all( mtrs... ); }
+
+
+template < typename T >
+bool is_small      ( T &  A )               noexcept { return is_small( & A ); }
+
+template < typename T >
+bool is_small_any  ( T &  A )               noexcept { return is_small( A ); }
+
+template < typename T1, typename... T2 >
+bool is_small_any  ( T1 &  A, T2...  mtrs ) noexcept { return is_small( A ) || is_small_any( mtrs... ); }
+
+template < typename T >
+bool is_small_all  ( T &  A )               noexcept { return is_small( A ); }
+
+template < typename T1, typename... T2 >
+bool is_small_all  ( T1 &  A, T2...  mtrs ) noexcept { return is_small( A ) && is_small_all( mtrs... ); }
+
 }// namespace hlr
 
 #endif // __HLR_UTILS_CHECKS_HH
