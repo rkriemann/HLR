@@ -70,10 +70,10 @@ Compilation
 Set compiler and compiler flags in the top section of the *SConstruct* file. Also modify
 the paths to the various frameworks.
 
-The set of programs (algorithms) is defined in the variable *BUILD*, which may contain the
+The set of programs (algorithms) is defined in the variable *PROGRAMS*, which may contain the
 values *dag*, *tlr*, *hodlr* or *tileh*. The parallelization frameworks are set in the
 variable *FRAMEWORKS* and may be any of *seq*, *openmp*, *tbb*, *taskflow*, *hpx*, *mpi*
-or *gpi2*.
+or *gpi2*. For both *all* refers to the full set.
 
 Afterwards just enter
 
@@ -83,6 +83,21 @@ scons
 
 to compile all wanted example programs.
 
+You may also provide options to scons:
+
+  Option     | Values | Description
+  -----------+--------+---------------------------------------------
+  debug      |   0/1  | disable/enable debug options
+  optimise   |   0/1  | disable/enable optimisation options
+  fullmsg    |   0/1  | disable/enable full output of compiler call
+  programs   |        | comma separated list of programs to build (see above)
+  frameworks |        | comma separated list of frameworks to use (see above)
+  
+An example for the options:
+
+~~~
+scons debug=1 programs=dag,tlr frameworks=seq,tbb,hpx
+~~~
 
 Remarks
 =======
