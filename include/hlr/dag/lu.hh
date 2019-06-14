@@ -14,6 +14,7 @@
 #include <algebra/mat_fac.hh>
 
 #include "hlr/dag/graph.hh"
+#include "hlr/matrix/level_matrix.hh"
 
 namespace hlr
 {
@@ -26,6 +27,10 @@ namespace dag
 //
 graph
 gen_lu_dag ( HLIB::TMatrix *                              A,
+             std::function< dag::graph ( dag::node * ) >  refine );
+
+graph
+gen_lu_dag ( hlr::matrix::level_matrix &                  L,
              std::function< dag::graph ( dag::node * ) >  refine );
 
 }// namespace dag

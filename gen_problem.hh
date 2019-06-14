@@ -21,7 +21,7 @@ gen_problem ()
 void
 print_problem_desc ( const std::string &  name )
 {
-    std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "Problem Setup" << term::reset << std::endl
+    std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << name
               << ( gridfile == "" ? HLIB::to_string( ", n = %d", n ) : ", grid = " + gridfile )
               << ", ntile = " << ntile

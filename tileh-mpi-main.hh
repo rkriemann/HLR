@@ -59,7 +59,7 @@ mymain ( int argc, char ** argv )
     // TLR::MPI::RANK = k;
     
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
@@ -104,7 +104,7 @@ main ( int argc, char ** argv )
         NET::set_nprocs( nprocs );
         NET::set_pid( pid );
     
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
+        std::cout << term::bullet << term::bold << Mach::hostname() << term::reset << std::endl
                   << "    CPU cores : " << Mach::cpuset() << std::endl;
         
         CFG::set_verbosity( verbosity );

@@ -33,7 +33,7 @@ hlrmain ( int argc, char ** argv )
     {
         INIT();
 
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
+        std::cout << term::bullet << term::bold << Mach::hostname() << term::reset << std::endl
                   << "    CPU cores : " << Mach::cpuset() << std::endl;
         
         CFG::set_verbosity( verbosity );

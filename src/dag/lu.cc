@@ -18,6 +18,7 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
+#include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 
 namespace hlr
@@ -30,6 +31,8 @@ namespace dag
 
 namespace
 {
+
+using hlr::matrix::level_matrix;
 
 // map for apply_node nodes
 using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
@@ -57,6 +60,30 @@ private:
     virtual local_graph         refine_      ();
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+};
+
+struct lvllu_node : public node
+{
+    TMatrix *       A;
+    level_matrix *  L;
+    apply_map_t &   apply_nodes;
+    
+    lvllu_node ( TMatrix *       aA,
+                 level_matrix *  aL,
+                 apply_map_t &   aapply_nodes )
+            : A( aA )
+            , L( aL )
+            , apply_nodes( aapply_nodes )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "lvllu( %d )", A->id() ); }
+    virtual std::string  color     () const { return "a40000"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ();
+    virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_A, L->block_is() } }; }
 };
 
 struct solve_upper_node : public node
@@ -174,20 +201,27 @@ lu_node::refine_ ()
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( dynamic_cast< level_matrix * >( A ) != nullptr )
     {
-        //
-        // generate sub nodes assuming 2x2 block structure
-        //
+        auto        L   = ptrcast( A, level_matrix );
+        const auto  nbr = L->block_rows();
+        const auto  nbc = L->block_cols();
 
+        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+        {
+            auto  L_ii  = L->block( i, i );
+
+            assert( L_ii != nullptr );
+            
+            hlr::dag::alloc_node< lvllu_node >( g, L_ii, L, apply_nodes );
+        }// for
+    }// if
+    else if ( is_blocked( A ) && ! is_small( A ) )
+    {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
         const auto  nbc = B->block_cols();
 
-        //
-        // then create factorise/solve nodes for all blocks
-        //
-        
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
             //
@@ -207,17 +241,12 @@ lu_node::refine_ ()
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
                     hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ), apply_nodes );
-        }// for
 
-        //
-        // now create update nodes with dependencies
-        //
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
             for ( uint j = i+1; j < nbr; j++ )
                 for ( uint l = i+1; l < nbc; l++ )
                     if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
                         hlr::dag::alloc_node< update_node >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ), apply_nodes );
+        }// for
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -238,6 +267,135 @@ lu_node::run_ ( const TTruncAcc &  acc )
         A->apply_updates( acc, recursive );
     
     HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// lu_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+lvllu_node::refine_ ()
+{
+    local_graph  g;
+
+    ///////////////////////////////////////////////////////////////
+    //
+    // either factorise diagonal block or recurse to visit all
+    // diagonal blocks
+    //
+    ///////////////////////////////////////////////////////////////
+
+    const bool  A_is_leaf = ( is_leaf( A ) || is_small( A ) );
+    
+    if ( A_is_leaf )
+    {
+        hlr::dag::alloc_node< lu_node >( g, A, apply_nodes );
+    }// if
+    else
+    {
+        auto        B      = ptrcast( A, TBlockMatrix );
+        const uint  nbrows = B->nblock_rows();
+        const uint  nbcols = B->nblock_cols();
+
+        for ( uint  i = 0; i < std::min( nbrows, nbcols ); ++i )
+        {
+            auto  A_ii = B->block( i, i );
+            
+            assert( ! is_null( A_ii ) );
+            
+            hlr::dag::alloc_node< lvllu_node >( g, A_ii, L->below(), apply_nodes );
+        }// for
+    }// if
+
+    ///////////////////////////////////////////////////////////////
+    //
+    // actual factorisation of A, solving in block row/column of A
+    // and update of trailing sub matrix with respect to A (all on L)
+    //
+    ///////////////////////////////////////////////////////////////
+    
+    //
+    // get block row/column of A in L
+    //
+
+    const auto  [ bi, bj ] = L->get_index( A );
+    const auto  nbrows     = L->nblock_rows();
+    const auto  nbcols     = L->nblock_cols();
+
+    // check if found in L
+    assert(( bi != L->nblock_rows() ) && ( bj != L->nblock_cols() ));
+    
+    // should be on diagonal
+    assert( bi == bj );
+    
+    //
+    // off-diagonal solves in current block row/column
+    //
+    
+    for ( uint  j = bi+1; j < nbcols; ++j )
+    {
+        auto  L_ij = L->block( bi, j );
+            
+        if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
+        {
+            // DBG::printf( "solve_lower_left( %d, %d )", A.id(), L_ij->id() );
+
+            hlr::dag::alloc_node< solve_lower_node >( g, A, L_ij, apply_nodes );
+        }// if
+    }// for
+        
+    for ( uint  j = bi+1; j < nbrows; ++j )
+    {
+        auto  L_ji = L->block( j, bi );
+            
+        if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
+        {
+            // DBG::printf( "solve_upper_right( %d, %d )", A.id(), L_ji->id() );
+
+            hlr::dag::alloc_node< solve_upper_node >( g, A, L_ji, apply_nodes );
+        }// if
+    }// for
+
+    //
+    // update of trailing sub matrix
+    //
+
+    for ( uint  j = bi+1; j < nbrows; ++j )
+    {
+        auto  L_ji = L->block( j, bi );
+            
+        for ( uint  l = bi+1; l < nbcols; ++l )
+        {
+            auto  L_il = L->block( bi, l );
+            auto  L_jl = L->block(  j, l );
+            
+            if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
+            {
+                // DBG::printf( "update( %d, %d, %d )", L_ji->id(), L_il->id(), L_jl->id() );
+                
+                hlr::dag::alloc_node< update_node >( g, L_ji, L_il, L_jl, apply_nodes );
+            }// if
+        }// for
+    }// for
+
+    // else if ( CFG::Arith::use_accu )
+    // {
+    //     auto  apply = apply_nodes[ A->id() ];
+        
+    //     assert( apply != nullptr );
+
+    //     apply->before( this );
+    // }// if
+
+    return g;
+}
+
+void
+lvllu_node::run_ ( const TTruncAcc &  acc )
+{
+    assert( false );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -582,6 +740,26 @@ gen_lu_dag ( TMatrix *                          A,
     }// for
     
     return  dag::graph( nodes, start, end );
+}
+
+graph
+gen_lu_dag ( hlr::matrix::level_matrix &                  L,
+             std::function< dag::graph ( dag::node * ) >  refine )
+{
+    //
+    // generate DAG for shifting and applying updates
+    //
+
+    // dummy
+    apply_map_t  apply_map;
+
+    //
+    // construct DAG for LU
+    //
+    
+    auto  dag = refine( new lu_node( & L, apply_map ) );
+
+    return dag;
 }
 
 }// namespace dag

@@ -27,11 +27,18 @@ lu ( TMatrix &               A,
 
     ///////////////////////////////////////////////////////////////
     //
-    // recurse to visit all diagonal blocks
+    // either factorise diagonal block or recurse to visit all
+    // diagonal blocks
     //
     ///////////////////////////////////////////////////////////////
 
-    if ( is_blocked( A ) && ! is_small( A ) )
+    const bool  A_is_leaf = ( is_leaf( A ) || is_small( A ) );
+    
+    if ( A_is_leaf )
+    {
+        HLIB::LU::factorise_rec( & A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    }// if
+    else
     {
         auto        B      = ptrcast( & A, TBlockMatrix );
         const uint  nbrows = B->nblock_rows();
@@ -67,15 +74,6 @@ lu ( TMatrix &               A,
     
     // should be on diagonal
     assert( bi == bj );
-    
-    //
-    // factorise diagonal
-    //
-
-    const bool  A_is_leaf = ( is_leaf( A ) || is_small( A ) );
-    
-    if ( A_is_leaf )
-        HLIB::LU::factorise_rec( & A, acc, fac_options_t( block_wise, store_inverse, false ) );
     
     //
     // off-diagonal solves in current block row/column

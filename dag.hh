@@ -81,14 +81,56 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    if ( false )
     {
-        std::cout << term::bullet << term::bold << "Level Sets" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "Level Sets (LU)" << term::reset << std::endl;
 
         auto  C = A->copy();
         auto  L = matrix::construct_lvlhier( *C );
 
         hlr::arith::lu( *( L[0] ), acc );
 
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+
+        return;
+    }
+    
+    if ( true )
+    {
+        std::cout << term::bullet << term::bold << "Level Sets (DAG)" << term::reset << std::endl;
+
+        auto  C = A->copy();
+        auto  L = matrix::construct_lvlhier( *C );
+
+        tic = Time::Wall::now();
+
+        auto  dag = hlr::dag::gen_lu_dag( L[0].get(), impl::dag::refine );
+
+        toc = Time::Wall::since( tic );
+
+        if ( verbose( 2 ) )
+        {
+            std::cout << "  dag in      " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
+            std::cout << "    #edges  = " << dag.nedges() << std::endl;
+            std::cout << "    #coll   = " << hlr::dag::collisions << std::endl;
+        }// if
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "lvllu.dot" );
+
+        if ( onlydag )
+            return;
+        
+        tic = Time::Wall::now();
+        
+        impl::dag::run( dag, acc );
+        
+        toc = Time::Wall::since( tic );
+        
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
         std::cout << "    done in " << toc << std::endl;

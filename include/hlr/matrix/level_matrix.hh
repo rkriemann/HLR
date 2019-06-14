@@ -58,7 +58,7 @@ public:
 
     // return block row/column of A
     std::pair< uint, uint >
-    get_index ( const TMatrix &  A ) const
+    get_index ( const TMatrix *  A ) const
     {
         for ( uint  i = 0; i < nblock_rows(); ++i )
         {
@@ -66,12 +66,17 @@ public:
             {
                 auto  A_ij = block( i, j );
                 
-                if ( A_ij == & A )
+                if ( A_ij == A )
                     return { i, j };
             }// for
         }// for
 
         return { nblock_rows(), nblock_cols() };
+    }
+    std::pair< uint, uint >
+    get_index ( const TMatrix &  A ) const
+    {
+        return get_index( & A );
     }
     
     //
