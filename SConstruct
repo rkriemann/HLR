@@ -76,6 +76,9 @@ opts.Add( BoolVariable( 'profile',  'enable building with profile informations',
 opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 
+opts.Add( ListVariable( 'build',      'programs to build',                 'all', BUILD      ) )
+opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all', FRAMEWORKS ) )
+
 # read options from options file
 opt_env = Environment( options = opts )
 
@@ -84,6 +87,12 @@ debug    = opt_env['debug']
 profile  = opt_env['profile']
 optimise = opt_env['optimise']
 warn     = opt_env['warn']
+
+BUILD      = Split( opt_env['build'] )
+FRAMEWORKS = Split( opt_env['frameworks'] )
+
+print( BUILD )
+print( FRAMEWORKS )
 
 opts.Save( opts_file, opt_env )
 

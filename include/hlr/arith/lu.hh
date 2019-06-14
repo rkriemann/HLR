@@ -23,7 +23,7 @@ lu ( TMatrix &               A,
      matrix::level_matrix &  L,
      const TTruncAcc &       acc )
 {
-    DBG::printf( "lu( %d )", A.id() );
+    // DBG::printf( "lu( %d )", A.id() );
 
     ///////////////////////////////////////////////////////////////
     //
@@ -31,7 +31,7 @@ lu ( TMatrix &               A,
     //
     ///////////////////////////////////////////////////////////////
 
-    if ( is_blocked( A ) )
+    if ( is_blocked( A ) && ! is_small( A ) )
     {
         auto        B      = ptrcast( & A, TBlockMatrix );
         const uint  nbrows = B->nblock_rows();
@@ -72,7 +72,9 @@ lu ( TMatrix &               A,
     // factorise diagonal
     //
 
-    if ( is_leaf( A ) || is_small( A ) )
+    const bool  A_is_leaf = ( is_leaf( A ) || is_small( A ) );
+    
+    if ( A_is_leaf )
         HLIB::LU::factorise_rec( & A, acc, fac_options_t( block_wise, store_inverse, false ) );
     
     //
@@ -83,9 +85,9 @@ lu ( TMatrix &               A,
     {
         auto  L_ij = L.block( bi, j );
             
-        if ( ! is_null( L_ij ) && is_leaf( L_ij ) )
+        if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
         {
-            DBG::printf( "solve_lower_left( %d, %d )", A.id(), L_ij->id() );
+            // DBG::printf( "solve_lower_left( %d, %d )", A.id(), L_ij->id() );
 
             solve_lower_left( apply_normal, & A, L_ij, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
         }// if
@@ -95,9 +97,9 @@ lu ( TMatrix &               A,
     {
         auto  L_ji = L.block( j, bi );
             
-        if ( ! is_null( L_ji ) && is_leaf( L_ji ) )
+        if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
         {
-            DBG::printf( "solve_upper_right( %d, %d )", A.id(), L_ji->id() );
+            // DBG::printf( "solve_upper_right( %d, %d )", A.id(), L_ji->id() );
 
             solve_upper_right( L_ji, & A, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
         }// if
@@ -116,9 +118,9 @@ lu ( TMatrix &               A,
             auto  L_il = L.block( bi, l );
             auto  L_jl = L.block(  j, l );
             
-            if ( ! is_null_any( L_ji, L_il, L_jl ) && is_leaf_any( L_ji, L_il, L_jl ) )
+            if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
             {
-                DBG::printf( "update( %d, %d, %d )", L_ji->id(), L_il->id(), L_jl->id() );
+                // DBG::printf( "update( %d, %d, %d )", L_ji->id(), L_il->id(), L_jl->id() );
                 
                 multiply( real(-1),
                           apply_normal, L_ji,
