@@ -19,20 +19,20 @@
 #include <matrix/TGhostMatrix.hh>
 #include <base/TTruncAcc.hh>
 
-#include "utils/tools.hh"
-#include "seq/matrix.hh"
-#include "tbb/matrix.hh"
-#include "mpi/mpi.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/seq/matrix.hh"
+#include "hlr/tbb/matrix.hh"
+#include "hlr/mpi/mpi.hh"
 
-namespace HLR
+namespace hlr
 {
 
-namespace Matrix
+namespace mpi
+{
+
+namespace matrix
 {
     
-namespace MPI
-{
-
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -68,11 +68,11 @@ build ( const HLIB::TBlockCluster *  bct,
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
-        return Matrix::Seq::build( bct, coeff, lrapx, acc );
+        return seq::matrix::build( bct, coeff, lrapx, acc );
 
     if ( ! bct->procs().contains( pid ) )
     {
-        M = std::make_unique< TGhostMatrix >( bct->is(), bct->procs(), value_type< value_t >::value );
+        M = std::make_unique< TGhostMatrix >( bct->is(), bct->procs(), HLIB::value_type< value_t >::value );
     }// if
     else if ( bct->is_leaf() )
     {
@@ -95,8 +95,8 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
-                                         0, B->nblock_cols() );
+        ::tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
+                                           0, B->nblock_cols() );
         
         // tbb::parallel_for( r,
         //     [&,bct] ( const tbb::blocked_range2d< uint > &  r )
@@ -243,10 +243,10 @@ build_col_comms ( const TBlockMatrix *                             A,
     }// for
 }
 
-}// namespace MPI
+}// namespace matrix
 
-}// namespace Matrix
+}// namespace mpi
 
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_MPI_MATRIX_HH

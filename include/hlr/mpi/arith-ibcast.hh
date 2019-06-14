@@ -21,16 +21,22 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "utils/tools.hh"
-#include "utils/log.hh"
-#include "common/multiply.hh"
-#include "common/solve.hh"
-#include "mpi/arith.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/utils/log.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
+#include "hlr/mpi/arith.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
+
+namespace mpi
+{
+
+namespace ibcast
+{
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -38,13 +44,7 @@ using namespace HLIB;
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TLR
-{
-
-namespace MPI
-{
-
-namespace ibcast
+namespace tlr
 {
 
 //
@@ -134,8 +134,8 @@ lu ( TMatrix *          A,
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
-    Matrix::MPI::build_row_comms( BA, row_comms, row_procs, row_maps );
-    Matrix::MPI::build_col_comms( BA, col_comms, col_procs, col_maps );
+    mpi::matrix::build_row_comms( BA, row_comms, row_procs, row_maps );
+    mpi::matrix::build_col_comms( BA, col_comms, col_procs, col_maps );
 
     //
     // LU factorization
@@ -149,7 +149,7 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
@@ -223,7 +223,7 @@ lu ( TMatrix *          A,
             for ( auto & req : diag_reqs )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
             }// for
         }
         
@@ -284,15 +284,15 @@ lu ( TMatrix *          A,
         // update of trailing sub-matrix
         //
         
-        std::vector< bool >           row_done( nbr, false );  // signals finished broadcast
-        std::vector< bool >           col_done( nbc, false );
-        std::vector< std::mutex >     row_mtx( nbr );          // mutices for access to requests
-        std::vector< std::mutex >     col_mtx( nbc );
-        tbb::blocked_range2d< uint >  range( i+1, nbr,
-                                             i+1, nbc );
+        std::vector< bool >             row_done( nbr, false );  // signals finished broadcast
+        std::vector< bool >             col_done( nbc, false );
+        std::vector< std::mutex >       row_mtx( nbr );          // mutices for access to requests
+        std::vector< std::mutex >       col_mtx( nbc );
+        ::tbb::blocked_range2d< uint >  range( i+1, nbr,
+                                               i+1, nbc );
         
-        // tbb::parallel_for( blocks,
-        //     [&,BA,i,pid] ( const tbb::blocked_range2d< uint > & range )
+        // ::tbb::parallel_for( blocks,
+        //       [&,BA,i,pid] ( const ::tbb::blocked_range2d< uint > & range )
             {
                 for ( auto  j = range.rows().begin(); j != range.rows().end(); ++j )
                 {
@@ -372,7 +372,7 @@ lu ( TMatrix *          A,
             for ( auto & req : row_reqs[j] )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
             }// for
         }// for
 
@@ -381,7 +381,7 @@ lu ( TMatrix *          A,
             for ( auto & req : col_reqs[l] )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
             }// for
         }// for
     }// for
@@ -390,11 +390,7 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
-}// namespace icast
-
-}// namespace MPI
-
-}// namespace TLR
+}// namespace tlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -402,15 +398,10 @@ lu ( TMatrix *          A,
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace HODLR
+namespace hodlr
 {
 
-namespace MPI
-{
-
-}// namespace MPI
-
-}// namespace HODLR
+}// namespace hodlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -418,13 +409,7 @@ namespace MPI
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TileH
-{
-
-namespace MPI
-{
-
-namespace ibcast
+namespace tileh
 {
 
 mpi::request
@@ -473,8 +458,8 @@ lu ( TMatrix *          A,
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
-    Matrix::MPI::build_row_comms( BA, row_comms, row_procs, row_maps );
-    Matrix::MPI::build_col_comms( BA, col_comms, col_procs, col_maps );
+    mpi::matrix::build_row_comms( BA, row_comms, row_procs, row_maps );
+    mpi::matrix::build_col_comms( BA, col_comms, col_procs, col_maps );
 
     //
     // LU factorization
@@ -485,7 +470,7 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = BA->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -524,13 +509,13 @@ lu ( TMatrix *          A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( col_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( col_procs[i] ) );
                 col_req_ii = ibroadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( row_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( row_procs[i] ) );
                 row_req_ii = ibroadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
             
@@ -635,7 +620,7 @@ lu ( TMatrix *          A,
                     row_i[j] = A_ji;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + HLR::to_string( row_procs[j] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + hlr::to_string( row_procs[j] ) );
 
                 row_reqs[j] = ibroadcast( row_comms[j], row_i_bs[j], row_maps[j][p_ji] );
                 add_mem    += row_i_bs[j].size();
@@ -659,7 +644,7 @@ lu ( TMatrix *          A,
                     col_i[l] = A_il;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + HLR::to_string( col_procs[l] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + hlr::to_string( col_procs[l] ) );
                 
                 col_reqs[l] = ibroadcast( col_comms[l], col_i_bs[l], col_maps[l][p_il] );
                 add_mem    += col_i_bs[l].size();
@@ -756,13 +741,13 @@ lu ( TMatrix *          A,
         for ( uint  j = i+1; j < nbr; ++j )
         {
             if ( row_reqs[j].mpi_request != MPI_REQUEST_NULL )
-                HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
         }// for
 
         for ( uint  l = i+1; l < nbc; ++l )
         {
             if ( col_reqs[l].mpi_request != MPI_REQUEST_NULL )
-                HLR::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
         }// for
     }// for
 
@@ -770,12 +755,12 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
+}// namespace tileh
+
 }// namespace ibcast
 
-}// namespace MPI
+}// namespace mpi
 
-}// namespace TileH
-
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_MPI_ARITH_IBCAST_HH

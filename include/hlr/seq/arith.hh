@@ -10,8 +10,8 @@
 
 #include <hlib.hh>
 
-#include "common/multiply.hh"
-#include "common/solve.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
 
 namespace hlr
 {
@@ -195,7 +195,7 @@ addlr ( BLAS::Matrix< value_t > &  U,
         addlr( U1, V1, A11, acc );
 
         {
-            auto [ U01, V01 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
+            auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
                                                                 { blas_mat_B< value_t >( A01 ), V1 },
                                                                 acc );
 
@@ -203,7 +203,7 @@ addlr ( BLAS::Matrix< value_t > &  U,
         }
 
         {
-            auto [ U10, V10 ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
+            auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
                                                                 { blas_mat_B< value_t >( A10 ), V0 },
                                                                 acc );
             A10->set_lrmat( U10, V10 );
@@ -236,7 +236,7 @@ lu ( TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        HODLR::Seq::lu< value_t >( A00, acc );
+        seq::hodlr::lu< value_t >( A00, acc );
         
         trsml(  A00, blas_mat_A< value_t >( A01 ) );
         trsmuh( A00, blas_mat_B< value_t >( A10 ) );
@@ -245,9 +245,9 @@ lu ( TMatrix *          A,
         auto  T  = BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
         auto  UT = BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
-        HODLR::Seq::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
+        seq::hodlr::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         
-        HODLR::Seq::lu< value_t >( A11, acc );
+        seq::hodlr::lu< value_t >( A11, acc );
     }// if
     else
     {

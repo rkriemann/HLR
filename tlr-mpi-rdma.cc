@@ -6,9 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "mpi/matrix.hh"
-#include "mpi/arith-rdma.hh"
+#include "hlr/mpi/matrix.hh"
+#include "hlr/mpi/arith-rdma.hh"
 
-namespace ARITH = HLR::TLR::MPI::rdma;
+namespace ARITH = hlr::mpi::rdma::tlr;
 
-#include "tlr-mpi-main.inc"
+#include "tlr-mpi-main.hh"

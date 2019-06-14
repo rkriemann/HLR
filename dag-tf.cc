@@ -9,16 +9,10 @@
 #include "hlr/tf/matrix.hh"
 #include "hlr/tf/dag.hh"
 
-namespace impl = hlr::tf;
+namespace          impl      = hlr::tf;
+const std::string  impl_name = "tf";
 
 #include "dag.hh"
-
-template < typename problem_t >
-void
-mymain ( int argc, char ** argv )
-{
-    dag_main< problem_t >( argc, argv, "tf" );
-}
 
 int
 main ( int argc, char ** argv )

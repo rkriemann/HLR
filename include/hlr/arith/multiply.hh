@@ -1,5 +1,5 @@
-#ifndef __HLR_MULTIPLY_HH
-#define __HLR_MULTIPLY_HH
+#ifndef __HLR_ARITH_MULTIPLY_HH
+#define __HLR_ARITH_MULTIPLY_HH
 //
 // Project     : HLib
 // File        : multiply.hh
@@ -8,10 +8,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "common/approx.hh"
-#include "utils/log.hh"
+#include "hlr/arith/approx.hh"
+#include "hlr/utils/log.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
@@ -34,7 +34,7 @@ multiply ( const value_t      alpha,
     auto  T  = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A ) ), blas_mat_A< value_t >( B ) );
     auto  UT = BLAS::prod(      alpha, blas_mat_A< value_t >( A ), T );
 
-    auto [ U, V ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), UT },
+    auto [ U, V ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), UT },
                                                     { blas_mat_B< value_t >( C ), blas_mat_B< value_t >( B ) },
                                                     acc );
         
@@ -55,7 +55,7 @@ multiply ( const value_t         alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
     auto  VB = BLAS::prod( alpha, BLAS::adjoint( blas_mat< value_t >( B ) ), blas_mat_B< value_t >( A ) );
 
-    auto [ U, V ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), blas_mat_A< value_t >( A ) },
+    auto [ U, V ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), blas_mat_A< value_t >( A ) },
                                                     { blas_mat_B< value_t >( C ), VB },
                                                     acc );
         
@@ -76,7 +76,7 @@ multiply ( const value_t         alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
     auto  AU = BLAS::prod( alpha, blas_mat< value_t >( A ), blas_mat_A< value_t >( B ) );
 
-    auto [ U, V ] = HLR::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), AU },
+    auto [ U, V ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( C ), AU },
                                                     { blas_mat_B< value_t >( C ), blas_mat_B< value_t >( B ) },
                                                     acc );
         
@@ -99,7 +99,7 @@ multiply ( const value_t         alpha,
 
     BLAS::prod( value_t(1), blas_mat_A< value_t >( C ), BLAS::adjoint( blas_mat_B< value_t >( C ) ), value_t(1), AB );
 
-    auto [ U, V ] = HLR::approx_svd< value_t >( AB, acc );
+    auto [ U, V ] = hlr::approx_svd< value_t >( AB, acc );
         
     C->set_lrmat( U, V );
 }
@@ -203,7 +203,7 @@ multiply ( const value_t      alpha,
     if      ( is_dense(   B ) ) multiply< value_t, matrix1_t, TDenseMatrix >( alpha, A, cptrcast( B, TDenseMatrix ), C, acc );
     else if ( is_lowrank( B ) ) multiply< value_t, matrix1_t, TRkMatrix >(    alpha, A, cptrcast( B, TRkMatrix ),    C, acc );
     else
-        HLR::error( "unsupported matrix type : " + B->typestr() );
+        hlr::error( "unsupported matrix type : " + B->typestr() );
 }
 
 template < typename value_t >
@@ -217,9 +217,9 @@ multiply ( const value_t      alpha,
     if      ( is_dense(   A ) ) multiply< value_t, TDenseMatrix >( alpha, cptrcast( A, TDenseMatrix ), B, C, acc );
     else if ( is_lowrank( A ) ) multiply< value_t, TRkMatrix >(    alpha, cptrcast( A, TRkMatrix ),    B, C, acc );
     else
-        HLR::error( "unsupported matrix type : " + B->typestr() );
+        hlr::error( "unsupported matrix type : " + B->typestr() );
 }
 
-}// namespace HLR
+}// namespace hlr
 
-#endif // __HLR_MULTIPLY_HH
+#endif // __HLR_ARITH_MULTIPLY_HH

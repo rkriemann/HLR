@@ -23,9 +23,7 @@ extern std::atomic< size_t >  collisions;
 //
 template < typename problem_t >
 void
-dag_main ( int,
-           char **,
-           const std::string &  name )
+mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
@@ -100,7 +98,7 @@ dag_main ( int,
     }
     
     {
-        std::cout << term::bullet << term::bold << "LU ( DAG " << name
+        std::cout << term::bullet << term::bold << "LU ( DAG " << impl_name
                   << ", " << acc.to_string() << " )" << term::reset << std::endl;
         
         auto  C = A->copy();

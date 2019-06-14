@@ -20,15 +20,21 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "utils/tools.hh"
-#include "common/multiply.hh"
-#include "common/solve.hh"
-#include "mpi/arith.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
+#include "hlr/mpi/arith.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
+
+namespace mpi
+{
+
+namespace bcast
+{
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -36,13 +42,7 @@ using namespace HLIB;
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TLR
-{
-
-namespace MPI
-{
-
-namespace bcast
+namespace tlr
 {
 
 //
@@ -120,8 +120,8 @@ lu ( TMatrix *          A,
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
-    Matrix::MPI::build_row_comms( BA, row_comms, row_procs, row_maps );
-    Matrix::MPI::build_col_comms( BA, col_comms, col_procs, col_maps );
+    mpi::matrix::build_row_comms( BA, row_comms, row_procs, row_maps );
+    mpi::matrix::build_col_comms( BA, col_comms, col_procs, col_maps );
 
     //
     // LU factorization
@@ -171,7 +171,7 @@ lu ( TMatrix *          A,
             // off-diagonal solve
             //
             
-            tbb::parallel_for(
+            ::tbb::parallel_for(
                 i+1, nbr,
                 [BA,H_ii,i,pid] ( uint  j )
                 // for ( uint  j = i+1; j < nbr; ++j )
@@ -249,10 +249,10 @@ lu ( TMatrix *          A,
         // update of trailing sub-matrix
         //
         
-        tbb::parallel_for(
-            tbb::blocked_range2d< uint >( i+1, nbr,
-                                          i+1, nbc ),
-            [BA,i,pid,&row_i,&col_i,&acc] ( const tbb::blocked_range2d< uint > & r )
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( i+1, nbr,
+                                            i+1, nbc ),
+            [BA,i,pid,&row_i,&col_i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
             {
                 for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                 {
@@ -280,11 +280,7 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
-}// namespace bcast
-
-}// namespace MPI
-
-}// namespace TLR
+}// namespace tlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -292,15 +288,10 @@ lu ( TMatrix *          A,
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace HODLR
+namespace hodlr
 {
 
-namespace MPI
-{
-
-}// namespace MPI
-
-}// namespace HODLR
+}// namespace hodlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -308,13 +299,7 @@ namespace MPI
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TileH
-{
-
-namespace MPI
-{
-
-namespace bcast
+namespace tileh
 {
 
 //
@@ -367,8 +352,8 @@ lu ( TMatrix *          A,
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
-    Matrix::MPI::build_row_comms( BA, row_comms, row_procs, row_maps );
-    Matrix::MPI::build_col_comms( BA, col_comms, col_procs, col_maps );
+    mpi::matrix::build_row_comms( BA, row_comms, row_procs, row_maps );
+    mpi::matrix::build_col_comms( BA, col_comms, col_procs, col_maps );
 
     //
     // LU factorization
@@ -418,13 +403,13 @@ lu ( TMatrix *          A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( col_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( col_procs[i] ) );
                 broadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + HLR::to_string( row_procs[i] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( row_procs[i] ) );
                 broadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
             
@@ -509,7 +494,7 @@ lu ( TMatrix *          A,
                     row_i[j] = A_ji;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + HLR::to_string( row_procs[j] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + hlr::to_string( row_procs[j] ) );
                 
                 broadcast( row_comms[j], bs, row_maps[j][p_ji] );
 
@@ -546,7 +531,7 @@ lu ( TMatrix *          A,
                     col_i[l] = A_il;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + HLR::to_string( col_procs[l] ) );
+                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + hlr::to_string( col_procs[l] ) );
                 
                 broadcast( col_comms[l], bs, col_maps[l][p_il] );
 
@@ -599,12 +584,12 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
+}// namespace tileh
+
 }// namespace bcast
 
-}// namespace MPI
+}// namespace mpi
 
-}// namespace TileH
-
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_MPI_ARITH_BCAST_HH

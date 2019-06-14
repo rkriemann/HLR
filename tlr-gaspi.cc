@@ -1,23 +1,23 @@
 
-#include "gaspi/gaspi.hh"
-#include "gaspi/matrix.hh"
-#include "gaspi/arith.hh"
-#include "mpi/distr.hh"
-#include "cluster/tlr.hh"
+#include "hlr/gaspi/gaspi.hh"
+#include "hlr/gaspi/matrix.hh"
+#include "hlr/gaspi/arith.hh"
+#include "hlr/cluster/distr.hh"
+#include "hlr/cluster/tlr.hh"
 #include "cmdline.hh"
 #include "gen_problem.hh"
-#include "utils/RedirectOutput.hh"
-#include "utils/compare.hh"
+#include "hlr/utils/RedirectOutput.hh"
+#include "hlr/utils/compare.hh"
 
 #define GPI_CHECK_RESULT( Func, Args )                                  \
     {                                                                   \
-        HLR::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
+        hlr::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
         auto _check_result = Func Args;                                 \
         assert( _check_result == GASPI_SUCCESS );                       \
     }
 
 
-using namespace HLR;
+using namespace hlr;
 
 //
 // main function
@@ -28,19 +28,19 @@ mymain ( int argc, char ** argv )
 {
     using value_t = typename problem_t::value_t;
     
-    GASPI::process  proc;
+    gaspi::process  proc;
     const auto      pid    = proc.rank();
     const auto      nprocs = proc.size();
 
     auto  tic     = Time::Wall::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = TLR::cluster( coord.get(), ntile );
-    auto  bct     = TLR::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::tlr::cluster( coord.get(), ntile );
+    auto  bct     = cluster::tlr::blockcluster( ct.get(), ct.get() );
 
     // assign blocks to nodes
-    if      ( distr == "cyclic2d"    ) distribution::cyclic_2d( nprocs, bct->root() );
-    else if ( distr == "shiftcycrow" ) distribution::shifted_cyclic_1d( nprocs, bct->root() );
+    if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
+    else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
     if (( pid == 0 ) && verbose( 3 ))
     {
@@ -53,7 +53,7 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
-    auto  A      = Matrix::GASPI::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  A      = gaspi::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
@@ -67,13 +67,13 @@ mymain ( int argc, char ** argv )
     }// if
 
     {
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
         
         auto  C = A->copy();
         
         tic = Time::Wall::now();
         
-        GASPI::TLR::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        gaspi::tlr::lu< HLIB::real >( C.get(), fixed_rank( k ) );
         
         toc = Time::Wall::since( tic );
         
@@ -92,8 +92,8 @@ int
 main ( int argc, char ** argv )
 {
     // init MPI before anything else
-    GASPI::environment  env;
-    GASPI::process      proc;
+    gaspi::environment  env;
+    gaspi::process      proc;
     const auto          pid    = proc.rank();
     const auto          nprocs = proc.size();
     
@@ -133,10 +133,10 @@ main ( int argc, char ** argv )
         {
             if (( pid == 0 ) || ( pid == 1 ))
             {
-                GASPI::queue    queue;
-                GASPI::group    grp( { 0, 1 } );
-                GASPI::segment  seg_v( id_v(pid), & v[0], n, grp );
-                GASPI::segment  seg_u( id_u(pid), & u[0], n, grp );
+                gaspi::queue    queue;
+                gaspi::group    grp( { 0, 1 } );
+                gaspi::segment  seg_v( id_v(pid), & v[0], n, grp );
+                gaspi::segment  seg_u( id_u(pid), & u[0], n, grp );
                 const auto      source = ( pid == 0 ? 1 : 0 );
 
                 queue.read( seg_v, source, id_u(source) );
@@ -145,18 +145,18 @@ main ( int argc, char ** argv )
         }// if
         else
         {
-            std::vector< GASPI::queue >  queues( nprocs );  // one queue to each remote processor
+            std::vector< gaspi::queue >  queues( nprocs );  // one queue to each remote processor
 
-            GASPI::group    world;
-            GASPI::segment  seg_v( id_v(pid), & v[0], n, world );
-            GASPI::segment  seg_u( id_u(pid), & u[0], n, world );
+            gaspi::group    world;
+            gaspi::segment  seg_v( id_v(pid), & v[0], n, world );
+            gaspi::segment  seg_u( id_u(pid), & u[0], n, world );
 
             const auto                dest  = ( pid + 1 ) % nprocs;
-            GASPI::notification_id_t  first = dest;
+            gaspi::notification_id_t  first = dest;
             
             queues[dest].write_notify( seg_u, dest, id_v(dest), id_v(dest) );
             
-            GASPI::notify_wait( seg_v, id_v(pid) );
+            gaspi::notify_wait( seg_v, id_v(pid) );
             
             queues[dest].wait();
 
@@ -188,7 +188,7 @@ main ( int argc, char ** argv )
         NET::set_nprocs( nprocs );
         NET::set_pid( pid );
     
-        std::cout << term::yellow << term::bold << "∙ " << term::reset << term::bold << Mach::hostname() << term::reset << std::endl
+        std::cout << term::bullet << term::bold << Mach::hostname() << term::reset << std::endl
                   << "    CPU cores : " << Mach::cpuset() << std::endl;
         
         CFG::set_verbosity( verbosity );
@@ -196,8 +196,8 @@ main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel" ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        if      ( appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
+        else if ( appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
         else
             throw "unknown application";
 

@@ -19,19 +19,12 @@
 #include <matrix/TGhostMatrix.hh>
 #include <base/TTruncAcc.hh>
 
-#include "utils/tools.hh"
-#include "seq/matrix.hh"
-#include "tbb/matrix.hh"
-#include "gaspi/gaspi.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/seq/matrix.hh"
+#include "hlr/tbb/matrix.hh"
+#include "hlr/gaspi/gaspi.hh"
 
-namespace HLR
-{
-
-namespace Matrix
-{
-    
-namespace GASPI
-{
+namespace hlr { namespace gaspi { namespace matrix {
 
 //
 // build representation of dense matrix with
@@ -59,7 +52,7 @@ build ( const HLIB::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    HLR::GASPI::process         proc;
+    gaspi::process              proc;
     const auto                  pid   = proc.rank();
     
     std::unique_ptr< TMatrix >  M;
@@ -68,7 +61,7 @@ build ( const HLIB::TBlockCluster *  bct,
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
-        return Matrix::Seq::build( bct, coeff, lrapx, acc );
+        return seq::matrix::build( bct, coeff, lrapx, acc );
 
     if ( ! bct->procs().contains( pid ) )
     {
@@ -95,11 +88,12 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
-                                         0, B->nblock_cols() );
+        ::tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
+                                           0, B->nblock_cols() );
         
-        tbb::parallel_for( r,
-            [&,bct] ( const tbb::blocked_range2d< uint > &  r )
+        ::tbb::parallel_for(
+            r,
+            [&,bct] ( const ::tbb::blocked_range2d< uint > &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -125,10 +119,6 @@ build ( const HLIB::TBlockCluster *  bct,
     return M;
 }
 
-}// namespace GASPI
-
-}// namespace Matrix
-
-}// namespace HLR
+}}}// namespace hlr::gaspi::matrix
 
 #endif // __HLR_MPI_MATRIX_HH

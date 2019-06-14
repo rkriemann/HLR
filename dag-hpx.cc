@@ -11,16 +11,10 @@
 #include "hlr/hpx/matrix.hh"
 #include "hlr/hpx/dag.hh"
 
-namespace impl = hlr::hpx;
+namespace          impl      = hlr::hpx;
+const std::string  impl_name = "hpx";
 
 #include "dag.hh"
-
-template < typename problem_t >
-void
-mymain ( int argc, char ** argv )
-{
-    dag_main< problem_t >( argc, argv, "hpx" );
-}
 
 int
 hpx_main ( int argc, char ** argv )

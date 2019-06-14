@@ -9,16 +9,10 @@
 #include "hlr/omp/matrix.hh"
 #include "hlr/omp/dag.hh"
 
-namespace impl = hlr::omp;
+namespace          impl      = hlr::omp;
+const std::string  impl_name = "omp";
 
 #include "dag.hh"
-
-template < typename problem_t >
-void
-mymain ( int argc, char ** argv )
-{
-    dag_main< problem_t >( argc, argv, "omp" );
-}
 
 int
 main ( int argc, char ** argv )

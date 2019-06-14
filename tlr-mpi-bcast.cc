@@ -6,9 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "mpi/matrix.hh"
-#include "mpi/arith-bcast.hh"
+#include "hlr/mpi/matrix.hh"
+#include "hlr/mpi/arith-bcast.hh"
 
-namespace ARITH = HLR::TLR::MPI::bcast;
+namespace ARITH = hlr::mpi::bcast::tlr;
 
-#include "tlr-mpi-main.inc"
+#include "tlr-mpi-main.hh"

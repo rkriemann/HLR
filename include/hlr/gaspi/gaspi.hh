@@ -14,13 +14,13 @@
 
 #include <GASPI.h>
 
-#include "utils/log.hh"
-#include "utils/tools.hh"
+#include "hlr/utils/log.hh"
+#include "hlr/utils/tools.hh"
 
-namespace HLR
+namespace hlr
 {
 
-namespace GASPI
+namespace gaspi
 {
 
 //
@@ -29,9 +29,9 @@ namespace GASPI
 #define GASPI_CHECK_RESULT( Func, Args )                                \
     {                                                                   \
         if ( HLIB::verbose( 6 ) )                                       \
-            HLR::log( 6, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
+            hlr::log( 6, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
         else if ( HLIB::verbose( 5 ) )                                  \
-            HLR::log( 5, #Func );                                       \
+            hlr::log( 5, #Func );                                       \
                                                                         \
         auto  check_result = Func Args;                                 \
                                                                         \
@@ -39,7 +39,7 @@ namespace GASPI
         {                                                               \
             gaspi_string_t  err_msg;                                    \
             gaspi_print_error( check_result, & err_msg );               \
-            HLR::log( 0, std::string( " in " ) + #Func + " : " + err_msg ); \
+            hlr::log( 0, std::string( " in " ) + #Func + " : " + err_msg ); \
             std::exit( 1 );                                             \
         }                                                               \
     }
@@ -200,7 +200,7 @@ public:
     {
         if ( _gaspi_group != GASPI_GROUP_ALL )
         {
-            HLR::log( 5, "active group" );
+            hlr::log( 5, "active group" );
             // GASPI_CHECK_RESULT( gaspi_group_delete, ( _gaspi_group ) );
         }// if
     }
@@ -241,7 +241,7 @@ public:
         
         GASPI_CHECK_RESULT( gaspi_group_ranks, ( _gaspi_group, & ranks[0] ) );
 
-        return HLR::to_string( ranks );
+        return hlr::to_string( ranks );
     }
 };
 
@@ -283,7 +283,7 @@ public:
     {
         if ( _size > 0 )
         {
-            HLR::log( 0, "segment is not free" );
+            hlr::log( 0, "segment is not free" );
             // release();
         }// if
     }
@@ -427,8 +427,8 @@ notify_wait ( const segment &            seg,       // local segment affected by
               
               
 
-}// namespace GASPI
+}// namespace gaspi
 
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_GASPI_HH

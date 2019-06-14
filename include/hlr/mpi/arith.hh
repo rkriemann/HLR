@@ -12,25 +12,22 @@
 #include <matrix/TRkMatrix.hh>
 #include <matrix/TGhostMatrix.hh>
 
-#include <utils/tensor.hh>
-#include <utils/log.hh>
+#include <hlr/utils/tensor.hh>
+#include <hlr/utils/log.hh>
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
 
-///////////////////////////////////////////////////////////////////////
-//
-// common arithmetic functions for tile low-rank format
-//
-///////////////////////////////////////////////////////////////////////
-
-namespace TLR
+namespace mpi
 {
 
-namespace MPI
-{
+///////////////////////////////////////////////////////////////////////
+//
+// common functions for MPI arithmetic
+//
+///////////////////////////////////////////////////////////////////////
 
 const typeid_t  TYPE_DENSE = RTTI::type_to_id( "TDenseMatrix" );
 const typeid_t  TYPE_LR    = RTTI::type_to_id( "TRkMatrix" );
@@ -50,12 +47,12 @@ create_matrix ( const TMatrix *  A,
 
     if ( type == TYPE_DENSE )
     {
-        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
+        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
         T = std::make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
     else if ( type == TYPE_LR )
     {
-        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
+        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
         T = std::make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
 
@@ -81,7 +78,7 @@ build_type_matrix ( const TBlockMatrix *  A )
         for ( uint  j = 0; j < nbc; ++j )
             mat_types(i,j) = A->block( i, j )->type();
     
-    for ( uint  p = 0; p < nprocs; ++p )
+    for ( int  p = 0; p < nprocs; ++p )
     {
         tensor2< typeid_t >  rem_types( mat_types );
 
@@ -103,42 +100,8 @@ build_type_matrix ( const TBlockMatrix *  A )
     return mat_types;
 }
 
-}// namespace MPI
+}// namespace mpi
 
-}// namespace TLR
-
-///////////////////////////////////////////////////////////////////////
-//
-// common arithmetic functions for HODLR format
-//
-///////////////////////////////////////////////////////////////////////
-
-namespace HODLR
-{
-
-namespace MPI
-{
-
-}// namespace MPI
-
-}// namespace HODLR
-
-///////////////////////////////////////////////////////////////////////
-//
-// common arithmetic functions for tile H format
-//
-///////////////////////////////////////////////////////////////////////
-
-namespace TileH
-{
-
-namespace MPI
-{
-
-}// namespace MPI
-
-}// namespace TileH
-
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_MPI_ARITH_HH

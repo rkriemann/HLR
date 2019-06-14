@@ -12,8 +12,8 @@
 
 #include <hlib.hh>
 
-#include "hlr/common/multiply.hh"
-#include "hlr/common/solve.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
 
 namespace hlr
@@ -95,10 +95,10 @@ namespace hodlr
 //
 template < typename value_t >
 void
-addlr ( B::Matrix< value_t > &  U,
-        B::Matrix< value_t > &  V,
-        TMatrix *               A,
-        const TTruncAcc &       acc )
+addlr ( BLAS::Matrix< value_t > &  U,
+        BLAS::Matrix< value_t > &  V,
+        TMatrix *                  A,
+        const TTruncAcc &          acc )
 {
     if ( HLIB::verbose( 4 ) )
         DBG::printf( "addlr( %d )", A->id() );
@@ -111,10 +111,10 @@ addlr ( B::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
         
-        B::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), B::Range::all );
-        B::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), B::Range::all );
-        B::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), B::Range::all );
-        B::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), B::Range::all );
+        BLAS::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
 
         auto  task_00 = ::hpx::async( [&,A00] () { addlr( U0, V0, A00, acc ); } );
         auto  task_11 = ::hpx::async( [&,A11] () { addlr( U1, V1, A11, acc ); } );
@@ -138,7 +138,7 @@ addlr ( B::Matrix< value_t > &  U,
     }// if
     else
     {
-        B::prod( value_t(1), U, B::adjoint( V ), value_t(1), blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
+        BLAS::prod( value_t(1), U, BLAS::adjoint( V ), value_t(1), blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
     }// else
 }
 
@@ -170,8 +170,8 @@ lu ( TMatrix *          A,
         solve.wait();
         
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = B::prod(  value_t(1), B::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
-        auto  UT = B::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
+        auto  T  = BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
+        auto  UT = BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
         addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         

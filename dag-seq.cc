@@ -9,16 +9,10 @@
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/dag.hh"
 
-namespace impl = hlr::seq;
+namespace          impl      = hlr::seq;
+const std::string  impl_name = "seq";
 
 #include "dag.hh"
-
-template < typename problem_t >
-void
-mymain ( int argc, char ** argv )
-{
-    dag_main< problem_t >( argc, argv, "seq" );
-}
 
 int
 main ( int argc, char ** argv )

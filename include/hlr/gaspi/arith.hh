@@ -21,17 +21,14 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "utils/tools.hh"
-#include "utils/tensor.hh"
-#include "common/multiply.hh"
-#include "common/solve.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/utils/tensor.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
 
-#include "gaspi/gaspi.hh"
+#include "hlr/gaspi/gaspi.hh"
 
-namespace HLR
-{
-
-using namespace HLIB;
+namespace hlr { namespace gaspi { namespace tlr {
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -39,11 +36,7 @@ using namespace HLIB;
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace GASPI
-{
-
-namespace TLR
-{
+using namespace HLIB;
 
 const typeid_t  TYPE_DENSE = RTTI::type_to_id( "TDenseMatrix" );
 const typeid_t  TYPE_LR    = RTTI::type_to_id( "TRkMatrix" );
@@ -61,7 +54,7 @@ build_type_matrix ( const TBlockMatrix *  A )
 {
     const auto           nbr = A->nblock_rows();
     const auto           nbc = A->nblock_cols();
-    GASPI::process  proc;
+    gaspi::process  proc;
     const auto           pid    = proc.rank();
     const auto           nprocs = proc.size();
     tensor2< typeid_t >  mat_types( nbr, nbc );
@@ -71,10 +64,10 @@ build_type_matrix ( const TBlockMatrix *  A )
             mat_types(i,j) = A->block( i, j )->type();
 
     tensor2< typeid_t >  rem_types( nbr, nbc );
-    GASPI::group         world;
-    GASPI::segment       loc_seg( 0, & mat_types(0,0), nbr*nbc, world );
-    GASPI::segment       rem_seg( 1, & rem_types(0,0), nbr*nbc, world );
-    GASPI::queue         queue;
+    gaspi::group         world;
+    gaspi::segment       loc_seg( 0, & mat_types(0,0), nbr*nbc, world );
+    gaspi::segment       rem_seg( 1, & rem_types(0,0), nbr*nbc, world );
+    gaspi::queue         queue;
     
     for ( uint  p = 0; p < nprocs; ++p )
     {
@@ -82,7 +75,7 @@ build_type_matrix ( const TBlockMatrix *  A )
         {
             queue.read( rem_seg, p, 0 );
             queue.wait();
-            // GASPI::notify_wait( rem_seg, 1 );
+            // gaspi::notify_wait( rem_seg, 1 );
                                
             for ( uint  i = 0; i < nbr; ++i )
                 for ( uint  j = 0; j < nbc; ++j )
@@ -123,12 +116,12 @@ create_matrix ( const TMatrix *  A,
 
     if ( type == TYPE_DENSE )
     {
-        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
+        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
         T = std::make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
     else if ( type == TYPE_LR )
     {
-        HLR::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
+        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
         T = std::make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
 
@@ -142,38 +135,38 @@ create_matrix ( const TMatrix *  A,
 // define GASPI segments for matrix data
 //
 template < typename value_t >
-std::vector< GASPI::segment >
+std::vector< gaspi::segment >
 create_segments ( const segment_id_t  sid,
                   TMatrix *           A,
                   const uint          rank,
-                  GASPI::group &      group )
+                  gaspi::group &      group )
 {
-    std::vector< GASPI::segment >  segs;
+    std::vector< gaspi::segment >  segs;
 
     // we need space for low-rank blocks
     assert( sid % 2 == 0 );
     
     if ( is_dense( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "create_segments: dense, %d, %d × %d on ", A->id(), A->nrows(), A->ncols() ) + group.to_string() );
+        hlr::log( 4, HLIB::to_string( "create_segments: dense, %d, %d × %d on ", A->id(), A->nrows(), A->ncols() ) + group.to_string() );
 
         segs.reserve( 1 );
-        segs.push_back( GASPI::segment( sid, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
+        segs.push_back( gaspi::segment( sid, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "create_segments: lowrank, %d, %d × %d, %d on ", A->id(), A->nrows(), A->ncols(), rank ) + group.to_string() );
+        hlr::log( 4, HLIB::to_string( "create_segments: lowrank, %d, %d × %d, %d on ", A->id(), A->nrows(), A->ncols(), rank ) + group.to_string() );
         
         auto  R = ptrcast( A, TRkMatrix );
         
         R->set_rank( rank );
         
         segs.reserve( 2 );
-        segs.push_back( GASPI::segment( sid,   blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group ) );
-        segs.push_back( GASPI::segment( sid+1, blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
+        segs.push_back( gaspi::segment( sid,   blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group ) );
+        segs.push_back( gaspi::segment( sid+1, blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
     }// if
     else
-        HLR::error( "(create_segments) unsupported matrix type : " + A->typestr() ) ;
+        hlr::error( "(create_segments) unsupported matrix type : " + A->typestr() ) ;
 
     return segs;
 }
@@ -183,26 +176,26 @@ create_segments ( const segment_id_t  sid,
 //
 template < typename value_t >
 void
-read_matrix ( std::vector< GASPI::segment > &  segs,
+read_matrix ( std::vector< gaspi::segment > &  segs,
               TMatrix *                        A,
               const int                        source,
-              GASPI::queue &                   queue )
+              gaspi::queue &                   queue )
 {
     if ( is_dense( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "read_matrix: dense, %d, %d × %d from %d", A->id(), A->nrows(), A->ncols(), source ) );
+        hlr::log( 4, HLIB::to_string( "read_matrix: dense, %d, %d × %d from %d", A->id(), A->nrows(), A->ncols(), source ) );
 
         queue.read( segs[0], source, segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), source ) );
+        hlr::log( 4, HLIB::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), source ) );
         
         queue.read( segs[0], source, segs[0].id() );
         queue.read( segs[1], source, segs[1].id() );
     }// if
     else
-        HLR::error( "(read_matrix) unsupported matrix type : " + A->typestr() ) ;
+        hlr::error( "(read_matrix) unsupported matrix type : " + A->typestr() ) ;
 }
 
 //
@@ -210,57 +203,57 @@ read_matrix ( std::vector< GASPI::segment > &  segs,
 //
 template < typename value_t >
 void
-send_matrix ( std::vector< GASPI::segment > &  segs,
+send_matrix ( std::vector< gaspi::segment > &  segs,
               TMatrix *                        A,
               const int                        dest,
-              GASPI::queue &                   queue )
+              gaspi::queue &                   queue )
 {
     if ( is_dense( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "send_matrix: dense, %d, %d × %d to %d", A->id(), A->nrows(), A->ncols(), dest ) );
+        hlr::log( 4, HLIB::to_string( "send_matrix: dense, %d, %d × %d to %d", A->id(), A->nrows(), A->ncols(), dest ) );
 
         queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 4, HLIB::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), dest ) );
+        hlr::log( 4, HLIB::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), dest ) );
         
         queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
         queue.write_notify( segs[1], dest, segs[1].id(), segs[1].id() );
     }// if
     else
-        HLR::error( "(send_matrix) unsupported matrix type : " + A->typestr() ) ;
+        hlr::error( "(send_matrix) unsupported matrix type : " + A->typestr() ) ;
 }
 
 //
 // wait for matrix communication to finish 
 //
 void
-wait_matrix ( std::vector< GASPI::segment > &  segs )
+wait_matrix ( std::vector< gaspi::segment > &  segs )
 {
     if ( segs.size() == 1 )
     {
-        GASPI::notify_wait( segs[0], segs[0].id() );
+        gaspi::notify_wait( segs[0], segs[0].id() );
     }// if
     else if ( segs.size() == 2 )
     {
-        GASPI::notify_wait( segs[0], segs[0].id() );
-        GASPI::notify_wait( segs[1], segs[1].id() );
+        gaspi::notify_wait( segs[0], segs[0].id() );
+        gaspi::notify_wait( segs[1], segs[1].id() );
     }// if
     else
-        HLR::error( HLIB::to_string( "(wait_matrix) unsupported number of segments: %d", segs.size() ) );
+        hlr::error( HLIB::to_string( "(wait_matrix) unsupported number of segments: %d", segs.size() ) );
 }
 
 //
 // return list of processors in row <row> starting after diagonal block
 //
-std::list< GASPI::rank_t >
+std::list< gaspi::rank_t >
 get_row_procs ( const TBlockMatrix *  A,
                 const uint            row )
 {
     const auto                  nbr = A->nblock_rows();
     const auto                  nbc = A->nblock_cols();
-    std::list< GASPI::rank_t >  procs;
+    std::list< gaspi::rank_t >  procs;
     
     for ( uint  j = 0; j < nbc; ++j )
         procs.push_back( A->block( row, j )->procs().master() );
@@ -274,13 +267,13 @@ get_row_procs ( const TBlockMatrix *  A,
 //
 // return list of processors in column <col> starting after diagonal block
 //
-std::list< GASPI::rank_t >
+std::list< gaspi::rank_t >
 get_col_procs ( const TBlockMatrix *  A,
                 const uint            col )
 {
     const auto                  nbr = A->nblock_rows();
     const auto                  nbc = A->nblock_cols();
-    std::list< GASPI::rank_t >  procs;
+    std::list< gaspi::rank_t >  procs;
     
     for ( uint  i = 0; i < nbr; ++i )
         procs.push_back( A->block( i, col )->procs().master() );
@@ -297,12 +290,12 @@ get_col_procs ( const TBlockMatrix *  A,
 //
 void
 build_row_groups ( const TBlockMatrix *                         A,
-                   std::vector< GASPI::group > &                groups,  // communicator per row
-                   std::vector< std::list< GASPI::rank_t > > &  procs )  // set of processors per row
+                   std::vector< gaspi::group > &                groups,  // communicator per row
+                   std::vector< std::list< gaspi::rank_t > > &  procs )  // set of processors per row
 {
     const auto      nbr = A->nblock_rows();
     const auto      nbc = A->nblock_cols();
-    GASPI::process  process;
+    gaspi::process  process;
     const auto      pid = process.rank();
     
     for ( uint  i = 0; i < nbr; ++i )
@@ -326,7 +319,7 @@ build_row_groups ( const TBlockMatrix *                         A,
         if ( contains( procs_i, pid ) )
         {
             if ( pos < nbr ) groups[i] = groups[pos];
-            else             groups[i] = GASPI::group( procs_i );
+            else             groups[i] = gaspi::group( procs_i );
         }// if
             
         procs[i] = std::move( procs_i );
@@ -340,12 +333,12 @@ build_row_groups ( const TBlockMatrix *                         A,
 //
 void
 build_col_groups ( const TBlockMatrix *                         A,
-                   std::vector< GASPI::group > &                groups,  // group per column
-                   std::vector< std::list< GASPI::rank_t > > &  procs )  // set of processors per column
+                   std::vector< gaspi::group > &                groups,  // group per column
+                   std::vector< std::list< gaspi::rank_t > > &  procs )  // set of processors per column
 {
     const auto      nbr = A->nblock_rows();
     const auto      nbc = A->nblock_cols();
-    GASPI::process  process;
+    gaspi::process  process;
     const auto      pid = process.rank();
     
     for ( uint  i = 0; i < nbc; ++i )
@@ -369,7 +362,7 @@ build_col_groups ( const TBlockMatrix *                         A,
         if ( contains( procs_i, pid ) )
         {
             if ( pos < nbc ) groups[i] = groups[pos];
-            else             groups[i] = GASPI::group( procs_i );
+            else             groups[i] = gaspi::group( procs_i );
         }// if
             
         procs[i] = std::move( procs_i );
@@ -386,11 +379,11 @@ lu ( TMatrix *          A,
     // assert( RANK != 0 );
     assert( is_blocked( A ) );
     
-    GASPI::process  process;
+    gaspi::process  process;
     const auto      pid    = process.rank();
     const auto      nprocs = process.size();
     
-    HLR::log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    hlr::log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
 
     auto  BA  = ptrcast( A, TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -411,15 +404,15 @@ lu ( TMatrix *          A,
     // queues for communication with all nodes
     //
 
-    std::vector< GASPI::queue >  queues( nprocs );  // one queue to each remote processor
-    GASPI::group                 world;
+    std::vector< gaspi::queue >  queues( nprocs );  // one queue to each remote processor
+    gaspi::group                 world;
 
     //
     // set up groups for all rows/columns
     //
 
-    std::vector< GASPI::group >                row_groups( nbr ), col_groups( nbc );
-    std::vector< std::list< GASPI::rank_t > >  row_procs( nbr ), col_procs( nbc );
+    std::vector< gaspi::group >                row_groups( nbr ), col_groups( nbc );
+    std::vector< std::list< gaspi::rank_t > >  row_procs( nbr ), col_procs( nbc );
 
     build_row_groups( BA, row_groups, row_procs );
     build_col_groups( BA, col_groups, col_procs );
@@ -435,7 +428,7 @@ lu ( TMatrix *          A,
         for ( uint  j = 0; j < nbc; ++j )
             id(i,j) = ( nid += 2 );
 
-    HLR::log( 4, HLIB::to_string( "maximal ID: %d", nid ) );
+    hlr::log( 4, HLIB::to_string( "maximal ID: %d", nid ) );
     
     //
     // LU factorization
@@ -457,9 +450,9 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
 
-        HLR::log( 5, HLIB::to_string( "#alloc. segments: %d of %d", process.nalloc_segments(), process.nmax_segments() ) );
+        hlr::log( 5, HLIB::to_string( "#alloc. segments: %d of %d", process.nalloc_segments(), process.nmax_segments() ) );
 
         //
         // factorization of diagonal block
@@ -470,7 +463,7 @@ lu ( TMatrix *          A,
 
         if ( pid == p_ii )
         {
-            HLR::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
+            hlr::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
             BLAS::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
@@ -499,7 +492,7 @@ lu ( TMatrix *          A,
             }// if
 
             // set up windows/attached memory 
-            std::vector< GASPI::segment >  diag_seg;
+            std::vector< gaspi::segment >  diag_seg;
 
             if ( with_comm )
                 diag_seg = create_segments< value_t >( id(i,i), H_ii, rank, col_groups[i] );
@@ -526,13 +519,13 @@ lu ( TMatrix *          A,
                 auto        A_ji = BA->block( j, i );
                 const auto  p_ji = A_ji->procs().master();
                 
-                HLR::log( 4, HLIB::to_string( "  solve( %d )", A_ji->id() ) );
+                hlr::log( 4, HLIB::to_string( "  solve( %d )", A_ji->id() ) );
                 
                 if ( pid == p_ji )
                 {
                     if ( ! have_diag )
                     {
-                        HLR::log( 4, HLIB::to_string( "waiting for %d", H_ii->id() ) );
+                        hlr::log( 4, HLIB::to_string( "waiting for %d", H_ii->id() ) );
                         wait_matrix( diag_seg );
                         have_diag = true;
                         
@@ -560,8 +553,8 @@ lu ( TMatrix *          A,
         std::vector< std::unique_ptr< TMatrix > >     col_i_mat( nbc );
         std::vector< TMatrix * >                      row_i( nbr, nullptr );   // actual matrix handles
         std::vector< TMatrix * >                      col_i( nbc, nullptr );
-        std::vector< std::vector< GASPI::segment > >  row_segs( nbr );         // holds GASPI segments for matrices
-        std::vector< std::vector< GASPI::segment > >  col_segs( nbc );
+        std::vector< std::vector< gaspi::segment > >  row_segs( nbr );         // holds GASPI segments for matrices
+        std::vector< std::vector< gaspi::segment > >  col_segs( nbc );
 
         for ( uint  j = i+1; j < nbr; ++j )
         {
@@ -654,7 +647,7 @@ lu ( TMatrix *          A,
 
                     if (( p_ji != pid ) && ! row_done[j] )
                     {
-                        HLR::log( 5, HLIB::to_string( "waiting for row matrix %d", BA->block(j,i)->id() ) );
+                        hlr::log( 5, HLIB::to_string( "waiting for row matrix %d", BA->block(j,i)->id() ) );
                         wait_matrix( row_segs[j] );
                         row_done[j] = true;
                         add_mem += row_i[j]->byte_size();
@@ -662,7 +655,7 @@ lu ( TMatrix *          A,
                             
                     if (( p_il != pid ) && ! col_done[l] )
                     {
-                        HLR::log( 5, HLIB::to_string( "waiting for col matrix %d", BA->block(i,l)->id() ) );
+                        hlr::log( 5, HLIB::to_string( "waiting for col matrix %d", BA->block(i,l)->id() ) );
                         wait_matrix( col_segs[l] );
                         col_done[l] = true;
                         add_mem += col_i[l]->byte_size();
@@ -698,10 +691,6 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
-}// namespace TLR
-
-}// namespace GASPI
-
-}// namespace HLR
+}}}// namespace hlr::gaspi::tlr
 
 #endif // __HLR_GASPI_ARITH_HH

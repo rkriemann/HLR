@@ -27,11 +27,11 @@ WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
-# set of programs to build: dag, tlr, hodlr, tileh
-BUILD        = [ 'dag' ]
+# set of programs to build: dag, tlr, hodlr, tileh (or "all")
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag' ]
 
-# set of frameworks to use: seq, openmp, tbb, taskflow, hpx, mpi, gpi2
-FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx' ]
+# set of frameworks to use: seq, openmp, tbb, taskflow, hpx, mpi, gpi2 (or "all")
+FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx', 'mpi', 'gpi2' ]
 
 # directories for the various external libraries
 HPRO_DIR     = 'hlibpro'
@@ -76,7 +76,7 @@ opts.Add( BoolVariable( 'profile',  'enable building with profile informations',
 opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 
-opts.Add( ListVariable( 'build',      'programs to build',                 'all', BUILD      ) )
+opts.Add( ListVariable( 'programs',   'programs to build',                 'all', PROGRAMS   ) )
 opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all', FRAMEWORKS ) )
 
 # read options from options file
@@ -88,11 +88,11 @@ profile  = opt_env['profile']
 optimise = opt_env['optimise']
 warn     = opt_env['warn']
 
-BUILD      = Split( opt_env['build'] )
-FRAMEWORKS = Split( opt_env['frameworks'] )
+programs   = Split( opt_env['programs'] )
+frameworks = Split( opt_env['frameworks'] )
 
-print( BUILD )
-print( FRAMEWORKS )
+if 'all' in programs   : programs   = PROGRAMS
+if 'all' in frameworks : frameworks = FRAMEWORKS
 
 opts.Save( opts_file, opt_env )
 
@@ -188,70 +188,70 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
 # default sequential environment
 #
 
-if 'seq' in FRAMEWORKS :
+if 'seq' in frameworks :
     seq = env.Clone()
         
-    if 'tlr'   in BUILD : seq.Program( 'tlr-seq.cc' )
-    if 'hodlr' in BUILD : seq.Program( 'hodlr-seq.cc' )
-    if 'tileh' in BUILD : seq.Program( 'tileh-seq.cc' )
-    if 'dag'   in BUILD : seq.Program( 'dag-seq.cc' )
+    if 'tlr'   in programs : seq.Program( 'tlr-seq.cc' )
+    if 'hodlr' in programs : seq.Program( 'hodlr-seq.cc' )
+    if 'tileh' in programs : seq.Program( 'tileh-seq.cc' )
+    if 'dag'   in programs : seq.Program( 'dag-seq.cc' )
 
 #
 # OpenMP
 #
 
-if 'openmp' in FRAMEWORKS :
+if 'openmp' in frameworks :
     omp = env.Clone()
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
 
-    if 'tlr'   in BUILD : omp.Program( 'tlr-omp.cc' )
-    if 'hodlr' in BUILD : omp.Program( 'hodlr-omp.cc' )
-    if 'tileh' in BUILD : omp.Program( 'tileh-omp.cc' )
-    if 'dag'   in BUILD : omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] )
+    if 'tlr'   in programs : omp.Program( 'tlr-omp.cc' )
+    if 'hodlr' in programs : omp.Program( 'hodlr-omp.cc' )
+    if 'tileh' in programs : omp.Program( 'tileh-omp.cc' )
+    if 'dag'   in programs : omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] )
 
 #
 # TBB
 #
 
-if 'tbb' in FRAMEWORKS :
+if 'tbb' in frameworks :
     tbb = env.Clone()
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
 
-    if 'tlr'   in BUILD : tbb.Program( 'tlr-tbb.cc' )
-    if 'hodlr' in BUILD : tbb.Program( 'hodlr-tbb.cc' )
-    if 'tileh' in BUILD : tbb.Program( 'tileh-tbb.cc' )
-    if 'dag'   in BUILD : tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
+    if 'tlr'   in programs : tbb.Program( 'tlr-tbb.cc' )
+    if 'hodlr' in programs : tbb.Program( 'hodlr-tbb.cc' )
+    if 'tileh' in programs : tbb.Program( 'tileh-tbb.cc' )
+    if 'dag'   in programs : tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] )
 
 #
 # TaskFlow
 #
 
-if 'taskflow' in FRAMEWORKS :
+if 'taskflow' in frameworks :
     tf = env.Clone()
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'   in BUILD : tf.Program( 'tlr-tf.cc' )
-    if 'hodlr' in BUILD : tf.Program( 'hodlr-tf.cc' )
-    if 'dag'   in BUILD : tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
+    if 'tlr'   in programs : tf.Program( 'tlr-tf.cc' )
+    if 'hodlr' in programs : tf.Program( 'hodlr-tf.cc' )
+    if 'dag'   in programs : tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] )
 
 #
 # MPI
 #
 
-if 'mpi' in FRAMEWORKS :
+if 'mpi' in frameworks :
     mpi = env.Clone()
     mpi.ParseConfig( 'mpic++ --showme:compile' )
     mpi.ParseConfig( 'mpic++ --showme:link' )
     
-    if 'tlr'   in BUILD :
+    if 'tlr'   in programs :
         mpi.Program( 'tlr-mpi-bcast.cc' )
         mpi.Program( 'tlr-mpi-ibcast.cc' )
         mpi.Program( 'tlr-mpi-rdma.cc' )
     
-    if 'tileh' in BUILD :
+    if 'tileh' in programs :
         mpi.Program( 'tileh-mpi-bcast.cc' )
         mpi.Program( 'tileh-mpi-ibcast.cc' )
 
@@ -259,27 +259,26 @@ if 'mpi' in FRAMEWORKS :
 # HPX
 #
 
-if 'hpx' in FRAMEWORKS :
+if 'hpx' in frameworks :
     hpx = env.Clone()
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.Append( LIBS = [ "hpx_iostreams" ] )
     
-    if 'tlr'   in BUILD : hpx.Program( 'tlr-hpx.cc' )
-    if 'hodlr' in BUILD : hpx.Program( 'hodlr-hpx.cc' )
-    if 'dag'   in BUILD : hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
+    if 'tlr'   in programs : hpx.Program( 'tlr-hpx.cc' )
+    if 'hodlr' in programs : hpx.Program( 'hodlr-hpx.cc' )
+    if 'dag'   in programs : hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] )
 
 #
 # GASPI
 #
 
-if 'gpi2' in FRAMEWORKS :
+if 'gpi2' in frameworks :
     gpi = env.Clone()
     gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
     gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
     gpi.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'   in BUILD : gpi.Program( 'tlr-gaspi.cc' )
-    if 'hodlr' in BUILD : gpi.Program( 'hodlr-gpi.cc' )
+    if 'tlr'   in programs : gpi.Program( 'tlr-gaspi.cc' )
 
     

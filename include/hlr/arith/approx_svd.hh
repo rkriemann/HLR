@@ -1,5 +1,5 @@
-#ifndef __HLR_APPROX_SVD_HH
-#define __HLR_APPROX_SVD_HH
+#ifndef __HLR_ARITH_APPROX_SVD_HH
+#define __HLR_ARITH_APPROX_SVD_HH
 //
 // Project     : HLib
 // File        : approx_svd.hh
@@ -14,7 +14,7 @@
 #include <blas/Matrix.hh>
 #include <blas/Algebra.hh>
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
@@ -133,7 +133,7 @@ truncate_svd ( const BLAS::Matrix< T > &  A,
 
         lacc.set_max_rank( acc_rank );
 
-        std::tie( OA, OB ) = HLR::approx_svd( M, lacc );
+        std::tie( OA, OB ) = hlr::approx_svd( M, lacc );
     }// if
     else
     {
@@ -251,7 +251,7 @@ approx_sum_svd ( const std::list< BLAS::Matrix< T > > &  U,
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
             BLAS::prod( value_t(1), *u_i, BLAS::adjoint( *v_i ), value_t(1), D );
 
-        auto [ U_tr, V_tr ] = BLAS::approx_svd( D, acc );
+        auto [ U_tr, V_tr ] = hlr::approx_svd( D, acc );
 
         return { std::move( U_tr ), std::move( V_tr ) };
     }// if
@@ -287,10 +287,10 @@ approx_sum_svd ( const std::list< BLAS::Matrix< T > > &  U,
         // truncate and return result
         //
     
-        return HLR::truncate_svd( U_all, V_all, acc );
+        return hlr::truncate_svd( U_all, V_all, acc );
     }// else
 }
 
-}// namespace HLR
+}// namespace hlr
 
-#endif // __HLR_APPROX_SVD_HH
+#endif // __HLR_ARITH_APPROX_SVD_HH

@@ -9,16 +9,10 @@
 #include "hlr/tbb/matrix.hh"
 #include "hlr/tbb/dag.hh"
 
-namespace impl = hlr::tbb;
+namespace          impl      = hlr::tbb;
+const std::string  impl_name = "tbb";
 
 #include "dag.hh"
-
-template < typename problem_t >
-void
-mymain ( int argc, char ** argv )
-{
-    dag_main< problem_t >( argc, argv, "tbb" );
-}
 
 int
 main ( int argc, char ** argv )

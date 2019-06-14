@@ -1,5 +1,5 @@
-#ifndef __HLR_APPROX_ACA_HH
-#define __HLR_APPROX_ACA_HH
+#ifndef __HLR_ARITH_APPROX_ACA_HH
+#define __HLR_ARITH_APPROX_ACA_HH
 //
 // Project     : HLib
 // File        : approx_aca.hh
@@ -15,7 +15,7 @@
 #include <blas/Vector.hh>
 #include <blas/Matrix.hh>
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
@@ -266,6 +266,6 @@ approx_aca  ( const operator_t &                        M,
     return { std::move( MU ), std::move( MV ) };
 }
 
-}// namespace HLR
+}// namespace hlr
 
-#endif // __HLR_APPROX_ACA_HH
+#endif // __HLR_ARITH_APPROX_ACA_HH

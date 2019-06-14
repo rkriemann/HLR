@@ -1,5 +1,5 @@
-#ifndef __HLR_SOLVE_HH
-#define __HLR_SOLVE_HH
+#ifndef __HLR_ARITH_SOLVE_HH
+#define __HLR_ARITH_SOLVE_HH
 //
 // Project     : HLib
 // File        : solve.hh
@@ -12,10 +12,10 @@
 #include <matrix/TDenseMatrix.hh>
 #include <matrix/TRkMatrix.hh>
 
-namespace HLR
+namespace hlr
 {
 
-using namespace HLR;
+using namespace HLIB;
 
 //
 // solve X U = M
@@ -47,6 +47,6 @@ trsmuh ( const TDenseMatrix *  U,
     }// else
 }
 
-}// namespace HLR
+}// namespace hlr
 
-#endif // __HLR_SOLVE_HH
+#endif // __HLR_ARITH_SOLVE_HH

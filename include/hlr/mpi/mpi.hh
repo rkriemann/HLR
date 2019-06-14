@@ -12,14 +12,17 @@
 #include <cassert>
 #include <vector>
 
-#include <utils/log.hh>
+#include "hlr/utils/log.hh"
+
+namespace hlr
+{
 
 namespace mpi
 {
 
 #define MPI_CHECK_RESULT( MPIFunc, Args )                               \
     {                                                                   \
-        HLR::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #MPIFunc ); \
+        hlr::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #MPIFunc ); \
         int _check_result = MPIFunc Args;                               \
         assert(_check_result == MPI_SUCCESS);                           \
     }
@@ -91,7 +94,7 @@ public:
         // assert( mpi_request == MPI_REQUEST_NULL );
         if ( mpi_request != MPI_REQUEST_NULL )
         {
-            HLR::log( 0, "open request" );
+            hlr::log( 0, "open request" );
         }// if
         
         // if ( mpi_request != MPI_REQUEST_NULL )
@@ -118,7 +121,7 @@ wait_all ( std::vector< request > &  reqs )
 {
     std::vector< MPI_Request >  requests( reqs.size() );
     
-    for ( int  i = 0; i < reqs.size(); ++i )
+    for ( uint  i = 0; i < reqs.size(); ++i )
     {
         assert( reqs[i].mpi_request != MPI_REQUEST_NULL );
         
@@ -285,7 +288,7 @@ public:
     ~window ()
     {
         if ( _mpi_window != MPI_WIN_NULL )
-            HLR::log( 0, "window is not free" );
+            hlr::log( 0, "window is not free" );
             // MPI_CHECK_RESULT( MPI_Win_free,
             //                   ( & _mpi_window ) );
     }
@@ -366,5 +369,7 @@ public:
 };
 
 }// namespace mpi
+
+}// namespace hlr
 
 #endif //  __HLR_MPI_HH

@@ -21,15 +21,21 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "utils/tools.hh"
-#include "common/multiply.hh"
-#include "common/solve.hh"
-#include "mpi/arith.hh"
+#include "hlr/utils/tools.hh"
+#include "hlr/arith/multiply.hh"
+#include "hlr/arith/solve.hh"
+#include "hlr/mpi/arith.hh"
 
-namespace HLR
+namespace hlr
 {
 
 using namespace HLIB;
+
+namespace mpi
+{
+
+namespace rdma
+{
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -37,13 +43,7 @@ using namespace HLIB;
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TLR
-{
-
-namespace MPI
-{
-
-namespace rdma
+namespace tlr
 {
 
 template < typename value_t >
@@ -52,7 +52,7 @@ rget ( mpi::window &                    win,
        HLIB::BLAS::Matrix< value_t > &  M,
        const int                        root )
 {
-    HLR::log( 5, HLIB::to_string( "rget: %d × %d from %d", M.nrows(), M.ncols(), root ) );
+    hlr::log( 5, HLIB::to_string( "rget: %d × %d from %d", M.nrows(), M.ncols(), root ) );
     
     mpi::request  req;
     const size_t  count = M.nrows() * M.ncols() * sizeof(value_t);
@@ -76,7 +76,7 @@ setup_rdma ( mpi::communicator &  comm,
     
     if ( is_dense( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "setup_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
+        hlr::log( 5, HLIB::to_string( "setup_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
                   
         wins.reserve( 1 );
         wins[0] = mpi::window( comm, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols() );
@@ -84,7 +84,7 @@ setup_rdma ( mpi::communicator &  comm,
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "setup_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), rank ) );
+        hlr::log( 5, HLIB::to_string( "setup_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), rank ) );
         
         auto  R = ptrcast( A, TRkMatrix );
         
@@ -97,7 +97,7 @@ setup_rdma ( mpi::communicator &  comm,
         wins[1].fence( MPI_MODE_NOPUT | MPI_MODE_NOPRECEDE );
     }// if
     else
-        HLR::error( "(setup_rdma) unsupported matrix type : " + A->typestr() ) ;
+        hlr::error( "(setup_rdma) unsupported matrix type : " + A->typestr() ) ;
 
     return wins;
 }
@@ -114,19 +114,19 @@ request_rdma ( std::vector< mpi::window > &  wins,
 
     if ( is_dense( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "request_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
+        hlr::log( 5, HLIB::to_string( "request_rdma: dense, %d × %d", A->nrows(), A->ncols() ) );
         
         reqs.push_back( rget( wins[0], blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ), root ) );
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR::log( 5, HLIB::to_string( "request_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
+        hlr::log( 5, HLIB::to_string( "request_rdma: lowrank, %d × %d, %d", A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank() ) );
         
         reqs.push_back( rget( wins[0], blas_mat_A< value_t >( ptrcast( A, TRkMatrix ) ), root ) );
         reqs.push_back( rget( wins[1], blas_mat_B< value_t >( ptrcast( A, TRkMatrix ) ), root ) );
     }// if
     else
-        HLR::error( "(request_rdma) unsupported matrix type : " + A->typestr() ) ;
+        hlr::error( "(request_rdma) unsupported matrix type : " + A->typestr() ) ;
 
     return std::move( reqs );
 }
@@ -185,8 +185,8 @@ lu ( TMatrix *          A,
     std::vector< std::list< int > >                row_procs( nbr ), col_procs( nbc );  // set of processors for rows/columns
     std::vector< std::unordered_map< int, int > >  row_maps( nbr ),  col_maps( nbc );   // mapping of global ranks to row/column ranks
 
-    Matrix::MPI::build_row_comms( BA, row_comms, row_procs, row_maps );
-    Matrix::MPI::build_col_comms( BA, col_comms, col_procs, col_maps );
+    mpi::matrix::build_row_comms( BA, row_comms, row_procs, row_maps );
+    mpi::matrix::build_col_comms( BA, col_comms, col_procs, col_maps );
 
     //
     // LU factorization
@@ -200,18 +200,18 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        HLR::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
 
         if ( pid == p_ii )
         {
-            HLR::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
+            hlr::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
             BLAS::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
-        if ( contains( col_procs[i], pid ) );
+        if ( contains( col_procs[i], pid ) )
         {
             //
             // set up RDMA for diagonal block
@@ -432,11 +432,7 @@ lu ( TMatrix *          A,
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 
-}// namespace rdma
-
-}// namespace MPI
-
-}// namespace TLR
+}// namespace tlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -444,15 +440,10 @@ lu ( TMatrix *          A,
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace HODLR
+namespace hodlr
 {
 
-namespace MPI
-{
-
-}// namespace MPI
-
-}// namespace HODLR
+}// namespace hodlr
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -460,21 +451,15 @@ namespace MPI
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace TileH
+namespace tileh
 {
 
-namespace MPI
-{
-
-namespace rdma
-{
+}// namespace tileh
 
 }// namespace rdma
 
-}// namespace MPI
+}// namespace mpi
 
-}// namespace TileH
-
-}// namespace HLR
+}// namespace hlr
 
 #endif // __HLR_MPI_ARITH_RDMA_HH

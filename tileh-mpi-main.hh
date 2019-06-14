@@ -1,13 +1,13 @@
 
-#include "mpi/mpi.hh"
-#include "mpi/distr.hh"
-#include "cluster/tlr.hh"
+#include "hlr/mpi/mpi.hh"
+#include "hlr/cluster/distr.hh"
+#include "hlr/cluster/tileh.hh"
 #include "cmdline.hh"
 #include "gen_problem.hh"
-#include "utils/RedirectOutput.hh"
-#include "utils/compare.hh"
+#include "hlr/utils/RedirectOutput.hh"
+#include "hlr/utils/compare.hh"
 
-using namespace HLR;
+using namespace hlr;
 
 //
 // main function
@@ -25,12 +25,12 @@ mymain ( int argc, char ** argv )
     auto  tic     = Time::Wall::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = TLR::cluster( coord.get(), ntile );
-    auto  bct     = TLR::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, std::max< uint >( 3, std::log2( nprocs )+2 ) );
+    auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
 
     // assign blocks to nodes
-    if      ( distr == "cyclic2d"    ) distribution::cyclic_2d( nprocs, bct->root() );
-    else if ( distr == "shiftcycrow" ) distribution::shifted_cyclic_1d( nprocs, bct->root() );
+    if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
+    else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
     if (( pid == 0 ) && verbose( 3 ))
     {
@@ -43,7 +43,7 @@ mymain ( int argc, char ** argv )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = Matrix::MPI::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  A      = mpi::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
     auto  toc    = Time::Wall::since( tic );
     
     std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
@@ -89,13 +89,13 @@ main ( int argc, char ** argv )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    parse_cmdline( argc, argv );
-    
     // redirect output for all except proc 0
-    std::unique_ptr< RedirectOutput >  redir_out = ( ! noredir && (pid != 0)
-                                                     ? std::make_unique< RedirectOutput >( to_string( "tlr-mpi_%03d.out", pid ) )
+    std::unique_ptr< RedirectOutput >  redir_out = ( pid != 0
+                                                     ? std::make_unique< RedirectOutput >( to_string( "tileh-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
+    parse_cmdline( argc, argv );
+    
     try
     {
         INIT();
@@ -112,8 +112,8 @@ main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel" ) mymain< HLR::Apps::LogKernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< HLR::Apps::MaternCov >( argc, argv );
+        if      ( appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
+        else if ( appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
         else
             throw "unknown application";
 
