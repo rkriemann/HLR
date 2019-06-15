@@ -615,10 +615,10 @@ apply_node::run_ ( const TTruncAcc &  acc )
 // construct DAG for applying updates
 //
 void
-build_apply_dag ( TMatrix *              A,
-                  node *                 parent,
-                  apply_map_t &          apply_map,
-                  std::list< node * > &  apply_nodes )
+build_apply_dag ( TMatrix *           A,
+                  node *              parent,
+                  apply_map_t &       apply_map,
+                  dag::node_list_t &  apply_nodes )
 {
     if ( is_null( A ) )
         return;
@@ -680,66 +680,66 @@ gen_lu_dag ( TMatrix *                          A,
     
     dag.add_nodes( apply_nodes );
 
-    //
-    // remove apply update nodes without updates
-    //
+    // //
+    // // remove apply update nodes without updates
+    // //
 
-    using  node_set_t = std::unordered_set< node * >;
+    // using  node_set_t = std::unordered_set< node * >;
 
-    dag::node_list_t  work;
-    node_set_t        deleted;
+    // dag::node_list_t  work;
+    // node_set_t        deleted;
 
-    for ( auto  node : dag.start() )
-        work.push_back( node );
+    // for ( auto  node : dag.start() )
+    //     work.push_back( node );
 
-    while ( ! work.empty() )
-    {
-        dag::node_list_t  succ;
+    // while ( ! work.empty() )
+    // {
+    //     dag::node_list_t  succ;
         
-        while ( ! work.empty() )
-        {
-            auto  node = behead( work );
+    //     while ( ! work.empty() )
+    //     {
+    //         auto  node = behead( work );
 
-            if ( dynamic_cast< apply_node * >( node ) != nullptr )
-            {
-                if ( node->dep_cnt() == 0 )
-                {
-                    for ( auto  out : node->successors() )
-                    {
-                        out->dec_dep_cnt();
-                        succ.push_back( out );
-                    }// for
+    //         if ( dynamic_cast< apply_node * >( node ) != nullptr )
+    //         {
+    //             if ( node->dep_cnt() == 0 )
+    //             {
+    //                 for ( auto  out : node->successors() )
+    //                 {
+    //                     out->dec_dep_cnt();
+    //                     succ.push_back( out );
+    //                 }// for
                     
-                    deleted.insert( node );
-                }// if
-            }// if
-        }// while
+    //                 deleted.insert( node );
+    //             }// if
+    //         }// if
+    //     }// while
 
-        work = std::move( succ );
-    }// while
+    //     work = std::move( succ );
+    // }// while
 
-    dag::node_list_t  nodes, start, end;
+    // dag::node_list_t  nodes, start, end;
 
-    for ( auto  node : dag.nodes() )
-    {
-        if ( deleted.find( node ) != deleted.end() )
-        {
-            // DBG::print( Term::on_red( "deleting " + node->to_string() ) );
-            delete node;
-        }// if
-        else
-        {
-            nodes.push_back( node );
+    // for ( auto  node : dag.nodes() )
+    // {
+    //     if ( deleted.find( node ) != deleted.end() )
+    //     {
+    //         // DBG::print( Term::on_red( "deleting " + node->to_string() ) );
+    //         delete node;
+    //     }// if
+    //     else
+    //     {
+    //         nodes.push_back( node );
             
-            if ( node->dep_cnt() == 0 )
-                start.push_back( node );
+    //         if ( node->dep_cnt() == 0 )
+    //             start.push_back( node );
 
-            if ( node->successors().empty() )
-                end.push_back( node );
-        }// else
-    }// for
+    //         if ( node->successors().empty() )
+    //             end.push_back( node );
+    //     }// else
+    // }// for
     
-    return  dag::graph( nodes, start, end );
+    // return  dag::graph( nodes, start, end );
 }
 
 graph

@@ -10,6 +10,8 @@
 
 #include <sstream>
 #include <algorithm>
+#include <set>
+#include <unordered_set>
 
 #include <base/config.hh>
 
@@ -19,12 +21,29 @@ namespace hlr
 //
 // simplifies test if <val> is in <cont>
 //
-template < typename container_t >
+template < template < typename > typename container_t,
+           typename value_t >
 bool
-contains ( container_t const &                    cont,
-           typename container_t::const_reference  val )
+contains ( const container_t< value_t > &  cont,
+           const value_t &                 val )
 {
     return std::find( cont.begin(), cont.end(), val ) != cont.end();
+}
+
+template < typename value_t >
+bool
+contains ( const std::set< value_t > &  cont,
+           const value_t &              val )
+{
+    return cont.find( val ) != cont.end();
+}
+
+template < typename value_t >
+bool
+contains ( const std::unordered_set< value_t > &  cont,
+           const value_t &                        val )
+{
+    return cont.find( val ) != cont.end();
 }
 
 //

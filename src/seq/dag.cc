@@ -36,12 +36,16 @@ refine ( node *  root )
     
     std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
+    auto                  tic = HLIB::Time::Wall::now();
+    auto                  toc = HLIB::Time::Wall::since( tic );
 
     while ( ! nodes.empty() )
     {
         std::deque< node * >  subnodes, del_nodes;
 
-        log( 4, HLIB::to_string( "no. of nodes in refinement step    = %d", nodes.size() ) );
+        HLR_LOG( 4, HLIB::to_string( "no. of nodes in refinement step    = %d", nodes.size() ) );
+
+        // tic = HLIB::Time::Wall::now();
         
         // first refine nodes
         std::for_each( nodes.begin(), nodes.end(),
@@ -50,6 +54,11 @@ refine ( node *  root )
                            node->refine();
                        } );
 
+        // toc = HLIB::Time::Wall::since( tic );
+        // log( 0, HLIB::to_string( "refine : %.4e", toc.seconds() ) );
+
+        // tic = HLIB::Time::Wall::now();
+        
         // then refine dependencies and collect new nodes
         std::for_each( nodes.begin(), nodes.end(),
                        [&] ( node * node )
@@ -77,6 +86,11 @@ refine ( node *  root )
                            }// else
                        } );
 
+        // toc = HLIB::Time::Wall::since( tic );
+        // log( 0, HLIB::to_string( "deps   : %.4e", toc.seconds() ) );
+
+        // tic = HLIB::Time::Wall::now();
+
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         std::for_each( del_nodes.begin(), del_nodes.end(),
                        [] ( node * node )
@@ -84,6 +98,9 @@ refine ( node *  root )
                            delete node;
                        } );
         
+        // toc = HLIB::Time::Wall::since( tic );
+        // log( 0, HLIB::to_string( "delete : %.4e", toc.seconds() ) );
+
         nodes = std::move( subnodes );
     }// while
 

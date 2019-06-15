@@ -9,6 +9,7 @@
 #include <iostream>
 #include <deque>
 #include <unordered_set>
+#include <set>
 
 
 #include "hlr/utils/log.hh"
@@ -33,10 +34,35 @@ constexpr int          def_path_len = 2;
 constexpr bool         lock_nodes   = true;
 
 // activates collision counting
-constexpr bool         count_coll   = true;
+constexpr bool         count_coll   = false;
 
 // counter for lock collisions
 std::atomic< size_t >  collisions;
+
+// type for a node set
+using  node_set_t = std::vector< node * >;
+
+//////////////////////////////////////////////
+//
+// auxiliary functions
+//
+//////////////////////////////////////////////
+
+inline
+void
+insert ( node *                   n,
+         std::vector< node * > &  v )
+{
+    v.push_back( n );
+}
+
+inline
+void
+insert ( node *                n,
+         std::set< node * > &  s )
+{
+    s.insert( n );
+}
 
 //////////////////////////////////////////////
 //
@@ -53,7 +79,7 @@ node::init ()
     _in_blk_deps  = in_blocks_();
     _out_blk_deps = out_blocks_();
 
-    log( 5, to_string() );
+    HLR_LOG( 5, to_string() );
 }
     
 //
@@ -62,7 +88,7 @@ node::init ()
 void
 node::run ( const TTruncAcc & acc )
 {
-    log( 4, "run( " + this->to_string() + " )" );
+    HLR_LOG( 4, "run( " + this->to_string() + " )" );
     
     run_( acc );
 }
@@ -90,10 +116,12 @@ node::refine ()
     // copy nodes to local array
     //
 
-    _sub_nodes.reserve( g.size() );
+    // _sub_nodes.reserve( g.size() );
 
-    for ( auto  n : g )
-        _sub_nodes.push_back( n );
+    // for ( auto  n : g )
+    //     _sub_nodes.push_back( n );
+
+    _sub_nodes = std::move( g );
 }
 
 namespace
@@ -104,15 +132,15 @@ namespace
 // - if <neighbourhood> is non-empty, search is restricted to nodes
 //   in <neighbourhood>
 //
-std::unordered_set< node * >
-reachable_indirect ( node *                                root,
-                     const std::unordered_set< node * > &  neighbourhood = {},
-                     const uint                            steps         = def_path_len )
+node_set_t
+reachable_indirect ( node *              root,
+                     const node_set_t &  neighbourhood = {},
+                     const uint          steps         = def_path_len )
 {
-    const bool                    no_neigh = ( neighbourhood.size() == 0 );
-    std::deque< node * >          nodes;
-    std::unordered_set< node * >  descendants;
-    uint                          step  = 1;
+    const bool            no_neigh = ( neighbourhood.size() == 0 );
+    std::deque< node * >  nodes;
+    node_set_t            descendants;
+    uint                  step  = 1;
 
     nodes.push_back( root );
 
@@ -124,12 +152,12 @@ reachable_indirect ( node *                                root,
         {
             for ( auto  out : node->successors() )
             {
-                if ( no_neigh || ( neighbourhood.find( out ) != neighbourhood.end() ))
+                if ( no_neigh || contains( neighbourhood, out ) )
                 {
                     sons.push_back( out );
 
                     if ( step > 1 )
-                        descendants.insert( out );
+                        insert( out, descendants );
                 }// if
             }// for
         }// for
@@ -148,15 +176,15 @@ reachable_indirect ( node *                                root,
 // remove edges (n,m) if m is reachable otherwise
 //
 void
-remove_redundant ( node *                                n,
-                   const std::unordered_set< node * > &  neighbourhood )
+remove_redundant ( node *              n,
+                   const node_set_t &  neighbourhood )
 {
     auto  descendants = reachable_indirect( n, neighbourhood );
     
     // if a direct edge to otherwise reachable node exists, remove it
     for ( auto  succ_iter = n->successors().begin(); succ_iter != n->successors().end(); )
     {
-        if ( descendants.find( *succ_iter ) != descendants.end() )
+        if ( contains( descendants, *succ_iter ) )
         {
             HLR_LOG( 6, "  removing " + n->to_string() + " → " + (*succ_iter)->to_string() + " from " + n->to_string() );
             succ_iter = n->successors().erase( succ_iter );
@@ -174,13 +202,13 @@ remove_redundant ( node *                                n,
 bool
 node::refine_deps ()
 {
-    log( 5, "refine_deps( " + to_string() + " )" );
+    HLR_LOG( 5, "refine_deps( " + to_string() + " )" );
 
     //
     // first lock all nodes
     //
 
-    node_list_t  locked;
+    std::list< node * >  locked;
     
     if ( lock_nodes )
     {
@@ -254,7 +282,7 @@ node::refine_deps ()
 bool
 node::refine_loc_deps ()
 {
-    log( 5, "refine_loc_deps( " + to_string() + " )" );
+    HLR_LOG( 5, "refine_loc_deps( " + to_string() + " )" );
 
     //
     // replace successor by refined successors if available
@@ -263,8 +291,8 @@ node::refine_loc_deps ()
     bool  changed = false;
 
     {
-        node_list_t  new_out;
-        auto         succ = successors().begin();
+        node_vec_t  new_out;
+        auto        succ = successors().begin();
             
         while ( succ != successors().end() )
         {
@@ -280,17 +308,27 @@ node::refine_loc_deps ()
                 }// for
 
                 // remove previous succendency
-                succ = successors().erase( succ );
+                // succ = successors().erase( succ );
+                ++succ;
             }// if
             else
+            {
+                new_out.push_back( *succ );
                 ++succ;
+            }// else
         }// for
 
-        successors().splice( successors().end(), new_out );
+        _successors = std::move( new_out );
+        // successors().splice( successors().end(), new_out );
 
         // remove duplicates
-        successors().sort();
-        successors().unique();
+        // auto  osize = successors().size();
+        // successors().sort();
+        // successors().unique();
+        // auto  nsize = successors().size();
+
+        // if ( osize != nsize )
+        //     log( 0, "non-unique found" );
     }
     
     //
@@ -300,10 +338,14 @@ node::refine_loc_deps ()
     if ( changed && sparsify )
     {
         // restrict search to local nodes and neighbouring nodes
-        std::unordered_set< node * >  neighbourhood{ this };
+        node_set_t  neighbourhood;
+
+        neighbourhood.reserve( 1 + successors().size() );
+
+        insert( this, neighbourhood );
         
         for ( auto  succ : successors() )
-            neighbourhood.insert( succ );
+            insert( succ, neighbourhood );
 
         remove_redundant( this, neighbourhood );
     }// if
@@ -317,7 +359,7 @@ node::refine_loc_deps ()
 void
 node::refine_sub_deps ()
 {
-    log( 5, "refine_sub_deps( " + to_string() + " )" );
+    HLR_LOG( 5, "refine_sub_deps( " + to_string() + " )" );
     
     if ( _sub_nodes.size() == 0 )
         return;
@@ -366,12 +408,12 @@ node::refine_sub_deps ()
         
         for ( auto  sub : _sub_nodes )
         {
-            std::unordered_set< node * >  neighbourhood;
+            node_set_t  neighbourhood;
 
-            neighbourhood.insert( sub );
+            insert( neighbourhood, sub );
 
             for ( auto  succ : sub->successors() )
-                neighbourhood.insert( succ );
+                insert( neighbourhood, succ );
 
             remove_redundant( sub, neighbourhood );
         }// for
@@ -382,10 +424,12 @@ node::refine_sub_deps ()
         // build common neighbourhood and then sparsify for each node (more code, slightly faster)
         //
         
-        std::unordered_set< node * >  neighbourhood;
+        node_set_t  neighbourhood;
 
+        neighbourhood.reserve( _sub_nodes.size() + _successors.size() );
+        
         for ( auto  sub : _sub_nodes )
-            neighbourhood.insert( sub );
+            insert( sub, neighbourhood );
 
         // go through local successors and their sub nodes instead of
         // successors of own sub nodes for efficiency (successor sets 
@@ -395,10 +439,10 @@ node::refine_sub_deps ()
             if ( succ->is_refined() )
             {
                 for ( auto  succ_sub : succ->sub_nodes() )
-                    neighbourhood.insert( succ_sub );
+                    insert( succ_sub, neighbourhood );
             }// if
             else
-                neighbourhood.insert( succ );
+                insert( succ, neighbourhood );
         }// for
 
         //
@@ -415,11 +459,16 @@ node::refine_sub_deps ()
     // remove duplicates
     //
 
-    for ( auto  sub : _sub_nodes )
-    {
-        sub->successors().sort();
-        sub->successors().unique();
-    }// for
+    // for ( auto  sub : _sub_nodes )
+    // {
+    //     auto  osize = sub->successors().size();
+    //     sub->successors().sort();
+    //     sub->successors().unique();
+    //     auto  nsize = sub->successors().size();
+
+    //     if ( osize != nsize )
+    //         log( 0, "double found" );
+    // }// for
 }
     
 //

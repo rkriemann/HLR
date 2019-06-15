@@ -71,20 +71,20 @@ class node
 {
 private:
     // successor nodes in DAG
-    node_list_t            _successors;
+    node_vec_t          _successors;
 
     // dependency counter (#incoming edges)
-    std::atomic< int >     _dep_cnt;
+    std::atomic< int >  _dep_cnt;
 
     // block index set dependencies for automatic dependency refinement
-    block_list_t           _in_blk_deps;
-    block_list_t           _out_blk_deps;
+    block_list_t        _in_blk_deps;
+    block_list_t        _out_blk_deps;
 
     // set of sub nodes
-    std::vector< node * >  _sub_nodes;
+    node_vec_t          _sub_nodes;
 
     // mutex to handle concurrent access to internal data
-    std::mutex             _mutex;
+    std::mutex          _mutex;
 
 public:
     // ctor
@@ -102,8 +102,8 @@ public:
     void  run   ( const HLIB::TTruncAcc & acc );
 
     // givess access to successor nodes
-    node_list_t &        successors ()       { return _successors; }
-    const node_list_t &  successors () const { return _successors; }
+    auto  successors ()       -> decltype(_successors) &       { return _successors; }
+    auto  successors () const -> decltype(_successors) const & { return _successors; }
 
     //
     // task dependencies
@@ -157,8 +157,8 @@ public:
     bool  is_refined  () const { return ! _sub_nodes.empty(); }
 
     // give access to sub nodes
-    auto  sub_nodes ()       -> decltype(_sub_nodes) { return _sub_nodes; };
-    auto  sub_nodes () const -> decltype(_sub_nodes) { return _sub_nodes; };
+    auto  sub_nodes ()       -> decltype(_sub_nodes) &       { return _sub_nodes; };
+    auto  sub_nodes () const -> decltype(_sub_nodes) const & { return _sub_nodes; };
     
     // split node into subnodes and update dependencies
     // if retval is empty, no refinement was done
@@ -235,27 +235,15 @@ private:
 // wrapper to simultaneously allocate node and put into list of subnodes
 //
 template < typename T,
+           typename T_container,
            typename ... Args >
 T *
-alloc_node ( std::list< node * > & subnodes,
-             Args && ...           args )
-{
-    auto  node = new T( std::forward< Args >( args ) ... );
-
-    subnodes.push_back( node );
-
-    return node;
-}
-
-template < typename T,
-           typename ... Args >
-T *
-alloc_node ( local_graph &  g,
+alloc_node ( T_container &  cont,
              Args && ...    args )
 {
     auto  node = new T( std::forward< Args >( args ) ... );
 
-    g.push_back( node );
+    cont.push_back( node );
 
     return node;
 }

@@ -98,7 +98,7 @@ mymain ( int, char ** )
         return;
     }
     
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "Level Sets (DAG)" << term::reset << std::endl;
 

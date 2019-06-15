@@ -9,6 +9,7 @@
 //
 
 #include <list>
+#include <vector>
 #include <string>
 
 namespace hlr
@@ -22,11 +23,12 @@ class node;
 
 // list of nodes
 using  node_list_t  = std::list< node * >;
+using  node_vec_t   = std::vector< node * >;
 
 //!
 //! class for local sub graph during refinement
 //!
-class local_graph : public node_list_t
+class local_graph : public node_vec_t
 {
 public:
     // add node and apply dependencies based on existing nodes
