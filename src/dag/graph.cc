@@ -32,13 +32,28 @@ using namespace HLIB;
 //
 // ctor
 //
-graph::graph ( node_list_t &  nodes,
-               node_list_t &  start,
-               node_list_t &  end )
+graph::graph ( node_list_t &           nodes,
+               node_list_t &           start,
+               node_list_t &           end,
+               const end_nodes_mode_t  end_mode )
         : _nodes( nodes )
         , _start( start )
         , _end(   end )
-{}
+{
+    //
+    // create single end node if wanted and not present
+    //
+
+    if (( end_mode == use_single_end_node ) && ( _end.size() > 1 ))
+    {
+        auto  new_end = new empty_node();
+
+        for ( auto  node : _end )
+            new_end->after( node );
+
+        new_end->set_dep_cnt( _end.size() );
+    }// if
+}
 
 //
 // return number of (out) edges

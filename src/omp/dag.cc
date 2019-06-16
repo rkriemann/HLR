@@ -122,7 +122,7 @@ refine ( node *  root )
                            end.push_back( node );
                    } );
 
-    return graph( tasks, start, end );
+    return graph( tasks, start, end, hlr::dag::use_single_end_node );
 }
 
 //
@@ -132,41 +132,13 @@ void
 run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
-    auto tic = Time::Wall::now();
-
-    //
-    // ensure only single end node
-    //
-
-    node *  final        = nullptr;
-    bool    multiple_end = false;
-    
-    if ( dag.end().size() > 1 )
-    {
-        log( 5, "omp::dag::run : multiple end nodes" );
-
-        multiple_end = true;
-        
-        final = new hlr::dag::empty_node();
-
-        for ( auto  node : dag.end() )
-            final->after( node );
-
-        final->set_dep_cnt( dag.end().size() );
-    }// if
-    else
-        final = dag.end().front();
-
-    auto  toc = Time::Wall::since( tic );
-
-    log( 2, "time for OpenMP DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    assert( dag.end().size() == 1 );
 
     //
     // begin with start nodes and proceed until final node was reached
     //
 
-    tic = Time::Wall::now();
-
+    auto                 tic = Time::Wall::now();
     std::list< node * >  workset;
     
     for ( auto  node : dag.start() )
@@ -175,6 +147,7 @@ run ( graph &                  dag,
     bool                     reached_final = false;
     std::mutex               wmtx, cmtx;
     std::condition_variable  cv;
+    auto                     final = dag.end().front();
     
     #pragma omp parallel
     {
@@ -223,109 +196,9 @@ run ( graph &                  dag,
         }// omp single
     }// omp parallel
         
-    toc = Time::Wall::since( tic );
+    auto  toc = Time::Wall::since( tic );
 
     log( 2, "time for OpenMP DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-
-    //
-    // remove auxiliary node from DAG
-    //
-        
-    if ( multiple_end )
-    {
-        for ( auto  node : dag.end() )
-            node->successors().remove( final );
-        
-        delete final;
-    }// if
-
-    // //
-    // // associate each task with an array position
-    // //
-
-    // const size_t                       nnodes = dag.nnodes();
-    // std::vector< int >                 task_no( nnodes );  // just dummy array
-    // int *                              d   = task_no.data(); // C-style and short name
-    // std::unordered_map< node *, int >  taskmap;
-    // size_t                             pos = 0;
-        
-    // for ( auto  node : dag.nodes() )
-    // {
-    //     log( 0, HLIB::to_string( "%d : ", pos ) + node->to_string() );
-    //     d[ pos ] = pos;
-    //     taskmap[ node ] = pos++;
-    // }// for
-    
-    // auto  toc = Time::Wall::since( tic );
-
-    // log( 2, "time for OMP DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-    
-    // //
-    // // loop through nodes and create OpenMP task with dependencies from dep_vecs
-    // //
-
-    // const int  MAX_DEPS = 15;
-    
-    // tic = Time::Wall::now();
-    
-    // #pragma omp parallel
-    // {
-    //     #pragma omp single
-    //     {
-    //         for ( auto  node : dag.nodes() )
-    //         {
-    //             //
-    //             // fill dependency positions in above array
-    //             //
-
-    //             const int  task_pos = taskmap[ node ];
-    //             int        s[ MAX_DEPS ]; // also short name!
-    //             int        dpos = 0;
-
-    //             for ( auto  succ : node->successors() )
-    //             {
-    //                 assert( dpos < MAX_DEPS );
-    //                 s[ dpos++ ] = taskmap[ succ ];
-    //             }// for
-
-    //             if ( dpos == 0 )
-    //             {
-    //                 #pragma omp task depend( in : d[ task_pos ] )
-    //                 {
-    //                     node->run( acc );
-    //                 }// omp task
-    //             }// if
-    //             else if ( dpos <= 5 ) // should cover most cases
-    //             {
-    //                 for ( int  i = dpos; i < 5; ++i )
-    //                     s[ i ] = s[ i-1 ];
-                    
-    //                 log( 0, node->to_string() );
-    //                 for ( int  i = 0; i < dpos; ++i )
-    //                     log( 0, HLIB::to_string( "%d -> %d", task_pos, s[i] ) );
-                    
-    //                 #pragma omp task depend( in : d[ task_pos ] ) depend( out : d[s[0]], d[s[1]], d[s[2]], d[s[3]], d[s[4]] )
-    //                 {
-    //                     node->run( acc );
-    //                 }// omp task
-    //             }// else
-    //             else 
-    //             {
-    //                 for ( int  i = dpos; i < MAX_DEPS; ++i )
-    //                     s[ i ] = s[ i-1 ];
-                    
-    //                 #pragma omp task depend( in : d[ task_pos ] ) depend( out : d[s[0]], d[s[1]], d[s[2]], d[s[3]], d[s[4]], d[s[5]], d[s[6]], d[s[7]], d[s[8]], d[s[10]] )
-    //                 {
-    //                     node->run( acc );
-    //                 }// omp task
-    //             }// else
-    //         }// for
-    //     }// omp single
-    // }// omp parallel
-
-    // toc = Time::Wall::since( tic );
-
-    // log( 2, "time for OMP DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 }
 
 }// namespace dag

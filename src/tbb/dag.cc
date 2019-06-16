@@ -115,13 +115,11 @@ refine ( node *  root )
                            end.push_back( node );
                    } );
 
-    return graph( tasks, start, end );
+    return graph( tasks, start, end, hlr::dag::use_single_end_node );
 }
 
 namespace
 {
-
-#if 1
 
 //
 // helper class for executing node via TBB
@@ -176,38 +174,18 @@ void
 run ( graph &                  dag,
       const HLIB::TTruncAcc &  acc )
 {
-    auto       tic          = Time::Wall::now();
-
+    assert( dag.end().size() == 1 );
+    
+    auto  tic = Time::Wall::now();
+    
     //
-    // ensure only single end node
+    // create task for end node since needed by all other tasks
     //
     
-    node *         final        = nullptr;
-    bool           multiple_end = false;
-    ::tbb::task *  final_task   = nullptr;
+    auto           final = dag.end().front();
+    ::tbb::task *  final_task = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, final, nullptr );
     
-    if ( dag.end().size() > 1 )
-    {
-        log( 5, "tbb::dag::run : multiple end nodes" );
-
-        multiple_end = true;
-        
-        final = new hlr::dag::empty_node();
-
-        for ( auto  node : dag.end() )
-            final->after( node );
-
-        final->set_dep_cnt( dag.end().size() );
-
-        final_task = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, final, nullptr );
-        final_task->set_ref_count( final->dep_cnt() );
-    }// if
-    else
-    {
-        final      = dag.end().front();
-        final_task = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, final, nullptr );
-        final_task->set_ref_count( final->dep_cnt() );
-    }// else
+    final_task->set_ref_count( final->dep_cnt() );
 
     //
     // set up start tasks
@@ -243,163 +221,7 @@ run ( graph &                  dag,
     toc = Time::Wall::since( tic );
 
     log( 2, "time for TBB DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-    
-    //
-    // remove auxiliary node from DAG
-    //
-        
-    if ( multiple_end )
-    {
-        for ( auto  node : dag.end() )
-            node->successors().remove( final );
-        
-        delete final;
-    }// if
 }
-
-#else
-
-// mapping of node to TBB task
-using  taskmap_t = std::unordered_map< node *, ::tbb::task * >;
-
-//
-// helper class for executing node via TBB
-//
-class runtime_task : public ::tbb::task
-{
-private:
-    node *             _node;
-    const TTruncAcc &  _acc;
-    taskmap_t &        _taskmap;
-    
-public:
-    runtime_task ( node *             anode,
-                  const TTruncAcc &  aacc,
-                  taskmap_t &        ataskmap )
-            : _node( anode )
-            , _acc( aacc )
-            , _taskmap( ataskmap )
-    {
-        set_ref_count( _node->dep_cnt() );
-    }
-
-    ::tbb::task *  execute ()
-    {
-        _node->run( _acc );
-
-        for ( auto  succ : _node->successors() )
-        {
-            auto  succ_task = _taskmap[ succ ];
-
-            assert( succ_task != nullptr );
-            
-            if ( succ_task->decrement_ref_count() == 0 )
-                spawn( * succ_task );
-        }// for
-
-        return nullptr;
-    }
-};
-
-}// namespace anonymous
-
-//
-// execute DAG <dag>
-//
-void
-run ( graph &                  dag,
-      const HLIB::TTruncAcc &  acc )
-{
-    auto       tic          = Time::Wall::now();
-
-    //
-    // ensure only single end node
-    //
-    
-    node *     final        = nullptr;
-    bool       multiple_end = false;
-    taskmap_t  taskmap;
-    
-    if ( dag.end().size() > 1 )
-    {
-        log( 5, "tbb::dag::run : multiple end nodes" );
-
-        multiple_end = true;
-        
-        final = new hlr::dag::empty_node();
-
-        for ( auto  node : dag.end() )
-            final->after( node );
-
-        final->set_dep_cnt( dag.end().size() );
-
-        taskmap[ final ] = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, taskmap );
-    }// if
-    else
-        final = dag.end().front();
-
-    //
-    // create tbb tasks for all nodes
-    //
-    
-    for ( auto  node : dag.nodes() )
-        taskmap[ node ] = new ( ::tbb::task::allocate_root() ) runtime_task( node, acc, taskmap );
-
-    //
-    // set up start tasks
-    //
-    
-    ::tbb::task_list  work_queue;
-    
-    for ( auto  node : dag.start() )
-    {
-        if ( node != final )
-        {
-            auto  task = taskmap[ node ];
-
-            assert( task != nullptr );
-            
-            work_queue.push_back( * task );
-        }// if
-    }// for
-
-    auto  toc = Time::Wall::since( tic );
-
-    log( 2, "time for TBB DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-
-    //
-    // run DAG
-    //
-    
-    tic = Time::Wall::now();
-    
-    auto  final_task = taskmap[ final ];
-    
-    assert( final_task != nullptr );
-    
-    final_task->increment_ref_count();                // for "tbb::wait" to actually wait for final node
-    final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
-    final_task->execute();                            // and the final node explicitly
-    ::tbb::task::destroy( * final_task );             // not done by TBB since executed manually
-
-    toc = Time::Wall::since( tic );
-
-    log( 2, "time for TBB DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-    
-    //
-    // remove auxiliary node from DAG
-    //
-        
-    if ( multiple_end )
-    {
-        for ( auto  node : dag.end() )
-            node->successors().remove( final );
-        
-        delete final;
-    }// if
-}
-
-#endif
 
 }// namespace dag
 

@@ -16,6 +16,13 @@ namespace hlr
 namespace dag
 {
 
+// signals multiple or single end node(s)
+enum end_nodes_mode_t
+{
+    use_multiple_end_nodes = false,
+    use_single_end_node    = true
+};
+
 //
 // directed acyclic graph (DAG)
 // - only holds list of nodes, start and end nodes
@@ -29,9 +36,10 @@ private:
 
 public:
     // ctor
-    graph ( node_list_t &  nodes,
-            node_list_t &  start,
-            node_list_t &  end );
+    graph ( node_list_t &           nodes,
+            node_list_t &           start,
+            node_list_t &           end,
+            const end_nodes_mode_t  single_end = use_multiple_end_nodes );
 
     // return number of nodes
     size_t  nnodes () const { return _nodes.size(); }

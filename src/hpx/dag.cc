@@ -115,7 +115,7 @@ refine ( node *  root )
                            end.push_back( node );
                    } );
 
-    return graph( tasks, start, end );
+    return graph( tasks, start, end, hlr::dag::use_single_end_node );
 }
 
 namespace
@@ -164,34 +164,9 @@ run ( graph &                  dag,
     using ::hpx::when_all;
     using ::hpx::util::unwrapping;
     
-    //
-    // use single end node to not wait sequentially for all
-    // original end nodes (and purely use HPX framework)
-    //
-
-    auto    tic          = Time::Wall::now();
-    node *  final        = nullptr;
-    bool    multiple_end = false;
-
-    if ( dag.end().size() > 1 )
-    {
-        log( 5, "dag::hpx::run : multiple end nodes" );
-
-        multiple_end = true;
-        
-        //
-        // create single special end node
-        //
-
-        final = new hlr::dag::empty_node();
-
-        for ( auto  node : dag.end() )
-            final->after( node );
-
-        final->set_dep_cnt( dag.end().size() );
-    }// if
-    else
-        final = dag.end().front();
+    assert( dag.end().size() == 1 );
+    
+    auto  tic = Time::Wall::now();
 
     //
     // Go through DAG, decrement dependency counter for each successor of
@@ -255,6 +230,8 @@ run ( graph &                  dag,
     // start execution by requesting future result for end node
     //
 
+    auto  final = dag.end().front();
+
     tic = Time::Wall::now();
     
     taskmap[ final ].get();
@@ -262,18 +239,6 @@ run ( graph &                  dag,
     toc = Time::Wall::since( tic );
 
     log( 2, "time for HPX DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
-    
-    //
-    // remove auxiliary end node from DAG
-    //
-    
-    if ( multiple_end )
-    {
-        for ( auto  node : dag.end() )
-            node->successors().remove( final );
-        
-        delete final;
-    }// if
 }
 
 }// namespace HPX
