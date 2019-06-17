@@ -40,19 +40,20 @@ graph::graph ( node_list_t &           nodes,
         , _start( start )
         , _end(   end )
 {
-    //
-    // create single end node if wanted and not present
-    //
+    if ( end_mode == use_single_end_node )
+        make_single_end();
+}
 
-    if (( end_mode == use_single_end_node ) && ( _end.size() > 1 ))
-    {
-        auto  new_end = new empty_node();
-
-        for ( auto  node : _end )
-            new_end->after( node );
-
-        new_end->set_dep_cnt( _end.size() );
-    }// if
+graph::graph ( node_list_t &&          nodes,
+               node_list_t &&          start,
+               node_list_t &&          end,
+               const end_nodes_mode_t  end_mode )
+        : _nodes( std::move( nodes ) )
+        , _start( std::move( start ) )
+        , _end(   std::move( end ) )
+{
+    if ( end_mode == use_single_end_node )
+        make_single_end();
 }
 
 //
@@ -97,6 +98,27 @@ graph::add_nodes ( node_list_t &  nodes )
     }// for
 }
 
+//
+// ensure graph has single end node
+//
+void
+graph::make_single_end ()
+{
+    if ( _end.size() > 1 )
+    {
+        auto  new_end = new empty_node();
+
+        for ( auto  node : _end )
+            new_end->after( node );
+
+        new_end->set_dep_cnt( _end.size() );
+
+        _nodes.push_back( new_end );
+        _end.clear();
+        _end.push_back( new_end );
+    }// if
+}
+    
 //
 // output DAG
 //

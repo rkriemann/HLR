@@ -129,7 +129,7 @@ refine ( node *  root )
                            end.push_back( node );
                    } );
 
-    return graph( tasks, start, end );
+    return graph( std::move( tasks ), std::move( start ), std::move( end ) );
 }
 
 //

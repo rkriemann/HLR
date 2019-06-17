@@ -39,7 +39,12 @@ public:
     graph ( node_list_t &           nodes,
             node_list_t &           start,
             node_list_t &           end,
-            const end_nodes_mode_t  single_end = use_multiple_end_nodes );
+            const end_nodes_mode_t  end_mode = use_multiple_end_nodes );
+
+    graph ( node_list_t &&          nodes,
+            node_list_t &&          start,
+            node_list_t &&          end,
+            const end_nodes_mode_t  end_mode = use_multiple_end_nodes );
 
     // return number of nodes
     size_t  nnodes () const { return _nodes.size(); }
@@ -58,6 +63,9 @@ public:
     // add given set of nodes to DAG
     // (assumption: dependency counter already set)
     void    add_nodes ( node_list_t &  nodes );
+
+    // ensure graph has single end node
+    void    make_single_end ();
     
     // simulate execution of DAG and look if all nodes are handled and
     // all end nodes are reached
