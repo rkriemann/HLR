@@ -66,7 +66,8 @@ mymain ( int, char ** )
         std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
 
         // for spreading memory usage
-        A = impl::matrix::copy( *A );
+        if ( docopy )
+            A = impl::matrix::copy( *A );
     }// else
 
     auto  toc    = Time::Wall::since( tic );

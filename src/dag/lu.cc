@@ -680,66 +680,68 @@ gen_lu_dag ( TMatrix *                          A,
     
     dag.add_nodes( apply_nodes );
 
-    // //
-    // // remove apply update nodes without updates
-    // //
+    //
+    // remove apply update nodes without updates
+    //
 
-    // using  node_set_t = std::unordered_set< node * >;
+    using  node_set_t = std::set< node * >;
 
-    // dag::node_list_t  work;
-    // node_set_t        deleted;
+    dag::node_list_t  work;
+    node_set_t        deleted;
 
-    // for ( auto  node : dag.start() )
-    //     work.push_back( node );
-
-    // while ( ! work.empty() )
-    // {
-    //     dag::node_list_t  succ;
-        
-    //     while ( ! work.empty() )
-    //     {
-    //         auto  node = behead( work );
-
-    //         if ( dynamic_cast< apply_node * >( node ) != nullptr )
-    //         {
-    //             if ( node->dep_cnt() == 0 )
-    //             {
-    //                 for ( auto  out : node->successors() )
-    //                 {
-    //                     out->dec_dep_cnt();
-    //                     succ.push_back( out );
-    //                 }// for
-                    
-    //                 deleted.insert( node );
-    //             }// if
-    //         }// if
-    //     }// while
-
-    //     work = std::move( succ );
-    // }// while
-
-    // dag::node_list_t  nodes, start, end;
-
-    // for ( auto  node : dag.nodes() )
-    // {
-    //     if ( deleted.find( node ) != deleted.end() )
-    //     {
-    //         // DBG::print( Term::on_red( "deleting " + node->to_string() ) );
-    //         delete node;
-    //     }// if
-    //     else
-    //     {
-    //         nodes.push_back( node );
-            
-    //         if ( node->dep_cnt() == 0 )
-    //             start.push_back( node );
-
-    //         if ( node->successors().empty() )
-    //             end.push_back( node );
-    //     }// else
-    // }// for
+    // deleted.reserve( dag.nnodes() );
     
-    // return  dag::graph( nodes, start, end );
+    for ( auto  node : dag.start() )
+        work.push_back( node );
+
+    while ( ! work.empty() )
+    {
+        dag::node_list_t  succ;
+        
+        while ( ! work.empty() )
+        {
+            auto  node = behead( work );
+
+            if ( dynamic_cast< apply_node * >( node ) != nullptr )
+            {
+                if ( node->dep_cnt() == 0 )
+                {
+                    for ( auto  out : node->successors() )
+                    {
+                        out->dec_dep_cnt();
+                        succ.push_back( out );
+                    }// for
+                    
+                    deleted.insert( node );
+                }// if
+            }// if
+        }// while
+
+        work = std::move( succ );
+    }// while
+
+    dag::node_list_t  nodes, start, end;
+
+    for ( auto  node : dag.nodes() )
+    {
+        if ( contains( deleted, node ) )
+        {
+            // DBG::print( Term::on_red( "deleting " + node->to_string() ) );
+            delete node;
+        }// if
+        else
+        {
+            nodes.push_back( node );
+            
+            if ( node->dep_cnt() == 0 )
+                start.push_back( node );
+
+            if ( node->successors().empty() )
+                end.push_back( node );
+        }// else
+    }// for
+    
+    return  dag::graph( nodes, start, end );
 }
 
 graph
