@@ -74,13 +74,13 @@ level_matrix::level_matrix ( const uint         nrows,
 
 //
 // construct set of level matrices for given H-matrix
-// - do BFS in A and create level matrices starting at first level with leaves
+// - do BFS in A and create level matrices (INACTIVE: starting at first level with leaves)
 //
 std::vector< std::shared_ptr< level_matrix > >
 construct_lvlhier ( TMatrix &  A )
 {
     list< TMatrix * >  matrices{ & A };
-    bool               reached_leaves = ! is_blocked( A );
+    // bool               reached_leaves = ! is_blocked( A );
     auto               L_hier = list< std::shared_ptr< level_matrix > >{};
     auto               L_prev = std::shared_ptr< level_matrix >{};
 
@@ -92,7 +92,7 @@ construct_lvlhier ( TMatrix &  A )
         //
         ////////////////////////////////////////////////////
 
-        if ( reached_leaves )
+        // if ( reached_leaves )
         {
             //
             // collect all row/column indexsets to determine number of rows/columns
@@ -125,8 +125,8 @@ construct_lvlhier ( TMatrix &  A )
             rowis.sort( cmp_is );
             colis.sort( cmp_is );
 
-            std::cout << "rowis : " << to_string( rowis ) << std::endl;
-            std::cout << "colis : " << to_string( colis ) << std::endl;
+            // std::cout << "rowis : " << to_string( rowis ) << std::endl;
+            // std::cout << "colis : " << to_string( colis ) << std::endl;
             
             uint  pos = 0;
             
@@ -188,8 +188,8 @@ construct_lvlhier ( TMatrix &  A )
                         {
                             subs.push_back( B_ij );
 
-                            if ( is_leaf( B_ij ) )
-                                reached_leaves = true;
+                            // if ( is_leaf( B_ij ) )
+                            //     reached_leaves = true;
                         }// if
                     }// for
                 }// for

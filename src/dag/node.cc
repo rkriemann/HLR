@@ -30,8 +30,8 @@ constexpr bool         sparsify     = true;
 // default maximal path distance in reachability test
 constexpr int          def_path_len = 2;
     
-// controls edge sparsification
-constexpr bool         lock_nodes   = true;
+// controls node locking during refinement
+bool                   lock_nodes   = true;
 
 // activates collision counting
 constexpr bool         count_coll   = false;

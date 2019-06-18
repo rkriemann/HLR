@@ -31,6 +31,7 @@ string  gridfile   = "";
 string  matrixfile = "";
 bool    onlydag    = false;
 bool    docopy     = true;
+bool    levelwise  = false;
 
 void
 parse_cmdline ( int argc, char ** argv )
@@ -60,6 +61,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "noredir",                      ": do not redirect output (MPI only)" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
+        ( "lvlwise",                      ": do level-wise LU" )
         ;
 
     //
@@ -107,6 +109,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "noredir"   ) ) noredir    = true;
     if ( vm.count( "onlydag"   ) ) onlydag    = true;
     if ( vm.count( "nocopy"    ) ) docopy     = false;
+    if ( vm.count( "lvlwise"   ) ) levelwise  = true;
 
     if ( appl == "help" )
     {

@@ -14,8 +14,18 @@ const std::string  impl_name = "seq";
 
 #include "dag.hh"
 
+namespace hlr { namespace dag { 
+
+// controls node locking during refinement
+extern bool  lock_nodes;
+
+}}// hlr::dag
+
 int
 main ( int argc, char ** argv )
 {
+    // not needed for sequential mode
+    hlr::dag::lock_nodes = false;
+    
     return hlrmain( argc, argv );
 }

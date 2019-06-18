@@ -82,33 +82,18 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( false )
+    if ( levelwise )
     {
-        std::cout << term::bullet << term::bold << "Level Sets (LU)" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "Level LU (DAG)" << term::reset << std::endl;
 
         auto  C = A->copy();
         auto  L = matrix::construct_lvlhier( *C );
 
-        hlr::arith::lu( *( L[0] ), acc );
-
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        C->set_hierarchy_data();
         
-        std::cout << "    done in " << toc << std::endl;
-        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-
-        return;
-    }
-    
-    if ( false )
-    {
-        std::cout << term::bullet << term::bold << "Level Sets (DAG)" << term::reset << std::endl;
-
-        auto  C = A->copy();
-        auto  L = matrix::construct_lvlhier( *C );
-
         tic = Time::Wall::now();
 
-        auto  dag = hlr::dag::gen_lu_dag( L[0].get(), impl::dag::refine );
+        auto  dag = hlr::dag::gen_lu_dag( *C, *L[0] );
 
         toc = Time::Wall::since( tic );
 
@@ -139,7 +124,7 @@ mymain ( int, char ** )
 
         return;
     }
-    
+    else
     {
         std::cout << term::bullet << term::bold << "LU ( DAG " << impl_name
                   << ", " << acc.to_string() << " )" << term::reset << std::endl;

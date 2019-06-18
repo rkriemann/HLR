@@ -30,8 +30,8 @@ gen_lu_dag ( HLIB::TMatrix *                              A,
              std::function< dag::graph ( dag::node * ) >  refine );
 
 graph
-gen_lu_dag ( hlr::matrix::level_matrix &                  L,
-             std::function< dag::graph ( dag::node * ) >  refine );
+gen_lu_dag ( HLIB::TMatrix &              A,
+             hlr::matrix::level_matrix &  L );
 
 }// namespace dag
 
