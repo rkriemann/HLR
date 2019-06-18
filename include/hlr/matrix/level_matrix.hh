@@ -11,6 +11,7 @@
 #include <cassert>
 #include <memory>
 #include <vector>
+#include <map>
 
 #include <matrix/TBlockMatrix.hh>
 
@@ -25,11 +26,17 @@ DECLARE_TYPE( level_matrix );
 //
 class level_matrix : public HLIB::TBlockMatrix
 {
+public:
+    using  matrix_map_t = std::map< HLIB::idx_t, HLIB::TMatrix * >;
+    
 private:
     // pointers to level matrices above and below
-    std::shared_ptr< level_matrix >  _above;
-    std::shared_ptr< level_matrix >  _below;
+    std::shared_ptr< level_matrix >        _above;
+    std::shared_ptr< level_matrix >        _below;
 
+    std::map< HLIB::idx_t, matrix_map_t >  _block_rows;
+    std::map< HLIB::idx_t, matrix_map_t >  _block_cols;
+    
 public:
     //
     // ctor
@@ -56,9 +63,69 @@ public:
     // index functions
     //
 
+    //! return matrix at index (i,j)
+    auto  block ( const uint  i,
+                  const uint  j ) -> HLIB::TMatrix *
+    {
+        return _block_rows[ i ][ j ];
+    }
+
+    //! set matrix block at block index (\a i,\a j) to matrix \a A
+    void  set_block ( const uint       i,
+                      const uint       j,
+                      HLIB::TMatrix *  A )
+    {
+        _block_rows[ i ][ j ] = A;
+        _block_cols[ j ][ i ] = A;
+    }
+
+    //! return block-row iterator to next entry starting at (i,j)
+    auto  row_iter ( const uint  i,
+                     const uint  j ) -> matrix_map_t::iterator
+    {
+        auto  iter = _block_rows[ i ].begin();
+        auto  end  = _block_rows[ i ].end();
+
+        for ( ; iter != end; ++iter )
+        {
+            if ( (*iter).first >= j )
+                return iter;
+        }// for
+
+        return end;
+    }
+    
+    //! return block-column iterator to next entry starting at (i,j)
+    auto  col_iter ( const uint  i,
+                     const uint  j ) -> matrix_map_t::iterator
+    {
+        auto  iter = _block_cols[ j ].begin();
+        auto  end  = _block_cols[ j ].end();
+
+        for ( ; iter != end; ++iter )
+        {
+            if ( (*iter).first >= i )
+                return iter;
+        }// for
+
+        return end;
+    }
+
+    //! return end of block-row i
+    auto  row_end ( const uint  i ) -> matrix_map_t::iterator
+    {
+        return _block_rows[ i ].end();
+    }
+    
+    //! return end of block-column j
+    auto  col_end ( const uint  j ) -> matrix_map_t::iterator
+    {
+        return _block_cols[ j ].end();
+    }
+    
     // return block row/column of A
     std::pair< uint, uint >
-    get_index ( const TMatrix *  A ) const
+    get_index ( const TMatrix *  A )
     {
         for ( uint  i = 0; i < nblock_rows(); ++i )
         {
@@ -74,7 +141,7 @@ public:
         return { nblock_rows(), nblock_cols() };
     }
     std::pair< uint, uint >
-    get_index ( const TMatrix &  A ) const
+    get_index ( const TMatrix &  A )
     {
         return get_index( & A );
     }

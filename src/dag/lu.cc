@@ -750,33 +750,35 @@ dag_lu_lvl ( TMatrix *         A,
     // and update of trailing sub matrix with respect to A (all on L)
     //
     ///////////////////////////////////////////////////////////////
-    
+
+    #if 0
+
     //
     // get block row/column of A in L
     //
 
-    // const auto  [ bi, bj ] = L->get_index( A );
-    // const auto  nbrows     = L->nblock_rows();
-    // const auto  nbcols     = L->nblock_cols();
+    const auto  [ bi, bj ] = L->get_index( A );
 
-    // // check if found in L
-    // assert(( bi != L->nblock_rows() ) && ( bj != L->nblock_cols() ));
+    // check if found in L
+    assert(( bi != L->nblock_rows() ) && ( bj != L->nblock_cols() ));
     
-    // // should be on diagonal
-    // assert( bi == bj );
+    // should be on diagonal
+    assert( bi == bj );
     
     //
     // off-diagonal solves in current block row/column
     //
     
-    for ( auto  L_ij = A->next_in_block_row(); L_ij != nullptr; L_ij = L_ij->next_in_block_row() )
-        // for ( uint  j = bi+1; j < nbcols; ++j )
+    auto  end_i = L->col_end( bi );
+    auto  end_j = L->row_end( bj );
+    
+    for ( auto  row_iter = L->row_iter( bi, bj+1 ); row_iter != end_j; ++row_iter )
     {
-        // auto  L_ij = L->block( bi, j );
+        auto  L_ij = row_iter->second;
             
         if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
         {
-            // DBG::printf( "solve_lower_left( %d, %d )", A.id(), L_ij->id() );
+            // DBG::printf( "solve_lower_left( %d, %d )", A->id(), L_ij->id() );
 
             auto  solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij, apply_nodes );
 
@@ -786,14 +788,13 @@ dag_lu_lvl ( TMatrix *         A,
         }// if
     }// for
         
-    for ( auto  L_ji = A->next_in_block_col(); L_ji != nullptr; L_ji = L_ji->next_in_block_col() )
-        // for ( uint  j = bi+1; j < nbrows; ++j )
+    for ( auto  col_iter = L->col_iter( bj+1, bi ); col_iter != end_i; ++col_iter )
     {
-        // auto  L_ji = L->block( j, bi );
+        auto  L_ji = col_iter->second;
             
         if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
         {
-            // DBG::printf( "solve_upper_right( %d, %d )", A.id(), L_ji->id() );
+            // DBG::printf( "solve_upper_right( %d, %d )", A->id(), L_ji->id() );
 
             auto  solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji, apply_nodes );
 
@@ -807,17 +808,14 @@ dag_lu_lvl ( TMatrix *         A,
     // update of trailing sub matrix
     //
 
-    for ( auto  L_ji = A->next_in_block_col(); L_ji != nullptr; L_ji = L_ji->next_in_block_col() )
-        // for ( uint  j = bi+1; j < nbrows; ++j )
+    for ( auto  col_iter = L->col_iter( bj+1, bi ); col_iter != end_i; ++col_iter )
     {
-        // auto  L_ji = L->block( j, bi );
+        auto  L_ji = col_iter->second;
             
-        for ( auto  L_il = A->next_in_block_row(); L_il != nullptr; L_il = L_il->next_in_block_row() )
-            // for ( uint  l = bi+1; l < nbcols; ++l )
+        for ( auto  row_iter = L->row_iter( bi, bj+1 ); row_iter != end_j; ++row_iter )
         {
-            // auto  L_il = L->block( bi, l );
-            // auto  L_jl = L->block(  j, l );
-            auto  L_jl = product_block( L_ji, L_il );
+            auto  L_il = row_iter->second;
+            auto  L_jl = L->block( row_iter->first, col_iter->first );
             
             if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
             {
@@ -833,6 +831,60 @@ dag_lu_lvl ( TMatrix *         A,
         }// for
     }// for
 
+    #else
+
+    //
+    // off-diagonal solves in current block row/column
+    //
+    
+    for ( auto  L_ij = A->next_in_block_row(); L_ij != nullptr; L_ij = L_ij->next_in_block_row() )
+    {
+        if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
+        {
+            auto  solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij, apply_nodes );
+
+            solve_node->after( node_A );
+            solve_node->inc_dep_cnt();
+            final_map[ L_ij->id() ] = solve_node;
+        }// if
+    }// for
+        
+    for ( auto  L_ji = A->next_in_block_col(); L_ji != nullptr; L_ji = L_ji->next_in_block_col() )
+    {
+        if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
+        {
+            auto  solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji, apply_nodes );
+
+            solve_node->after( node_A );
+            solve_node->inc_dep_cnt();
+            final_map[ L_ji->id() ] = solve_node;
+        }// if
+    }// for
+
+    //
+    // update of trailing sub matrix
+    //
+
+    for ( auto  L_ji = A->next_in_block_col(); L_ji != nullptr; L_ji = L_ji->next_in_block_col() )
+    {
+        for ( auto  L_il = A->next_in_block_row(); L_il != nullptr; L_il = L_il->next_in_block_row() )
+        {
+            auto  L_jl = product_block( L_ji, L_il );
+            
+            if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
+            {
+                auto  upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl, apply_nodes );
+
+                updates[ L_jl->id() ].push_back( upd_node );
+
+                add_dep_from_all_sub( upd_node, L_ji, final_map );
+                add_dep_from_all_sub( upd_node, L_il, final_map );
+            }// if
+        }// for
+    }// for
+
+    #endif
+    
     return node_A;
 }
 
