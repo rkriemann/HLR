@@ -46,47 +46,52 @@ refine ( node *  root )
     while ( ! nodes.empty() )
     {
         std::deque< node * >  subnodes, del_nodes;
+        auto                  nrange = ::tbb::blocked_range< size_t >( 0, nodes.size(), 10 );
 
         // first refine nodes
-        ::tbb::parallel_for< size_t >( 0, nodes.size(),
-                                       [&nodes] ( const size_t  i )
-                                       {
-                                           nodes[i]->refine();
-                                       } );
+        ::tbb::parallel_for( nrange,
+                             [&nodes] ( const auto &  r )
+                             {
+                                 for ( auto  i = r.begin(); i != r.end(); ++i )
+                                     nodes[i]->refine();
+                             } );
 
         // then refine dependencies and collect new nodes
-        ::tbb::parallel_for< size_t >( 0, nodes.size(),
-                                       [&] ( const size_t  i )
-                                       {
-                                           auto        node         = nodes[i];
-                                           const bool  node_changed = node->refine_deps();
+        ::tbb::parallel_for( nrange,
+                             [&] ( const auto &  r )
+                             {
+                                 for ( auto  i = r.begin(); i != r.end(); ++i )
+                                 {
+                                     auto        node         = nodes[i];
+                                     const bool  node_changed = node->refine_deps();
 
-                                           if ( node->is_refined() )       // node was refined; collect all sub nodes
-                                           {
-                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                                     if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                     {
+                                         ::tbb::mutex::scoped_lock  lock( mtx );
                     
-                                               for ( auto  sub : node->sub_nodes() )
-                                                   subnodes.push_back( sub );
+                                         for ( auto  sub : node->sub_nodes() )
+                                             subnodes.push_back( sub );
                     
-                                               del_nodes.push_back( node );
-                                           }// if
-                                           else if ( node_changed )        // node was not refined but dependencies were
-                                           {
-                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                                         del_nodes.push_back( node );
+                                     }// if
+                                     else if ( node_changed )        // node was not refined but dependencies were
+                                     {
+                                         ::tbb::mutex::scoped_lock  lock( mtx );
                     
-                                               subnodes.push_back( node );
-                                           }// if
-                                           else                            // neither node nor dependencies changed: reached final state
-                                           {
-                                               // adjust dependency counter of successors (which were NOT refined!)
-                                               for ( auto  succ : node->successors() )
-                                                   succ->inc_dep_cnt();
+                                         subnodes.push_back( node );
+                                     }// if
+                                     else                            // neither node nor dependencies changed: reached final state
+                                     {
+                                         // adjust dependency counter of successors (which were NOT refined!)
+                                         for ( auto  succ : node->successors() )
+                                             succ->inc_dep_cnt();
 
-                                               ::tbb::mutex::scoped_lock  lock( mtx );
+                                         ::tbb::mutex::scoped_lock  lock( mtx );
                     
-                                               tasks.push_back( node );
-                                           }// else
-                                       } );
+                                         tasks.push_back( node );
+                                     }// else
+                                 }// for
+                             } );
 
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         std::for_each( del_nodes.begin(), del_nodes.end(),

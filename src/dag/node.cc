@@ -116,11 +116,6 @@ node::refine ()
     // copy nodes to local array
     //
 
-    // _sub_nodes.reserve( g.size() );
-
-    // for ( auto  n : g )
-    //     _sub_nodes.push_back( n );
-
     _sub_nodes = std::move( g );
 }
 
@@ -208,29 +203,29 @@ node::refine_deps ()
     // first lock all nodes
     //
 
-    std::list< node * >  locked;
+    std::set< node * >  locked;
     
     if ( lock_nodes )
     {
-        locked.push_back( this );
+        insert( this, locked );
 
         for ( auto  sub : _sub_nodes )
-            locked.push_back( sub );
+            insert( sub, locked );
     
         for ( auto  succ : successors() )
         {
             if ( succ->is_refined() )
             {
                 for ( auto  succ_sub : succ->sub_nodes() )
-                    locked.push_back( succ_sub );
+                    insert( succ_sub, locked );
             }// if
             else
-                locked.push_back( succ );
+                insert( succ, locked );
         }// for
 
-        // remove duplicates
-        locked.sort();
-        locked.unique();
+        // // remove duplicates
+        // locked.sort();
+        // locked.unique();
     
         for ( auto  n : locked )
         {
@@ -307,8 +302,6 @@ node::refine_loc_deps ()
                     new_out.push_back( succ_sub );
                 }// for
 
-                // remove previous succendency
-                // succ = successors().erase( succ );
                 ++succ;
             }// if
             else
@@ -319,16 +312,6 @@ node::refine_loc_deps ()
         }// for
 
         _successors = std::move( new_out );
-        // successors().splice( successors().end(), new_out );
-
-        // remove duplicates
-        // auto  osize = successors().size();
-        // successors().sort();
-        // successors().unique();
-        // auto  nsize = successors().size();
-
-        // if ( osize != nsize )
-        //     log( 0, "non-unique found" );
     }
     
     //
@@ -400,75 +383,20 @@ node::refine_sub_deps ()
     
     if ( sparsify )
     {
-        #if 0
-
-        //
-        // search for each sub node individually (less code, slightly slower)
-        //
-        
         for ( auto  sub : _sub_nodes )
         {
             node_set_t  neighbourhood;
 
-            insert( neighbourhood, sub );
-
-            for ( auto  succ : sub->successors() )
-                insert( neighbourhood, succ );
-
-            remove_redundant( sub, neighbourhood );
-        }// for
-        
-        #else
-        
-        //
-        // build common neighbourhood and then sparsify for each node (more code, slightly faster)
-        //
-        
-        node_set_t  neighbourhood;
-
-        neighbourhood.reserve( _sub_nodes.size() + _successors.size() );
-        
-        for ( auto  sub : _sub_nodes )
+            neighbourhood.reserve( 1 + sub->successors().size() );
+            
             insert( sub, neighbourhood );
 
-        // go through local successors and their sub nodes instead of
-        // successors of own sub nodes for efficiency (successor sets 
-        // of sub nodes are not disjoint)
-        for ( auto  succ : _successors )
-        {
-            if ( succ->is_refined() )
-            {
-                for ( auto  succ_sub : succ->sub_nodes() )
-                    insert( succ_sub, neighbourhood );
-            }// if
-            else
+            for ( auto  succ : sub->successors() )
                 insert( succ, neighbourhood );
-        }// for
 
-        //
-        // now remove redundant edges
-        //
-        
-        for ( auto  sub : _sub_nodes )
             remove_redundant( sub, neighbourhood );
-        
-        #endif
+        }// for
     }// if
-
-    //
-    // remove duplicates
-    //
-
-    // for ( auto  sub : _sub_nodes )
-    // {
-    //     auto  osize = sub->successors().size();
-    //     sub->successors().sort();
-    //     sub->successors().unique();
-    //     auto  nsize = sub->successors().size();
-
-    //     if ( osize != nsize )
-    //         log( 0, "double found" );
-    // }// for
 }
     
 //
