@@ -86,7 +86,7 @@ mymain ( int, char ** )
     {
         std::cout << term::bullet << term::bold << "Level LU (DAG)" << term::reset << std::endl;
 
-        auto  C = A->copy();
+        auto  C = ( onlydag ? std::move( A ) : A->copy() );
         auto  L = matrix::construct_lvlhier( *C );
 
         C->set_hierarchy_data();
@@ -99,10 +99,10 @@ mymain ( int, char ** )
 
         if ( verbose( 2 ) )
         {
-            std::cout << "  dag in      " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
-            std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
-            std::cout << "    #edges  = " << dag.nedges() << std::endl;
-            std::cout << "    #coll   = " << hlr::dag::collisions << std::endl;
+            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+            std::cout << "    #edges = " << dag.nedges() << std::endl;
+            std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
         if ( verbose( 3 ) )
@@ -119,17 +119,15 @@ mymain ( int, char ** )
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "    done in " << toc << std::endl;
-        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-
-        return;
+        std::cout << "  LU in      " << toc << std::endl;
+        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
     else
     {
         std::cout << term::bullet << term::bold << "LU ( DAG " << impl_name
                   << ", " << acc.to_string() << " )" << term::reset << std::endl;
         
-        auto  C = A->copy();
+        auto  C = ( onlydag ? std::move( A ) : A->copy() );
         
         tic = Time::Wall::now();
 
@@ -139,10 +137,10 @@ mymain ( int, char ** )
 
         if ( verbose( 2 ) )
         {
-            std::cout << "  dag in      " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
-            std::cout << "    #nodes  = " << dag.nnodes() << std::endl;
-            std::cout << "    #edges  = " << dag.nedges() << std::endl;
-            std::cout << "    #coll   = " << hlr::dag::collisions << std::endl;
+            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+            std::cout << "    #edges = " << dag.nedges() << std::endl;
+            std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
         if ( verbose( 3 ) )
@@ -159,8 +157,8 @@ mymain ( int, char ** )
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "    done in " << toc << std::endl;
-        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+        std::cout << "  LU in      " << toc << std::endl;
+        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 
 }
