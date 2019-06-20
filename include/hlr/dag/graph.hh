@@ -36,6 +36,9 @@ private:
 
 public:
     // ctor
+    graph ()
+    {}
+    
     graph ( node_list_t &           nodes,
             node_list_t &           start,
             node_list_t &           end,
@@ -46,6 +49,24 @@ public:
             node_list_t &&          end,
             const end_nodes_mode_t  end_mode = use_multiple_end_nodes );
 
+    graph ( graph &&                g )
+    {
+        _nodes = std::move( g._nodes );
+        _start = std::move( g._start );
+        _end   = std::move( g._end );
+    }
+
+    graph &  operator = ( graph &&  g )
+    {
+        clear();
+        
+        _nodes = std::move( g._nodes );
+        _start = std::move( g._start );
+        _end   = std::move( g._end );
+
+        return *this;
+    }
+    
     // return number of nodes
     size_t  nnodes () const { return _nodes.size(); }
 
@@ -66,6 +87,17 @@ public:
 
     // ensure graph has single end node
     void    make_single_end ();
+
+    // remove all nodes in graph
+    void    clear ()
+    {
+        for ( auto  n : _nodes )
+            delete n;
+
+        _nodes.clear();
+        _start.clear();
+        _end.clear();
+    }
     
     // simulate execution of DAG and look if all nodes are handled and
     // all end nodes are reached

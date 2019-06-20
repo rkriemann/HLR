@@ -15,6 +15,7 @@
 namespace hlr { namespace dag {
 
 extern std::atomic< size_t >  collisions;
+extern bool                   lock_nodes;
 
 } }// namespace hlr::dag
 
@@ -87,40 +88,64 @@ mymain ( int, char ** )
         std::cout << term::bullet << term::bold << "Level LU (DAG)" << term::reset << std::endl;
 
         auto  C = ( onlydag ? std::move( A ) : A->copy() );
-        auto  L = matrix::construct_lvlhier( *C );
 
         C->set_hierarchy_data();
+
+        hlr::dag::graph  dag;
+        double           tmin = 0;
+        double           tmax = 0;
+        double           tsum = 0;
         
-        tic = Time::Wall::now();
+        for ( int  i = 0; i < nbench; ++i )
+        {
+            tic = Time::Wall::now();
 
-        auto  dag = hlr::dag::gen_lu_dag( *C, *L[0] );
+            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
+            
+            toc = Time::Wall::since( tic );
+            
+            if ( verbose( 2 ) )
+            {
+                std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
 
-        toc = Time::Wall::since( tic );
+                if ( hlr::dag::lock_nodes )
+                    std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
+            }// if
 
+            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+            tmax  = std::max( tmax, toc.seconds() );
+            tsum += toc.seconds();
+
+            if ( i < nbench-1 )
+                dag = std::move( hlr::dag::graph() );
+        }// for
+        
         if ( verbose( 2 ) )
         {
-            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << std::endl;
             std::cout << "    #nodes = " << dag.nnodes() << std::endl;
             std::cout << "    #edges = " << dag.nedges() << std::endl;
-            std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
         if ( verbose( 3 ) )
             dag.print_dot( "lvllu.dot" );
-
-        if ( onlydag )
-            return;
         
-        tic = Time::Wall::now();
+        if ( ! onlydag )
+        {
+            tic = Time::Wall::now();
         
-        impl::dag::run( dag, acc );
+            impl::dag::run( dag, acc );
         
-        toc = Time::Wall::since( tic );
+            toc = Time::Wall::since( tic );
         
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+            TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "  LU in      " << toc << std::endl;
-        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+            std::cout << "  LU in      " << toc << std::endl;
+            std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+        }// if
     }
     else
     {
@@ -129,36 +154,61 @@ mymain ( int, char ** )
         
         auto  C = ( onlydag ? std::move( A ) : A->copy() );
         
-        tic = Time::Wall::now();
-
-        auto  dag = hlr::dag::gen_lu_dag( C.get(), impl::dag::refine );
+        hlr::dag::graph  dag;
+        double           tmin = 0;
+        double           tmax = 0;
+        double           tsum = 0;
         
-        toc = Time::Wall::since( tic );
+        for ( int  i = 0; i < nbench; ++i )
+        {
+            tic = Time::Wall::now();
 
+            dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
+        
+            toc = Time::Wall::since( tic );
+            
+            if ( verbose( 2 ) )
+            {
+                std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+
+                if ( hlr::dag::lock_nodes )
+                    std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
+            }// if
+
+            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+            tmax  = std::max( tmax, toc.seconds() );
+            tsum += toc.seconds();
+
+            if ( i < nbench-1 )
+                dag = std::move( hlr::dag::graph() );
+        }// for
+        
         if ( verbose( 2 ) )
         {
-            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << std::endl;
             std::cout << "    #nodes = " << dag.nnodes() << std::endl;
             std::cout << "    #edges = " << dag.nedges() << std::endl;
-            std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
         if ( verbose( 3 ) )
             dag.print_dot( "lu.dot" );
 
-        if ( onlydag )
-            return;
+        if ( ! onlydag )
+        {
+            tic = Time::Wall::now();
         
-        tic = Time::Wall::now();
+            impl::dag::run( dag, acc );
         
-        impl::dag::run( dag, acc );
+            toc = Time::Wall::since( tic );
         
-        toc = Time::Wall::since( tic );
-        
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
-        
-        std::cout << "  LU in      " << toc << std::endl;
-        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+            TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+            
+            std::cout << "  LU in      " << toc << std::endl;
+            std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+        }// if
     }
 
 }

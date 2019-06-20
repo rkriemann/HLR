@@ -531,8 +531,8 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_lu_dag ( TMatrix *                          A,
-             std::function< graph ( node * ) >  refine )
+gen_dag_lu_rec ( TMatrix *                          A,
+                 std::function< graph ( node * ) >  refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -706,7 +706,7 @@ add_dep_from_all_sub ( node *            node,
 //
 node *
 dag_lu_lvl ( TMatrix *         A,
-             level_matrix *    L,
+//              level_matrix *    L,
              node_list_t &     nodes,
              node_map_t &      final_map,
              nodelist_map_t &  updates,
@@ -737,7 +737,9 @@ dag_lu_lvl ( TMatrix *         A,
             
             assert( ! is_null( A_ii ) );
             
-            auto  node_A_ii = dag_lu_lvl( A_ii, L->below(), nodes, final_map, updates, apply_nodes );
+            auto  node_A_ii = dag_lu_lvl( A_ii,
+                                          // L->below(),
+                                          nodes, final_map, updates, apply_nodes );
 
             node_A->after( node_A_ii );
             node_A->inc_dep_cnt();
@@ -954,8 +956,7 @@ assign_dependencies ( TMatrix *            A,
 }// namespace anonymous
 
 graph
-gen_lu_dag ( TMatrix &                    A,
-             hlr::matrix::level_matrix &  L )
+gen_dag_lu_lvl ( TMatrix &  A )
 {
     //
     // construct DAG for LU
@@ -970,7 +971,9 @@ gen_lu_dag ( TMatrix &                    A,
     final_map.resize( nid );
     updates.resize( nid );
 
-    auto  final = dag_lu_lvl( & A, & L, nodes, final_map, updates, apply_nodes );
+    auto  final = dag_lu_lvl( & A,
+                              // & L,
+                              nodes, final_map, updates, apply_nodes );
     
     if ( CFG::Arith::use_accu )
     {

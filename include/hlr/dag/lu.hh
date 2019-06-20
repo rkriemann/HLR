@@ -26,12 +26,15 @@ namespace dag
 // return graph representing compute DAG for LU of <A>
 //
 graph
-gen_lu_dag ( HLIB::TMatrix *                              A,
-             std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_lu_rec  ( HLIB::TMatrix *                              A,
+                  std::function< dag::graph ( dag::node * ) >  refine );
 
+//
+// return graph representing compute DAG for LU of <A>
+// - compute DAG level wise
+//
 graph
-gen_lu_dag ( HLIB::TMatrix &              A,
-             hlr::matrix::level_matrix &  L );
+gen_dag_lu_lvl  ( HLIB::TMatrix &  A );
 
 }// namespace dag
 

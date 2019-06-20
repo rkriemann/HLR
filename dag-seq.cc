@@ -14,13 +14,6 @@ const std::string  impl_name = "seq";
 
 #include "dag.hh"
 
-namespace hlr { namespace dag { 
-
-// controls node locking during refinement
-extern bool  lock_nodes;
-
-}}// hlr::dag
-
 int
 main ( int argc, char ** argv )
 {
