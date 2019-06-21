@@ -16,6 +16,8 @@
 #include <matrix/structure.hh>
 #include <base/TTruncAcc.hh>
 
+#include "hlr/utils/checks.hh"
+
 namespace hlr
 {
 
@@ -35,11 +37,11 @@ namespace matrix
 //
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
-        const coeff_t &              coeff,
-        const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+std::unique_ptr< TMatrix >
+build ( const TBlockCluster *  bct,
+        const coeff_t &        coeff,
+        const lrapx_t &        lrapx,
+        const TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                                  typename lrapx_t::value_t >::value,
@@ -130,6 +132,50 @@ copy ( const TMatrix &  M )
     {
         // assuming non-structured block
         return M.copy();
+    }// else
+}
+
+//
+// reallocate matrix blocks
+// - frees old data
+// - local operation thereby limiting extra memory usage
+//
+std::unique_ptr< TMatrix >
+realloc ( TMatrix *  A )
+{
+    if ( is_null( A ) )
+        return nullptr;
+    
+    if ( is_blocked( A ) )
+    {
+        auto  B  = ptrcast( A, TBlockMatrix );
+        auto  C  = B->create();
+        auto  BC = ptrcast( C.get(), TBlockMatrix );
+
+        C->copy_struct_from( B );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  C_ij = realloc( B->block( i, j ) );
+
+                BC->set_block( i, j, C_ij.release() );
+                B->set_block( i, j, nullptr );
+            }// for
+        }// for
+
+        delete B;
+
+        return C;
+    }// if
+    else
+    {
+        auto  C = A->copy();
+
+        delete A;
+
+        return C;
     }// else
 }
 

@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <matrix/structure.hh>
+
 namespace hlr
 {
 

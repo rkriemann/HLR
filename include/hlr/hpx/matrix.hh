@@ -156,6 +156,57 @@ copy ( const TMatrix &  M )
     }// else
 }
 
+//
+// reallocate matrix blocks
+// - frees old data
+// - local operation thereby limiting extra memory usage
+//
+std::unique_ptr< TMatrix >
+realloc ( TMatrix *  A )
+{
+    if ( is_null( A ) )
+        return nullptr;
+    
+    if ( is_blocked( A ) )
+    {
+        auto  B  = ptrcast( A, TBlockMatrix );
+        auto  C  = B->create();
+        auto  BC = ptrcast( C.get(), TBlockMatrix );
+
+        C->copy_struct_from( B );
+
+        ::hpx::parallel::v2::define_task_block(
+            [B,BC] ( auto &  tb )
+            {
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                    {
+                        tb.run( [BC,B,i,j]
+                                {
+                                    auto  C_ij = realloc( B->block( i, j ) );
+                        
+                                    BC->set_block( i, j, C_ij.release() );
+                                    B->set_block( i, j, nullptr );
+                                } );
+                    }// for
+                }// for
+            } );
+
+        delete B;
+
+        return C;
+    }// if
+    else
+    {
+        auto  C = A->copy();
+
+        delete A;
+
+        return C;
+    }// else
+}
+
 }// namespace matrix
 
 }// namespace hpx

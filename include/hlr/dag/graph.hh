@@ -108,6 +108,9 @@ public:
     
     // output DAG in DOT format
     void    print_dot ( const std::string &  filename ) const;
+
+    // return memory usage of graph (with all nodes and edges)
+    size_t  mem_size  () const;
 };
 
 //

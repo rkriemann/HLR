@@ -186,6 +186,67 @@ copy ( const TMatrix &  M )
     return res;
 }
 
+//
+// reallocate matrix blocks
+// - frees old data
+// - local operation thereby limiting extra memory usage
+//
+std::unique_ptr< TMatrix >
+realloc_helper ( ::tf::SubflowBuilder &  tf,
+                 TMatrix *               A )
+{
+    if ( is_null( A ) )
+        return nullptr;
+    
+    if ( is_blocked( A ) )
+    {
+        auto  B  = ptrcast( A, TBlockMatrix );
+        auto  C  = B->create();
+        auto  BC = ptrcast( C.get(), TBlockMatrix );
+
+        C->copy_struct_from( B );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                tf.silent_emplace(
+                    [B,BC,i,j] ( auto &  sf )
+                    {
+                        auto  C_ij = realloc_helper( sf, B->block( i, j ) );
+                        
+                        BC->set_block( i, j, C_ij.release() );
+                        B->set_block( i, j, nullptr );
+                    } );
+            }// for
+        }// for
+
+        delete B;
+
+        return C;
+    }// if
+    else
+    {
+        auto  C = A->copy();
+
+        delete A;
+
+        return C;
+    }// else
+}
+
+std::unique_ptr< TMatrix >
+realloc ( TMatrix *  A )
+{
+    ::tf::Taskflow              tf;
+    std::unique_ptr< TMatrix >  res;
+    
+    tf.silent_emplace( [A,&res] ( auto &  sf ) { res = realloc_helper( sf, A ); } );
+    tf.wait_for_all();
+
+    return res;
+}
+
 }// namespace matrix
 
 }// namespace tf

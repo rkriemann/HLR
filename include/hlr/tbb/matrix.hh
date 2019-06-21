@@ -158,6 +158,56 @@ copy ( const TMatrix &  M )
     }// else
 }
 
+//
+// reallocate matrix blocks
+// - frees old data
+// - local operation thereby limiting extra memory usage
+//
+std::unique_ptr< TMatrix >
+realloc ( TMatrix *  A )
+{
+    if ( is_null( A ) )
+        return nullptr;
+    
+    if ( is_blocked( A ) )
+    {
+        auto  B  = ptrcast( A, TBlockMatrix );
+        auto  C  = B->create();
+        auto  BC = ptrcast( C.get(), TBlockMatrix );
+
+        C->copy_struct_from( B );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BC] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  C_ij = realloc( B->block( i, j ) );
+
+                        BC->set_block( i, j, C_ij.release() );
+                        B->set_block( i, j, nullptr );
+                    }// for
+                }// for
+            } );
+
+        delete B;
+
+        return C;
+    }// if
+    else
+    {
+        auto  C = A->copy();
+
+        delete A;
+
+        return C;
+    }// else
+}
+
 }// namespace matrix
 
 }// namespace tbb

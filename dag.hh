@@ -11,6 +11,7 @@
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/arith/lu.hh"
+#include "hlr/utils/perf.hh"
 
 namespace hlr { namespace dag {
 
@@ -67,8 +68,10 @@ mymain ( int, char ** )
         std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
 
         // for spreading memory usage
+        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
         if ( docopy )
-            A = impl::matrix::copy( *A );
+            A = impl::matrix::realloc( A.release() );
+        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
     }// else
 
     auto  toc    = Time::Wall::since( tic );
@@ -128,6 +131,7 @@ mymain ( int, char ** )
                           << std::endl;
             std::cout << "    #nodes = " << dag.nnodes() << std::endl;
             std::cout << "    #edges = " << dag.nedges() << std::endl;
+            std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
         }// if
         
         if ( verbose( 3 ) )
@@ -158,6 +162,8 @@ mymain ( int, char ** )
         double           tmin = 0;
         double           tmax = 0;
         double           tsum = 0;
+
+        // hlr::perf::start();
         
         for ( int  i = 0; i < nbench; ++i )
         {
@@ -191,6 +197,7 @@ mymain ( int, char ** )
                           << std::endl;
             std::cout << "    #nodes = " << dag.nnodes() << std::endl;
             std::cout << "    #edges = " << dag.nedges() << std::endl;
+            std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
         }// if
         
         if ( verbose( 3 ) )

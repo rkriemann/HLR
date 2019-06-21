@@ -182,7 +182,8 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/dag/lu.cc',
                                         'src/matrix/level_matrix.cc',
                                         'src/seq/dag.cc',
-                                        'src/utils/compare.cc' ] )
+                                        'src/utils/compare.cc',
+                                        'src/utils/perf.cc' ] )
 
 #
 # default sequential environment

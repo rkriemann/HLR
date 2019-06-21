@@ -230,6 +230,26 @@ graph::test ()
             succ->inc_dep_cnt();
 }
 
+//
+// return memory usage of graph (with all nodes and edges)
+//
+size_t
+graph::mem_size  () const
+{
+    size_t  size = sizeof(_nodes) + sizeof(_start) + sizeof(_end);
+
+    for ( auto  n : _nodes )
+    {
+        size += sizeof(node) + sizeof(node*);
+        size += sizeof(node*) * n->successors().size();
+    }// for
+
+    size += sizeof(node*) * _start.size();
+    size += sizeof(node*) * _end.size();
+    
+    return size;
+}
+
 }// namespace dag
 
 }// namespace hlr

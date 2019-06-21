@@ -196,6 +196,75 @@ copy ( const TMatrix &  M )
     return res;
 }
 
+//
+// reallocate matrix blocks
+// - frees old data
+// - local operation thereby limiting extra memory usage
+//
+std::unique_ptr< TMatrix >
+realloc_task ( TMatrix *  A )
+{
+    if ( is_null( A ) )
+        return nullptr;
+    
+    if ( is_blocked( A ) )
+    {
+        auto  B  = ptrcast( A, TBlockMatrix );
+        auto  C  = B->create();
+        auto  BC = ptrcast( C.get(), TBlockMatrix );
+
+        C->copy_struct_from( B );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                #pragma omp task
+                {
+                    auto  C_ij = realloc_task( B->block( i, j ) );
+                    
+                    BC->set_block( i, j, C_ij.release() );
+                    B->set_block( i, j, nullptr );
+                }
+            }// for
+        }// for
+
+        #pragma omp taskwait
+        
+        delete B;
+
+        return C;
+    }// if
+    else
+    {
+        auto  C = A->copy();
+
+        delete A;
+
+        return C;
+    }// else
+}
+
+std::unique_ptr< TMatrix >
+realloc ( TMatrix *  A )
+{
+    std::unique_ptr< TMatrix >  res;
+
+    // spawn parallel region for tasks
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            #pragma omp task
+            {
+                res = realloc_task( A );
+            }// omp task
+        }// omp single
+    }// omp parallel
+
+    return res;
+}
+
 }// namespace matrix
 
 }// namespace omp
