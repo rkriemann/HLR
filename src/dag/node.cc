@@ -170,23 +170,25 @@ reachable_indirect ( node *              root,
 // compute reachable nodes from <n> in <neighbourhood> and
 // remove edges (n,m) if m is reachable otherwise
 //
-void
+node_vec_t
 remove_redundant ( node *              n,
                    const node_set_t &  neighbourhood )
 {
-    auto  descendants = reachable_indirect( n, neighbourhood );
+    auto        descendants = reachable_indirect( n, neighbourhood );
+    node_vec_t  new_out;
+
+    new_out.reserve( n->successors().size() );
     
     // if a direct edge to otherwise reachable node exists, remove it
-    for ( auto  succ_iter = n->successors().begin(); succ_iter != n->successors().end(); )
+    for ( auto  succ : n->successors() )
     {
-        if ( contains( descendants, *succ_iter ) )
-        {
-            HLR_LOG( 6, "  removing " + n->to_string() + " → " + (*succ_iter)->to_string() + " from " + n->to_string() );
-            succ_iter = n->successors().erase( succ_iter );
-        }// if
+        if ( contains( descendants, succ ) )
+            HLR_LOG( 6, "  removing " + n->to_string() + " → " + succ->to_string() + " from " + n->to_string() );
         else
-            ++succ_iter;
+            new_out.push_back( succ );
     }// for
+
+    return new_out;
 }
 
 }// namespace anonymous
@@ -330,7 +332,7 @@ node::refine_loc_deps ()
         for ( auto  succ : successors() )
             insert( succ, neighbourhood );
 
-        remove_redundant( this, neighbourhood );
+        _successors = remove_redundant( this, neighbourhood );
     }// if
     
     return changed;
@@ -394,7 +396,7 @@ node::refine_sub_deps ()
             for ( auto  succ : sub->successors() )
                 insert( succ, neighbourhood );
 
-            remove_redundant( sub, neighbourhood );
+            sub->_successors = remove_redundant( sub, neighbourhood );
         }// for
     }// if
 }

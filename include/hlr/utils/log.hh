@@ -9,6 +9,7 @@
 //
 
 #include <iostream>
+#include <mutex>
 
 #include <base/config.hh>
 
@@ -26,6 +27,9 @@ error ( const msg_t &  msg )
     std::exit( 1 );
 }
 
+// mutex for log function
+extern std::mutex  __LOG_MUTEX;
+
 //
 // logging function
 //
@@ -35,7 +39,11 @@ log ( const int      lvl,
       const msg_t &  msg )
 {
     if ( HLIB::verbose( lvl ) )
+    {
+        std::scoped_lock  lock( __LOG_MUTEX );
+        
         std::cout << msg << std::endl;
+    }// if
 }
 
 //

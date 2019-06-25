@@ -7,9 +7,9 @@
 #include "hlr/apps/matern_cov.hh"
 #include "hlr/apps/laplace.hh"
 
-#include "hlr/utils/termcolor.hpp"
+#include "hlr/utils/term.hh"
 
-namespace term = termcolor;
+namespace term = hlr::term;
 
 template < typename problem_t >
 std::unique_ptr< problem_t >

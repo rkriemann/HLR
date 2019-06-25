@@ -126,7 +126,10 @@ build ( const HLIB::TBlockCluster *  bct,
     std::unique_ptr< TMatrix >  res;
     
     tf.silent_emplace( [&,bct] ( auto &  sf ) { res = build_helper( sf, bct, coeff, lrapx, acc ); } );
-    tf.wait_for_all();
+
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
 
     return res;
 }
@@ -181,7 +184,10 @@ copy ( const TMatrix &  M )
     std::unique_ptr< TMatrix >  res;
     
     tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = copy_helper( sf, M ); } );
-    tf.wait_for_all();
+
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
 
     return res;
 }
@@ -242,8 +248,11 @@ realloc ( TMatrix *  A )
     std::unique_ptr< TMatrix >  res;
     
     tf.silent_emplace( [A,&res] ( auto &  sf ) { res = realloc_helper( sf, A ); } );
-    tf.wait_for_all();
 
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
+    
     return res;
 }
 

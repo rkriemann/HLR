@@ -36,11 +36,12 @@ FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx', 'mpi', 'gpi2' ]
 # directories for the various external libraries
 HPRO_DIR     = 'hlibpro'
 TBB_DIR      = '/usr'
-TASKFLOW_DIR = '/opt/local/cpp-taskflow'
+TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
 HPX_DIR      = '/opt/local/hpx'
 GPI2_DIR     = '/opt/local/gpi2'
 
-JEMALLOC_DIR = '/opt/local/jemalloc/5.0.1'
+JEMALLOC_DIR = '/opt/local/jemalloc/5.1.0'
+LIKWID_DIR   = None # '/opt/local/likwid'
 
 ######################################################################
 #
@@ -122,6 +123,7 @@ env = Environment( options    = opts,
                    LINKFLAGS  = Split( LINKFLAGS ),
                    CPPDEFINES = Split( DEFINES ),
                    )
+
 env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
 
 if not fullmsg :
@@ -136,8 +138,15 @@ env.Append(  CPPPATH = [ '#include' ] )
 env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
-if JEMALLOC_DIR != '' :
-    env.Append( LINKFLAGS = os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
+if JEMALLOC_DIR != None :
+    env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
+    env.Append( LIBS    = 'jemalloc' )
+
+if LIKWID_DIR != None :
+    env.Append( CPPDEFINES = 'LIKWID_PERFMON' )
+    env.Append( CPPPATH    = os.path.join( LIKWID_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
+    env.Append( LIBS       = 'likwid' )
 
 ######################################################################
 #
@@ -181,9 +190,9 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/dag/node.cc',
                                         'src/dag/lu.cc',
                                         'src/matrix/level_matrix.cc',
-                                        'src/seq/dag.cc',
                                         'src/utils/compare.cc',
-                                        'src/utils/perf.cc' ] )
+                                        'src/utils/log.cc',
+                                        'src/utils/term.cc' ] )
 
 #
 # default sequential environment
@@ -195,7 +204,7 @@ if 'seq' in frameworks :
     if 'tlr'   in programs : seq.Program( 'tlr-seq.cc' )
     if 'hodlr' in programs : seq.Program( 'hodlr-seq.cc' )
     if 'tileh' in programs : seq.Program( 'tileh-seq.cc' )
-    if 'dag'   in programs : seq.Program( 'dag-seq.cc' )
+    if 'dag'   in programs : seq.Program( 'dag-seq',  [ 'dag-seq.cc', 'src/seq/dag.cc' ] )
 
 #
 # OpenMP

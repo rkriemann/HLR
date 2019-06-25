@@ -12,7 +12,7 @@
 
 #include <tbb/task.h>
 #include <tbb/parallel_for.h>
-#include <tbb/mutex.h>
+#include "tbb/partitioner.h"
 
 #include "hlr/utils/log.hh"
 #include "hlr/tbb/dag.hh"
@@ -34,14 +34,15 @@ using hlr::dag::graph;
 //
 // construct DAG using refinement of given node
 //
+#if  0
 graph
 refine ( node *  root )
 {
     assert( root != nullptr );
     
-    std::deque< node * >   nodes{ root };
-    std::list< node * >    tasks;
-    ::tbb::mutex           mtx;
+    std::deque< node * >  nodes{ root };
+    std::list< node * >   tasks;
+    std::mutex            mtx;
     
     while ( ! nodes.empty() )
     {
@@ -67,7 +68,7 @@ refine ( node *  root )
 
                                      if ( node->is_refined() )       // node was refined; collect all sub nodes
                                      {
-                                         ::tbb::mutex::scoped_lock  lock( mtx );
+                                         std::scoped_lock  lock( mtx );
                     
                                          for ( auto  sub : node->sub_nodes() )
                                              subnodes.push_back( sub );
@@ -76,7 +77,7 @@ refine ( node *  root )
                                      }// if
                                      else if ( node_changed )        // node was not refined but dependencies were
                                      {
-                                         ::tbb::mutex::scoped_lock  lock( mtx );
+                                         std::scoped_lock  lock( mtx );
                     
                                          subnodes.push_back( node );
                                      }// if
@@ -86,7 +87,7 @@ refine ( node *  root )
                                          for ( auto  succ : node->successors() )
                                              succ->inc_dep_cnt();
 
-                                         ::tbb::mutex::scoped_lock  lock( mtx );
+                                         std::scoped_lock  lock( mtx );
                     
                                          tasks.push_back( node );
                                      }// else
@@ -122,6 +123,184 @@ refine ( node *  root )
 
     return graph( tasks, start, end, hlr::dag::use_single_end_node );
 }
+
+#else
+
+graph
+refine ( node *  root )
+{
+    assert( root != nullptr );
+    
+    std::deque< std::deque< node * > >  node_sets{ { root } };
+    std::list< node * >                 tasks;
+    std::mutex                          mtx;
+    std::list< node * >                 end;
+    ::tbb::affinity_partitioner         aff_part;
+    
+    while ( node_sets.size() > 0 )
+    {
+        // log( 0, "----------------------------------" );
+        // log( 0, HLIB::to_string( "#sets = %d", node_sets.size() ) );
+        // for ( auto &  nset :  node_sets )
+        //     log( 0, HLIB::to_string( "  %d", nset.size() ) );
+        
+        std::vector< std::deque< node * > >  subnodes( node_sets.size() );
+        std::vector< std::deque< node * > >  delnodes( node_sets.size() );
+
+        // first refine nodes
+        ::tbb::parallel_for< size_t >( 0, node_sets.size(),
+                                       [&] ( const size_t  i )
+                                       {
+                                           const std::deque< node * > &  nset = node_sets[i];
+                                           
+                                           for ( auto  node : nset )
+                                               node->refine();
+                                       } );
+
+        // then refine dependencies and collect new nodes
+        ::tbb::parallel_for< size_t >( 0, node_sets.size(),
+                                       [&] ( const size_t  i )
+                                       {
+                                           const std::deque< node * > &  nset = node_sets[i];
+                                     
+                                           for ( auto  node : nset )
+                                           {
+                                               const bool  node_changed = node->refine_deps();
+
+                                               if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                               {
+                                                   for ( auto  sub : node->sub_nodes() )
+                                                       subnodes[i].push_back( sub );
+                    
+                                                   delnodes[i].push_back( node );
+                                               }// if
+                                               else if ( node_changed )        // node was not refined but dependencies were
+                                               {
+                                                   subnodes[i].push_back( node );
+                                               }// if
+                                               else                            // neither node nor dependencies changed: reached final state
+                                               {
+                                                   // adjust dependency counter of successors (which were NOT refined!)
+                                                   for ( auto  succ : node->successors() )
+                                                       succ->inc_dep_cnt();
+
+                                                   {
+                                                       std::scoped_lock  lock( mtx );
+                    
+                                                       tasks.push_back( node );
+
+                                                       if ( node->successors().empty() )
+                                                           end.push_back( node );
+                                                   }
+                                               }// else
+                                           }// for
+                                       } );
+
+        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+        ::tbb::parallel_for< size_t >( 0, node_sets.size(),
+                                       [&] ( const size_t  i )
+                                       {
+                                           const std::deque< node * > &  nset = delnodes[i];
+
+                                           for ( auto  node : nset )
+                                               delete node;
+                                       } );
+
+        //
+        // split node sets if too large (increase parallelity)
+        //
+
+        std::deque< std::deque< node * > >  new_sets;
+
+        constexpr size_t  max_size = 1000;
+        
+        for ( size_t  i = 0; i < subnodes.size(); ++i )
+        {
+            const auto  snsize = subnodes[i].size();
+            
+            if ( snsize >= max_size )
+            {
+                //
+                // split into chunks of size <max_size>
+                //
+                
+                size_t  pos = 0;
+
+                while ( pos < snsize )
+                {
+                    std::deque< node * >  sset;
+                    size_t                nsset = 0;
+
+                    for ( ; ( nsset < max_size ) && ( pos < snsize ); ++nsset )
+                        sset.push_back( subnodes[i][pos++] );
+
+                    // put rest into last set if not much left
+                    if ( snsize - pos < max_size / 2 )
+                    {
+                        while ( pos < snsize )
+                            sset.push_back( subnodes[i][pos++] );
+                    }// if
+
+                    new_sets.push_back( std::move( sset ) );
+                }// while
+            }// if
+            else if (( snsize > 0 ) && ( snsize < max_size / 10 ))
+            {
+                //
+                // merge with next non-empty set
+                //
+                
+                std::deque< node * >  mset = std::move( subnodes[i] );
+
+                size_t  j = i+1;
+                
+                while (( j < subnodes.size() ) && ( subnodes[j].size() == 0 ))
+                    ++j;
+
+                if ( j < subnodes.size() )
+                {
+                    for ( auto  n : subnodes[j] )
+                        mset.push_back( n );
+                }// if
+                
+                new_sets.push_back( std::move( mset ) );
+                i = j;
+            }// if
+            else if ( snsize > 0 )
+            {
+                // log( 0, HLIB::to_string( "copying %d", nset.size() ) );
+                new_sets.push_back( std::move( subnodes[i] ) );
+            }// if
+        }// for
+        
+        node_sets = std::move( new_sets );
+    }// while
+
+    //
+    // collect start nodes
+    //
+    
+    std::list< node * >   start;
+    
+    // for ( auto  t : tasks )
+    std::for_each( tasks.begin(), tasks.end(),
+                   [&] ( node * node )
+                   {
+                       if ( node->dep_cnt() == 0 )
+                           start.push_back( node );
+                   } );
+
+    // log( 0, "start" );
+    // for ( auto  n : start )
+    //     n->print();
+    // log( 0, "end" );
+    // for ( auto  n : end )
+    //     n->print();
+    
+    return graph( tasks, start, end, hlr::dag::use_single_end_node );
+}
+
+#endif
 
 namespace
 {

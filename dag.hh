@@ -11,7 +11,6 @@
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/arith/lu.hh"
-#include "hlr/utils/perf.hh"
 
 namespace hlr { namespace dag {
 
@@ -163,8 +162,6 @@ mymain ( int, char ** )
         double           tmax = 0;
         double           tsum = 0;
 
-        // hlr::perf::start();
-        
         for ( int  i = 0; i < nbench; ++i )
         {
             tic = Time::Wall::now();
@@ -188,7 +185,7 @@ mymain ( int, char ** )
             if ( i < nbench-1 )
                 dag = std::move( hlr::dag::graph() );
         }// for
-        
+
         if ( verbose( 2 ) )
         {
             if ( nbench > 1 )

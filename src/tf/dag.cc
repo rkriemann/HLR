@@ -42,6 +42,7 @@ refine ( node *  root )
     std::list< node * >   tasks, start, end;
     std::mutex            mtx;
     ::tf::Taskflow        tf;
+    ::tf::Executor        executor;
 
     while ( ! nodes.empty() )
     {
@@ -53,7 +54,7 @@ refine ( node *  root )
                          {
                              node->refine();
                          } );
-        tf.wait_for_all();
+        executor.run( tf ).wait();
 
         // then refine dependencies and collect new nodes
         tf.parallel_for( nodes.begin(), nodes.end(),
@@ -87,7 +88,7 @@ refine ( node *  root )
                                  tasks.push_back( node );
                              }// else
                          } );
-        tf.wait_for_all();
+        executor.run( tf ).wait();
         
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         tf.parallel_for( del_nodes.begin(), del_nodes.end(),
@@ -95,7 +96,7 @@ refine ( node *  root )
                          {
                              delete node;
                          } );
-        tf.wait_for_all();
+        executor.run( tf ).wait();
         
         nodes = std::move( subnodes );
     }// while
@@ -153,10 +154,12 @@ run ( graph &                  dag,
     //
     // run tasks
     //
+
+    ::tf::Executor  executor;
     
     tic = Time::Wall::now();
     
-    tf.wait_for_all();
+    executor.run( tf ).wait();
 
     toc = Time::Wall::since( tic );
 
