@@ -558,6 +558,9 @@ gen_dag_lu_rec ( TMatrix *                          A,
     //
     // remove apply update nodes without updates
     //
+    // TEST: loop over apply_nodes (top to bottom) instead of performing
+    //       BFS in full DAG
+    //
 
     using  node_set_t = std::set< node * >;
 
@@ -993,6 +996,49 @@ gen_dag_lu_lvl ( TMatrix &  A )
     }// for
 
     return  dag::graph( nodes, start, end );
+}
+
+//
+// return graph representing compute DAG for solving L X = A
+//
+graph
+gen_dag_solve_lower  ( const HLIB::TMatrix *                        L,
+                       HLIB::TMatrix *                              A,
+                       std::function< dag::graph ( dag::node * ) >  refine )
+{
+    apply_map_t  apply_map;
+    auto         dag = refine( new solve_lower_node( L, A, apply_map ) );
+
+    return dag;
+}
+
+//
+// return graph representing compute DAG for solving X U = A
+//
+graph
+gen_dag_solve_upper  ( const HLIB::TMatrix *                        U,
+                       HLIB::TMatrix *                              A,
+                       std::function< dag::graph ( dag::node * ) >  refine )
+{
+    apply_map_t  apply_map;
+    auto         dag = refine( new solve_upper_node( U, A, apply_map ) );
+
+    return dag;
+}
+
+//
+// return graph representing compute DAG for C = A B + C
+//
+graph
+gen_dag_update       ( const HLIB::TMatrix *                        A,
+                       const HLIB::TMatrix *                        B,
+                       HLIB::TMatrix *                              C,
+                       std::function< dag::graph ( dag::node * ) >  refine )
+{
+    apply_map_t  apply_map;
+    auto         dag = refine( new update_node( A, B, C, apply_map ) );
+
+    return dag;
 }
 
 }// namespace dag

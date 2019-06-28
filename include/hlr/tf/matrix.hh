@@ -206,7 +206,7 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
     if ( is_blocked( A ) )
     {
         auto  B  = ptrcast( A, TBlockMatrix );
-        auto  C  = B->create();
+        auto  C  = std::make_unique< TBlockMatrix >();
         auto  BC = ptrcast( C.get(), TBlockMatrix );
 
         C->copy_struct_from( B );

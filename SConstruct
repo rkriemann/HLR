@@ -211,7 +211,9 @@ common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
                                         'src/dag/local_graph.cc',
                                         'src/dag/node.cc',
                                         'src/dag/lu.cc',
+                                        'src/dag/coarselu.cc',
                                         'src/matrix/level_matrix.cc',
+                                        'src/seq/dag.cc',
                                         'src/utils/compare.cc',
                                         'src/utils/log.cc',
                                         'src/utils/term.cc' ] )
@@ -226,7 +228,7 @@ if 'seq' in frameworks :
     if 'tlr'   in programs : seq.Program( 'tlr-seq.cc' )
     if 'hodlr' in programs : seq.Program( 'hodlr-seq.cc' )
     if 'tileh' in programs : seq.Program( 'tileh-seq.cc' )
-    if 'dag'   in programs : seq.Program( 'dag-seq',  [ 'dag-seq.cc', 'src/seq/dag.cc' ] )
+    if 'dag'   in programs : seq.Program( 'dag-seq.cc' )
 
 #
 # OpenMP

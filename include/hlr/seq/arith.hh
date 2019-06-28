@@ -312,6 +312,87 @@ lu ( TMatrix *          A,
 
 }// namespace tileh
 
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                    alpha,
+          const matop_t                    op_M,
+          const TMatrix *                  M,
+          const BLAS::Vector< value_t > &  x,
+          BLAS::Vector< value_t > &        y )
+{
+    assert( ! is_null( M ) );
+    assert( M->ncols( op_M ) == x.length() );
+    assert( M->nrows( op_M ) == y.length() );
+
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto        B       = cptrcast( M, TBlockMatrix );
+        const auto  row_ofs = B->row_is( op_M ).first();
+        const auto  col_ofs = B->col_is( op_M ).first();
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+                
+                if ( ! is_null( B_ij ) )
+                {
+                    auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
+                    auto  y_i = x( B_ij->row_is( op_M ) - row_ofs );
+
+                    mul_vec( alpha, op_M, B_ij, x_j, y_i );
+                }// if
+            }// for
+        }// for
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D = cptrcast( M, TDenseMatrix );
+        
+        BLAS::mulvec( alpha, BLAS::mat_view( op_M, blas_mat< value_t >( D ) ), x, value_t(1), y );
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( M, TRkMatrix );
+
+        if ( op_M == apply_normal )
+        {
+            auto  t = BLAS::mulvec( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( R ) ), x );
+
+            BLAS::mulvec( alpha, blas_mat_A< value_t >( R ), t, value_t(1), y );
+        }// if
+        else if ( op_M == apply_transposed )
+        {
+            assert( is_complex_type< value_t >::value == false );
+            
+            auto  t = BLAS::mulvec( value_t(1), BLAS::transposed( blas_mat_A< value_t >( R ) ), x );
+
+            BLAS::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
+        }// if
+        else if ( op_M == apply_adjoint )
+        {
+            auto  t = BLAS::mulvec( value_t(1), BLAS::adjoint( blas_mat_A< value_t >( R ) ), x );
+
+            BLAS::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
+        }// if
+    }// if
+    else
+        assert( false );
+}
+
 }// namespace seq
 
 }// namespace hlr

@@ -57,10 +57,6 @@ mymain ( int, char ** )
 
         if ( A->nrows() != n )
             std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-
-        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
-        A = impl::matrix::realloc( A.release() );
-        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
     }// if
     else
     {
@@ -73,10 +69,8 @@ mymain ( int, char ** )
         std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
 
         // for spreading memory usage
-        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
-        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
     }// else
 
     auto  toc    = Time::Wall::since( tic );
@@ -91,150 +85,85 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    std::cout << term::bullet << term::bold
+              << ( levelwise ? "Level LU (DAG)" : ( coarse ? "LU (Coarse DAG)" : "LU (DAG)" ) )
+              << term::reset
+              << ", " << acc.to_string()
+              << std::endl;
+
+    hlr::dag::graph  dag;
+    
+    auto  C = ( onlydag ? std::move( A ) : A->copy() );
+
     if ( levelwise )
-    {
-        std::cout << term::bullet << term::bold << "Level LU (DAG)" << term::reset << std::endl;
-
-        auto  C = ( onlydag ? std::move( A ) : A->copy() );
-
         C->set_hierarchy_data();
 
-        hlr::dag::graph  dag;
-        double           tmin = 0;
-        double           tmax = 0;
-        double           tsum = 0;
+    double  tmin = 0;
+    double  tmax = 0;
+    double  tsum = 0;
+    
+    // LIKWID_MARKER_INIT;
         
-        // LIKWID_MARKER_INIT;
-        
-        for ( int  i = 0; i < nbench; ++i )
-        {
-            tic = Time::Wall::now();
-
-            // LIKWID_MARKER_START( "dag" );
-            
-            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
-            
-            // LIKWID_MARKER_STOP( "dag" );
-            
-            toc = Time::Wall::since( tic );
-            
-            if ( verbose( 2 ) )
-            {
-                std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
-
-                if ( hlr::dag::lock_nodes )
-                    std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
-            }// if
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-
-            if ( i < nbench-1 )
-                dag = std::move( hlr::dag::graph() );
-        }// for
-
-        // LIKWID_MARKER_CLOSE;
-        
-        if ( verbose( 2 ) )
-        {
-            if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
-                          << std::endl;
-            std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-            std::cout << "    #edges = " << dag.nedges() << std::endl;
-            std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
-        }// if
-        
-        if ( verbose( 3 ) )
-            dag.print_dot( "lvllu.dot" );
-        
-        if ( ! onlydag )
-        {
-            tic = Time::Wall::now();
-        
-            impl::dag::run( dag, acc );
-        
-            toc = Time::Wall::since( tic );
-        
-            TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
-        
-            std::cout << "  LU in      " << toc << std::endl;
-            std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-        }// if
-    }
-    else
+    for ( int  i = 0; i < nbench; ++i )
     {
-        std::cout << term::bullet << term::bold << "LU ( DAG " << impl_name
-                  << ", " << acc.to_string() << " )" << term::reset << std::endl;
+        tic = Time::Wall::now();
         
-        auto  C = ( onlydag ? std::move( A ) : A->copy() );
-        
-        hlr::dag::graph  dag;
-        double           tmin = 0;
-        double           tmax = 0;
-        double           tsum = 0;
+        // LIKWID_MARKER_START( "dag" );
 
-        // LIKWID_MARKER_INIT;
-        
-        for ( int  i = 0; i < nbench; ++i )
-        {
-            tic = Time::Wall::now();
-
-            // LIKWID_MARKER_START( "dag" );
-            
+        if ( levelwise )
+            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
+        else if ( coarse )
+            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine ) );
+        else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
-
-            // LIKWID_MARKER_STOP( "dag" );
-            
-            toc = Time::Wall::since( tic );
-            
-            if ( verbose( 2 ) )
-            {
-                std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
-
-                if ( hlr::dag::lock_nodes )
-                    std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
-            }// if
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-
-            if ( i < nbench-1 )
-                dag = std::move( hlr::dag::graph() );
-        }// for
-
-        // LIKWID_MARKER_CLOSE;
-
+        
+        // LIKWID_MARKER_STOP( "dag" );
+        
+        toc = Time::Wall::since( tic );
+        
         if ( verbose( 2 ) )
         {
-            if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
-                          << std::endl;
-            std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-            std::cout << "    #edges = " << dag.nedges() << std::endl;
-            std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
-        }// if
-        
-        if ( verbose( 3 ) )
-            dag.print_dot( "lu.dot" );
-
-        if ( ! onlydag )
-        {
-            tic = Time::Wall::now();
-        
-            impl::dag::run( dag, acc );
-        
-            toc = Time::Wall::since( tic );
-        
-            TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
             
-            std::cout << "  LU in      " << toc << std::endl;
-            std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+            if ( hlr::dag::lock_nodes )
+                std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
-    }
+        
+        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+        tmax  = std::max( tmax, toc.seconds() );
+        tsum += toc.seconds();
+        
+        if ( i < nbench-1 )
+            dag = std::move( hlr::dag::graph() );
+    }// for
 
+    // LIKWID_MARKER_CLOSE;
+        
+    if ( verbose( 2 ) )
+    {
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
+    }// if
+        
+    if ( verbose( 3 ) )
+        dag.print_dot( "lu.dot" );
+        
+    if ( ! onlydag )
+    {
+        tic = Time::Wall::now();
+        
+        impl::dag::run( dag, acc );
+        
+        toc = Time::Wall::since( tic );
+        
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "  LU in      " << toc << std::endl;
+        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+    }// if
 }

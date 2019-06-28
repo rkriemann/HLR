@@ -26,15 +26,47 @@ namespace dag
 // return graph representing compute DAG for LU of <A>
 //
 graph
-gen_dag_lu_rec  ( HLIB::TMatrix *                              A,
-                  std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_lu_rec    ( HLIB::TMatrix *                              A,
+                    std::function< dag::graph ( dag::node * ) >  refine );
+
+//
+// return graph representing compute DAG for LU of <A>
+//
+graph
+gen_dag_coarselu  ( HLIB::TMatrix *                              A,
+                    std::function< dag::graph ( dag::node * ) >  refine );
 
 //
 // return graph representing compute DAG for LU of <A>
 // - compute DAG level wise
 //
 graph
-gen_dag_lu_lvl  ( HLIB::TMatrix &  A );
+gen_dag_lu_lvl    ( HLIB::TMatrix &  A );
+
+//
+// return graph representing compute DAG for solving L X = A
+//
+graph
+gen_dag_solve_lower  ( const HLIB::TMatrix *                        L,
+                       HLIB::TMatrix *                              A,
+                       std::function< dag::graph ( dag::node * ) >  refine );
+
+//
+// return graph representing compute DAG for solving X U = A
+//
+graph
+gen_dag_solve_upper  ( const HLIB::TMatrix *                        U,
+                       HLIB::TMatrix *                              A,
+                       std::function< dag::graph ( dag::node * ) >  refine );
+
+//
+// return graph representing compute DAG for C = A B + C
+//
+graph
+gen_dag_update       ( const HLIB::TMatrix *                        A,
+                       const HLIB::TMatrix *                        B,
+                       HLIB::TMatrix *                              C,
+                       std::function< dag::graph ( dag::node * ) >  refine );
 
 }// namespace dag
 
