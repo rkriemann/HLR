@@ -14,6 +14,7 @@
 #include <taskflow/taskflow.hpp>
 
 #include "hlr/utils/log.hh"
+#include "hlr/utils/term.hh" // DEBUG
 #include "hlr/tf/dag.hh"
 
 using namespace HLIB;
@@ -41,8 +42,8 @@ refine ( node *  root )
     std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
     std::mutex            mtx;
-    ::tf::Taskflow        tf;
     ::tf::Executor        executor;
+    ::tf::Taskflow        tf;
 
     while ( ! nodes.empty() )
     {
@@ -55,26 +56,27 @@ refine ( node *  root )
                              node->refine();
                          } );
         executor.run( tf ).wait();
+        tf.clear();
 
         // then refine dependencies and collect new nodes
         tf.parallel_for( nodes.begin(), nodes.end(),
                          [&] ( node * node )
                          {
                              const bool  node_changed = node->refine_deps();
-
+                                 
                              if ( node->is_refined() )       // node was refined; collect all sub nodes
                              {
                                  std::scoped_lock  lock( mtx );
-                    
+                                     
                                  for ( auto  sub : node->sub_nodes() )
                                      subnodes.push_back( sub );
-                    
+                                     
                                  del_nodes.push_back( node );
                              }// if
                              else if ( node_changed )        // node was not refined but dependencies were
                              {
                                  std::scoped_lock  lock( mtx );
-                    
+                                     
                                  subnodes.push_back( node );
                              }// if
                              else                            // neither node nor dependencies changed: reached final state
@@ -82,13 +84,14 @@ refine ( node *  root )
                                  // adjust dependency counter of successors (which were NOT refined!)
                                  for ( auto  succ : node->successors() )
                                      succ->inc_dep_cnt();
-
+                                     
                                  std::scoped_lock  lock( mtx );
-                    
+                                     
                                  tasks.push_back( node );
                              }// else
                          } );
         executor.run( tf ).wait();
+        tf.clear();
         
         // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
         tf.parallel_for( del_nodes.begin(), del_nodes.end(),
@@ -97,6 +100,7 @@ refine ( node *  root )
                              delete node;
                          } );
         executor.run( tf ).wait();
+        tf.clear();
         
         nodes = std::move( subnodes );
     }// while

@@ -2,7 +2,7 @@
 # to enable print() syntax with python2
 from __future__ import print_function
 
-import os
+import os, sys
 
 ######################################################################
 #
@@ -99,6 +99,26 @@ opts.Save( opts_file, opt_env )
 
 ######################################################################
 #
+# colorization
+#
+######################################################################
+
+colors = { 'reset'  : '\033[0m',
+           'bold'   : '\033[1m',
+           'red'    : '\033[31m',
+           'green'  : '\033[32m',
+           'yellow' : '\033[33m',
+           'blue'   : '\033[34m',
+           'purple' : '\033[35m',
+           'cyan'   : '\033[36m' }
+
+# no colors if output is not a terminal ('dumb' is for emacs)
+if not sys.stdout.isatty() or os.environ['TERM'] == 'dumb' :
+    for key in colors.keys() :
+        colors[key] = ''
+      
+######################################################################
+#
 # set up compilation environment
 #
 ######################################################################
@@ -127,9 +147,11 @@ env = Environment( options    = opts,
 env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
 
 if not fullmsg :
-    env.Replace( CCCOMSTR   = " CC     $SOURCES" )
-    env.Replace( CXXCOMSTR  = " C++    $SOURCES" )
-    env.Replace( LINKCOMSTR = " Link   $TARGET"  )
+    env.Replace( CCCOMSTR     = " %sCC%s     $SOURCES" % ( colors['green']  + colors['bold'], colors['reset'] )  )
+    env.Replace( CXXCOMSTR    = " %sC++%s    $SOURCES" % ( colors['green']  + colors['bold'], colors['reset'] ) )
+    env.Replace( LINKCOMSTR   = " %sLink%s   %s$TARGET%s"  % ( colors['cyan'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
+    env.Replace( ARCOMSTR     = " %sAR%s     $TARGET"  % ( colors['yellow'] + colors['bold'], colors['reset'] ) )
+    env.Replace( RANLIBCOMSTR = " %sIndex%s  $TARGET"  % ( colors['yellow'] + colors['bold'], colors['reset'] ) )
 
 if not debug :
     env.Append(  CPPDEFINES = [ "NDEBUG" ] )

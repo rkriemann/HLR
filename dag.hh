@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+// #include <likwid.h>
+
 #include "common.inc"
 #include "hlr/cluster/h.hh"
 #include "hlr/matrix/level_matrix.hh"
@@ -55,6 +57,10 @@ mymain ( int, char ** )
 
         if ( A->nrows() != n )
             std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
+
+        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
+        A = impl::matrix::realloc( A.release() );
+        std::cout << "    mem = " << HLIB::Mem::to_string( HLIB::Mem::usage() ) << std::endl;
     }// if
     else
     {
@@ -98,11 +104,17 @@ mymain ( int, char ** )
         double           tmax = 0;
         double           tsum = 0;
         
+        // LIKWID_MARKER_INIT;
+        
         for ( int  i = 0; i < nbench; ++i )
         {
             tic = Time::Wall::now();
 
+            // LIKWID_MARKER_START( "dag" );
+            
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
+            
+            // LIKWID_MARKER_STOP( "dag" );
             
             toc = Time::Wall::since( tic );
             
@@ -121,6 +133,8 @@ mymain ( int, char ** )
             if ( i < nbench-1 )
                 dag = std::move( hlr::dag::graph() );
         }// for
+
+        // LIKWID_MARKER_CLOSE;
         
         if ( verbose( 2 ) )
         {
@@ -162,12 +176,18 @@ mymain ( int, char ** )
         double           tmax = 0;
         double           tsum = 0;
 
+        // LIKWID_MARKER_INIT;
+        
         for ( int  i = 0; i < nbench; ++i )
         {
             tic = Time::Wall::now();
 
+            // LIKWID_MARKER_START( "dag" );
+            
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
-        
+
+            // LIKWID_MARKER_STOP( "dag" );
+            
             toc = Time::Wall::since( tic );
             
             if ( verbose( 2 ) )
@@ -185,6 +205,8 @@ mymain ( int, char ** )
             if ( i < nbench-1 )
                 dag = std::move( hlr::dag::graph() );
         }// for
+
+        // LIKWID_MARKER_CLOSE;
 
         if ( verbose( 2 ) )
         {

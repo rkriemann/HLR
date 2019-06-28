@@ -18,7 +18,6 @@
 #include <base/TTruncAcc.hh>
 
 #include "hlr/utils/tensor.hh"
-#include "hlr/utils/log.hh"
 #include "hlr/seq/matrix.hh"
 
 namespace hlr
@@ -212,22 +211,28 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
 
         C->copy_struct_from( B );
 
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        auto  sub_tasks = tf.emplace(
+            [B,BC] ( auto &  sf )
             {
-                tf.silent_emplace(
-                    [B,BC,i,j] ( auto &  sf )
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
                     {
-                        auto  C_ij = realloc_helper( sf, B->block( i, j ) );
-                        
-                        BC->set_block( i, j, C_ij.release() );
-                        B->set_block( i, j, nullptr );
-                    } );
-            }// for
-        }// for
+                        sf.silent_emplace(
+                            [B,BC,i,j] ( auto &  sf )
+                            {
+                                auto  C_ij = realloc_helper( sf, B->block( i, j ) );
+                                
+                                BC->set_block( i, j, C_ij.release() );
+                                B->set_block( i, j, nullptr );
+                            } );
+                    }// for
+                }// for
+            } );
 
-        delete B;
+        auto  del_task = tf.emplace( [B] () { delete B; } );
+
+        sub_tasks.precede( del_task );
 
         return C;
     }// if
@@ -252,7 +257,7 @@ realloc ( TMatrix *  A )
     ::tf::Executor  executor;
     
     executor.run( tf ).wait();
-    
+
     return res;
 }
 
