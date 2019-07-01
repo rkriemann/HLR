@@ -41,6 +41,7 @@ HPX_DIR      = '/opt/local/hpx'
 GPI2_DIR     = '/opt/local/gpi2'
 
 JEMALLOC_DIR = '/opt/local/jemalloc/5.2.0'
+MIMALLOC_DIR = '/opt/local/mimalloc'
 LIKWID_DIR   = None # '/opt/local/likwid'
 
 ######################################################################
@@ -161,8 +162,11 @@ env.Prepend( LIBS    = [ "common" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
 if JEMALLOC_DIR != None :
-    env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
-    env.Append( LIBS    = 'jemalloc' )
+    # env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
+    env.MergeFlags( os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
+    env.Append( LIBS = 'dl' )
+elif MIMALLOC_DIR != None :
+    env.MergeFlags( os.path.join( MIMALLOC_DIR, 'lib', 'libmimalloc.a' ) )
 
 if LIKWID_DIR != None :
     env.Append( CPPDEFINES = 'LIKWID_PERFMON' )

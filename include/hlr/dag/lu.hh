@@ -37,7 +37,8 @@ gen_dag_coarselu  ( HLIB::TMatrix *                                            A
                     const std::function< dag::graph ( dag::node * ) > &        coarse_refine,
                     const std::function< dag::graph ( dag::node * ) > &        fine_refine,
                     const std::function< void ( hlr::dag::graph &,
-                                                const HLIB::TTruncAcc & ) > &  fine_run );
+                                                const HLIB::TTruncAcc & ) > &  fine_run,
+                    const size_t                                               ncoarse = 0 );
 
 //
 // return graph representing compute DAG for LU of <A>

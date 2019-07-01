@@ -35,6 +35,8 @@ namespace dag
 namespace
 {
 
+size_t  coarse_size = 1000;
+
 //
 // return true if matrix is still large enough
 //
@@ -44,7 +46,7 @@ is_large ( const T *  A )
 {
     assert( ! is_null( A ) );
     
-    return ( std::min( A->nrows(), A->ncols() ) >= 5000 );
+    return ( std::min( A->nrows(), A->ncols() ) >= coarse_size );
 }
 
 template < typename T >
@@ -547,8 +549,16 @@ gen_dag_coarselu ( TMatrix *                                                  A,
                    const std::function< graph ( node * ) > &                  coarse_refine,
                    const std::function< dag::graph ( dag::node * ) > &        fine_refine,
                    const std::function< void ( hlr::dag::graph &,
-                                               const HLIB::TTruncAcc & ) > &  fine_run )
+                                               const HLIB::TTruncAcc & ) > &  fine_run,
+                   const size_t                                               ncoarse )
 {
+    if ( ncoarse != 0 )
+        coarse_size = ncoarse;
+
+    // if coarse size if too small, generate standard LU DAG
+    if ( coarse_size <= HLIB::CFG::Arith::max_seq_size )
+        return gen_dag_lu_rec( A, coarse_refine );
+            
     apply_map_t  apply_map;
     auto         dag = coarse_refine( new lu_node( A, apply_map, fine_refine, fine_run ) );
 

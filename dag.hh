@@ -85,8 +85,10 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    const size_t  ncoarse = A->nrows() / 50;
+    
     std::cout << term::bullet << term::bold
-              << ( levelwise ? "Level LU (DAG)" : ( coarse ? "LU (Coarse DAG)" : "LU (DAG)" ) )
+              << ( levelwise ? "Level LU (DAG)" : ( coarse ? HLIB::to_string( "LU (Coarse-%d DAG)", ncoarse ) : "LU (DAG)" ) )
               << term::reset
               << ", " << acc.to_string()
               << std::endl;
@@ -113,7 +115,7 @@ mymain ( int, char ** )
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
         else if ( coarse )
-            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, impl::dag::refine, impl::dag::run ) );
+            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, impl::dag::refine, impl::dag::run, ncoarse ) );
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         
