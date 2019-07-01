@@ -113,7 +113,7 @@ mymain ( int, char ** )
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
         else if ( coarse )
-            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, impl::dag::refine, impl::dag::run ) );
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         

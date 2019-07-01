@@ -40,7 +40,7 @@ TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
 HPX_DIR      = '/opt/local/hpx'
 GPI2_DIR     = '/opt/local/gpi2'
 
-JEMALLOC_DIR = '/opt/local/jemalloc/5.1.0'
+JEMALLOC_DIR = '/opt/local/jemalloc/5.2.0'
 LIKWID_DIR   = None # '/opt/local/likwid'
 
 ######################################################################

@@ -58,6 +58,10 @@ bool is_large_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_large( A ) && i
 // map for apply_node nodes
 using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
 
+// refine and rnu functions for fine graphs
+using  refine_func_t = std::function< dag::graph ( dag::node * ) >;
+using  run_func_t    = std::function< void ( hlr::dag::graph &, const HLIB::TTruncAcc & ) >;
+
 // identifiers for memory blocks
 const HLIB::id_t  id_A = 'A';
 const HLIB::id_t  id_U = 'U';
@@ -66,11 +70,17 @@ struct lu_node : public node
 {
     TMatrix *      A;
     apply_map_t &  apply_nodes;
+    refine_func_t  refine_func;
+    run_func_t     run_func;
     
     lu_node ( TMatrix *      aA,
-              apply_map_t &  aapply_nodes )
+              apply_map_t &  aapply_nodes,
+              refine_func_t  arefine_func,
+              run_func_t     arun_func )
             : A( aA )
             , apply_nodes( aapply_nodes )
+            , refine_func( arefine_func )
+            , run_func(    arun_func )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
@@ -88,13 +98,19 @@ struct solve_upper_node : public node
     const TMatrix *  U;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
+    refine_func_t    refine_func;
+    run_func_t       run_func;
     
     solve_upper_node ( const TMatrix *  aU,
                        TMatrix *        aA,
-                       apply_map_t &    aapply_nodes )
+                       apply_map_t &    aapply_nodes,
+                       refine_func_t    arefine_func,
+                       run_func_t       arun_func )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
+            , refine_func( arefine_func )
+            , run_func(    arun_func )
     { init(); }
     
     virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, %d )",
@@ -113,13 +129,19 @@ struct solve_lower_node : public node
     const TMatrix *  L;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
+    refine_func_t    refine_func;
+    run_func_t       run_func;
 
     solve_lower_node ( const TMatrix *  aL,
                        TMatrix *        aA,
-                       apply_map_t &    aapply_nodes )
+                       apply_map_t &    aapply_nodes,
+                       refine_func_t    arefine_func,
+                       run_func_t       arun_func )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )
+            , refine_func( arefine_func )
+            , run_func(    arun_func )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, %d )",
@@ -139,15 +161,21 @@ struct update_node : public node
     const TMatrix *  B;
     TMatrix *        C;
     apply_map_t &    apply_nodes;
+    refine_func_t    refine_func;
+    run_func_t       run_func;
 
     update_node ( const TMatrix *  aA,
                   const TMatrix *  aB,
                   TMatrix *        aC,
-                  apply_map_t &    aapply_nodes )
+                  apply_map_t &    aapply_nodes,
+                  refine_func_t    arefine_func,
+                  run_func_t       arun_func )
             : A( aA )
             , B( aB )
             , C( aC )
             , apply_nodes( aapply_nodes )
+            , refine_func( arefine_func )
+            , run_func(    arun_func )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "update( %d, %d, %d )",
@@ -214,20 +242,24 @@ lu_node::refine_ ()
 
             assert( A_ii != nullptr );
 
-            hlr::dag::alloc_node< lu_node >( g, A_ii, apply_nodes );
+            hlr::dag::alloc_node< lu_node >( g, A_ii,
+                                             apply_nodes, refine_func, run_func );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
-                    hlr::dag::alloc_node< solve_upper_node >( g, A_ii, B->block( j, i ), apply_nodes );
+                    hlr::dag::alloc_node< solve_upper_node >( g, A_ii, B->block( j, i ),
+                                                              apply_nodes, refine_func, run_func );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
-                    hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ), apply_nodes );
+                    hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ),
+                                                              apply_nodes, refine_func, run_func );
 
             for ( uint j = i+1; j < nbr; j++ )
                 for ( uint l = i+1; l < nbc; l++ )
                     if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
-                        hlr::dag::alloc_node< update_node >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ),
+                                                             apply_nodes, refine_func, run_func );
         }// for
     }// if
     else if ( CFG::Arith::use_accu )
@@ -245,9 +277,9 @@ lu_node::refine_ ()
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = gen_dag_lu_rec( A, hlr::tbb::dag::refine );
+    auto  dag = gen_dag_lu_rec( A, refine_func );
 
-    hlr::tbb::dag::run( dag, acc );
+    run_func( dag, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -284,7 +316,8 @@ solve_lower_node::refine_ ()
             {
                 for ( uint j = 0; j < nbc; ++j )
                     if ( ! is_null( BA->block( i, j ) ) )
-                        hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ), apply_nodes );
+                        hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ),
+                                                                  apply_nodes, refine_func, run_func );
             }// if
         }// for
 
@@ -296,7 +329,8 @@ solve_lower_node::refine_ ()
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        hlr::dag::alloc_node< update_node >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ),
+                                                             apply_nodes, refine_func, run_func );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -314,9 +348,9 @@ void
 solve_lower_node::run_ ( const TTruncAcc &  acc )
 {
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-    auto  dag = gen_dag_solve_lower( L, A, hlr::tbb::dag::refine );
+    auto  dag = gen_dag_solve_lower( L, A, refine_func );
 
-    hlr::tbb::dag::run( dag, acc );
+    run_func( dag, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -349,7 +383,8 @@ solve_upper_node::refine_ ()
             {
                 for ( uint i = 0; i < nbr; ++i )
                     if ( ! is_null( BA->block(i,j) ) )
-                        hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ), apply_nodes );
+                        hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ),
+                                                                  apply_nodes, refine_func, run_func );
             }// if
         }// for
 
@@ -361,7 +396,8 @@ solve_upper_node::refine_ ()
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        hlr::dag::alloc_node< update_node >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ), apply_nodes );
+                        hlr::dag::alloc_node< update_node >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ),
+                                                             apply_nodes, refine_func, run_func );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -379,9 +415,9 @@ void
 solve_upper_node::run_ ( const TTruncAcc &  acc )
 {
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-    auto  dag = gen_dag_solve_upper( U, A, hlr::tbb::dag::refine );
+    auto  dag = gen_dag_solve_upper( U, A, refine_func );
 
-    hlr::tbb::dag::run( dag, acc );
+    run_func( dag, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -419,7 +455,9 @@ update_node::refine_ ()
                                                              BA->block( i, k ),
                                                              BB->block( k, j ),
                                                              BC->block( i, j ),
-                                                             apply_nodes );
+                                                             apply_nodes,
+                                                             refine_func,
+                                                             run_func );
                 }// for
             }// for
         }// for
@@ -440,9 +478,9 @@ void
 update_node::run_ ( const TTruncAcc &  acc )
 {
     // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
-    auto  dag = gen_dag_update( A, B, C, hlr::tbb::dag::refine );
+    auto  dag = gen_dag_update( A, B, C, refine_func );
 
-    hlr::tbb::dag::run( dag, acc );
+    run_func( dag, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -505,11 +543,14 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_coarselu ( TMatrix *                          A,
-                   std::function< graph ( node * ) >  refine )
+gen_dag_coarselu ( TMatrix *                                                  A,
+                   const std::function< graph ( node * ) > &                  coarse_refine,
+                   const std::function< dag::graph ( dag::node * ) > &        fine_refine,
+                   const std::function< void ( hlr::dag::graph &,
+                                               const HLIB::TTruncAcc & ) > &  fine_run )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new lu_node( A, apply_map ) );
+    auto         dag = coarse_refine( new lu_node( A, apply_map, fine_refine, fine_run ) );
 
     return dag;
 }

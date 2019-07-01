@@ -33,8 +33,11 @@ gen_dag_lu_rec    ( HLIB::TMatrix *                              A,
 // return graph representing compute DAG for LU of <A>
 //
 graph
-gen_dag_coarselu  ( HLIB::TMatrix *                              A,
-                    std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_coarselu  ( HLIB::TMatrix *                                            A,
+                    const std::function< dag::graph ( dag::node * ) > &        coarse_refine,
+                    const std::function< dag::graph ( dag::node * ) > &        fine_refine,
+                    const std::function< void ( hlr::dag::graph &,
+                                                const HLIB::TTruncAcc & ) > &  fine_run );
 
 //
 // return graph representing compute DAG for LU of <A>

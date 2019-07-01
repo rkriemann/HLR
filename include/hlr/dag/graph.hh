@@ -42,12 +42,12 @@ public:
     graph ( node_list_t &           nodes,
             node_list_t &           start,
             node_list_t &           end,
-            const end_nodes_mode_t  end_mode = use_multiple_end_nodes );
+            const end_nodes_mode_t  end_mode = use_single_end_node );
 
     graph ( node_list_t &&          nodes,
             node_list_t &&          start,
             node_list_t &&          end,
-            const end_nodes_mode_t  end_mode = use_multiple_end_nodes );
+            const end_nodes_mode_t  end_mode = use_single_end_node );
 
     graph ( graph &&                g )
     {
