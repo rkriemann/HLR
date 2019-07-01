@@ -30,8 +30,8 @@ DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 # set of programs to build: dag, tlr, hodlr, tileh (or "all")
 PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag' ]
 
-# set of frameworks to use: seq, openmp, tbb, taskflow, hpx, mpi, gpi2 (or "all")
-FRAMEWORKS   = [ 'seq', 'openmp', 'tbb', 'taskflow', 'hpx', 'mpi', 'gpi2' ]
+# set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
+FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
 
 # directories for the various external libraries
 HPRO_DIR     = 'hlibpro'
@@ -238,7 +238,7 @@ if 'seq' in frameworks :
 # OpenMP
 #
 
-if 'openmp' in frameworks :
+if 'omp' in frameworks :
     omp = env.Clone()
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
@@ -266,7 +266,7 @@ if 'tbb' in frameworks :
 # TaskFlow
 #
 
-if 'taskflow' in frameworks :
+if 'tf' in frameworks :
     tf = env.Clone()
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )

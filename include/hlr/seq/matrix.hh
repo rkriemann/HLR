@@ -136,6 +136,44 @@ copy ( const TMatrix &  M )
 }
 
 //
+// copy data of A to matrix B
+// - ASSUMPTION: identical matrix structure
+//
+void
+copy_to ( const TMatrix &  A,
+          TMatrix &        B )
+{
+    assert( A.type()     == B.type() );
+    assert( A.block_is() == B.block_is() );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = ptrcast(  &B, TBlockMatrix );
+
+        assert( BA->nblock_rows() == BB->nblock_rows() );
+        assert( BA->nblock_cols() == BB->nblock_cols() );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+            {
+                if ( BA->block( i, j ) != nullptr )
+                {
+                    assert( ! is_null( BB->block( i, j ) ) );
+
+                    copy_to( * BA->block( i, j ), * BB->block( i, j ) );
+                }// if
+            }// for
+        }// for
+    }// if
+    else
+    {
+        A.copy_to( & B );
+    }// else
+}
+
+//
 // reallocate matrix blocks
 // - frees old data
 // - local operation thereby limiting extra memory usage

@@ -88,6 +88,9 @@ public:
     // ensure graph has single end node
     void    make_single_end ();
 
+    // reset dependency counters of all nodes
+    void    reset_dependencies ();
+    
     // remove all nodes in graph
     void    clear ()
     {

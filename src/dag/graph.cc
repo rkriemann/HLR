@@ -118,7 +118,20 @@ graph::make_single_end ()
         _end.push_back( new_end );
     }// if
 }
-    
+
+//
+// reset dependency counters of all nodes
+//
+void
+graph::reset_dependencies ()
+{
+    for ( auto  n : nodes() )
+    {
+        for ( auto  succ : n->successors() )
+            succ->inc_dep_cnt();
+    }// for
+}
+
 //
 // output DAG
 //

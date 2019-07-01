@@ -35,6 +35,9 @@ namespace matrix
 // matrix coefficients defined by <coeff> and
 // low-rank blocks computed by <lrapx>
 //
+namespace detail
+{
+
 template < typename coeff_t,
            typename lrapx_t >
 std::unique_ptr< HLIB::TMatrix >
@@ -113,6 +116,8 @@ build_helper ( ::tf::SubflowBuilder &       tf,
     return M;
 }
 
+}// namespace detail
+
 template < typename coeff_t,
            typename lrapx_t >
 std::unique_ptr< HLIB::TMatrix >
@@ -124,7 +129,7 @@ build ( const HLIB::TBlockCluster *  bct,
     ::tf::Taskflow              tf;
     std::unique_ptr< TMatrix >  res;
     
-    tf.silent_emplace( [&,bct] ( auto &  sf ) { res = build_helper( sf, bct, coeff, lrapx, acc ); } );
+    tf.silent_emplace( [&,bct] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc ); } );
 
     ::tf::Executor  executor;
     
@@ -137,6 +142,9 @@ build ( const HLIB::TBlockCluster *  bct,
 // return copy of matrix
 // - copy operation is performed in parallel for sub blocks
 //
+namespace detail
+{
+
 std::unique_ptr< TMatrix >
 copy_helper ( ::tf::SubflowBuilder &  tf,
               const TMatrix &         M )
@@ -176,13 +184,15 @@ copy_helper ( ::tf::SubflowBuilder &  tf,
     }// else
 }
 
+}// namespace detail
+
 std::unique_ptr< TMatrix >
 copy ( const TMatrix &  M )
 {
     ::tf::Taskflow              tf;
     std::unique_ptr< TMatrix >  res;
     
-    tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = copy_helper( sf, M ); } );
+    tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = detail::copy_helper( sf, M ); } );
 
     ::tf::Executor  executor;
     
@@ -192,10 +202,74 @@ copy ( const TMatrix &  M )
 }
 
 //
+// copy data of A to matrix B
+// - ASSUMPTION: identical matrix structure
+//
+namespace detail
+{
+
+void
+copy_to_helper ( ::tf::SubflowBuilder &  tf,
+                 const TMatrix &         A,
+                 TMatrix &               B )
+{
+    assert( A.type()     == B.type() );
+    assert( A.block_is() == B.block_is() );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = ptrcast(  &B, TBlockMatrix );
+
+        assert( BA->nblock_rows() == BB->nblock_rows() );
+        assert( BA->nblock_cols() == BB->nblock_cols() );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+            {
+                if ( BA->block( i, j ) != nullptr )
+                {
+                    tf.silent_emplace(
+                        [BA,BB,i,j] ( auto &  sf )
+                        {
+                            assert( ! is_null( BB->block( i, j ) ) );
+                            
+                            copy_to_helper( sf, * BA->block( i, j ), * BB->block( i, j ) );
+                        } );
+                }// if
+            }// for
+        }// for
+    }// if
+    else
+    {
+        A.copy_to( & B );
+    }// else
+}
+
+}// namespace detail
+
+void
+copy_to ( const TMatrix &  A,
+          TMatrix &        B )
+{
+    ::tf::Taskflow  tf;
+    
+    tf.silent_emplace( [&A,&B] ( auto &  sf ) { detail::copy_to_helper( sf, A, B ); } );
+
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
+}
+
+//
 // reallocate matrix blocks
 // - frees old data
 // - local operation thereby limiting extra memory usage
 //
+namespace detail
+{
+
 std::unique_ptr< TMatrix >
 realloc_helper ( ::tf::SubflowBuilder &  tf,
                  TMatrix *               A )
@@ -246,13 +320,15 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
     }// else
 }
 
+}// namespace detail
+
 std::unique_ptr< TMatrix >
 realloc ( TMatrix *  A )
 {
     ::tf::Taskflow              tf;
     std::unique_ptr< TMatrix >  res;
     
-    tf.silent_emplace( [A,&res] ( auto &  sf ) { res = realloc_helper( sf, A ); } );
+    tf.silent_emplace( [A,&res] ( auto &  sf ) { res = detail::realloc_helper( sf, A ); } );
 
     ::tf::Executor  executor;
     
