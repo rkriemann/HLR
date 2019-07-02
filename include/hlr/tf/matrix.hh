@@ -293,9 +293,9 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
                     for ( uint  j = 0; j < B->nblock_cols(); ++j )
                     {
                         sf.silent_emplace(
-                            [B,BC,i,j] ( auto &  sf )
+                            [B,BC,i,j] ( auto &  ssf )
                             {
-                                auto  C_ij = realloc_helper( sf, B->block( i, j ) );
+                                auto  C_ij = realloc_helper( ssf, B->block( i, j ) );
                                 
                                 BC->set_block( i, j, C_ij.release() );
                                 B->set_block( i, j, nullptr );

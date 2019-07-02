@@ -32,7 +32,7 @@ Parallelization Frameworks
 
   - seq:       standard sequential arithmetic
   - omp:       uses OpenMP loop/task parallelization
-  - tbb:       TBB loop parallelization
+  - tbb:       TBB task parallelization
   - tf:        C++-TaskFlow library (https://github.com/cpp-taskflow/cpp-taskflow)
   - hpx:       HPX C++ library (https://github.com/STEllAR-GROUP/hpx)
   - mpi        Message Passing Interface

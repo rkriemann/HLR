@@ -225,10 +225,6 @@ node::refine_deps ()
                 insert( succ, locked );
         }// for
 
-        // // remove duplicates
-        // locked.sort();
-        // locked.unique();
-    
         for ( auto  n : locked )
         {
             if ( count_coll )

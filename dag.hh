@@ -54,9 +54,6 @@ mymain ( int, char ** )
         auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
-
-        if ( A->nrows() != n )
-            std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     }// if
     else
     {
@@ -66,8 +63,6 @@ mymain ( int, char ** )
 
         A = read_matrix( matrixfile );
 
-        std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-
         // for spreading memory usage
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
@@ -75,8 +70,9 @@ mymain ( int, char ** )
 
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    std::cout << "    done in  " << format( "%.3e s" ) % toc.seconds() << std::endl;
+    std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
+    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -125,7 +121,7 @@ mymain ( int, char ** )
         
         if ( verbose( 1 ) )
         {
-            std::cout << "  dag in     " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
             
             // if ( hlr::dag::lock_nodes )
             //     std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
@@ -145,11 +141,11 @@ mymain ( int, char ** )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = "
-                      << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << boost::format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << HLIB::Mem::to_string( dag.mem_size() ) << std::endl;
+        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
     }// if
         
     if ( verbose( 3 ) )
@@ -167,7 +163,7 @@ mymain ( int, char ** )
         
             toc = Time::Wall::since( tic );
 
-            std::cout << "  LU in      " << boost::format( "%.3e" ) % toc.seconds() << std::endl;
+            std::cout << "  LU in      " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
 
             tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
             tmax  = std::max( tmax, toc.seconds() );
@@ -182,8 +178,10 @@ mymain ( int, char ** )
         
         if ( nbench > 1 )
             std::cout << "  runtime  = "
-                      << boost::format( "%.3e / %.3e / %.3e" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << boost::format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
+        
+        std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
