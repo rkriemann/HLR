@@ -13,11 +13,11 @@
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/arith/lu.hh"
+#include "hlr/seq/dag.hh"
 
 namespace hlr { namespace dag {
 
 extern std::atomic< size_t >  collisions;
-extern bool                   lock_nodes;
 
 } }// namespace hlr::dag
 
@@ -111,7 +111,7 @@ mymain ( int, char ** )
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
         else if ( coarse > 0 )
-            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, impl::dag::refine, impl::dag::run, ncoarse ) );
+            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, seq::dag::refine, impl::dag::run, ncoarse ) );
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         
@@ -123,8 +123,7 @@ mymain ( int, char ** )
         {
             std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
             
-            // if ( hlr::dag::lock_nodes )
-            //     std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
+            // std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
         tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );

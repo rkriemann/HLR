@@ -164,23 +164,11 @@ public:
     // if retval is empty, no refinement was done
     void  refine ();
 
-    //
-    // refine dependencies, either local or of sub nodes
-    // - return true, if local node changed (modified dependencies)
-    //
-    bool  refine_deps  ();
+    // refine dependencies of <node>, either local or of sub nodes
+    // - return true, if <node> changed (modified dependencies)
+    // - if <do_lock> == true, lock affected nodes during refinement
+    bool  refine_deps  ( const bool  do_lock );
 
-    //
-    // refine local dependencies, e.g., if successors were refined
-    // - return true, if dependencies were refined
-    //
-    bool  refine_loc_deps ();
-
-    //
-    // refine dependencies of sub nodes
-    //
-    void  refine_sub_deps ();
-    
     //
     // mutex functions
     //

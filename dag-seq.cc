@@ -17,8 +17,5 @@ const std::string  impl_name = "seq";
 int
 main ( int argc, char ** argv )
 {
-    // not needed for sequential mode
-    hlr::dag::lock_nodes = false;
-    
     return hlrmain( argc, argv );
 }

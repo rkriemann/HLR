@@ -30,9 +30,6 @@ constexpr bool         sparsify     = true;
 // default maximal path distance in reachability test
 constexpr int          def_path_len = 2;
     
-// controls node locking during refinement
-bool                   lock_nodes   = true;
-
 // activates collision counting
 constexpr bool         count_coll   = false;
 
@@ -118,6 +115,20 @@ node::refine ()
 
     _sub_nodes = std::move( g );
 }
+    
+//
+// print node with full edge information
+//
+void
+node::print () const
+{
+    std::cout << to_string() << std::endl;
+    std::cout << "   #deps : " << _dep_cnt << std::endl;
+
+    std::cout << "   succ  : " << successors().size() << std::endl;
+    for ( auto  succ : successors() )
+        std::cout << "      " << succ->to_string() << std::endl;
+}
 
 namespace
 {
@@ -191,13 +202,145 @@ remove_redundant ( node *              n,
     return new_out;
 }
 
+//
+// refine dependencies of local node
+//
+bool
+refine_loc_deps ( node *  node )
+{
+    assert( ! is_null( node ) );
+    
+    HLR_LOG( 5, "refine_loc_deps( " + node->to_string() + " )" );
+
+    //
+    // replace successor by refined successors if available
+    //
+    
+    bool  changed = false;
+
+    {
+        node_vec_t  new_out;
+        auto        succ = node->successors().begin();
+            
+        while ( succ != node->successors().end() )
+        {
+            if ( (*succ)->is_refined() )
+            {
+                changed = true;
+                
+                // insert succendencies for subnodes (intersection test neccessary???)
+                for ( auto  succ_sub : (*succ)->sub_nodes() )
+                {
+                    HLR_LOG( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
+                    new_out.push_back( succ_sub );
+                }// for
+
+                ++succ;
+            }// if
+            else
+            {
+                new_out.push_back( *succ );
+                ++succ;
+            }// else
+        }// for
+
+        node->successors() = std::move( new_out );
+    }
+    
+    //
+    // remove direct outgoing edges if reachable otherwise
+    //
+    
+    if ( changed && sparsify )
+    {
+        // restrict search to local nodes and neighbouring nodes
+        node_set_t  neighbourhood;
+
+        neighbourhood.reserve( 1 + node->successors().size() );
+
+        insert( node, neighbourhood );
+        
+        for ( auto  succ : node->successors() )
+            insert( succ, neighbourhood );
+
+        node->successors() = remove_redundant( node, neighbourhood );
+    }// if
+    
+    return changed;
+}
+
+//
+// refine dependencies of sub nodes
+//
+void
+refine_sub_deps ( node *  node )
+{
+    assert( ! is_null( node ) );
+    
+    HLR_LOG( 5, "refine_sub_deps( " + node->to_string() + " )" );
+    
+    if ( node->sub_nodes().size() == 0 )
+        return;
+
+    //
+    // add dependencies for all sub nodes to old or refined successors
+    //
+    
+    for ( auto  sub : node->sub_nodes() )
+    {
+        for ( auto  succ : node->successors() )
+        {
+            if ( succ->is_refined() )
+            {
+                for ( auto  succ_sub : succ->sub_nodes() )
+                {
+                    if ( is_intersecting( sub->out_blocks(), succ_sub->in_blocks() ) )
+                    {
+                        HLR_LOG( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
+                        sub->successors().push_back( succ_sub );
+                    }// if
+                }// for
+            }// if
+            else
+            {
+                if ( is_intersecting( sub->out_blocks(), succ->in_blocks() ) )
+                {
+                    HLR_LOG( 6, sub->to_string() + " → " + succ->to_string() );
+                    sub->successors().push_back( succ );
+                }// if
+            }// for
+        }// else
+    }// for
+
+    //
+    // remove direct outgoing edges if reachable via path
+    //
+    
+    if ( sparsify )
+    {
+        for ( auto  sub : node->sub_nodes() )
+        {
+            node_set_t  neighbourhood;
+
+            neighbourhood.reserve( 1 + sub->successors().size() );
+            
+            insert( sub, neighbourhood );
+
+            for ( auto  succ : sub->successors() )
+                insert( succ, neighbourhood );
+
+            sub->successors() = remove_redundant( sub, neighbourhood );
+        }// for
+    }// if
+}
+
 }// namespace anonymous
 
 //
 // refine dependencies of local node or of sub nodes
 //
 bool
-node::refine_deps ()
+node::refine_deps ( const bool  do_lock )
 {
     HLR_LOG( 5, "refine_deps( " + to_string() + " )" );
 
@@ -207,11 +350,11 @@ node::refine_deps ()
 
     std::set< node * >  locked;
     
-    if ( lock_nodes )
+    if ( do_lock )
     {
         insert( this, locked );
 
-        for ( auto  sub : _sub_nodes )
+        for ( auto  sub : sub_nodes() )
             insert( sub, locked );
     
         for ( auto  succ : successors() )
@@ -243,21 +386,21 @@ node::refine_deps ()
     }// if
 
     //
-    // decide to refine local node or sub node dependencies
+    // decide to refine node or sub node dependencies
     //
 
     bool  changed = false;
 
     if ( is_refined() )
-        refine_sub_deps();
+        refine_sub_deps( this );
     else
-        changed = refine_loc_deps();
+        changed = refine_loc_deps( this );
     
     //
     // finally unlock nodes
     //
     
-    if ( lock_nodes )
+    if ( do_lock )
     {
          for ( auto  n : locked )
          {
@@ -269,148 +412,6 @@ node::refine_deps ()
     return changed;
 }
 
-//
-// refine dependencies of local node
-//
-bool
-node::refine_loc_deps ()
-{
-    HLR_LOG( 5, "refine_loc_deps( " + to_string() + " )" );
-
-    //
-    // replace successor by refined successors if available
-    //
-    
-    bool  changed = false;
-
-    {
-        node_vec_t  new_out;
-        auto        succ = successors().begin();
-            
-        while ( succ != successors().end() )
-        {
-            if ( (*succ)->is_refined() )
-            {
-                changed = true;
-                
-                // insert succendencies for subnodes (intersection test neccessary???)
-                for ( auto  succ_sub : (*succ)->sub_nodes() )
-                {
-                    HLR_LOG( 6, to_string() + " ⟶ " + succ_sub->to_string() );
-                    new_out.push_back( succ_sub );
-                }// for
-
-                ++succ;
-            }// if
-            else
-            {
-                new_out.push_back( *succ );
-                ++succ;
-            }// else
-        }// for
-
-        _successors = std::move( new_out );
-    }
-    
-    //
-    // remove direct outgoing edges if reachable otherwise
-    //
-    
-    if ( changed && sparsify )
-    {
-        // restrict search to local nodes and neighbouring nodes
-        node_set_t  neighbourhood;
-
-        neighbourhood.reserve( 1 + successors().size() );
-
-        insert( this, neighbourhood );
-        
-        for ( auto  succ : successors() )
-            insert( succ, neighbourhood );
-
-        _successors = remove_redundant( this, neighbourhood );
-    }// if
-    
-    return changed;
-}
-
-//
-// refine dependencies of sub nodes
-//
-void
-node::refine_sub_deps ()
-{
-    HLR_LOG( 5, "refine_sub_deps( " + to_string() + " )" );
-    
-    if ( _sub_nodes.size() == 0 )
-        return;
-
-    //
-    // add dependencies for all sub nodes to old or refined successors
-    //
-    
-    for ( auto  sub : _sub_nodes )
-    {
-        for ( auto  succ : successors() )
-        {
-            if ( succ->is_refined() )
-            {
-                for ( auto  succ_sub : succ->sub_nodes() )
-                {
-                    if ( is_intersecting( sub->out_blocks(), succ_sub->in_blocks() ) )
-                    {
-                        HLR_LOG( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
-                        sub->successors().push_back( succ_sub );
-                    }// if
-                }// for
-            }// if
-            else
-            {
-                if ( is_intersecting( sub->out_blocks(), succ->in_blocks() ) )
-                {
-                    HLR_LOG( 6, sub->to_string() + " → " + succ->to_string() );
-                    sub->successors().push_back( succ );
-                }// if
-            }// for
-        }// else
-    }// for
-
-    //
-    // remove direct outgoing edges if reachable via path
-    //
-    
-    if ( sparsify )
-    {
-        for ( auto  sub : _sub_nodes )
-        {
-            node_set_t  neighbourhood;
-
-            neighbourhood.reserve( 1 + sub->successors().size() );
-            
-            insert( sub, neighbourhood );
-
-            for ( auto  succ : sub->successors() )
-                insert( succ, neighbourhood );
-
-            sub->_successors = remove_redundant( sub, neighbourhood );
-        }// for
-    }// if
-}
-    
-//
-// print node with full edge information
-//
-void
-node::print () const
-{
-    std::cout << to_string() << std::endl;
-    std::cout << "   #deps : " << _dep_cnt << std::endl;
-
-    std::cout << "   succ  : " << successors().size() << std::endl;
-    for ( auto  succ : successors() )
-        std::cout << "      " << succ->to_string() << std::endl;
-}
-    
 }// namespace dag
 
 }// namespace hlr

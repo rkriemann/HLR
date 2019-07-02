@@ -66,7 +66,7 @@ refine ( node *  root )
                 for ( size_t  i = 0; i < nodes.size(); ++i )
                 {
                     auto        node         = nodes[i];
-                    const bool  node_changed = node->refine_deps();
+                    const bool  node_changed = node->refine_deps( true );
                         
                     if ( node->is_refined() )       // node was refined; collect all sub nodes
                     {

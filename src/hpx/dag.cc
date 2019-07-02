@@ -64,7 +64,7 @@ refine ( node *  root )
                                    nodes.begin(), nodes.end(),
                                    [&] ( node * node )
                                    {
-                                       const bool  node_changed = node->refine_deps();
+                                       const bool  node_changed = node->refine_deps( true );
 
                                        if ( node->is_refined() )       // node was refined; collect all sub nodes
                                        {

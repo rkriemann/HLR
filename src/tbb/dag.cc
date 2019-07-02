@@ -64,7 +64,7 @@ refine ( node *  root )
                                  for ( auto  i = r.begin(); i != r.end(); ++i )
                                  {
                                      auto        node         = nodes[i];
-                                     const bool  node_changed = node->refine_deps();
+                                     const bool  node_changed = node->refine_deps( true );
 
                                      if ( node->is_refined() )       // node was refined; collect all sub nodes
                                      {
@@ -165,7 +165,7 @@ refine ( node *  root )
                                      
                                            for ( auto  node : nset )
                                            {
-                                               const bool  node_changed = node->refine_deps();
+                                               const bool  node_changed = node->refine_deps( true );
 
                                                if ( node->is_refined() )       // node was refined; collect all sub nodes
                                                {
