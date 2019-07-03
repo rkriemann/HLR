@@ -12,8 +12,10 @@
 #include "hlr/cluster/h.hh"
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
+#include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
 #include "hlr/seq/dag.hh"
+#include "hlr/seq/arith.hh"
 
 namespace hlr { namespace dag {
 
@@ -185,5 +187,70 @@ mymain ( int, char ** )
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
         std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+
+        {
+            HLIB::CFG::Arith::vector_solve_method = 1;
+
+            {
+                TScalarVector  x( A->col_is() );
+
+                x.fill_rand( 0 );
+
+                TScalarVector  y( x );
+
+                solve_lower( apply_normal, A.get(), nullptr, & y, { block_wise, unit_diag, store_inverse } );
+            
+                tic = Time::Wall::now();
+        
+                dag = std::move( hlr::dag::gen_dag_solve_lower( apply_normal, A.get(), x, impl::dag::refine ) );
+                
+                toc = Time::Wall::since( tic );
+                std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+                dag.print_dot( "solve_lower.dot" );
+                
+                tic = Time::Wall::now();
+                
+                ///hlr::seq::trsvl( apply_normal, *A, x, unit_diag );
+                impl::dag::run( dag, acc_exact );
+                
+                toc = Time::Wall::since( tic );
+                std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+                
+                y.axpy( -1, & x );
+                std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
+                
+                // DBG::write( &x, "x.mat", "x" );
+                // DBG::write( &y, "y.mat", "y" );
+            }
+
+            {
+                TScalarVector  x( A->col_is() );
+
+                x.fill_rand( 0 );
+
+                TScalarVector  y( x );
+
+                solve_upper( apply_normal, A.get(), nullptr, & y, { block_wise, general_diag, store_inverse } );
+                
+                tic = Time::Wall::now();
+        
+                dag = std::move( hlr::dag::gen_dag_solve_upper( apply_normal, A.get(), x, impl::dag::refine ) );
+        
+                toc = Time::Wall::since( tic );
+                std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+                dag.print_dot( "solve_upper.dot" );
+
+                tic = Time::Wall::now();
+                
+                /// hlr::seq::trsvu( apply_normal, *A, x, general_diag );
+                impl::dag::run( dag, acc_exact );
+                
+                toc = Time::Wall::since( tic );
+                std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+                
+                y.axpy( -1, & x );
+                std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
+            }
+        }
     }// if
 }

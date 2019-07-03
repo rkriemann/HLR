@@ -393,6 +393,24 @@ mul_vec ( const value_t                    alpha,
         assert( false );
 }
 
+//
+// solve op(L) x = y with lower triangular L
+//
+void
+trsvl ( const HLIB::matop_t      op_L,
+        const HLIB::TMatrix &    L,
+        HLIB::TScalarVector &    x,
+        const HLIB::diag_type_t  diag_mode );
+
+//
+// solve op(U) x = y with upper triangular U
+//
+void
+trsvu ( const HLIB::matop_t      op_U,
+        const HLIB::TMatrix &    U,
+        HLIB::TScalarVector &    x,
+        const HLIB::diag_type_t  diag_mode );
+
 }// namespace seq
 
 }// namespace hlr
