@@ -223,11 +223,10 @@ mymain ( int, char ** )
                 y.axpy( -1, & x );
                 std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
                 
-                DBG::write( &x, "x.mat", "x" );
-                DBG::write( &y, "y.mat", "y" );
+                // DBG::write( &x, "x.mat", "x" );
+                // DBG::write( &y, "y.mat", "y" );
             }
 
-            if ( false )
             {
                 TScalarVector  x( A->col_is() );
 

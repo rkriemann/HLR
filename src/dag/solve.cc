@@ -61,7 +61,7 @@ struct solve_upper_node : public node
     
     solve_upper_node ( const matop_t     aop_U,
                        const TMatrix *   aU,
-                       TScalarVector     av )
+                       TScalarVector &&  av )
             : op_U( aop_U )
             , U( aU )
             , v( std::move( av ) )
@@ -85,7 +85,7 @@ struct solve_lower_node : public node
 
     solve_lower_node ( const matop_t     aop_L,
                        const TMatrix *   aL,
-                       TScalarVector     av )
+                       TScalarVector &&  av )
             : op_L( aop_L )
             , L( aL )
             , v( std::move( av ) )
@@ -113,8 +113,8 @@ struct mul_vec_node : public node
     mul_vec_node ( const value_t     aalpha,
                    const matop_t     aop_A,
                    const TMatrix *   aA,
-                   TScalarVector     ax,
-                   TScalarVector     ay )
+                   TScalarVector &&  ax,
+                   TScalarVector &&  ay )
             : alpha( aalpha )
             , op_A( aop_A )
             , A( aA )
@@ -161,9 +161,7 @@ solve_lower_node::refine_ ()
             
                 if ( ! is_null( L_ii ) )
                 {
-                    TScalarVector  v_i( std::move( sub_vector( v, L_ii->col_is() ) ) );
-                
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, std::move( v_i ) );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->col_is() ) );
                 }// if
             
                 //
@@ -176,10 +174,9 @@ solve_lower_node::refine_ ()
                 
                     if ( ! is_null( L_ji ) )
                     {
-                        TScalarVector  v_j( std::move( sub_vector( v, L_ji->row_is() ) ) );
-                        TScalarVector  v_i( std::move( sub_vector( v, L_ji->col_is() ) ) );
-                    
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ji, std::move( v_i ), std::move( v_j ) );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ji,
+                                                                      sub_vector( v, L_ji->col_is() ),
+                                                                      sub_vector( v, L_ji->row_is() ) );
                     }// if
                 }// for
             }// for
@@ -200,9 +197,7 @@ solve_lower_node::refine_ ()
                 
                 if ( ! is_null( L_ii ) )
                 {
-                    TScalarVector  v_i( std::move( sub_vector( v, L_ii->row_is() ) ) );
-                
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, std::move( v_i ) );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->row_is() ) );
                 }// if
 
                 //
@@ -215,10 +210,9 @@ solve_lower_node::refine_ ()
                     
                     if ( ! is_null( L_ij ) )
                     {
-                        TScalarVector  v_i( std::move( sub_vector( v, L_ij->col_is() ) ) );
-                        TScalarVector  v_j( std::move( sub_vector( v, L_ij->row_is() ) ) );
-                                   
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ij, std::move( v_j ), std::move( v_i ) );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ij,
+                                                                      sub_vector( v, L_ij->row_is() ),
+                                                                      sub_vector( v, L_ij->col_is() ) );
                     }// if
                 }// for
             }// for
@@ -266,9 +260,7 @@ solve_upper_node::refine_ ()
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    TScalarVector  v_i( std::move( sub_vector( v, U_ii->col_is() ) ) );
-                
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, std::move( v_i ) );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->col_is() ) );
                 }// if
 
                 //
@@ -281,10 +273,9 @@ solve_upper_node::refine_ ()
                     
                     if ( ! is_null( U_ji ) )
                     {
-                        TScalarVector  v_j( std::move( sub_vector( v, U_ji->row_is() ) ) );
-                        TScalarVector  v_i( std::move( sub_vector( v, U_ji->col_is() ) ) );
-                                   
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ji, std::move( v_i ), std::move( v_j ) );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ji,
+                                                                      sub_vector( v, U_ji->col_is() ),
+                                                                      sub_vector( v, U_ji->row_is() ) );
                     }// if
                 }// for
             }// for
@@ -305,9 +296,7 @@ solve_upper_node::refine_ ()
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    TScalarVector  v_i( std::move( sub_vector( v, U_ii->row_is() ) ) );
-                
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, std::move( v_i ) );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->row_is() ) );
                 }// if
 
                 //
@@ -320,10 +309,9 @@ solve_upper_node::refine_ ()
                     
                     if ( ! is_null( U_ij ) )
                     {
-                        TScalarVector  v_i( std::move( sub_vector( v, U_ij->col_is() ) ) );
-                        TScalarVector  v_j( std::move( sub_vector( v, U_ij->row_is() ) ) );
-                                   
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ij, std::move( v_j ), std::move( v_i ) );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ij,
+                                                                      sub_vector( v, U_ij->row_is() ),
+                                                                      sub_vector( v, U_ij->col_is() ) );
                     }// if
                 }// for
             }// for
@@ -370,10 +358,9 @@ mul_vec_node< value_t >::refine_ ()
                 
                 if ( ! is_null( A_ij ) )
                 {
-                    TScalarVector  x_j( std::move( sub_vector( x, A_ij->col_is( op_A ) ) ) );
-                    TScalarVector  y_i( std::move( sub_vector( y, A_ij->row_is( op_A ) ) ) );
-                                   
-                    hlr::dag::alloc_node< mul_vec_node< real > >( g, alpha, op_A, A_ij, std::move( x_j ), std::move( y_i ) );
+                    hlr::dag::alloc_node< mul_vec_node< real > >( g, alpha, op_A, A_ij,
+                                                                  sub_vector( x, A_ij->col_is( op_A ) ),
+                                                                  sub_vector( y, A_ij->row_is( op_A ) ) );
                 }// if
             }// for
         }// for
@@ -402,19 +389,19 @@ mul_vec_node< value_t >::run_ ( const TTruncAcc & )
 graph
 gen_dag_solve_lower ( const matop_t                      op_L,
                       TMatrix *                          L,
-                      TScalarVector                      x,
+                      TScalarVector &                    x,
                       std::function< graph ( node * ) >  refine )
 {
-    return refine( new solve_lower_node( op_L, L, x ) );
+    return refine( new solve_lower_node( op_L, L, x.sub_vector( x.is() ) ) );
 }
 
 graph
 gen_dag_solve_upper ( const matop_t                      op_U,
                       TMatrix *                          U,
-                      TScalarVector                      x,
+                      TScalarVector &                    x,
                       std::function< graph ( node * ) >  refine )
 {
-    return refine( new solve_upper_node( op_U, U, x ) );
+    return refine( new solve_upper_node( op_U, U, x.sub_vector( x.is() ) ) );
 }
 
 }// namespace dag

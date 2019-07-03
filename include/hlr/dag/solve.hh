@@ -28,7 +28,7 @@ namespace dag
 graph
 gen_dag_solve_lower ( const HLIB::matop_t                op_L,
                       HLIB::TMatrix *                    L,
-                      HLIB::TScalarVector                x,
+                      HLIB::TScalarVector &              x,
                       std::function< graph ( node * ) >  refine );
 
 //
@@ -38,7 +38,7 @@ gen_dag_solve_lower ( const HLIB::matop_t                op_L,
 graph
 gen_dag_solve_upper ( const HLIB::matop_t                op_U,
                       HLIB::TMatrix *                    U,
-                      HLIB::TScalarVector                x,
+                      HLIB::TScalarVector &              x,
                       std::function< graph ( node * ) >  refine );
 
 }// namespace dag
