@@ -46,7 +46,7 @@ TScalarVector
 sub_vector ( TScalarVector &    v,
              const TIndexSet &  is )
 {
-    return v.sub_vector( is );
+    return std::move( v.sub_vector( is ) );
 }
 
 // identifiers for memory blocks
@@ -64,7 +64,7 @@ struct solve_upper_node : public node
                        TScalarVector     av )
             : op_U( aop_U )
             , U( aU )
-            , v( av )
+            , v( std::move( av ) )
     { init(); }
     
     virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, ", U->id() ) + v.is().to_string() + " )"; }
@@ -88,7 +88,7 @@ struct solve_lower_node : public node
                        TScalarVector     av )
             : op_L( aop_L )
             , L( aL )
-            , v( av )
+            , v( std::move( av ) )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, ", L->id() ) + v.is().to_string() + " )"; }
@@ -118,8 +118,8 @@ struct mul_vec_node : public node
             : alpha( aalpha )
             , op_A( aop_A )
             , A( aA )
-            , x( ax )
-            , y( ay )
+            , x( std::move( ax ) )
+            , y( std::move( ay ) )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "mul_vec( %d, " ) + x.is().to_string() + ", " + y.is().to_string() + " )"; }
@@ -161,9 +161,9 @@ solve_lower_node::refine_ ()
             
                 if ( ! is_null( L_ii ) )
                 {
-                    TScalarVector  v_i( sub_vector( v, L_ii->col_is() ) );
+                    TScalarVector  v_i( std::move( sub_vector( v, L_ii->col_is() ) ) );
                 
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, v_i );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, std::move( v_i ) );
                 }// if
             
                 //
@@ -176,10 +176,10 @@ solve_lower_node::refine_ ()
                 
                     if ( ! is_null( L_ji ) )
                     {
-                        TScalarVector  v_j( sub_vector( v, L_ji->row_is() ) );
-                        TScalarVector  v_i( sub_vector( v, L_ji->col_is() ) );
+                        TScalarVector  v_j( std::move( sub_vector( v, L_ji->row_is() ) ) );
+                        TScalarVector  v_i( std::move( sub_vector( v, L_ji->col_is() ) ) );
                     
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ji, v_i, v_j );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ji, std::move( v_i ), std::move( v_j ) );
                     }// if
                 }// for
             }// for
@@ -200,9 +200,9 @@ solve_lower_node::refine_ ()
                 
                 if ( ! is_null( L_ii ) )
                 {
-                    TScalarVector  v_i( sub_vector( v, L_ii->row_is() ) );
+                    TScalarVector  v_i( std::move( sub_vector( v, L_ii->row_is() ) ) );
                 
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, v_i );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, std::move( v_i ) );
                 }// if
 
                 //
@@ -215,10 +215,10 @@ solve_lower_node::refine_ ()
                     
                     if ( ! is_null( L_ij ) )
                     {
-                        TScalarVector  v_i( sub_vector( v, L_ij->col_is() ) );
-                        TScalarVector  v_j( sub_vector( v, L_ij->row_is() ) );
+                        TScalarVector  v_i( std::move( sub_vector( v, L_ij->col_is() ) ) );
+                        TScalarVector  v_j( std::move( sub_vector( v, L_ij->row_is() ) ) );
                                    
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ij, v_j, v_i );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ij, std::move( v_j ), std::move( v_i ) );
                     }// if
                 }// for
             }// for
@@ -229,8 +229,10 @@ solve_lower_node::refine_ ()
 }
 
 void
-solve_lower_node::run_ ( const TTruncAcc &  acc )
+solve_lower_node::run_ ( const TTruncAcc & )
 {
+    HLR_LOG( 2, HLIB::to_string( "trsvl( %d )", L->id() ) );
+    
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
     hlr::seq::trsvl( op_L, * L, v, unit_diag );
 }
@@ -264,9 +266,9 @@ solve_upper_node::refine_ ()
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    TScalarVector  v_i( sub_vector( v, U_ii->col_is() ) );
+                    TScalarVector  v_i( std::move( sub_vector( v, U_ii->col_is() ) ) );
                 
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, v_i );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, std::move( v_i ) );
                 }// if
 
                 //
@@ -279,10 +281,10 @@ solve_upper_node::refine_ ()
                     
                     if ( ! is_null( U_ji ) )
                     {
-                        TScalarVector  v_j( sub_vector( v, U_ji->row_is() ) );
-                        TScalarVector  v_i( sub_vector( v, U_ji->col_is() ) );
+                        TScalarVector  v_j( std::move( sub_vector( v, U_ji->row_is() ) ) );
+                        TScalarVector  v_i( std::move( sub_vector( v, U_ji->col_is() ) ) );
                                    
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ji, v_i, v_j );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ji, std::move( v_i ), std::move( v_j ) );
                     }// if
                 }// for
             }// for
@@ -303,9 +305,9 @@ solve_upper_node::refine_ ()
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    TScalarVector  v_i( sub_vector( v, U_ii->row_is() ) );
+                    TScalarVector  v_i( std::move( sub_vector( v, U_ii->row_is() ) ) );
                 
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, v_i );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, std::move( v_i ) );
                 }// if
 
                 //
@@ -318,10 +320,10 @@ solve_upper_node::refine_ ()
                     
                     if ( ! is_null( U_ij ) )
                     {
-                        TScalarVector  v_i( sub_vector( v, U_ij->col_is() ) );
-                        TScalarVector  v_j( sub_vector( v, U_ij->row_is() ) );
+                        TScalarVector  v_i( std::move( sub_vector( v, U_ij->col_is() ) ) );
+                        TScalarVector  v_j( std::move( sub_vector( v, U_ij->row_is() ) ) );
                                    
-                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ij, v_j, v_i );
+                        hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ij, std::move( v_j ), std::move( v_i ) );
                     }// if
                 }// for
             }// for
@@ -332,8 +334,10 @@ solve_upper_node::refine_ ()
 }
 
 void
-solve_upper_node::run_ ( const TTruncAcc &  acc )
+solve_upper_node::run_ ( const TTruncAcc & )
 {
+    HLR_LOG( 2, HLIB::to_string( "trsvu( %d )", U->id() ) );
+    
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
     hlr::seq::trsvu( op_U, * U, v, general_diag );
 }
@@ -366,10 +370,10 @@ mul_vec_node< value_t >::refine_ ()
                 
                 if ( ! is_null( A_ij ) )
                 {
-                    TScalarVector  x_j( sub_vector( x, A_ij->col_is( op_A ) ) );
-                    TScalarVector  y_i( sub_vector( y, A_ij->row_is( op_A ) ) );
+                    TScalarVector  x_j( std::move( sub_vector( x, A_ij->col_is( op_A ) ) ) );
+                    TScalarVector  y_i( std::move( sub_vector( y, A_ij->row_is( op_A ) ) ) );
                                    
-                    hlr::dag::alloc_node< mul_vec_node< real > >( g, alpha, op_A, A_ij, x_j, y_i );
+                    hlr::dag::alloc_node< mul_vec_node< real > >( g, alpha, op_A, A_ij, std::move( x_j ), std::move( y_i ) );
                 }// if
             }// for
         }// for
@@ -380,8 +384,10 @@ mul_vec_node< value_t >::refine_ ()
 
 template < typename value_t >
 void
-mul_vec_node< value_t >::run_ ( const TTruncAcc &  acc )
+mul_vec_node< value_t >::run_ ( const TTruncAcc & )
 {
+    HLR_LOG( 2, HLIB::to_string( "update( %d, ", A->id() ) + x.is().to_string() + ", " + y.is().to_string() );
+    
     A->apply_add( alpha, & x, & y, op_A );
 }
 

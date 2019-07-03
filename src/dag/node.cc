@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <set>
 
-
+#include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tools.hh"
 #include "hlr/dag/node.hh"

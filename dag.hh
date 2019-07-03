@@ -196,10 +196,15 @@ mymain ( int, char ** )
 
                 x.fill_rand( 0 );
 
+                DBG::write( & x, "x1.mat", "x1" );
+                
                 TScalarVector  y( x );
 
-                solve_lower( apply_normal, A.get(), nullptr, & y, { block_wise, unit_diag, store_inverse } );
+                hlr::seq::trsvl( apply_normal, *A, y, unit_diag );
+                // solve_lower( apply_normal, A.get(), nullptr, & y, { block_wise, unit_diag, store_inverse } );
             
+                DBG::write( & x, "x2.mat", "x2" );
+                
                 tic = Time::Wall::now();
         
                 dag = std::move( hlr::dag::gen_dag_solve_lower( apply_normal, A.get(), x, impl::dag::refine ) );
@@ -210,7 +215,6 @@ mymain ( int, char ** )
                 
                 tic = Time::Wall::now();
                 
-                ///hlr::seq::trsvl( apply_normal, *A, x, unit_diag );
                 impl::dag::run( dag, acc_exact );
                 
                 toc = Time::Wall::since( tic );
@@ -219,10 +223,11 @@ mymain ( int, char ** )
                 y.axpy( -1, & x );
                 std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
                 
-                // DBG::write( &x, "x.mat", "x" );
-                // DBG::write( &y, "y.mat", "y" );
+                DBG::write( &x, "x.mat", "x" );
+                DBG::write( &y, "y.mat", "y" );
             }
 
+            if ( false )
             {
                 TScalarVector  x( A->col_is() );
 

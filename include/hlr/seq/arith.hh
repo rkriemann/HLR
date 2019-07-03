@@ -330,8 +330,8 @@ mul_vec ( const value_t                    alpha,
           BLAS::Vector< value_t > &        y )
 {
     assert( ! is_null( M ) );
-    assert( M->ncols( op_M ) == x.length() );
-    assert( M->nrows( op_M ) == y.length() );
+    // assert( M->ncols( op_M ) == x.length() );
+    // assert( M->nrows( op_M ) == y.length() );
 
     if ( alpha == value_t(0) )
         return;
