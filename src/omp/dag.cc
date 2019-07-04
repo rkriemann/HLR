@@ -37,7 +37,8 @@ using hlr::dag::graph;
 // construct DAG using refinement of given node
 //
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -57,7 +58,7 @@ refine ( node *  root )
                 #pragma omp taskloop shared( nodes )
                 for ( size_t  i = 0; i < nodes.size(); ++i )
                 {
-                    nodes[i]->refine();
+                    nodes[i]->refine( min_size );
                 }// for
                 #pragma omp taskwait
 

@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <functional>
+
 #include "hlr/dag/node.hh"
 
 namespace hlr
@@ -117,10 +119,10 @@ public:
 };
 
 //
-// construct DAG based on refinement of given node
+// function type for graph generation through node refinement
 //
-graph
-refine  ( node *  node );
+using  refine_func_t = std::function< graph ( node *,
+                                              const size_t ) >;
 
 }// namespace dag
 

@@ -30,7 +30,8 @@ using hlr::dag::node;
 // construct DAG using refinement of given node
 //
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -49,9 +50,9 @@ refine ( node *  root )
         
         // first refine nodes
         std::for_each( nodes.begin(), nodes.end(),
-                       [] ( node * node )
+                       [=] ( node * node )
                        {
-                           node->refine();
+                           node->refine( min_size );
                        } );
 
         // toc = HLIB::Time::Wall::since( tic );

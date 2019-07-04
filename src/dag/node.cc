@@ -95,7 +95,7 @@ node::run ( const TTruncAcc & acc )
 // if retval is empty, no refinement was done
 //
 void
-node::refine ()
+node::refine ( const size_t  min_size )
 {
     HLR_LOG( 5, "refine( " + to_string() + " )" );
 
@@ -103,7 +103,7 @@ node::refine ()
     // create subnodes
     //
 
-    auto  g = refine_();
+    auto  g = refine_( min_size );
 
     g.set_dependencies();
 

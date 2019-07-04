@@ -36,7 +36,8 @@ using hlr::dag::graph;
 //
 #if  0
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -51,10 +52,10 @@ refine ( node *  root )
 
         // first refine nodes
         ::tbb::parallel_for( nrange,
-                             [&nodes] ( const auto &  r )
+                             [&nodes,min_size] ( const auto &  r )
                              {
                                  for ( auto  i = r.begin(); i != r.end(); ++i )
-                                     nodes[i]->refine();
+                                     nodes[i]->refine( min_size );
                              } );
 
         // then refine dependencies and collect new nodes
@@ -127,7 +128,8 @@ refine ( node *  root )
 #else
 
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -149,12 +151,12 @@ refine ( node *  root )
 
         // first refine nodes
         ::tbb::parallel_for< size_t >( 0, node_sets.size(),
-                                       [&] ( const size_t  i )
+                                       [&,min_size] ( const size_t  i )
                                        {
                                            const std::deque< node * > &  nset = node_sets[i];
                                            
                                            for ( auto  node : nset )
-                                               node->refine();
+                                               node->refine( min_size );
                                        } );
 
         // then refine dependencies and collect new nodes

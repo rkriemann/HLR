@@ -39,7 +39,8 @@ using hlr::dag::graph;
 // construct DAG using refinement of given node
 //
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -54,9 +55,9 @@ refine ( node *  root )
         // first refine nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                    nodes.begin(), nodes.end(),
-                                   [] ( node * node )
+                                   [=] ( node * node )
                                    {
-                                       node->refine();
+                                       node->refine( min_size );
                                    } );
 
         // then refine dependencies and collect new nodes

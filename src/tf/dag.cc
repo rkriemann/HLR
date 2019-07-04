@@ -35,7 +35,8 @@ using hlr::dag::graph;
 // construct DAG using refinement of given node
 //
 graph
-refine ( node *  root )
+refine ( node *        root,
+         const size_t  min_size )
 {
     assert( root != nullptr );
     
@@ -51,9 +52,9 @@ refine ( node *  root )
 
         // first refine nodes
         tf.parallel_for( nodes.begin(), nodes.end(),
-                         [] ( node * node )
+                         [=] ( node * node )
                          {
-                             node->refine();
+                             node->refine( min_size );
                          } );
         executor.run( tf ).wait();
         tf.clear();

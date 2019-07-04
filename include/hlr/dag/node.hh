@@ -162,7 +162,7 @@ public:
     
     // split node into subnodes and update dependencies
     // if retval is empty, no refinement was done
-    void  refine ();
+    void  refine ( const size_t  min_size = HLIB::CFG::Arith::max_seq_size );
 
     // refine dependencies of <node>, either local or of sub nodes
     // - return true, if <node> changed (modified dependencies)
@@ -216,7 +216,7 @@ private:
 
     virtual
     local_graph
-    refine_ () = 0;
+    refine_ ( const size_t  min_size ) = 0;
 };
 
 //
@@ -251,7 +251,7 @@ class empty_node : public node
 private:
 
     virtual void         run_    ( const HLIB::TTruncAcc & ) {}
-    virtual local_graph  refine_ ()                          { return {}; }
+    virtual local_graph  refine_ ( const size_t )            { return {}; }
 };
 
 }// namespace dag

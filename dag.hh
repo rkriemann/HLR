@@ -152,19 +152,76 @@ mymain ( int, char ** )
     if ( verbose( 3 ) )
         dag.print_dot( "lu.dot" );
         
-    if ( ! onlydag )
-    {
-        tmin = tmax = tsum = 0;
+    if ( onlydag )
+        return;
         
+    //////////////////////////////////////////////////////////////////////
+    //
+    // factorization
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    tmin = tmax = tsum = 0;
+        
+    for ( int  i = 0; i < 1; ++i ) // nbench
+    {
+        tic = Time::Wall::now();
+        
+        impl::dag::run( dag, acc );
+        
+        toc = Time::Wall::since( tic );
+
+        std::cout << "  LU in      " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+
+        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+        tmax  = std::max( tmax, toc.seconds() );
+        tsum += toc.seconds();
+
+        if ( i < (nbench-1) )
+        {
+            impl::matrix::copy_to( *A, *C );
+            dag.reset_dependencies();
+        }// if
+    }// for
+        
+    if ( nbench > 1 )
+        std::cout << "  runtime  = "
+                  << boost::format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                  << std::endl;
+        
+    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+        
+    TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+    std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // vector solves
+    //
+    //////////////////////////////////////////////////////////////////////
+        
+    HLIB::CFG::Arith::vector_solve_method = 1;
+
+    {
+        TScalarVector  x( A->col_is() );
+
+        x.fill_rand( 0 );
+
+        const TScalarVector  xc( x );
+        TScalarVector        xref( x );
+
+        tmin = tmax = tsum = 0;
+                
         for ( int  i = 0; i < nbench; ++i )
         {
             tic = Time::Wall::now();
         
-            impl::dag::run( dag, acc );
+            hlr::seq::trsvl( apply_normal, *A, xref, unit_diag );
         
             toc = Time::Wall::since( tic );
 
-            std::cout << "  LU in      " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+            std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
 
             tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
             tmax  = std::max( tmax, toc.seconds() );
@@ -172,89 +229,92 @@ mymain ( int, char ** )
 
             if ( i < (nbench-1) )
             {
-                impl::matrix::copy_to( *A, *C );
+                xref.assign( 1.0, & xc );
                 dag.reset_dependencies();
             }// if
         }// for
-        
+
         if ( nbench > 1 )
             std::cout << "  runtime  = "
                       << boost::format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
+                
+        tic = Time::Wall::now();
         
-        std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
-        
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
-        
-        std::cout << "    error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
-
+        dag = std::move( hlr::dag::gen_dag_solve_lower( apply_normal, A.get(), x, impl::dag::refine ) );
+                
+        toc = Time::Wall::since( tic );
+        std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+                
+        if ( verbose( 3 ) )
+            dag.print_dot( "solve_lower.dot" );
+                
+        tmin = tmax = tsum = 0;
+                
+        for ( int  i = 0; i < nbench; ++i )
         {
-            HLIB::CFG::Arith::vector_solve_method = 1;
+            tic = Time::Wall::now();
+        
+            impl::dag::run( dag, acc_exact );
+        
+            toc = Time::Wall::since( tic );
 
+            std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+
+            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+            tmax  = std::max( tmax, toc.seconds() );
+            tsum += toc.seconds();
+
+            if ( i < (nbench-1) )
             {
-                TScalarVector  x( A->col_is() );
+                x.assign( 1.0, & xc );
+                dag.reset_dependencies();
+            }// if
+        }// for
 
-                x.fill_rand( 0 );
-
-                DBG::write( & x, "x1.mat", "x1" );
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << boost::format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << std::endl;
                 
-                TScalarVector  y( x );
-
-                hlr::seq::trsvl( apply_normal, *A, y, unit_diag );
-                // solve_lower( apply_normal, A.get(), nullptr, & y, { block_wise, unit_diag, store_inverse } );
-            
-                DBG::write( & x, "x2.mat", "x2" );
+        xref.axpy( -1, & x );
+        std::cout << "  error =    " << boost::format( "%.3e s" ) % xref.norm2() << std::endl;
                 
-                tic = Time::Wall::now();
+        // DBG::write( &x, "x.mat", "x" );
+        // DBG::write( &y, "y.mat", "y" );
+    }
+
+    {
+        TScalarVector  x( A->col_is() );
+
+        x.fill_rand( 0 );
+
+        TScalarVector  y( x );
+
+        solve_upper( apply_normal, A.get(), nullptr, & y, { block_wise, general_diag, store_inverse } );
+                
+        tic = Time::Wall::now();
         
-                dag = std::move( hlr::dag::gen_dag_solve_lower( apply_normal, A.get(), x, impl::dag::refine ) );
-                
-                toc = Time::Wall::since( tic );
-                std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
-                dag.print_dot( "solve_lower.dot" );
-                
-                tic = Time::Wall::now();
-                
-                impl::dag::run( dag, acc_exact );
-                
-                toc = Time::Wall::since( tic );
-                std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
-                
-                y.axpy( -1, & x );
-                std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
-                
-                // DBG::write( &x, "x.mat", "x" );
-                // DBG::write( &y, "y.mat", "y" );
-            }
-
-            {
-                TScalarVector  x( A->col_is() );
-
-                x.fill_rand( 0 );
-
-                TScalarVector  y( x );
-
-                solve_upper( apply_normal, A.get(), nullptr, & y, { block_wise, general_diag, store_inverse } );
-                
-                tic = Time::Wall::now();
+        dag = std::move( hlr::dag::gen_dag_solve_upper( apply_normal, A.get(), x, impl::dag::refine ) );
         
-                dag = std::move( hlr::dag::gen_dag_solve_upper( apply_normal, A.get(), x, impl::dag::refine ) );
-        
-                toc = Time::Wall::since( tic );
-                std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
-                dag.print_dot( "solve_upper.dot" );
+        toc = Time::Wall::since( tic );
+        std::cout << "  DAG in     " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
 
-                tic = Time::Wall::now();
+        if ( verbose( 3 ) )
+            dag.print_dot( "solve_upper.dot" );
+
+        tic = Time::Wall::now();
                 
-                /// hlr::seq::trsvu( apply_normal, *A, x, general_diag );
-                impl::dag::run( dag, acc_exact );
+        /// hlr::seq::trsvu( apply_normal, *A, x, general_diag );
+        impl::dag::run( dag, acc_exact );
                 
-                toc = Time::Wall::since( tic );
-                std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
+        toc = Time::Wall::since( tic );
+        std::cout << "  solve in   " << boost::format( "%.3e s" ) % toc.seconds() << std::endl;
                 
-                y.axpy( -1, & x );
-                std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
-            }
-        }
-    }// if
+        y.axpy( -1, & x );
+        std::cout << "  error =    " << boost::format( "%.3e s" ) % y.norm2() << std::endl;
+    }
 }

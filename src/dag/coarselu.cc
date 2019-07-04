@@ -61,7 +61,6 @@ bool is_large_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_large( A ) && i
 using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
 
 // refine and rnu functions for fine graphs
-using  refine_func_t = std::function< dag::graph ( dag::node * ) >;
 using  run_func_t    = std::function< void ( hlr::dag::graph &, const HLIB::TTruncAcc & ) >;
 
 // identifiers for memory blocks
@@ -90,7 +89,7 @@ struct lu_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -121,7 +120,7 @@ struct solve_upper_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, U->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -152,7 +151,7 @@ struct solve_lower_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -186,7 +185,7 @@ struct update_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_A, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -208,7 +207,7 @@ struct apply_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      () { return {}; } // not needed because of direct DAG generation
+    virtual local_graph         refine_      ( const size_t ) { return {}; } // not needed because of direct DAG generation
     virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -224,7 +223,7 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lu_node::refine_ ()
+lu_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -291,7 +290,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_lower_node::refine_ ()
+solve_lower_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -362,7 +361,7 @@ solve_lower_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_upper_node::refine_ ()
+solve_upper_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -429,7 +428,7 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-update_node::refine_ ()
+update_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -545,12 +544,11 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_coarselu ( TMatrix *                                                  A,
-                   const std::function< graph ( node * ) > &                  coarse_refine,
-                   const std::function< dag::graph ( dag::node * ) > &        fine_refine,
-                   const std::function< void ( hlr::dag::graph &,
-                                               const HLIB::TTruncAcc & ) > &  fine_run,
-                   const size_t                                               ncoarse )
+gen_dag_coarselu ( TMatrix *            A,
+                   const refine_func_t  coarse_refine,
+                   const refine_func_t  fine_refine,
+                   const run_func_t     fine_run,
+                   const size_t         ncoarse )
 {
     if ( ncoarse != 0 )
         coarse_size = ncoarse;
@@ -560,7 +558,7 @@ gen_dag_coarselu ( TMatrix *                                                  A,
         return gen_dag_lu_rec( A, coarse_refine );
             
     apply_map_t  apply_map;
-    auto         dag = coarse_refine( new lu_node( A, apply_map, fine_refine, fine_run ) );
+    auto         dag = coarse_refine( new lu_node( A, apply_map, fine_refine, fine_run ), ncoarse );
 
     return dag;
 }

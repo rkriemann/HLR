@@ -8,8 +8,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <functional>
-
 #include <matrix/TMatrix.hh>
 #include <algebra/mat_fac.hh>
 
@@ -26,18 +24,18 @@ namespace dag
 // return graph representing compute DAG for LU of <A>
 //
 graph
-gen_dag_lu_rec    ( HLIB::TMatrix *                              A,
-                    std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_lu_rec    ( HLIB::TMatrix *  A,
+                    refine_func_t    refine );
 
 //
 // return graph representing compute DAG for LU of <A>
 //
 graph
 gen_dag_coarselu  ( HLIB::TMatrix *                                            A,
-                    const std::function< dag::graph ( dag::node * ) > &        coarse_refine,
-                    const std::function< dag::graph ( dag::node * ) > &        fine_refine,
+                    refine_func_t                                              coarse_refine,
+                    refine_func_t                                              fine_refine,
                     const std::function< void ( hlr::dag::graph &,
-                                                const HLIB::TTruncAcc & ) > &  fine_run,
+                                                const HLIB::TTruncAcc & ) >    fine_run,
                     const size_t                                               ncoarse = 0 );
 
 //
@@ -51,26 +49,26 @@ gen_dag_lu_lvl    ( HLIB::TMatrix &  A );
 // return graph representing compute DAG for solving L X = A
 //
 graph
-gen_dag_solve_lower  ( const HLIB::TMatrix *                        L,
-                       HLIB::TMatrix *                              A,
-                       std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
+                       HLIB::TMatrix *        A,
+                       refine_func_t          refine );
 
 //
 // return graph representing compute DAG for solving X U = A
 //
 graph
-gen_dag_solve_upper  ( const HLIB::TMatrix *                        U,
-                       HLIB::TMatrix *                              A,
-                       std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
+                       HLIB::TMatrix *        A,
+                       refine_func_t          refine );
 
 //
 // return graph representing compute DAG for C = A B + C
 //
 graph
-gen_dag_update       ( const HLIB::TMatrix *                        A,
-                       const HLIB::TMatrix *                        B,
-                       HLIB::TMatrix *                              C,
-                       std::function< dag::graph ( dag::node * ) >  refine );
+gen_dag_update       ( const HLIB::TMatrix *  A,
+                       const HLIB::TMatrix *  B,
+                       HLIB::TMatrix *        C,
+                       refine_func_t          refine );
 
 }// namespace dag
 

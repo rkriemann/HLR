@@ -58,7 +58,7 @@ struct lu_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -79,7 +79,7 @@ struct lvllu_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -104,7 +104,7 @@ struct solve_upper_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, U->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -129,7 +129,7 @@ struct solve_lower_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() }, { id_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
 };
@@ -157,7 +157,7 @@ struct update_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ();
+    virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_A, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -179,7 +179,7 @@ struct apply_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      () { return {}; } // not needed because of direct DAG generation
+    virtual local_graph         refine_      ( const size_t ) { return {}; } // not needed because of direct DAG generation
     virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -195,11 +195,11 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lu_node::refine_ ()
+lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
     {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
@@ -259,7 +259,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lvllu_node::refine_ ()
+lvllu_node::refine_ ( const size_t )
 {
     return {};
 }
@@ -280,11 +280,11 @@ lvllu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_lower_node::refine_ ()
+solve_lower_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! is_small_any( A, L ) )
+    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -349,11 +349,11 @@ solve_lower_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_upper_node::refine_ ()
+solve_upper_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! is_small_any( A, U ) )
+    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -414,11 +414,11 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-update_node::refine_ ()
+update_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! is_small_any( A, B, C ) )
+    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -531,8 +531,8 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_rec ( TMatrix *                          A,
-                 std::function< graph ( node * ) >  refine )
+gen_dag_lu_rec ( TMatrix *      A,
+                 refine_func_t  refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -548,7 +548,7 @@ gen_dag_lu_rec ( TMatrix *                          A,
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( A, apply_map ) );
+    auto  dag = refine( new lu_node( A, apply_map ), HLIB::CFG::Arith::max_seq_size );
 
     if ( ! CFG::Arith::use_accu )
         return dag;
@@ -1002,12 +1002,12 @@ gen_dag_lu_lvl ( TMatrix &  A )
 // return graph representing compute DAG for solving L X = A
 //
 graph
-gen_dag_solve_lower  ( const HLIB::TMatrix *                        L,
-                       HLIB::TMatrix *                              A,
-                       std::function< dag::graph ( dag::node * ) >  refine )
+gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
+                       HLIB::TMatrix *        A,
+                       refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new solve_lower_node( L, A, apply_map ) );
+    auto         dag = refine( new solve_lower_node( L, A, apply_map ), HLIB::CFG::Arith::max_seq_size );
 
     return dag;
 }
@@ -1016,12 +1016,12 @@ gen_dag_solve_lower  ( const HLIB::TMatrix *                        L,
 // return graph representing compute DAG for solving X U = A
 //
 graph
-gen_dag_solve_upper  ( const HLIB::TMatrix *                        U,
-                       HLIB::TMatrix *                              A,
-                       std::function< dag::graph ( dag::node * ) >  refine )
+gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
+                       HLIB::TMatrix *        A,
+                       refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new solve_upper_node( U, A, apply_map ) );
+    auto         dag = refine( new solve_upper_node( U, A, apply_map ), HLIB::CFG::Arith::max_seq_size );
 
     return dag;
 }
@@ -1030,13 +1030,13 @@ gen_dag_solve_upper  ( const HLIB::TMatrix *                        U,
 // return graph representing compute DAG for C = A B + C
 //
 graph
-gen_dag_update       ( const HLIB::TMatrix *                        A,
-                       const HLIB::TMatrix *                        B,
-                       HLIB::TMatrix *                              C,
-                       std::function< dag::graph ( dag::node * ) >  refine )
+gen_dag_update       ( const HLIB::TMatrix *  A,
+                       const HLIB::TMatrix *  B,
+                       HLIB::TMatrix *        C,
+                       refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new update_node( A, B, C, apply_map ) );
+    auto         dag = refine( new update_node( A, B, C, apply_map ), HLIB::CFG::Arith::max_seq_size );
 
     return dag;
 }
