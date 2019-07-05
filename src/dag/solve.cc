@@ -6,21 +6,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <list>
 #include <cassert>
-#include <unordered_map>
-#include <unordered_set>
 #include <map>
 
-#include <matrix/structure.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
-
-#include "hlr/utils/tensor.hh"
+#include "hlr/utils/term.hh" // DEBUG
 #include "hlr/utils/checks.hh"
-#include "hlr/utils/tools.hh"
-#include "hlr/matrix/level_matrix.hh"
-#include "hlr/dag/lu.hh"
+#include "hlr/dag/solve.hh"
 #include "hlr/seq/arith.hh"
 
 namespace hlr
@@ -33,6 +24,8 @@ namespace dag
 
 namespace
 {
+
+using mtx_map_t = std::map< idx_t, std::unique_ptr< std::mutex > >;
 
 // convert index set <is> into block index set { is, {0} }
 TBlockIndexSet
@@ -58,16 +51,16 @@ struct solve_upper_node : public node
     const matop_t    op_U;
     const TMatrix *  U;
     TScalarVector    v;
-    mtx_vec_t &      chunk_mtx;
+    mtx_map_t &      mtx_map;
     
     solve_upper_node ( const matop_t     aop_U,
                        const TMatrix *   aU,
                        TScalarVector &&  av,
-                       mtx_vec_t &       achunk_mtx)
+                       mtx_map_t &       amtx_map)
             : op_U( aop_U )
             , U( aU )
             , v( std::move( av ) )
-            , chunk_mtx( achunk_mtx )
+            , mtx_map( amtx_map )
     { init(); }
     
     virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, ", U->id() ) + v.is().to_string() + " )"; }
@@ -85,16 +78,16 @@ struct solve_lower_node : public node
     const matop_t    op_L;
     const TMatrix *  L;
     TScalarVector    v;
-    mtx_vec_t &      chunk_mtx;
+    mtx_map_t &      mtx_map;
 
     solve_lower_node ( const matop_t     aop_L,
                        const TMatrix *   aL,
                        TScalarVector &&  av,
-                       mtx_vec_t &       achunk_mtx)
+                       mtx_map_t &       amtx_map)
             : op_L( aop_L )
             , L( aL )
             , v( std::move( av ) )
-            , chunk_mtx( achunk_mtx )
+            , mtx_map( amtx_map )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, ", L->id() ) + v.is().to_string() + " )"; }
@@ -115,20 +108,20 @@ struct mul_vec_node : public node
     const TMatrix *  A;
     TScalarVector    x;
     TScalarVector    y;
-    mtx_vec_t &      chunk_mtx;
+    mtx_map_t &      mtx_map;
 
     mul_vec_node ( const value_t     aalpha,
                    const matop_t     aop_A,
                    const TMatrix *   aA,
                    TScalarVector &&  ax,
                    TScalarVector &&  ay,
-                   mtx_vec_t &       achunk_mtx)
+                   mtx_map_t &       amtx_map)
             : alpha( aalpha )
             , op_A( aop_A )
             , A( aA )
             , x( std::move( ax ) )
             , y( std::move( ay ) )
-            , chunk_mtx( achunk_mtx )
+            , mtx_map( amtx_map )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "mul_vec( %d, " ) + x.is().to_string() + ", " + y.is().to_string() + " )"; }
@@ -170,7 +163,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
             
                 if ( ! is_null( L_ii ) )
                 {
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->col_is() ), chunk_mtx );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->col_is() ), mtx_map );
                 }// if
             
                 //
@@ -186,7 +179,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
                         hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ji,
                                                                       sub_vector( v, L_ji->col_is() ),
                                                                       sub_vector( v, L_ji->row_is() ),
-                                                                      chunk_mtx );
+                                                                      mtx_map );
                     }// if
                 }// for
             }// for
@@ -207,7 +200,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
                 
                 if ( ! is_null( L_ii ) )
                 {
-                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->row_is() ), chunk_mtx );
+                    hlr::dag::alloc_node< solve_lower_node >( g, op_L, L_ii, sub_vector( v, L_ii->row_is() ), mtx_map );
                 }// if
 
                 //
@@ -223,7 +216,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
                         hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_L, L_ij,
                                                                       sub_vector( v, L_ij->row_is() ),
                                                                       sub_vector( v, L_ij->col_is() ),
-                                                                      chunk_mtx );
+                                                                      mtx_map );
                     }// if
                 }// for
             }// for
@@ -271,7 +264,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->col_is() ), chunk_mtx );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->col_is() ), mtx_map );
                 }// if
 
                 //
@@ -287,7 +280,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
                         hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ji,
                                                                       sub_vector( v, U_ji->col_is() ),
                                                                       sub_vector( v, U_ji->row_is() ),
-                                                                      chunk_mtx );
+                                                                      mtx_map );
                     }// if
                 }// for
             }// for
@@ -308,7 +301,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
                 
                 if ( ! is_null( U_ii ) )
                 {
-                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->row_is() ), chunk_mtx );
+                    hlr::dag::alloc_node< solve_upper_node >( g, op_U, U_ii, sub_vector( v, U_ii->row_is() ), mtx_map );
                 }// if
 
                 //
@@ -324,7 +317,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
                         hlr::dag::alloc_node< mul_vec_node< real > >( g, -1, op_U, U_ij,
                                                                       sub_vector( v, U_ij->row_is() ),
                                                                       sub_vector( v, U_ij->col_is() ),
-                                                                      chunk_mtx );
+                                                                      mtx_map );
                     }// if
                 }// for
             }// for
@@ -350,29 +343,30 @@ solve_upper_node::run_ ( const TTruncAcc & )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 //
-// apply y' to y chunkwise while only locking currently updated chunk
+// apply t to y in chunks of size CHUNK_SIZE
+// while only locking currently updated chunk
 //
 void
 update ( const TScalarVector &  t,
          TScalarVector &        y,
-         mtx_vec_t &            chunk_mtx )
+         mtx_map_t &            mtx_map )
 {
-    const idx_t  ofs_loc_glo = t.is().first();
-    idx_t        start_idx   = ofs_loc_glo;
-    idx_t        chunk       = start_idx / CHUNK_SIZE;
+    idx_t        start_idx   = t.is().first();
     const idx_t  last_idx    = t.is().last();
+    idx_t        chunk       = start_idx / CHUNK_SIZE;
     idx_t        end_idx     = std::min< idx_t >( (chunk+1) * CHUNK_SIZE - 1, last_idx );
 
     while ( start_idx <= end_idx )
     {
-        const B::Range        is_chunk( start_idx, end_idx );
-        B::Vector< value_t >  y_glo( blas_vec< value_t >( _data.y ), is_chunk );
-        B::Vector< value_t >  y_loc( yc, is_chunk - ofs_loc_glo );
+        const TIndexSet  chunk_is( start_idx, end_idx );
+        auto             t_i = t.sub_vector( chunk_is );
+        auto             y_i = y.sub_vector( chunk_is );
 
         {
-            std::scoped_lock  lock( chunk_mtx[ chunk ] );
+            // std::cout << term::on_red( HLIB::to_string( "locking %d", chunk ) ) << std::endl;
+            std::scoped_lock  lock( * mtx_map[ chunk ] );
                 
-            B::add( value_t(1), y_loc, y_glo );
+            y_i.axpy( real(1), & t_i );
         }
 
         ++chunk;
@@ -406,7 +400,7 @@ mul_vec_node< value_t >::refine_ ( const size_t  min_size )
                     hlr::dag::alloc_node< mul_vec_node< real > >( g, alpha, op_A, A_ij,
                                                                   sub_vector( x, A_ij->col_is( op_A ) ),
                                                                   sub_vector( y, A_ij->row_is( op_A ) ),
-                                                                  chunk_mtx );
+                                                                  mtx_map );
                 }// if
             }// for
         }// for
@@ -425,7 +419,7 @@ mul_vec_node< value_t >::run_ ( const TTruncAcc & )
     
     A->apply_add( alpha, & x, & t, op_A );
 
-    update( t, y, chunk_mtx );
+    update( t, y, mtx_map );
     // x.axpy( 1.0, & t );
     
     // A->apply_add( alpha, & x, & y, op_A );
@@ -443,18 +437,20 @@ graph
 gen_dag_solve_lower ( const matop_t    op_L,
                       TMatrix *        L,
                       TScalarVector &  x,
-                      refine_func_t    refine )
+                      refine_func_t    refine,
+                      mtx_map_t &      mtx_map )
 {
-    return refine( new solve_lower_node( op_L, L, x.sub_vector( x.is() ) ), 1000 );
+    return refine( new solve_lower_node( op_L, L, x.sub_vector( x.is() ), mtx_map ), 1000 );
 }
 
 graph
 gen_dag_solve_upper ( const matop_t    op_U,
                       TMatrix *        U,
                       TScalarVector &  x,
-                      refine_func_t    refine )
+                      refine_func_t    refine,
+                      mtx_map_t &      mtx_map )
 {
-    return refine( new solve_upper_node( op_U, U, x.sub_vector( x.is() ) ), 1000 );
+    return refine( new solve_upper_node( op_U, U, x.sub_vector( x.is() ), mtx_map ), 1000 );
 }
 
 }// namespace dag

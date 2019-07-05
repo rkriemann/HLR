@@ -391,7 +391,7 @@ run ( graph &                  dag,
 
     auto  toc = Time::Wall::since( tic );
 
-    log( 2, "time for TBB DAG prepare = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "TBB DAG prepare in " + HLIB::to_string( "%.3e s", toc.seconds() ) );
 
     //
     // run DAG
@@ -406,7 +406,7 @@ run ( graph &                  dag,
 
     toc = Time::Wall::since( tic );
 
-    log( 2, "time for TBB DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
+    log( 2, "TBB DAG run in     " + HLIB::to_string( "%.3e s", toc.seconds() ) );
 }
 
 }// namespace dag
