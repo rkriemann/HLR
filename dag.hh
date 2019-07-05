@@ -177,11 +177,11 @@ mymain ( int, char ** )
         tmax  = std::max( tmax, toc.seconds() );
         tsum += toc.seconds();
 
-        if ( i < (nbench-1) )
-        {
-            impl::matrix::copy_to( *A, *C );
-            dag.reset_dependencies();
-        }// if
+        // if ( i < (nbench-1) )
+        // {
+        //     impl::matrix::copy_to( *A, *C );
+        //     dag.reset_dependencies();
+        // }// if
     }// for
         
     if ( nbench > 1 )

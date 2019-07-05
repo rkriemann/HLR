@@ -440,7 +440,7 @@ gen_dag_solve_lower ( const matop_t    op_L,
                       refine_func_t    refine,
                       mtx_map_t &      mtx_map )
 {
-    return refine( new solve_lower_node( op_L, L, x.sub_vector( x.is() ), mtx_map ), 1000 );
+    return refine( new solve_lower_node( op_L, L, x.sub_vector( x.is() ), mtx_map ), 256 );
 }
 
 graph
@@ -450,7 +450,7 @@ gen_dag_solve_upper ( const matop_t    op_U,
                       refine_func_t    refine,
                       mtx_map_t &      mtx_map )
 {
-    return refine( new solve_upper_node( op_U, U, x.sub_vector( x.is() ), mtx_map ), 1000 );
+    return refine( new solve_upper_node( op_U, U, x.sub_vector( x.is() ), mtx_map ), 256 );
 }
 
 }// namespace dag

@@ -23,7 +23,7 @@ namespace dag
 {
 
 // size of lockable chunks for vector updates
-constexpr size_t  CHUNK_SIZE = 1024;
+constexpr size_t  CHUNK_SIZE = 256;
 
 //
 // return graph representing compute DAG for solving op(L) x = y

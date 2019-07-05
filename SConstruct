@@ -15,6 +15,7 @@ debug        = False
 profile      = False
 optimise     = True
 warn         = False
+color        = True
 
 # cache file storing SCons settings
 opts_file    = '.scons.options'
@@ -83,6 +84,7 @@ opts.Add( BoolVariable( 'debug',    'enable building with debug informations',  
 opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
 opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
+opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
 
 opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
 opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
@@ -98,6 +100,7 @@ debug    = opt_env['debug']
 profile  = opt_env['profile']
 optimise = opt_env['optimise']
 warn     = opt_env['warn']
+color    = opt_env['color']
 
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )
@@ -123,10 +126,11 @@ colors = { 'reset'  : '\033[0m',
            'yellow' : '\033[33m',
            'blue'   : '\033[34m',
            'purple' : '\033[35m',
-           'cyan'   : '\033[36m' }
+           'cyan'   : '\033[36m',
+           'gray'   : '\033[37m' }
 
-# no colors if output is not a terminal ('dumb' is for emacs)
-if not sys.stdout.isatty() or os.environ['TERM'] == 'dumb' :
+# no colors if wanted or output is not a terminal ('dumb' is for emacs)
+if not color or not sys.stdout.isatty() or os.environ['TERM'] == 'dumb' :
     for key in colors.keys() :
         colors[key] = ''
       
@@ -205,22 +209,26 @@ if likwid and LIKWID_DIR != None :
 ######################################################################
 
 def show_options ( target, source, env ):
+    bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
+                 True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
+    
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
-    print( '  Option     │ Description                │ Value' )
-    print( ' ────────────┼────────────────────────────┼───────' )
-    print( '  fullmsg    │ full command line output   │', opt_env['fullmsg'] )
-    print( '  debug      │ debug informations         │', opt_env['debug'] )
-    print( '  profile    │ profile informations       │', opt_env['profile'] )
-    print( '  optimise   │ compiler optimisation      │', opt_env['optimise'] )
-    print( '  warn       │ compiler warnings          │', opt_env['warn'] )
-    print( ' ────────────┼────────────────────────────┼───────' )
-    print( '  programs   │ programs to build          │', opt_env['programs'] )
-    print( '  frameworks │ software frameworks to use │', opt_env['frameworks'] )
-    print( ' ────────────┼────────────────────────────┼───────' )
-    print( '  malloc     │ malloc library to use      │', opt_env['malloc'] )
-    print( '  likwid     │ use LikWid library         │', opt_env['likwid'] )
+    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), opt_env['programs'] )
+    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), opt_env['frameworks'] )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), opt_env['malloc'] )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['likwid'] ] )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['optimise'] ] )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['debug'] ] )
+    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['profile'] ] )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['warn'] ] )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['fullmsg'] ] )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['color'] ] )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )
