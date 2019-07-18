@@ -9,10 +9,13 @@
 //
 
 #include <memory>
+#include <map>
+#include <mutex>
 
 #include <matrix/TLinearOperator.hh>
 
 #include <hlr/dag/graph.hh>
+#include <hlr/dag/solve.hh>
 
 namespace hlr { namespace matrix {
 
@@ -27,10 +30,16 @@ class luinv_eval : public HLIB::TLinearOperator
 private:
     // matrix containing LU data
     std::shared_ptr< HLIB::TMatrix >  _mat;
+
+    // holds pointer to vector to solve
+    mutable HLIB::TScalarVector *     _vec;
     
     // DAGs for solving with LU
-    hlr::dag::graph                   _dag_trsvl;
-    hlr::dag::graph                   _dag_trsvu;
+    mutable hlr::dag::graph           _dag_trsvl, _dag_trsvlt, _dag_trsvlh;
+    mutable hlr::dag::graph           _dag_trsvu, _dag_trsvut, _dag_trsvuh;
+
+    // mutex maps for updating vectors
+    hlr::dag::mutex_map_t             _map_rows, _map_cols;
     
 public:
     //
@@ -65,7 +74,7 @@ public:
     //
     virtual void  apply       ( const HLIB::TVector *  x,
                                 HLIB::TVector *        y,
-                                const HLIB::matop_t    op = apply_normal ) const;
+                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
 
     //
     // mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
@@ -74,16 +83,16 @@ public:
     virtual void  apply_add   ( const HLIB::real       alpha,
                                 const HLIB::TVector *  x,
                                 HLIB::TVector *        y,
-                                const HLIB::matop_t    op = apply_normal ) const;
+                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
     virtual void  capply_add  ( const HLIB::complex    alpha,
                                 const HLIB::TVector *  x,
                                 HLIB::TVector *        y,
-                                const HLIB::matop_t    op = apply_normal ) const;
+                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
 
     virtual void  apply_add   ( const HLIB::real       alpha,
                                 const HLIB::TMatrix *  X,
                                 HLIB::TMatrix *        Y,
-                                const HLIB::matop_t    op = apply_normal ) const;
+                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
     
     //
     // access to vector space elements

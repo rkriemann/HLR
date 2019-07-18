@@ -11,6 +11,7 @@
 #include "common.inc"
 #include "hlr/cluster/h.hh"
 #include "hlr/matrix/level_matrix.hh"
+#include "hlr/matrix/luinv_eval.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
@@ -93,7 +94,7 @@ mymain ( int, char ** )
 
     hlr::dag::graph  dag;
     
-    auto  C = ( onlydag ? std::move( A ) : A->copy() );
+    auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
 
     if ( levelwise )
         C->set_hierarchy_data();
@@ -222,7 +223,7 @@ mymain ( int, char ** )
     {
         TScalarVector  x( A->col_is() );
 
-        x.fill_rand( 0 );
+        x.fill_rand( 1 );
 
         const TScalarVector  xcopy( x );
         TScalarVector        xref( x );
@@ -233,21 +234,19 @@ mymain ( int, char ** )
         {
             tic = Time::Wall::now();
         
-            hlr::seq::trsvl( apply_normal, *A, xref, unit_diag );
+            hlr::seq::trsvl( apply_normal, *C, xref, unit_diag );
+            hlr::seq::trsvu( apply_normal, *C, xref, general_diag );
         
             toc = Time::Wall::since( tic );
 
-            std::cout << "  trsvl in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  trsv in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
             tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
             tmax  = std::max( tmax, toc.seconds() );
             tsum += toc.seconds();
 
             if ( i < (nbench-1) )
-            {
                 xref.assign( 1.0, & xcopy );
-                dag.reset_dependencies();
-            }// if
         }// for
 
         if ( nbench > 1 )
@@ -255,28 +254,18 @@ mymain ( int, char ** )
                       << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
 
-        tic = Time::Wall::now();
+
+        matrix::luinv_eval  A_inv2( C );
+        TScalarVector       v( x );
         
-        dag = std::move( hlr::dag::gen_dag_solve_lower( apply_normal, A.get(), x, impl::dag::refine, mtx_map ) );
-                
-        toc = Time::Wall::since( tic );
-        std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-        std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
-                
-        if ( verbose( 3 ) )
-            dag.print_dot( "solve_lower.dot" );
-                
         tmin = tmax = tsum = 0;
-                
+        
         for ( int  i = 0; i < nbench; ++i )
         {
             tic = Time::Wall::now();
-        
-            impl::dag::run( dag, acc_exact );
-            dag.reset_dependencies();
-        
+
+            A_inv2.apply( & x, & v, apply_normal );
+
             toc = Time::Wall::since( tic );
 
             std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
@@ -284,11 +273,6 @@ mymain ( int, char ** )
             tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
             tmax  = std::max( tmax, toc.seconds() );
             tsum += toc.seconds();
-
-            if ( i < (nbench-1) )
-            {
-                x.assign( 1.0, & xcopy );
-            }// if
         }// for
 
         if ( nbench > 1 )
@@ -296,96 +280,10 @@ mymain ( int, char ** )
                       << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
                 
-        DBG::write( & x,    "x.mat", "x" );
+        DBG::write( & v,    "x.mat", "x" );
         DBG::write( & xref, "y.mat", "y" );
 
-        x.axpy( -1, & xref );
-        std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( x.norm2() / xref.norm2() ) << term::reset << std::endl;
-    }
-
-    std::cout << std::endl;
-    
-    {
-        TScalarVector  x( A->col_is() );
-
-        x.fill_rand( 0 );
-
-        const TScalarVector  xcopy( x );
-        TScalarVector        xref( x );
-
-        tmin = tmax = tsum = 0;
-                
-        for ( int  i = 0; i < nbench; ++i )
-        {
-            tic = Time::Wall::now();
-        
-            hlr::seq::trsvu( apply_normal, *A, xref, general_diag );
-        
-            toc = Time::Wall::since( tic );
-
-            std::cout << "  trsvu in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-
-            if ( i < (nbench-1) )
-            {
-                xref.assign( 1.0, & xcopy );
-                dag.reset_dependencies();
-            }// if
-        }// for
-
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
-                      << std::endl;
-
-        tic = Time::Wall::now();
-        
-        dag = std::move( hlr::dag::gen_dag_solve_upper( apply_normal, A.get(), x, impl::dag::refine, mtx_map ) );
-                
-        toc = Time::Wall::since( tic );
-        std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-        std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
-                
-        if ( verbose( 3 ) )
-            dag.print_dot( "solve_upper.dot" );
-                
-        tmin = tmax = tsum = 0;
-                
-        for ( int  i = 0; i < nbench; ++i )
-        {
-            tic = Time::Wall::now();
-        
-            impl::dag::run( dag, acc_exact );
-            dag.reset_dependencies();
-        
-            toc = Time::Wall::since( tic );
-
-            std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-
-            if ( i < (nbench-1) )
-            {
-                x.assign( 1.0, & xcopy );
-            }// if
-        }// for
-
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
-                      << std::endl;
-                
-        DBG::write( & x,    "x.mat", "x" );
-        DBG::write( & xref, "y.mat", "y" );
-
-        x.axpy( -1, & xref );
-        std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( x.norm2() / xref.norm2() ) << term::reset << std::endl;
+        v.axpy( -1, & xref );
+        std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
     }
 }

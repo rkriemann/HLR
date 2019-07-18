@@ -123,11 +123,20 @@ void
 node::print () const
 {
     std::cout << to_string() << std::endl;
-    std::cout << "   #deps : " << _dep_cnt << std::endl;
 
-    std::cout << "   succ  : " << successors().size() << std::endl;
+    std::cout << "   in blks  : " << std::endl;
+    for ( auto  b : in_blocks() )
+        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
+    
+    std::cout << "   out blks : " << std::endl;
+    for ( auto  b : out_blocks() )
+        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
+    
+    std::cout << "   #deps    : " << _dep_cnt << std::endl;
+
+    std::cout << "   succ     : " << successors().size() << std::endl;
     for ( auto  succ : successors() )
-        std::cout << "      " << succ->to_string() << std::endl;
+        std::cout << "       " << succ->to_string() << std::endl;
 }
 
 namespace
