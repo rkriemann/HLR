@@ -88,6 +88,7 @@ node::run ( const TTruncAcc & acc )
     HLR_LOG( 4, "run( " + this->to_string() + " )" );
     
     run_( acc );
+    reset_dep_cnt();
 }
 
 //
@@ -115,7 +116,19 @@ node::refine ( const size_t  min_size )
 
     _sub_nodes = std::move( g );
 }
+
+//
+// finalize node data (if internal data will not change)
+//
+void
+node::finalize ()
+{
+    _ndeps = _dep_cnt;
     
+    _in_blk_deps.resize( 0 );
+    _out_blk_deps.resize( 0 );
+}
+
 //
 // print node with full edge information
 //

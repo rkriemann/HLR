@@ -123,6 +123,8 @@ refine ( node *        root,
     std::for_each( tasks.begin(), tasks.end(),
                    [&] ( node * node )
                    {
+                       node->finalize();
+                       
                        if ( node->dep_cnt() == 0 )
                            start.push_back( node );
                        

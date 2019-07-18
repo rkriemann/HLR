@@ -73,7 +73,10 @@ private:
     // successor nodes in DAG
     node_vec_t          _successors;
 
-    // dependency counter (#incoming edges)
+    // number of dependencies (incoming edges)
+    int                 _ndeps;
+
+    // runtime dependency counter (used for scheduling)
     std::atomic< int >  _dep_cnt;
 
     // block index set dependencies for automatic dependency refinement
@@ -89,7 +92,8 @@ private:
 public:
     // ctor
     node ()
-            : _dep_cnt( 0 )
+            : _ndeps( 0 )
+            , _dep_cnt( 0 )
     {}
 
     // dtor
@@ -128,16 +132,19 @@ public:
     }
 
     // return dependency counter
-    int   dep_cnt      () const   { return _dep_cnt; }
+    int   dep_cnt       () const   { return _dep_cnt; }
     
     // increase task dependency counter
-    int   inc_dep_cnt  ()         { return ++_dep_cnt; }
+    int   inc_dep_cnt   ()         { return ++_dep_cnt; }
     
     // decrease task dependency counter
-    int   dec_dep_cnt  ()         { return --_dep_cnt; }
+    int   dec_dep_cnt   ()         { return --_dep_cnt; }
     
     // set task dependency counter
-    void  set_dep_cnt  ( int  d ) { _dep_cnt = d; }
+    //void  set_dep_cnt   ( int  d ) { _dep_cnt = d; }
+
+    // reset dependency counter
+    void  reset_dep_cnt ()         { _dep_cnt = _ndeps; }
     
     //
     // data dependencies
@@ -148,7 +155,7 @@ public:
     
     // return local list of block index sets for output dependencies
     const block_list_t &  out_blocks () const { return _out_blk_deps; }
-
+    
     //
     // refinement
     //
@@ -169,6 +176,9 @@ public:
     // - if <do_lock> == true, lock affected nodes during refinement
     bool  refine_deps  ( const bool  do_lock );
 
+    // finalize node data (if internal data will not change)
+    void  finalize ();
+    
     //
     // mutex functions
     //

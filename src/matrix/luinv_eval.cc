@@ -62,16 +62,16 @@ luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M )
     auto  tic = Time::Wall::now();
     
     _dag_trsvl  = std::move( hlr::dag::gen_dag_solve_lower( apply_normal,  _mat.get(), & _vec, _map_rows, seq::dag::refine ) );
-    // _dag_trsvlt = std::move( hlr::dag::gen_dag_solve_lower( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
-    // _dag_trsvlh = std::move( hlr::dag::gen_dag_solve_lower( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvlt = std::move( hlr::dag::gen_dag_solve_lower( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvlh = std::move( hlr::dag::gen_dag_solve_lower( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
                                                                                                         
     _dag_trsvu  = std::move( hlr::dag::gen_dag_solve_upper( apply_normal,  _mat.get(), & _vec, _map_rows, seq::dag::refine ) );
-    // _dag_trsvut = std::move( hlr::dag::gen_dag_solve_upper( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
-    // _dag_trsvuh = std::move( hlr::dag::gen_dag_solve_upper( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvut = std::move( hlr::dag::gen_dag_solve_upper( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvuh = std::move( hlr::dag::gen_dag_solve_upper( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
 
     auto  toc = Time::Wall::since( tic );
 
-    log( 4, to_string( "luinv_eval : time for DAG setup = %.3e", toc.seconds() ) );
+    log( 0, to_string( "luinv_eval : time for DAG setup = %.3e", toc.seconds() ) );
 }
     
 //
@@ -105,31 +105,16 @@ luinv_eval::apply  ( const TVector *  x,
         auto  toc = Time::Wall::since( tic );
 
         log( 4, to_string( "luinv_eval : time for DAG run   = %.3e", toc.seconds() ) );
-        
-        tic = Time::Wall::now();
-
-        _dag_trsvl.reset_dependencies();
-        _dag_trsvu.reset_dependencies();
-
-        toc = Time::Wall::since( tic );
-
-        log( 4, to_string( "luinv_eval : time for DAG reset = %.3e", toc.seconds() ) );
     }// if
     else if ( op == apply_trans )
     {
         seq::dag::run( _dag_trsvut, acc_exact );
         seq::dag::run( _dag_trsvlt, acc_exact );
-
-        _dag_trsvut.reset_dependencies();
-        _dag_trsvlt.reset_dependencies();
     }// if
     else // if ( op == apply_adjoint )
     {
         seq::dag::run( _dag_trsvuh, acc_exact );
         seq::dag::run( _dag_trsvlh, acc_exact );
-
-        _dag_trsvuh.reset_dependencies();
-        _dag_trsvlh.reset_dependencies();
     }// else
 }
 
@@ -159,31 +144,16 @@ luinv_eval::apply_add  ( const real       alpha,
         auto  toc = Time::Wall::since( tic );
 
         log( 4, to_string( "luinv_eval : time for DAG run   = %.3e", toc.seconds() ) );
-        
-        tic = Time::Wall::now();
-        
-        _dag_trsvl.reset_dependencies();
-        _dag_trsvu.reset_dependencies();
-
-        toc = Time::Wall::since( tic );
-
-        log( 4, to_string( "luinv_eval : time for DAG reset = %.3e", toc.seconds() ) );
     }// if
     else if ( op == apply_trans )
     {
         seq::dag::run( _dag_trsvut, acc_exact );
         seq::dag::run( _dag_trsvlt, acc_exact );
-
-        _dag_trsvut.reset_dependencies();
-        _dag_trsvlt.reset_dependencies();
     }// if
     else // if ( op == apply_adjoint )
     {
         seq::dag::run( _dag_trsvuh, acc_exact );
         seq::dag::run( _dag_trsvlh, acc_exact );
-
-        _dag_trsvuh.reset_dependencies();
-        _dag_trsvlh.reset_dependencies();
     }// else
 
     y->axpy( alpha, & t );
@@ -205,25 +175,16 @@ luinv_eval::capply_add  ( const complex    alpha,
     {
         seq::dag::run( _dag_trsvl, acc_exact );
         seq::dag::run( _dag_trsvu, acc_exact );
-
-        _dag_trsvl.reset_dependencies();
-        _dag_trsvu.reset_dependencies();
     }// if
     else if ( op == apply_trans )
     {
         seq::dag::run( _dag_trsvut, acc_exact );
         seq::dag::run( _dag_trsvlt, acc_exact );
-
-        _dag_trsvut.reset_dependencies();
-        _dag_trsvlt.reset_dependencies();
     }// if
     else // if ( op == apply_adjoint )
     {
         seq::dag::run( _dag_trsvuh, acc_exact );
         seq::dag::run( _dag_trsvlh, acc_exact );
-
-        _dag_trsvuh.reset_dependencies();
-        _dag_trsvlh.reset_dependencies();
     }// else
 
     y->caxpy( alpha, & t );

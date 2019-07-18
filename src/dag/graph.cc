@@ -109,27 +109,15 @@ graph::make_single_end ()
         auto  new_end = new empty_node();
 
         for ( auto  node : _end )
+        {
             new_end->after( node );
-
-        new_end->set_dep_cnt( _end.size() );
+            new_end->inc_dep_cnt();
+        }// for
 
         _nodes.push_back( new_end );
         _end.clear();
         _end.push_back( new_end );
     }// if
-}
-
-//
-// reset dependency counters of all nodes
-//
-void
-graph::reset_dependencies ()
-{
-    for ( auto  n : nodes() )
-    {
-        for ( auto  succ : n->successors() )
-            succ->inc_dep_cnt();
-    }// for
 }
 
 //
@@ -255,6 +243,8 @@ graph::mem_size  () const
     {
         size += sizeof(node) + sizeof(node*);
         size += sizeof(node*) * n->successors().size();
+        size += sizeof(std::mutex);
+        size += sizeof(mem_block_t) * ( n->in_blocks().size() + n->out_blocks().size() );
     }// for
 
     size += sizeof(node*) * _start.size();
