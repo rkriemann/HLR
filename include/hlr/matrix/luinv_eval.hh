@@ -16,6 +16,7 @@
 
 #include <hlr/dag/graph.hh>
 #include <hlr/dag/solve.hh>
+#include <hlr/seq/dag.hh>
 
 namespace hlr { namespace matrix {
 
@@ -40,13 +41,18 @@ private:
 
     // mutex maps for updating vectors
     hlr::dag::mutex_map_t             _map_rows, _map_cols;
+
+    // dag execution function
+    hlr::dag::exec_func_t             _exec_func;
     
 public:
     //
     // ctor
     //
 
-    luinv_eval ( std::shared_ptr< HLIB::TMatrix > &  M );
+    luinv_eval ( std::shared_ptr< HLIB::TMatrix > &  M,
+                 hlr::dag::refine_func_t             refine_func = seq::dag::refine,
+                 hlr::dag::exec_func_t               exec_func   = seq::dag::run );
     
     //
     // linear operator properties

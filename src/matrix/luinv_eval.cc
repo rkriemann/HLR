@@ -20,9 +20,12 @@ using namespace HLIB;
 // ctor
 //
 
-luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M )
+luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M,
+                         hlr::dag::refine_func_t       refine_func,
+                         hlr::dag::exec_func_t         exec_func )
         : _mat( M )
         , _vec( nullptr )
+        , _exec_func( exec_func )
 {
     assert( _mat.get() != nullptr );
 
@@ -30,30 +33,11 @@ luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M )
     // set up mutex maps
     //
     
-    idx_t  last = -1;
+    for ( idx_t  i = _mat->row_is().first() / hlr::dag::CHUNK_SIZE; i <= idx_t(_mat->row_is().last() / hlr::dag::CHUNK_SIZE); ++i )
+        _map_rows[ i ] = std::make_unique< std::mutex >();
 
-    for ( auto  i : _mat->row_is() )
-    {
-        const idx_t  ci = i / hlr::dag::CHUNK_SIZE;
-            
-        if ( ci != last )
-        {
-            last            = ci;
-            _map_rows[ ci ] = std::make_unique< std::mutex >();
-        }// if
-    }// for
-
-    last = -1;
-    for ( auto  i : _mat->row_is() )
-    {
-        const idx_t  ci = i / hlr::dag::CHUNK_SIZE;
-            
-        if ( ci != last )
-        {
-            last            = ci;
-            _map_cols[ ci ] = std::make_unique< std::mutex >();
-        }// if
-    }// for
+    for ( idx_t  i = _mat->col_is().first() / hlr::dag::CHUNK_SIZE; i <= idx_t(_mat->col_is().last() / hlr::dag::CHUNK_SIZE); ++i )
+        _map_cols[ i ] = std::make_unique< std::mutex >();
 
     //
     // and the DAGs
@@ -61,13 +45,13 @@ luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M )
 
     auto  tic = Time::Wall::now();
     
-    _dag_trsvl  = std::move( hlr::dag::gen_dag_solve_lower( apply_normal,  _mat.get(), & _vec, _map_rows, seq::dag::refine ) );
-    _dag_trsvlt = std::move( hlr::dag::gen_dag_solve_lower( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
-    _dag_trsvlh = std::move( hlr::dag::gen_dag_solve_lower( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvl  = std::move( hlr::dag::gen_dag_solve_lower( apply_normal,  _mat.get(), & _vec, _map_rows, refine_func ) );
+    _dag_trsvlt = std::move( hlr::dag::gen_dag_solve_lower( apply_trans,   _mat.get(), & _vec, _map_cols, refine_func ) );
+    _dag_trsvlh = std::move( hlr::dag::gen_dag_solve_lower( apply_adjoint, _mat.get(), & _vec, _map_cols, refine_func ) );
                                                                                                         
-    _dag_trsvu  = std::move( hlr::dag::gen_dag_solve_upper( apply_normal,  _mat.get(), & _vec, _map_rows, seq::dag::refine ) );
-    _dag_trsvut = std::move( hlr::dag::gen_dag_solve_upper( apply_trans,   _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
-    _dag_trsvuh = std::move( hlr::dag::gen_dag_solve_upper( apply_adjoint, _mat.get(), & _vec, _map_cols, seq::dag::refine ) );
+    _dag_trsvu  = std::move( hlr::dag::gen_dag_solve_upper( apply_normal,  _mat.get(), & _vec, _map_rows, refine_func ) );
+    _dag_trsvut = std::move( hlr::dag::gen_dag_solve_upper( apply_trans,   _mat.get(), & _vec, _map_cols, refine_func ) );
+    _dag_trsvuh = std::move( hlr::dag::gen_dag_solve_upper( apply_adjoint, _mat.get(), & _vec, _map_cols, refine_func ) );
 
     auto  toc = Time::Wall::since( tic );
 
@@ -97,24 +81,18 @@ luinv_eval::apply  ( const TVector *  x,
 
     if ( op == apply_normal )
     {
-        auto  tic = Time::Wall::now();
-
-        seq::dag::run( _dag_trsvl, acc_exact );
-        seq::dag::run( _dag_trsvu, acc_exact );
-
-        auto  toc = Time::Wall::since( tic );
-
-        log( 4, to_string( "luinv_eval : time for DAG run   = %.3e", toc.seconds() ) );
+        _exec_func( _dag_trsvl, acc_exact );
+        _exec_func( _dag_trsvu, acc_exact );
     }// if
     else if ( op == apply_trans )
     {
-        seq::dag::run( _dag_trsvut, acc_exact );
-        seq::dag::run( _dag_trsvlt, acc_exact );
+        _exec_func( _dag_trsvut, acc_exact );
+        _exec_func( _dag_trsvlt, acc_exact );
     }// if
     else // if ( op == apply_adjoint )
     {
-        seq::dag::run( _dag_trsvuh, acc_exact );
-        seq::dag::run( _dag_trsvlh, acc_exact );
+        _exec_func( _dag_trsvuh, acc_exact );
+        _exec_func( _dag_trsvlh, acc_exact );
     }// else
 }
 
@@ -138,8 +116,8 @@ luinv_eval::apply_add  ( const real       alpha,
     {
         auto  tic = Time::Wall::now();
         
-        seq::dag::run( _dag_trsvl, acc_exact );
-        seq::dag::run( _dag_trsvu, acc_exact );
+        _exec_func( _dag_trsvl, acc_exact );
+        _exec_func( _dag_trsvu, acc_exact );
 
         auto  toc = Time::Wall::since( tic );
 
@@ -147,13 +125,13 @@ luinv_eval::apply_add  ( const real       alpha,
     }// if
     else if ( op == apply_trans )
     {
-        seq::dag::run( _dag_trsvut, acc_exact );
-        seq::dag::run( _dag_trsvlt, acc_exact );
+        _exec_func( _dag_trsvut, acc_exact );
+        _exec_func( _dag_trsvlt, acc_exact );
     }// if
     else // if ( op == apply_adjoint )
     {
-        seq::dag::run( _dag_trsvuh, acc_exact );
-        seq::dag::run( _dag_trsvlh, acc_exact );
+        _exec_func( _dag_trsvuh, acc_exact );
+        _exec_func( _dag_trsvlh, acc_exact );
     }// else
 
     y->axpy( alpha, & t );
@@ -173,18 +151,18 @@ luinv_eval::capply_add  ( const complex    alpha,
     
     if ( op == apply_normal )
     {
-        seq::dag::run( _dag_trsvl, acc_exact );
-        seq::dag::run( _dag_trsvu, acc_exact );
+        _exec_func( _dag_trsvl, acc_exact );
+        _exec_func( _dag_trsvu, acc_exact );
     }// if
     else if ( op == apply_trans )
     {
-        seq::dag::run( _dag_trsvut, acc_exact );
-        seq::dag::run( _dag_trsvlt, acc_exact );
+        _exec_func( _dag_trsvut, acc_exact );
+        _exec_func( _dag_trsvlt, acc_exact );
     }// if
     else // if ( op == apply_adjoint )
     {
-        seq::dag::run( _dag_trsvuh, acc_exact );
-        seq::dag::run( _dag_trsvlh, acc_exact );
+        _exec_func( _dag_trsvuh, acc_exact );
+        _exec_func( _dag_trsvlh, acc_exact );
     }// else
 
     y->caxpy( alpha, & t );

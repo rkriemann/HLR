@@ -23,7 +23,7 @@ namespace dag
 {
 
 // size of lockable chunks for vector updates
-constexpr size_t  CHUNK_SIZE = 256;
+constexpr size_t  CHUNK_SIZE = 128;
 
 // map from index to mutex
 using  mutex_map_t = std::map< HLIB::idx_t, std::unique_ptr< std::mutex > >;

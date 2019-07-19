@@ -121,6 +121,12 @@ public:
 using  refine_func_t = std::function< graph ( node *,
                                               const size_t ) >;
 
+//
+// function type for graph execution
+//
+using  exec_func_t   = std::function< void ( graph &,
+                                             const HLIB::TTruncAcc & ) >;
+
 }// namespace dag
 
 }// namespace hlr

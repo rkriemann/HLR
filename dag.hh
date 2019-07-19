@@ -234,8 +234,8 @@ mymain ( int, char ** )
         {
             tic = Time::Wall::now();
         
-            hlr::seq::trsvl( apply_normal, *C, xref, unit_diag );
-            hlr::seq::trsvu( apply_normal, *C, xref, general_diag );
+            hlr::seq::trsvu( apply_trans, *C, xref, general_diag );
+            hlr::seq::trsvl( apply_trans, *C, xref, unit_diag );
         
             toc = Time::Wall::since( tic );
 
@@ -255,7 +255,7 @@ mymain ( int, char ** )
                       << std::endl;
 
 
-        matrix::luinv_eval  A_inv2( C );
+        matrix::luinv_eval  A_inv2( C, impl::dag::refine, impl::dag::run );
         TScalarVector       v( x );
         
         tmin = tmax = tsum = 0;
@@ -264,7 +264,7 @@ mymain ( int, char ** )
         {
             tic = Time::Wall::now();
 
-            A_inv2.apply( & x, & v, apply_normal );
+            A_inv2.apply( & x, & v, apply_trans );
 
             toc = Time::Wall::since( tic );
 
