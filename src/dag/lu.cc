@@ -991,6 +991,8 @@ gen_dag_lu_lvl ( TMatrix &  A )
 
     for ( auto  node : nodes )
     {
+        node->finalize();
+        
         if ( node->dep_cnt() == 0 )
             start.push_back( node );
     }// for
