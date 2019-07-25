@@ -10,6 +10,8 @@
 
 #include <hlib.hh>
 
+#include "hlr/utils/checks.hh"
+#include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 
@@ -38,8 +40,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
+    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
     
     assert( is_blocked( A ) );
 
@@ -90,8 +91,7 @@ void
 trsml ( const TMatrix *            L,
         BLAS::Matrix< value_t > &  X )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "trsml( %d )", L->id() );
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
     
     if ( is_blocked( L ) )
     {
@@ -134,8 +134,7 @@ void
 trsmuh ( const TMatrix *            U,
          BLAS::Matrix< value_t > &  X )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "trsmuh( %d )", U->id() );
+    HLR_LOG( 4, HLIB::to_string( "trsmuh( %d )", U->id() ) );
     
     if ( is_blocked( U ) )
     {
@@ -175,8 +174,7 @@ addlr ( BLAS::Matrix< value_t > &  U,
         TMatrix *               A,
         const TTruncAcc &       acc )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "addlr( %d )", A->id() );
+    HLR_LOG( 4, HLIB::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -225,8 +223,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    if ( HLIB::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
+    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -276,6 +273,8 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
+    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    
     assert( is_blocked( A ) );
 
     auto  BA  = ptrcast( A, TBlockMatrix );
@@ -410,6 +409,73 @@ trsvu ( const HLIB::matop_t      op_U,
         const HLIB::TMatrix &    U,
         HLIB::TScalarVector &    x,
         const HLIB::diag_type_t  diag_mode );
+
+//
+// Gaussian elimination of A, e.g. A = A^-1
+// - T is used as temporary space and has to have the same
+//   structure as A
+//
+inline void
+gauss_elim ( HLIB::TMatrix *    A,
+             HLIB::TMatrix *    T,
+             const TTruncAcc &  acc )
+{
+    assert( ! is_null_any( A, T ) );
+    assert( A->type() == T->type() );
+    
+    // HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( A, TBlockMatrix );
+        auto  BT = ptrcast( T, TBlockMatrix );
+        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
+        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
+
+        // A_00 = A_00⁻¹
+        hlr::seq::gauss_elim( MA(0,0), MT(0,0), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
+
+        // T_01 = A_00⁻¹ · A_01
+        multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+        // hlr::log( 0, HLIB::to_string( "T%d = %.8e", MT(0,1)->id(), HLIB::norm_F( MT(0,1) ) ) );
+        
+        // T_10 = A_10 · A_00⁻¹
+        multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+        // hlr::log( 0, HLIB::to_string( "T%d = %.8e", MT(1,0)->id(), HLIB::norm_F( MT(1,0) ) ) );
+
+        // A_11 = A_11 - T_10 · A_01
+        multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
+    
+        // A_11 = A_11⁻¹
+        hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
+
+        // A_01 = - T_01 · A_11
+        multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,1)->id(), HLIB::norm_F( MA(0,1) ) ) );
+            
+        // A_10 = - A_11 · T_10
+        multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,0)->id(), HLIB::norm_F( MA(1,0) ) ) );
+
+        // A_00 = T_00 - A_01 · T_10
+        multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  DA = ptrcast( A, TDenseMatrix );
+        
+        if ( A->is_complex() ) HLIB::BLAS::invert( DA->blas_cmat() );
+        else                   HLIB::BLAS::invert( DA->blas_rmat() );
+    }// if
+    else
+        assert( false );
+
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+}
 
 }// namespace seq
 

@@ -27,8 +27,7 @@ multiply ( const value_t      alpha,
            TRkMatrix *        C,
            const TTruncAcc &  acc )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) V(A)^H U(B) ] , [ V(C), V(B)^H ] )
     auto  T  = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A ) ), blas_mat_A< value_t >( B ) );
@@ -49,8 +48,7 @@ multiply ( const value_t         alpha,
            TRkMatrix *           C,
            const TTruncAcc &     acc )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
     auto  VB = BLAS::prod( alpha, BLAS::adjoint( blas_mat< value_t >( B ) ), blas_mat_B< value_t >( A ) );
@@ -70,8 +68,7 @@ multiply ( const value_t         alpha,
            TRkMatrix *           C,
            const TTruncAcc &     acc )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
     auto  AU = BLAS::prod( alpha, blas_mat< value_t >( A ), blas_mat_A< value_t >( B ) );
@@ -91,8 +88,7 @@ multiply ( const value_t         alpha,
            TRkMatrix *           C,
            const TTruncAcc &     acc )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = approx( C - A B )
     auto  AB = BLAS::prod( alpha, blas_mat< value_t >( A ), blas_mat< value_t >( B ) );
@@ -112,8 +108,7 @@ multiply ( const value_t      alpha,
            TDenseMatrix *     C,
            const TTruncAcc & )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + U(A) ( V(A)^H U(B) ) V(B)^H
     auto  T  = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A ) ), blas_mat_A< value_t >( B ) );
@@ -130,8 +125,7 @@ multiply ( const value_t         alpha,
            TDenseMatrix *        C,
            const TTruncAcc & )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + ( A U(B) ) V(B)^H
     auto  AU = BLAS::prod( value_t(1), blas_mat< value_t >( A ), blas_mat_A< value_t >( B ) );
@@ -147,8 +141,7 @@ multiply ( const value_t         alpha,
            TDenseMatrix *        C,
            const TTruncAcc & )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + U(A) ( V(A)^H B )
     auto  VB = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A ) ), blas_mat< value_t >( B ) );
@@ -164,8 +157,7 @@ multiply ( const value_t         alpha,
            TDenseMatrix *        C,
            const TTruncAcc & )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() );
+    HLR_LOG( 4, HLIB::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + A B
     BLAS::prod( alpha, blas_mat< value_t >( A ), blas_mat< value_t >( B ), value_t(1), blas_mat< value_t >( C ) );

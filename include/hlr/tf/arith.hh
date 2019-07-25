@@ -123,7 +123,9 @@ lu ( TMatrix *          A,
         }// for
     }// for
     
-    tf.wait_for_all();
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
 }
 
 }// namespace tlr
@@ -182,7 +184,9 @@ addlr ( const BLAS::Matrix< value_t > &  U,
                                               A10->set_lrmat( U10, V10 );
                                           } );
 
-        tf.wait_for_all();
+        ::tf::Executor  executor;
+    
+        executor.run( tf ).wait();
     }// if
     else
     {
@@ -258,7 +262,9 @@ lu ( TMatrix *             A,
             auto  task_01 = tf.silent_emplace( [A00,A01]  () { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
             auto  task_10 = tf.silent_emplace( [A00,A10]  () { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
 
-            tf.wait_for_all();
+            ::tf::Executor  executor;
+    
+            executor.run( tf ).wait();
         }
         
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
@@ -294,6 +300,99 @@ namespace tileh
 //
 
 }// namespace tileh
+
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// Gaussian elimination of A, e.g. A = A^-1
+// - T is used as temporary space and has to have the same
+//   structure as A
+//
+namespace detail
+{
+
+inline void
+gauss_elim ( ::tf::SubflowBuilder &  tf,
+             HLIB::TMatrix *         A,
+             HLIB::TMatrix *         T,
+             const TTruncAcc &       acc )
+{
+    assert( ! is_null_any( A, T ) );
+    assert( A->type() == T->type() );
+    
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( A, TBlockMatrix );
+        auto  BT = ptrcast( T, TBlockMatrix );
+        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
+        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
+
+        // A_00 = A_00⁻¹
+        auto  inv_a00 = tf.emplace( [&] ( auto &  sf ) { detail::gauss_elim( sf, MA(0,0), MT(0,0), acc ); } );
+
+        // T_01 = A_00⁻¹ · A_01
+        auto  upd_t01 = tf.emplace( [&] () { multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
+        inv_a00.precede( upd_t01 );
+        
+        // T_10 = A_10 · A_00⁻¹
+        auto  upd_t10 = tf.emplace( [&] () { multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
+        inv_a00.precede( upd_t10 );
+
+        // A_11 = A_11 - T_10 · A_01
+        auto  upd_a11 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc ); } );
+        upd_t10.precede( upd_a11 );
+    
+        // A_11 = A_11⁻¹
+        auto  inv_a11 = tf.emplace( [&] ( auto &  sf ) { detail::gauss_elim( sf, MA(1,1), MT(1,1), acc ); } );
+        upd_a11.precede( inv_a11 );
+
+        // A_01 = - T_01 · A_11
+        auto  upd_a01 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
+        inv_a11.precede( upd_a01 );
+            
+        // A_10 = - A_11 · T_10
+        auto  upd_a10 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
+        inv_a11.precede( upd_a10 );
+
+        // A_00 = T_00 - A_01 · T_10
+        auto  upd_a00 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc ); } );
+        upd_t10.precede( upd_a00 );
+        upd_a01.precede( upd_a00 );
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  DA = ptrcast( A, TDenseMatrix );
+        
+        if ( A->is_complex() ) HLIB::BLAS::invert( DA->blas_cmat() );
+        else                   HLIB::BLAS::invert( DA->blas_rmat() );
+    }// if
+    else
+        assert( false );
+
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+}
+
+}// namespace detail
+
+inline void
+gauss_elim ( HLIB::TMatrix *    A,
+             HLIB::TMatrix *    T,
+             const TTruncAcc &  acc )
+{
+    ::tf::Taskflow  tf;
+    
+    tf.silent_emplace( [A,T,&acc] ( auto &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
+
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
+}
 
 }// namespace tf
 

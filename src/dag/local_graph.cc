@@ -42,6 +42,10 @@ local_graph::add_node_and_dependencies ( node *  node )
 void
 local_graph::set_dependencies ()
 {
+    // no edge construction if alread finished
+    if ( _finished )
+        return;
+    
     //
     // check all nodes against all other
     // - only one direction to prevent double edges

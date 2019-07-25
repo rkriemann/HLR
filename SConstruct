@@ -43,7 +43,7 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag' ]
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag', 'gauss' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
@@ -185,7 +185,7 @@ env.Prepend( LIBPATH = [ "." ] )
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
     # env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
     env.MergeFlags( os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
-    env.Append( LIBS = 'dl' )
+    env.Append( LIBS = [ 'dl', 'pthread' ] )
 elif MIMALLOC_DIR != None and malloc == 'mimalloc' :
     env.MergeFlags( os.path.join( MIMALLOC_DIR, 'lib', 'libmimalloc.a' ) )
 elif malloc == 'tbbmalloc' :
@@ -241,19 +241,20 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-common = env.StaticLibrary( 'common', [ 'src/apps/log_kernel.cc',
+common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
+                                        'src/apps/log_kernel.cc',
                                         'src/apps/matern_cov.cc',
-                                        'src/apps/laplace.cc',
                                         'src/cluster/distr.cc',
                                         'src/cluster/h.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',
                                         'src/cluster/tlr.cc',
+                                        'src/dag/coarselu.cc',
+                                        'src/dag/gauss_elim.cc',
                                         'src/dag/graph.cc',
                                         'src/dag/local_graph.cc',
-                                        'src/dag/node.cc',
                                         'src/dag/lu.cc',
-                                        'src/dag/coarselu.cc',
+                                        'src/dag/node.cc',
                                         'src/dag/solve.cc',
                                         'src/matrix/level_matrix.cc',
                                         'src/matrix/luinv_eval.cc',
@@ -276,6 +277,7 @@ if 'seq' in frameworks :
     if 'hodlr' in programs : Default( seq.Program( 'hodlr-seq.cc' ) )
     if 'tileh' in programs : Default( seq.Program( 'tileh-seq.cc' ) )
     if 'dag'   in programs : Default( seq.Program( 'dag-seq.cc' ) )
+    if 'gauss' in programs : Default( seq.Program( 'gauss-seq.cc' ) )
 
 #
 # OpenMP
@@ -303,7 +305,8 @@ if 'tbb' in frameworks :
     if 'tlr'   in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
     if 'hodlr' in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
     if 'tileh' in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
-    if 'dag'   in programs : Default( tbb.Program( 'dag-tbb', [ 'dag-tbb.cc', 'src/tbb/dag.cc' ] ) )
+    if 'dag'   in programs : Default( tbb.Program( 'dag-tbb',   [ 'dag-tbb.cc',   'src/tbb/dag.cc' ] ) )
+    if 'gauss' in programs : Default( tbb.Program( 'gauss-tbb', [ 'gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -316,7 +319,8 @@ if 'tf' in frameworks :
     
     if 'tlr'   in programs : Default( tf.Program( 'tlr-tf.cc' ) )
     if 'hodlr' in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
-    if 'dag'   in programs : Default( tf.Program( 'dag-tf', [ 'dag-tf.cc', 'src/tf/dag.cc' ] ) )
+    if 'dag'   in programs : Default( tf.Program( 'dag-tf',   [ 'dag-tf.cc',   'src/tf/dag.cc' ] ) )
+    if 'gauss' in programs : Default( tf.Program( 'gauss-tf', [ 'gauss-tf.cc', 'src/tf/dag.cc' ] ) )
 
 #
 # MPI

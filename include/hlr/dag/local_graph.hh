@@ -30,7 +30,16 @@ using  node_vec_t   = std::vector< node * >;
 //!
 class local_graph : public node_vec_t
 {
+protected:
+    // signals finished graph, e.g. no update of edges needed
+    bool  _finished;
+    
 public:
+    // ctor
+    local_graph ()
+            : _finished( false )
+    {}
+    
     // add node and apply dependencies based on existing nodes
     void  add_node_and_dependencies ( node *  node );
 
@@ -44,6 +53,9 @@ public:
     // in/out data blocks of nodes
     void  set_dependencies ();
 
+    // signal finished graph
+    void  finalize () { _finished = true; }
+    
     // output graph
     void  print () const;
     

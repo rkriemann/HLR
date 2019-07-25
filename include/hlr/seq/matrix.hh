@@ -18,17 +18,10 @@
 
 #include "hlr/utils/checks.hh"
 
-namespace hlr
-{
+namespace hlr { namespace seq { namespace matrix {
 
 using namespace HLIB;
     
-namespace seq
-{
-
-namespace matrix
-{
-
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -101,6 +94,7 @@ build ( const TBlockCluster *  bct,
 //
 // return copy of matrix
 //
+inline
 std::unique_ptr< TMatrix >
 copy ( const TMatrix &  M )
 {
@@ -139,6 +133,7 @@ copy ( const TMatrix &  M )
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //
+inline
 void
 copy_to ( const TMatrix &  A,
           TMatrix &        B )
@@ -164,6 +159,8 @@ copy_to ( const TMatrix &  A,
 
                     copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
+                else
+                    assert( is_null( BB->block( i, j ) ) );
             }// for
         }// for
     }// if
@@ -178,6 +175,7 @@ copy_to ( const TMatrix &  A,
 // - frees old data
 // - local operation thereby limiting extra memory usage
 //
+inline
 std::unique_ptr< TMatrix >
 realloc ( TMatrix *  A )
 {
@@ -217,10 +215,47 @@ realloc ( TMatrix *  A )
     }// else
 }
 
-}// namespace matrix
+//
+// nullify data in matrix, e.g., M := 0
+//
+inline
+void
+clear ( TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = ptrcast( & M, TBlockMatrix );
 
-}// namespace seq
+        for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    clear( * BM->block( i, j ) );
+                }// if
+            }// for
+        }// for
+    }// if
+    else if ( is_lowrank( & M ) )
+    {
+        auto  R = ptrcast( & M, TRkMatrix );
 
-}// namespace hlr
+        R->set_rank( 0 );
+    }// if
+    else if ( is_dense( & M ) )
+    {
+        auto  D = ptrcast( & M, TDenseMatrix );
+
+        if ( D->is_complex() )
+            BLAS::fill( HLIB::complex(0), blas_mat< HLIB::complex >( D ) );
+        else
+            BLAS::fill( HLIB::real(0), blas_mat< HLIB::real >( D ) );
+    }// if
+    else
+        assert( false );
+}
+
+}}}// namespace hlr::seq::matrix
 
 #endif // __HLR_SEQ_MATRIX_HH
