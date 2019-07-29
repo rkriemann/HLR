@@ -14,6 +14,7 @@
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tools.hh"
+#include "hlr/utils/term.hh"
 #include "hlr/dag/node.hh"
 
 namespace hlr
@@ -38,6 +39,9 @@ std::atomic< size_t >  collisions;
 
 // type for a node set
 using  node_set_t = std::vector< node * >;
+
+// indentation offset
+constexpr char         indent[] = "    ";
 
 //////////////////////////////////////////////
 //
@@ -76,7 +80,7 @@ node::init ()
     _in_blk_deps  = in_blocks_();
     _out_blk_deps = out_blocks_();
 
-    HLR_LOG( 5, to_string() );
+    HLR_LOG( 5, indent + to_string() );
 }
     
 //
@@ -85,7 +89,7 @@ node::init ()
 void
 node::run ( const TTruncAcc & acc )
 {
-    HLR_LOG( 4, "run( " + this->to_string() + " )" );
+    HLR_LOG( 4, term::bold( term::green( "run( " ) ) + term::bold( this->to_string() ) + term::bold( term::green( " )" ) ) );
     
     run_( acc );
     reset_dep_cnt();
@@ -98,7 +102,7 @@ node::run ( const TTruncAcc & acc )
 void
 node::refine ( const size_t  min_size )
 {
-    HLR_LOG( 5, "refine( " + to_string() + " )" );
+    HLR_LOG( 5, term::cyan( term::bold( "refine" ) ) + "( " + to_string() + " )" );
 
     //
     // create subnodes
@@ -232,7 +236,7 @@ refine_loc_deps ( node *  node )
 {
     assert( ! is_null( node ) );
     
-    HLR_LOG( 5, "refine_loc_deps( " + node->to_string() + " )" );
+    HLR_LOG( 5, term::magenta( term::bold( "refine_loc_deps" ) ) + "( " + node->to_string() + " )" );
 
     //
     // replace successor by refined successors if available
@@ -253,7 +257,7 @@ refine_loc_deps ( node *  node )
                 // insert succendencies for subnodes (intersection test neccessary???)
                 for ( auto  succ_sub : (*succ)->sub_nodes() )
                 {
-                    HLR_LOG( 6, node->to_string() + " ⟶ " + succ_sub->to_string() );
+                    HLR_LOG( 6, indent + node->to_string() + " ⟶ " + succ_sub->to_string() );
                     new_out.push_back( succ_sub );
                 }// for
 
@@ -299,7 +303,7 @@ refine_sub_deps ( node *  node )
 {
     assert( ! is_null( node ) );
     
-    HLR_LOG( 5, "refine_sub_deps( " + node->to_string() + " )" );
+    HLR_LOG( 5, term::magenta( term::bold( "refine_sub_deps" ) ) + "( " + node->to_string() + " )" );
     
     if ( node->sub_nodes().size() == 0 )
         return;
@@ -318,7 +322,7 @@ refine_sub_deps ( node *  node )
                 {
                     if ( is_intersecting( sub->out_blocks(), succ_sub->in_blocks() ) )
                     {
-                        HLR_LOG( 6, sub->to_string() + " ⟶ " + succ_sub->to_string() );
+                        HLR_LOG( 6, indent + sub->to_string() + " ⟶ " + succ_sub->to_string() );
                         sub->successors().push_back( succ_sub );
                     }// if
                 }// for
@@ -327,7 +331,7 @@ refine_sub_deps ( node *  node )
             {
                 if ( is_intersecting( sub->out_blocks(), succ->in_blocks() ) )
                 {
-                    HLR_LOG( 6, sub->to_string() + " → " + succ->to_string() );
+                    HLR_LOG( 6, indent + sub->to_string() + " → " + succ->to_string() );
                     sub->successors().push_back( succ );
                 }// if
             }// for
@@ -364,7 +368,7 @@ refine_sub_deps ( node *  node )
 bool
 node::refine_deps ( const bool  do_lock )
 {
-    HLR_LOG( 5, "refine_deps( " + to_string() + " )" );
+    // HLR_LOG( 5, "refine_deps( " + to_string() + " )" );
 
     //
     // first lock all nodes

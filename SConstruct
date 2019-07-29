@@ -291,7 +291,8 @@ if 'omp' in frameworks :
     if 'tlr'   in programs : Default( omp.Program( 'tlr-omp.cc' ) )
     if 'hodlr' in programs : Default( omp.Program( 'hodlr-omp.cc' ) )
     if 'tileh' in programs : Default( omp.Program( 'tileh-omp.cc' ) )
-    if 'dag'   in programs : Default( omp.Program( 'dag-omp', [ 'dag-omp.cc', 'src/omp/dag.cc' ] ) )
+    if 'dag'   in programs : Default( omp.Program( 'dag-omp',   [ 'dag-omp.cc',   'src/omp/dag.cc' ] ) )
+    if 'gauss' in programs : Default( omp.Program( 'gauss-omp', [ 'gauss-omp.cc', 'src/omp/dag.cc' ] ) )
 
 #
 # TBB
@@ -352,7 +353,8 @@ if 'hpx' in frameworks :
     
     if 'tlr'   in programs : Default( hpx.Program( 'tlr-hpx.cc' ) )
     if 'hodlr' in programs : Default( hpx.Program( 'hodlr-hpx.cc' ) )
-    if 'dag'   in programs : Default( hpx.Program( 'dag-hpx', [ 'dag-hpx.cc', 'src/hpx/dag.cc' ] ) )
+    if 'dag'   in programs : Default( hpx.Program( 'dag-hpx',   [ 'dag-hpx.cc',   'src/hpx/dag.cc' ] ) )
+    if 'gauss' in programs : Default( hpx.Program( 'gauss-hpx', [ 'gauss-hpx.cc', 'src/hpx/dag.cc' ] ) )
 
 #
 # GASPI

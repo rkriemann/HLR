@@ -196,6 +196,79 @@ namespace tileh
 
 }// namespace tileh
 
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// Gaussian elimination of A, e.g. A = A^-1
+// - T is used as temporary space and has to have the same
+//   structure as A
+//
+inline void
+gauss_elim ( HLIB::TMatrix *    A,
+             HLIB::TMatrix *    T,
+             const TTruncAcc &  acc )
+{
+    assert( ! is_null_any( A, T ) );
+    assert( A->type() == T->type() );
+
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( A, TBlockMatrix );
+        auto  BT = ptrcast( T, TBlockMatrix );
+        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
+        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
+
+        // A_00 = A_00⁻¹
+        hlr::seq::gauss_elim( MA(0,0), MT(0,0), acc );
+
+        ::hpx::parallel::v2::define_task_block(
+            [&] ( auto &  tb )
+            {
+                // T_01 = A_00⁻¹ · A_01
+                tb.run( [&] () { multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
+        
+                // T_10 = A_10 · A_00⁻¹
+                tb.run( [&] () { multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
+            } );
+
+        // A_11 = A_11 - T_10 · A_01
+        multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+    
+        // A_11 = A_11⁻¹
+        hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
+
+        ::hpx::parallel::v2::define_task_block(
+            [&] ( auto &  tb )
+            {
+                // A_01 = - T_01 · A_11
+                tb.run( [&] () { multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
+            
+                // A_10 = - A_11 · T_10
+                tb.run( [&] () { multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
+            } );
+        
+        // A_00 = T_00 - A_01 · T_10
+        multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  DA = ptrcast( A, TDenseMatrix );
+        
+        if ( A->is_complex() ) HLIB::BLAS::invert( DA->blas_cmat() );
+        else                   HLIB::BLAS::invert( DA->blas_rmat() );
+    }// if
+    else
+        assert( false );
+
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+}
+
 }// namespace hpx
 
 }// namespace hlr

@@ -58,7 +58,10 @@ local_graph::set_dependencies ()
             if ( n1 != n2 )
             {
                 if ( is_intersecting( n1->in_blocks(), n2->out_blocks() ) )
+                {
+                    HLR_LOG( 4, "    " + n2->to_string() + " → " + n1->to_string() );
                     n1->after( n2 );
+                }// if
             }// if
         }// for
     }// for

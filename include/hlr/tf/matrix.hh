@@ -57,7 +57,7 @@ build_helper ( ::tf::SubflowBuilder &       tf,
     // decide upon cluster type, how to construct matrix
     //
 
-    auto        M     = std::unique_ptr< TMatrix >();
+    auto        M     = std::unique_ptr< HLIB::TMatrix >();
     const auto  rowis = bct->is().row_is();
     const auto  colis = bct->is().col_is();
 
@@ -69,7 +69,7 @@ build_helper ( ::tf::SubflowBuilder &       tf,
     {
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< TMatrix >( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< HLIB::TMatrix >( lrapx.build( bct, acc ) );
         }// if
         else
         {
@@ -78,9 +78,9 @@ build_helper ( ::tf::SubflowBuilder &       tf,
     }// if
     else
     {
-        M = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< HLIB::TBlockMatrix >( bct );
         
-        auto  B = ptrcast( M.get(), TBlockMatrix );
+        auto  B = ptrcast( M.get(), HLIB::TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -126,8 +126,8 @@ build ( const HLIB::TBlockCluster *  bct,
         const lrapx_t &              lrapx,
         const HLIB::TTruncAcc &      acc )
 {
-    ::tf::Taskflow              tf;
-    std::unique_ptr< TMatrix >  res;
+    ::tf::Taskflow                    tf;
+    std::unique_ptr< HLIB::TMatrix >  res;
     
     tf.silent_emplace( [&,bct] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc ); } );
 
@@ -145,15 +145,15 @@ build ( const HLIB::TBlockCluster *  bct,
 namespace detail
 {
 
-std::unique_ptr< TMatrix >
+std::unique_ptr< HLIB::TMatrix >
 copy_helper ( ::tf::SubflowBuilder &  tf,
-              const TMatrix &         M )
+              const HLIB::TMatrix &   M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, TBlockMatrix );
-        auto  N  = std::make_unique< TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), TBlockMatrix );
+        auto  BM = cptrcast( &M, HLIB::TBlockMatrix );
+        auto  N  = std::make_unique< HLIB::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), HLIB::TBlockMatrix );
 
         B->copy_struct_from( BM );
         
@@ -186,11 +186,11 @@ copy_helper ( ::tf::SubflowBuilder &  tf,
 
 }// namespace detail
 
-std::unique_ptr< TMatrix >
-copy ( const TMatrix &  M )
+std::unique_ptr< HLIB::TMatrix >
+copy ( const HLIB::TMatrix &  M )
 {
-    ::tf::Taskflow              tf;
-    std::unique_ptr< TMatrix >  res;
+    ::tf::Taskflow                    tf;
+    std::unique_ptr< HLIB::TMatrix >  res;
     
     tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = detail::copy_helper( sf, M ); } );
 
@@ -210,16 +210,16 @@ namespace detail
 
 void
 copy_to_helper ( ::tf::SubflowBuilder &  tf,
-                 const TMatrix &         A,
-                 TMatrix &               B )
+                 const HLIB::TMatrix &   A,
+                 HLIB::TMatrix &         B )
 {
     assert( A.type()     == B.type() );
     assert( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, TBlockMatrix );
-        auto  BB = ptrcast(  &B, TBlockMatrix );
+        auto  BA = cptrcast( &A, HLIB::TBlockMatrix );
+        auto  BB = ptrcast(  &B, HLIB::TBlockMatrix );
 
         assert( BA->nblock_rows() == BB->nblock_rows() );
         assert( BA->nblock_cols() == BB->nblock_cols() );
@@ -250,8 +250,8 @@ copy_to_helper ( ::tf::SubflowBuilder &  tf,
 }// namespace detail
 
 void
-copy_to ( const TMatrix &  A,
-          TMatrix &        B )
+copy_to ( const HLIB::TMatrix &  A,
+          HLIB::TMatrix &        B )
 {
     ::tf::Taskflow  tf;
     
@@ -270,18 +270,18 @@ copy_to ( const TMatrix &  A,
 namespace detail
 {
 
-std::unique_ptr< TMatrix >
+std::unique_ptr< HLIB::TMatrix >
 realloc_helper ( ::tf::SubflowBuilder &  tf,
-                 TMatrix *               A )
+                 HLIB::TMatrix *         A )
 {
     if ( is_null( A ) )
         return nullptr;
     
     if ( is_blocked( A ) )
     {
-        auto  B  = ptrcast( A, TBlockMatrix );
-        auto  C  = std::make_unique< TBlockMatrix >();
-        auto  BC = ptrcast( C.get(), TBlockMatrix );
+        auto  B  = ptrcast( A, HLIB::TBlockMatrix );
+        auto  C  = std::make_unique< HLIB::TBlockMatrix >();
+        auto  BC = ptrcast( C.get(), HLIB::TBlockMatrix );
 
         C->copy_struct_from( B );
 
@@ -322,11 +322,11 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
 
 }// namespace detail
 
-std::unique_ptr< TMatrix >
-realloc ( TMatrix *  A )
+std::unique_ptr< HLIB::TMatrix >
+realloc ( HLIB::TMatrix *  A )
 {
-    ::tf::Taskflow              tf;
-    std::unique_ptr< TMatrix >  res;
+    ::tf::Taskflow                    tf;
+    std::unique_ptr< HLIB::TMatrix >  res;
     
     tf.silent_emplace( [A,&res] ( auto &  sf ) { res = detail::realloc_helper( sf, A ); } );
 

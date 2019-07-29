@@ -271,7 +271,7 @@ gauss_elim ( HLIB::TMatrix *    A,
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
     
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d ) {", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -328,7 +328,7 @@ gauss_elim ( HLIB::TMatrix *    A,
     else
         assert( false );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "} gauss_elim( %d )", A->id() ) );
 }
 
 }// namespace tbb

@@ -14,6 +14,8 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/seq/matrix.hh"
+// #include "hlr/seq/mat_mul.hh"
 
 namespace hlr
 {
@@ -422,8 +424,8 @@ gauss_elim ( HLIB::TMatrix *    A,
 {
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
-    
-    // HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -434,35 +436,39 @@ gauss_elim ( HLIB::TMatrix *    A,
 
         // A_00 = A_00⁻¹
         hlr::seq::gauss_elim( MA(0,0), MT(0,0), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
+        // hlr::log( 0, HLIB::to_string( "                               %d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
 
         // T_01 = A_00⁻¹ · A_01
         multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc );
-        // hlr::log( 0, HLIB::to_string( "T%d = %.8e", MT(0,1)->id(), HLIB::norm_F( MT(0,1) ) ) );
+        // seq::matrix::clear( *MT(0,1) );
+        // multiply( 1.0, MA(0,0), MA(0,1), MT(0,1), acc );
         
         // T_10 = A_10 · A_00⁻¹
         multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc );
-        // hlr::log( 0, HLIB::to_string( "T%d = %.8e", MT(1,0)->id(), HLIB::norm_F( MT(1,0) ) ) );
+        // seq::matrix::clear( *MT(1,0) );
+        // multiply( 1.0, MA(1,0), MA(0,0), MT(1,0), acc );
 
         // A_11 = A_11 - T_10 · A_01
         multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
+        // multiply( -1.0, MT(1,0), MA(0,1), MA(1,1), acc );
     
         // A_11 = A_11⁻¹
         hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
+        // hlr::log( 0, HLIB::to_string( "                               %d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
 
         // A_01 = - T_01 · A_11
         multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,1)->id(), HLIB::norm_F( MA(0,1) ) ) );
+        // seq::matrix::clear( *MA(0,1) );
+        // multiply( -1.0, MT(0,1), MA(1,1), MA(0,1), acc );
             
         // A_10 = - A_11 · T_10
         multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(1,0)->id(), HLIB::norm_F( MA(1,0) ) ) );
+        // seq::matrix::clear( *MA(1,0) );
+        // multiply( -1.0, MA(1,1), MT(1,0), MA(1,0), acc );
 
         // A_00 = T_00 - A_01 · T_10
         multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
-        // hlr::log( 0, HLIB::to_string( "A%d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
+        // multiply( -1.0, MA(0,1), MT(1,0), MA(0,0), acc );
     }// if
     else if ( is_dense( A ) )
     {

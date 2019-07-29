@@ -324,44 +324,44 @@ gauss_elim ( ::tf::SubflowBuilder &  tf,
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
     
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d ) {", A->id() ) );
     
     if ( is_blocked( A ) )
     {
         auto  BA = ptrcast( A, TBlockMatrix );
         auto  BT = ptrcast( T, TBlockMatrix );
-        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
-        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        auto  inv_a00 = tf.emplace( [&] ( auto &  sf ) { detail::gauss_elim( sf, MA(0,0), MT(0,0), acc ); } );
+        auto  inv_a00 = tf.emplace( [BA,BT,&acc] ( auto &  sf ) { detail::gauss_elim( sf, BA->block(0,0), BT->block(0,0), acc ); } );
 
         // T_01 = A_00⁻¹ · A_01
-        auto  upd_t01 = tf.emplace( [&] () { multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
+        auto  upd_t01 = tf.emplace( [BA,BT,&acc] () { multiply( 1.0, apply_normal, BA->block(0,0), apply_normal, BA->block(0,1), 0.0, BT->block(0,1), acc ); } );
         inv_a00.precede( upd_t01 );
         
         // T_10 = A_10 · A_00⁻¹
-        auto  upd_t10 = tf.emplace( [&] () { multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
+        auto  upd_t10 = tf.emplace( [BA,BT,&acc] () { multiply( 1.0, apply_normal, BA->block(1,0), apply_normal, BA->block(0,0), 0.0, BT->block(1,0), acc ); } );
         inv_a00.precede( upd_t10 );
 
         // A_11 = A_11 - T_10 · A_01
-        auto  upd_a11 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc ); } );
+        auto  upd_a11 = tf.emplace( [BA,BT,&acc] () { multiply( -1.0, apply_normal, BT->block(1,0), apply_normal, BA->block(0,1), 1.0, BA->block(1,1), acc ); } );
         upd_t10.precede( upd_a11 );
     
         // A_11 = A_11⁻¹
-        auto  inv_a11 = tf.emplace( [&] ( auto &  sf ) { detail::gauss_elim( sf, MA(1,1), MT(1,1), acc ); } );
+        auto  inv_a11 = tf.emplace( [BA,BT,&acc] ( auto &  sf ) { detail::gauss_elim( sf, BA->block(1,1), BT->block(1,1), acc ); } );
         upd_a11.precede( inv_a11 );
 
         // A_01 = - T_01 · A_11
-        auto  upd_a01 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
+        auto  upd_a01 = tf.emplace( [BA,BT,&acc] () { multiply( -1.0, apply_normal, BT->block(0,1), apply_normal, BA->block(1,1), 0.0, BA->block(0,1), acc ); } );
+        upd_t01.precede( upd_a01 );
         inv_a11.precede( upd_a01 );
             
         // A_10 = - A_11 · T_10
-        auto  upd_a10 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
+        auto  upd_a10 = tf.emplace( [BA,BT,&acc] () { multiply( -1.0, apply_normal, BA->block(1,1), apply_normal, BT->block(1,0), 0.0, BA->block(1,0), acc ); } );
+        upd_t10.precede( upd_a10 );
         inv_a11.precede( upd_a10 );
 
         // A_00 = T_00 - A_01 · T_10
-        auto  upd_a00 = tf.emplace( [&] () { multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc ); } );
+        auto  upd_a00 = tf.emplace( [BA,BT,&acc] () { multiply( -1.0, apply_normal, BA->block(0,1), apply_normal, BT->block(1,0), 1.0, BA->block(0,0), acc ); } );
         upd_t10.precede( upd_a00 );
         upd_a01.precede( upd_a00 );
     }// if
@@ -375,7 +375,7 @@ gauss_elim ( ::tf::SubflowBuilder &  tf,
     else
         assert( false );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "} gauss_elim( %d )", A->id() ) );
 }
 
 }// namespace detail
@@ -386,7 +386,7 @@ gauss_elim ( HLIB::TMatrix *    A,
              const TTruncAcc &  acc )
 {
     ::tf::Taskflow  tf;
-    
+
     tf.silent_emplace( [A,T,&acc] ( auto &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
 
     ::tf::Executor  executor;

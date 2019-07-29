@@ -134,9 +134,11 @@ mymain ( int, char ** )
     for ( int  i = 0; i < 1; ++i ) // nbench
     {
         tic = Time::Wall::now();
-        
-        // impl::dag::run( dag, acc );
-        impl::gauss_elim( C.get(), T.get(), acc );
+
+        if ( HLIB::CFG::Arith::use_dag )
+            impl::dag::run( dag, acc );
+        else
+            impl::gauss_elim( C.get(), T.get(), acc );
         
         toc = Time::Wall::since( tic );
 
@@ -158,6 +160,5 @@ mymain ( int, char ** )
     std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
     std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), C.get() ) << term::reset << std::endl;
 
-    DBG::write( A.get(), "A.mat", "A" );
-    DBG::write( C.get(), "C.mat", "C" );
+    // DBG::write( C.get(), "C.mat", "C" );
 }
