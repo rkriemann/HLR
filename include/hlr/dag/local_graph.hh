@@ -53,8 +53,11 @@ public:
     // in/out data blocks of nodes
     void  set_dependencies ();
 
+    // return finish status of graph
+    bool  is_finalized () const { return _finished; }
+    
     // signal finished graph
-    void  finalize () { _finished = true; }
+    void  finalize     ()       { _finished = true; }
     
     // output graph
     void  print () const;

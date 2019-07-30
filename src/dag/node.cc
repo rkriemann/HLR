@@ -25,14 +25,17 @@ namespace dag
 
 using namespace HLIB;
 
-// controls edge sparsification
-constexpr bool         sparsify     = true;
+// enable edge sparsification after edge refinement
+constexpr bool         sparsify       = true;
+
+// enable edge sparsification after node refinement (within local_graph)
+constexpr bool         local_sparsify = true;
 
 // default maximal path distance in reachability test
-constexpr int          def_path_len = 2;
+constexpr int          def_path_len   = 2;
     
 // activates collision counting
-constexpr bool         count_coll   = false;
+constexpr bool         count_coll     = false;
 
 // counter for lock collisions
 std::atomic< size_t >  collisions;
@@ -48,6 +51,9 @@ constexpr char         indent[] = "    ";
 // auxiliary functions
 //
 //////////////////////////////////////////////
+
+namespace
+{
 
 inline
 void
@@ -65,100 +71,6 @@ insert ( node *                n,
     s.insert( n );
 }
 
-//////////////////////////////////////////////
-//
-// node
-//
-//////////////////////////////////////////////
-
-//
-// per node initialization
-//
-void
-node::init ()
-{
-    _in_blk_deps  = in_blocks_();
-    _out_blk_deps = out_blocks_();
-
-    HLR_LOG( 5, indent + to_string() );
-}
-    
-//
-// handles execution of node code and spawning of successor nodes
-//
-void
-node::run ( const TTruncAcc & acc )
-{
-    HLR_LOG( 4, term::bold( term::green( "run( " ) ) + term::bold( this->to_string() ) + term::bold( term::green( " )" ) ) );
-    
-    run_( acc );
-    reset_dep_cnt();
-}
-
-//
-// split node into subnodes and update dependencies
-// if retval is empty, no refinement was done
-//
-void
-node::refine ( const size_t  min_size )
-{
-    HLR_LOG( 5, term::cyan( term::bold( "refine" ) ) + "( " + to_string() + " )" );
-
-    //
-    // create subnodes
-    //
-
-    auto  g = refine_( min_size );
-
-    g.set_dependencies();
-
-    // g.print_dot( "g.dot" );
-        
-    //
-    // copy nodes to local array
-    //
-
-    _sub_nodes = std::move( g );
-}
-
-//
-// finalize node data (if internal data will not change)
-//
-void
-node::finalize ()
-{
-    _ndeps = _dep_cnt;
-    
-    _in_blk_deps.resize( 0 );
-    _out_blk_deps.resize( 0 );
-}
-
-//
-// print node with full edge information
-//
-void
-node::print () const
-{
-    std::cout << to_string() << std::endl;
-
-    std::cout << "   in blks  : " << std::endl;
-    for ( auto  b : in_blocks() )
-        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
-    
-    std::cout << "   out blks : " << std::endl;
-    for ( auto  b : out_blocks() )
-        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
-    
-    std::cout << "   #deps    : " << _dep_cnt << std::endl;
-
-    std::cout << "   succ     : " << successors().size() << std::endl;
-    for ( auto  succ : successors() )
-        std::cout << "       " << succ->to_string() << std::endl;
-}
-
-namespace
-{
-
 //
 // return set of nodes reachable by <steps> steps
 // - if <neighbourhood> is non-empty, search is restricted to nodes
@@ -169,7 +81,7 @@ reachable_indirect ( node *              root,
                      const node_set_t &  neighbourhood = {},
                      const uint          steps         = def_path_len )
 {
-    const bool            no_neigh = ( neighbourhood.size() == 0 );
+    const bool            no_neigh = ( neighbourhood.empty() );
     std::deque< node * >  nodes;
     node_set_t            descendants;
     uint                  step  = 1;
@@ -203,15 +115,52 @@ reachable_indirect ( node *              root,
     return descendants;
 }
 
+node_set_t
+reachable_indirect ( node *      root,
+                     const uint  steps = def_path_len )
+{
+    std::deque< node * >  nodes;
+    node_set_t            descendants;
+    uint                  step  = 1;
+
+    nodes.push_back( root );
+
+    while ( ! nodes.empty() )
+    {
+        std::deque< node * >  sons;
+
+        for ( auto  node : nodes )
+        {
+            for ( auto  out : node->successors() )
+            {
+                sons.push_back( out );
+                
+                if ( step > 1 )
+                    insert( out, descendants );
+            }// for
+        }// for
+
+        nodes = std::move( sons );
+
+        if ( ++step > steps )
+            break;
+    }// while
+
+    return descendants;
+}
+
 //
 // compute reachable nodes from <n> in <neighbourhood> and
 // remove edges (n,m) if m is reachable otherwise
 //
 node_vec_t
 remove_redundant ( node *              n,
-                   const node_set_t &  neighbourhood )
+                   const node_set_t &  neighbourhood,
+                   const uint          steps = def_path_len )
 {
-    auto        descendants = reachable_indirect( n, neighbourhood );
+    auto        descendants = ( neighbourhood.empty()
+                                ? reachable_indirect( n, steps )
+                                : reachable_indirect( n, neighbourhood, steps ) );
     node_vec_t  new_out;
 
     new_out.reserve( n->successors().size() );
@@ -361,6 +310,108 @@ refine_sub_deps ( node *  node )
 }
 
 }// namespace anonymous
+
+//////////////////////////////////////////////
+//
+// node
+//
+//////////////////////////////////////////////
+
+//
+// per node initialization
+//
+void
+node::init ()
+{
+    _in_blk_deps  = in_blocks_();
+    _out_blk_deps = out_blocks_();
+
+    HLR_LOG( 5, indent + to_string() );
+}
+    
+//
+// handles execution of node code and spawning of successor nodes
+//
+void
+node::run ( const TTruncAcc & acc )
+{
+    HLR_LOG( 4, term::bold( term::green( "run( " ) ) + term::bold( this->to_string() ) + term::bold( term::green( " )" ) ) );
+    
+    run_( acc );
+    reset_dep_cnt();
+}
+
+//
+// split node into subnodes and update dependencies
+// if retval is empty, no refinement was done
+//
+void
+node::refine ( const size_t  min_size )
+{
+    HLR_LOG( 5, term::cyan( term::bold( "refine" ) ) + "( " + to_string() + " )" );
+
+    //
+    // create subnodes
+    //
+
+    auto  g = refine_( min_size );
+
+    //
+    // set dependencies in sub graph and sparsify edges
+    //
+
+    if ( ! g.is_finalized() )
+    {
+        g.set_dependencies();
+
+        if ( sparsify && local_sparsify )
+        {
+            for ( auto  sub : g )
+                sub->successors() = remove_redundant( sub, {}, g.size()-1 );
+        }// if
+    }// if
+        
+    //
+    // copy nodes to local array
+    //
+
+    _sub_nodes = std::move( g );
+}
+
+//
+// finalize node data (if internal data will not change)
+//
+void
+node::finalize ()
+{
+    _ndeps = _dep_cnt;
+    
+    _in_blk_deps.resize( 0 );
+    _out_blk_deps.resize( 0 );
+}
+
+//
+// print node with full edge information
+//
+void
+node::print () const
+{
+    std::cout << to_string() << std::endl;
+
+    std::cout << "   in blks  : " << std::endl;
+    for ( auto  b : in_blocks() )
+        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
+    
+    std::cout << "   out blks : " << std::endl;
+    for ( auto  b : out_blocks() )
+        std::cout << "       " << b.id << " " << b.is.to_string() << std::endl;
+    
+    std::cout << "   #deps    : " << _dep_cnt << std::endl;
+
+    std::cout << "   succ     : " << successors().size() << std::endl;
+    for ( auto  succ : successors() )
+        std::cout << "       " << succ->to_string() << std::endl;
+}
 
 //
 // refine dependencies of local node or of sub nodes

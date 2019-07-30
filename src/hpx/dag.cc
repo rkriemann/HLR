@@ -16,6 +16,8 @@
 #include <hpx/util/unwrap.hpp>
 #include <hpx/include/parallel_for_each.hpp>
 
+#include <boost/range/irange.hpp>
+
 #include "hlr/utils/tools.hh"
 #include "hlr/utils/log.hh"
 
@@ -44,67 +46,185 @@ refine ( node *        root,
 {
     assert( root != nullptr );
     
-    std::deque< node * >  nodes{ root };
-    std::list< node * >   tasks, start, end;
-    std::mutex            mtx;
-
-    while ( ! nodes.empty() )
+    std::deque< std::deque< node * > >  node_sets{ { root } };
+    std::list< node * >                 tasks;
+    std::mutex                          mtx;
+    std::list< node * >                 end;
+    
+    while ( node_sets.size() > 0 )
     {
-        std::deque< node * >  subnodes, del_nodes;
+        std::vector< std::deque< node * > >  subnodes( node_sets.size() );
+        std::vector< std::deque< node * > >  delnodes( node_sets.size() );
+        std::atomic< bool >                  any_changed = false;
 
         // first refine nodes
         ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                   nodes.begin(), nodes.end(),
-                                   [=] ( node * node )
+                                   node_sets.begin(), node_sets.end(),
+                                   [&,min_size] ( const auto &  nset )
                                    {
-                                       node->refine( min_size );
+                                       bool          any_chg_loc = false;
+                                       
+                                       for ( auto  node : nset )
+                                       {
+                                           node->refine( min_size );
+                                           
+                                           if ( node->is_refined() )
+                                               any_chg_loc = true;
+                                       }// for
+                                       
+                                       if ( any_chg_loc )
+                                           any_changed = true;
                                    } );
 
-        // then refine dependencies and collect new nodes
-        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                   nodes.begin(), nodes.end(),
-                                   [&] ( node * node )
-                                   {
-                                       const bool  node_changed = node->refine_deps( true );
-
-                                       if ( node->is_refined() )       // node was refined; collect all sub nodes
+        if ( any_changed )
+        {
+            auto  set_range = boost::irange( size_t(0), node_sets.size() );
+            
+            // then refine dependencies and collect new nodes
+            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
+                                       set_range.begin(), set_range.end(),
+                                       [&] ( const auto  i )
                                        {
-                                           std::scoped_lock  lock( mtx );
-                    
-                                           for ( auto  sub : node->sub_nodes() )
-                                               subnodes.push_back( sub );
-                    
-                                           del_nodes.push_back( node );
-                                       }// if
-                                       else if ( node_changed )        // node was not refined but dependencies were
-                                       {
-                                           std::scoped_lock  lock( mtx );
-                    
-                                           subnodes.push_back( node );
-                                       }// if
-                                       else                            // neither node nor dependencies changed: reached final state
-                                       {
-                                           // adjust dependency counter of successors (which were NOT refined!)
-                                           for ( auto  succ : node->successors() )
-                                               succ->inc_dep_cnt();
+                                           const auto &  nset = node_sets[i];
+                                     
+                                           for ( auto  node : nset )
+                                           {
+                                               const bool  node_changed = node->refine_deps( true );
 
-                                           std::scoped_lock  lock( mtx );
+                                               if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                               {
+                                                   for ( auto  sub : node->sub_nodes() )
+                                                       subnodes[i].push_back( sub );
                     
-                                           tasks.push_back( node );
-                                       }// else
-                                   } );
+                                                   delnodes[i].push_back( node );
+                                               }// if
+                                               else if ( node_changed )        // node was not refined but dependencies were
+                                               {
+                                                   subnodes[i].push_back( node );
+                                               }// if
+                                               else                            // neither node nor dependencies changed: reached final state
+                                               {
+                                                   // adjust dependency counter of successors (which were NOT refined!)
+                                                   for ( auto  succ : node->successors() )
+                                                       succ->inc_dep_cnt();
 
-        // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                   del_nodes.begin(), del_nodes.end(),
-                                   [] ( node * node ) { delete node; } );
+                                                   {
+                                                       std::scoped_lock  lock( mtx );
+                    
+                                                       tasks.push_back( node );
+
+                                                       if ( node->successors().empty() )
+                                                           end.push_back( node );
+                                                   }
+                                               }// else
+                                           }// for
+                                       } );
+
+            // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
+            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
+                                       delnodes.begin(), delnodes.end(),
+                                       [&] ( const auto &  nset )
+                                       {
+                                           for ( auto  node : nset )
+                                               delete node;
+                                       } );
+            
+            //
+            // split node sets if too large (increase parallelity)
+            //
+
+            std::deque< std::deque< node * > >  new_sets;
+
+            constexpr size_t  max_size = 1000;
+
+            for ( size_t  i = 0; i < subnodes.size(); ++i )
+            {
+                const auto  snsize = subnodes[i].size();
+            
+                if ( snsize >= max_size )
+                {
+                    //
+                    // split into chunks of size <max_size>
+                    //
+                
+                    size_t  pos = 0;
+
+                    while ( pos < snsize )
+                    {
+                        std::deque< node * >  sset;
+                        size_t                nsset = 0;
+
+                        for ( ; ( nsset < max_size ) && ( pos < snsize ); ++nsset )
+                            sset.push_back( subnodes[i][pos++] );
+
+                        // put rest into last set if not much left
+                        if ( snsize - pos < max_size / 2 )
+                        {
+                            while ( pos < snsize )
+                                sset.push_back( subnodes[i][pos++] );
+                        }// if
+
+                        new_sets.push_back( std::move( sset ) );
+                    }// while
+                }// if
+                else if (( snsize > 0 ) && ( snsize < max_size / 10 ))
+                {
+                    //
+                    // merge with next non-empty set
+                    //
+                
+                    std::deque< node * >  mset = std::move( subnodes[i] );
+
+                    size_t  j = i+1;
+                
+                    while (( j < subnodes.size() ) && ( subnodes[j].size() == 0 ))
+                        ++j;
+
+                    if ( j < subnodes.size() )
+                    {
+                        for ( auto  n : subnodes[j] )
+                            mset.push_back( n );
+                    }// if
+                
+                    new_sets.push_back( std::move( mset ) );
+                    i = j;
+                }// if
+                else if ( snsize > 0 )
+                {
+                    // log( 0, HLIB::to_string( "copying %d", nset.size() ) );
+                    new_sets.push_back( std::move( subnodes[i] ) );
+                }// if
+            }// for
         
-        nodes = std::move( subnodes );
+            node_sets = std::move( new_sets );
+        }// if
+        else
+        {
+            std::for_each( node_sets.begin(), node_sets.end(),
+                           [&] ( std::deque< node * > &  nset )
+                           {
+                               for ( auto  node : nset )
+                               {
+                                   tasks.push_back( node );
+
+                                   // adjust dependency counter of successors (which were NOT refined!)
+                                   for ( auto  succ : node->successors() )
+                                       succ->inc_dep_cnt();
+
+                                   if ( node->successors().empty() )
+                                       end.push_back( node );
+                               }// for
+                           } );
+
+            node_sets.clear();
+        }// else
     }// while
 
     //
-    // collect start and end nodes
+    // collect start nodes
     //
+    
+    std::list< node * >   start;
     
     std::for_each( tasks.begin(), tasks.end(),
                    [&] ( node * node )
@@ -113,12 +233,9 @@ refine ( node *        root,
                        
                        if ( node->dep_cnt() == 0 )
                            start.push_back( node );
-                       
-                       if ( node->successors().empty() )
-                           end.push_back( node );
                    } );
 
-    return graph( tasks, start, end, hlr::dag::use_single_end_node );
+    return graph( std::move( tasks ), std::move( start ), std::move( end ), hlr::dag::use_single_end_node );
 }
 
 namespace
