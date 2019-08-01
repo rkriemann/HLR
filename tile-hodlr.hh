@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : hodlr.hh
-// Description : generic code for HODLR LU
+// File        : tile-hodlr.hh
+// Description : geeric code for tile-based HODLR LU
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -54,7 +54,7 @@ mymain ( int, char ** )
         
         tic = Time::Wall::now();
         
-        impl::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        impl::tile::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ), ntile );
         
         toc = Time::Wall::since( tic );
         

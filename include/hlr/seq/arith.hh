@@ -17,13 +17,11 @@
 #include "hlr/seq/matrix.hh"
 // #include "hlr/seq/mat_mul.hh"
 
-namespace hlr
-{
+#include "hlr/seq/arith_tile.hh"
+
+namespace hlr { namespace seq {
 
 using namespace HLIB;
-
-namespace seq
-{
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -173,8 +171,8 @@ template < typename value_t >
 void
 addlr ( BLAS::Matrix< value_t > &  U,
         BLAS::Matrix< value_t > &  V,
-        TMatrix *               A,
-        const TTruncAcc &       acc )
+        TMatrix *                  A,
+        const TTruncAcc &          acc )
 {
     HLR_LOG( 4, HLIB::to_string( "addlr( %d )", A->id() ) );
     
@@ -483,8 +481,6 @@ gauss_elim ( HLIB::TMatrix *    A,
     HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
 }
 
-}// namespace seq
-
-}// namespace hlr
+}}// namespace hlr::seq
 
 #endif // __HLR_SEQ_ARITH_HH

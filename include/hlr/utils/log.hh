@@ -52,7 +52,7 @@ log ( const int      lvl,
 #ifdef NDEBUG
 #  define HLR_LOG( lvl, msg ) 
 #else
-#  define HLR_LOG( lvl, msg ) hlr::log( lvl, msg )
+#  define HLR_LOG( lvl, msg ) hlr::log( lvl, __FILE__ + std::string( " / " ) + __func__ + std::string( " : " ) + msg )
 #endif
 
 }// namespace hlr
