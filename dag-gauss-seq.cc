@@ -13,7 +13,7 @@
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "gauss.hh"
+#include "dag-gauss.hh"
 
 int
 main ( int argc, char ** argv )

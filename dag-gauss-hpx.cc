@@ -15,7 +15,7 @@
 namespace          impl      = hlr::hpx;
 const std::string  impl_name = "hpx";
 
-#include "gauss.hh"
+#include "dag-gauss.hh"
 
 int
 hpx_main ( int argc, char ** argv )

@@ -14,7 +14,7 @@
 namespace          impl      = hlr::hpx;
 const std::string  impl_name = "hpx";
 
-#include "dag.hh"
+#include "dag-lu.hh"
 
 int
 hpx_main ( int argc, char ** argv )

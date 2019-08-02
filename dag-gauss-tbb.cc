@@ -13,7 +13,7 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-#include "gauss.hh"
+#include "dag-gauss.hh"
 
 int
 main ( int argc, char ** argv )

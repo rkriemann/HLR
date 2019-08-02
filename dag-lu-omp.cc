@@ -12,7 +12,7 @@
 namespace          impl      = hlr::omp;
 const std::string  impl_name = "omp";
 
-#include "dag.hh"
+#include "dag-lu.hh"
 
 int
 main ( int argc, char ** argv )

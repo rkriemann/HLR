@@ -13,7 +13,7 @@
 namespace          impl      = hlr::omp;
 const std::string  impl_name = "omp";
 
-#include "gauss.hh"
+#include "dag-gauss.hh"
 
 int
 main ( int argc, char ** argv )

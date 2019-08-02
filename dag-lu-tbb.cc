@@ -12,7 +12,7 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-#include "dag.hh"
+#include "dag-lu.hh"
 
 int
 main ( int argc, char ** argv )

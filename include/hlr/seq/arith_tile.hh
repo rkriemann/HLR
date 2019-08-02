@@ -44,6 +44,7 @@ template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRk
 //
 // split given range into <n> subsets
 //
+inline
 std::vector< BLAS::Range >
 split ( const BLAS::Range &  r,
         const size_t         n )

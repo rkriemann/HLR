@@ -12,7 +12,7 @@
 namespace          impl      = hlr::tf;
 const std::string  impl_name = "tf";
 
-#include "dag.hh"
+#include "dag-lu.hh"
 
 int
 main ( int argc, char ** argv )

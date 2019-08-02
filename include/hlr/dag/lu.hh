@@ -70,6 +70,13 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
                        HLIB::TMatrix *        C,
                        refine_func_t          refine );
 
+//
+// return DAG for tile-based LU of HODLR format
+//
+graph
+gen_dag_lu_hodlr_tile ( HLIB::TMatrix *  A,
+                        refine_func_t    refine );
+
 }// namespace dag
 
 }// namespace hlr

@@ -12,7 +12,7 @@
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "dag.hh"
+#include "dag-lu.hh"
 
 int
 main ( int argc, char ** argv )

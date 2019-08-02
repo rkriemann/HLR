@@ -22,13 +22,9 @@
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/dag/lu.hh"
 
-namespace hlr
-{
+namespace hlr { namespace dag {
 
 using namespace HLIB;
-
-namespace dag
-{
 
 namespace
 {

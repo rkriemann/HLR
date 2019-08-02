@@ -13,7 +13,7 @@
 namespace          impl      = hlr::tf;
 const std::string  impl_name = "tf";
 
-#include "gauss.hh"
+#include "dag-gauss.hh"
 
 int
 main ( int argc, char ** argv )
