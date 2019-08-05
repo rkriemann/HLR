@@ -280,8 +280,8 @@ mymain ( int, char ** )
                       << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                       << std::endl;
                 
-        DBG::write( & v,    "x.mat", "x" );
-        DBG::write( & xref, "y.mat", "y" );
+        // DBG::write( & v,    "x.mat", "x" );
+        // DBG::write( & xref, "y.mat", "y" );
 
         v.axpy( -1, & xref );
         std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;

@@ -10,6 +10,7 @@
 #include <deque>
 #include <unordered_set>
 #include <cassert>
+#include <map>
 
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tools.hh"
@@ -144,9 +145,16 @@ graph::print_dot ( const std::string &  filename ) const
         << "  node [ shape = box, style = \"filled,rounded\", fontsize = 20, fontname = \"Noto Sans\", height = 1.5, width = 4, fixedsize = true ];" << std::endl
         << "  edge [ arrowhead = open, color = \"#babdb6\" ];" << std::endl;
 
+    std::map< node *, HLIB::id_t >  node_ids;
+    HLIB::id_t                      id = 0;
+    
     for ( auto node : _nodes )
     {
-        out << size_t(node) << "[ label = \"" << node->to_string() << "\", ";
+        node_ids[ node ] = id;
+        
+        out << "  " << id << " [ label = \"" << node->to_string() << "\", ";
+
+        ++id;
         
         if ( node->successors().empty()  )
             out << "shape = parallelogram, ";
@@ -165,12 +173,12 @@ graph::print_dot ( const std::string &  filename ) const
 
         if ( succ != node->successors().end() )
         {
-            out << size_t(node) << " -> {";
+            out << "  " << node_ids[node] << " -> {";
 
-            out << size_t(*succ);
+            out << node_ids[*succ];
         
             while ( ++succ != node->successors().end() )
-                out << ";" << size_t(*succ);
+                out << ";" << node_ids[*succ];
             
             out << "};" << std::endl;
         }// if

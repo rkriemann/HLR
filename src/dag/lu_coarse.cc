@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : lu.cc
-// Description : generate DAG for LU factorization
+// File        : lu_coarse.cc
+// Description : generate coarse DAG for LU factorization
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

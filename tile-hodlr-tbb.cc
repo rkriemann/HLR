@@ -1,7 +1,7 @@
 //
 // Project     : HLib
-// File        : hodlr-seq.cc
-// Description : sequential tile-based HODLR arithmetic
+// File        : hodlr-tbb.cc
+// Description : tile-based HODLR-LU using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

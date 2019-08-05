@@ -25,14 +25,14 @@ using namespace HLIB;
 namespace hodlr
 {
 
-template < typename value_t > BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
 
 template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
 template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
 
-template < typename value_t > BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
 
 template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
 template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }

@@ -249,11 +249,12 @@ common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
                                         'src/cluster/hodlr.cc',
                                         'src/cluster/tileh.cc',
                                         'src/cluster/tlr.cc',
-                                        'src/dag/coarselu.cc',
                                         'src/dag/gauss_elim.cc',
                                         'src/dag/graph.cc',
                                         'src/dag/local_graph.cc',
                                         'src/dag/lu.cc',
+                                        'src/dag/lu_coarse.cc',
+                                        'src/dag/lu_lvl.cc',
                                         'src/dag/node.cc',
                                         'src/dag/solve.cc',
                                         'src/matrix/level_matrix.cc',
@@ -306,7 +307,7 @@ if 'tbb' in frameworks :
 
     if 'tlr'        in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
     if 'hodlr'      in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
-    if 'tile-hodlr' in programs : Default( seq.Program( 'tile-hodlr-tbb.cc' ) )
+    if 'tile-hodlr' in programs : Default( tbb.Program( 'tile-hodlr-tbb.cc' ) )
     if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
     if 'dag-lu'     in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
     if 'dag-gauss'  in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
@@ -322,6 +323,7 @@ if 'tf' in frameworks :
     
     if 'tlr'        in programs : Default( tf.Program( 'tlr-tf.cc' ) )
     if 'hodlr'      in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
+    if 'tile-hodlr' in programs : Default( tf.Program( 'tile-hodlr-tf.cc' ) )
     if 'dag-lu'     in programs : Default( tf.Program( 'dag-lu-tf',    [ 'dag-lu-tf.cc',    'src/tf/dag.cc' ] ) )
     if 'dag-gauss'  in programs : Default( tf.Program( 'dag-gauss-tf', [ 'dag-gauss-tf.cc', 'src/tf/dag.cc' ] ) )
 
