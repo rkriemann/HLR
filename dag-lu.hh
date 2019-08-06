@@ -18,12 +18,6 @@
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
 
-namespace hlr { namespace dag {
-
-extern std::atomic< size_t >  collisions;
-
-} }// namespace hlr::dag
-
 //
 // main function
 //
@@ -92,6 +86,12 @@ mymain ( int, char ** )
               << ", " << acc.to_string()
               << std::endl;
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // compute DAG
+    //
+    //////////////////////////////////////////////////////////////////////
+    
     hlr::dag::graph  dag;
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
@@ -101,6 +101,34 @@ mymain ( int, char ** )
     if ( levelwise )
         C->set_hierarchy_data();
 
+    //
+    // set up DAG generation options optimised for different DAGs
+    //
+
+    if ( levelwise )
+    {
+        // different algorithm; no options evaluated
+    }// if
+    else if ( coarse > 0 )
+    {
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+        hlr::dag::def_path_len  = 2;
+    }// if
+    else if ( oop_lu )
+    {
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+        hlr::dag::def_path_len  = 10;
+    }// if
+    else 
+    {
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+        hlr::dag::def_path_len  = 2;
+    }// if
+
+    //
+    // benchmark DAG generation
+    //
+    
     double  tmin = 0;
     double  tmax = 0;
     double  tsum = 0;

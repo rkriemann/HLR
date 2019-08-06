@@ -205,12 +205,12 @@ lu_node::refine_ ( const size_t  min_size )
         auto        BA  = ptrcast( A, TBlockMatrix );
         auto        BL  = ptrcast( L, TBlockMatrix );
         auto        BU  = ptrcast( U, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
 
-        assert( nbr = BL->block_rows() );
-        assert( nbc = BU->block_cols() );
-        assert( BL->block_cols() = BU->block_rows() );
+        assert( nbr == BL->nblock_rows() );
+        assert( nbc == BU->nblock_cols() );
+        assert( BL->nblock_cols() == BU->nblock_rows() );
         
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
@@ -274,67 +274,6 @@ lu_node::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// solve_lower_node
-//
-///////////////////////////////////////////////////////////////////////////////////////
-
-local_graph
-solve_lower_node::refine_ ( const size_t  min_size )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, L, X ) && ! hlr::is_small_any( min_size, A, L, X ) )
-    {
-        auto        BL  = cptrcast( L, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        auto        BX  = ptrcast( X, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
-
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            const auto  L_ii = BL->block( i, i );
-        
-            assert( ! is_null( L_ii ) );
-
-            for ( uint j = 0; j < nbc; ++j )
-                if ( ! is_null( BA->block( i, j ) ) )
-                    hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ), BX->block( i, j ), apply_nodes );
-
-            for ( uint  k = i+1; k < nbr; ++k )
-                for ( uint  j = 0; j < nbc; ++j )
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        hlr::dag::alloc_node< update_node >( g,
-                                                             BL->block( k, i ), ID_L,
-                                                             BA->block( i, j ), ID_U,
-                                                             BA->block( k, j ), ID_A,
-                                                             apply_nodes );
-        }// for
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    return g;
-}
-
-void
-solve_lower_node::run_ ( const TTruncAcc &  acc )
-{
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
-
-    A->copy_to( X );
-    solve_lower_left( apply_normal, L, X, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-//
 // solve_upper_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -349,8 +288,8 @@ solve_upper_node::refine_ ( const size_t  min_size )
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
         auto        BX  = ptrcast( X, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
 
         for ( uint j = 0; j < nbc; ++j )
         {
@@ -396,6 +335,67 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
+// solve_lower_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+solve_lower_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_blocked_all( A, L, X ) && ! hlr::is_small_any( min_size, A, L, X ) )
+    {
+        auto        BL  = cptrcast( L, TBlockMatrix );
+        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BX  = ptrcast( X, TBlockMatrix );
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
+
+        for ( uint i = 0; i < nbr; ++i )
+        {
+            const auto  L_ii = BL->block( i, i );
+        
+            assert( ! is_null( L_ii ) );
+
+            for ( uint j = 0; j < nbc; ++j )
+                if ( ! is_null( BA->block( i, j ) ) )
+                    hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ), BX->block( i, j ), apply_nodes );
+
+            for ( uint  k = i+1; k < nbr; ++k )
+                for ( uint  j = 0; j < nbc; ++j )
+                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
+                        hlr::dag::alloc_node< update_node >( g,
+                                                             BL->block( k, i ), ID_L,
+                                                             BA->block( i, j ), ID_U,
+                                                             BA->block( k, j ), ID_A,
+                                                             apply_nodes );
+        }// for
+    }// if
+    else if ( CFG::Arith::use_accu )
+    {
+        auto  apply = apply_nodes[ A->id() ];
+        
+        assert( apply != nullptr );
+
+        apply->before( this );
+    }// if
+
+    return g;
+}
+
+void
+solve_lower_node::run_ ( const TTruncAcc &  acc )
+{
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+
+    A->copy_to( X );
+    solve_lower_left( apply_normal, L, X, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
 // update_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -415,14 +415,14 @@ update_node::refine_ ( const size_t  min_size )
         auto  BB = cptrcast( B, TBlockMatrix );
         auto  BC = ptrcast(  C, TBlockMatrix );
 
-        for ( uint  i = 0; i < BC->block_rows(); ++i )
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
-            for ( uint  j = 0; j < BC->block_cols(); ++j )
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
                 if ( is_null( BC->block( i, j ) ) )
                     continue;
                 
-                for ( uint  k = 0; k < BA->block_cols(); ++k )
+                for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
                         hlr::dag::alloc_node< update_node >( g,

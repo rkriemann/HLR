@@ -26,25 +26,22 @@ namespace dag
 using namespace HLIB;
 
 // enable edge sparsification after edge refinement
-constexpr bool         sparsify       = true;
-
-// enable edge sparsification after node refinement (within local_graph)
-constexpr bool         local_sparsify = false;
+sparsify_mode_t        sparsify_mode  = sparsify_all;
 
 // default maximal path distance in reachability test
-constexpr int          def_path_len   = 2;
+int                    def_path_len   = 10;
     
 // activates collision counting
-constexpr bool         count_coll     = false;
+bool                   count_coll     = false;
 
 // counter for lock collisions
 std::atomic< size_t >  collisions;
 
+// indentation offset
+constexpr char         indent[]       = "    ";
+
 // type for a node set
 using  node_set_t = std::vector< node * >;
-
-// indentation offset
-constexpr char         indent[] = "    ";
 
 //////////////////////////////////////////////
 //
@@ -55,21 +52,14 @@ constexpr char         indent[] = "    ";
 namespace
 {
 
-inline
-void
-insert ( node *                   n,
-         std::vector< node * > &  v )
-{
-    v.push_back( n );
-}
+//
+// wrappers to permit switch between std::vector and std::set
+//
+inline void insert  ( std::vector< node * > &  v, node *  n ) { v.push_back( n ); }
+inline void insert  ( std::set< node * > &     s, node *  n ) { s.insert( n ); }
 
-inline
-void
-insert ( node *                n,
-         std::set< node * > &  s )
-{
-    s.insert( n );
-}
+inline void reserve ( std::vector< node * > &  v, const size_t  n ) { v.reserve( n ); }
+inline void reserve ( std::set< node * > &,       const size_t    ) {}
 
 //
 // return set of nodes reachable by <steps> steps
@@ -84,7 +74,8 @@ reachable_indirect ( node *              root,
     const bool            no_neigh = ( neighbourhood.empty() );
     std::deque< node * >  nodes;
     node_set_t            descendants;
-    uint                  step  = 1;
+    uint                  step      = 1;
+    const uint            max_steps = ( no_neigh ? steps : std::min< uint >( steps, neighbourhood.size() - 1 ) );
 
     nodes.push_back( root );
 
@@ -92,57 +83,39 @@ reachable_indirect ( node *              root,
     {
         std::deque< node * >  sons;
 
-        for ( auto  node : nodes )
+        if ( no_neigh )
         {
-            for ( auto  out : node->successors() )
+            for ( auto  node : nodes )
             {
-                if ( no_neigh || contains( neighbourhood, out ) )
+                for ( auto  out : node->successors() )
                 {
                     sons.push_back( out );
-
+                        
                     if ( step > 1 )
-                        insert( out, descendants );
-                }// if
-            }// for
-        }// for
-
-        nodes = std::move( sons );
-
-        if ( ++step > steps )
-            break;
-    }// while
-
-    return descendants;
-}
-
-node_set_t
-reachable_indirect ( node *      root,
-                     const uint  steps = def_path_len )
-{
-    std::deque< node * >  nodes;
-    node_set_t            descendants;
-    uint                  step  = 1;
-
-    nodes.push_back( root );
-
-    while ( ! nodes.empty() )
-    {
-        std::deque< node * >  sons;
-
-        for ( auto  node : nodes )
+                        insert( descendants, out );
+                }// for
+            }// fo
+        }// if
+        else
         {
-            for ( auto  out : node->successors() )
+            for ( auto  node : nodes )
             {
-                sons.push_back( out );
-                
-                if ( step > 1 )
-                    insert( out, descendants );
+                for ( auto  out : node->successors() )
+                {
+                    if ( contains( neighbourhood, out ) )
+                    {
+                        sons.push_back( out );
+                        
+                        if ( step > 1 )
+                            insert( descendants, out );
+                    }// if
+                }// for
             }// for
-        }// for
+        }// else
 
         nodes = std::move( sons );
 
-        if ( ++step > steps )
+        if ( ++step > max_steps )
             break;
     }// while
 
@@ -158,9 +131,7 @@ remove_redundant ( node *              n,
                    const node_set_t &  neighbourhood,
                    const uint          steps = def_path_len )
 {
-    auto        descendants = ( neighbourhood.empty()
-                                ? reachable_indirect( n, steps )
-                                : reachable_indirect( n, neighbourhood, steps ) );
+    const auto  descendants = reachable_indirect( n, neighbourhood, steps );
     node_vec_t  new_out;
 
     new_out.reserve( n->successors().size() );
@@ -169,7 +140,9 @@ remove_redundant ( node *              n,
     for ( auto  succ : n->successors() )
     {
         if ( contains( descendants, succ ) )
+        {
             HLR_LOG( 6, "  removing " + n->to_string() + " → " + succ->to_string() + " from " + n->to_string() );
+        }// if
         else
             new_out.push_back( succ );
     }// for
@@ -226,17 +199,17 @@ refine_loc_deps ( node *  node )
     // remove direct outgoing edges if reachable otherwise
     //
     
-    if ( changed && sparsify )
+    if ( changed && ( sparsify_mode & ( sparsify_node_succ | sparsify_sub_succ | sparsify_sub_all ) ))
     {
         // restrict search to local nodes and neighbouring nodes
         node_set_t  neighbourhood;
 
-        neighbourhood.reserve( 1 + node->successors().size() );
+        reserve( neighbourhood, 1 + node->successors().size() );
 
-        insert( node, neighbourhood );
+        insert( neighbourhood, node );
         
         for ( auto  succ : node->successors() )
-            insert( succ, neighbourhood );
+            insert( neighbourhood, succ );
 
         node->successors() = remove_redundant( node, neighbourhood );
     }// if
@@ -291,21 +264,67 @@ refine_sub_deps ( node *  node )
     // remove direct outgoing edges if reachable via path
     //
     
-    if ( sparsify )
+    if ( sparsify_mode & sparsify_node_succ )
     {
         for ( auto  sub : node->sub_nodes() )
         {
             node_set_t  neighbourhood;
 
-            neighbourhood.reserve( 1 + sub->successors().size() );
-            
-            insert( sub, neighbourhood );
+            reserve( neighbourhood, 1 + sub->successors().size() );
+
+            insert( neighbourhood, sub );
 
             for ( auto  succ : sub->successors() )
-                insert( succ, neighbourhood );
+                insert( neighbourhood, succ );
 
             sub->successors() = remove_redundant( sub, neighbourhood );
         }// for
+    }// if
+    else if ( sparsify_mode & sparsify_sub_succ )
+    {
+        //
+        // put sub nodes and all their successors into neighbourhood to
+        // look for paths in full subgraphs reaching successors
+        //
+        
+        node_set_t  neighbourhood;
+
+        for ( auto  sub : node->sub_nodes() )
+        {
+            insert( neighbourhood, sub );
+
+            for ( auto  succ : sub->successors() )
+                insert( neighbourhood, succ );
+        }// for
+
+        for ( auto  sub : node->sub_nodes() )
+            sub->successors() = remove_redundant( sub, neighbourhood );
+    }// if
+    else if ( sparsify_mode & sparsify_sub_all )
+    {
+        //
+        // look in all sub nodes of all successors of parent node
+        // (sub nodes can only have successors in this set!)
+        //
+        
+        node_set_t  neighbourhood;
+
+        for ( auto  sub : node->sub_nodes() )
+            insert( neighbourhood, sub );
+
+        for ( auto  succ : node->successors() )
+        {
+            if ( succ->is_refined() )
+            {
+                for ( auto  sub : succ->sub_nodes() )
+                    insert( neighbourhood, sub );
+            }// if
+            else
+                insert( neighbourhood, succ );
+        }// for
+
+        for ( auto  sub : node->sub_nodes() )
+            sub->successors() = remove_redundant( sub, neighbourhood );
     }// if
 }
 
@@ -364,7 +383,7 @@ node::refine ( const size_t  min_size )
     {
         g.set_dependencies();
 
-        if ( sparsify && local_sparsify )
+        if ( sparsify_mode & sparsify_local )
         {
             for ( auto  sub : g )
                 sub->successors() = remove_redundant( sub, {}, g.size()-1 );
@@ -429,20 +448,20 @@ node::refine_deps ( const bool  do_lock )
     
     if ( do_lock )
     {
-        insert( this, locked );
+        insert( locked, this );
 
         for ( auto  sub : sub_nodes() )
-            insert( sub, locked );
+            insert( locked, sub );
     
         for ( auto  succ : successors() )
         {
             if ( succ->is_refined() )
             {
                 for ( auto  succ_sub : succ->sub_nodes() )
-                    insert( succ_sub, locked );
+                    insert( locked, succ_sub );
             }// if
             else
-                insert( succ, locked );
+                insert( locked, succ );
         }// for
 
         for ( auto  n : locked )
