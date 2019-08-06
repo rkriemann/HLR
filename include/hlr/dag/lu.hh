@@ -21,14 +21,21 @@ namespace dag
 {
 
 //
-// return graph representing compute DAG for LU of <A>
+// compute DAG for in-place LU of <A>
 //
 graph
 gen_dag_lu_rec    ( HLIB::TMatrix *  A,
                     refine_func_t    refine );
 
 //
-// return graph representing compute DAG for LU of <A>
+// compute DAG for out-of-place LU of <A>
+//
+graph
+gen_dag_lu_oop    ( HLIB::TMatrix *  A,
+                    refine_func_t    refine );
+
+//
+// compute DAG for coarse version of LU with on-the-fly DAGs for small matrices
 //
 graph
 gen_dag_coarselu  ( HLIB::TMatrix *                                            A,
@@ -39,14 +46,14 @@ gen_dag_coarselu  ( HLIB::TMatrix *                                            A
                     const size_t                                               ncoarse = 0 );
 
 //
-// return graph representing compute DAG for LU of <A>
-// - compute DAG level wise
+// level wise computation of DAG for LU of <A>
+// - recurse on diagonal blocks and perform per-level LU on global scope 
 //
 graph
 gen_dag_lu_lvl    ( HLIB::TMatrix &  A );
 
 //
-// return graph representing compute DAG for solving L X = A
+// compute DAG for solving L X = A with lower-triangular L
 //
 graph
 gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
@@ -54,7 +61,7 @@ gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
                        refine_func_t          refine );
 
 //
-// return graph representing compute DAG for solving X U = A
+// compute DAG for solving X U = A with upper triangular U
 //
 graph
 gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
@@ -62,7 +69,7 @@ gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
                        refine_func_t          refine );
 
 //
-// return graph representing compute DAG for C = A B + C
+// compute DAG for C = A B + C
 //
 graph
 gen_dag_update       ( const HLIB::TMatrix *  A,
@@ -71,7 +78,7 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
                        refine_func_t          refine );
 
 //
-// return DAG for tile-based LU of HODLR format
+// compute DAG for tile-based LU of <A> in HODLR format
 //
 graph
 gen_dag_lu_hodlr_tile ( HLIB::TMatrix *  A,

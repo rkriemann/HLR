@@ -32,6 +32,7 @@ string  matrixfile = "";
 bool    onlydag    = false;
 bool    docopy     = true;
 bool    levelwise  = false;
+bool    oop_lu     = false;
 int     coarse     = 0;
 int     nbench     = 1;
 
@@ -64,6 +65,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
         ( "lvlwise",                      ": do level-wise LU" )
+        ( "oop",                          ": do out-of-place LU" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
         ;
@@ -114,6 +116,7 @@ parse_cmdline ( int argc, char ** argv )
     if ( vm.count( "onlydag"   ) ) onlydag    = true;
     if ( vm.count( "nocopy"    ) ) docopy     = false;
     if ( vm.count( "lvlwise"   ) ) levelwise  = true;
+    if ( vm.count( "oop"       ) ) oop_lu     = true;
     if ( vm.count( "coarse"    ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "bench"     ) ) nbench     = vm["bench"].as<int>();
 

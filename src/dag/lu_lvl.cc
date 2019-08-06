@@ -856,15 +856,15 @@ gen_dag_lu_lvl ( TMatrix &  A )
     final_map.resize( nid );
     updates.resize( nid );
 
-    auto  tic   = Time::Wall::now();
+    // auto  tic   = Time::Wall::now();
     
     auto  final = dag_lu_lvl( & A, nodes, final_map, updates, apply_nodes, mtx_nodes );
     
-    auto  toc   = Time::Wall::since( tic );
+    // auto  toc   = Time::Wall::since( tic );
 
-    hlr::log( 0, HLIB::to_string( "time for dag_lu_lvl = %.3e s", toc.seconds() ) );
+    // hlr::log( 0, HLIB::to_string( "time for dag_lu_lvl = %.3e s", toc.seconds() ) );
 
-    tic   = Time::Wall::now();
+    // tic   = Time::Wall::now();
     
     if ( CFG::Arith::use_accu )
     {
@@ -876,9 +876,9 @@ gen_dag_lu_lvl ( TMatrix &  A )
         assign_dependencies( & A, final_map, updates );
     }// if
     
-    toc   = Time::Wall::since( tic );
+    // toc   = Time::Wall::since( tic );
 
-    hlr::log( 0, HLIB::to_string( "time for assign_dep = %.3e s", toc.seconds() ) );
+    // hlr::log( 0, HLIB::to_string( "time for assign_dep = %.3e s", toc.seconds() ) );
     
     dag::node_list_t  start, end{ final };
 

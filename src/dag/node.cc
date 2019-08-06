@@ -29,7 +29,7 @@ using namespace HLIB;
 constexpr bool         sparsify       = true;
 
 // enable edge sparsification after node refinement (within local_graph)
-constexpr bool         local_sparsify = true;
+constexpr bool         local_sparsify = false;
 
 // default maximal path distance in reachability test
 constexpr int          def_path_len   = 2;
