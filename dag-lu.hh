@@ -95,6 +95,8 @@ mymain ( int, char ** )
     hlr::dag::graph  dag;
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
+    auto  L = ( onlydag ? C : ( oop_lu ? std::shared_ptr( C->copy() ) : C ) );
+    auto  U = ( onlydag ? C : ( oop_lu ? std::shared_ptr( C->copy() ) : C ) );
 
     if ( levelwise )
         C->set_hierarchy_data();
@@ -116,7 +118,7 @@ mymain ( int, char ** )
         else if ( coarse > 0 )
             dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, seq::dag::refine, impl::dag::run, ncoarse ) );
         else if ( oop_lu )
-            dag = std::move( hlr::dag::gen_dag_lu_oop( C.get(), impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_lu_oop( *C, *L, *U, impl::dag::refine ) );
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         

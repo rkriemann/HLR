@@ -31,7 +31,9 @@ gen_dag_lu_rec    ( HLIB::TMatrix *  A,
 // compute DAG for out-of-place LU of <A>
 //
 graph
-gen_dag_lu_oop    ( HLIB::TMatrix *  A,
+gen_dag_lu_oop    ( HLIB::TMatrix &  A,
+                    HLIB::TMatrix &  L,
+                    HLIB::TMatrix &  U,
                     refine_func_t    refine );
 
 //

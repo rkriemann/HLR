@@ -130,6 +130,82 @@ copy ( const TMatrix &  M )
 }
 
 //
+// return copy of (block-wise) lower-left part of matrix
+//
+inline
+std::unique_ptr< TMatrix >
+copy_ll ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j <= i; ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ) ) : copy( * BM->block( i, j ) ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of (block-wise) upper-right part of matrix
+//
+inline
+std::unique_ptr< TMatrix >
+copy_ur ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = i; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ) ) : copy( * BM->block( i, j ) ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //
@@ -158,6 +234,94 @@ copy_to ( const TMatrix &  A,
                     assert( ! is_null( BB->block( i, j ) ) );
 
                     copy_to( * BA->block( i, j ), * BB->block( i, j ) );
+                }// if
+                else
+                    assert( is_null( BB->block( i, j ) ) );
+            }// for
+        }// for
+    }// if
+    else
+    {
+        A.copy_to( & B );
+    }// else
+}
+
+//
+// copy lower-left data of A to matrix B
+// - ASSUMPTION: identical matrix structure in lower-left part
+//
+inline
+void
+copy_to_ll ( const TMatrix &  A,
+             TMatrix &        B )
+{
+    assert( A.type()     == B.type() );
+    assert( A.block_is() == B.block_is() );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = ptrcast(  &B, TBlockMatrix );
+
+        assert( BA->nblock_rows() == BB->nblock_rows() );
+        assert( BA->nblock_cols() == BB->nblock_cols() );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j <= i; ++j )
+            {
+                if ( BA->block( i, j ) != nullptr )
+                {
+                    assert( ! is_null( BB->block( i, j ) ) );
+
+                    if ( i == j )
+                        copy_to_ll( * BA->block( i, j ), * BB->block( i, j ) );
+                    else
+                        copy_to( * BA->block( i, j ), * BB->block( i, j ) );
+                }// if
+                else
+                    assert( is_null( BB->block( i, j ) ) );
+            }// for
+        }// for
+    }// if
+    else
+    {
+        A.copy_to( & B );
+    }// else
+}
+
+//
+// copy upper-right data of A to matrix B
+// - ASSUMPTION: identical matrix structure in upper-right part
+//
+inline
+void
+copy_to_ur ( const TMatrix &  A,
+             TMatrix &        B )
+{
+    assert( A.type()     == B.type() );
+    assert( A.block_is() == B.block_is() );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = ptrcast(  &B, TBlockMatrix );
+
+        assert( BA->nblock_rows() == BB->nblock_rows() );
+        assert( BA->nblock_cols() == BB->nblock_cols() );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = i; j < BA->nblock_cols(); ++j )
+            {
+                if ( BA->block( i, j ) != nullptr )
+                {
+                    assert( ! is_null( BB->block( i, j ) ) );
+
+                    if ( i == j )
+                        copy_to_ur( * BA->block( i, j ), * BB->block( i, j ) );
+                    else
+                        copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
                 else
                     assert( is_null( BB->block( i, j ) ) );
