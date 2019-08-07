@@ -105,24 +105,36 @@ mymain ( int, char ** )
     // set up DAG generation options optimised for different DAGs
     //
 
-    if ( levelwise )
+    if ( nosparsify )
     {
-        // different algorithm; no options evaluated
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
     }// if
-    else if ( coarse > 0 )
+    else
     {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
-        hlr::dag::def_path_len  = 2;
-    }// if
-    else if ( oop_lu )
-    {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
-        hlr::dag::def_path_len  = 10;
-    }// if
-    else 
-    {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
-        hlr::dag::def_path_len  = 2;
+        if ( levelwise )
+        {
+            // different algorithm; no options evaluated
+        }// if
+        else if ( coarse > 0 )
+        {
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+            hlr::dag::def_path_len  = 2;
+        }// if
+        else if ( oop_lu )
+        {
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+            hlr::dag::def_path_len  = 10;
+        }// if
+        else if ( CFG::Arith::use_accu )
+        {
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+            hlr::dag::def_path_len  = 2;
+        }// if
+        else
+        {
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+            hlr::dag::def_path_len  = 2;
+        }// if
     }// if
 
     //
@@ -147,6 +159,8 @@ mymain ( int, char ** )
             dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, seq::dag::refine, impl::dag::run, ncoarse ) );
         else if ( oop_lu )
             dag = std::move( hlr::dag::gen_dag_lu_oop( *C, *L, *U, impl::dag::refine ) );
+        else if ( CFG::Arith::use_accu )
+            dag = std::move( hlr::dag::gen_dag_lu_accu( C.get(), impl::dag::refine ) );
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         
@@ -224,7 +238,8 @@ mymain ( int, char ** )
         
     std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
         
-    TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+    matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
+    // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
     std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
 

@@ -254,7 +254,6 @@ run ( graph &                  dag,
     // begin with start nodes and proceed until final node was reached
     //
 
-    auto                 tic = Time::Wall::now();
     std::list< node * >  workset;
     
     for ( auto  node : dag.start() )
@@ -311,10 +310,6 @@ run ( graph &                  dag,
             }// while
         }// omp single
     }// omp parallel
-        
-    auto  toc = Time::Wall::since( tic );
-
-    log( 2, "time for OpenMP DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 }
 
 }// namespace dag

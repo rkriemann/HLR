@@ -33,6 +33,7 @@ bool    onlydag    = false;
 bool    docopy     = true;
 bool    levelwise  = false;
 bool    oop_lu     = false;
+bool    nosparsify = false;
 int     coarse     = 0;
 int     nbench     = 1;
 
@@ -66,6 +67,7 @@ parse_cmdline ( int argc, char ** argv )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
         ( "lvlwise",                      ": do level-wise LU" )
         ( "oop",                          ": do out-of-place LU" )
+        ( "nosparsify",                   ": do not sparsify DAG" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
         ;
@@ -100,25 +102,26 @@ parse_cmdline ( int argc, char ** argv )
         exit( 1 );
     }// if
 
-    if ( vm.count( "nodag"     ) ) HLIB::CFG::Arith::use_dag = false;
-    if ( vm.count( "accu"      ) ) HLIB::CFG::Arith::use_accu = true;
-    if ( vm.count( "threads"   ) ) nthreads   = vm["threads"].as<int>();
-    if ( vm.count( "verbosity" ) ) verbosity  = vm["verbosity"].as<int>();
-    if ( vm.count( "nprob"     ) ) n          = vm["nprob"].as<int>();
-    if ( vm.count( "ntile"     ) ) ntile      = vm["ntile"].as<int>();
-    if ( vm.count( "rank"      ) ) k          = vm["rank"].as<uint>();
-    if ( vm.count( "eps"       ) ) eps        = vm["eps"].as<double>();
-    if ( vm.count( "app"       ) ) appl       = vm["app"].as<string>();
-    if ( vm.count( "grid"      ) ) gridfile   = vm["grid"].as<string>();
-    if ( vm.count( "matrix"    ) ) matrixfile = vm["matrix"].as<string>();
-    if ( vm.count( "distr"     ) ) distr      = vm["distr"].as<string>();
-    if ( vm.count( "noredir"   ) ) noredir    = true;
-    if ( vm.count( "onlydag"   ) ) onlydag    = true;
-    if ( vm.count( "nocopy"    ) ) docopy     = false;
-    if ( vm.count( "lvlwise"   ) ) levelwise  = true;
-    if ( vm.count( "oop"       ) ) oop_lu     = true;
-    if ( vm.count( "coarse"    ) ) coarse     = vm["coarse"].as<int>();
-    if ( vm.count( "bench"     ) ) nbench     = vm["bench"].as<int>();
+    if ( vm.count( "nodag"      ) ) HLIB::CFG::Arith::use_dag = false;
+    if ( vm.count( "accu"       ) ) HLIB::CFG::Arith::use_accu = true;
+    if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
+    if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
+    if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
+    if ( vm.count( "ntile"      ) ) ntile      = vm["ntile"].as<int>();
+    if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
+    if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
+    if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
+    if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
+    if ( vm.count( "distr"      ) ) distr      = vm["distr"].as<string>();
+    if ( vm.count( "noredir"    ) ) noredir    = true;
+    if ( vm.count( "onlydag"    ) ) onlydag    = true;
+    if ( vm.count( "nocopy"     ) ) docopy     = false;
+    if ( vm.count( "lvlwise"    ) ) levelwise  = true;
+    if ( vm.count( "oop"        ) ) oop_lu     = true;
+    if ( vm.count( "nosparsify" ) ) nosparsify = true;
+    if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
+    if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
 
     if ( appl == "help" )
     {

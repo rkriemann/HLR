@@ -55,7 +55,7 @@ luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M,
 
     auto  toc = Time::Wall::since( tic );
 
-    log( 0, to_string( "luinv_eval : time for DAG setup = %.3e", toc.seconds() ) );
+    log( 2, to_string( "luinv_eval : time for DAG setup = %.3e", toc.seconds() ) );
 }
     
 //

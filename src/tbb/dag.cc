@@ -293,8 +293,6 @@ run ( graph &                  dag,
 {
     assert( dag.end().size() == 1 );
     
-    auto  tic = Time::Wall::now();
-    
     //
     // create task for end node since needed by all other tasks
     //
@@ -320,24 +318,14 @@ run ( graph &                  dag,
         }// if
     }// for
 
-    auto  toc = Time::Wall::since( tic );
-
-    log( 2, "TBB DAG prepare in " + HLIB::to_string( "%.3e s", toc.seconds() ) );
-
     //
     // run DAG
     //
-    
-    tic = Time::Wall::now();
     
     final_task->increment_ref_count();                // for "tbb::wait" to actually wait for final node
     final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
     final_task->execute();                            // and the final node explicitly
     ::tbb::task::destroy( * final_task );             // not done by TBB since executed manually
-
-    toc = Time::Wall::since( tic );
-
-    log( 2, "TBB DAG run in     " + HLIB::to_string( "%.3e s", toc.seconds() ) );
 }
 
 }// namespace dag

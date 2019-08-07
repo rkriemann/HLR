@@ -28,6 +28,13 @@ gen_dag_lu_rec    ( HLIB::TMatrix *  A,
                     refine_func_t    refine );
 
 //
+// compute DAG for in-place LU of <A> using accumulators
+//
+graph
+gen_dag_lu_accu   ( HLIB::TMatrix *  A,
+                    refine_func_t    refine );
+
+//
 // compute DAG for out-of-place LU of <A>
 //
 graph

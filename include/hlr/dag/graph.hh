@@ -109,10 +109,13 @@ public:
     void    print () const;
     
     // output DAG in DOT format
-    void    print_dot ( const std::string &  filename ) const;
+    void    print_dot  ( const std::string &  filename ) const;
+
+    // output DAG in GEXF format
+    void    print_gexf ( const std::string &  filename ) const;
 
     // return memory usage of graph (with all nodes and edges)
-    size_t  mem_size  () const;
+    size_t  mem_size   () const;
 };
 
 //

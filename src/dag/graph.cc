@@ -188,6 +188,40 @@ graph::print_dot ( const std::string &  filename ) const
 }// if
 
 //
+// output DAG in GEXF format
+//
+void
+graph::print_gexf ( const std::string &  filename ) const
+{
+    std::ofstream  out( filename );
+
+    out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl
+        << "<gexf xmlns=\"http://www.gexf.net/1.2draft\" version=\"1.2\">" << std::endl
+        << "  <graph mode=\"static\" defaultedgetype=\"directed\">" << std::endl;
+
+    std::map< node *, HLIB::id_t >  node_ids;
+    HLIB::id_t                      nid = 0;
+    HLIB::id_t                      eid = 0;
+    
+    out << "    <nodes>" << std::endl;
+    for ( auto node : _nodes )
+    {
+        out << "      <node id=\"" << nid << "\" label=\"" << node->to_string() << "\" />" << std::endl;
+        node_ids[ node ] = nid++;
+    }// for
+    out << "    </nodes>" << std::endl;
+
+    out << "    <edges>" << std::endl;
+    for ( auto node : _nodes )
+        for ( auto  succ : node->successors() )
+            out << "      <edge id=\"" << eid++ << "\" source=\"" << node_ids[node] << "\" target=\"" << node_ids[succ] << "\" />" << std::endl;
+    out << "    </edges>" << std::endl;
+
+    out << "  </graph>" << std::endl
+        << "</gexf>" << std::endl;
+}// if
+
+//
 // simulate execution of DAG and
 // look if all nodes are handled and
 // all ende nodes are reached
