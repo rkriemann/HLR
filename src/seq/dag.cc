@@ -37,6 +37,8 @@ refine ( node *        root,
     
     std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
+    const bool            output_inter = HLIB::verbose( 4 );
+    uint                  step         = 0;
 
     while ( ! nodes.empty() )
     {
@@ -107,6 +109,23 @@ refine ( node *        root,
 
             nodes.clear();
         }// else
+
+        if ( output_inter )
+        {
+            std::list< node * >  ltasks, lstart, lend;
+            
+            for ( auto  n : nodes )
+                ltasks.push_back( n );
+
+            for ( auto  n : tasks )
+                ltasks.push_back( n );
+            
+            graph  dag( ltasks, lstart, lend, hlr::dag::use_multiple_end_nodes );
+
+            dag.print_dot( HLIB::to_string( "dag_%03d.dot", step ) );
+        }// if
+
+        ++step;
     }// while
 
     //

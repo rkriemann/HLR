@@ -57,11 +57,11 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
-struct leaf_lu_node : public node
+struct lu_leaf_node : public node
 {
     TMatrix *  A;
     
-    leaf_lu_node ( TMatrix *  aA )
+    lu_leaf_node ( TMatrix *  aA )
             : A( aA )
     { init(); }
 
@@ -75,13 +75,13 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
-struct solve_upper_node : public node
+struct trsmu_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
     
-    solve_upper_node ( const TMatrix *  aU,
-                       TMatrix *        aA )
+    trsmu_node ( const TMatrix *  aU,
+                 TMatrix *        aA )
             : U( aU )
             , A( aA )
     { init(); }
@@ -96,13 +96,13 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
-struct leaf_solve_upper_node : public node
+struct trsmu_leaf_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
     
-    leaf_solve_upper_node ( const TMatrix *  aU,
-                            TMatrix *        aA )
+    trsmu_leaf_node ( const TMatrix *  aU,
+                      TMatrix *        aA )
             : U( aU )
             , A( aA )
     { init(); }
@@ -117,13 +117,13 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
-struct solve_lower_node : public node
+struct trsml_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
 
-    solve_lower_node ( const TMatrix *  aL,
-                       TMatrix *        aA )
+    trsml_node ( const TMatrix *  aL,
+                 TMatrix *        aA )
             : L( aL )
             , A( aA )
     { init(); }
@@ -138,13 +138,13 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
     
-struct leaf_solve_lower_node : public node
+struct trsml_leaf_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
 
-    leaf_solve_lower_node ( const TMatrix *  aL,
-                            TMatrix *        aA )
+    trsml_leaf_node ( const TMatrix *  aL,
+                      TMatrix *        aA )
             : L( aL )
             , A( aA )
     { init(); }
@@ -256,11 +256,7 @@ lu_node::refine_ ( const size_t  min_size )
         
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
-            //
-            // factorise diagonal block
-            //
-            
-            auto  A_ii  = B->block( i, i );
+            auto  A_ii = B->block( i, i );
 
             assert( A_ii != nullptr );
 
@@ -268,11 +264,11 @@ lu_node::refine_ ( const size_t  min_size )
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
-                    hlr::dag::alloc_node< solve_upper_node >( g, A_ii, B->block( j, i ) );
+                    hlr::dag::alloc_node< trsmu_node >( g, A_ii, B->block( j, i ) );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
-                    hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ) );
+                    hlr::dag::alloc_node< trsml_node >( g, A_ii, B->block( i, j ) );
 
             for ( uint j = i+1; j < nbr; j++ )
                 for ( uint l = i+1; l < nbc; l++ )
@@ -286,7 +282,7 @@ lu_node::refine_ ( const size_t  min_size )
     else
     {
         hlr::dag::alloc_node< apply_node >( g, A );
-        hlr::dag::alloc_node< leaf_lu_node >( g, A );
+        hlr::dag::alloc_node< lu_leaf_node >( g, A );
     }// else
 
     return g;
@@ -298,19 +294,19 @@ lu_node::run_ ( const TTruncAcc & )
 }
 
 void
-leaf_lu_node::run_ ( const TTruncAcc &  acc )
+lu_leaf_node::run_ ( const TTruncAcc &  acc )
 {
     HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// solve_upper_node
+// trsmu_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_upper_node::refine_ ( const size_t  min_size )
+trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -331,7 +327,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ) );
+                    hlr::dag::alloc_node< trsmu_node >( g, U_jj, BA->block( i, j ) );
 
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
@@ -345,31 +341,31 @@ solve_upper_node::refine_ ( const size_t  min_size )
     else
     {
         hlr::dag::alloc_node< apply_node >( g, A );
-        hlr::dag::alloc_node< leaf_solve_upper_node >( g, U, A );
+        hlr::dag::alloc_node< trsmu_leaf_node >( g, U, A );
     }// else
 
     return g;
 }
 
 void
-solve_upper_node::run_ ( const TTruncAcc & )
+trsmu_node::run_ ( const TTruncAcc & )
 {
 }
 
 void
-leaf_solve_upper_node::run_ ( const TTruncAcc &  acc )
+trsmu_leaf_node::run_ ( const TTruncAcc &  acc )
 {
     solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// solve_lower_node
+// trsml_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_lower_node::refine_ ( const size_t  min_size )
+trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -390,7 +386,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ) );
+                    hlr::dag::alloc_node< trsml_node >( g, L_ii, BA->block( i, j ) );
 
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
@@ -404,19 +400,19 @@ solve_lower_node::refine_ ( const size_t  min_size )
     else
     {
         hlr::dag::alloc_node< apply_node >( g, A );
-        hlr::dag::alloc_node< leaf_solve_lower_node >( g, L, A );
+        hlr::dag::alloc_node< trsml_leaf_node >( g, L, A );
     }// else
 
     return g;
 }
 
 void
-solve_lower_node::run_ ( const TTruncAcc & )
+trsml_node::run_ ( const TTruncAcc & )
 {
 }
 
 void
-leaf_solve_lower_node::run_ ( const TTruncAcc &  acc )
+trsml_leaf_node::run_ ( const TTruncAcc &  acc )
 {
     solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 }

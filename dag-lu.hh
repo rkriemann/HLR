@@ -127,8 +127,8 @@ mymain ( int, char ** )
         }// if
         else if ( CFG::Arith::use_accu )
         {
-            hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
-            hlr::dag::def_path_len  = 2;
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+            hlr::dag::def_path_len  = 20;
         }// if
         else
         {

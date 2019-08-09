@@ -43,7 +43,7 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'tile-hodlr' ]
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tile-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
@@ -251,6 +251,7 @@ common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
                                         'src/cluster/tlr.cc',
                                         'src/dag/gauss_elim.cc',
                                         'src/dag/graph.cc',
+                                        'src/dag/invert.cc',
                                         'src/dag/local_graph.cc',
                                         'src/dag/lu.cc',
                                         'src/dag/lu_accu.cc',
@@ -282,6 +283,7 @@ if 'seq' in frameworks :
     if 'tileh'      in programs : Default( seq.Program( 'tileh-seq.cc' ) )
     if 'dag-lu'     in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
     if 'dag-gauss'  in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
+    if 'dag-inv'    in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
 
 #
 # OpenMP

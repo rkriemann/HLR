@@ -34,7 +34,7 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^((hodlr|tile-hodlr|tlr|tileh|dag|gauss)-(seq|omp|tbb|tf|hpx|mpi))$
+^((hodlr|tile-hodlr|tlr|tileh|dag-(lu|inv|gauss))-(seq|omp|tbb|tf|hpx|mpi))$
 ^(tlr|tileh)-mpi-(bcast|ibcast|rdma)$
 ^(tlr|tileh)-gaspi$
 

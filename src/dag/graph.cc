@@ -143,7 +143,7 @@ graph::print_dot ( const std::string &  filename ) const
         << "  size  = \"16,16\";" << std::endl
         << "  ratio = \"1.5\";" << std::endl
         << "  node [ shape = box, style = \"filled,rounded\", fontsize = 20, fontname = \"Noto Sans\", height = 1.5, width = 4, fixedsize = true ];" << std::endl
-        << "  edge [ arrowhead = open, color = \"#babdb6\" ];" << std::endl;
+        << "  edge [ arrowhead = open, color = \"#000000\" ];" << std::endl; // #babdb6
 
     std::map< node *, HLIB::id_t >  node_ids;
     HLIB::id_t                      id = 0;
