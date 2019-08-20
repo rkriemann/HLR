@@ -64,6 +64,21 @@ public:
     
     // output graph in DOT format
     void  print_dot ( const std::string &  filename ) const;
+
+    //
+    // wrapper to simultaneously allocate node and put into list local graph
+    //
+    template < typename T,
+               typename ... Args >
+    T *
+    alloc_node ( Args && ...    args )
+    {
+        auto  node = new T( std::forward< Args >( args ) ... );
+
+        push_back( node );
+
+        return node;
+    }
 };
 
 }// namespace dag

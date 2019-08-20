@@ -159,6 +159,130 @@ copy ( const TMatrix &  M )
 }
 
 //
+// return copy of (block-wise) lower-left part of matrix
+//
+inline
+std::unique_ptr< TMatrix >
+copy_ll ( const TMatrix &    M,
+          const diag_type_t  diag = general_diag )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM,diag] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        auto  T = M.copy();
+
+        if ( diag == unit_diag )
+        {
+            if ( T->row_is() == T->col_is() )
+            {
+                assert( is_dense( T.get() ) );
+
+                auto  D = ptrcast( T.get(), TDenseMatrix );
+
+                if ( D->is_complex() )
+                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                else
+                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+            }// if
+        }// if
+
+        return T;
+    }// else
+}
+
+//
+// return copy of (block-wise) upper-right part of matrix
+//
+inline
+std::unique_ptr< TMatrix >
+copy_ur ( const TMatrix &    M,
+          const diag_type_t  diag = general_diag )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM,diag] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
+                    
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        auto  T = M.copy();
+
+        if ( diag == unit_diag )
+        {
+            if ( T->row_is() == T->col_is() )
+            {
+                assert( is_dense( T.get() ) );
+
+                auto  D = ptrcast( T.get(), TDenseMatrix );
+
+                if ( D->is_complex() )
+                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                else
+                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+            }// if
+        }// if
+
+        return T;
+    }// else
+}
+
+//
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //

@@ -295,6 +295,58 @@ graph::mem_size  () const
     return size;
 }
 
+//
+// concatenate dag1 and dag2
+// - end nodes of dag1 are dependencies for start nodes of dag2
+// - input DAGs are destroyed
+//
+graph
+concat ( graph &  g1,
+         graph &  g2 )
+{
+    std::list< node * >  nodes, start, end;
+
+    // collect all nodes
+    for ( auto  n : g1.nodes() ) nodes.push_back( n );
+    for ( auto  n : g2.nodes() ) nodes.push_back( n );
+
+    for ( auto  n : g1.start() ) start.push_back( n );
+    for ( auto  n : g2.end()   ) end.push_back( n );
+
+    for ( auto  start2 : g2.start() )
+    {
+        for ( auto  end1 : g1.end() )
+        {
+            start2->after( end1 );
+            start2->inc_dep_cnt();
+        }// for
+    }// for
+
+    return graph( std::move( nodes ), std::move( start ), std::move( end ), use_multiple_end_nodes );
+}
+
+//
+// merge g1 and g2
+//
+graph
+merge ( graph &  g1,
+        graph &  g2 )
+{
+    std::list< node * >  nodes, start, end;
+
+    // collect all nodes
+    for ( auto  n : g1.nodes() ) nodes.push_back( n );
+    for ( auto  n : g2.nodes() ) nodes.push_back( n );
+
+    for ( auto  n : g1.start() ) start.push_back( n );
+    for ( auto  n : g2.start() ) start.push_back( n );
+
+    for ( auto  n : g1.end()   ) end.push_back( n );
+    for ( auto  n : g2.end()   ) end.push_back( n );
+
+    return graph( std::move( nodes ), std::move( start ), std::move( end ), use_multiple_end_nodes );
+}
+
 }// namespace dag
 
 }// namespace hlr

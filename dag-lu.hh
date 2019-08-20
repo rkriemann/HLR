@@ -69,7 +69,7 @@ mymain ( int, char ** )
     
     std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -193,7 +193,7 @@ mymain ( int, char ** )
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
     }// if
         
     if ( verbose( 3 ) )
@@ -236,7 +236,7 @@ mymain ( int, char ** )
                   << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                   << std::endl;
         
-    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;
         
     matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
     // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );

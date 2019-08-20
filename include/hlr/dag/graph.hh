@@ -130,6 +130,21 @@ using  refine_func_t = std::function< graph ( node *,
 using  exec_func_t   = std::function< void ( graph &,
                                              const HLIB::TTruncAcc & ) >;
 
+//
+// concatenate g1 and g2
+// - end nodes of g1 are dependencies for start nodes of g2
+//
+graph
+concat  ( graph &  g1,
+          graph &  g2 );
+
+//
+// merge g1 and g2
+//
+graph
+merge   ( graph &  g1,
+          graph &  g2 );
+
 }// namespace dag
 
 }// namespace hlr

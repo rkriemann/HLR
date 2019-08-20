@@ -13,6 +13,8 @@
 
 #include <base/config.hh>
 
+#include <hlr/utils/term.hh>
+
 namespace hlr
 {
 
@@ -26,6 +28,14 @@ error ( const msg_t &  msg )
     std::cout << msg << std::endl;
     std::exit( 1 );
 }
+
+// always-on-assert
+#define HLR_ASSERT( expr )                                              \
+    if ( ! expr )                                                       \
+        hlr::error( term::on_red( term::white( "[ERROR]" ) ) + " " +    \
+                    __FILE__ + HLIB::to_string( ":%d", __LINE__ ) +     \
+                    std::string( " in " ) + __PRETTY_FUNCTION__ +       \
+                    std::string( " : " ) + term::bold( #expr ) + " failed" )
 
 // mutex for log function
 extern std::mutex  __LOG_MUTEX;
@@ -52,7 +62,7 @@ log ( const int      lvl,
 #ifdef NDEBUG
 #  define HLR_LOG( lvl, msg ) 
 #else
-#  define HLR_LOG( lvl, msg ) hlr::log( lvl, __FILE__ + std::string( " / " ) + __func__ + std::string( " : " ) + msg )
+#  define HLR_LOG( lvl, msg ) hlr::log( lvl, __FILE__ + std::string( " / " ) + __ASSERT_FUNCTION__ + std::string( " : " ) + msg )
 #endif
 
 }// namespace hlr

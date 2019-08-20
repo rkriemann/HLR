@@ -36,6 +36,13 @@ gen_dag_invert_ur ( HLIB::TMatrix *          U,
                     const HLIB::diag_type_t  diag,
                     refine_func_t            refine );
 
+//
+// compute DAG for inversion of A
+//
+dag::graph
+gen_dag_invert    ( HLIB::TMatrix *          A,
+                    refine_func_t            refine );
+
 }// namespace dag
 
 }// namespace hlr

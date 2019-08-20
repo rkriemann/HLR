@@ -12,8 +12,6 @@
 #include <unordered_set>
 #include <map>
 
-// #include <tbb/parallel_for.h>
-
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
@@ -74,7 +72,7 @@ struct solve_upper_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "L%d = trsmu( U%d, A%d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "%d = trsmu( %d, %d )", A->id(), U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
@@ -98,7 +96,7 @@ struct solve_lower_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "U%d = trsml( L%d, A%d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "%d = trsml( %d, %d )", A->id(), L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:

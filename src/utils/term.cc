@@ -152,9 +152,9 @@ const char *  yellow       () { return "\033[33m"; }
 const char *  blue         () { return "\033[34m"; }
 const char *  magenta      () { return "\033[35m"; }
 const char *  cyan         () { return "\033[36m"; }
-const char *  grey         () { return "\033[37m"; }
+const char *  grey         () { return "\033[90m"; }
 
-const char *  ltgrey       () { return "\033[90m"; }
+const char *  ltgrey       () { return "\033[37m"; }
 const char *  ltred        () { return "\033[91m"; }
 const char *  ltgreen      () { return "\033[92m"; }
 const char *  ltyellow     () { return "\033[93m"; }

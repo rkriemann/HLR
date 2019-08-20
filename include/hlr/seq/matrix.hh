@@ -134,7 +134,8 @@ copy ( const TMatrix &  M )
 //
 inline
 std::unique_ptr< TMatrix >
-copy_ll ( const TMatrix &  M )
+copy_ll ( const TMatrix &    M,
+          const diag_type_t  diag = general_diag )
 {
     if ( is_blocked( M ) )
     {
@@ -150,7 +151,7 @@ copy_ll ( const TMatrix &  M )
             {
                 if ( BM->block( i, j ) != nullptr )
                 {
-                    auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ) ) : copy( * BM->block( i, j ) ) );
+                    auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );
@@ -163,7 +164,24 @@ copy_ll ( const TMatrix &  M )
     else
     {
         // assuming non-structured block
-        return M.copy();
+        auto  T = M.copy();
+
+        if ( diag == unit_diag )
+        {
+            if ( T->row_is() == T->col_is() )
+            {
+                assert( is_dense( T.get() ) );
+
+                auto  D = ptrcast( T.get(), TDenseMatrix );
+
+                if ( D->is_complex() )
+                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                else
+                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+            }// if
+        }// if
+
+        return T;
     }// else
 }
 
@@ -172,7 +190,8 @@ copy_ll ( const TMatrix &  M )
 //
 inline
 std::unique_ptr< TMatrix >
-copy_ur ( const TMatrix &  M )
+copy_ur ( const TMatrix &    M,
+          const diag_type_t  diag = general_diag )
 {
     if ( is_blocked( M ) )
     {
@@ -188,7 +207,7 @@ copy_ur ( const TMatrix &  M )
             {
                 if ( BM->block( i, j ) != nullptr )
                 {
-                    auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ) ) : copy( * BM->block( i, j ) ) );
+                    auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );
@@ -201,7 +220,24 @@ copy_ur ( const TMatrix &  M )
     else
     {
         // assuming non-structured block
-        return M.copy();
+        auto  T = M.copy();
+
+        if ( diag == unit_diag )
+        {
+            if ( T->row_is() == T->col_is() )
+            {
+                assert( is_dense( T.get() ) );
+
+                auto  D = ptrcast( T.get(), TDenseMatrix );
+
+                if ( D->is_complex() )
+                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                else
+                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+            }// if
+        }// if
+
+        return T;
     }// else
 }
 

@@ -19,6 +19,13 @@ namespace B = HLIB::BLAS;
 
 using namespace hlr;
 
+// return main memory usage as a string
+std::string
+mem_usage ()
+{
+    return term::ltgrey( " [" + Mem::to_string( Mem::usage() ) + "]" );
+}
+
 // main function specific to arithmetic
 template < typename problem_t >
 void
