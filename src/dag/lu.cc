@@ -452,6 +452,9 @@ update_node::refine_ ( const size_t  min_size )
         apply->after( this );
     }// if
 
+    // no dependencies between updates
+    g.finalize();
+    
     return g;
 }
 
@@ -585,14 +588,18 @@ gen_dag_lu_rec ( TMatrix *      A,
 
     if ( ! CFG::Arith::use_accu )
         return std::move( dag );
+    else
+    {
+        dag.add_nodes( apply_nodes );
+
+        return std::move( dag );
+    }// else
 
     //
     // loop over apply nodes from top to bottom and remove nodes without updates
     //
 
     using  node_set_t = std::set< node * >;
-
-    dag.add_nodes( apply_nodes );
 
     dag::node_list_t  work;
     node_set_t        deleted;

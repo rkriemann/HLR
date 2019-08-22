@@ -35,13 +35,18 @@ gen_dag_lu_accu   ( HLIB::TMatrix *  A,
                     refine_func_t    refine );
 
 //
-// compute DAG for out-of-place LU of <A>
+// compute DAG for LU of <A> using out-of-place ids
 //
 graph
 gen_dag_lu_oop    ( HLIB::TMatrix &  A,
-                    HLIB::TMatrix &  L,
-                    HLIB::TMatrix &  U,
                     refine_func_t    refine );
+
+//
+// compute DAG for out-of-place LU of <A> with automatic local dependencies
+//
+graph
+gen_dag_lu_oop_auto ( HLIB::TMatrix &  A,
+                      refine_func_t    refine );
 
 //
 // compute DAG for coarse version of LU with on-the-fly DAGs for small matrices

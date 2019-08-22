@@ -37,7 +37,7 @@ trsvl ( const HLIB::matop_t      op_L,
         HLIB::TScalarVector &    v,
         const HLIB::diag_type_t  diag_mode )
 {
-    HLR_LOG( 2, HLIB::to_string( "trsvl( %d )", L.id() ) );
+    HLR_LOG( 4, HLIB::to_string( "trsvl( %d )", L.id() ) );
         
     if ( is_blocked( L ) )
     {
@@ -79,7 +79,7 @@ trsvl ( const HLIB::matop_t      op_L,
                         TScalarVector  v_j( sub_vector( v, L_ji->row_is() ) );
                         TScalarVector  v_i( sub_vector( v, L_ji->col_is() ) );
                     
-                        HLR_LOG( 2, HLIB::to_string( "update( %d, ", L_ji->id() ) + v_i.is().to_string() + ", " + v_j.is().to_string() );
+                        HLR_LOG( 4, HLIB::to_string( "update( %d, ", L_ji->id() ) + v_i.is().to_string() + ", " + v_j.is().to_string() );
                         mul_vec( real(-1), L_ji, & v_i, real(1), & v_j, op_L );
                     }// if
                 }// for
@@ -119,7 +119,7 @@ trsvl ( const HLIB::matop_t      op_L,
                         TScalarVector  v_i( sub_vector( v, L_ij->col_is() ) );
                         TScalarVector  v_j( sub_vector( v, L_ij->row_is() ) );
                     
-                        HLR_LOG( 2, HLIB::to_string( "update( %d, ", L_ij->id() ) + v_j.is().to_string() + ", " + v_i.is().to_string() );
+                        HLR_LOG( 4, HLIB::to_string( "update( %d, ", L_ij->id() ) + v_j.is().to_string() + ", " + v_i.is().to_string() );
                         mul_vec( real(-1), L_ij, & v_j, real(1), & v_i, op_L );
                     }// if
                 }// for
@@ -152,7 +152,7 @@ trsvu ( const HLIB::matop_t      op_U,
         HLIB::TScalarVector &    v,
         const HLIB::diag_type_t  diag_mode )
 {
-    HLR_LOG( 2, HLIB::to_string( "trsvu( %d )", U.id() ) );
+    HLR_LOG( 4, HLIB::to_string( "trsvu( %d )", U.id() ) );
         
     if ( is_blocked( U ) )
     {
@@ -194,7 +194,7 @@ trsvu ( const HLIB::matop_t      op_U,
                         TScalarVector  v_j( sub_vector( v, U_ji->row_is() ) );
                         TScalarVector  v_i( sub_vector( v, U_ji->col_is() ) );
                     
-                        HLR_LOG( 2, HLIB::to_string( "update( %d, ", U_ji->id() ) + v_i.is().to_string() + ", " + v_j.is().to_string() );
+                        HLR_LOG( 4, HLIB::to_string( "update( %d, ", U_ji->id() ) + v_i.is().to_string() + ", " + v_j.is().to_string() );
                         mul_vec( real(-1), U_ji, & v_i, real(1), & v_j, op_U );
                     }// if
                 }// for
@@ -234,7 +234,7 @@ trsvu ( const HLIB::matop_t      op_U,
                         TScalarVector  v_i( sub_vector( v, U_ij->col_is() ) );
                         TScalarVector  v_j( sub_vector( v, U_ij->row_is() ) );
                     
-                        HLR_LOG( 2, HLIB::to_string( "update( %d, ", U_ij->id() ) + v_j.is().to_string() + ", " + v_i.is().to_string() );
+                        HLR_LOG( 4, HLIB::to_string( "update( %d, ", U_ij->id() ) + v_j.is().to_string() + ", " + v_i.is().to_string() );
                         mul_vec( real(-1), U_ij, & v_j, real(1), & v_i, op_U );
                     }// if
                 }// for

@@ -95,8 +95,6 @@ mymain ( int, char ** )
     hlr::dag::graph  dag;
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
-    auto  L = ( onlydag ? C : ( oop_lu ? std::shared_ptr( C->copy() ) : C ) );
-    auto  U = ( onlydag ? C : ( oop_lu ? std::shared_ptr( C->copy() ) : C ) );
 
     if ( levelwise )
         C->set_hierarchy_data();
@@ -122,13 +120,13 @@ mymain ( int, char ** )
         }// if
         else if ( oop_lu )
         {
-            hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
-            hlr::dag::def_path_len  = 10;
-        }// if
-        else if ( CFG::Arith::use_accu )
-        {
-            hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
-            hlr::dag::def_path_len  = 20;
+            if ( CFG::Arith::use_accu )
+                hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+            else
+            {
+                hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+                hlr::dag::def_path_len  = 10;
+            }// else
         }// if
         else
         {
@@ -158,9 +156,12 @@ mymain ( int, char ** )
         else if ( coarse > 0 )
             dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, seq::dag::refine, impl::dag::run, ncoarse ) );
         else if ( oop_lu )
-            dag = std::move( hlr::dag::gen_dag_lu_oop( *C, *L, *U, impl::dag::refine ) );
-        else if ( CFG::Arith::use_accu )
-            dag = std::move( hlr::dag::gen_dag_lu_accu( C.get(), impl::dag::refine ) );
+        {
+            if ( CFG::Arith::use_accu )
+                dag = std::move( hlr::dag::gen_dag_lu_accu( C.get(), impl::dag::refine ) );
+            else
+                dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
+        }// if
         else 
             dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
         
@@ -195,10 +196,24 @@ mymain ( int, char ** )
         std::cout << "    #edges = " << dag.nedges() << std::endl;
         std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
     }// if
+
+    // {
+    //     tic = Time::Wall::now();
+    
+    //     dag.sparsify();
+
+    //     toc = Time::Wall::since( tic );
+    //     std::cout << "  sparsify in" << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    //     std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+    //     std::cout << "    #edges = " << dag.nedges() << std::endl;
+    // }
         
     if ( verbose( 3 ) )
         dag.print_dot( "lu.dot" );
-        
+    
+    if ( verbose( 3 ) )
+        dag.print();
+    
     if ( onlydag )
         return;
         

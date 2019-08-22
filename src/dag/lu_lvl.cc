@@ -31,22 +31,12 @@ using namespace HLIB;
 namespace
 {
 
-// map for apply_node nodes
-using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
-
-// identifiers for memory blocks
-const HLIB::id_t  id_A = 'A';
-const HLIB::id_t  id_U = 'U';
-
 struct lu_node : public node
 {
-    TMatrix *       A;
-    apply_map_t &   apply_nodes;
+    TMatrix *  A;
     
-    lu_node ( TMatrix *       aA,
-              apply_map_t &   aapply_nodes )
+    lu_node ( TMatrix *  aA )
             : A( aA )
-            , apply_nodes( aapply_nodes )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
@@ -54,59 +44,51 @@ struct lu_node : public node
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return {}; }
+    virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
 struct solve_upper_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
-    apply_map_t &    apply_nodes;
     
     solve_upper_node ( const TMatrix *  aU,
-                       TMatrix *        aA,
-                       apply_map_t &    aapply_nodes )
+                       TMatrix *        aA )
             : U( aU )
             , A( aA )
-            , apply_nodes( aapply_nodes )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, %d )",
-                                                                      U->id(), A->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, %d )", U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, U->block_is() }, { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return {}; }
+    virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
 struct solve_lower_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
-    apply_map_t &    apply_nodes;
 
     solve_lower_node ( const TMatrix *  aL,
-                       TMatrix *        aA,
-                       apply_map_t &    aapply_nodes )
+                       TMatrix *        aA )
             : L( aL )
             , A( aA )
-            , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, %d )",
-                                                                      L->id(), A->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, %d )", L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() }, { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return {}; }
+    virtual const block_list_t  out_blocks_  () const { return {}; }
 };
     
 struct update_node : public node
@@ -114,31 +96,23 @@ struct update_node : public node
     const TMatrix *  A;
     const TMatrix *  B;
     TMatrix *        C;
-    apply_map_t &    apply_nodes;
 
     update_node ( const TMatrix *  aA,
                   const TMatrix *  aB,
-                  TMatrix *        aC,
-                  apply_map_t &    aapply_nodes )
+                  TMatrix *        aC )
             : A( aA )
             , B( aB )
             , C( aC )
-            , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "update( %d, %d, %d )",
-                                                                      A->id(), B->id(), C->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "update( %d, %d, %d )", A->id(), B->id(), C->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_A, B->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const
-    {
-        if ( CFG::Arith::use_accu ) return { { id_U, C->block_is() } };
-        else                        return { { id_A, C->block_is() } };
-    }
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return {}; }
+    virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
 struct apply_node : public node
@@ -159,12 +133,8 @@ struct apply_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; } // not needed because of direct DAG generation
-    virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const
-    {
-        if ( is_leaf( A ) ) return { { id_A, A->block_is() } };
-        else                return { };
-    }
+    virtual const block_list_t  in_blocks_   () const { return {}; }
+    virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -172,12 +142,6 @@ private:
 // lu_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
-
-local_graph
-lu_node::refine_ ( const size_t )
-{
-    return {};
-}
 
 void
 lu_node::run_ ( const TTruncAcc &  acc )
@@ -194,60 +158,6 @@ lu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-local_graph
-solve_lower_node::refine_ ( const size_t  min_size )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
-    {
-        auto        BL  = cptrcast( L, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
-
-        //
-        // first create all solve nodes
-        //
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            const auto  L_ii = BL->block( i, i );
-        
-            //
-            // solve in current block row
-            //
-
-            if ( ! is_null( L_ii ) )
-            {
-                for ( uint j = 0; j < nbc; ++j )
-                    if ( ! is_null( BA->block( i, j ) ) )
-                        hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ), apply_nodes );
-            }// if
-        }// for
-
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint i = 0; i < nbr; ++i )
-            for ( uint  k = i+1; k < nbr; ++k )
-                for ( uint  j = 0; j < nbc; ++j )
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        hlr::dag::alloc_node< update_node >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ), apply_nodes );
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    return g;
-}
-
 void
 solve_lower_node::run_ ( const TTruncAcc &  acc )
 {
@@ -263,56 +173,6 @@ solve_lower_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-local_graph
-solve_upper_node::refine_ ( const size_t  min_size )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
-    {
-        auto        BU  = cptrcast( U, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        const auto  nbr = BA->block_rows();
-        const auto  nbc = BA->block_cols();
-
-        //
-        // first create all solve nodes
-        //
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            const auto  U_jj = BU->block( j, j );
-        
-            if ( ! is_null( U_jj ) )
-            {
-                for ( uint i = 0; i < nbr; ++i )
-                    if ( ! is_null( BA->block(i,j) ) )
-                        hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ), apply_nodes );
-            }// if
-        }// for
-
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint j = 0; j < nbc; ++j )
-            for ( uint  k = j+1; k < nbc; ++k )
-                for ( uint  i = 0; i < nbr; ++i )
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        hlr::dag::alloc_node< update_node >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ), apply_nodes );
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ A->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->before( this );
-    }// if
-
-    return g;
-}
-
 void
 solve_upper_node::run_ ( const TTruncAcc &  acc )
 {
@@ -327,52 +187,6 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 // update_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
-
-local_graph
-update_node::refine_ ( const size_t  min_size )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
-    {
-        //
-        // generate sub nodes assuming 2x2 block structure
-        //
-
-        auto  BA = cptrcast( A, TBlockMatrix );
-        auto  BB = cptrcast( B, TBlockMatrix );
-        auto  BC = ptrcast(  C, TBlockMatrix );
-
-        for ( uint  i = 0; i < BC->block_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->block_cols(); ++j )
-            {
-                if ( is_null( BC->block( i, j ) ) )
-                    continue;
-                
-                for ( uint  k = 0; k < BA->block_cols(); ++k )
-                {
-                    if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        hlr::dag::alloc_node< update_node >( g,
-                                                             BA->block( i, k ),
-                                                             BB->block( k, j ),
-                                                             BC->block( i, j ),
-                                                             apply_nodes );
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( CFG::Arith::use_accu )
-    {
-        auto  apply = apply_nodes[ C->id() ];
-        
-        assert( apply != nullptr );
-
-        apply->after( this );
-    }// if
-
-    return g;
-}
 
 void
 update_node::run_ ( const TTruncAcc &  acc )
@@ -395,49 +209,13 @@ update_node::run_ ( const TTruncAcc &  acc )
 void
 apply_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_recursive )
-        A->apply_updates( acc, recursive );
+    if ( ! is_recursive )
+        A->apply_updates( acc, nonrecursive );
     
     // if ( is_blocked( A ) && ! is_small( A ) )
     //     A->apply_updates( acc, nonrecursive );
     // else
     //     A->apply_updates( acc, recursive );
-}
-
-//
-// construct DAG for applying updates
-//
-void
-build_apply_dag ( TMatrix *           A,
-                  node *              parent,
-                  apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes )
-{
-    if ( is_null( A ) )
-        return;
-    
-    // DBG::printf( "apply( %d )", A->id() );
-    
-    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
-
-    apply_map[ A->id() ] = apply;
-
-    if ( parent != nullptr )
-        apply->after( parent );
-    
-    if ( is_blocked( A ) && ! is_small( A ) )
-    {
-        auto  BA = ptrcast( A, TBlockMatrix );
-
-        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
-            {
-                if ( BA->block( i, j ) != nullptr )
-                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes );
-            }// for
-        }// for
-    }// if
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -525,7 +303,6 @@ dag_lu_lvl ( TMatrix *         A,
              node_list_t &     nodes,
              node_map_t &      final_map,
              nodelist_map_t &  updates,
-             apply_map_t &     apply_nodes,
              std::mutex &      mtx_nodes )
 {
     local_graph  g;
@@ -542,7 +319,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         std::scoped_lock  lock( mtx_nodes );
         
-        node_A = hlr::dag::alloc_node< lu_node >( nodes, A, apply_nodes );
+        node_A = hlr::dag::alloc_node< lu_node >( nodes, A );
     }
 
     final_map[ A->id() ] = node_A;
@@ -563,14 +340,9 @@ dag_lu_lvl ( TMatrix *         A,
                 
                 assert( ! is_null( A_ii ) );
                 
-                auto  node_A_ii = dag_lu_lvl( A_ii, nodes, final_map, updates, apply_nodes, mtx_nodes );
+                auto  node_A_ii = dag_lu_lvl( A_ii, nodes, final_map, updates, mtx_nodes );
 
-                {
-                    // std::scoped_lock  lock( mtx );
-                    
-                    node_A->after( node_A_ii );
-                }
-                
+                node_A->after( node_A_ii );
                 node_A->inc_dep_cnt();
             }
     }// if
@@ -590,13 +362,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
         {
-            node *  solve_node = nullptr;
-
-            {
-                // std::scoped_lock  lock( mtx_nodes );
-                
-                solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij, apply_nodes );
-            }
+            node *  solve_node = solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -608,13 +374,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
         {
-            node *  solve_node = nullptr;
-
-            {
-                // std::scoped_lock  lock( mtx_nodes );
-
-                solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji, apply_nodes );
-            }
+            node *  solve_node = solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -634,13 +394,7 @@ dag_lu_lvl ( TMatrix *         A,
             
             if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
             {
-                node *  upd_node = nullptr;
-
-                {
-                    // std::scoped_lock  lock( mtx_nodes );
-
-                    upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl, apply_nodes );
-                }
+                node *  upd_node = upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl );
                 
                 updates[ L_jl->id() ].push_back( upd_node );
 
@@ -737,7 +491,10 @@ add_dep_from_all_updates_below ( const TMatrix *   M,
             root_apply = hlr::dag::alloc_node< apply_node >( nodes, M_root );
                 
         for ( auto  upd : updates[ M->id() ] )
+        {
             root_apply->after( upd );
+            root_apply->inc_dep_cnt();
+        }// for
     }// if
 
     if ( is_blocked( M ) )
@@ -780,7 +537,10 @@ build_apply_dep ( TMatrix *         M,
 
         // all updates form dependency
         for ( auto  upd : updates[ M->id() ] )
+        {
             M_apply->after( upd );
+            M_apply->inc_dep_cnt();
+        }// for
     }// if
 
     //
@@ -801,6 +561,7 @@ build_apply_dep ( TMatrix *         M,
     if ( parent_apply != nullptr )
     {
         M_apply->after( parent_apply );
+        M_apply->inc_dep_cnt();
     }// if
 
     //
@@ -819,6 +580,7 @@ build_apply_dep ( TMatrix *         M,
             //
             
             M_final->after( M_apply );
+            M_final->inc_dep_cnt();
             M_apply->set_recursive();
         }// if
     }// if
@@ -849,36 +611,18 @@ gen_dag_lu_lvl ( TMatrix &  A )
     node_list_t     nodes;
     node_map_t      final_map;
     nodelist_map_t  updates;
-    apply_map_t     apply_nodes;
     std::mutex      mtx_nodes;
     const auto      nid = max_id( & A ) + 1;
 
     final_map.resize( nid );
     updates.resize( nid );
 
-    // auto  tic   = Time::Wall::now();
-    
-    auto  final = dag_lu_lvl( & A, nodes, final_map, updates, apply_nodes, mtx_nodes );
-    
-    // auto  toc   = Time::Wall::since( tic );
+    auto  final = dag_lu_lvl( & A, nodes, final_map, updates, mtx_nodes );
 
-    // hlr::log( 0, HLIB::to_string( "time for dag_lu_lvl = %.3e s", toc.seconds() ) );
-
-    // tic   = Time::Wall::now();
-    
     if ( CFG::Arith::use_accu )
-    {
-        hlr::log( 0, term::red( term::bold( "!!! TODO: fix problems with accu-DAG !!!" ) ) );
         build_apply_dep( & A, nullptr, nodes, final_map, updates );
-    }// if
     else
-    {
         assign_dependencies( & A, final_map, updates );
-    }// if
-    
-    // toc   = Time::Wall::since( tic );
-
-    // hlr::log( 0, HLIB::to_string( "time for assign_dep = %.3e s", toc.seconds() ) );
     
     dag::node_list_t  start, end{ final };
 
@@ -890,7 +634,7 @@ gen_dag_lu_lvl ( TMatrix &  A )
             start.push_back( node );
     }// for
 
-    return  dag::graph( nodes, start, end );
+    return std::move( dag::graph( nodes, start, end ) );
 }
 
 }}// namespace hlr::dag

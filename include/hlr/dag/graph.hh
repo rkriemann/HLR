@@ -100,6 +100,9 @@ public:
         _start.clear();
         _end.clear();
     }
+
+    // remove direct edges between nodes if path of length <max_path_len> exists
+    void    sparsify ( const uint  max_path_len = def_path_len );
     
     // simulate execution of DAG and look if all nodes are handled and
     // all end nodes are reached

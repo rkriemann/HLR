@@ -122,6 +122,40 @@ graph::make_single_end ()
 }
 
 //
+// remove direct edges between nodes if path of length <max_path_len> exists
+//
+void
+graph::sparsify ( const uint  max_path_len )
+{
+    for ( auto  node : nodes() )
+    {
+        node->sparsify( max_path_len );
+
+        node->set_dep_cnt( 0 );
+    }// for
+
+    for ( auto  node : nodes() )
+    {
+        for ( auto  succ : node->successors() )
+            succ->inc_dep_cnt();
+    }// for
+
+    _start.clear();
+    _end.clear();
+    
+    for ( auto  node : nodes() )
+    {
+        node->finalize();
+
+        if ( node->dep_cnt() == 0 )
+            _start.push_back( node );
+
+        if ( node->successors().empty() )
+            _end.push_back( node );
+    }// for
+}
+
+//
 // output DAG
 //
 void

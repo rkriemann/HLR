@@ -169,7 +169,7 @@ public:
     int   dec_dep_cnt   ()         { return --_dep_cnt; }
     
     // set task dependency counter
-    //void  set_dep_cnt   ( int  d ) { _dep_cnt = d; }
+    void  set_dep_cnt   ( int  d ) { _dep_cnt = d; }
 
     // reset dependency counter
     void  reset_dep_cnt ()         { _dep_cnt = _ndeps; }
@@ -206,6 +206,9 @@ public:
 
     // finalize node data (if internal data will not change)
     void  finalize ();
+    
+    // remove direct edges of node to descendants if path of length <max_path_len> exists
+    void  sparsify ( const uint  max_path_len = def_path_len );
     
     //
     // mutex functions

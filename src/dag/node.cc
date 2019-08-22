@@ -179,8 +179,11 @@ refine_loc_deps ( node *  node )
                 // insert succendencies for subnodes (intersection test neccessary???)
                 for ( auto  succ_sub : (*succ)->sub_nodes() )
                 {
-                    HLR_LOG( 6, indent + node->to_string() + " ⟶ " + succ_sub->to_string() );
-                    new_out.push_back( succ_sub );
+                    if ( is_intersecting( node->out_blocks(), succ_sub->in_blocks() ) )
+                    {
+                        HLR_LOG( 6, indent + node->to_string() + " ⟶ " + succ_sub->to_string() );
+                        new_out.push_back( succ_sub );
+                    }// if
                 }// for
 
                 ++succ;
@@ -508,6 +511,24 @@ node::refine_deps ( const bool  do_lock )
     return changed;
 }
 
+//
+// remove direct edges of node to descendants if path of length <max_path_len> exists
+//
+void
+node::sparsify ( const uint  max_path_len )
+{
+    node_set_t  neighbourhood;
+
+    reserve( neighbourhood, 1 + successors().size() );
+
+    insert( neighbourhood, this );
+        
+    for ( auto  succ : successors() )
+        insert( neighbourhood, succ );
+
+    successors() = remove_redundant( this, neighbourhood, max_path_len );
+}
+    
 }// namespace dag
 
 }// namespace hlr

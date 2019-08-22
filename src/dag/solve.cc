@@ -262,7 +262,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
 void
 solve_lower_node::run_ ( const TTruncAcc & )
 {
-    HLR_LOG( 2, HLIB::to_string( "trsvl( %d )", L->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "trsvl( %d )", L->id() ) );
     
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
     TScalarVector  v_l( std::move( sub_vec( *v, row_is( L, op_L ) ) ) );
@@ -369,7 +369,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
 void
 solve_upper_node::run_ ( const TTruncAcc & )
 {
-    HLR_LOG( 2, HLIB::to_string( "trsvu( %d )", U->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "trsvu( %d )", U->id() ) );
     
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
     TScalarVector  v_u( std::move( sub_vec( *v, row_is( U, op_U ) ) ) );
@@ -455,7 +455,7 @@ template < typename value_t >
 void
 update_node< value_t >::run_ ( const TTruncAcc & )
 {
-    HLR_LOG( 2, HLIB::to_string( "update( %d )", A->id() ) );
+    HLR_LOG( 4, HLIB::to_string( "update( %d )", A->id() ) );
 
     TScalarVector  t( row_is( A, op_A ) );
     TScalarVector  x( std::move( sub_vec( *v, col_is( A, op_A ) ) ) );

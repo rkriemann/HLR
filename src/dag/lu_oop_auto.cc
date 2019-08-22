@@ -21,7 +21,6 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
-#include "hlr/utils/tensor.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
 
@@ -147,8 +146,6 @@ lu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
 
-        tensor2< node * >  finished( nbr, nbc );
-        
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
             //
@@ -161,46 +158,25 @@ lu_node::refine_ ( const size_t  min_size )
 
             assert( ! is_null_any( A_ii, L_ii, U_ii ) );
 
-            finished( i, i ) = g.alloc_node< lu_node >( A_ii );
+            g.alloc_node< lu_node >( A_ii );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( BA->block( j, i ) ) )
-                {
-                    finished( j, i ) = g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
-                    finished( j, i )->after( finished( i, i ) );
-                }// if
+                    g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( BA->block( i, j ) ) )
-                {
-                    finished( i, j ) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
-                    finished( i, j )->after( finished( i, i ) );
-                }// if
-        }// for
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
-            for ( uint j = i+1; j < nbr; j++ )
-            {
-                for ( uint l = i+1; l < nbc; l++ )
-                {
-                    if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BL->block( j, i ),
-                                                                    BU->block( i, l ),
-                                                                    BA->block( j, l ) );
+                    g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
 
-                        update->after( finished( j, i ) );
-                        update->after( finished( i, l ) );
-                        finished( j, l )->after( update );
-                    }// if
-                }// for
-            }// for
+            for ( uint j = i+1; j < nbr; j++ )
+                for ( uint l = i+1; l < nbc; l++ )
+                    if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
+                        g.alloc_node< update_node >( BL->block( j, i ),
+                                                     BU->block( i, l ),
+                                                     BA->block( j, l ) );
         }// for
     }// if
 
-    g.finalize();
-    
     return g;
 }
 
@@ -229,8 +205,6 @@ trsmu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
 
-        tensor2< node * >  finished( nbr, nbc );
-        
         for ( uint j = 0; j < nbc; ++j )
         {
             const auto  U_jj = BU->block( j, j );
@@ -239,27 +213,17 @@ trsmu_node::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
-        }// for
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
+                    g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
+
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BX->block( i, j ),
-                                                                    BU->block( j, k ),
-                                                                    BA->block( i, k ) );
-
-                        update->after( finished( i, j ) );
-                        finished( i, k )->after( update );
-                    }// if
+                        g.alloc_node< update_node >( BX->block( i, j ),
+                                                     BU->block( j, k ),
+                                                     BA->block( i, k ) );
         }// for
     }// if
 
-    g.finalize();
-    
     return g;
 }
 
@@ -288,8 +252,6 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
 
-        tensor2< node * >  finished( nbr, nbc );
-        
         for ( uint i = 0; i < nbr; ++i )
         {
             const auto  L_ii = BL->block( i, i );
@@ -298,27 +260,17 @@ trsml_node::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
-        }// for
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
+                    g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BL->block( k, i ),
-                                                                    BX->block( i, j ),
-                                                                    BA->block( k, j ) );
-
-                        update->after( finished( i, j ) );
-                        finished( k, j )->after( update );
-                    }// if
+                        g.alloc_node< update_node >( BL->block( k, i ),
+                                                     BX->block( i, j ),
+                                                     BA->block( k, j ) );
         }// for
     }// if
 
-    g.finalize();
-    
     return g;
 }
 
@@ -367,8 +319,6 @@ update_node::refine_ ( const size_t  min_size )
         }// for
     }// if
 
-    g.finalize();
-    
     return g;
 }
 
@@ -387,8 +337,8 @@ update_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_oop ( TMatrix &      A,
-                 refine_func_t  refine )
+gen_dag_lu_oop_auto ( TMatrix &      A,
+                      refine_func_t  refine )
 {
     return std::move( refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size ) );
 }
