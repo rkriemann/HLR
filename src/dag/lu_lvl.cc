@@ -12,8 +12,6 @@
 #include <unordered_set>
 #include <map>
 
-// #include <tbb/parallel_for.h>
-
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
@@ -21,7 +19,6 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
-#include "hlr/utils/term.hh" // DEBUG
 #include "hlr/dag/lu.hh"
 
 namespace hlr { namespace dag {

@@ -12,8 +12,6 @@
 #include <unordered_set>
 #include <map>
 
-// #include <tbb/parallel_for.h>
-
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>

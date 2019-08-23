@@ -12,8 +12,6 @@
 #include <unordered_set>
 #include <map>
 
-// #include <tbb/parallel_for.h>
-
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
@@ -32,95 +30,11 @@ namespace
 
 using HLIB::id_t;
 
-// map for apply_node nodes
-using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
-
 // identifiers for memory blocks
 const id_t  ID_A    = 'A';
 const id_t  ID_L    = 'L';
 const id_t  ID_U    = 'U';
 const id_t  ID_ACCU = 'X';
-
-struct shift_lu_node : public node
-{
-    TMatrix *  A;
-    
-    shift_lu_node ( TMatrix *  aA )
-            : A( aA )
-    { init(); }
-
-    virtual std::string  to_string () const { return HLIB::to_string( "shift_lu( %d )", A->id() ); }
-    virtual std::string  color     () const { return "ef2929"; }
-    
-private:
-    virtual void                run_         ( const TTruncAcc & ) {}
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) )
-            return { { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
-    }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
-};
-
-struct shift_trsmu_node : public node
-{
-    const TMatrix *  U;
-    TMatrix *        A;
-    
-    shift_trsmu_node ( const TMatrix *  aU,
-                       TMatrix *        aA )
-            : U( aU )
-            , A( aA )
-    { init(); }
-
-    virtual std::string  to_string () const { return HLIB::to_string( "shift_trsmu( %d )", A->id() ); }
-    virtual std::string  color     () const { return "ef2929"; }
-    
-private:
-    virtual void                run_         ( const TTruncAcc & ) {}
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) )
-            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
-    }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
-};
-
-struct shift_trsml_node : public node
-{
-    const TMatrix *  L;
-    TMatrix *        A;
-    
-    shift_trsml_node ( const TMatrix *  aL,
-                       TMatrix *        aA )
-            : L( aL )
-            , A( aA )
-    { init(); }
-
-    virtual std::string  to_string () const { return HLIB::to_string( "shift_trsml( %d )", A->id() ); }
-    virtual std::string  color     () const { return "ef2929"; }
-    
-private:
-    virtual void                run_         ( const TTruncAcc & ) {}
-    virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) )
-            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
-    }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
-};
-
-
-
 
 struct lu_node : public node
 {
@@ -136,7 +50,13 @@ struct lu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const
+    {
+        if ( is_null( A->parent() ) )
+            return { { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
+        else
+            return { { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+    }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
 
@@ -175,7 +95,13 @@ struct trsmu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const
+    {
+        if ( is_null( A->parent() ) )
+            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
+        else
+            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+    }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 };
 
@@ -217,7 +143,13 @@ struct trsml_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const
+    {
+        if ( is_null( A->parent() ) )
+            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
+        else
+            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+    }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 };
     
@@ -287,7 +219,7 @@ private:
         else
             return { { id_t(A), A->block_is() } };
     }
-    virtual const block_list_t  out_blocks_  () const         { return { { ID_A,    A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A,    A->block_is() } }; }
 };
 
 struct shift_node : public node
@@ -313,71 +245,22 @@ private:
     }
     virtual const block_list_t  out_blocks_  () const
     {
-        if ( is_blocked( A ) )
-        {
-            auto          B = ptrcast( A, TBlockMatrix );
-            block_list_t  mblocks;
+        return { { id_t(A), A->block_is() } };
+        // if ( is_blocked( A ) )
+        // {
+        //     auto          B = ptrcast( A, TBlockMatrix );
+        //     block_list_t  mblocks;
 
-            for ( uint  i = 0; i < B->nblock_rows(); ++i )
-                for ( uint  j = 0; j < B->nblock_rows(); ++j )
-                    mblocks.push_back( { id_t(B->block(i,j)), B->block(i,j)->block_is() } );
+        //     for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        //         for ( uint  j = 0; j < B->nblock_rows(); ++j )
+        //             mblocks.push_back( { id_t(B->block(i,j)), B->block(i,j)->block_is() } );
 
-            return mblocks;
-        }// if
-        else
-            return {};
+        //     return mblocks;
+        // }// if
+        // else
+        //     return {};
     }
 };
-
-
-
-
-
-
-local_graph
-shift_lu_node::refine_ ( const size_t  min_size )
-{
-    local_graph  g;
-
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
-        g.alloc_node< shift_node >( A )->before( g.alloc_node< lu_node >( A ) );
-    else
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< lu_node >( A ) );
-    
-    g.finalize();
-    
-    return g;
-}
-
-local_graph
-shift_trsmu_node::refine_ ( const size_t  min_size  )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
-        g.alloc_node< shift_node >( A )->before( g.alloc_node< trsmu_node >( U, A ) );
-    else
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsmu_node >( U, A ) );
-    
-    g.finalize();
-
-    return g;
-}
-
-local_graph
-shift_trsml_node::refine_ ( const size_t  min_size  )
-{
-    local_graph  g;
-
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
-        g.alloc_node< shift_node >( A )->before( g.alloc_node< trsml_node >( L, A ) );
-    else
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsml_node >( L, A ) );
-    
-    g.finalize();
-
-    return g;
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
@@ -396,7 +279,7 @@ lu_node::refine_ ( const size_t  min_size )
         const auto  nbr = B->block_rows();
         const auto  nbc = B->block_cols();
 
-        // g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node >( A );
 
         tensor2< node * >  finished( nbr, nbc );
         
@@ -406,20 +289,23 @@ lu_node::refine_ ( const size_t  min_size )
 
             assert( A_ii != nullptr );
 
-            finished(i,i) = g.alloc_node< shift_lu_node >( A_ii );
+            finished(i,i) = g.alloc_node< lu_node >( A_ii );
+            finished(i,i)->after( shift_A );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
                 {
-                    finished(j,i) = g.alloc_node< shift_trsmu_node >( A_ii, B->block( j, i ) );
+                    finished(j,i) = g.alloc_node< trsmu_node >( A_ii, B->block( j, i ) );
                     finished(j,i)->after( finished(i,i) );
+                    finished(j,i)->after( shift_A );
                 }// if
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
                 {
-                    finished(i,j) = g.alloc_node< shift_trsml_node >( A_ii, B->block( i, j ) );
+                    finished(i,j) = g.alloc_node< trsml_node >( A_ii, B->block( i, j ) );
                     finished(i,j)->after( finished(i,i) );
+                    finished(i,j)->after( shift_A );
                 }// if
         }// for
 
@@ -441,8 +327,7 @@ lu_node::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        // g.alloc_node< apply_node >( A );
-        // g.alloc_node< lu_leaf_node >( A );
+        g.alloc_node< apply_node >( A )->before( g.alloc_node< lu_leaf_node >( A ) );
     }// else
 
     g.finalize();
@@ -451,9 +336,9 @@ lu_node::refine_ ( const size_t  min_size )
 }
 
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node::run_ ( const TTruncAcc & )
 {
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    assert( false );
 }
 
 void
@@ -480,7 +365,7 @@ trsmu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        // g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node >( A );
         
         tensor2< node * >  finished( nbr, nbc );
         
@@ -492,7 +377,10 @@ trsmu_node::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    finished(i,j) = g.alloc_node< shift_trsmu_node >( U_jj, BA->block( i, j ) );
+                {
+                    finished(i,j) = g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ) );
+                    finished(i,j)->after( shift_A );
+                }// if
         }// for
 
         for ( uint j = 0; j < nbc; ++j )
@@ -512,8 +400,7 @@ trsmu_node::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        // g.alloc_node< apply_node >( A );
-        // g.alloc_node< trsmu_leaf_node >( U, A );
+        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsmu_leaf_node >( U, A ) );
     }// else
 
     g.finalize();
@@ -522,9 +409,9 @@ trsmu_node::refine_ ( const size_t  min_size )
 }
 
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node::run_ ( const TTruncAcc & )
 {
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    assert( false );
 }
 
 void
@@ -551,7 +438,7 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        // g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node >( A );
         
         tensor2< node * >  finished( nbr, nbc );
         
@@ -563,7 +450,10 @@ trsml_node::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    finished(i,j) = g.alloc_node< shift_trsml_node >( L_ii, BA->block( i, j ) );
+                {
+                    finished(i,j) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+                    finished(i,j)->after( shift_A );
+                }// if
         }// for
 
         for ( uint i = 0; i < nbr; ++i )
@@ -583,8 +473,7 @@ trsml_node::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        // g.alloc_node< apply_node >( A );
-        // g.alloc_node< trsml_leaf_node >( L, A );
+        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsml_leaf_node >( L, A ) );
     }// else
 
     g.finalize();
@@ -593,9 +482,9 @@ trsml_node::refine_ ( const size_t  min_size )
 }
 
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node::run_ ( const TTruncAcc & )
 {
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    assert( false );
 }
 
 void
@@ -698,12 +587,12 @@ gen_dag_lu_accu ( TMatrix *      A,
     // construct DAG for LU
     //
     
-    return std::move( refine( new shift_lu_node( A ), HLIB::CFG::Arith::max_seq_size ) );
+    auto  dag = refine( new lu_node( A ), HLIB::CFG::Arith::max_seq_size );
 
-    #if 0
+    return std::move( dag );
     
     //
-    // loop over apply nodes from top to bottom and remove nodes without updates
+    // loop over accumulator nodes from top to bottom and remove nodes without updates
     //
 
     using  node_set_t = std::set< node * >;
@@ -769,9 +658,7 @@ gen_dag_lu_accu ( TMatrix *      A,
         }// else
     }// for
     
-    return  dag::graph( std::move( nodes ), std::move( start ), std::move( end ) );
-
-    #endif
+    return  std::move( dag::graph( std::move( nodes ), std::move( start ), std::move( end ) ) );
 }
 
 }// namespace dag

@@ -176,9 +176,11 @@ refine_loc_deps ( node *  node )
             {
                 changed = true;
                 
-                // insert succendencies for subnodes (intersection test neccessary???)
+                // insert succendencies for subnodes
                 for ( auto  succ_sub : (*succ)->sub_nodes() )
                 {
+                    // test only needed if sub nodes do not have data dependencies corresponding to actual sub blocks
+                    // (example: lu_accu with shift/apply sub nodes not acting on ID_A/L/U)
                     if ( is_intersecting( node->out_blocks(), succ_sub->in_blocks() ) )
                     {
                         HLR_LOG( 6, indent + node->to_string() + " ⟶ " + succ_sub->to_string() );

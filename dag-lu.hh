@@ -121,7 +121,10 @@ mymain ( int, char ** )
         else if ( oop_lu )
         {
             if ( CFG::Arith::use_accu )
+            {
                 hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+                hlr::dag::def_path_len  = 2;
+            }// if
             else
             {
                 hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
@@ -211,8 +214,8 @@ mymain ( int, char ** )
     if ( verbose( 3 ) )
         dag.print_dot( "lu.dot" );
     
-    if ( verbose( 3 ) )
-        dag.print();
+    // if ( verbose( 3 ) )
+    //     dag.print();
     
     if ( onlydag )
         return;
