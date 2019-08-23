@@ -52,10 +52,8 @@ private:
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( is_null( A->parent() ) )
-            return { { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+        if ( is_null( A->parent() ) ) return { { ID_A, A->block_is() } };
+        else                          return { { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
     }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
@@ -97,10 +95,8 @@ private:
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( is_null( A->parent() ) )
-            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+        if ( is_null( A->parent() ) ) return { { ID_U, U->block_is() }, { ID_A, A->block_is() } };
+        else                          return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
     }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 };
@@ -145,10 +141,8 @@ private:
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( is_null( A->parent() ) )
-            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
+        if ( is_null( A->parent() ) ) return { { ID_L, L->block_is() }, { ID_A, A->block_is() } };
+        else                          return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
     }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 };
@@ -214,12 +208,10 @@ private:
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( A->parent() != nullptr )
-            return { { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { id_t(A), A->block_is() } };
+        if ( A->parent() != nullptr ) return { { id_t(A->parent()), A->block_is() }, { id_t(A), A->block_is() } };
+        else                          return { { id_t(A), A->block_is() } };
     }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A,    A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
 struct shift_node : public node
@@ -238,28 +230,10 @@ private:
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( A->parent() != nullptr )
-            return { { id_t(A->parent()), A->parent()->block_is() }, { id_t(A), A->block_is() } };
-        else
-            return { { id_t(A), A->block_is() } };
+        if ( A->parent() != nullptr ) return { { id_t(A->parent()), A->block_is() }, { id_t(A), A->block_is() } };
+        else                          return { { id_t(A), A->block_is() } };
     }
-    virtual const block_list_t  out_blocks_  () const
-    {
-        return { { id_t(A), A->block_is() } };
-        // if ( is_blocked( A ) )
-        // {
-        //     auto          B = ptrcast( A, TBlockMatrix );
-        //     block_list_t  mblocks;
-
-        //     for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        //         for ( uint  j = 0; j < B->nblock_rows(); ++j )
-        //             mblocks.push_back( { id_t(B->block(i,j)), B->block(i,j)->block_is() } );
-
-        //     return mblocks;
-        // }// if
-        // else
-        //     return {};
-    }
+    virtual const block_list_t  out_blocks_  () const { return { { id_t(A), A->block_is() } }; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
