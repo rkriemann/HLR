@@ -44,14 +44,11 @@ refine ( node *        root,
     std::list< node * >                 tasks;
     std::mutex                          mtx;
     std::list< node * >                 end;
+    const bool                          do_lock = (( hlr::dag::sparsify_mode != hlr::dag::sparsify_none  ) &&
+                                                   ( hlr::dag::sparsify_mode != hlr::dag::sparsify_local ));
     
     while ( node_sets.size() > 0 )
     {
-        // log( 0, "----------------------------------" );
-        // log( 0, HLIB::to_string( "#sets = %d", node_sets.size() ) );
-        // for ( auto &  nset :  node_sets )
-        //     log( 0, HLIB::to_string( "  %d", nset.size() ) );
-        
         std::vector< std::deque< node * > >  subnodes( node_sets.size() );
         std::vector< std::deque< node * > >  delnodes( node_sets.size() );
         std::atomic< bool >                  any_changed = false;
@@ -85,7 +82,7 @@ refine ( node *        root,
                                      
                                                for ( auto  node : nset )
                                                {
-                                                   const bool  node_changed = node->refine_deps( true );
+                                                   const bool  node_changed = node->refine_deps( do_lock );
 
                                                    if ( node->is_refined() )       // node was refined; collect all sub nodes
                                                    {

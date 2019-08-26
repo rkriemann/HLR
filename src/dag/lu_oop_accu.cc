@@ -50,11 +50,7 @@ struct lu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) ) return { { ID_A, A->block_is() } };
-        else                          return { { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
-    }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
 
@@ -93,11 +89,7 @@ struct trsmu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) ) return { { ID_U, U->block_is() }, { ID_A, A->block_is() } };
-        else                          return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
-    }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 };
 
@@ -139,11 +131,7 @@ struct trsml_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const
-    {
-        if ( is_null( A->parent() ) ) return { { ID_L, L->block_is() }, { ID_A, A->block_is() } };
-        else                          return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A->parent()), A->block_is() } };
-    }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() }, { id_t(A), A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 };
     

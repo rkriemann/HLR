@@ -10,6 +10,7 @@
 
 #include "common.inc"
 #include "hlr/cluster/h.hh"
+#include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/matrix/luinv_eval.hh"
 #include "hlr/dag/lu.hh"
@@ -35,8 +36,8 @@ mymain ( int, char ** )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::h::cluster( coord.get(), ntile );
-        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
+        auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
     
         if ( verbose( 3 ) )
         {
