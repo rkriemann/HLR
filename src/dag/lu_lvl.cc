@@ -37,7 +37,7 @@ struct lu_node : public node
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
-    virtual std::string  color     () const { return "a40000"; }
+    virtual std::string  color     () const { return "ef2929"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );

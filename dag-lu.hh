@@ -36,8 +36,8 @@ mymain ( int, char ** )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
-        auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::h::cluster( coord.get(), ntile );
+        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
         if ( verbose( 3 ) )
         {
