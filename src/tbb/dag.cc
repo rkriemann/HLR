@@ -76,7 +76,7 @@ refine ( node *        root,
         {
             // then refine dependencies and collect new nodes
             ::tbb::parallel_for< size_t >( 0, node_sets.size(),
-                                           [&] ( const size_t  i )
+                                           [&,do_lock] ( const size_t  i )
                                            {
                                                const auto &  nset = node_sets[i];
                                      

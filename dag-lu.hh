@@ -201,22 +201,8 @@ mymain ( int, char ** )
         std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
     }// if
 
-    // {
-    //     tic = Time::Wall::now();
-    
-    //     dag.sparsify();
-
-    //     toc = Time::Wall::since( tic );
-    //     std::cout << "  sparsify in" << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-    //     std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-    //     std::cout << "    #edges = " << dag.nedges() << std::endl;
-    // }
-        
     if ( verbose( 3 ) )
         dag.print_dot( "lu.dot" );
-    
-    // if ( verbose( 3 ) )
-    //     dag.print();
     
     if ( onlydag )
         return;
@@ -229,7 +215,7 @@ mymain ( int, char ** )
     
     tmin = tmax = tsum = 0;
         
-    for ( int  i = 0; i < 1; ++i ) // nbench
+    for ( int  i = 0; i < nbench; ++i )
     {
         tic = Time::Wall::now();
         
@@ -243,11 +229,8 @@ mymain ( int, char ** )
         tmax  = std::max( tmax, toc.seconds() );
         tsum += toc.seconds();
 
-        // if ( i < (nbench-1) )
-        // {
-        //     impl::matrix::copy_to( *A, *C );
-        //     dag.reset_dependencies();
-        // }// if
+        if ( i < (nbench-1) )
+            impl::matrix::copy_to( *A, *C );
     }// for
         
     if ( nbench > 1 )
@@ -267,89 +250,101 @@ mymain ( int, char ** )
     // vector solves
     //
     //////////////////////////////////////////////////////////////////////
+
+    // {
+    //     TScalarVector *        x_ptr;
+    //     hlr::dag::mutex_map_t  map_row_mtx;
         
-    std::cout << term::bullet << term::bold << "Vector Solves" << term::reset << std::endl;
+    //     auto  dag_trsml = gen_dag_solve_lower( apply_normal, C.get(), & x_ptr, map_row_mtx, impl::dag::refine );
+
+    //     dag_trsml.print_dot( "trsml.dot" );
+    // }
     
-    HLIB::CFG::Arith::vector_solve_method = 1;
-
-    auto   mtx_map = std::map< idx_t, std::unique_ptr< std::mutex > >();
-    idx_t  last    = -1;
-
-    for ( auto  i : A->row_is() )
+    if ( false )
     {
-        const idx_t  ci = i / hlr::dag::CHUNK_SIZE;
+        std::cout << term::bullet << term::bold << "Vector Solves" << term::reset << std::endl;
+    
+        HLIB::CFG::Arith::vector_solve_method = 1;
+
+        auto   mtx_map = std::map< idx_t, std::unique_ptr< std::mutex > >();
+        idx_t  last    = -1;
+
+        for ( auto  i : A->row_is() )
+        {
+            const idx_t  ci = i / hlr::dag::CHUNK_SIZE;
             
-        if ( ci != last )
-        {
-            last = ci;
-            mtx_map[ ci ] = std::make_unique< std::mutex >();
-        }// if
-    }// for
-        
-    {
-        TScalarVector  x( A->col_is() );
-
-        x.fill_rand( 1 );
-
-        const TScalarVector  xcopy( x );
-        TScalarVector        xref( x );
-
-        tmin = tmax = tsum = 0;
-                
-        for ( int  i = 0; i < nbench; ++i )
-        {
-            tic = Time::Wall::now();
-        
-            hlr::seq::trsvu( apply_trans, *C, xref, general_diag );
-            hlr::seq::trsvl( apply_trans, *C, xref, unit_diag );
-        
-            toc = Time::Wall::since( tic );
-
-            std::cout << "  trsv in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-
-            if ( i < (nbench-1) )
-                xref.assign( 1.0, & xcopy );
+            if ( ci != last )
+            {
+                last = ci;
+                mtx_map[ ci ] = std::make_unique< std::mutex >();
+            }// if
         }// for
-
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
-                      << std::endl;
-
-
-        matrix::luinv_eval  A_inv2( C, impl::dag::refine, impl::dag::run );
-        TScalarVector       v( x );
         
-        tmin = tmax = tsum = 0;
-        
-        for ( int  i = 0; i < nbench; ++i )
         {
-            tic = Time::Wall::now();
+            TScalarVector  x( A->col_is() );
 
-            A_inv2.apply( & x, & v, apply_trans );
+            x.fill_rand( 1 );
 
-            toc = Time::Wall::since( tic );
+            const TScalarVector  xcopy( x );
+            TScalarVector        xref( x );
 
-            std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-
-            tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-            tmax  = std::max( tmax, toc.seconds() );
-            tsum += toc.seconds();
-        }// for
-
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
-                      << std::endl;
+            tmin = tmax = tsum = 0;
                 
-        // DBG::write( & v,    "x.mat", "x" );
-        // DBG::write( & xref, "y.mat", "y" );
+            for ( int  i = 0; i < nbench; ++i )
+            {
+                tic = Time::Wall::now();
+        
+                hlr::seq::trsvu( apply_trans, *C, xref, general_diag );
+                hlr::seq::trsvl( apply_trans, *C, xref, unit_diag );
+        
+                toc = Time::Wall::since( tic );
 
-        v.axpy( -1, & xref );
-        std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
-    }
+                std::cout << "  trsv in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+
+                tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+                tmax  = std::max( tmax, toc.seconds() );
+                tsum += toc.seconds();
+
+                if ( i < (nbench-1) )
+                    xref.assign( 1.0, & xcopy );
+            }// for
+
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << std::endl;
+
+
+            matrix::luinv_eval  A_inv2( C, impl::dag::refine, impl::dag::run );
+            TScalarVector       v( x );
+        
+            tmin = tmax = tsum = 0;
+        
+            for ( int  i = 0; i < nbench; ++i )
+            {
+                tic = Time::Wall::now();
+
+                A_inv2.apply( & x, & v, apply_trans );
+
+                toc = Time::Wall::since( tic );
+
+                std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+
+                tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
+                tmax  = std::max( tmax, toc.seconds() );
+                tsum += toc.seconds();
+            }// for
+
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << std::endl;
+                
+            // DBG::write( & v,    "x.mat", "x" );
+            // DBG::write( & xref, "y.mat", "y" );
+
+            v.axpy( -1, & xref );
+            std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
+        }
+    }// if
 }

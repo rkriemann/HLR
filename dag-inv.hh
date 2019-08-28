@@ -116,7 +116,7 @@ mymain ( int, char ** )
         
     if ( verbose( 3 ) )
         dag.print_dot( "inv.dot" );
-        
+
     if ( onlydag )
         return;
         

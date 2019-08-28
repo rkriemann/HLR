@@ -921,19 +921,23 @@ gen_dag_invert ( HLIB::TMatrix *  A,
 {
     auto  dag_lu     = gen_dag_lu_rec( A, refine );
     
+    // if ( verbose( 3 ) )
+    //     dag_lu.print_dot( "lu.dot" );
+    
     auto  dag_ll     = refine( new inv_ll_node( A, unit_diag,    store_inverse ), HLIB::CFG::Arith::max_seq_size );
+
+    // if ( verbose( 3 ) )
+    //     dag_ll.print_dot( "inv_ll.dot" );
+    
     auto  dag_ur     = refine( new inv_ur_node( A, general_diag, store_inverse ), HLIB::CFG::Arith::max_seq_size );
     auto  dag_inv    = merge( dag_ll, dag_ur );
 
-    // dag_inv.print_dot( "inv.dot" );
-    
     auto  dag_lu_inv = concat( dag_lu, dag_inv );
-    
-    // dag_lu_inv.print_dot( "lu_inv.dot" );
     
     auto  dag_mul    = refine( new mul_ur_ll_node( A ), HLIB::CFG::Arith::max_seq_size );
 
-    // dag_mul.print_dot( "mul.dot" );
+    // if ( verbose( 3 ) )
+    //     dag_mul.print_dot( "mul.dot" );
     
     auto  dag_all    = concat( dag_lu_inv, dag_mul );
 

@@ -44,6 +44,8 @@ refine ( node *        root,
     std::list< node * >                 tasks;
     std::mutex                          mtx;
     std::list< node * >                 end;
+    const bool                          do_lock = (( hlr::dag::sparsify_mode != hlr::dag::sparsify_none  ) &&
+                                                   ( hlr::dag::sparsify_mode != hlr::dag::sparsify_local ));
     ::tf::Executor                      executor;
     ::tf::Taskflow                      tf;
     
@@ -77,13 +79,13 @@ refine ( node *        root,
         {
             // then refine dependencies and collect new nodes
             tf.parallel_for( size_t(0), node_sets.size(), size_t(1),
-                             [&] ( const auto  i )
+                             [&,do_lock] ( const auto  i )
                              {
                                  const auto &  nset = node_sets[i];
                                  
                                  for ( auto  node : nset )
                                  {
-                                     const bool  node_changed = node->refine_deps( true );
+                                     const bool  node_changed = node->refine_deps( do_lock );
                                      
                                      if ( node->is_refined() )       // node was refined; collect all sub nodes
                                      {

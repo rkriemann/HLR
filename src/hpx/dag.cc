@@ -50,6 +50,8 @@ refine ( node *        root,
     std::list< node * >                 tasks;
     std::mutex                          mtx;
     std::list< node * >                 end;
+    const bool                          do_lock = (( hlr::dag::sparsify_mode != hlr::dag::sparsify_none  ) &&
+                                                   ( hlr::dag::sparsify_mode != hlr::dag::sparsify_local ));
     
     while ( node_sets.size() > 0 )
     {
@@ -83,13 +85,13 @@ refine ( node *        root,
             // then refine dependencies and collect new nodes
             ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
                                        set_range.begin(), set_range.end(),
-                                       [&] ( const auto  i )
+                                       [&,do_lock] ( const auto  i )
                                        {
                                            const auto &  nset = node_sets[i];
                                      
                                            for ( auto  node : nset )
                                            {
-                                               const bool  node_changed = node->refine_deps( true );
+                                               const bool  node_changed = node->refine_deps( do_lock );
 
                                                if ( node->is_refined() )       // node was refined; collect all sub nodes
                                                {

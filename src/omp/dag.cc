@@ -46,6 +46,8 @@ refine ( node *        root,
     std::list< node * >                 tasks;
     std::mutex                          mtx;
     std::list< node * >                 end;
+    const bool                          do_lock = (( hlr::dag::sparsify_mode != hlr::dag::sparsify_none  ) &&
+                                                   ( hlr::dag::sparsify_mode != hlr::dag::sparsify_local ));
     
     #pragma omp parallel
     {
@@ -87,7 +89,7 @@ refine ( node *        root,
                                      
                         for ( auto  node : nset )
                         {
-                            const bool  node_changed = node->refine_deps( true );
+                            const bool  node_changed = node->refine_deps( do_lock );
 
                             if ( node->is_refined() )       // node was refined; collect all sub nodes
                             {
