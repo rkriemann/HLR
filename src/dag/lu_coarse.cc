@@ -34,28 +34,6 @@ namespace dag
 namespace
 {
 
-size_t  coarse_size = 1000;
-
-//
-// return true if matrix is still large enough
-//
-template < typename T >
-bool
-is_large ( const T *  A )
-{
-    assert( ! is_null( A ) );
-    
-    return ( std::min( A->nrows(), A->ncols() ) >= coarse_size );
-}
-
-template < typename T >
-bool is_large_all  ( T *  A )               noexcept { return is_large( A ); }
-
-template < typename T1, typename... T2 >
-bool is_large_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_large( A ) && is_large_all( mtrs... ); }
-
-
-
 // map for apply_node nodes
 using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
 
@@ -223,10 +201,6 @@ lu_node::refine_ ( const size_t  min_size )
 
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
-            //
-            // factorise diagonal block
-            //
-            
             auto  A_ii  = B->block( i, i );
 
             assert( A_ii != nullptr );
@@ -296,36 +270,22 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        //
-        // first create all solve nodes
-        //
-        
         for ( uint i = 0; i < nbr; ++i )
         {
             const auto  L_ii = BL->block( i, i );
-        
-            //
-            // solve in current block row
-            //
 
-            if ( ! is_null( L_ii ) )
-            {
-                for ( uint j = 0; j < nbc; ++j )
-                    if ( ! is_null( BA->block( i, j ) ) )
-                        g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes, run_func );
-            }// if
-        }// for
+            assert( ! is_null( L_ii ) );
 
-        //
-        // then create update nodes with dependencies
-        //
+            for ( uint j = 0; j < nbc; ++j )
+                if ( ! is_null( BA->block( i, j ) ) )
+                    g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes, run_func );
 
-        for ( uint i = 0; i < nbr; ++i )
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
                         g.alloc_node< update_node >( BL->block( k, i ), BA->block( i, j ), BA->block( k, j ),
                                                      apply_nodes, run_func );
+        }// for
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -375,32 +335,22 @@ trsmu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        //
-        // first create all solve nodes
-        //
-        
         for ( uint j = 0; j < nbc; ++j )
         {
             const auto  U_jj = BU->block( j, j );
         
-            if ( ! is_null( U_jj ) )
-            {
-                for ( uint i = 0; i < nbr; ++i )
-                    if ( ! is_null( BA->block(i,j) ) )
-                        g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes, run_func );
-            }// if
-        }// for
+            assert( ! is_null( U_jj ) );
+            
+            for ( uint i = 0; i < nbr; ++i )
+                if ( ! is_null( BA->block(i,j) ) )
+                    g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes, run_func );
 
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint j = 0; j < nbc; ++j )
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
                         g.alloc_node< update_node >( BA->block( i, j ), BU->block( j, k ), BA->block( i, k ),
                                                      apply_nodes, run_func );
+        }// for
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -508,7 +458,7 @@ update_node::run_ ( const TTruncAcc &  acc )
 void
 apply_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_blocked( A ) && is_large( A ) )
+    if ( is_blocked( A ) && ! is_small( A ) )
         A->apply_updates( acc, nonrecursive );
     else
         A->apply_updates( acc, recursive );
@@ -533,7 +483,7 @@ build_apply_dag ( TMatrix *           A,
     if ( parent != nullptr )
         apply->after( parent );
     
-    if ( is_blocked( A ) && is_large( A ) )
+    if ( is_blocked( A ) && is_small( A ) )
     {
         auto  BA = ptrcast( A, TBlockMatrix );
 
@@ -562,11 +512,8 @@ gen_dag_lu_oop_coarse ( TMatrix &            A,
                         const exec_func_t    fine_run,
                         const size_t         ncoarse )
 {
-    if ( ncoarse != 0 )
-        coarse_size = ncoarse;
-
     // if coarse size if too small, generate standard LU DAG
-    if ( coarse_size <= HLIB::CFG::Arith::max_seq_size )
+    if ( ncoarse <= HLIB::CFG::Arith::max_seq_size )
         return gen_dag_lu_oop_auto( A, refine );
             
     apply_map_t  apply_map;
