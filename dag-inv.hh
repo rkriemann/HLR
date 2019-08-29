@@ -88,7 +88,7 @@ mymain ( int, char ** )
     {
         tic = Time::Wall::now();
         
-        dag = std::move( hlr::dag::gen_dag_invert( A_inv.get(), impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_invert( *A_inv, impl::dag::refine ) );
         
         toc = Time::Wall::since( tic );
         

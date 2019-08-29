@@ -542,14 +542,14 @@ shift_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_accu ( TMatrix *      A,
-                  refine_func_t  refine )
+gen_dag_lu_oop_accu ( TMatrix &      A,
+                      refine_func_t  refine )
 {
     //
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( A ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size );
 
     return std::move( dag );
     

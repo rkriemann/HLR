@@ -24,22 +24,15 @@ namespace dag
 // compute DAG for in-place LU of <A>
 //
 graph
-gen_dag_lu_rec    ( HLIB::TMatrix *  A,
-                    refine_func_t    refine );
-
-//
-// compute DAG for in-place LU of <A> using accumulators
-//
-graph
-gen_dag_lu_accu   ( HLIB::TMatrix *  A,
-                    refine_func_t    refine );
+gen_dag_lu_rec    ( HLIB::TMatrix &    A,
+                    refine_func_t      refine );
 
 //
 // compute DAG for LU of <A> using out-of-place ids
 //
 graph
-gen_dag_lu_oop    ( HLIB::TMatrix &  A,
-                    refine_func_t    refine );
+gen_dag_lu_oop    ( HLIB::TMatrix &    A,
+                    refine_func_t      refine );
 
 //
 // compute DAG for out-of-place LU of <A> with automatic local dependencies
@@ -49,15 +42,27 @@ gen_dag_lu_oop_auto ( HLIB::TMatrix &  A,
                       refine_func_t    refine );
 
 //
+// compute DAG for in-place LU of <A> using accumulators
+//
+graph
+gen_dag_lu_oop_accu ( HLIB::TMatrix &  A,
+                      refine_func_t    refine );
+
+//
+// compute DAG for LU of <A> using out-of-place ids
+//
+graph
+gen_dag_lu_oop_accu_sep ( HLIB::TMatrix &  A,
+                          refine_func_t    refine );
+
+//
 // compute DAG for coarse version of LU with on-the-fly DAGs for small matrices
 //
 graph
-gen_dag_coarselu  ( HLIB::TMatrix *                                            A,
-                    refine_func_t                                              coarse_refine,
-                    refine_func_t                                              fine_refine,
-                    const std::function< void ( hlr::dag::graph &,
-                                                const HLIB::TTruncAcc & ) >    fine_run,
-                    const size_t                                               ncoarse = 0 );
+gen_dag_lu_oop_coarse  ( HLIB::TMatrix &    A,
+                         refine_func_t      refine,
+                         exec_func_t        fine_run,
+                         const size_t       ncoarse = 0 );
 
 //
 // level wise computation of DAG for LU of <A>

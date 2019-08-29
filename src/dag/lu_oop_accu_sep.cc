@@ -16,10 +16,8 @@
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
 
-#include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
-#include "hlr/utils/tensor.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
 
@@ -30,19 +28,26 @@ using namespace HLIB;
 namespace
 {
 
+// map for apply_node nodes
+using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
+
 using HLIB::id_t;
 
 // identifiers for memory blocks
-constexpr id_t  ID_A = 'A';
-constexpr id_t  ID_L = 'L';
-constexpr id_t  ID_U = 'U';
+constexpr id_t  ID_A    = 'A';
+constexpr id_t  ID_L    = 'L';
+constexpr id_t  ID_U    = 'U';
+constexpr id_t  ID_ACCU = 'X';
 
 struct lu_node : public node
 {
-    TMatrix *  A;
+    TMatrix *      A;
+    apply_map_t &  apply_map;
     
-    lu_node ( TMatrix *  aA )
+    lu_node ( TMatrix *      aA,
+              apply_map_t &  aapply_map )
             : A( aA )
+            , apply_map( aapply_map )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
@@ -59,11 +64,14 @@ struct trsmu_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
+    apply_map_t &    apply_map;
     
     trsmu_node ( const TMatrix *  aU,
-                 TMatrix *        aA )
+                 TMatrix *        aA,
+                 apply_map_t &    aapply_map )
             : U( aU )
             , A( aA )
+            , apply_map( aapply_map )
     { init(); }
     
     virtual std::string  to_string () const { return HLIB::to_string( "L%d = trsmu( U%d, A%d )", A->id(), U->id(), A->id() ); }
@@ -80,11 +88,14 @@ struct trsml_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
+    apply_map_t &    apply_map;
 
     trsml_node ( const TMatrix *  aL,
-                 TMatrix *        aA )
+                 TMatrix *        aA,
+                 apply_map_t &    aapply_map )
             : L( aL )
             , A( aA )
+            , apply_map( aapply_map )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "U%d = trsml( L%d, A%d )", A->id(), L->id(), A->id() ); }
@@ -102,13 +113,16 @@ struct update_node : public node
     const TMatrix *  A;
     const TMatrix *  B;
     TMatrix *        C;
+    apply_map_t &    apply_map;
 
     update_node ( const TMatrix *  aA,
                   const TMatrix *  aB,
-                  TMatrix *        aC )
+                  TMatrix *        aC,
+                  apply_map_t &    aapply_map )
             : A( aA )
             , B( aB )
             , C( aC )
+            , apply_map( aapply_map )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "A%d = mul( L%d, U%d )", C->id(), A->id(), B->id() ); }
@@ -118,7 +132,33 @@ private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A,    C->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const
+    {
+        if ( CFG::Arith::use_accu ) return { { ID_ACCU, C->block_is() } };
+        else                        return { { ID_A,    C->block_is() } };
+    }
+};
+
+struct apply_node : public node
+{
+    TMatrix *  A;
+    
+    apply_node ( TMatrix *  aA )
+            : A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "apply( %d )", A->id() ); }
+    virtual std::string  color     () const { return "edd400"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_ACCU, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const
+    {
+        if ( is_leaf( A ) ) return { { ID_A,    A->block_is() } };
+        else                return { { ID_ACCU, A->block_is() } };
+    }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -140,8 +180,6 @@ lu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
 
-        tensor2< node * >  finished( nbr, nbc );
-        
         for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
         {
             //
@@ -154,45 +192,37 @@ lu_node::refine_ ( const size_t  min_size )
 
             assert( ! is_null_any( A_ii, L_ii, U_ii ) );
 
-            finished( i, i ) = g.alloc_node< lu_node >( A_ii );
+            g.alloc_node< lu_node >( A_ii, apply_map );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( BA->block( j, i ) ) )
-                {
-                    finished( j, i ) = g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
-                    finished( j, i )->after( finished( i, i ) );
-                }// if
+                    g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ), apply_map );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( BA->block( i, j ) ) )
-                {
-                    finished( i, j ) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
-                    finished( i, j )->after( finished( i, i ) );
-                }// if
-        }// for
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
+                    g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_map );
+
             for ( uint j = i+1; j < nbr; j++ )
             {
                 for ( uint l = i+1; l < nbc; l++ )
                 {
                     if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BL->block( j, i ),
-                                                                    BU->block( i, l ),
-                                                                    BA->block( j, l ) );
-
-                        update->after( finished( j, i ) );
-                        update->after( finished( i, l ) );
-                        finished( j, l )->after( update );
-                    }// if
+                        g.alloc_node< update_node >( BL->block( j, i ),
+                                                     BU->block( i, l ),
+                                                     BA->block( j, l ),
+                                                     apply_map );
                 }// for
             }// for
         }// for
     }// if
+    else if ( CFG::Arith::use_accu )
+    {
+        auto  apply = apply_map[ A->id() ];
+        
+        assert( apply != nullptr );
 
-    g.finalize();
+        apply->before( this );
+    }// if
     
     return g;
 }
@@ -200,6 +230,9 @@ lu_node::refine_ ( const size_t  min_size )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
     HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
@@ -221,8 +254,6 @@ trsmu_node::refine_ ( const size_t  min_size )
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
-
-        tensor2< node * >  finished( nbr, nbc );
         
         for ( uint j = 0; j < nbc; ++j )
         {
@@ -232,26 +263,25 @@ trsmu_node::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
-        }// for
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
+                    g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ), apply_map );
+
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BX->block( i, j ),
-                                                                    BU->block( j, k ),
-                                                                    BA->block( i, k ) );
-
-                        update->after( finished( i, j ) );
-                        finished( i, k )->after( update );
-                    }// if
+                        g.alloc_node< update_node >( BX->block( i, j ),
+                                                     BU->block( j, k ),
+                                                     BA->block( i, k ),
+                                                     apply_map );
         }// for
     }// if
+    else if ( CFG::Arith::use_accu )
+    {
+        auto  apply = apply_map[ A->id() ];
+        
+        assert( apply != nullptr );
 
-    g.finalize();
+        apply->before( this );
+    }// if
     
     return g;
 }
@@ -259,6 +289,9 @@ trsmu_node::refine_ ( const size_t  min_size )
 void
 trsmu_node::run_ ( const TTruncAcc &  acc )
 {
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
     solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
 }
 
@@ -280,8 +313,6 @@ trsml_node::refine_ ( const size_t  min_size )
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
-
-        tensor2< node * >  finished( nbr, nbc );
         
         for ( uint i = 0; i < nbr; ++i )
         {
@@ -291,26 +322,25 @@ trsml_node::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
-        }// for
+                    g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ), apply_map );
         
-        for ( uint i = 0; i < nbr; ++i )
-        {
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BL->block( k, i ),
-                                                                    BX->block( i, j ),
-                                                                    BA->block( k, j ) );
-
-                        update->after( finished( i, j ) );
-                        finished( k, j )->after( update );
-                    }// if
+                        g.alloc_node< update_node >( BL->block( k, i ),
+                                                     BX->block( i, j ),
+                                                     BA->block( k, j ),
+                                                     apply_map );
         }// for
     }// if
+    else if ( CFG::Arith::use_accu )
+    {
+        auto  apply = apply_map[ A->id() ];
+        
+        assert( apply != nullptr );
 
-    g.finalize();
+        apply->before( this );
+    }// if
     
     return g;
 }
@@ -318,6 +348,9 @@ trsml_node::refine_ ( const size_t  min_size )
 void
 trsml_node::run_ ( const TTruncAcc &  acc )
 {
+    if ( CFG::Arith::use_accu )
+        A->apply_updates( acc, recursive );
+    
     solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 }
 
@@ -354,10 +387,19 @@ update_node::refine_ ( const size_t  min_size )
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
                         g.alloc_node< update_node >( BA->block( i, k ),
                                                      BB->block( k, j ),
-                                                     BC->block( i, j ) );
+                                                     BC->block( i, j ),
+                                                     apply_map );
                 }// for
             }// for
         }// for
+    }// if
+    else if ( CFG::Arith::use_accu )
+    {
+        auto  apply = apply_map[ C->id() ];
+        
+        assert( apply != nullptr );
+
+        apply->after( this );
     }// if
 
     g.finalize();
@@ -368,7 +410,68 @@ update_node::refine_ ( const size_t  min_size )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    if ( CFG::Arith::use_accu )
+        add_product( real(-1),
+                     apply_normal, A,
+                     apply_normal, B,
+                     C, acc );
+    else
+        multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// apply_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+void
+apply_node::run_ ( const TTruncAcc &  acc )
+{
+    if ( is_blocked( A ) && ! is_small( A ) )
+        A->apply_updates( acc, nonrecursive );
+    else
+        A->apply_updates( acc, recursive );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// apply DAG
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+//
+// construct DAG for applying updates
+//
+void
+build_apply_dag ( TMatrix *           A,
+                  node *              parent,
+                  apply_map_t &       apply_map,
+                  dag::node_list_t &  apply_nodes )
+{
+    if ( is_null( A ) )
+        return;
+    
+    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
+
+    apply_map[ A->id() ] = apply;
+
+    if ( parent != nullptr )
+        apply->after( parent );
+    
+    if ( is_blocked( A ) && ! is_small( A ) )
+    {
+        auto  BA = ptrcast( A, TBlockMatrix );
+
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+            {
+                if ( BA->block( i, j ) != nullptr )
+                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes );
+            }// for
+        }// for
+    }// if
 }
 
 }// namespace anonymous
@@ -380,10 +483,29 @@ update_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_oop ( TMatrix &      A,
-                 refine_func_t  refine )
+gen_dag_lu_oop_accu_sep ( TMatrix &      A,
+                          refine_func_t  refine )
 {
-    return std::move( refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size ) );
+    //
+    // generate DAG for shifting and applying updates
+    //
+    
+    apply_map_t       apply_map;
+    dag::node_list_t  apply_nodes;
+
+    if ( CFG::Arith::use_accu )
+        build_apply_dag( & A, nullptr, apply_map, apply_nodes );
+    
+    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size );
+
+    if ( ! CFG::Arith::use_accu )
+        return std::move( dag );
+    else
+    {
+        dag.add_nodes( apply_nodes );
+
+        return std::move( dag );
+    }// else
 }
 
 }// namespace dag

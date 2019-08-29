@@ -23,7 +23,7 @@ namespace dag
 // - if <diag> == unit_diag, diagonal blocks are not modified
 //
 dag::graph
-gen_dag_invert_ll ( HLIB::TMatrix *          L,
+gen_dag_invert_ll ( HLIB::TMatrix &          L,
                     const HLIB::diag_type_t  diag,
                     refine_func_t            refine );
 
@@ -32,7 +32,7 @@ gen_dag_invert_ll ( HLIB::TMatrix *          L,
 // - if <diag> == unit_diag, diagonal blocks are not modified
 //
 dag::graph
-gen_dag_invert_ur ( HLIB::TMatrix *          U,
+gen_dag_invert_ur ( HLIB::TMatrix &          U,
                     const HLIB::diag_type_t  diag,
                     refine_func_t            refine );
 
@@ -40,7 +40,7 @@ gen_dag_invert_ur ( HLIB::TMatrix *          U,
 // compute DAG for inversion of A
 //
 dag::graph
-gen_dag_invert    ( HLIB::TMatrix *          A,
+gen_dag_invert    ( HLIB::TMatrix &          A,
                     refine_func_t            refine );
 
 }// namespace dag

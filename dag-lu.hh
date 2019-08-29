@@ -116,8 +116,8 @@ mymain ( int, char ** )
         }// if
         else if ( coarse > 0 )
         {
-            hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
-            hlr::dag::def_path_len  = 2;
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+            hlr::dag::def_path_len  = 10;
         }// if
         else if ( oop_lu )
         {
@@ -158,16 +158,16 @@ mymain ( int, char ** )
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
         else if ( coarse > 0 )
-            dag = std::move( hlr::dag::gen_dag_coarselu( C.get(), impl::dag::refine, seq::dag::refine, impl::dag::run, ncoarse ) );
+            dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, impl::dag::refine, impl::dag::run, ncoarse ) );
         else if ( oop_lu )
         {
             if ( CFG::Arith::use_accu )
-                dag = std::move( hlr::dag::gen_dag_lu_accu( C.get(), impl::dag::refine ) );
+                dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, impl::dag::refine ) );
             else
                 dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
         }// if
         else 
-            dag = std::move( hlr::dag::gen_dag_lu_rec( C.get(), impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_lu_rec( *C, impl::dag::refine ) );
         
         // LIKWID_MARKER_STOP( "dag" );
         

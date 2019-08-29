@@ -144,7 +144,7 @@ refine ( node *        root,
                            end.push_back( node );
                    } );
 
-    return graph( std::move( tasks ), std::move( start ), std::move( end ), hlr::dag::use_multiple_end_nodes );
+    return graph( std::move( tasks ), std::move( start ), std::move( end ), hlr::dag::use_single_end_node );
 }
 
 //

@@ -21,7 +21,6 @@
 #include "hlr/utils/tools.hh"
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/seq/dag.hh"
-#include "hlr/tbb/dag.hh"
 #include "hlr/dag/lu.hh"
 
 namespace hlr
@@ -60,27 +59,25 @@ bool is_large_all  ( T1 *  A, T2...  mtrs ) noexcept { return is_large( A ) && i
 // map for apply_node nodes
 using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
 
-// refine and rnu functions for fine graphs
-using  run_func_t    = std::function< void ( hlr::dag::graph &, const HLIB::TTruncAcc & ) >;
+using HLIB::id_t;
 
 // identifiers for memory blocks
-const HLIB::id_t  id_A = 'A';
-const HLIB::id_t  id_U = 'U';
+constexpr id_t  ID_A    = 'A';
+constexpr id_t  ID_L    = 'L';
+constexpr id_t  ID_U    = 'U';
+constexpr id_t  ID_ACCU = 'X';
 
 struct lu_node : public node
 {
     TMatrix *      A;
     apply_map_t &  apply_nodes;
-    refine_func_t  refine_func;
-    run_func_t     run_func;
+    exec_func_t    run_func;
     
     lu_node ( TMatrix *      aA,
               apply_map_t &  aapply_nodes,
-              refine_func_t  arefine_func,
-              run_func_t     arun_func )
+              exec_func_t    arun_func )
             : A( aA )
             , apply_nodes( aapply_nodes )
-            , refine_func( arefine_func )
             , run_func(    arun_func )
     { init(); }
 
@@ -90,27 +87,24 @@ struct lu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
 
-struct solve_upper_node : public node
+struct trsmu_node : public node
 {
     const TMatrix *  U;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
-    refine_func_t    refine_func;
-    run_func_t       run_func;
+    exec_func_t      run_func;
     
-    solve_upper_node ( const TMatrix *  aU,
+    trsmu_node ( const TMatrix *  aU,
                        TMatrix *        aA,
                        apply_map_t &    aapply_nodes,
-                       refine_func_t    arefine_func,
-                       run_func_t       arun_func )
+                       exec_func_t      arun_func )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
-            , refine_func( arefine_func )
             , run_func(    arun_func )
     { init(); }
     
@@ -121,27 +115,24 @@ struct solve_upper_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, U->block_is() }, { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 };
 
-struct solve_lower_node : public node
+struct trsml_node : public node
 {
     const TMatrix *  L;
     TMatrix *        A;
     apply_map_t &    apply_nodes;
-    refine_func_t    refine_func;
-    run_func_t       run_func;
+    exec_func_t      run_func;
 
-    solve_lower_node ( const TMatrix *  aL,
+    trsml_node ( const TMatrix *  aL,
                        TMatrix *        aA,
                        apply_map_t &    aapply_nodes,
-                       refine_func_t    arefine_func,
-                       run_func_t       arun_func )
+                       exec_func_t      arun_func )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )
-            , refine_func( arefine_func )
             , run_func(    arun_func )
     { init(); }
 
@@ -152,8 +143,8 @@ struct solve_lower_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, L->block_is() }, { id_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 };
     
 struct update_node : public node
@@ -162,20 +153,17 @@ struct update_node : public node
     const TMatrix *  B;
     TMatrix *        C;
     apply_map_t &    apply_nodes;
-    refine_func_t    refine_func;
-    run_func_t       run_func;
+    exec_func_t      run_func;
 
     update_node ( const TMatrix *  aA,
                   const TMatrix *  aB,
                   TMatrix *        aC,
                   apply_map_t &    aapply_nodes,
-                  refine_func_t    arefine_func,
-                  run_func_t       arun_func )
+                  exec_func_t      arun_func )
             : A( aA )
             , B( aB )
             , C( aC )
             , apply_nodes( aapply_nodes )
-            , refine_func( arefine_func )
             , run_func(    arun_func )
     { init(); }
 
@@ -186,11 +174,11 @@ struct update_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_A, B->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
-        if ( CFG::Arith::use_accu ) return { { id_U, C->block_is() } };
-        else                        return { { id_A, C->block_is() } };
+        if ( CFG::Arith::use_accu ) return { { ID_ACCU, C->block_is() } };
+        else                        return { { ID_A,    C->block_is() } };
     }
 };
 
@@ -208,10 +196,10 @@ struct apply_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; } // not needed because of direct DAG generation
-    virtual const block_list_t  in_blocks_   () const { return { { id_U, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
-        if ( is_leaf( A ) ) return { { id_A, A->block_is() } };
+        if ( is_leaf( A ) ) return { { ID_A, A->block_is() } };
         else                return { };
     }
 };
@@ -223,11 +211,11 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lu_node::refine_ ( const size_t )
+lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && is_large( A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
@@ -243,24 +231,21 @@ lu_node::refine_ ( const size_t )
 
             assert( A_ii != nullptr );
 
-            hlr::dag::alloc_node< lu_node >( g, A_ii,
-                                             apply_nodes, refine_func, run_func );
+            g.alloc_node< lu_node >( A_ii, apply_nodes, run_func );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
-                    hlr::dag::alloc_node< solve_upper_node >( g, A_ii, B->block( j, i ),
-                                                              apply_nodes, refine_func, run_func );
+                    g.alloc_node< trsmu_node >( A_ii, B->block( j, i ), apply_nodes, run_func );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
-                    hlr::dag::alloc_node< solve_lower_node >( g, A_ii, B->block( i, j ),
-                                                              apply_nodes, refine_func, run_func );
+                    g.alloc_node< trsml_node >( A_ii, B->block( i, j ), apply_nodes, run_func );
 
             for ( uint j = i+1; j < nbr; j++ )
                 for ( uint l = i+1; l < nbc; l++ )
                     if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
-                        hlr::dag::alloc_node< update_node >( g, B->block( j, i ), B->block( i, l ), B->block( j, l ),
-                                                             apply_nodes, refine_func, run_func );
+                        g.alloc_node< update_node >( B->block( j, i ), B->block( i, l ), B->block( j, l ),
+                                                     apply_nodes, run_func );
         }// for
     }// if
     else if ( CFG::Arith::use_accu )
@@ -278,23 +263,33 @@ lu_node::refine_ ( const size_t )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = gen_dag_lu_rec( A, refine_func );
+    const auto  min_size = HLIB::CFG::Arith::max_seq_size;
+        
+    if ( is_small( min_size, A ) || is_leaf( A ) )
+    {
+        HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    }// if
+    else
+    {
+        apply_map_t  apply_map;
+        auto         dag = seq::dag::refine( new lu_node( A, apply_map, run_func ), min_size );
 
-    run_func( dag, acc );
+        run_func( dag, acc );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// solve_lower_node
+// trsml_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_lower_node::refine_ ( const size_t )
+trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && is_large_all( A, L ) )
+    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -317,8 +312,7 @@ solve_lower_node::refine_ ( const size_t )
             {
                 for ( uint j = 0; j < nbc; ++j )
                     if ( ! is_null( BA->block( i, j ) ) )
-                        hlr::dag::alloc_node< solve_lower_node >( g, L_ii, BA->block( i, j ),
-                                                                  apply_nodes, refine_func, run_func );
+                        g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes, run_func );
             }// if
         }// for
 
@@ -330,8 +324,8 @@ solve_lower_node::refine_ ( const size_t )
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        hlr::dag::alloc_node< update_node >( g, BL->block( k, i ), BA->block( i, j ), BA->block( k, j ),
-                                                             apply_nodes, refine_func, run_func );
+                        g.alloc_node< update_node >( BL->block( k, i ), BA->block( i, j ), BA->block( k, j ),
+                                                     apply_nodes, run_func );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -346,26 +340,35 @@ solve_lower_node::refine_ ( const size_t )
 }
 
 void
-solve_lower_node::run_ ( const TTruncAcc &  acc )
+trsml_node::run_ ( const TTruncAcc &  acc )
 {
-    // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-    auto  dag = gen_dag_solve_lower( L, A, refine_func );
+    const auto  min_size = HLIB::CFG::Arith::max_seq_size;
+        
+    if ( is_small_any( min_size, A, L ) || is_leaf_any( A, L ) )
+    {
+        solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    }// if
+    else
+    {
+        apply_map_t  apply_map;
+        auto         dag = seq::dag::refine( new trsml_node( L, A, apply_map, run_func ), min_size );
 
-    run_func( dag, acc );
+        run_func( dag, acc );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// solve_upper_node
+// trsmu_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-solve_upper_node::refine_ ( const size_t )
+trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && is_large_all( A, U ) )
+    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -384,8 +387,7 @@ solve_upper_node::refine_ ( const size_t )
             {
                 for ( uint i = 0; i < nbr; ++i )
                     if ( ! is_null( BA->block(i,j) ) )
-                        hlr::dag::alloc_node< solve_upper_node >( g, U_jj, BA->block( i, j ),
-                                                                  apply_nodes, refine_func, run_func );
+                        g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes, run_func );
             }// if
         }// for
 
@@ -397,8 +399,8 @@ solve_upper_node::refine_ ( const size_t )
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        hlr::dag::alloc_node< update_node >( g, BA->block( i, j ), BU->block( j, k ), BA->block( i, k ),
-                                                             apply_nodes, refine_func, run_func );
+                        g.alloc_node< update_node >( BA->block( i, j ), BU->block( j, k ), BA->block( i, k ),
+                                                     apply_nodes, run_func );
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -413,12 +415,21 @@ solve_upper_node::refine_ ( const size_t )
 }
 
 void
-solve_upper_node::run_ ( const TTruncAcc &  acc )
+trsmu_node::run_ ( const TTruncAcc &  acc )
 {
-    // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-    auto  dag = gen_dag_solve_upper( U, A, refine_func );
+    const auto  min_size = HLIB::CFG::Arith::max_seq_size;
 
-    run_func( dag, acc );
+    if ( is_small_any( min_size, U, A ) || is_leaf_any( U, A ) )
+    {
+        solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    }// if
+    else
+    {
+        apply_map_t  apply_map;
+        auto         dag = seq::dag::refine( new trsmu_node( U, A, apply_map, run_func ), min_size );
+
+        run_func( dag, acc );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -428,11 +439,11 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-update_node::refine_ ( const size_t )
+update_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && is_large_all( A, B, C ) )
+    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -452,13 +463,8 @@ update_node::refine_ ( const size_t )
                 for ( uint  k = 0; k < BA->block_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        hlr::dag::alloc_node< update_node >( g,
-                                                             BA->block( i, k ),
-                                                             BB->block( k, j ),
-                                                             BC->block( i, j ),
-                                                             apply_nodes,
-                                                             refine_func,
-                                                             run_func );
+                        g.alloc_node< update_node >( BA->block( i, k ), BB->block( k, j ), BC->block( i, j ),
+                                                     apply_nodes, run_func );
                 }// for
             }// for
         }// for
@@ -478,10 +484,19 @@ update_node::refine_ ( const size_t )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
-    auto  dag = gen_dag_update( A, B, C, refine_func );
+    const auto  min_size = HLIB::CFG::Arith::max_seq_size;
 
-    run_func( dag, acc );
+    if ( is_small_any( min_size, A, B, C ) || is_leaf_any( A, B, C ) )
+    {
+        multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    }// if
+    else
+    {
+        apply_map_t  apply_map;
+        auto         dag = seq::dag::refine( new update_node( A, B, C, apply_map, run_func ), min_size );
+
+        run_func( dag, acc );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -510,8 +525,6 @@ build_apply_dag ( TMatrix *           A,
 {
     if ( is_null( A ) )
         return;
-    
-    // DBG::printf( "apply( %d )", A->id() );
     
     auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
 
@@ -544,23 +557,22 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_coarselu ( TMatrix *            A,
-                   const refine_func_t  coarse_refine,
-                   const refine_func_t  fine_refine,
-                   const run_func_t     fine_run,
-                   const size_t         ncoarse )
+gen_dag_lu_oop_coarse ( TMatrix &            A,
+                        const refine_func_t  refine,
+                        const exec_func_t    fine_run,
+                        const size_t         ncoarse )
 {
     if ( ncoarse != 0 )
         coarse_size = ncoarse;
 
     // if coarse size if too small, generate standard LU DAG
     if ( coarse_size <= HLIB::CFG::Arith::max_seq_size )
-        return gen_dag_lu_rec( A, coarse_refine );
+        return gen_dag_lu_oop_auto( A, refine );
             
     apply_map_t  apply_map;
-    auto         dag = coarse_refine( new lu_node( A, apply_map, fine_refine, fine_run ), ncoarse );
+    auto         dag = refine( new lu_node( & A, apply_map, fine_run ), ncoarse );
 
-    return dag;
+    return std::move( dag );
 }
 
 }// namespace dag

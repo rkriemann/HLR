@@ -893,11 +893,11 @@ mul_ur_ll_node::run_ ( const TTruncAcc & )
 // - if <diag> == unit_diag, diagonal blocks are not modified
 //
 dag::graph
-gen_dag_invert_ll ( HLIB::TMatrix *    L,
+gen_dag_invert_ll ( HLIB::TMatrix &    L,
                     const diag_type_t  diag,
                     refine_func_t      refine )
 {
-    return refine( new inv_ll_node( L, diag, store_normal ), HLIB::CFG::Arith::max_seq_size );
+    return refine( new inv_ll_node( & L, diag, store_normal ), HLIB::CFG::Arith::max_seq_size );
 }
 
 //
@@ -905,36 +905,36 @@ gen_dag_invert_ll ( HLIB::TMatrix *    L,
 // - if <diag> == unit_diag, diagonal blocks are not modified
 //
 dag::graph
-gen_dag_invert_ur ( HLIB::TMatrix *    U,
+gen_dag_invert_ur ( HLIB::TMatrix &    U,
                     const diag_type_t  diag,
                     refine_func_t      refine )
 {
-    return refine( new inv_ur_node( U, diag, store_normal ), HLIB::CFG::Arith::max_seq_size );
+    return refine( new inv_ur_node( & U, diag, store_normal ), HLIB::CFG::Arith::max_seq_size );
 }
 
 //
 // compute DAG for inversion of A
 //
 dag::graph
-gen_dag_invert ( HLIB::TMatrix *  A,
+gen_dag_invert ( HLIB::TMatrix &  A,
                  refine_func_t    refine )
 {
-    auto  dag_lu     = gen_dag_lu_rec( A, refine );
+    auto  dag_lu     = gen_dag_lu_oop_auto( A, refine );
     
     // if ( verbose( 3 ) )
     //     dag_lu.print_dot( "lu.dot" );
     
-    auto  dag_ll     = refine( new inv_ll_node( A, unit_diag,    store_inverse ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag_ll     = refine( new inv_ll_node( &A, unit_diag,    store_inverse ), HLIB::CFG::Arith::max_seq_size );
 
     // if ( verbose( 3 ) )
     //     dag_ll.print_dot( "inv_ll.dot" );
     
-    auto  dag_ur     = refine( new inv_ur_node( A, general_diag, store_inverse ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag_ur     = refine( new inv_ur_node( &A, general_diag, store_inverse ), HLIB::CFG::Arith::max_seq_size );
     auto  dag_inv    = merge( dag_ll, dag_ur );
 
     auto  dag_lu_inv = concat( dag_lu, dag_inv );
     
-    auto  dag_mul    = refine( new mul_ur_ll_node( A ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag_mul    = refine( new mul_ur_ll_node( &A ), HLIB::CFG::Arith::max_seq_size );
 
     // if ( verbose( 3 ) )
     //     dag_mul.print_dot( "mul.dot" );
