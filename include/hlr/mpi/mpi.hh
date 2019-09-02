@@ -22,7 +22,6 @@ namespace mpi
 
 #define MPI_CHECK_RESULT( MPIFunc, Args )                               \
     {                                                                   \
-        hlr::log( 5, std::string( __ASSERT_FUNCTION ) + " : " + #MPIFunc ); \
         int _check_result = MPIFunc Args;                               \
         assert(_check_result == MPI_SUCCESS);                           \
     }

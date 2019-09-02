@@ -26,6 +26,8 @@
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/mpi/arith.hh"
+#include "hlr/dag/lu.hh"
+#include "hlr/tbb/dag.hh"
 
 namespace hlr
 {
@@ -480,7 +482,11 @@ lu ( TMatrix *          A,
         if ( pid == p_ii )
         {
             log( 4, HLIB::to_string( "lu( %d )", A_ii->id() ) );
-            HLIB::LU::factorise_rec( A_ii, acc );
+
+            // HLIB::LU::factorise_rec( A_ii, acc );
+            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *A_ii, tbb::dag::refine ) );
+
+            tbb::dag::run( dag, acc );
         }// if
 
         // nothing to solve/update at last step
@@ -560,7 +566,11 @@ lu ( TMatrix *          A,
                         wait_ii();
             
                     log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
-                    solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+
+                    // solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+                    auto  dag = std::move( gen_dag_solve_upper( H_ii, A_ji, tbb::dag::refine ) );
+
+                    tbb::dag::run( dag, acc );
                 }// if
             }// for
 
@@ -578,7 +588,11 @@ lu ( TMatrix *          A,
                         wait_ii();
                     
                     log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
-                    solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+
+                    //solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+                    auto  dag = std::move( gen_dag_solve_lower( H_ii, A_il, tbb::dag::refine ) );
+
+                    tbb::dag::run( dag, acc );
                 }// if
             }// for
 
@@ -713,6 +727,7 @@ lu ( TMatrix *          A,
                 
                     log( 4, HLIB::to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
                     
+                    // recursive method has same degree of parallelism as DAG method
                     multiply( -1.0, row_i[j], col_i[l], 1.0, A_jl, acc );
                 }// if
             }// for
