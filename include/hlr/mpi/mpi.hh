@@ -8,11 +8,25 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+// prevent warnings MPI headers
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wcast-function-type"
+#  pragma GCC diagnostic ignored "-Wold-style-cast"
+#  pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
 #include <mpi.h>
 #include <cassert>
 #include <vector>
 
 #include "hlr/utils/log.hh"
+
+///////////////////////////////////////////////////////////////
+//
+// prevent MPI warnings
+//
+///////////////////////////////////////////////////////////////
 
 namespace hlr
 {
@@ -370,5 +384,10 @@ public:
 }// namespace mpi
 
 }// namespace hlr
+
+// re-enable warnings
+// #if defined(__GNUC__)
+// #  pragma GCC diagnostic pop
+// #endif
 
 #endif //  __HLR_MPI_HH

@@ -21,6 +21,7 @@ namespace fs = boost::filesystem;
 #include <matrix/structure.hh>
 #include <io/TMatrixIO.hh>
 
+#include "hlr/utils/term.hh"
 #include "hlr/utils/compare.hh"
 
 namespace hlr
@@ -33,11 +34,9 @@ using namespace HLIB;
 //
 void
 compare_ref_file ( TMatrix *            A,
-                   const std::string &  filename )
+                   const std::string &  filename,
+                   const double         error )
 {
-    // mpi::communicator  world;
-    // const auto         pid = world.rank();
-
     if ( fs::exists( filename ) )
     {
         auto  D  = read_matrix( filename );
@@ -62,9 +61,11 @@ compare_ref_file ( TMatrix *            A,
                     {
                         const auto  f = diff_norm_F( BD->block( i, j ), BA->block( i, j ) );
 
-                        if ( f > 1e-10 )
+                        if ( f > error )
                         {
-                            DBG::printf( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BA->block( i, j ) ) );
+                            std::cout << term::ltred
+                                      << HLIB::to_string( "%2d,%2d : %.6e", i, j, diff_norm_F( BD->block( i, j ), BA->block( i, j ) ) )
+                                      << term::reset << std::endl;
                             correct = false;
                         }// if
                     }// if
@@ -72,11 +73,20 @@ compare_ref_file ( TMatrix *            A,
             }// for
 
             if ( correct )
-                std::cout << "    no error" << std::endl;
+                std::cout << term::ltgreen << "no error" << term::reset << std::endl;
         }// if
+        else
+        {
+            std::cout << term::ltred << "different block structure" << term::reset << std::endl;
+
+            std::cout << BA->block_is().to_string() << std::endl
+                      << BA->nblock_rows() << " x " << BA->nblock_cols() << std::endl;
+            std::cout << BD->block_is().to_string() << std::endl
+                      << BD->nblock_rows() << " x " << BD->nblock_cols() << std::endl;
+        }// else
     }// if
     else
-        std::cout << "    no reference matrix found" << std::endl;
+        std::cout << "no reference matrix found" << std::endl;
 }
 
 }// namespace hlr
