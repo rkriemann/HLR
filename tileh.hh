@@ -8,6 +8,7 @@
 
 #include "common.inc"
 #include "hlr/cluster/tileh.hh"
+#include "hlr/seq/norm.hh"
 
 //
 // main function
@@ -40,6 +41,11 @@ mymain ( int, char ** )
     
     std::cout << "    done in " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
     std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    norm  = " << seq::norm::norm_F( *A ) << std::endl;
+    std::cout << "    norm  = " << seq::norm::norm_F( 1.0, *A, -1.0, *A ) << std::endl;
+    std::cout << "    norm  = " << HLIB::diff_norm_F( A.get(), A.get() ) << std::endl;
+
+    DBG::write( A.get(), "A.mat", "A" );
     
     if ( verbose( 3 ) )
     {
