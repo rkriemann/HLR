@@ -11,6 +11,7 @@
 #include <matrix/TMatrix.hh>
 #include <blas/Algebra.hh>
 
+#include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
 
 namespace hlr { namespace seq { namespace norm {
@@ -150,15 +151,15 @@ norm_F ( const double     alpha,
                               
                               for ( size_t  l = 0; l < rank1; l++ )
                               {
-                                  const auto  U_l = U1.column( l );
-                                  const auto  V_l = V1.column( l );
+                                  const auto  U1_l = U1.column( l );
+                                  const auto  V1_l = V1.column( l );
                                   
                                   for ( size_t  k = 0; k < rank2; k++ )
                                   {
-                                      const auto  U_k = U2.column( k );
-                                      const auto  V_k = V2.column( k );
+                                      const auto  U2_k = U2.column( k );
+                                      const auto  V2_k = V2.column( k );
                                       
-                                      val += BLAS::dot( U_l, U_k ) * BLAS::dot( V_l, V_k );
+                                      val += BLAS::dot( U1_l, U2_k ) * BLAS::dot( V1_l, V2_k );
                                   }// for
                               }// for
 
@@ -213,9 +214,9 @@ norm_F ( const double     alpha,
             {
                 for ( idx_t i = 0; i < n; ++i )
                 {
-                    const auto  a_ij = alpha * MA(i,j) - beta * MB(i,j);
+                    const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
                     
-                    val += re( HLIB::conj( a_ij ) * a_ij );
+                    val += a_ij * a_ij;
                 }// for
             }// for
 
