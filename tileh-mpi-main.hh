@@ -52,6 +52,7 @@ mymain ( int, char ** )
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
+    else if ( distr == "cyclic1d"    ) cluster::distribution::cyclic_1d( nprocs, bct->root() );
     else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
     if (( pid == 0 ) && verbose( 3 ))

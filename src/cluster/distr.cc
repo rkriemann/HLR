@@ -117,7 +117,105 @@ cyclic_2d ( const uint       nprocs,
 }
 
 //
-// assigns 2d cyclic distribution
+// assigns 1d cyclic distribution
+//
+void
+cyclic_1d ( const uint       nprocs,
+            TBlockCluster *  bct )
+{
+    //
+    // first set all to all processors (so the upper levels will stay on all)
+    //
+
+    bct->set_procs( ps( nprocs ), true );
+    
+    //
+    // look for level in bct with sufficient nodes
+    //
+
+    std::list< TBlockCluster * >  nodes;
+
+    nodes.push_back( bct );
+
+    while ( nodes.size() < 2*nprocs )
+    {
+        std::list< TBlockCluster * >  sons;
+
+        for ( auto node : nodes )
+        {
+            for ( uint  i = 0; i < node->nsons(); ++i )
+                sons.push_back( node->son( i ) );
+        }// for
+
+        nodes = std::move( sons );
+    }// while
+
+    //
+    // loop through nodes and count block rows/columns
+    //
+
+    std::list< TIndexSet >  block_rows, block_cols;
+
+    for ( auto node : nodes )
+    {
+        const TIndexSet  row_is = *( node->rowcl() );
+        const TIndexSet  col_is = *( node->colcl() );
+
+        if ( find( block_rows.begin(), block_rows.end(), row_is ) == block_rows.end() )
+            block_rows.push_back( row_is );
+
+        if ( find( block_cols.begin(), block_cols.end(), col_is ) == block_cols.end() )
+            block_cols.push_back( col_is );
+    }// for
+
+    block_rows.sort( [] ( const TIndexSet & is1, const TIndexSet & is2 ) { return is1.is_strictly_left_of( is2 ); } );
+    block_cols.sort( [] ( const TIndexSet & is1, const TIndexSet & is2 ) { return is1.is_strictly_left_of( is2 ); } );
+
+    const uint  nrows = block_rows.size();
+    const uint  ncols = block_cols.size();
+    
+    //
+    // set up 2D grid of nodes
+    //
+
+    tensor2< TBlockCluster * >  blocks2d( nrows, ncols );
+    
+    for ( auto node : nodes )
+    {
+        const TIndexSet  row_is = *( node->rowcl() );
+        const TIndexSet  col_is = *( node->colcl() );
+
+        uint  i = 0;
+        uint  j = 0;
+
+        for ( const auto & br : block_rows )
+        {
+            if ( br == row_is )
+                break;
+            ++i;
+        }// for
+        
+        for ( const auto & bc : block_cols )
+        {
+            if ( bc == col_is )
+                break;
+            ++j;
+        }// for
+
+        blocks2d( i, j ) = node;
+    }// for
+
+    //
+    // for each row, apply 1d cyclic
+    //
+
+    for ( uint  i = 0; i < nrows; ++i )
+        for ( uint  j = 0; j < ncols; ++j )
+            blocks2d( i, j )->set_procs( ps_single( ( j ) % nprocs ), true );
+}
+
+//
+// assigns shifted 1d cyclic distribution
 //
 void
 shifted_cyclic_1d ( const uint       nprocs,
