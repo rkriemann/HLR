@@ -8,6 +8,7 @@
 #include "hlr/utils/compare.hh"
 #include "hlr/matrix/luinv_eval.hh"
 #include "hlr/tbb/dag.hh"
+#include "hlr/tbb/matrix.hh"
 
 using namespace hlr;
 
@@ -84,9 +85,11 @@ mymain ( int, char ** )
     hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
     
     {
-        std::cout << term::bullet << term::bold << "LU ( Tile-H MPI, " << acc.to_string() << " )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( Tile-H MPI, "
+                  << impl_name << ", "
+                  << acc.to_string() << " )" << term::reset << std::endl;
         
-        auto  C = std::shared_ptr( A->copy() );
+        auto  C = std::shared_ptr( hlr::tbb::matrix::copy( *A ) );
         
         tic = Time::Wall::now();
 
@@ -98,7 +101,7 @@ mymain ( int, char ** )
         }// if
         else
         {
-            ARITH::lu< HLIB::real >( C.get(), acc );
+            impl::lu< HLIB::real >( C.get(), acc );
         }// else
         
         toc = Time::Wall::since( tic );

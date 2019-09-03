@@ -314,10 +314,10 @@ if 'tbb' in frameworks :
     if 'tlr'        in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
     if 'hodlr'      in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
     if 'tile-hodlr' in programs : Default( tbb.Program( 'tile-hodlr-tbb.cc' ) )
-    if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
+    if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb',     [ 'tileh-tbb.cc',     'src/tbb/dag.cc' ] ) )
     if 'dag-lu'     in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
     if 'dag-gauss'  in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
-    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc', 'src/tbb/dag.cc' ] ) )
+    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc',   'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
