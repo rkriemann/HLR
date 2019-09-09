@@ -166,44 +166,6 @@ tsadd ( const value_t                    alpha,
 }
 
 //
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X,
-        const size_t               ntile )
-{
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
-            
-        hodlr::trsml( L00, X0, ntile );
-
-        auto  T = hodlr::tsmul( mat_V< value_t >( L10 ), X0, ntile );
-
-        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
-
-        hodlr::trsml( L11, X1, ntile );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
-    }// else
-}
-
-//
 // compute QR factorization of [αX·T,U]
 //
 template < typename value_t >
@@ -493,6 +455,44 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  Y( X, copy_value );
 
         BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+    }// else
+}
+
+//
+// solve L X = M
+// - on input, X = M
+//
+template < typename value_t >
+void
+trsml ( const TMatrix *            L,
+        BLAS::Matrix< value_t > &  X,
+        const size_t               ntile )
+{
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
+    
+    if ( is_blocked( L ) )
+    {
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
+
+        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+            
+        hodlr::trsml( L00, X0, ntile );
+
+        auto  T = hodlr::tsmul( mat_V< value_t >( L10 ), X0, ntile );
+
+        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
+
+        hodlr::trsml( L11, X1, ntile );
+    }// if
+    else
+    {
+        //
+        // UNIT DIAGONAL !!!
+        //
     }// else
 }
 

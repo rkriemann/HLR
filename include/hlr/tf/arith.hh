@@ -16,6 +16,8 @@
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
 
+#include "hlr/tf/arith_tile.hh"
+
 namespace hlr
 {
 
