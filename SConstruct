@@ -204,6 +204,49 @@ if likwid and LIKWID_DIR != None :
 
 ######################################################################
 #
+# target "help"
+#
+######################################################################
+
+def show_help ( target, source, env ):
+    bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
+                 True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
+    
+    print() 
+    print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
+    print()
+    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), PROGRAMS )
+    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), FRAMEWORKS )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), MALLOCS )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print() 
+    print( 'The parameters {0}programs{1} and {0}frameworks{1} can get comma separated values:'.format( colors['bold'], colors['reset'] ) ) 
+    print() 
+    print( '    scons programs=dag-lu,dag-inv frameworks=seq,tbb,omp' ) 
+    print() 
+    print( 'For {0}malloc{1} only a single value is valid:'.format( colors['bold'], colors['reset'] ) )
+    print() 
+    print( '    scons malloc=jemalloc' ) 
+    print() 
+    print( 'Don\'t forget to adjust paths for all software frameworks in the file {0}SConstruct{1}.'.format( colors['bold'], colors['reset'] ) ) 
+    print() 
+
+help_cmd = env.Command( 'phony-target-help', None, show_help )
+
+env.Alias( 'help', help_cmd )
+
+######################################################################
+#
 # target "options"
 #
 ######################################################################
