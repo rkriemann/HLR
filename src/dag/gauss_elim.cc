@@ -315,7 +315,7 @@ gen_dag_gauss_elim ( TMatrix *      A,
                      TMatrix *      T,
                      refine_func_t  refine )
 {
-    return refine( new gauss_node( A, ID_A, ID_C, T ), HLIB::CFG::Arith::max_seq_size );
+    return refine( new gauss_node( A, ID_A, ID_C, T ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 }
 
 }}// namespace hlr::dag

@@ -545,11 +545,14 @@ graph
 gen_dag_lu_oop_accu ( TMatrix &      A,
                       refine_func_t  refine )
 {
+    if ( hlr::dag::sparsify_mode != hlr::dag::sparsify_none )
+        hlr::log( 0, term::red( term::bold( "SPARSIFICATION NOT WORKING WITH ACCUMULATOR ARITHMETIC" ) ) );
+    
     //
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     return std::move( dag );
     

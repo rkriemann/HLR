@@ -16,7 +16,7 @@ using namespace boost::program_options;
 
 using namespace HLIB;
 
-namespace B = HLIB::BLAS;
+namespace hlr { namespace cmdline {
 
 size_t  n          = 1024;
 size_t  ntile      = 128;
@@ -38,7 +38,7 @@ int     coarse     = 0;
 int     nbench     = 1;
 
 void
-parse_cmdline ( int argc, char ** argv )
+parse ( int argc, char ** argv )
 {
     //
     // define command line options
@@ -152,6 +152,8 @@ parse_cmdline ( int argc, char ** argv )
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
 }
+
+}}// namespace hlr::cmdline
 
 #endif // __HLR_CMDLINE_HH
 

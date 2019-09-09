@@ -517,7 +517,7 @@ gen_dag_lu_oop_coarse ( TMatrix &            A,
         return gen_dag_lu_oop_auto( A, refine );
             
     apply_map_t  apply_map;
-    auto         dag = refine( new lu_node( & A, apply_map, fine_run ), ncoarse );
+    auto         dag = refine( new lu_node( & A, apply_map, fine_run ), ncoarse, use_single_end_node );
 
     return std::move( dag );
 }
