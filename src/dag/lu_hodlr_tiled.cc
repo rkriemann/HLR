@@ -21,6 +21,7 @@
 #include "hlr/utils/tools.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
+#include "hlr/seq/arith.hh"
 
 namespace hlr { namespace dag {
 
@@ -28,6 +29,102 @@ using namespace HLIB;
 
 namespace
 {
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// auxiliary functions
+//
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// access to matrices U/V of lowrank matrices
+//
+template < typename value_t >
+BLAS::Matrix< value_t > &
+mat_U ( TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return blas_mat_A< value_t >( A );
+}
+
+template < typename value_t >
+BLAS::Matrix< value_t > &
+mat_V ( TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return blas_mat_B< value_t >( A );
+}
+
+template < typename value_t >
+const BLAS::Matrix< value_t > &
+mat_U ( const TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return blas_mat_A< value_t >( A );
+}
+
+template < typename value_t >
+const BLAS::Matrix< value_t > &
+mat_V ( const TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return blas_mat_B< value_t >( A );
+}
+
+template < typename value_t >
+BLAS::Matrix< value_t > &
+mat_U ( TRkMatrix &  A )
+{
+    return blas_mat_A< value_t >( & A );
+}
+
+template < typename value_t >
+BLAS::Matrix< value_t > &
+mat_V ( TRkMatrix &  A )
+{
+    return blas_mat_B< value_t >( & A );
+}
+
+template < typename value_t >
+const BLAS::Matrix< value_t > &
+mat_U ( const TRkMatrix &  A )
+{
+    return blas_mat_A< value_t >( & A );
+}
+
+template < typename value_t >
+const BLAS::Matrix< value_t > &
+mat_V ( const TRkMatrix &  A )
+{
+    return blas_mat_B< value_t >( & A );
+}
+
+//
+// split given range into <n> subsets
+//
+inline
+std::vector< BLAS::Range >
+split ( const BLAS::Range &  r,
+        const size_t         n )
+{
+    if ( n == 2 )
+    {
+        const BLAS::Range  r0( r.first(), (r.first() + r.last()) / 2 - 1 );
+        const BLAS::Range  r1( r0.last() + 1, r.last() );
+
+        return { std::move(r0), std::move(r1) };
+    }// if
+    else
+        assert( false );
+
+    return {};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// tasks
+//
+////////////////////////////////////////////////////////////////////////////////
 
 using HLIB::id_t;
 
@@ -61,14 +158,17 @@ struct trsmu_node : public node
 {
     const TMatrix *         U;
     const TBlockIndexSet    is_A;
-    BLAS::Matrix< real > &  A;
+    BLAS::Matrix< real > &  X;
+    const size_t            ntile;
     
     trsmu_node ( const TMatrix *         aU,
-                 const TBlockIndexSet    ais_A,
-                 BLAS::Matrix< real > &  aA )
+                 const TBlockIndexSet    ais_X,
+                 BLAS::Matrix< real > &  aX,
+                 const size_t            antile )
             : U( aU )
-            , is_A( ais_A )
-            , A( aA )
+            , is_X( ais_X )
+            , X( aX )
+            , ntile( antile )
     { init(); }
     
     virtual std::string  to_string () const { return HLIB::to_string( "L = trsmu( U%d, A )", U->id() ); }
@@ -77,22 +177,25 @@ struct trsmu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, is_A } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_L, is_A } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, is_X } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_L, is_X } }; }
 };
 
 struct trsml_node : public node
 {
     const TMatrix *         L;
-    const TBlockIndexSet    bis_A;
-    BLAS::Matrix< real > &  A;
+    const TBlockIndexSet    is_X;
+    BLAS::Matrix< real > &  X;
+    const size_t            ntile;
 
     trsml_node ( const TMatrix *         aL,
-                 const TBlockIndexSet    ais_A,
-                 BLAS::Matrix< real > &  aA )
+                 const TBlockIndexSet    ais_X,
+                 BLAS::Matrix< real > &  aX,
+                 const size_t            antile )
             : L( aL )
-            , is_A( ais_A )
-            , A( aA )
+            , is_X( ais_X )
+            , X( aX )
+            , ntile( antile )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "U = trsml( L%d, A )", L->id() ); }
@@ -101,8 +204,8 @@ struct trsml_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, is_A } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_U, is_A } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, is_X } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_U, is_X } }; }
 };
     
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -128,33 +231,26 @@ lu_node::refine_ ( const size_t  min_size )
         assert( ! is_null( A10 ) && is_lowrank( A10 ));
         assert( ! is_null( A01 ) && is_lowrank( A01 ));
             
-        auto  lu_00 = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
-
+        auto  lu_00    = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ), bis( A10->col_is(), is( A10->rank() ) ), mat_V< real >( A10 ), ntile );
         auto  solve_01 = g.alloc_node< trsml_node >( BL->block( 0, 0 ), bis( A01->row_is(), is( A01->rank() ) ), mat_U< real >( A01 ), ntile );
+        auto  T        = make_shared< BLAS::Matrix< real > >();
+        auto  tsmul    = g.alloc_node< tsmul_node >( bis( A10->col_is(), is( A10->rank() ) ), mat_V< value_t >( A10 ),
+                                                     bis( A01->row_is(), is( A01->rank() ) ), mat_U< value_t >( A01 ),
+                                                     T,
+                                                     ntile );
+        auto  addlr    = g.alloc_node< addlr_node >( bis( A10->row_is(), is( A10->rank() ) ), mat_U< value_t >( A10 ),
+                                                     T,
+                                                     bis( A01->col_is(), is( A01->rank() ) ), mat_V< value_t >( A01 ),
+                                                     BA->block( 1, 1 ),
+                                                     ntile );
+        auto  lu_11    = g.alloc_node< lu_node >( BA->block( 1, 1 ), ntile );
 
         solve_10->after( lu_00 );
         solve_01->after( lu_00 );
-
-        auto  T     = make_shared< BLAS::Matrix< real > >();
-        auto  tsmul = g.alloc_node< tsmul_node >( bis( A10->col_is(), is( A10->rank() ) ), mat_V< value_t >( A10 ),
-                                                  bis( A01->row_is(), is( A01->rank() ) ), mat_U< value_t >( A01 ),
-                                                  T,
-                                                  ntile );
-
         tsmul->after( solve_10 );
         tsmul->after( solve_01 );
- 
-        auto  addlr = g.alloc_node< addlr_node >( bis( A10->row_is(), is( A10->rank() ) ), mat_U< value_t >( A10 ),
-                                                  T,
-                                                  bis( A01->col_is(), is( A01->rank() ) ), mat_V< value_t >( A01 ),
-                                                  BA->block( 1, 1 ),
-                                                  ntile );
-
         addlr->after( tsmul );
-        
-        auto  lu_11 = g.alloc_node< lu_node >( BA->block( 1, 1 ), ntile );
-
         lu_11->after( addlr );
     }// if
 
@@ -166,7 +262,7 @@ lu_node::refine_ ( const size_t  min_size )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    hlr::seq::tile::hodlr::lu( A, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -180,41 +276,27 @@ trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    if ( is_blocked( U ) && ! hlr::is_small( min_size, U ) )
     {
-        auto        BU  = cptrcast( U, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        auto        BX  = BA;
-        const auto  nbr = BA->nblock_rows();
-        const auto  nbc = BA->nblock_cols();
+        auto  BU  = cptrcast( U, TBlockMatrix );
+        auto  U00 = BU->block( 0, 0 );
+        auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
+        auto  U11 = BU->block( 1, 1 );
 
-        tensor2< node * >  finished( nbr, nbc );
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            const auto  U_jj = BU->block( j, j );
-        
-            assert( ! is_null( U_jj ) );
+        const auto               is0 = U00->col_is();
+        const auto               is1 = U11->col_is();
+        BLAS::Matrix< value_t >  X0( X, is0 - U->col_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, is1 - U->col_ofs(), BLAS::Range::all );
 
-            for ( uint i = 0; i < nbr; ++i )
-                if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
-        }// for
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            for ( uint  k = j+1; k < nbc; ++k )
-                for ( uint  i = 0; i < nbr; ++i )
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BX->block( i, j ),
-                                                                    BU->block( j, k ),
-                                                                    BA->block( i, k ) );
+        auto  solve_00 = g.alloc_node< trsmu_node >( U00, is0, X0, ntile );
+        auto  T        = std::make_shared< BLAS::Matrix< real > >();
+        auto  tsmul    = g.alloc_node< tsmul_node >(           mat_U< value_t >( U01 ), T, is0, X0, ntile );
+        auto  tsadd    = g.alloc_node< tsadd_node >( real(-1), mat_V< value_t >( U01 ), T, is1, X1, ntile );
+        auto  solve_11 = g.alloc_node< trsmu_node >( U00, is0, X0, ntile );
 
-                        update->after( finished( i, j ) );
-                        finished( i, k )->after( update );
-                    }// if
-        }// for
+        tsmul->after( solve_00 );
+        tsadd->after( tsmul );
+        solve_11->after( tsadd );
     }// if
 
     g.finalize();
@@ -225,7 +307,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 void
 trsmu_node::run_ ( const TTruncAcc &  acc )
 {
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    hlr::seq::tile::hodlr::trsmuh( U, X, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -239,41 +321,27 @@ trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    if ( is_blocked( L ) && ! hlr::is_small( L ) )
     {
-        auto        BL  = cptrcast( L, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
-        auto        BX  = BA;
-        const auto  nbr = BA->nblock_rows();
-        const auto  nbc = BA->nblock_cols();
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
 
-        tensor2< node * >  finished( nbr, nbc );
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            const auto  L_ii = BL->block( i, i );
-        
-            assert( ! is_null( L_ii ) );
+        const auto               is0 = L00->row_is();
+        const auto               is1 = L11->row_is();
+        BLAS::Matrix< value_t >  X0( X, is0 - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, is0 - L->row_ofs(), BLAS::Range::all );
+            
+        auto  solve_00 = g.alloc_node< trsml_node >( L00, is0, X0, ntile );
+        auto  T        = std::make_shared< BLAS::Matrix< real > >();
+        auto  tsmul    = g.alloc_node< tsmul_node >(           mat_V< real >( L10 ), T, is0, X0, ntile );
+        auto  tsadd    = g.alloc_node< tsadd_node >( real(-1), mat_U< real >( L10 ), T, is1, X1, ntile );
+        auto  solve_11 = g.alloc_node< trsml_node >( L11, is1, X1, ntile );
 
-            for ( uint j = 0; j < nbc; ++j )
-                if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
-        }// for
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            for ( uint  k = i+1; k < nbr; ++k )
-                for ( uint  j = 0; j < nbc; ++j )
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                    {
-                        auto  update = g.alloc_node< update_node >( BL->block( k, i ),
-                                                                    BX->block( i, j ),
-                                                                    BA->block( k, j ) );
-
-                        update->after( finished( i, j ) );
-                        finished( k, j )->after( update );
-                    }// if
-        }// for
+        tsmul->after( solve_00 );
+        tsadd->after( tsmul );
+        solve_11->after( tsadd );
     }// if
 
     g.finalize();
@@ -284,7 +352,7 @@ trsml_node::refine_ ( const size_t  min_size )
 void
 trsml_node::run_ ( const TTruncAcc &  acc )
 {
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    hlr::seq::tile::hodlr::trsmuh( L, X, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
