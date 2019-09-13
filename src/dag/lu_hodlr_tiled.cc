@@ -100,7 +100,7 @@ mat_V ( const TRkMatrix &  A )
 }
 
 //
-// split given range into <n> subsets
+// split given range/is into <n> subsets
 //
 inline
 std::vector< BLAS::Range >
@@ -118,6 +118,34 @@ split ( const BLAS::Range &  r,
         assert( false );
 
     return {};
+}
+
+inline
+std::vector< TIndexSet >
+split ( const TIndexSet &  is,
+        const size_t       n )
+{
+    if ( n == 2 )
+    {
+        const TIndexSet  is0( is.first(), (is.first() + is.last()) / 2 - 1 );
+        const TIndexSet  is1( is0.last() + 1, is.last() );
+
+        return { std::move(is0), std::move(is1) };
+    }// if
+    else
+        assert( false );
+
+    return {};
+}
+
+//
+// return a block indexset for a BLAS::Matrix
+//
+template < typename value_t >
+TBlockIndexSet
+bis ( const BLAS::Matrix< value_t > &  M )
+{
+    return TBlockIndexSet( is( 0, M.nrows()-1 ), is( 0, M.ncols()-1 ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +236,72 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, is_X } }; }
 };
     
+struct tsmul_node : public node
+{
+    const id_t                               id_A;
+    const TBlockIndexSet                     is_A;
+    const BLAS::Matrix< real > &             A;
+    const id_t                               id_B;
+    const TBlockIndexSet                     is_B;
+    const BLAS::Matrix< real > &             B;
+    std::shared_ptr< BLAS::Matrix< real > >  T;
+    const size_t                             ntile;
+
+    tsmul_node ( const id_t              aid_A,
+                 const TBlockIndexSet    ais_A,
+                 BLAS::Matrix< real > &  aA,
+                 const id_t              aid_B,
+                 const TBlockIndexSet    ais_B,
+                 BLAS::Matrix< real > &  aB,
+                 std::shared_ptr< BLAS::Matrix< real > >  aT,
+                 const size_t            antile )
+            : id_A( aid_A )
+            , is_A( ais_A )
+            , A( aA )
+            , id_B( aid_B )
+            , is_B( ais_B )
+            , B( aB )
+            , T( aT )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "tsmul( %c-[%d,%d], %c-[%d,%d] )",
+                                                                      char(id_A), is_A.first(), is_A.last(),
+                                                                      char(id_B), is_B.first(), is_B.last() ); }
+    virtual std::string  color     () const { return "8ae234"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { id_A, is_A }, { id_B, is_B } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_t(T.get()), bis( *T ) } }; } // empty???
+};
+
+struct tadd_node : public node
+{
+    std::shared_ptr< BLAS::Matrix< real > >  T0;
+    std::shared_ptr< BLAS::Matrix< real > >  T1;
+    std::shared_ptr< BLAS::Matrix< real > >  T;
+
+    tadd_node ( std::shared_ptr< BLAS::Matrix< real > >  aT0,
+                std::shared_ptr< BLAS::Matrix< real > >  aT1,
+                std::shared_ptr< BLAS::Matrix< real > >  aT )
+            : T0( aT0 )
+            , T1( aT1 )
+            , T( aT )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "%d = tadd( %d, %d )",
+                                                                      id_t(T.get()), id_t(T0.get()), id_t(T1.get()) ); }
+    virtual std::string  color     () const { return "8ae234"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_t(T0.get()), bis( *T0 ) }, { id_t(T1.get()), bis( *T1 ) } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_t(T.get()), bis( *T ) } }; }
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////
 //
 // lu_node
@@ -357,52 +451,58 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// update_node
+// trsml_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-update_node::refine_ ( const size_t  min_size )
+tsmul_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
+    assert( A.nrows() == B.nrows() );
+
+    if ( A.nrows() > ntile )
     {
-        //
-        // generate sub nodes assuming 2x2 block structure
-        //
+        const auto                     R     = split( BLAS::Range( 0, A.nrows()-1 ), 2 );
+        const auto                     sis_A = split( is_A, 2 );
+        const auto                     sis_B = split( is_B, 2 );
+        const BLAS::Matrix< value_t >  A0( A, R[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  B0( B, R[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  B1( B, R[1], BLAS::Range::all );
 
-        auto  BA = cptrcast( A, TBlockMatrix );
-        auto  BB = cptrcast( B, TBlockMatrix );
-        auto  BC = ptrcast(  C, TBlockMatrix );
+        auto  T0     = std::make_shared< BLAS::Matrix< real > >();
+        auto  T1     = std::make_shared< BLAS::Matrix< real > >();
+        auto  tsmul0 = g.alloc_node< tsmul_node >( id_A, sis_A[0], A0, id_B, sis_B[0], B0, T0, ntile );
+        auto  tsmul1 = g.alloc_node< tsmul_node >( id_A, sis_A[1], A1, id_B, sis_B[1], B1, T1, ntile );
+        auto  add    = g.alloc_node< tadd_node >( T0, T1, T );
 
-        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-            {
-                if ( is_null( BC->block( i, j ) ) )
-                    continue;
-                
-                for ( uint  k = 0; k < BA->nblock_cols(); ++k )
-                {
-                    if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        g.alloc_node< update_node >( BA->block( i, k ),
-                                                     BB->block( k, j ),
-                                                     BC->block( i, j ) );
-                }// for
-            }// for
-        }// for
+        add->after( tsmul0 );
+        add->after( tsmul1 );
     }// if
 
     g.finalize();
-    
+
     return g;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// tadd_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
 void
-update_node::run_ ( const TTruncAcc &  acc )
+tadd_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    assert(( T0->nrows() == T1->nrows() ) && ( T0->ncols() == T1->ncols() ));
+    
+    if (( T->nrows() != T0->nrows() ) || ( T->ncols() != T0->ncols() ))
+        *T = BLAS::Matrix< real >( T0->nrows(), T0->ncols() );
+    
+    BLAS::add( value_t(1), *T0, *T );
+    BLAS::add( value_t(1), *T1, *T );
 }
 
 }// namespace anonymous
