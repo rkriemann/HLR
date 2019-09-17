@@ -24,7 +24,7 @@ using namespace hlr;
 std::string
 mem_usage ()
 {
-    return term::ltgrey( " [" + Mem::to_string( Mem::usage() ) + "]" );
+    return term::yellow( " [" + Mem::to_string( Mem::usage() ) + "]" );
 }
 
 // return min/max/median of elements in container

@@ -68,7 +68,7 @@ mymain ( int, char ** )
 
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    done in  " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
     
@@ -173,7 +173,7 @@ mymain ( int, char ** )
         
         if ( verbose( 1 ) )
         {
-            std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  DAG in     " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
             
             // std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
@@ -219,7 +219,7 @@ mymain ( int, char ** )
         
         toc = Time::Wall::since( tic );
 
-        std::cout << "  LU in      " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  LU in      " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
         runtime.push_back( toc.seconds() );
 
@@ -237,7 +237,7 @@ mymain ( int, char ** )
     matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
     // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-    std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
+    std::cout << "    error  = " << term::red << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -293,7 +293,7 @@ mymain ( int, char ** )
         
                 toc = Time::Wall::since( tic );
 
-                std::cout << "  trsv in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  trsv in    " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
                 runtime.push_back( toc.seconds() );
 
@@ -319,7 +319,7 @@ mymain ( int, char ** )
 
                 toc = Time::Wall::since( tic );
 
-                std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  solve in   " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
                 runtime.push_back( toc.seconds() );
             }// for
@@ -333,7 +333,7 @@ mymain ( int, char ** )
             // DBG::write( & xref, "y.mat", "y" );
 
             v.axpy( -1, & xref );
-            std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
+            std::cout << "  error =    " << term::red << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
         }
     }// if
 }
