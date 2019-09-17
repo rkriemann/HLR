@@ -161,6 +161,9 @@ constexpr id_t  ID_A = 'A';
 constexpr id_t  ID_L = 'L';
 constexpr id_t  ID_U = 'U';
 
+//
+// compute A = LU
+//
 struct lu_node : public node
 {
     TMatrix *     A;
@@ -182,10 +185,13 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
 
+//
+// solve X U = M with upper triangular U and M given
+//
 struct trsmu_node : public node
 {
     const TMatrix *         U;
-    const TBlockIndexSet    is_A;
+    const TBlockIndexSet    is_X;
     BLAS::Matrix< real > &  X;
     const size_t            ntile;
     
@@ -209,6 +215,9 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, is_X } }; }
 };
 
+//
+// solve L X = M with lower triangular L and M given
+//
 struct trsml_node : public node
 {
     const TMatrix *         L;
@@ -236,6 +245,9 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, is_X } }; }
 };
     
+//
+// compute T := A^H · B
+//
 struct tsmul_node : public node
 {
     const id_t                               id_A;
@@ -255,28 +267,122 @@ struct tsmul_node : public node
                  BLAS::Matrix< real > &  aB,
                  std::shared_ptr< BLAS::Matrix< real > >  aT,
                  const size_t            antile )
-            : id_A( aid_A )
-            , is_A( ais_A )
-            , A( aA )
-            , id_B( aid_B )
-            , is_B( ais_B )
-            , B( aB )
+            : id_A( aid_A ), is_A( ais_A ), A( aA )
+            , id_B( aid_B ), is_B( ais_B ), B( aB )
             , T( aT )
             , ntile( antile )
     { init(); }
 
     virtual std::string  to_string () const { return HLIB::to_string( "tsmul( %c-[%d,%d], %c-[%d,%d] )",
-                                                                      char(id_A), is_A.first(), is_A.last(),
-                                                                      char(id_B), is_B.first(), is_B.last() ); }
+                                                                      char(id_A), is_A.row_is().first(), is_A.row_is().last(),
+                                                                      char(id_B), is_B.row_is().first(), is_B.row_is().last() ); }
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { id_A, is_A }, { id_B, is_B } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_t(T.get()), bis( *T ) } }; } // empty???
+    virtual const block_list_t  out_blocks_  () const { return { { id_t(T.get()), bis( *T ) } }; } // empty indexset???
 };
 
+//
+// compute B := B + α·A·T
+//
+struct tsadd_node : public node
+{
+    const real                    alpha;
+    const id_t                    id_A;
+    const TBlockIndexSet          is_A;
+    const BLAS::Matrix< real > &  A;
+    const id_t                    id_T;
+    const TBlockIndexSet          is_T;
+    const BLAS::Matrix< real > &  T;
+    const id_t                    id_B;
+    const TBlockIndexSet          is_B;
+    BLAS::Matrix< real > &        B;
+    const size_t                  ntile;
+
+    tsadd_node ( const real              aalpha,
+                 const id_t              aid_A,
+                 const TBlockIndexSet    ais_A,
+                 BLAS::Matrix< real > &  aA,
+                 const id_t              aid_T,
+                 const TBlockIndexSet    ais_T,
+                 BLAS::Matrix< real > &  aT,
+                 const id_t              aid_B,
+                 const TBlockIndexSet    ais_B,
+                 BLAS::Matrix< real > &  aB,
+                 const size_t            antile )
+            : alpha( aalpha )
+            , id_A( aid_A ), is_A( ais_A ), A( aA )
+            , id_T( aid_T ), is_T( ais_T ), T( aT )
+            , id_B( aid_B ), is_B( ais_B ), B( aB )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "tsadd( %c-[%d,%d], %c-[%d,%d] )",
+                                                                      char(id_A), is_A.row_is().first(), is_A.row_is().last(),
+                                                                      char(id_B), is_B.row_is().first(), is_B.row_is().last() ); }
+    virtual std::string  color     () const { return "8ae234"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { id_A, is_A }, { id_B, is_B }, { id_T, is_T } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_B, is_B } }; }
+};
+
+//
+// compute A := A - U·T·V^H
+//
+struct addlr_node : public node
+{
+    const id_t                    id_U;
+    const TBlockIndexSet          is_U;
+    const BLAS::Matrix< real > &  U;
+    const id_t                    id_T;
+    const TBlockIndexSet          is_T;
+    const BLAS::Matrix< real > &  T;
+    const id_t                    id_V;
+    const TBlockIndexSet          is_V;
+    BLAS::Matrix< real > &        V;
+    TMatrix *                     A;
+    const size_t                  ntile;
+
+    addlr_node ( const id_t              aid_U,
+                 const TBlockIndexSet    ais_U,
+                 BLAS::Matrix< real > &  aU,
+                 const id_t              aid_T,
+                 const TBlockIndexSet    ais_T,
+                 BLAS::Matrix< real > &  aT,
+                 const id_t              aid_V,
+                 const TBlockIndexSet    ais_V,
+                 BLAS::Matrix< real > &  aV,
+                 TMatrix *               aA,
+                 const size_t            antile )
+            : id_U( aid_U ), is_U( ais_U ), U( aU )
+            , id_T( aid_T ), is_T( ais_T ), T( aT )
+            , id_V( aid_V ), is_V( ais_V ), V( aV )
+            , A( aA )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "addlr( %c-[%d,%d], %c-[%d,%d], %d )",
+                                                                      char(id_U), is_U.row_is().first(), is_U.row_is().last(),
+                                                                      char(id_V), is_V.row_is().first(), is_V.row_is().last(),
+                                                                      A->id() ); }
+    virtual std::string  color     () const { return "8ae234"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { id_U, is_U }, { id_V, is_V }, { id_T, is_T } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+};
+
+//
+// compute T := T_0 + T_1
+//
 struct tadd_node : public node
 {
     std::shared_ptr< BLAS::Matrix< real > >  T0;
@@ -489,6 +595,92 @@ tsmul_node::refine_ ( const size_t  min_size )
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
+// trsml_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+tsadd_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    assert( A.nrows() == B.nrows() );
+
+    if ( A.nrows() > ntile )
+    {
+        const auto                  R     = split( BLAS::Range( 0, A.nrows()-1 ), 2 );
+        const auto                  sis_A = split( is_A, 2 );
+        const auto                  sis_B = split( is_B, 2 );
+        const BLAS::Matrix< real >  A0( A, R[0], BLAS::Range::all );
+        const BLAS::Matrix< real >  A1( A, R[1], BLAS::Range::all );
+        BLAS::Matrix< real >        B0( B, R[0], BLAS::Range::all );
+        BLAS::Matrix< real >        B1( B, R[1], BLAS::Range::all );
+
+        auto  tsadd0 = g.alloc_node< tsadd_node >( id_A, sis_A[0], A0, id_T, is_T, T, id_B, sis_B[0], B0, ntile );
+        auto  tsadd1 = g.alloc_node< tsadd_node >( id_A, sis_A[1], A1, id_T, is_T, T, id_B, sis_B[1], B1, ntile );
+    }// if
+
+    g.finalize();
+
+    return g;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// addlr_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+addlr_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
+    {
+        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  A00 = BA->block( 0, 0 );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
+        auto  A11 = BA->block( 1, 1 );
+        
+        const BLAS::Matrix< real >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
+        const BLAS::Matrix< real >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
+        const BLAS::Matrix< real >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
+        const BLAS::Matrix< real >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
+
+        auto  task00 = g.alloc_node< addlr_node >( id_U, A00->row_is(), U0,
+                                                   id_T, is_T, T,
+                                                   id_V, A00->col_is(), V0,
+                                                   A00,
+                                                   ntile );
+
+        // {
+        //     auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
+
+        //     A01->set_lrmat( U01, V01 );
+        // }
+
+        // {
+        //     auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
+            
+        //     A10->set_lrmat( U10, V10 );
+        // }
+
+        auto  task11 = g.alloc_node< addlr_node >( id_U, A11->row_is(), U1,
+                                                   id_T, is_T, T,
+                                                   id_V, A11->col_is(), V1,
+                                                   A11,
+                                                   ntile );
+    }// if
+
+    g.finalize();
+
+    return g;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
 // tadd_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -514,10 +706,18 @@ tadd_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_oop ( TMatrix &      A,
-                 refine_func_t  refine )
+gen_dag_lu_hodlr_tiled ( TMatrix &      A,
+                         refine_func_t  refine )
 {
-    return std::move( refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size ) );
+    BLAS::Matrix< real >  A( 512, 16 );
+    BLAS::Matrix< real >  B( 512, 16 );
+    auto                  T = std::make_shared< BLAS::Matrix< real > >( 16, 16 );
+    
+    return refine( new tsmul_node( id_t('A'), bis( is( 0, 511 ), is( 0, 15 ) ), A,
+                                   id_t('B'), bis( is( 0, 511 ), is( 0, 15 ) ), B,
+                                   T, 128 ) );
+    
+    // return std::move( refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size ) );
 }
 
 }// namespace dag

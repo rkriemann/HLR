@@ -29,7 +29,7 @@ LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # directories for the various external libraries
-HPRO_DIR     = 'hlibpro'
+HPRO_DIR     = '/home/rok/programming/hpro/main'
 TBB_DIR      = '/usr'
 TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
 HPX_DIR      = '/opt/local/hpx'
@@ -255,6 +255,7 @@ common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
                                         'src/dag/local_graph.cc',
                                         'src/dag/lu.cc',
                                         'src/dag/lu_coarse.cc',
+                                        'src/dag/lu_hodlr_tiled.cc',
                                         'src/dag/lu_lvl.cc',
                                         'src/dag/lu_oop.cc',
                                         'src/dag/lu_oop_accu.cc',
