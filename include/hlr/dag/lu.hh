@@ -100,8 +100,8 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
 // compute DAG for tile-based LU of <A> in HODLR format
 //
 graph
-gen_dag_lu_hodlr_tile ( HLIB::TMatrix *  A,
-                        refine_func_t    refine );
+gen_dag_lu_hodlr_tiled ( HLIB::TMatrix &  A,
+                         refine_func_t    refine );
 
 }// namespace dag
 

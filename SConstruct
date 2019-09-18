@@ -43,7 +43,7 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tile-hodlr' ]
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tile-hodlr', 'dag-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
@@ -287,6 +287,7 @@ if 'seq' in frameworks :
     if 'dag-lu'     in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
     if 'dag-gauss'  in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
     if 'dag-inv'    in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
+    if 'dag-hodlr'  in programs : Default( seq.Program( 'dag-hodlr.cc' ) )
 
 #
 # OpenMP

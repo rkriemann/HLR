@@ -623,6 +623,12 @@ tsmul_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+void
+tsmul_node::run_ ( const TTruncAcc &  acc )
+{
+    *T = std::move( BLAS::prod( real(1), BLAS::adjoint( A ), B ) );
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////
 //
 // trsml_node
@@ -661,6 +667,14 @@ tsadd_node::refine_ ( const size_t  min_size )
     g.finalize();
 
     return g;
+}
+
+void
+tsadd_node::run_ ( const TTruncAcc &  acc )
+{
+    auto  W = BLAS::prod( real(1), A, *T );
+        
+    BLAS::add( alpha, W, B );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -715,6 +729,17 @@ addlr_node::refine_ ( const size_t  min_size )
     g.finalize();
 
     return g;
+}
+
+void
+addlr_node::run_ ( const TTruncAcc & )
+{
+    assert( is_dense( A ) );
+    
+    auto        D = ptrcast( A, TDenseMatrix );
+    const auto  W = BLAS::prod( real(1), U, *T );
+
+    BLAS::prod( real(-1), W, BLAS::adjoint( V ), real(1), blas_mat< real >( D ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
