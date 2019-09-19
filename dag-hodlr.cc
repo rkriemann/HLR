@@ -64,8 +64,6 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    const size_t  ncoarse = ( coarse > 0 ? A->nrows() / coarse : A->nrows() / 50 );
-    
     std::cout << term::bullet << term::bold << "Tiled HODLR LU (DAG)" << term::reset << ", " << acc.to_string() << std::endl;
 
     //////////////////////////////////////////////////////////////////////
@@ -88,8 +86,8 @@ mymain ( int, char ** )
     }// if
     else
     {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
-        hlr::dag::def_path_len  = 2;
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+        hlr::dag::def_path_len  = 10;
     }// if
 
     //

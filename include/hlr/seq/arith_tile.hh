@@ -63,50 +63,17 @@ split ( const BLAS::Range &  r,
 }
 
 //
-// compute U := X · T
-//
-template < typename value_t >
-void
-tmul ( const BLAS::Matrix< value_t > &  X,
-       const BLAS::Matrix< value_t > &  T,
-       BLAS::Matrix< value_t > &        U,
-       const size_t                     ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    assert( X.ncols() == T.nrows() );
-    assert( T.ncols() == U.ncols() );
-
-    HLR_LOG( 4, HLIB::to_string( "tmul( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        const auto                     R = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
-        const BLAS::Matrix< value_t >  X0( X, R[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  X1( X, R[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        U0( U, R[0], BLAS::Range::all );
-        BLAS::Matrix< value_t >        U1( U, R[1], BLAS::Range::all );
-        
-        tmul( X0, T, U0, ntile );
-        tmul( X1, T, U1, ntile );
-    }// if
-    else
-    {
-        BLAS::prod( value_t(1), X, T, value_t(0), U );
-    }// else
-}
-
-//
 // compute T := A^H · B
 //
 template < typename value_t >
 BLAS::Matrix< value_t >
-tsmul ( const BLAS::Matrix< value_t > &  A,
-        const BLAS::Matrix< value_t > &  B,
-        const size_t                     ntile )
+dot ( const BLAS::Matrix< value_t > &  A,
+      const BLAS::Matrix< value_t > &  B,
+      const size_t                     ntile )
 {
     assert( A.nrows() == B.nrows() );
 
-    HLR_LOG( 4, HLIB::to_string( "tsmul( %d )", B.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "dot( %d )", B.nrows() ) );
     
     if ( A.nrows() > ntile )
     {
@@ -116,8 +83,8 @@ tsmul ( const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t >  B0( B, R[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B1( B, R[1], BLAS::Range::all );
         
-        auto  T0 = tsmul( A0, B0, ntile );
-        auto  T1 = tsmul( A1, B1, ntile );
+        auto  T0 = dot( A0, B0, ntile );
+        auto  T1 = dot( A1, B1, ntile );
 
         BLAS::add( value_t(1), T0, T1 );
 
@@ -130,13 +97,14 @@ tsmul ( const BLAS::Matrix< value_t > &  A,
 }
 
 //
-// compute B := B + α·A·T
+// compute B := β·B + α·A·T
 //
 template < typename value_t >
 void
-tsadd ( const value_t                    alpha,
+tprod ( const value_t                    alpha,
         const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t > &  T,
+        const value_t                    beta,
         BLAS::Matrix< value_t > &        B,
         const size_t                     ntile )
 {
@@ -144,7 +112,7 @@ tsadd ( const value_t                    alpha,
     assert( A.ncols() == T.nrows() );
     assert( T.ncols() == B.ncols() );
 
-    HLR_LOG( 4, HLIB::to_string( "tsadd( %d )", B.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", B.nrows() ) );
     
     if ( A.ncols() > ntile )
     {
@@ -154,14 +122,12 @@ tsadd ( const value_t                    alpha,
         BLAS::Matrix< value_t >        B0( B, R[0], BLAS::Range::all );
         BLAS::Matrix< value_t >        B1( B, R[1], BLAS::Range::all );
 
-        tsadd( alpha, A0, T, B0, ntile );
-        tsadd( alpha, A1, T, B1, ntile );
+        tprod( alpha, A0, T, beta, B0, ntile );
+        tprod( alpha, A1, T, beta, B1, ntile );
     }// if
     else
     {
-        auto  W = BLAS::prod( value_t(1), A, T );
-        
-        BLAS::add( alpha, W, B );
+        BLAS::prod( alpha, A, T, beta, B );
     }// else
 }
 
@@ -214,8 +180,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tmul( Q0, Q01_0, Q_0, ntile );
-        tmul( Q1, Q01_1, Q_1, ntile );
+        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
+        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -284,8 +250,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tmul( Q0, Q01_0, Q_0, ntile );
-        tmul( Q1, Q01_1, Q_1, ntile );
+        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
+        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -363,8 +329,8 @@ truncate ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Uk( U.nrows(), k );
         BLAS::Matrix< value_t >  Vk( V.nrows(), k );
 
-        tmul( Q0, Usk, Uk, ntile );
-        tmul( Q1, Vsk, Vk, ntile );
+        tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile );
+        tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
@@ -442,9 +408,9 @@ trsmuh ( const TMatrix *            U,
             
         hodlr::trsmuh( U00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = hodlr::dot( mat_U< value_t >( U01 ), X0, ntile );
         
-        hodlr::tsadd( value_t(-1), mat_V< value_t >( U01 ), T, X1, ntile );
+        hodlr::tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
 
         hodlr::trsmuh( U11, X1, ntile );
     }// if
@@ -482,9 +448,9 @@ trsml ( const TMatrix *            L,
             
         hodlr::trsml( L00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_V< value_t >( L10 ), X0, ntile );
+        auto  T = hodlr::dot( mat_V< value_t >( L10 ), X0, ntile );
 
-        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
+        hodlr::tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
 
         hodlr::trsml( L11, X1, ntile );
     }// if
@@ -521,7 +487,7 @@ lu ( TMatrix *          A,
         trsmuh( A00, mat_V< value_t >( A10 ), ntile );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  T  = hodlr::tsmul( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        auto  T  = hodlr::dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
         hodlr::addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         

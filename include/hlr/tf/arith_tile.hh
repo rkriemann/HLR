@@ -100,13 +100,13 @@ tmul ( const BLAS::Matrix< value_t > &  X,
 //
 template < typename value_t >
 BLAS::Matrix< value_t >
-tsmul ( const BLAS::Matrix< value_t > &  A,
-        const BLAS::Matrix< value_t > &  B,
-        const size_t                     ntile )
+dot ( const BLAS::Matrix< value_t > &  A,
+      const BLAS::Matrix< value_t > &  B,
+      const size_t                     ntile )
 {
     assert( A.nrows() == B.nrows() );
 
-    HLR_LOG( 4, HLIB::to_string( "tsmul( %d )", B.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "dot( %d )", B.nrows() ) );
     
     if ( A.nrows() > ntile )
     {
@@ -116,8 +116,8 @@ tsmul ( const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t >  B0( B, R[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B1( B, R[1], BLAS::Range::all );
         
-        auto  T0 = tsmul( A0, B0, ntile );
-        auto  T1 = tsmul( A1, B1, ntile );
+        auto  T0 = dot( A0, B0, ntile );
+        auto  T1 = dot( A1, B1, ntile );
 
         BLAS::add( value_t(1), T0, T1 );
 
@@ -189,7 +189,7 @@ trsml ( const TMatrix *            L,
             
         hodlr::trsml( L00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_V< value_t >( L10 ), X0, ntile );
+        auto  T = hodlr::dot( mat_V< value_t >( L10 ), X0, ntile );
 
         hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
 
@@ -480,7 +480,7 @@ trsmuh ( const TMatrix *            U,
             
         hodlr::trsmuh( U00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = hodlr::dot( mat_U< value_t >( U01 ), X0, ntile );
         
         hodlr::tsadd( value_t(-1), mat_V< value_t >( U01 ), T, X1, ntile );
 
@@ -524,7 +524,7 @@ lu ( ::tf::SubflowBuilder &  tf,
         // T = ( V(A_10)^H · U(A_01) )
         auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf )
                                     {
-                                        auto  T  = hodlr::tsmul( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+                                        auto  T  = hodlr::dot( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
                                         hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
                                     } );
