@@ -51,7 +51,7 @@ split ( const BLAS::Range &  r,
 {
     if ( n == 2 )
     {
-        const BLAS::Range  r0( r.first(), (r.first() + r.last()) / 2 - 1 );
+        const BLAS::Range  r0( r.first(), r.first() + r.size() / 2 - 1 );
         const BLAS::Range  r1( r0.last() + 1, r.last() );
 
         return { std::move(r0), std::move(r1) };
@@ -131,6 +131,34 @@ tprod ( const value_t                    alpha,
     }// else
 }
 
+template < typename value_t >
+void
+tprod ( const value_t                    alpha,
+        BLAS::Matrix< value_t > &        A,
+        const BLAS::Matrix< value_t > &  T,
+        const size_t                     ntile )
+{
+    assert( A.ncols() == T.nrows() );
+
+    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", A.nrows() ) );
+    
+    if ( A.ncols() > ntile )
+    {
+        const auto               R = split( BLAS::Range( 0, A.nrows()-1 ), 2 );
+        BLAS::Matrix< value_t >  A0( A, R[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
+
+        tprod( alpha, A0, T, ntile );
+        tprod( alpha, A1, T, ntile );
+    }// if
+    else
+    {
+        BLAS::Matrix< value_t >  Ac( A, HLIB::copy_value );
+        
+        BLAS::prod( alpha, Ac, T, value_t(0), A );
+    }// else
+}
+
 //
 // compute QR factorization of [αX·T,U]
 //
@@ -151,8 +179,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
-        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -203,6 +231,62 @@ tsqr ( const value_t                 alpha,
     }// else
 }
 
+template < typename value_t >
+void
+tsqr ( const value_t                 alpha,
+       const BLAS::Matrix< real > &  X,
+       const BLAS::Matrix< real > &  T,
+       const BLAS::Matrix< real > &  U,
+       BLAS::Matrix< real > &        Q,
+       BLAS::Matrix< real > &        R,
+       const size_t                  ntile )
+{
+    assert( X.nrows() == U.nrows() );
+    assert( X.ncols() == T.nrows() );
+    
+    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
+    
+    if ( X.nrows() > ntile )
+    {
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
+        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
+        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
+
+        tsqr( alpha, X0, T, U0, Q0, R0, ntile );
+        tsqr( alpha, X1, T, U1, Q1, R1, ntile );
+
+        // Q = | R0 |
+        //     | R1 |
+        BLAS::qr( Q01, R );
+
+        tprod( value_t(1), Q0, R0, ntile );
+        tprod( value_t(1), Q1, R1, ntile );
+    }// if
+    else
+    {
+        auto                     W = BLAS::prod( alpha, X, T );
+        BLAS::Matrix< value_t >  WU_W( Q, BLAS::Range::all, BLAS::Range( 0, W.ncols()-1 ) );
+        BLAS::Matrix< value_t >  WU_U( Q, BLAS::Range::all, BLAS::Range( W.ncols(), Q.ncols()-1 ) );
+
+        BLAS::copy( W, WU_W );
+        BLAS::copy( U, WU_U );
+
+        BLAS::qr( Q, R );
+    }// else
+}
+
 //
 // compute QR factorization of [αX,U]
 //
@@ -221,8 +305,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
-        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -272,6 +356,59 @@ tsqr ( const value_t                 alpha,
     }// else
 }
 
+template < typename value_t >
+void
+tsqr ( const value_t                 alpha,
+       const BLAS::Matrix< real > &  X,
+       const BLAS::Matrix< real > &  U,
+       BLAS::Matrix< real > &        Q,
+       BLAS::Matrix< real > &        R,
+       const size_t                  ntile )
+{
+    assert( X.nrows() == U.nrows() );
+    
+    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
+    
+    if ( X.nrows() > ntile )
+    {
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
+        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
+        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
+
+        tsqr( alpha, X0, U0, Q0, R0, ntile );
+        tsqr( alpha, X1, U1, Q1, R1, ntile );
+        
+        // Q = | R0 |
+        //     | R1 |
+        BLAS::qr( Q01, R );
+
+        tprod( value_t(1), Q0, R0, ntile );
+        tprod( value_t(1), Q1, R1, ntile );
+    }// if
+    else
+    {
+        BLAS::Matrix< value_t >  XU_X( Q, BLAS::Range::all, BLAS::Range( 0, X.ncols()-1 ) );
+        BLAS::Matrix< value_t >  XU_U( Q, BLAS::Range::all, BLAS::Range( X.ncols(), Q.ncols()-1 ) );
+
+        BLAS::copy( X, XU_X );
+        BLAS::copy( U, XU_U );
+
+        BLAS::qr( Q, R );
+    }// else
+}
+
 //
 // truncate α X T Y^H + U V^H
 //
@@ -308,9 +445,23 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
+        #if 0
+        
+        BLAS::Matrix< value_t >  Q0( X.nrows(), T.ncols() + U.ncols() );
+        BLAS::Matrix< value_t >  Q1( Y.nrows(), Y.ncols() + V.ncols() );
+        BLAS::Matrix< value_t >  R0( Q0.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >  R1( Q1.ncols(), Q1.ncols() );
+        
+        tsqr( alpha,      X, T, U, Q0, R0, ntile );
+        tsqr( value_t(1), Y,    V, Q1, R1, ntile );
+        
+        #else
+        
         auto [ Q0, R0 ] = tsqr( alpha,      X, T, U, ntile );
         auto [ Q1, R1 ] = tsqr( value_t(1), Y,    V, ntile );
-
+        
+        #endif
+        
         auto R = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
 
         auto                     Us = std::move( R );

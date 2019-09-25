@@ -32,6 +32,43 @@ bool is_null_any  ( T *  p )               noexcept { return is_null( p ); }
 template < typename T1, typename... T2 >
 bool is_null_any  ( T1 *  p, T2...  ptrs ) noexcept { return is_null( p ) || is_null_any( ptrs... ); }
 
+//!
+//! same for smart pointers
+//!
+template < typename T >
+bool is_null      ( const std::shared_ptr< T > &   p ) noexcept { return (p.get() == nullptr); }
+
+template < typename T >
+bool is_null      ( const std::unique_ptr< T > &   p ) noexcept { return (p.get() == nullptr); }
+
+template < typename T >
+bool is_null_all  ( const std::shared_ptr< T > &   p ) noexcept { return is_null( p ); }
+
+template < typename T >
+bool is_null_all  ( const std::unique_ptr< T > &   p ) noexcept { return is_null( p ); }
+
+template < typename T >
+bool is_null_any  ( const std::shared_ptr< T > &   p ) noexcept { return is_null( p ); }
+
+template < typename T >
+bool is_null_any  ( const std::unique_ptr< T > &   p ) noexcept { return is_null( p ); }
+
+template < typename T1, typename... T2 >
+bool is_null_all  ( const std::shared_ptr< T1 > &  p,
+                    T2...                          ptrs ) noexcept { return is_null( p ) && is_null_all( ptrs... ); }
+
+template < typename T1, typename... T2 >
+bool is_null_all  ( const std::unique_ptr< T1 > &  p,
+                    T2...                          ptrs ) noexcept { return is_null( p ) && is_null_all( ptrs... ); }
+
+template < typename T1, typename... T2 >
+bool is_null_any  ( const std::shared_ptr< T1 > &  p,
+                    T2...                          ptrs ) noexcept { return is_null( p ) || is_null_any( ptrs... ); }
+
+template < typename T1, typename... T2 >
+bool is_null_any  ( const std::unique_ptr< T1 > &  p,
+                    T2...                          ptrs ) noexcept { return is_null( p ) || is_null_any( ptrs... ); }
+
 //
 // return true if A is corresponding to leaf matrix block
 //

@@ -53,7 +53,7 @@ split ( const BLAS::Range &  r,
 {
     if ( n == 2 )
     {
-        const BLAS::Range  r0( r.first(), (r.first() + r.last()) / 2 - 1 );
+        const BLAS::Range  r0( r.first(), r.first() + r.size() / 2 - 1 );
         const BLAS::Range  r1( r0.last() + 1, r.last() );
 
         return { std::move(r0), std::move(r1) };

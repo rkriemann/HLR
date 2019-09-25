@@ -103,6 +103,17 @@ graph
 gen_dag_lu_hodlr_tiled ( HLIB::TMatrix &  A,
                          refine_func_t    refine );
 
+//
+// compute DAG for TSQR( X·T, U )
+//
+graph
+gen_dag_tsqr ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  T,
+               HLIB::BLAS::Matrix< HLIB::real > &                     U,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  Q,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  R,
+               refine_func_t                                          refine );
+
 }// namespace dag
 
 }// namespace hlr

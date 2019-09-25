@@ -150,6 +150,31 @@ remove_redundant ( node *              n,
     return new_out;
 }
 
+node_vec_t
+remove_redundant ( node *              n,
+                   const node_set_t &  neighbourhood,
+                   const node_vec_t &  keep,
+                   const uint          steps = def_path_len )
+{
+    const auto  descendants = reachable_indirect( n, neighbourhood, steps );
+    node_vec_t  new_out;
+
+    new_out.reserve( n->successors().size() );
+    
+    // if a direct edge to otherwise reachable node exists, remove it
+    for ( auto  succ : n->successors() )
+    {
+        if ( contains( descendants, succ ) && ! contains( keep, succ ) )
+        {
+            HLR_LOG( 6, "  removing " + n->to_string() + " → " + succ->to_string() + " from " + n->to_string() );
+        }// if
+        else
+            new_out.push_back( succ );
+    }// for
+
+    return new_out;
+}
+
 //
 // refine dependencies of local node
 //
@@ -271,6 +296,10 @@ refine_sub_deps ( node *  node )
     
     if ( sparsify_mode & sparsify_node_succ )
     {
+        //
+        // look for paths in successor set of each sub node
+        //
+        
         for ( auto  sub : node->sub_nodes() )
         {
             node_set_t  neighbourhood;
@@ -288,8 +317,7 @@ refine_sub_deps ( node *  node )
     else if ( sparsify_mode & sparsify_sub_succ )
     {
         //
-        // put sub nodes and all their successors into neighbourhood to
-        // look for paths in full subgraphs reaching successors
+        // look for paths in successor set of all sub nodes
         //
         
         node_set_t  neighbourhood;
@@ -308,8 +336,7 @@ refine_sub_deps ( node *  node )
     else if ( sparsify_mode & sparsify_sub_all )
     {
         //
-        // look in all sub nodes of all successors of parent node
-        // (sub nodes can only have successors in this set!)
+        // look for paths in set of all sub nodes of all successors
         //
         
         node_set_t  neighbourhood;
@@ -330,6 +357,33 @@ refine_sub_deps ( node *  node )
 
         for ( auto  sub : node->sub_nodes() )
             sub->successors() = remove_redundant( sub, neighbourhood );
+    }// if
+    else if ( sparsify_mode & sparsify_sub_all_ext )
+    {
+        //
+        // look for path in set of all sub nodes of all successors
+        // but only eliminate edges to external nodes (not within
+        // nodes sub nodes)
+        //
+        
+        node_set_t  neighbourhood;
+
+        for ( auto  sub : node->sub_nodes() )
+            insert( neighbourhood, sub );
+
+        for ( auto  succ : node->successors() )
+        {
+            if ( succ->is_refined() )
+            {
+                for ( auto  sub : succ->sub_nodes() )
+                    insert( neighbourhood, sub );
+            }// if
+            else
+                insert( neighbourhood, succ );
+        }// for
+
+        for ( auto  sub : node->sub_nodes() )
+            sub->successors() = remove_redundant( sub, neighbourhood, node->sub_nodes() );
     }// if
 }
 

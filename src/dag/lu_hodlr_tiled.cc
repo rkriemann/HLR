@@ -148,6 +148,20 @@ bis ( const BLAS::Matrix< value_t > &  M )
     return TBlockIndexSet( is( 0, M.nrows()-1 ), is( 0, M.ncols()-1 ) );
 }
 
+inline
+TBlockIndexSet
+bis_row ( const TIndexSet &  row_is )
+{
+    return TBlockIndexSet( row_is, is( 0, 0 ) );
+}
+
+inline
+TBlockIndexSet
+bis_col ( const TIndexSet &  col_is )
+{
+    return TBlockIndexSet( is( 0, 0 ), col_is );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // tasks
@@ -337,30 +351,31 @@ private:
 //
 // compute Y := β·Y + α·X·T
 //
+template < typename matrixX_t, typename matrixY_t >
 struct tprod_node : public node
 {
     const real                    alpha;
     const id_t                    id_X;
     const TBlockIndexSet          is_X;
-    const BLAS::Matrix< real >    X;
+    matrixX_t                     X;
     const id_t                    id_T;
     std::shared_ptr< BLAS::Matrix< real > >  T;
     const real                    beta;
     const id_t                    id_Y;
     const TBlockIndexSet          is_Y;
-    BLAS::Matrix< real >          Y;
+    matrixY_t                     Y;
     const size_t                  ntile;
 
     tprod_node ( const real                   aalpha,
                  const id_t                   aid_X,
                  const TBlockIndexSet         ais_X,
-                 const BLAS::Matrix< real > & aX,
+                 matrixX_t                    aX,
                  const id_t                   aid_T,
                  std::shared_ptr< BLAS::Matrix< real > >  aT,
                  const real                   abeta,
                  const id_t                   aid_Y,
                  const TBlockIndexSet         ais_Y,
-                 BLAS::Matrix< real > &       aY,
+                 matrixY_t                    aY,
                  const size_t                 antile )
             : alpha( aalpha )
             , id_X( aid_X ), is_X( ais_X ), X( aX )
@@ -370,9 +385,9 @@ struct tprod_node : public node
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "tprod( %c[%d,%d], %c[%d,%d] )",
-                                                                      char(id_X), is_X.row_is().first(), is_X.row_is().last(),
-                                                                      char(id_Y), is_Y.row_is().first(), is_Y.row_is().last() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "tprod( %d, %d )",
+                                                                      is_X.row_is().first() / ntile,
+                                                                      is_Y.row_is().first() / ntile ); }
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
@@ -384,6 +399,48 @@ private:
         else                   return { { id_X, is_X }, { id_T, BIS_ONE }, { id_Y, is_Y } };
     }
     virtual const block_list_t  out_blocks_  () const { return { { id_Y, is_Y } }; }
+};
+
+template < typename matrix_t >
+struct tprod_ip_node : public node
+{
+    const real                    alpha;
+    const id_t                    id_X;
+    const TBlockIndexSet          is_X;
+    matrix_t                      X;
+    const id_t                    id_T;
+    std::shared_ptr< BLAS::Matrix< real > >  T;
+    const size_t                  ntile;
+
+    tprod_ip_node ( const real                   aalpha,
+                    const id_t                   aid_X,
+                    const TBlockIndexSet         ais_X,
+                    matrix_t                     aX,
+                    const id_t                   aid_T,
+                    std::shared_ptr< BLAS::Matrix< real > >  aT,
+                    const size_t                 antile )
+            : alpha( aalpha )
+            , id_X( aid_X ), is_X( ais_X ), X( aX )
+            , id_T( aid_T ), T( aT )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        if ( is_X.row_is().size() > ntile )
+            return HLIB::to_string( "tprod_ip( %d:%d )",
+                                    is_X.row_is().first() / ntile,
+                                    is_X.row_is().last() / ntile );
+        else
+            return HLIB::to_string( "tprod_ip( %d )", is_X.row_is().first() / ntile );
+    }
+    virtual std::string  color     () const { return "8ae234"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { id_X, is_X }, { id_T, BIS_ONE } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_X, is_X } }; }
 };
 
 //
@@ -417,43 +474,50 @@ private:
 //
 // truncate α X T Y^H + U(A) V(A)^H
 //
-// struct truncate_node : public node
-// {
-//     const id_t                               id_X;
-//     const TBlockIndexSet                     is_X;
-//     const BLAS::Matrix< real >               X;
-//     const id_t                               id_T;
-//     std::shared_ptr< BLAS::Matrix< real > >  T;
-//     const id_t                               id_Y;
-//     const TBlockIndexSet                     is_Y;
-//     const BLAS::Matrix< real >               Y;
-//     TRkMatrix *                              A;
-//     const size_t                             ntile;
+struct truncate_node : public node
+{
+    const id_t                               id_X;
+    const TBlockIndexSet                     is_X;
+    const BLAS::Matrix< real >               X;
+    const id_t                               id_T;
+    std::shared_ptr< BLAS::Matrix< real > >  T;
+    const id_t                               id_Y;
+    const TBlockIndexSet                     is_Y;
+    const BLAS::Matrix< real >               Y;
+    TRkMatrix *                              A;
+    const size_t                             ntile;
 
-//     truncate_node ( const id_t                               aid_X,
-//                     const TBlockIndexSet                     ais_X,
-//                     const BLAS::Matrix< real > &             aX,
-//                     const id_t                               aid_T,
-//                     std::shared_ptr< BLAS::Matrix< real > >  aT,
-//                     const id_t                               aid_Y,
-//                     const TBlockIndexSet                     ais_Y,
-//                     const BLAS::Matrix< real > &             aY,
-//                     TRkMatrix *                              aA,
-//                     const size_t                             antile )
-//             : T0( aT0 )
-//             , T1( aT1 )
-//             , T( aT )
-//     { init(); }
+    truncate_node ( const id_t                               aid_X,
+                    const TBlockIndexSet                     ais_X,
+                    const BLAS::Matrix< real > &             aX,
+                    const id_t                               aid_T,
+                    std::shared_ptr< BLAS::Matrix< real > >  aT,
+                    const id_t                               aid_Y,
+                    const TBlockIndexSet                     ais_Y,
+                    const BLAS::Matrix< real > &             aY,
+                    TRkMatrix *                              aA,
+                    const size_t                             antile )
+            : id_X( aid_X )
+            , is_X( ais_X )
+            , X( aX )
+            , id_T( aid_T )
+            , T( aT )
+            , id_Y( aid_Y )
+            , is_Y( ais_Y )
+            , Y( aY )
+            , A( aA )
+            , ntile( antile )
+    { init(); }
 
-//     virtual std::string  to_string () const { return HLIB::to_string( "truncate( %d )", A->id() ); }
-//     virtual std::string  color     () const { return "e9b96e"; }
+    virtual std::string  to_string () const { return HLIB::to_string( "truncate( %d )", A->id() ); }
+    virtual std::string  color     () const { return "e9b96e"; }
 
-// private:
-//     virtual void                run_         ( const TTruncAcc &  acc );
-//     virtual local_graph         refine_      ( const size_t ) { return {}; }
-//     virtual const block_list_t  in_blocks_   () const { return { { id_X, is_X }, { id_T, BIS_ONE }, { id_Y, is_Y } }; }
-//     virtual const block_list_t  out_blocks_  () const { return { { A->block_is(), ID_A } }; }
-// };
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_X, is_X }, { id_T, BIS_ONE }, { id_Y, is_Y } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { A->block_is(), ID_A } }; }
+};
 
 //
 // QR factorization of [αX·T,U]
@@ -471,7 +535,7 @@ struct tsqr_node : public node
     const BLAS::Matrix< real >               U;
     const id_t                               id_Q;
     const TBlockIndexSet                     is_Q;
-    BLAS::Matrix< real >                     Q;
+    std::shared_ptr< BLAS::Matrix< real > >  Q;
     const id_t                               id_R;
     std::shared_ptr< BLAS::Matrix< real > >  R;
     const size_t                             ntile;
@@ -487,7 +551,7 @@ struct tsqr_node : public node
                 const BLAS::Matrix< real > &             aU,
                 const id_t                               aid_Q,
                 const TBlockIndexSet                     ais_Q,
-                BLAS::Matrix< real >                     aQ,
+                std::shared_ptr< BLAS::Matrix< real > >  aQ,
                 const id_t                               aid_R,
                 std::shared_ptr< BLAS::Matrix< real > >  aR,
                 const size_t                             antile )
@@ -500,13 +564,25 @@ struct tsqr_node : public node
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "tsqr( %d )", X.nrows() ); }
+    virtual std::string  to_string () const
+    {
+        if ( is_X.row_is().size() > ntile )
+            return HLIB::to_string( "tsqr( %d:%d )",
+                                    is_X.row_is().first() / ntile,
+                                    is_X.row_is().last() / ntile );
+        else
+            return HLIB::to_string( "tsqr( %d )", is_X.row_is().first() / ntile );
+    }
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_X, is_X }, { id_T, BIS_ONE }, { id_U, is_U } }; }
+    virtual const block_list_t  in_blocks_   () const
+    {
+        if ( is_null( T ) ) return { { id_X, is_X }, { id_U, is_U } };
+        else                return { { id_X, is_X }, { id_U, is_U }, { id_T, BIS_ONE } };
+    }
     virtual const block_list_t  out_blocks_  () const { return { { id_Q, is_Q }, { id_R, BIS_ONE } }; }
 };
 
@@ -533,14 +609,120 @@ struct qr_node : public node
             , id_R(  aid_R  ), R(  aR  )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = qr( %d, %d )", id_t(R.get()), id_t(R0.get()), id_t(R1.get()) ); }
-    virtual std::string  color     () const { return "e9b96e"; }
+    virtual std::string  to_string () const { return HLIB::to_string( "qr( %d )", id_t(R.get()) ); }
+    virtual std::string  color     () const { return "c17d11"; }
 
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { { id_R0, BIS_ONE }, { id_R1, BIS_ONE } }; }
     virtual const block_list_t  out_blocks_  () const { return { { id_R0, BIS_ONE }, { id_R1, BIS_ONE }, { id_R, BIS_ONE } }; }
+};
+
+//
+// allocate Q matrices for QR during truncation
+//
+struct alloc_node : public node
+{
+    const id_t                               id_X;
+    const TBlockIndexSet                     is_X;
+    const BLAS::Matrix< real >               X;
+    const id_t                               id_T;
+    std::shared_ptr< BLAS::Matrix< real > >  T;
+    const id_t                               id_Y;
+    const TBlockIndexSet                     is_Y;
+    const BLAS::Matrix< real >               Y;
+    const id_t                               id_Q0;
+    const TBlockIndexSet                     is_Q0;
+    std::shared_ptr< BLAS::Matrix< real > >  Q0;
+    const id_t                               id_Q1;
+    const TBlockIndexSet                     is_Q1;
+    std::shared_ptr< BLAS::Matrix< real > >  Q1;
+    const TRkMatrix *                        A;
+
+    alloc_node ( const id_t                               aid_X;
+                 const TBlockIndexSet                     ais_X;
+                 const BLAS::Matrix< real >               aX;
+                 const id_t                               aid_T;
+                 std::shared_ptr< BLAS::Matrix< real > >  aT;
+                 const id_t                               aid_Y;
+                 const TBlockIndexSet                     ais_Y;
+                 const BLAS::Matrix< real >               aY;
+                 const id_t                               aid_Q0;
+                 const TBlockIndexSet                     ais_Q0;
+                 std::shared_ptr< BLAS::Matrix< real > >  aQ0;
+                 const id_t                               aid_Q1;
+                 const TBlockIndexSet                     ais_Q1;
+                 std::shared_ptr< BLAS::Matrix< real > >  aQ1,
+                 const TRkMatrix *                        aA )
+            : id_X( aid_X ), is_X( ais_X ), X( aX )
+            , id_T( aid_T ), T( aT )
+            , id_Y( aid_Y ), is_Y( ais_Y ), Y( aY )
+            , id_Q0( aid_Q0 ), is_Q0( ais_Q0 ), Q0( aQ0 )
+            , id_Q1( aid_Q1 ), is_Q1( ais_Q1 ), Q1( aQ1 )
+            , A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "alloc( %d )", A->id() ); }
+    virtual std::string  color     () const { return "aaaaaa"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_X, is_X }, { id_T, BIS_ONE }, { id_Y, is_Y }, { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_Q0, is_Q0 }, { id_Q1, is_Q1 } }; }
+};
+
+//
+// compute truncation rank and set up matrices for truncation
+//
+struct svd_node : public node
+{
+    const id_t                               id_R0;
+    const BLAS::Matrix< real >               R0;
+    const id_t                               id_R1;
+    std::shared_ptr< BLAS::Matrix< real > >  R1;
+    const id_t                               id_Uk;
+    const BLAS::Matrix< real >               Uk;
+    const id_t                               id_Vk;
+    std::shared_ptr< BLAS::Matrix< real > >  Vk;
+    const id_t                               id_U;
+    const TBlockIndexSet                     is_U;
+    std::shared_ptr< BLAS::Matrix< real > >  U;
+    const id_t                               id_V;
+    const TBlockIndexSet                     is_V;
+    std::shared_ptr< BLAS::Matrix< real > >  V;
+
+    svd_node ( const id_t                               aid_R0;
+               const BLAS::Matrix< real >               aR0;
+               const id_t                               aid_R1;
+               std::shared_ptr< BLAS::Matrix< real > >  aR1;
+               const id_t                               aid_Uk;
+               const BLAS::Matrix< real >               aUk;
+               const id_t                               aid_Vk;
+               std::shared_ptr< BLAS::Matrix< real > >  aVk;
+               const id_t                               aid_U;
+               const TBlockIndexSet                     ais_U;
+               std::shared_ptr< BLAS::Matrix< real > >  aU,
+               const id_t                               aid_V;
+               const TBlockIndexSet                     ais_V;
+               std::shared_ptr< BLAS::Matrix< real > >  aV )
+            : id_R0( aid_R0 ), R0( aR0 )
+            , id_R1( aid_R1 ), R1( aR1 )
+            , id_Uk( aid_Uk ), Uk( aUk )
+            , id_Vk( aid_Vk ), Vk( aVk )
+            , id_U( aid_U ), is_U( ais_U ), U( aU )
+            , id_V( aid_V ), is_V( ais_V ), V( aV )
+    { init(); }
+
+    virtual std::string  to_string () const { return "svd"; }
+    virtual std::string  color     () const { return "ad7fa8"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t ) { return {}; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_R0, BIS_ONE }, { id_R1, BIS_ONE } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_Uk, BIS_ONE }, { is_Vk, BIS_ONE }, { id_U, is_U }, { id_V, is_V } }; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -630,19 +812,21 @@ trsmu_node::refine_ ( const size_t  min_size )
         BLAS::Matrix< real >  X0( X, is0 - U->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< real >  X1( X, is1 - U->col_ofs(), BLAS::Range::all );
 
-        auto  solve_00 = g.alloc_node< trsmu_node >( U00, bis( is0, is_X.col_is() ), X0, ntile );
+        auto  solve_00 = g.alloc_node< trsmu_node >( U00, bis_row( is0 ), X0, ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul    = g.alloc_node< dot_node >( ID_U, bis( U01->row_is(), is( 0, U01->rank()-1 ) ), mat_U< real >( U01 ),
-                                                     ID_L, bis( sis_X[0], is_X.col_is() ), X0,
-                                                     T, ntile );
-        auto  tprod    = g.alloc_node< tprod_node >( real(-1),
-                                                     ID_U, bis( U01->col_is(), is( 0, U01->rank()-1 ) ), mat_V< real >( U01 ),
-                                                     id_t(T.get()), T, // dummy index set
-                                                     real(1),
-                                                     ID_L, bis( sis_X[1], is_X.col_is() ), X1,
-                                                     ntile );
-        auto  solve_11 = g.alloc_node< trsmu_node >( U11, bis( is1, is_X.col_is() ), X1, ntile );
+        auto  tsmul    = g.alloc_node< dot_node >( ID_U, bis_row( U01->row_is() ), mat_U< real >( U01 ),
+                                                   ID_L, bis_row( sis_X[0] ), X0,
+                                                   T, ntile );
+        auto  tprod    = new tprod_node( real(-1),
+                                         ID_U, bis_row( U01->col_is() ), mat_V< real >( U01 ),
+                                         id_t(T.get()), T, // dummy index set
+                                         real(1),
+                                         ID_L, bis_row( sis_X[1] ), X1,
+                                         ntile );
+        auto  solve_11 = g.alloc_node< trsmu_node >( U11, bis_row( is1 ), X1, ntile );
 
+        g.add_node( tprod );
+        
         tsmul->after( solve_00 );
         tprod->after( tsmul );
         solve_11->after( tprod );
@@ -689,19 +873,21 @@ trsml_node::refine_ ( const size_t  min_size )
         BLAS::Matrix< real >  X0( X, is0 - L->row_ofs(), BLAS::Range::all );
         BLAS::Matrix< real >  X1( X, is0 - L->row_ofs(), BLAS::Range::all );
             
-        auto  solve_00 = g.alloc_node< trsml_node >( L00, bis( is0, is_X.col_is() ), X0, ntile );
+        auto  solve_00 = g.alloc_node< trsml_node >( L00, bis_row( is0 ), X0, ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul    = g.alloc_node< dot_node >( ID_L, bis( L10->col_is(), is( 0, L10->rank()-1 ) ), mat_V< real >( L10 ),
-                                                     ID_U, bis( sis_X[0], is_X.col_is() ), X0,
-                                                     T, ntile );
-        auto  tprod    = g.alloc_node< tprod_node >( real(-1),
-                                                     ID_L, bis( L10->row_is(), is( 0, L10->rank()-1 ) ), mat_U< real >( L10 ),
-                                                     id_t(T.get()), T, // dummy index set
-                                                     real(1),
-                                                     ID_U, bis( sis_X[1], is_X.col_is() ), X1,
-                                                     ntile );
-        auto  solve_11 = g.alloc_node< trsml_node >( L11, bis( is1, is_X.col_is() ), X1, ntile );
+        auto  tsmul    = g.alloc_node< dot_node >( ID_L, bis_row( L10->col_is() ), mat_V< real >( L10 ),
+                                                   ID_U, bis_row( sis_X[0] ), X0,
+                                                   T, ntile );
+        auto  tprod    = new tprod_node( real(-1),
+                                         ID_L, bis_row( L10->row_is() ), mat_U< real >( L10 ),
+                                         id_t(T.get()), T,
+                                         real(1),
+                                         ID_U, bis_row( sis_X[1] ), X1,
+                                         ntile );
+        auto  solve_11 = g.alloc_node< trsml_node >( L11, bis_row( is1 ), X1, ntile );
 
+        g.add_node( tprod );
+        
         tsmul->after( solve_00 );
         tprod->after( tsmul );
         solve_11->after( tprod );
@@ -735,19 +921,19 @@ dot_node::refine_ ( const size_t  min_size )
     {
         const auto                  sis_A = split( is_A.row_is(), 2 );
         const auto                  sis_B = split( is_B.row_is(), 2 );
-        const BLAS::Matrix< real >  A0( A, sis_A[0] - is_A.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  A1( A, sis_A[1] - is_A.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  B0( B, sis_B[0] - is_A.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  B1( B, sis_B[1] - is_A.row_is().first(), BLAS::Range::all );
+        // const BLAS::Matrix< real >  A0( A, sis_A[0] - is_A.row_is().first(), BLAS::Range::all );
+        // const BLAS::Matrix< real >  A1( A, sis_A[1] - is_A.row_is().first(), BLAS::Range::all );
+        // const BLAS::Matrix< real >  B0( B, sis_B[0] - is_A.row_is().first(), BLAS::Range::all );
+        // const BLAS::Matrix< real >  B1( B, sis_B[1] - is_A.row_is().first(), BLAS::Range::all );
 
         auto  T0     = std::make_shared< BLAS::Matrix< real > >();
         auto  T1     = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul0 = g.alloc_node< dot_node >( id_A, bis( sis_A[0], is_A.col_is() ), A0,
-                                                   id_B, bis( sis_B[0], is_B.col_is() ), B0,
-                                                   T0, ntile );
-        auto  tsmul1 = g.alloc_node< dot_node >( id_A, bis( sis_A[1], is_A.col_is() ), A1,
-                                                   id_B, bis( sis_B[1], is_B.col_is() ), B1,
-                                                   T1, ntile );
+        auto  tsmul0 = g.alloc_node< dot_node  >( id_A, bis( sis_A[0], is_A.col_is() ), A,
+                                                  id_B, bis( sis_B[0], is_B.col_is() ), B,
+                                                  T0, ntile );
+        auto  tsmul1 = g.alloc_node< dot_node  >( id_A, bis( sis_A[1], is_A.col_is() ), A,
+                                                  id_B, bis( sis_B[1], is_B.col_is() ), B,
+                                                  T1, ntile );
         auto  add    = g.alloc_node< tadd_node >( T0, T1, T );
 
         add->after( tsmul0 );
@@ -762,42 +948,42 @@ dot_node::refine_ ( const size_t  min_size )
 void
 dot_node::run_ ( const TTruncAcc &  acc )
 {
-    *T = std::move( BLAS::prod( real(1), BLAS::adjoint( A ), B ) );
+    const BLAS::Matrix< real >  Ai( A, is_A.row_is(), BLAS::Range::all );
+    const BLAS::Matrix< real >  Bi( B, is_B.row_is(), BLAS::Range::all );
+    
+    *T = std::move( BLAS::prod( real(1), BLAS::adjoint( Ai ), Bi ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
-// trsml_node
+// tprod_node
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename matrixX_t, typename matrixY_t >
 local_graph
-tprod_node::refine_ ( const size_t  min_size )
+tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    assert( X.nrows() == Y.nrows() );
+    assert( is_X.row_is().size() == is_Y.row_is().size() );
 
-    if ( X.nrows() > ntile )
+    if ( is_X.row_is().size() > ntile )
     {
-        const auto                  sis_X = split( is_X.row_is(), 2 );
-        const auto                  sis_Y = split( is_Y.row_is(), 2 );
-        const BLAS::Matrix< real >  X0( X, sis_X[0] - is_X.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  X1( X, sis_X[1] - is_X.row_is().first(), BLAS::Range::all );
-        BLAS::Matrix< real >        Y0( Y, sis_Y[0] - is_Y.row_is().first(), BLAS::Range::all );
-        BLAS::Matrix< real >        Y1( Y, sis_Y[1] - is_Y.row_is().first(), BLAS::Range::all );
+        const auto  sis_X = split( is_X.row_is(), 2 );
+        const auto  sis_Y = split( is_Y.row_is(), 2 );
 
         g.alloc_node< tprod_node >( alpha,
-                                    id_X, bis( sis_X[0], is_X.col_is() ), X0,
+                                    id_X, bis_row( sis_X[0] ), X,
                                     id_T, T,
                                     beta,
-                                    id_Y, bis( sis_Y[0], is_Y.col_is() ), Y0,
+                                    id_Y, bis_row( sis_Y[0] ), Y,
                                     ntile );
         g.alloc_node< tprod_node >( alpha,
-                                    id_X, bis( sis_X[1], is_X.col_is() ), X1,
+                                    id_X, bis_row( sis_X[1] ), X,
                                     id_T, T,
                                     beta,
-                                    id_Y, bis( sis_Y[1], is_Y.col_is() ), Y1,
+                                    id_Y, bis_row( sis_Y[1] ), Y,
                                     ntile );
     }// if
 
@@ -806,10 +992,100 @@ tprod_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template <>
 void
-tprod_node::run_ ( const TTruncAcc &  acc )
+tprod_node< BLAS::Matrix< real >, BLAS::Matrix< real > >::run_ ( const TTruncAcc &  acc )
 {
-    BLAS::prod( alpha, X, *T, beta, Y );
+    const BLAS::Matrix< real >  Xi( X, is_X.row_is(), BLAS::Range::all );
+    BLAS::Matrix< real >        Yi( Y, is_Y.row_is(), BLAS::Range::all );
+    
+    BLAS::prod( alpha, Xi, *T, beta, Yi );
+}
+
+template <>
+void
+tprod_node< BLAS::Matrix< real >, std::shared_ptr< BLAS::Matrix< real > > >::run_ ( const TTruncAcc &  acc )
+{
+    const BLAS::Matrix< real >  Xi(  X, is_X.row_is(), BLAS::Range::all );
+    BLAS::Matrix< real >        Yi( *Y, is_Y.row_is(), BLAS::Range::all );
+    
+    BLAS::prod( alpha, Xi, *T, beta, Yi );
+}
+
+template <>
+void
+tprod_node< std::shared_ptr< BLAS::Matrix< real > >, BLAS::Matrix< real > >::run_ ( const TTruncAcc &  acc )
+{
+    const BLAS::Matrix< real >  Xi( *X, is_X.row_is(), BLAS::Range::all );
+    BLAS::Matrix< real >        Yi(  Y, is_Y.row_is(), BLAS::Range::all );
+    
+    BLAS::prod( alpha, Xi, *T, beta, Yi );
+}
+
+template <>
+void
+tprod_node< std::shared_ptr< BLAS::Matrix< real > >, std::shared_ptr< BLAS::Matrix< real > > >::run_ ( const TTruncAcc &  acc )
+{
+    const BLAS::Matrix< real >  Xi( *X, is_X.row_is(), BLAS::Range::all );
+    BLAS::Matrix< real >        Yi( *Y, is_Y.row_is(), BLAS::Range::all );
+    
+    // DBG::write( Xi, "X1.mat", "X1" );
+    // DBG::write( Yi, "Y1.mat", "Y1" );
+    // DBG::write( *T, "T1.mat", "T1" );
+    
+    BLAS::prod( alpha, Xi, *T, beta, Yi );
+
+    // DBG::write( Yi,  "Z1.mat", "Z1" );
+}
+
+template < typename matrix_t >
+local_graph
+tprod_ip_node< matrix_t >::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_X.row_is().size() > ntile )
+    {
+        const auto  sis_X = split( is_X.row_is(), 2 );
+
+        g.alloc_node< tprod_ip_node >( alpha,
+                                       id_X, bis_row( sis_X[0] ), X,
+                                       id_T, T,
+                                       ntile );
+        g.alloc_node< tprod_ip_node >( alpha,
+                                       id_X, bis_row( sis_X[1] ), X,
+                                       id_T, T,
+                                       ntile );
+    }// if
+
+    g.finalize();
+
+    return g;
+}
+
+template <>
+void
+tprod_ip_node< BLAS::Matrix< real > >::run_ ( const TTruncAcc &  acc )
+{
+    BLAS::Matrix< real >        Xi( X, is_X.row_is(), BLAS::Range::all );
+    const BLAS::Matrix< real >  Xc( Xi, HLIB::copy_value );
+    
+    BLAS::prod( alpha, Xc, *T, 0.0, Xi );
+}
+
+template <>
+void
+tprod_ip_node< std::shared_ptr< BLAS::Matrix< real > > >::run_ ( const TTruncAcc &  acc )
+{
+    BLAS::Matrix< real >        Xi( *X, is_X.row_is(), BLAS::Range::all );
+    const BLAS::Matrix< real >  Xc( Xi, HLIB::copy_value );
+    
+    // DBG::write( Xi, "X1.mat", "X1" );
+    // DBG::write( *T, "T1.mat", "T1" );
+
+    BLAS::prod( alpha, Xc, *T, 0.0, Xi );
+
+    // DBG::write( Xi,  "Z1.mat", "Z1" );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -899,114 +1175,95 @@ tadd_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-// local_graph
-// truncate_node::refine_ ( const size_t  min_size )
-// {
-//     local_graph  g;
+local_graph
+truncate_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
 
-//     // assert( X.nrows() == A->nrows() );
-//     // assert( Y.nrows() == A->ncols() );
-//     // assert( X.ncols() == T.nrows() );
-//     // assert( T.ncols() == Y.ncols() );
+    assert( is_X == A->row_is() );
+    assert( is_Y == A->col_is() );
     
-//     // if ( Y.ncols() + A->rank() > A->nrows() / 2 )
-//     // {
-//     //     // M = α X T Y^H + U(A) V(A)^H
-//     //     auto  W = BLAS::prod( value_t(1), X, T );
-//     //     auto  M = BLAS::prod( value_t(1), U, BLAS::adjoint( V ) );
+    // assert( X.nrows() == A->nrows() );
+    // assert( Y.nrows() == A->ncols() );
+    // assert( X.ncols() == T.nrows() );
+    // assert( T.ncols() == Y.ncols() );
+    
+    auto  Q0     = std::make_shared< BLAS::Matrix< real > >();
+    auto  R0     = std::make_shared< BLAS::Matrix< real > >();
+    auto  Q1     = std::make_shared< BLAS::Matrix< real > >();
+    auto  R1     = std::make_shared< BLAS::Matrix< real > >();
+    auto  bis_X  = bis_row( is_X - is_X.row_is().first() );
+    auto  bis_Y  = bis_row( is_Y - is_Y.row_is().first() );
 
-//     //     BLAS::prod( alpha, W, BLAS::adjoint( Y ), value_t(1), M );
-            
-//     //     // truncate to rank-k
-//     //     return std::move( hlr::approx_svd( M, acc ) );
-//     // }// if
-//     // else
-//     // {
-//     //     auto  qr_U   = g.alloc_node< tsqr_node >( alpha,      X, T, U, Q0, R0, ntile );
-//     //     auto  qr_V   = g.alloc_node< tsqr_node >( value_t(1), Y,    V, Q1, R1, ntile );
+    // ensure that Q0/Q1 are allocated with correct size before QR
+    auto  alloc  = g.alloc_node< alloc_node >( id_X, bis_row( is_X ), X,
+                                               id_T, T,
+                                               id_Y, bis_row( is_Y ), Y,
+                                               A,
+                                               Q0, Q1 );
+    
+    // perform QR for U/V
+    auto  qr_U   = g.alloc_node< tsqr_node >( alpha,
+                                              id_X, bis_row( is_X ), X,
+                                              id_T, T,
+                                              id_t( A->blas_rmat_A().data() ), bis_row( A->row_is() ), A->blas_rmat_A(),
+                                              id_t(Q0.get()), bis_X, Q0,
+                                              id_t(R0.get()), R0,
+                                              ntile );
 
-//     //     auto  svd    = g.alloc_node< svd_node  >();
+    auto  qr_V   = g.alloc_node< tsqr_node >( real(1),
+                                              id_Y, bis_row( is_Y ), Y,
+                                              id_T, std::shared_ptr< BLAS::Matrix< real > >(), // T = 0
+                                              id_t( A->blas_rmat_B().data() ), bis_row( A->col_is() ), A->blas_rmat_B(),
+                                              id_t(Q1.get()), bis_Y, Q1,
+                                              id_t(R1.get()), R1,
+                                              ntile );
 
-//     //     auto  mul_U  = g.alloc_node< tmul_node >();
-//     //     auto  mul_V  = g.alloc_node< tmul_node >();
+    qr_U->after( alloc );
+    qr_V->after( alloc );
 
-//     //     auto  assign = g.alloc_node< assign_node >();
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = std::make_shared< BLAS::Matrix< real > >();
+    auto  Vk     = std::make_shared< BLAS::Matrix< real > >();
+    auto  U      = std::make_shared< BLAS::Matrix< real > >();
+    auto  V      = std::make_shared< BLAS::Matrix< real > >();
+    auto  svd    = g.alloc_node< svd_node >( id_t(R0.get()), R0,
+                                             id_t(R1.get()), R1,
+                                             id_t(Uk.get()), Uk,
+                                             id_t(Vk.get()), Vk,
+                                             id_t(U.get()),  bis_X, U,
+                                             id_t(V.get()),  bis_Y, V );
 
-//     //     svd->after( qr_U );
-//     //     svd->after( qr_V );
+    svd->after( qr_U );
+    svd->after( qr_V );
 
-//     //     mul_U->after( svd );
-//     //     mul_V->after( svd );
+    // compute final result
+    auto  mul_U  = g.alloc_node< tprod_node >( real(1),
+                                               id_t(Q0.get()), bis_X, Q0,
+                                               id_t(Uk.get()), Uk,
+                                               real(0),
+                                               id_t(U.get()),  bis_X, U );
+    auto  mul_V  = g.alloc_node< tprod_node >( real(1),
+                                               id_t(Q1.get()), bis_Y, Q1,
+                                               id_t(Vk.get()), Vk,
+                                               real(0),
+                                               id_t(V.get()),  bis_Y, V );
 
-//     //     assign->after( mul_U );
-//     //     assign->after( mul_V );
+    mul_U->after( svd );
+    mul_V->after( svd );
 
-        
-//     //     auto                     R  = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
-//     //     auto                     Us = std::move( R );
-//     //     BLAS::Matrix< value_t >  Vs;
-//     //     BLAS::Vector< value_t >  Ss;
-        
-//     //     BLAS::svd( Us, Ss, Vs );
-        
-//     //     auto  k  = acc.trunc_rank( Ss );
+    // assign destination to actual matrix
+    auto  assign = g.alloc_node< assign_node >( id_t(U.get()), bis_X, U
+                                                id_t(V.get()), bis_Y, V
+                                                A );
 
-//     //     BLAS::Matrix< value_t >  Usk( Us, BLAS::Range::all, BLAS::Range( 0, k-1 ) );
-//     //     BLAS::Matrix< value_t >  Vsk( Vs, BLAS::Range::all, BLAS::Range( 0, k-1 ) );
-        
-//     //     BLAS::prod_diag( Usk, Ss, k );
+    assign->after( mul_U );
+    assign->after( mul_V );
+    
+    g.finalize();
 
-//     //     BLAS::Matrix< value_t >  Uk( U.nrows(), k );
-//     //     BLAS::Matrix< value_t >  Vk( V.nrows(), k );
-
-
-
-//     //     ::tbb::parallel_invoke( [&,ntile] { tmul( Q0, Usk, Uk, ntile ); },
-//     //                             [&,ntile] { tmul( Q1, Vsk, Vk, ntile ); } );
-
-//     //     return { std::move( Uk ), std::move( Vk ) };
-//     // }// else
-
-//     // if ( is_blocked( A ) && ! is_small( min_size, A ) )
-//     // {
-//     //     auto  BA  = ptrcast( A, TBlockMatrix );
-//     //     auto  A00 = BA->block( 0, 0 );
-//     //     auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-//     //     auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
-//     //     auto  A11 = BA->block( 1, 1 );
-        
-//     //     const BLAS::Matrix< real >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
-//     //     const BLAS::Matrix< real >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
-//     //     const BLAS::Matrix< real >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
-//     //     const BLAS::Matrix< real >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
-
-//     //     g.alloc_node< addlr_node    >( id_U, bis( A00->row_is(), is_U.col_is() ), U0,
-//     //                                    id_T, T,
-//     //                                    id_V, bis( A00->col_is(), is_V.col_is() ), V0,
-//     //                                    A00,
-//     //                                    ntile );
-        
-//     //     g.alloc_node< truncate_node >( id_U, bis( A00->row_is(), is_U.col_is() ), U0,
-//     //                                    id_T, T,
-//     //                                    id_V, bis( A11->col_is(), is_V.col_is() ), V1,
-//     //                                    A01, ntile );
-
-//     //     g.alloc_node< truncate_node >( id_U, bis( A11->row_is(), is_U.col_is() ), U1,
-//     //                                    id_T, T,
-//     //                                    id_V, bis( A00->col_is(), is_V.col_is() ), V0,
-//     //                                    A10, ntile );
-        
-//     //     g.alloc_node< addlr_node    >( id_U, bis( A11->row_is(), is_U.col_is() ), U1,
-//     //                                    id_T, T,
-//     //                                    id_V, bis( A11->col_is(), is_V.col_is() ), V1,
-//     //                                    A11,
-//     //                                    ntile );
-//     // }// if
-
-//     g.finalize();
-
-//     return g;
-// }
+    return g;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
@@ -1019,62 +1276,55 @@ tsqr_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    assert( X.nrows() == U.nrows() );
-    
-    if ( X.nrows() > ntile )
+    if ( is_X.row_is().size() > ntile )
     {
         //
-        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
-        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
-        const auto                  sis_X = split( is_X.row_is(), 2 );
-        const BLAS::Matrix< real >  X0( X, sis_X[0] - is_X.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  X1( X, sis_X[1] - is_X.row_is().first(), BLAS::Range::all );
-        const auto                  sis_U = split( is_U.row_is(), 2 );
-        const BLAS::Matrix< real >  U0( U, sis_U[0] - is_U.row_is().first(), BLAS::Range::all );
-        const BLAS::Matrix< real >  U1( U, sis_U[1] - is_U.row_is().first(), BLAS::Range::all );
+        const auto  sis_X = split( is_X.row_is(), 2 );
+        const auto  sis_U = split( is_U.row_is(), 2 );
+        const auto  sis_Q = split( is_Q.row_is(), 2 );
 
-        auto  Q0    = std::make_shared< BLAS::Matrix< real > >();
-        auto  R0    = std::make_shared< BLAS::Matrix< real > >();
         auto  tsqr0 = g.alloc_node< tsqr_node >( alpha,
-                                                 id_X, bis( sis_X[0], is_X.col_is() ), X0,
+                                                 id_X, bis_row( sis_X[0] ), X,
                                                  id_T, T,
-                                                 id_U, bis( sis_U[0], is_U.col_is() ), U0,
-                                                 id_t(Q0.get()), bis( sis_X[0], is_X.col_is() ), Q0,
+                                                 id_U, bis_row( sis_U[0] ), U,
+                                                 id_Q, bis_row( sis_Q[0] ), Q,
                                                  id_t(R0.get()), R0,
                                                  ntile );
         
-        auto  Q1    = std::make_shared< BLAS::Matrix< real > >();
-        auto  R1    = std::make_shared< BLAS::Matrix< real > >();
         auto  tsqr1 = g.alloc_node< tsqr_node >( alpha,
-                                                 id_X, bis( sis_X[1], is_X.col_is() ), X1,
+                                                 id_X, bis_row( sis_X[1] ), X,
                                                  id_T, T,
-                                                 id_U, bis( sis_U[1], is_U.col_is() ), U1,
-                                                 id_t(Q1.get()), bis( sis_X[1], is_X.col_is() ), Q1,
+                                                 id_U, bis_row( sis_U[1] ), U,
+                                                 id_Q, bis_row( sis_Q[1] ), Q,
                                                  id_t(R1.get()), R1,
                                                  ntile );
 
-        auto  Q01   = std::make_shared< BLAS::Matrix< real > >();
-        auto  qr01  = g.alloc_node< qr_node >( id_t(R0.get()), R0, id_t(R0.get()), R1, id_R, R );
+        auto  qr01  = g.alloc_node< qr_node >( id_t(R0.get()), R0,
+                                               id_t(R1.get()), R1,
+                                               id_R, R );
 
         qr01->after( tsqr0 );
         qr01->after( tsqr1 );
         
-        auto  mul0 = g.alloc_node< tprod_node >( real(1),
-                                                 id_t(Q0.get()), bis( sis_X[0], is_X.col_is() ), Q0,
-                                                 id_t(R0.get()), R0,
-                                                 real(0),
-                                                 id_Q, is_Q, Q,  // TODO: is_Q oder is_Q0 ???
-                                                 ntile );
-        auto  mul1 = g.alloc_node< tprod_node >( real(1),
-                                                 id_t(Q1.get()), bis( sis_X[1], is_X.col_is() ), Q1,
-                                                 id_t(R1.get()), R1,
-                                                 real(0),
-                                                 id_Q, is_Q, Q,
-                                                 ntile );
+        auto  mul0 = new tprod_ip_node( real(1),
+                                        id_Q, bis_row( sis_Q[0] ), Q,
+                                        id_t(R0.get()), R0,
+                                        ntile );
+        auto  mul1 = new tprod_ip_node( real(1),
+                                        id_Q, bis_row( sis_Q[1] ), Q,
+                                        id_t(R1.get()), R1,
+                                        ntile );
 
+        g.add_node( mul0 );
+        g.add_node( mul1 );
+        
+        mul0->after( tsqr0 );
         mul0->after( qr01 );
+        mul1->after( tsqr1 );
         mul1->after( qr01 );
     }// if
 
@@ -1087,18 +1337,56 @@ void
 tsqr_node::run_ ( const TTruncAcc & )
 {
     // TODO: asserts
+
+    std::cout << is_X.row_is() << ", " << is_U.row_is() << std::endl;
     
-    auto                  W = BLAS::prod( alpha, X, *T );
-    BLAS::Matrix< real >  WU( W.nrows(), W.ncols() + U.ncols () );
-    BLAS::Matrix< real >  WU_W( WU, BLAS::Range::all, BLAS::Range( 0, W.ncols()-1 ) );
-    BLAS::Matrix< real >  WU_U( WU, BLAS::Range::all, BLAS::Range( W.ncols(), WU.ncols()-1 ) );
+    const BLAS::Matrix< real >  Xi( X, is_X.row_is(), BLAS::Range::all );
+    const BLAS::Matrix< real >  Ui( U, is_U.row_is(), BLAS::Range::all );
 
-    BLAS::copy( W, WU_W );
-    BLAS::copy( U, WU_U );
+    // DBG::write( Xi, "X1.mat", "X1" );
+    // DBG::write( *T, "T1.mat", "T1" );
+    // DBG::write( Ui, "U1.mat", "U1" );
+    
+    if ( is_null( T ) )
+    {
+        BLAS::Matrix< real >  XU( Xi.nrows(), Xi.ncols() + Ui.ncols () );
+        BLAS::Matrix< real >  XU_X( XU, BLAS::Range::all, BLAS::Range( 0, Xi.ncols()-1 ) );
+        BLAS::Matrix< real >  XU_U( XU, BLAS::Range::all, BLAS::Range( Xi.ncols(), XU.ncols()-1 ) );
 
-    BLAS::qr( WU, *R );
+        BLAS::copy( Xi, XU_X );
+        BLAS::copy( Ui, XU_U );
+        
+        BLAS::qr( XU, *R );
 
-    Q = std::move( WU );
+        // DBG::write( WU, "Q1.mat", "Q1" );
+        // DBG::write( *R, "R1.mat", "R1" );
+        
+        BLAS::Matrix< real >  Qi( *Q, is_Q.row_is(), BLAS::Range::all );
+        
+        BLAS::copy( XU, Qi );
+    }// if
+    else
+    {
+        auto                  XT = BLAS::prod( alpha, Xi, *T );
+
+        // DBG::write( XT, "XT1.mat", "XT1" );
+    
+        BLAS::Matrix< real >  XU( Xi.nrows(), XT.ncols() + Ui.ncols () );
+        BLAS::Matrix< real >  XU_X( XU, BLAS::Range::all, BLAS::Range( 0, XT.ncols()-1 ) );
+        BLAS::Matrix< real >  XU_U( XU, BLAS::Range::all, BLAS::Range( XT.ncols(), XU.ncols()-1 ) );
+
+        BLAS::copy( XT, XU_X );
+        BLAS::copy( Ui, XU_U );
+        
+        BLAS::qr( XU, *R );
+
+        // DBG::write( XU, "Q1.mat", "Q1" );
+        // DBG::write( *R, "R1.mat", "R1" );
+        
+        BLAS::Matrix< real >  Qi( *Q, is_Q.row_is(), BLAS::Range::all );
+        
+        BLAS::copy( XU, Qi );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1119,7 +1407,11 @@ qr_node::run_ ( const TTruncAcc & )
     BLAS::copy( *R0, Q_0 );
     BLAS::copy( *R1, Q_1 );
 
+    // DBG::write( Q, "R1.mat", "R1" );
+    
     BLAS::qr( Q, *R );
+
+    // DBG::write( Q, "Q1.mat", "Q1" );
 
     BLAS::copy( Q_0, *R0 );
     BLAS::copy( Q_1, *R1 );
@@ -1140,19 +1432,40 @@ gen_dag_lu_hodlr_tiled ( TMatrix &      A,
     BLAS::Matrix< real >  X( A.nrows(), 16 );
     BLAS::Matrix< real >  U( A.nrows(), 16 );
     auto                  T = std::make_shared< BLAS::Matrix< real > >();
-    BLAS::Matrix< real >  Q( A.nrows(), 16 );
+    auto                  Q = std::make_shared< BLAS::Matrix< real > >();
     auto                  R = std::make_shared< BLAS::Matrix< real > >();
     
     return refine( new tsqr_node( -1,
-                                  id_t('X'), bis( is( 0, X.nrows()-1 ), is( 0, X.ncols()-1 ) ), X,
+                                  id_t('X'), bis_row( is( 0, X.nrows()-1 ) ), X,
                                   id_t('T'), T,
-                                  id_t('U'), bis( is( 0, U.nrows()-1 ), is( 0, U.ncols()-1 ) ), U,
-                                  id_t('Q'), bis( is( 0, X.nrows()-1 ), is( 0, X.ncols()-1 ) ), Q,
+                                  id_t('U'), bis_row( is( 0, U.nrows()-1 ) ), U,
+                                  id_t('Q'), bis_row( is( 0, X.nrows()-1 ) ), Q,
                                   id_t('R'), R,
                                   128 ),
                    HLIB::CFG::Arith::max_seq_size );
     
     // return std::move( refine( new lu_node( & A, 128 ), HLIB::CFG::Arith::max_seq_size ) );
+}
+
+//
+// compute DAG for TSQR( X·T, U )
+//
+graph
+gen_dag_tsqr ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  T,
+               HLIB::BLAS::Matrix< HLIB::real > &                     U,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  Q,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  R,
+               refine_func_t                                          refine )
+{
+    return refine( new tsqr_node( 1,
+                                  id_t('X'), bis_row( is( 0, X.nrows()-1 ) ), X,
+                                  id_t('T'), T,
+                                  id_t('U'), bis_row( is( 0, U.nrows()-1 ) ), U,
+                                  id_t('Q'), bis_row( is( 0, X.nrows()-1 ) ), Q,
+                                  id_t('R'), R,
+                                  128 ),
+                   HLIB::CFG::Arith::max_seq_size );
 }
 
 }// namespace dag

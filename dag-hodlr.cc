@@ -86,10 +86,48 @@ mymain ( int, char ** )
     }// if
     else
     {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all_ext;
         hlr::dag::def_path_len  = 10;
     }// if
 
+    {
+        auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
+        auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
+        auto  X   = A01->blas_rmat_A();
+        auto  T   = std::make_shared< BLAS::Matrix< real > >();
+        auto  U   = A10->blas_rmat_A();
+        auto  Q   = std::make_shared< BLAS::Matrix< real > >();
+        auto  R   = std::make_shared< BLAS::Matrix< real > >();
+
+        *T = BLAS::prod( real(1), BLAS::adjoint( A10->blas_rmat_B() ), A01->blas_rmat_B() );
+        *Q = BLAS::Matrix< real >( X.nrows(), T->ncols() + U.ncols() );
+        *R = BLAS::Matrix< real >( Q->ncols(), Q->ncols() );
+
+        DBG::write( X, "X.mat", "X" );
+        DBG::write( *T, "T.mat", "T" );
+        DBG::write( U, "U.mat", "U" );
+
+        T = std::shared_ptr< BLAS::Matrix< real > >();
+        
+        if ( true )
+        {
+            auto  dag_tsqr = std::move( hlr::dag::gen_dag_tsqr( X, T, U, Q, R, impl::dag::refine ) );
+        
+            dag_tsqr.print_dot( "tsqr.dot" );
+            
+            impl::dag::run( dag_tsqr, acc );
+        }// if
+        else
+        {
+            hlr::seq::tile::hodlr::tsqr( 1.0, X, *T, U, *Q, *R, 128 );
+        }// else
+
+        DBG::write( *Q, "Q.mat", "Q" );
+        DBG::write( *R, "R.mat", "R" );
+
+        return;
+    }
+    
     //
     // benchmark DAG generation
     //

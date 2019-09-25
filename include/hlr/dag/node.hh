@@ -31,12 +31,13 @@ namespace dag
 // different sparsification modes, e.g. where to look for redundant edges
 // - can be ORed, e.g., sparsify_local | sparsify_node_succ
 //
-typedef enum { sparsify_none      = 0x0, // no sparsification
-               sparsify_local     = 0x1, // in local graph after refinement
-               sparsify_node_succ = 0x2, // in direct successors of node
-               sparsify_sub_succ  = 0x4, // in all sub nodes and all their successors
-               sparsify_sub_all   = 0x8, // in all sub nodes of all successors of parent node
-               sparsify_all       = 0x9
+typedef enum { sparsify_none        = 0x0,  // no sparsification
+               sparsify_local       = 0x1,  // in local graph after refinement
+               sparsify_node_succ   = 0x2,  // in direct successors of single node
+               sparsify_sub_succ    = 0x4,  // in all sub nodes and all their successors
+               sparsify_sub_all     = 0x8,  // in all sub nodes of all successors of parent node
+               sparsify_sub_all_ext = 0x10, // as in "sub_all" but do not delete edges in local sub graph
+               sparsify_all         = 0x9
 } sparsify_mode_t;
 
 //
