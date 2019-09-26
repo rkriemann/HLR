@@ -166,37 +166,37 @@ gauss_node::refine_ ( const size_t  min_size )
 
         // T_01 = T_00 · A_01
         auto  upd_t01  = hlr::dag::alloc_node< update_node >( g, 1.0, MA(0,0), id_temp, MA(0,1), id_A, 0.0, MT(0,1), id_temp );
-        // upd_t01->after( inv_a00 );
+        upd_t01->after( inv_a00 );
 
         // T_10 = A_10 · T_00
         auto  upd_t10  = hlr::dag::alloc_node< update_node >( g, 1.0, MA(1,0), id_A, MA(0,0), id_temp, 0.0, MT(1,0), id_temp );
-        // upd_t10->after( inv_a00 );
+        upd_t10->after( inv_a00 );
 
         // A_11 = A_11 - T_10 · A_01
         auto  upd_a11  = hlr::dag::alloc_node< update_node >( g, -1.0, MT(1,0), id_temp, MA(0,1), id_A, 1.0, MA(1,1), id_A );
-        // upd_a11->after( upd_t10 );
+        upd_a11->after( upd_t10 );
     
         // C_11 = A_11⁻¹
         auto  inv_a11  = hlr::dag::alloc_node< gauss_node >( g, MA(1,1), id_A, id_C, MT(1,1) );
-        // inv_a11->after( upd_a11 );
+        inv_a11->after( upd_a11 );
 
         // C_01 = - T_01 · C_11
         auto  upd_a01  = hlr::dag::alloc_node< update_node >( g, -1.0, MT(0,1), id_temp, MA(1,1), id_C, 0.0, MA(0,1), id_C );
-        // upd_a01->after( upd_t01 );
-        // upd_a01->after( inv_a11 );
+        upd_a01->after( upd_t01 );
+        upd_a01->after( inv_a11 );
             
         // C_10 = - C_11 · T_10
         auto  upd_a10  = hlr::dag::alloc_node< update_node >( g, -1.0, MA(1,1), id_C, MT(1,0), id_temp, 0.0, MA(1,0), id_C );
-        // upd_a10->after( inv_a11 );
-        // upd_a10->after( upd_t10 );
+        upd_a10->after( inv_a11 );
+        upd_a10->after( upd_t10 );
         
         // C_00 = A_00 - C_01 · T_10
         auto  upd_a00  = hlr::dag::alloc_node< update_node >( g, -1.0, MA(0,1), id_C, MT(1,0), id_temp, 1.0, MA(0,0), id_C );
-        // upd_a00->after( upd_a01 );
-        // upd_a00->after( upd_t10 );
-        // upd_a00->after( inv_a00 );
+        upd_a00->after( upd_a01 );
+        upd_a00->after( upd_t10 );
+        upd_a00->after( inv_a00 );
         
-        // g.finalize();
+        g.finalize();
     }// if
 
     return g;

@@ -229,7 +229,7 @@ refine_loc_deps ( node *  node )
     // remove direct outgoing edges if reachable otherwise
     //
     
-    if ( changed && ( sparsify_mode & ( sparsify_node_succ | sparsify_sub_succ | sparsify_sub_all ) ))
+    if ( changed && ( sparsify_mode & ( sparsify_node_succ | sparsify_sub_succ | sparsify_sub_all | sparsify_sub_all_ext ) ))
     {
         // restrict search to local nodes and neighbouring nodes
         node_set_t  neighbourhood;

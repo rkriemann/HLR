@@ -90,6 +90,7 @@ mymain ( int, char ** )
         hlr::dag::def_path_len  = 10;
     }// if
 
+    if ( false )
     {
         auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
         auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
@@ -119,11 +120,51 @@ mymain ( int, char ** )
         }// if
         else
         {
-            hlr::seq::tile::hodlr::tsqr( 1.0, X, *T, U, *Q, *R, 128 );
+            hlr::seq::tile::tsqr( 1.0, X, *T, U, *Q, *R, 128 );
         }// else
 
         DBG::write( *Q, "Q.mat", "Q" );
         DBG::write( *R, "R.mat", "R" );
+
+        return;
+    }
+    
+    if ( true )
+    {
+        auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
+        auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
+        auto  X   = A01->blas_rmat_A();
+        auto  T   = std::make_shared< BLAS::Matrix< real > >();
+        auto  Y   = A01->blas_rmat_B();
+
+        *T = BLAS::prod( real(1), BLAS::adjoint( A10->blas_rmat_B() ), A01->blas_rmat_B() );
+
+        DBG::write( X,  "X.mat", "X" );
+        DBG::write( *T, "T.mat", "T" );
+        DBG::write( Y,  "Y.mat", "Y" );
+        DBG::write( A10, "A.mat", "A" );
+
+        // T = std::shared_ptr< BLAS::Matrix< real > >();
+        
+        if ( HLIB::CFG::Arith::use_dag )
+        {
+            auto  dag_trunc = std::move( hlr::dag::gen_dag_truncate( X, T, Y, A10, impl::dag::refine ) );
+        
+            dag_trunc.print_dot( "trunc.dot" );
+            
+            impl::dag::run( dag_trunc, acc );
+        }// if
+        else
+        {
+            auto [ U, V ] = hlr::seq::tile::truncate( 1.0, X, *T, Y, A10->blas_rmat_A(), A10->blas_rmat_B(), acc, 128 );
+
+            DBG::write( U, "U.mat", "U" );
+            DBG::write( V, "V.mat", "V" );
+            
+            A10->set_lrmat( U, V );
+        }// else
+
+        DBG::write( A10, "C.mat", "C" );
 
         return;
     }
