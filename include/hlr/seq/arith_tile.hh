@@ -424,7 +424,7 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
-        #if 0
+        #if 1
         
         BLAS::Matrix< value_t >  Q0( X.nrows(), T.ncols() + U.ncols() );
         BLAS::Matrix< value_t >  Q1( Y.nrows(), Y.ncols() + V.ncols() );
@@ -451,11 +451,6 @@ truncate ( const value_t                 alpha,
         
         auto  k  = acc.trunc_rank( Ss );
 
-        for ( uint i = 0; i < k; ++i )
-            std::cout << Ss(i) << std::endl;
-        for ( uint i = k; i < Ss.length(); ++i )
-            std::cout << Ss(i) << std::endl;
-        
         BLAS::Matrix< value_t >  Usk( Us, BLAS::Range::all, BLAS::Range( 0, k-1 ) );
         BLAS::Matrix< value_t >  Vsk( Vs, BLAS::Range::all, BLAS::Range( 0, k-1 ) );
         

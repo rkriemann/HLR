@@ -20,8 +20,7 @@
 
 #include "hlr/tbb/arith_tile.hh"
 
-namespace hlr
-{
+namespace hlr { namespace tbb {
 
 using namespace HLIB;
 
@@ -30,9 +29,6 @@ using namespace HLIB;
 // arithmetic functions for tile low-rank format
 //
 ///////////////////////////////////////////////////////////////////////
-
-namespace tbb
-{
 
 namespace tlr
 {
@@ -333,8 +329,6 @@ gauss_elim ( HLIB::TMatrix *    A,
     HLR_LOG( 4, HLIB::to_string( "} gauss_elim( %d )", A->id() ) );
 }
 
-}// namespace tbb
-
-}// namespace hlr
+}}// namespace hlr::tbb
 
 #endif // __HLR_TBB_ARITH_HH

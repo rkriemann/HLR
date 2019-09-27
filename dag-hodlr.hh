@@ -12,10 +12,9 @@
 #include "hlr/dag/lu.hh"
 #include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
-#include "hlr/seq/dag.hh"
-#include "hlr/seq/arith.hh"
 
-namespace impl = hlr::seq;
+using Time::Wall::now;
+using Time::Wall::since;
 
 //
 // main function
@@ -26,7 +25,7 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic = Time::Wall::now();
+    auto  tic = now();
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< TMatrix >();
 
@@ -51,7 +50,7 @@ mymain ( int, char ** )
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     }// if
 
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = since( tic );
     
     std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -150,20 +149,29 @@ mymain ( int, char ** )
         {
             auto  dag_trunc = std::move( hlr::dag::gen_dag_truncate( X, T, Y, A10, impl::dag::refine ) );
         
+            std::cout << "    #nodes = " << dag_trunc.nnodes() << std::endl;
+            std::cout << "    #edges = " << dag_trunc.nedges() << std::endl;
             dag_trunc.print_dot( "trunc.dot" );
+
+            tic = now();
             
             impl::dag::run( dag_trunc, acc );
+
+            toc = since( tic );
         }// if
         else
         {
-            auto [ U, V ] = hlr::seq::tile::truncate( 1.0, X, *T, Y, A10->blas_rmat_A(), A10->blas_rmat_B(), acc, 128 );
+            tic = now();
 
-            DBG::write( U, "U.mat", "U" );
-            DBG::write( V, "V.mat", "V" );
+            auto [ U, V ] = impl::tile::truncate( 1.0, X, *T, Y, A10->blas_rmat_A(), A10->blas_rmat_B(), acc, ntile );
             
             A10->set_lrmat( U, V );
+
+            toc = since( tic );
         }// else
 
+        std::cout << "  trunc in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        
         DBG::write( A10, "C.mat", "C" );
 
         return;
@@ -179,11 +187,11 @@ mymain ( int, char ** )
     
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = Time::Wall::now();
+        tic = now();
 
         dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, impl::dag::refine ) );
         
-        toc = Time::Wall::since( tic );
+        toc = since( tic );
         
         if ( verbose( 1 ) )
             std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
@@ -223,11 +231,11 @@ mymain ( int, char ** )
         
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = Time::Wall::now();
+        tic = now();
         
         impl::dag::run( dag, acc );
         
-        toc = Time::Wall::since( tic );
+        toc = since( tic );
 
         std::cout << "  LU in      " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
@@ -249,12 +257,4 @@ mymain ( int, char ** )
     matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
         
     std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
-}
-
-int
-main ( int argc, char ** argv )
-{
-    HLIB::CFG::set_nthreads( 1 );
-
-    return hlrmain( argc, argv );
 }

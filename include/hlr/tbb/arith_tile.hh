@@ -22,27 +22,6 @@ namespace hlr { namespace tbb { namespace tile {
 
 using namespace HLIB;
 
-namespace hodlr
-{
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
-
-///////////////////////////////////////////////////////////////////////
-//
-// tile based arithmetic functions for HODLR format
-//
-///////////////////////////////////////////////////////////////////////
-
 //
 // split given range into <n> subsets
 //
@@ -132,44 +111,6 @@ tprod ( const value_t                    alpha,
     else
     {
         BLAS::prod( alpha, A, T, beta, B );
-    }// else
-}
-
-//
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X,
-        const size_t               ntile )
-{
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
-            
-        hodlr::trsml( L00, X0, ntile );
-
-        auto  T = hodlr::dot( mat_V< value_t >( L10 ), X0, ntile );
-
-        hodlr::tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
-
-        hodlr::trsml( L11, X1, ntile );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
     }// else
 }
 
@@ -386,6 +327,65 @@ truncate ( const value_t                 alpha,
     }// else
 }
     
+namespace hodlr
+{
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
+
+///////////////////////////////////////////////////////////////////////
+//
+// tile based arithmetic functions for HODLR format
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// solve L X = M
+// - on input, X = M
+//
+template < typename value_t >
+void
+trsml ( const TMatrix *            L,
+        BLAS::Matrix< value_t > &  X,
+        const size_t               ntile )
+{
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
+    
+    if ( is_blocked( L ) )
+    {
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
+
+        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+            
+        hodlr::trsml( L00, X0, ntile );
+
+        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
+
+        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
+
+        trsml( L11, X1, ntile );
+    }// if
+    else
+    {
+        //
+        // UNIT DIAGONAL !!!
+        //
+    }// else
+}
+
 //
 // compute A := A - U·T·V^H
 //
@@ -469,13 +469,13 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), BLAS::Range::all );
             
-        hodlr::trsmuh( U00, X0, ntile );
+        trsmuh( U00, X0, ntile );
 
-        auto  T = hodlr::dot( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = dot( mat_U< value_t >( U01 ), X0, ntile );
         
-        hodlr::tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
+        tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
 
-        hodlr::trsmuh( U11, X1, ntile );
+        trsmuh( U11, X1, ntile );
     }// if
     else
     {
@@ -506,17 +506,17 @@ lu ( TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        hodlr::lu< value_t >( A00, acc, ntile );
+        lu< value_t >( A00, acc, ntile );
 
         ::tbb::parallel_invoke( [&,ntile] { trsml(  A00, mat_U< value_t >( A01 ), ntile ); },
                                 [&,ntile] { trsmuh( A00, mat_V< value_t >( A10 ), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  T  = hodlr::dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
-        hodlr::addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
+        addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         
-        hodlr::lu< value_t >( A11, acc, ntile );
+        lu< value_t >( A11, acc, ntile );
     }// if
     else
     {

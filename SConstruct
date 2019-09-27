@@ -287,7 +287,7 @@ if 'seq' in frameworks :
     if 'dag-lu'     in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
     if 'dag-gauss'  in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
     if 'dag-inv'    in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
-    if 'dag-hodlr'  in programs : Default( seq.Program( 'dag-hodlr.cc' ) )
+    if 'dag-hodlr'  in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
 
 #
 # OpenMP
@@ -319,7 +319,8 @@ if 'tbb' in frameworks :
     if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
     if 'dag-lu'     in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
     if 'dag-gauss'  in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
-    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc', 'src/tbb/dag.cc' ] ) )
+    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc',   'src/tbb/dag.cc' ] ) )
+    if 'dag-hodlr'  in programs : Default( tbb.Program( 'dag-hodlr-tbb', [ 'dag-hodlr-tbb.cc', 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
