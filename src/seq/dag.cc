@@ -211,7 +211,7 @@ run ( graph &                  dag,
                 worklist.push_front( succ );
         }// for
 
-        delete t;
+        // delete t;
     }// while
 }
 

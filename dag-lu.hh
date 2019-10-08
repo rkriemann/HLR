@@ -8,7 +8,7 @@
 
 // #include <likwid.h>
 
-#include "common.inc"
+#include "common.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/level_matrix.hh"

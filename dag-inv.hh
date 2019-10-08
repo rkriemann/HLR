@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "common.inc"
+#include "common.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/dag/invert.hh"
 #include "hlr/dag/lu.hh"

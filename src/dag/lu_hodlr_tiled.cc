@@ -138,13 +138,13 @@ matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( const TIndexSet     
         , data( adata )
 {}
 
-template <>
-matrix< BLAS::Matrix< real > >::matrix ( BLAS::Matrix< real >  adata )
-        : id( id_t(adata.data()) )
-        , is( IS_ONE )
-        , base_is( IS_ONE )
-        , data( adata )
-{}
+// template <>
+// matrix< BLAS::Matrix< real > >::matrix ( BLAS::Matrix< real >  adata )
+//         : id( id_t(adata.data()) )
+//         , is( IS_ONE )
+//         , base_is( IS_ONE )
+//         , data( adata )
+// {}
 
 template <>
 matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( std::shared_ptr< BLAS::Matrix< real > >  adata )
@@ -898,14 +898,14 @@ trsmu_node::refine_ ( const size_t  min_size )
         auto  solve_00 = g.alloc_node< trsmu_node >( U00, matrix( is0, X ), ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_U, U01->row_is(), mat_U< real >( U01 ) ),
-                                                   matrix( ID_L, sis_X[0], X ),
+                                                   matrix( sis_X[0], X ),
                                                    matrix( T ),
                                                    ntile );
         auto  tprod    = new tprod_node( real(-1),
                                          matrix( ID_U, U01->col_is(), mat_V< real >( U01 ) ),
-                                         shared_matrix( id_t(T.get()), T ),
+                                         matrix( T ),
                                          real(1),
-                                         matrix( ID_L, sis_X[1], X ),
+                                         matrix( sis_X[1], X ),
                                          ntile );
         auto  solve_11 = g.alloc_node< trsmu_node >( U11, matrix( is1, X ), ntile );
 
@@ -958,15 +958,16 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  is1   = L11->row_is();
             
         auto  solve_00 = g.alloc_node< trsml_node >( L00, matrix( is0, X ), ntile );
-        auto  T        = shared_matrix( std::make_shared< BLAS::Matrix< real > >() );
+        auto  T        = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_L, L10->col_is(), mat_V< real >( L10 ) ),
-                                                   matrix( ID_U, sis_X[0], X ),
-                                                   T, ntile );
+                                                   matrix( sis_X[0], X ),
+                                                   matrix( T ),
+                                                   ntile );
         auto  tprod    = new tprod_node( real(-1),
                                          matrix( ID_L, L10->row_is(), mat_U< real >( L10 ) ),
-                                         T,
+                                         matrix( T ),
                                          real(1),
-                                         matrix( ID_U, sis_X[1], X ),
+                                         matrix( sis_X[1], X ),
                                          ntile );
         auto  solve_11 = g.alloc_node< trsml_node >( L11, matrix( is1, X ), ntile );
 
@@ -1008,10 +1009,10 @@ dot_node::refine_ ( const size_t  min_size )
         const auto  sis_A = split( A.is, 2 );
         const auto  sis_B = split( B.is, 2 );
 
-        auto  T0     = shared_matrix( std::make_shared< BLAS::Matrix< real > >() );
-        auto  T1     = shared_matrix( std::make_shared< BLAS::Matrix< real > >() );
-        auto  tsmul0 = g.alloc_node< dot_node  >( matrix( sis_A[0], A ), matrix( sis_B[0], B ), T0, ntile );
-        auto  tsmul1 = g.alloc_node< dot_node  >( matrix( sis_A[1], A ), matrix( sis_B[1], B ), T1, ntile );
+        auto  T0     = std::make_shared< BLAS::Matrix< real > >();
+        auto  T1     = std::make_shared< BLAS::Matrix< real > >();
+        auto  tsmul0 = g.alloc_node< dot_node  >( matrix( sis_A[0], A ), matrix( sis_B[0], B ), matrix( T0 ), ntile );
+        auto  tsmul1 = g.alloc_node< dot_node  >( matrix( sis_A[1], A ), matrix( sis_B[1], B ), matrix( T1 ), ntile );
         auto  add    = g.alloc_node< tadd_node >( T0, T1, T );
 
         add->after( tsmul0 );
@@ -1051,8 +1052,8 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  min_size )
         const auto  sis_X = split( X.is, 2 );
         const auto  sis_Y = split( Y.is, 2 );
 
-        g.alloc_node< tprod_node >( alpha, matrix( sis_X[0], X ), T, beta, matrix( sis_Y[0], Y ), ntile );
-        g.alloc_node< tprod_node >( alpha, matrix( sis_X[1], X ), T, beta, matrix( sis_Y[1], Y ), ntile );
+        g.alloc_node< tprod_node >( alpha, matrix( sis_X[0], X.data ), T, beta, matrix( sis_Y[0], Y.data ), ntile );
+        g.alloc_node< tprod_node >( alpha, matrix( sis_X[1], X.data ), T, beta, matrix( sis_Y[1], Y.data ), ntile );
     }// if
 
     g.finalize();
@@ -1497,7 +1498,7 @@ gen_dag_lu_hodlr_tiled ( TMatrix &      A,
     auto                  Q = std::make_shared< BLAS::Matrix< real > >();
     auto                  R = std::make_shared< BLAS::Matrix< real > >();
     
-    // return std::move( refine( new lu_node( & A, 128 ), HLIB::CFG::Arith::max_seq_size ) );
+    return std::move( refine( new lu_node( & A, 128 ), HLIB::CFG::Arith::max_seq_size, use_single_end_node ) );
 }
 
 //

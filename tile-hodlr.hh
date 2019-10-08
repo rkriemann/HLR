@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "common.inc"
+#include "common.hh"
 #include "hlr/cluster/hodlr.hh"
 
 //
@@ -34,11 +34,12 @@ mymain ( int, char ** )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  acc    = gen_accuracy();
+    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    std::cout << "    done in " << format_time( toc ) << std::endl;
+    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -58,11 +59,11 @@ mymain ( int, char ** )
         {
             tic = Time::Wall::now();
             
-            impl::tile::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ), ntile );
+            impl::tile::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
             
             toc = Time::Wall::since( tic );
 
-            std::cout << "    done in " << toc << std::endl;
+            std::cout << "    done in " << format_time( toc ) << std::endl;
             
             runtime.push_back( toc.seconds() );
 
@@ -71,12 +72,11 @@ mymain ( int, char ** )
         }// for
         
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
 
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
 }

@@ -71,7 +71,7 @@ dot ( const BLAS::Matrix< value_t > &  A,
 
         BLAS::add( value_t(1), T0, T1 );
 
-        return std::move( T1 );
+        return T1;
     }// if
     else
     {

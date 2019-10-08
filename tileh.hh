@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "common.inc"
+#include "common.hh"
 #include "hlr/cluster/tileh.hh"
 
 //

@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "common.inc"
+#include "common.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/luinv_eval.hh"
 #include "hlr/dag/lu.hh"
@@ -52,9 +52,9 @@ mymain ( int, char ** )
 
     auto  toc    = since( tic );
     
-    std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -174,14 +174,14 @@ mymain ( int, char ** )
             toc = since( tic );
         }// else
 
-        std::cout << "  trunc in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  trunc in    " << format_time( toc ) << std::endl;
         
         DBG::write( A10, "C.mat", "C" );
 
         return;
     }
 
-    if ( true )
+    if ( false )
     {
         auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
         auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
@@ -230,7 +230,7 @@ mymain ( int, char ** )
             toc = since( tic );
         }// else
 
-        std::cout << "  addlr in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  addlr in    " << format_time( toc ) << std::endl;
         
         if ( A11->nrows() <= 4096 )
             DBG::write( A11, "C.mat", "C" );
@@ -253,7 +253,7 @@ mymain ( int, char ** )
         toc = since( tic );
         
         if ( verbose( 1 ) )
-            std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  DAG in     " << format_time( toc ) << std::endl;
         
         runtime.push_back( toc.seconds() );
         
@@ -264,12 +264,11 @@ mymain ( int, char ** )
     if ( verbose( 1 ) )
     {
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
+
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
 
     if ( verbose( 3 ) )
@@ -294,7 +293,7 @@ mymain ( int, char ** )
         
         toc = since( tic );
 
-        std::cout << "  LU in      " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  LU in      " << format_time( toc ) << std::endl;
 
         runtime.push_back( toc.seconds() );
 
@@ -303,13 +302,12 @@ mymain ( int, char ** )
     }// for
         
     if ( nbench > 1 )
-        std::cout << "  runtime  = "
-                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                  << std::endl;
+        std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
         
-    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
-    matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
+    TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
         
-    std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
+    std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << term::reset << std::endl;
 }
