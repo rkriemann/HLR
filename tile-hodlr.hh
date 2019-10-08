@@ -62,15 +62,21 @@ mymain ( int, char ** )
             
             toc = Time::Wall::since( tic );
 
+            std::cout << "    done in " << toc << std::endl;
+            
             runtime.push_back( toc.seconds() );
 
             if ( i < nbench-1 )
                 impl::matrix::copy_to( *A, *C );
         }// for
         
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "    done in " << toc << std::endl;
         std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 }

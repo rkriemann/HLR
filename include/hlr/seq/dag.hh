@@ -25,8 +25,9 @@ namespace dag
 // construct DAG using refinement of given node
 //
 hlr::dag::graph
-refine ( hlr::dag::node *  root,
-         const size_t      min_size );
+refine ( hlr::dag::node *                  root,
+         const size_t                      min_size,
+         const hlr::dag::end_nodes_mode_t  end_mode = hlr::dag::use_single_end_node );
 
 //
 // execute DAG <dag>

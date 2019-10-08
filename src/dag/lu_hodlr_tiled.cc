@@ -1518,7 +1518,8 @@ gen_dag_tsqr ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
                                   matrix( id_t('Q'), is( 0, X.nrows()-1 ), Q ),
                                   matrix( id_t('R'), R ),
                                   128 ),
-                   HLIB::CFG::Arith::max_seq_size );
+                   HLIB::CFG::Arith::max_seq_size,
+                   use_single_end_node );
 }
 
 //
@@ -1537,7 +1538,8 @@ gen_dag_truncate ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
                                       matrix( id_t('U'), A->col_is(), Y ),
                                       A,
                                       128 ),
-                   HLIB::CFG::Arith::max_seq_size );
+                   HLIB::CFG::Arith::max_seq_size,
+                   use_single_end_node );
 }
 
 graph
@@ -1552,7 +1554,8 @@ gen_dag_addlr ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
                                    matrix( id_t('U'), A->col_is(), Y ),
                                    A,
                                    128 ),
-                   HLIB::CFG::Arith::max_seq_size );
+                   HLIB::CFG::Arith::max_seq_size,
+                   use_single_end_node );
 }
 
 }// namespace dag

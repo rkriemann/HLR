@@ -32,8 +32,9 @@ using hlr::dag::node;
 // construct DAG using refinement of given node
 //
 graph
-refine ( node *        root,
-         const size_t  min_size )
+refine ( node *                            root,
+         const size_t                      min_size,
+         const hlr::dag::end_nodes_mode_t  end_mode )
 {
     assert( root != nullptr );
     
@@ -146,7 +147,7 @@ refine ( node *        root,
                            end.push_back( node );
                    } );
 
-    return graph( std::move( tasks ), std::move( start ), std::move( end ), hlr::dag::use_single_end_node );
+    return graph( std::move( tasks ), std::move( start ), std::move( end ), end_mode );
 }
 
 //

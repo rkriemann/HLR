@@ -68,7 +68,7 @@ mymain ( int, char ** )
 
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    done in  " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
     
@@ -123,8 +123,8 @@ mymain ( int, char ** )
         {
             if ( CFG::Arith::use_accu )
             {
-                hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
-                hlr::dag::def_path_len  = 2;
+                hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
+                hlr::dag::def_path_len  = 10;
             }// if
             else
             {
@@ -143,9 +143,7 @@ mymain ( int, char ** )
     // benchmark DAG generation
     //
     
-    double  tmin = 0;
-    double  tmax = 0;
-    double  tsum = 0;
+    std::vector< double >  runtime;
     
     // LIKWID_MARKER_INIT;
         
@@ -175,14 +173,12 @@ mymain ( int, char ** )
         
         if ( verbose( 1 ) )
         {
-            std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  DAG in     " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
             
             // std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
         
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
         
         if ( i < nbench-1 )
             dag = std::move( hlr::dag::graph() );
@@ -194,7 +190,7 @@ mymain ( int, char ** )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
@@ -213,7 +209,7 @@ mymain ( int, char ** )
     //
     //////////////////////////////////////////////////////////////////////
     
-    tmin = tmax = tsum = 0;
+    runtime.clear();
         
     for ( int  i = 0; i < nbench; ++i )
     {
@@ -223,11 +219,9 @@ mymain ( int, char ** )
         
         toc = Time::Wall::since( tic );
 
-        std::cout << "  LU in      " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  LU in      " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
 
         if ( i < (nbench-1) )
             impl::matrix::copy_to( *A, *C );
@@ -235,7 +229,7 @@ mymain ( int, char ** )
         
     if ( nbench > 1 )
         std::cout << "  runtime  = "
-                  << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
         
     std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;
@@ -243,7 +237,7 @@ mymain ( int, char ** )
     matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
     // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-    std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
+    std::cout << "    error  = " << term::red << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -288,7 +282,7 @@ mymain ( int, char ** )
             const TScalarVector  xcopy( x );
             TScalarVector        xref( x );
 
-            tmin = tmax = tsum = 0;
+            runtime.clear();
                 
             for ( int  i = 0; i < nbench; ++i )
             {
@@ -299,11 +293,9 @@ mymain ( int, char ** )
         
                 toc = Time::Wall::since( tic );
 
-                std::cout << "  trsv in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  trsv in    " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
-                tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-                tmax  = std::max( tmax, toc.seconds() );
-                tsum += toc.seconds();
+                runtime.push_back( toc.seconds() );
 
                 if ( i < (nbench-1) )
                     xref.assign( 1.0, & xcopy );
@@ -311,15 +303,14 @@ mymain ( int, char ** )
 
             if ( nbench > 1 )
                 std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
-
 
             matrix::luinv_eval  A_inv2( C, impl::dag::refine, impl::dag::run );
             TScalarVector       v( x );
         
-            tmin = tmax = tsum = 0;
-        
+            runtime.clear();
+            
             for ( int  i = 0; i < nbench; ++i )
             {
                 tic = Time::Wall::now();
@@ -328,23 +319,21 @@ mymain ( int, char ** )
 
                 toc = Time::Wall::since( tic );
 
-                std::cout << "  solve in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  solve in   " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
-                tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-                tmax  = std::max( tmax, toc.seconds() );
-                tsum += toc.seconds();
+                runtime.push_back( toc.seconds() );
             }// for
 
             if ( nbench > 1 )
                 std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
                 
             // DBG::write( & v,    "x.mat", "x" );
             // DBG::write( & xref, "y.mat", "y" );
 
             v.axpy( -1, & xref );
-            std::cout << "  error =    " << term::ltred << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
+            std::cout << "  error =    " << term::red << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
         }
     }// if
 }

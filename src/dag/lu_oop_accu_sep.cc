@@ -12,6 +12,9 @@
 #include <unordered_set>
 #include <map>
 
+#include <tbb/blocked_range2d.h>
+#include <tbb/parallel_for.h>
+
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
@@ -451,7 +454,7 @@ build_apply_dag ( TMatrix *           A,
 {
     if ( is_null( A ) )
         return;
-    
+
     auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
 
     apply_map[ A->id() ] = apply;
@@ -493,19 +496,27 @@ gen_dag_lu_oop_accu_sep ( TMatrix &      A,
     apply_map_t       apply_map;
     dag::node_list_t  apply_nodes;
 
-    if ( CFG::Arith::use_accu )
-        build_apply_dag( & A, nullptr, apply_map, apply_nodes );
+    build_apply_dag( & A, nullptr, apply_map, apply_nodes );
     
-    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
-    if ( ! CFG::Arith::use_accu )
-        return std::move( dag );
-    else
+    //
+    // add apply/shift nodes with shift(A) as new start
+    //
+        
+    for ( auto  node : apply_nodes )
     {
-        dag.add_nodes( apply_nodes );
+        dag.nodes().push_back( node );
 
-        return std::move( dag );
-    }// else
+        // adjust dependency counters
+        for ( auto  succ : node->successors() )
+            succ->inc_dep_cnt();
+    }// for
+
+    dag.start().clear();
+    dag.start().push_back( apply_map[ A.id() ] );
+        
+    return std::move( dag );
 }
 
 }// namespace dag

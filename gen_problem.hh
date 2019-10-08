@@ -9,7 +9,10 @@
 
 #include "hlr/utils/term.hh"
 
-namespace term = hlr::term;
+namespace hlr
+{
+
+using namespace cmdline;
 
 template < typename problem_t >
 std::unique_ptr< problem_t >
@@ -60,6 +63,8 @@ gen_problem ()
     
     return std::make_unique< hlr::apps::laplace_slp >( gridfile );
 }
+
+}// namespace hlr
 
 #endif // __HLR_GEN_PROBLEM_HH
 

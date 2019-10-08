@@ -125,7 +125,8 @@ public:
 // function type for graph generation through node refinement
 //
 using  refine_func_t = std::function< graph ( node *,
-                                              const size_t ) >;
+                                              const size_t,
+                                              const end_nodes_mode_t ) >;
 
 //
 // function type for graph execution

@@ -284,7 +284,7 @@ mymain ( int, char ** )
     //
     //////////////////////////////////////////////////////////////////////
     
-    tmin = tmax = tsum = 0;
+    runtime.clear();
         
     for ( int  i = 0; i < nbench; ++i )
     {
@@ -296,9 +296,7 @@ mymain ( int, char ** )
 
         std::cout << "  LU in      " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
 
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
 
         if ( i < (nbench-1) )
             impl::matrix::copy_to( *A, *C );
@@ -306,7 +304,7 @@ mymain ( int, char ** )
         
     if ( nbench > 1 )
         std::cout << "  runtime  = "
-                  << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
         
     std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;

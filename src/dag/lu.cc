@@ -245,10 +245,6 @@ trsmu_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        //
-        // first create all solve nodes
-        //
-        
         for ( uint j = 0; j < nbc; ++j )
         {
             const auto  U_jj = BU->block( j, j );
@@ -259,13 +255,7 @@ trsmu_node::refine_ ( const size_t  min_size )
                     if ( ! is_null( BA->block(i,j) ) )
                         g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes );
             }// if
-        }// for
 
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint j = 0; j < nbc; ++j )
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
@@ -273,6 +263,7 @@ trsmu_node::refine_ ( const size_t  min_size )
                                                      BU->block( j, k ),
                                                      BA->block( i, k ),
                                                      apply_nodes );
+        }// for
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -313,10 +304,6 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        //
-        // first create all solve nodes
-        //
-        
         for ( uint i = 0; i < nbr; ++i )
         {
             const auto  L_ii = BL->block( i, i );
@@ -331,13 +318,7 @@ trsml_node::refine_ ( const size_t  min_size )
                     if ( ! is_null( BA->block( i, j ) ) )
                         g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes );
             }// if
-        }// for
 
-        //
-        // then create update nodes with dependencies
-        //
-
-        for ( uint i = 0; i < nbr; ++i )
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
@@ -345,6 +326,7 @@ trsml_node::refine_ ( const size_t  min_size )
                                                      BA->block( i, j ),
                                                      BA->block( k, j ),
                                                      apply_nodes );
+        }// for
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -514,13 +496,27 @@ gen_dag_lu_rec ( TMatrix &      A,
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size );
+    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     if ( ! CFG::Arith::use_accu )
         return std::move( dag );
     else
     {
-        dag.add_nodes( apply_nodes );
+        //
+        // add apply/shift nodes with shift(A) as new start
+        //
+        
+        for ( auto  node : apply_nodes )
+        {
+            dag.nodes().push_back( node );
+
+            // adjust dependency counters
+            for ( auto  succ : node->successors() )
+                succ->inc_dep_cnt();
+        }// for
+
+        dag.start().clear();
+        dag.start().push_back( apply_map[ A.id() ] );
 
         return std::move( dag );
     }// else
@@ -597,7 +593,7 @@ gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsml_node( L, A, apply_map ), HLIB::CFG::Arith::max_seq_size );
+    auto         dag = refine( new trsml_node( L, A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     return dag;
 }
@@ -611,7 +607,7 @@ gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsmu_node( U, A, apply_map ), HLIB::CFG::Arith::max_seq_size );
+    auto         dag = refine( new trsmu_node( U, A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     return dag;
 }
@@ -626,7 +622,7 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new update_node( A, B, C, apply_map ), HLIB::CFG::Arith::max_seq_size );
+    auto         dag = refine( new update_node( A, B, C, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     return dag;
 }
