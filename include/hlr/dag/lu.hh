@@ -124,6 +124,16 @@ gen_dag_truncate ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
                    HLIB::TRkMatrix *                                      A,
                    refine_func_t                                          refine );
 
+//
+// compute DAG for truncation of [X·T,U(A)] • [Y,V(A)]'
+//
+graph
+gen_dag_addlr ( HLIB::BLAS::Matrix< HLIB::real > &                     X,
+                std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  T,
+                HLIB::BLAS::Matrix< HLIB::real > &                     Y,
+                HLIB::TMatrix *                                        A,
+                refine_func_t                                          refine );
+
 }// namespace dag
 
 }// namespace hlr

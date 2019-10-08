@@ -9,6 +9,8 @@
 #include <cassert>
 #include <deque>
 
+#include <base/System.hh>
+
 #include "hlr/utils/tools.hh"
 #include "hlr/utils/log.hh"
 
@@ -180,12 +182,23 @@ run ( graph &                  dag,
 
     for ( auto  t : dag.start() )
         worklist.push_back( t );
+
+    size_t  old_mem = HLIB::Mem::usage();
+    
+    std::cout << "==================================================" << std::endl;
     
     while ( ! worklist.empty() )
     {
         auto  t = behead( worklist );
 
         t->run( acc );
+
+        // size_t  new_mem = HLIB::Mem::usage();
+
+        // if ( new_mem > old_mem )
+        //     std::cout << term::yellow( "mem increase = " + HLIB::Mem::to_string( new_mem - old_mem ) ) << std::endl;
+
+        // old_mem = new_mem;
 
         for ( auto  succ : t->successors() )
         {
@@ -196,6 +209,8 @@ run ( graph &                  dag,
             if ( deps == 0 )
                 worklist.push_front( succ );
         }// for
+
+        delete t;
     }// while
 }
 

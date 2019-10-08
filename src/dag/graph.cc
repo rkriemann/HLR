@@ -316,12 +316,7 @@ graph::mem_size  () const
     size_t  size = sizeof(_nodes) + sizeof(_start) + sizeof(_end);
 
     for ( auto  n : _nodes )
-    {
-        size += sizeof(node) + sizeof(node*);
-        size += sizeof(node*) * n->successors().size();
-        size += sizeof(std::mutex);
-        size += sizeof(mem_block_t) * ( n->in_blocks().size() + n->out_blocks().size() );
-    }// for
+        size += n->mem_size() + sizeof(node*);
 
     size += sizeof(node*) * _start.size();
     size += sizeof(node*) * _end.size();

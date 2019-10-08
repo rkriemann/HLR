@@ -232,6 +232,16 @@ public:
     // (optional) color for DAG visualization (format: RRGGBB)
     virtual std::string  color     () const { return "FFFFFF"; }
 
+    //
+    // misc.
+    //
+
+    size_t          mem_size  () const { return ( mem_size_() +
+                                                  sizeof(_ndeps) + sizeof(_dep_cnt) +
+                                                  sizeof(mem_block_t) * ( _in_blk_deps.size() + _out_blk_deps.size() ) +
+                                                  sizeof(node*) * _sub_nodes.size() +
+                                                  sizeof(_mutex) ); }
+    
 private:
 
     //
@@ -259,6 +269,13 @@ private:
     virtual
     local_graph
     refine_ ( const size_t  min_size ) = 0;
+
+    virtual
+    size_t
+    mem_size_ () const
+    {
+        return sizeof(node);
+    }
 };
 
 //

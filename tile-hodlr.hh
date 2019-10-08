@@ -50,13 +50,23 @@ mymain ( int, char ** )
     {
         std::cout << term::bullet << term::bold << "LU ( HODLR " << impl_name << " )" << term::reset << std::endl;
         
-        auto  C = A->copy();
-        
-        tic = Time::Wall::now();
-        
-        impl::tile::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ), ntile );
-        
-        toc = Time::Wall::since( tic );
+        auto  C = impl::matrix::copy( *A );
+
+        std::vector< double >  runtime;
+    
+        for ( int  i = 0; i < nbench; ++i )
+        {
+            tic = Time::Wall::now();
+            
+            impl::tile::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ), ntile );
+            
+            toc = Time::Wall::since( tic );
+
+            runtime.push_back( toc.seconds() );
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *C );
+        }// for
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         

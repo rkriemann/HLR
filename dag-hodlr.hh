@@ -107,9 +107,13 @@ mymain ( int, char ** )
         DBG::write( *T, "T.mat", "T" );
         DBG::write( U, "U.mat", "U" );
 
+        std::cout << "T = " << T.get() << std::endl;
+        std::cout << "Q = " << Q.get() << std::endl;
+        std::cout << "R = " << R.get() << std::endl;
+        
         T = std::shared_ptr< BLAS::Matrix< real > >();
         
-        if ( true )
+        if ( HLIB::CFG::Arith::use_dag )
         {
             auto  dag_tsqr = std::move( hlr::dag::gen_dag_tsqr( X, T, U, Q, R, impl::dag::refine ) );
         
@@ -128,7 +132,7 @@ mymain ( int, char ** )
         return;
     }
     
-    if ( true )
+    if ( false )
     {
         auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
         auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
@@ -176,14 +180,69 @@ mymain ( int, char ** )
 
         return;
     }
+
+    if ( true )
+    {
+        auto  A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), TRkMatrix );
+        auto  A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), TRkMatrix );
+        auto  A11 = ptrcast( C.get(), TBlockMatrix )->block( 1, 1 );
+        auto  X   = A10->blas_rmat_A();
+        auto  T   = std::make_shared< BLAS::Matrix< real > >();
+        auto  Y   = A01->blas_rmat_B();
+
+        *T = BLAS::prod( real(1), BLAS::adjoint( A10->blas_rmat_B() ), A01->blas_rmat_A() );
+
+        if ( A11->nrows() <= 4096 )
+        {
+            DBG::write( X,  "X.mat", "X" );
+            DBG::write( *T, "T.mat", "T" );
+            DBG::write( Y,  "Y.mat", "Y" );
+            DBG::write( A11, "A.mat", "A" );
+        }// if
+
+        // T = std::shared_ptr< BLAS::Matrix< real > >();
+        
+        if ( HLIB::CFG::Arith::use_dag )
+        {
+            std::cout << "    mem    = " << mem_usage() << std::endl;
+            
+            auto  dag_addlr = std::move( hlr::dag::gen_dag_addlr( X, T, Y, A11, impl::dag::refine ) );
+        
+            std::cout << "    #nodes = " << dag_addlr.nnodes() << std::endl;
+            std::cout << "    #edges = " << dag_addlr.nedges() << std::endl;
+            std::cout << "    mem    = " << Mem::to_string( dag_addlr.mem_size() ) << mem_usage() << std::endl;
+
+            dag_addlr.print_dot( "addlr.dot" );
+
+            tic = now();
+            
+            impl::dag::run( dag_addlr, acc );
+
+            toc = since( tic );
+            std::cout << "    mem    = " << mem_usage() << std::endl;
+        }// if
+        else
+        {
+            tic = now();
+
+            impl::tile::hodlr::addlr( X, *T, Y, A11, acc, ntile );
+            
+            toc = since( tic );
+        }// else
+
+        std::cout << "  addlr in    " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        
+        if ( A11->nrows() <= 4096 )
+            DBG::write( A11, "C.mat", "C" );
+
+        return;
+    }
     
     //
     // benchmark DAG generation
     //
     
-    double  tmin = 0;
-    double  tmax = 0;
-    double  tsum = 0;
+    std::vector< double >  runtime;
     
     for ( int  i = 0; i < nbench; ++i )
     {
@@ -196,9 +255,7 @@ mymain ( int, char ** )
         if ( verbose( 1 ) )
             std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
         
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
         
         if ( i < nbench-1 )
             dag = std::move( hlr::dag::graph() );
@@ -208,7 +265,7 @@ mymain ( int, char ** )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
