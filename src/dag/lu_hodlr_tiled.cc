@@ -988,7 +988,7 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 {
     BLAS::Matrix< real >  Xi( X.data, X.range(), BLAS::Range::all );
 
-    hlr::seq::tile::hodlr::trsmuh( L, Xi, ntile );
+    hlr::seq::tile::hodlr::trsml( L, Xi, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1031,6 +1031,8 @@ dot_node::run_ ( const TTruncAcc &  acc )
     const BLAS::Matrix< real >  Bi( B.data, B.range(), BLAS::Range::all );
     
     *(T.data) = std::move( BLAS::prod( real(1), BLAS::adjoint( Ai ), Bi ) );
+
+    std::cout << "dot : " << BLAS::norm_F( *(T.data) ) << std::endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
