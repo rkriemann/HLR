@@ -12,6 +12,7 @@
 #include <map>
 
 #include <matrix/TMatrix.hh>
+#include <hlr/utils/checks.hh>
 
 namespace std
 {
@@ -26,13 +27,17 @@ operator < ( const HLIB::TIndexSet  is1,
 
 }// namespace std
 
-namespace hlr { namespace matrix {
+namespace hlr
+{ 
 
 using namespace HLIB;
 namespace hpro = HLIB;
 
 // local matrix type
 DECLARE_TYPE( tiled_lrmatrix );
+
+namespace matrix
+{
 
 //
 // Represents a low-rank matrix in factorised form: U·V^H
@@ -135,11 +140,11 @@ public:
     tile_t &           tile_V ( const indexset &  is )       { return _V[ is ]; }
     const tile_t &     tile_V ( const indexset &  is ) const { return _V[ is ]; }
 
-    tilemap_t &        U      ()       { return U; }
-    const tilemap_t &  U      () const { return U; }
+    tilemap_t &        U      ()       { return _U; }
+    const tilemap_t &  U      () const { return _U; }
 
-    tilemap_t &        V      ()       { return V; }
-    const tilemap_t &  V      () const { return V; }
+    tilemap_t &        V      ()       { return _V; }
+    const tilemap_t &  V      () const { return _V; }
     
     uint               rank   () const { return _rank; }
     
@@ -181,6 +186,13 @@ public:
     // algebra routines
     //
 
+    // compute y ≔ β·y + α·op(M)·x, with M = this
+    virtual void mul_vec ( const real       alpha,
+                           const TVector *  x,
+                           const real       beta,
+                           TVector       *  y,
+                           const matop_t    op = apply_normal ) const;
+    
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const TTruncAcc & acc );
 
@@ -188,7 +200,7 @@ public:
     // RTTI
     //
 
-    HLIB_RTTI_DERIVED( TMatrix, tiled_lrmatrix )
+    HLIB_RTTI_DERIVED( tiled_lrmatrix, TMatrix )
 
     //
     // virtual constructor
@@ -207,14 +219,14 @@ tiled_lrmatrix< value_t >::init_tiles ()
 {
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _row_is.last() ) );
+        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
 
         _U[ is_i ] = BLAS::Matrix< value_t >( is_i.size(), _rank );
     }// for
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _col_is.last() ) );
+        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
 
         _V[ is_i ] = BLAS::Matrix< value_t >( is_i.size(), _rank );
     }// for
@@ -234,7 +246,7 @@ tiled_lrmatrix< value_t >::copy_tiles ( const BLAS::Matrix< value_t > &  U,
     
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _row_is.last() ) );
+        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
         const tile_t    U_i( U, is_i - _row_is.first(), BLAS::Range::all );
 
         _U[ is_i ] = BLAS::Matrix< value_t >( U_i, copy_value );
@@ -242,12 +254,81 @@ tiled_lrmatrix< value_t >::copy_tiles ( const BLAS::Matrix< value_t > &  U,
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _col_is.last() ) );
+        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
         const tile_t    V_i( V, is_i - _col_is.first(), BLAS::Range::all );
 
         _V[ is_i ] = BLAS::Matrix< value_t >( V_i, copy_value );
     }// for
 }
+
+template < typename value_t >
+void
+tiled_lrmatrix< value_t >::mul_vec ( const real       alpha,
+                                     const TVector *  ax,
+                                     const real       beta,
+                                     TVector       *  ay,
+                                     const matop_t    op ) const
+{
+    using  vector = BLAS::Vector< value_t >;
+        
+    assert( ax->is_complex() == this->is_complex() );
+    assert( ay->is_complex() == this->is_complex() );
+    assert( ax->is() == this->col_is( op ) );
+    assert( ay->is() == this->row_is( op ) );
+    assert( is_scalar_all( ax, ay ) );
+
+    // exclude complex value and transposed operation for now
+    assert( (  op == apply_normal     ) ||
+            (  op == apply_adjoint    ) ||
+            (( op == apply_transposed ) && ! is_complex_type< value_t >::value ) );
+
+    const auto  x = cptrcast( ax, TScalarVector );
+    const auto  y = ptrcast(  ay, TScalarVector );
+
+    // y := β·y
+    if ( beta != value_t(1) )
+        BLAS::scale( beta, blas_vec< value_t >( y ) );
+                     
+    vector  t( _rank );
+            
+    if ( op == apply_normal )
+    {
+        // t := Σ V_i^H x_i
+        for ( const auto & [ is, V_i ] : _V )
+        {
+            const auto  x_i = vector( blas_vec< value_t >( x ), is - _col_is.first() );
+
+            BLAS::mulvec( value_t(1), BLAS::adjoint( V_i ), x_i, value_t(1), t );
+        }// for
+
+        // y_i := y_i + α U_i t
+        for ( const auto & [ is, U_i ] : _U )
+        {
+            auto  y_i = vector( blas_vec< value_t >( y ), is - _row_is.first() );
+
+            BLAS::mulvec( value_t(alpha), U_i, t, value_t(1), y_i );
+        }// for
+    }// if
+    else
+    {
+        // t := Σ U_i^H x_i
+        for ( const auto & [ is, U_i ] : _U )
+        {
+            const auto  x_i = vector( blas_vec< value_t >( x ), is - _row_is.first() );
+
+            BLAS::mulvec( value_t(1), BLAS::adjoint( U_i ), x_i, value_t(1), t );
+        }// for
+
+        // y_i := y_i + α V_i t
+        for ( const auto & [ is, V_i ] : _V )
+        {
+            auto  y_i = vector( blas_vec< value_t >( y ), is - _col_is.first() );
+
+            BLAS::mulvec( value_t(alpha), V_i, t, value_t(1), y_i );
+        }// for
+    }// if
+}
+
 
 //
 // truncate matrix to accuracy <acc>

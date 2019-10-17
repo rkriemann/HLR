@@ -159,7 +159,7 @@ copy_tiled ( const TMatrix &  M,
         
         return N;
     }// if
-    else if ( is_lowrank( & M ) )
+    else if ( is_lowrank( M ) )
     {
         //
         // copy low-rank data into tiled form

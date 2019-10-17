@@ -15,6 +15,8 @@
 namespace hlr
 {
 
+using namespace HLIB;
+
 //!
 //! return true, if pointer is null
 //!
@@ -189,6 +191,10 @@ bool is_small_all  ( T1 &          A,
                      T2...         mtrs )  noexcept { return is_small( A ) && is_small_all( mtrs... ); }
 
 
+//
+// return true if given matrix is a structured (blocked) matrix
+//
+
 inline
 bool is_blocked_any ( const HLIB::TMatrix &  A )     noexcept { return is_blocked( A ); }
 
@@ -203,6 +209,10 @@ template < typename... T >
 bool is_blocked_all ( const HLIB::TMatrix &  A,
                       T&&...                 mtrs )  noexcept { return is_blocked( A ) && is_blocked_all( std::forward< T >( mtrs )... ); }
 
+
+//
+// return true if given matrix is a dense matrix
+//
 
 inline
 bool is_dense       ( const HLIB::TMatrix &  A )     noexcept { return is_dense( & A ); }
@@ -222,6 +232,10 @@ bool is_dense_all   ( const HLIB::TMatrix &  A,
                       T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
 
 
+//
+// return true if given matrix is a low-rank matrix
+//
+
 inline
 bool is_lowrank     ( const HLIB::TMatrix &  A )     noexcept { return is_lowrank( & A ); }
 
@@ -238,6 +252,44 @@ bool is_lowrank_all ( const HLIB::TMatrix &  A )     noexcept { return is_lowran
 template < typename... T >
 bool is_lowrank_all ( const HLIB::TMatrix &  A,
                       T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
+
+//
+// return true if given vector is a scalar vector
+//
+
+inline
+bool is_scalar      ( const HLIB::TVector &  v )     noexcept { return IS_TYPE( & v, TScalarVector ); }
+
+inline
+bool is_scalar_any  ( const HLIB::TVector &  v )     noexcept { return is_scalar( v ); }
+
+template < typename... T >
+bool is_scalar_any  ( const HLIB::TVector &  v,
+                      T&&...                 vecs )  noexcept { return is_scalar( v ) || is_scalar_any( std::forward< T >( vecs )... ); }
+
+inline
+bool is_scalar_all  ( const HLIB::TVector &  v )     noexcept { return is_scalar( v ); }
+
+template < typename... T >
+bool is_scalar_all  ( const HLIB::TVector &  v,
+                      T&&...                 vecs )  noexcept { return is_scalar( v ) && is_scalar_all( std::forward< T >( vecs )... ); }
+
+inline
+bool is_scalar      ( const HLIB::TVector *  v )     noexcept { return ! is_null( v ) && IS_TYPE( v, TScalarVector ); }
+
+inline
+bool is_scalar_any  ( const HLIB::TVector *  v )     noexcept { return is_scalar( v ); }
+
+template < typename... T >
+bool is_scalar_any  ( const HLIB::TVector *  v,
+                      T&&...                 vecs )  noexcept { return is_scalar( v ) || is_scalar_any( std::forward< T >( vecs )... ); }
+
+inline
+bool is_scalar_all  ( const HLIB::TVector *  v )     noexcept { return is_scalar( v ); }
+
+template < typename... T >
+bool is_scalar_all  ( const HLIB::TVector *  v,
+                      T&&...                 vecs )  noexcept { return is_scalar( v ) && is_scalar_all( std::forward< T >( vecs )... ); }
 
 }// namespace hlr
 

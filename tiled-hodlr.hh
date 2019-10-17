@@ -9,6 +9,7 @@
 #include "common.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
+#include "hlr/seq/norm.hh"
 
 //
 // main function
@@ -52,9 +53,22 @@ mymain ( int, char ** )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
+        // auto  B   = ptrcast( A.get(), TBlockMatrix );
+        // auto  A01 = ptrcast( B->block( 0, 1 ), TRkMatrix );
+
+        // DBG::write( A01, "A.mat", "A" );
+        
+        // auto  C01 = std::make_unique< matrix::tiled_lrmatrix< double > >( A01->row_is(), A01->col_is(), ntile, A01->blas_rmat_A(), A01->blas_rmat_B() );
+            
+        // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
+        // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
+        
         auto  C = impl::matrix::copy_tiled< double >( *A, ntile );
 
-        
+        std::cout << norm_2( A.get() ) << std::endl;
+        std::cout << norm_2( C.get() ) << std::endl;
+
+        return;
     }
     
     {
