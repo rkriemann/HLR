@@ -12,7 +12,7 @@
 namespace          impl      = hlr::tf;
 const std::string  impl_name = "tf";
 
-#include "tile-hodlr.hh"
+#include "tiled-hodlr.hh"
 
 int
 main ( int argc, char ** argv )

@@ -12,7 +12,7 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-#include "tile-hodlr.hh"
+#include "tiled-hodlr.hh"
 
 int
 main ( int argc, char ** argv )

@@ -13,10 +13,23 @@
 
 #include <matrix/TMatrix.hh>
 
-// local matrix type
-DECLARE_TYPE( TRkMatrix );
+namespace std
+{
+
+// (partial) ordering of index sets
+bool
+operator < ( const HLIB::TIndexSet  is1,
+             const HLIB::TIndexSet  is2 )
+{
+    return is1.is_strictly_left_of( is2 );
+}
+
+}// namespace std
 
 namespace hlr { namespace matrix {
+
+// local matrix type
+DECLARE_TYPE( tiled_lrmatrix );
 
 //
 // Represents a low-rank matrix in factorised form: U·V^H
@@ -69,16 +82,21 @@ public:
     //
 
     tiled_lrmatrix ()
+            : HLIB::TMatrix( HLIB::value_type< value_t >::value )
+            , _row_is( 0, 0 )
+            , _col_is( 0, 0 )
+            , _rank( 0 )
+            , _ntile( 0 )
     {
-        set_complex( HLIB::is_complex_type< value_t >::value );
     }
     
     tiled_lrmatrix ( const indexset  arow_is,
                      const indexset  acol_is,
                      const size_t    antile )
-            : tiled_lrmatrix()
+            : HLIB::TMatrix( HLIB::value_type< value_t >::value )
             , _row_is( arow_is )
             , _col_is( acol_is )
+            , _rank( 0 )
             , _ntile(  antile )
     {
         set_ofs( _row_is.first(), _col_is.first() );
@@ -90,9 +108,10 @@ public:
                      const size_t                           antile,
                      const HLIB::BLAS::Matrix< value_t > &  aU,
                      const HLIB::BLAS::Matrix< value_t > &  aV )
-            : tiled_lrmatrix()
+            : HLIB::TMatrix( HLIB::value_type< value_t >::value )
             , _row_is( arow_is )
             , _col_is( acol_is )
+            , _rank( 0 )
             , _ntile(  antile )
     {
         set_ofs( _row_is.first(), _col_is.first() );
@@ -100,7 +119,7 @@ public:
     }
 
     // dtor
-    virtual tiled_lrmatrix ()
+    virtual ~tiled_lrmatrix ()
     {}
     
     //
@@ -166,7 +185,7 @@ public:
     // RTTI
     //
 
-    HLIB_RTTI_DERIVED( HLIB::TMatrix, tiled_lrmatrix )
+    HLIB_RTTI_DERIVED( TMatrix, tiled_lrmatrix )
 
     //
     // virtual constructor
@@ -183,6 +202,19 @@ template < typename value_t >
 void
 tiled_lrmatrix< value_t >::init_tiles ()
 {
+    for ( HLIB::idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
+    {
+        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _row_is.last() ) );
+
+        _U[ is_i ] = HLIB::BLAS::Matrix< value_t >( is_i.size(), _rank );
+    }// for
+
+    for ( HLIB::idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
+    {
+        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _col_is.last() ) );
+
+        _V[ is_i ] = HLIB::BLAS::Matrix< value_t >( is_i.size(), _rank );
+    }// for
 }
 
 //
@@ -193,6 +225,25 @@ void
 tiled_lrmatrix< value_t >::copy_tiles ( const HLIB::BLAS::Matrix< value_t > &  U,
                                         const HLIB::BLAS::Matrix< value_t > &  V )
 {
+    assert( U.ncols() == V.ncols() );
+
+    _rank = U.ncols();
+    
+    for ( HLIB::idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
+    {
+        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _row_is.last() ) );
+        const tile_t    U_i( U, is_i - _row_is.first(), HLIB::BLAS::Range::all );
+
+        _U[ is_i ] = HLIB::BLAS::Matrix< value_t >( U_i, HLIB::copy_value );
+    }// for
+
+    for ( HLIB::idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
+    {
+        const indexset  is_i( i, std::max< idx_t >( i + _ntile - 1, _col_is.last() ) );
+        const tile_t    V_i( V, is_i - _col_is.first(), HLIB::BLAS::Range::all );
+
+        _V[ is_i ] = HLIB::BLAS::Matrix< value_t >( V_i, HLIB::copy_value );
+    }// for
 }
 
 //

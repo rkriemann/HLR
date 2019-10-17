@@ -43,7 +43,7 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tile-hodlr', 'dag-hodlr' ]
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tiled-hodlr', 'dag-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
@@ -323,14 +323,14 @@ Default( None )
 if 'seq' in frameworks :
     seq = env.Clone()
         
-    if 'tlr'        in programs : Default( seq.Program( 'tlr-seq.cc' ) )
-    if 'hodlr'      in programs : Default( seq.Program( 'hodlr-seq.cc' ) )
-    if 'tile-hodlr' in programs : Default( seq.Program( 'tile-hodlr-seq.cc' ) )
-    if 'tileh'      in programs : Default( seq.Program( 'tileh-seq.cc' ) )
-    if 'dag-lu'     in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
-    if 'dag-gauss'  in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
-    if 'dag-inv'    in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
-    if 'dag-hodlr'  in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
+    if 'tlr'         in programs : Default( seq.Program( 'tlr-seq.cc' ) )
+    if 'hodlr'       in programs : Default( seq.Program( 'hodlr-seq.cc' ) )
+    if 'tiled-hodlr' in programs : Default( seq.Program( 'tiled-hodlr-seq.cc' ) )
+    if 'tileh'       in programs : Default( seq.Program( 'tileh-seq.cc' ) )
+    if 'dag-lu'      in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
+    if 'dag-gauss'   in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
+    if 'dag-inv'     in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
+    if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
 
 #
 # OpenMP
@@ -356,14 +356,14 @@ if 'tbb' in frameworks :
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
 
-    if 'tlr'        in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
-    if 'hodlr'      in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
-    if 'tile-hodlr' in programs : Default( tbb.Program( 'tile-hodlr-tbb.cc' ) )
-    if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
-    if 'dag-lu'     in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
-    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc',   'src/tbb/dag.cc' ] ) )
-    if 'dag-hodlr'  in programs : Default( tbb.Program( 'dag-hodlr-tbb', [ 'dag-hodlr-tbb.cc', 'src/tbb/dag.cc' ] ) )
+    if 'tlr'         in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
+    if 'hodlr'       in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
+    if 'tiled-hodlr' in programs : Default( tbb.Program( 'tiled-hodlr-tbb.cc' ) )
+    if 'tileh'       in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
+    if 'dag-lu'      in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
+    if 'dag-gauss'   in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
+    if 'dag-inv'     in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc',   'src/tbb/dag.cc' ] ) )
+    if 'dag-hodlr'   in programs : Default( tbb.Program( 'dag-hodlr-tbb', [ 'dag-hodlr-tbb.cc', 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -374,11 +374,11 @@ if 'tf' in frameworks :
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'        in programs : Default( tf.Program( 'tlr-tf.cc' ) )
-    if 'hodlr'      in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
-    if 'tile-hodlr' in programs : Default( tf.Program( 'tile-hodlr-tf.cc' ) )
-    if 'dag-lu'     in programs : Default( tf.Program( 'dag-lu-tf',    [ 'dag-lu-tf.cc',    'src/tf/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( tf.Program( 'dag-gauss-tf', [ 'dag-gauss-tf.cc', 'src/tf/dag.cc' ] ) )
+    if 'tlr'         in programs : Default( tf.Program( 'tlr-tf.cc' ) )
+    if 'hodlr'       in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
+    if 'tiled-hodlr' in programs : Default( tf.Program( 'tiled-hodlr-tf.cc' ) )
+    if 'dag-lu'      in programs : Default( tf.Program( 'dag-lu-tf',    [ 'dag-lu-tf.cc',    'src/tf/dag.cc' ] ) )
+    if 'dag-gauss'   in programs : Default( tf.Program( 'dag-gauss-tf', [ 'dag-gauss-tf.cc', 'src/tf/dag.cc' ] ) )
 
 #
 # HPX

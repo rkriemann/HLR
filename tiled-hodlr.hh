@@ -8,6 +8,7 @@
 
 #include "common.hh"
 #include "hlr/cluster/hodlr.hh"
+#include "hlr/matrix/tiled_lrmatrix.hh"
 
 //
 // main function
@@ -47,9 +48,15 @@ mymain ( int, char ** )
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
+
+    {
+        std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
+
+        matrix::tiled_lrmatrix< double >  R( A->row_is(), A->col_is(), ntile );
+    }
     
     {
-        std::cout << term::bullet << term::bold << "LU ( HODLR " << impl_name << " )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR " << impl_name << " )" << term::reset << std::endl;
         
         auto  C = impl::matrix::copy( *A );
 
