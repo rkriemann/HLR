@@ -9,6 +9,7 @@
 #include "hlr/mpi/matrix.hh"
 #include "hlr/mpi/arith-ibcast.hh"
 
-namespace ARITH = hlr::mpi::ibcast::tileh;
+namespace          impl      = hlr::mpi::ibcast::tileh;
+const std::string  impl_name = "ibcast";
 
 #include "tileh-mpi-main.hh"

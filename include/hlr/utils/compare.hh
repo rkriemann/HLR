@@ -16,11 +16,13 @@ namespace hlr
 {
 
 //
-// compare <A> with reference read from file <filename>
+// compare blocks of <A> with reference read from file <filename>
+// and output difference if larger then <error>
 //
 void
 compare_ref_file ( HLIB::TMatrix *      A,
-                   const std::string &  filename );
+                   const std::string &  filename,
+                   const double         error );
 
 }// namespace hlr
 

@@ -20,6 +20,13 @@ cyclic_2d ( const uint             nprocs,
             HLIB::TBlockCluster *  bct );
 
 //
+// assigns 1d cyclic distribution
+//
+void
+cyclic_1d ( const uint             nprocs,
+            HLIB::TBlockCluster *  bct );
+
+//
 // assigns shifted 1d cyclic distribution
 //
 void
