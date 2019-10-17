@@ -52,7 +52,9 @@ mymain ( int, char ** )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
-        matrix::tiled_lrmatrix< double >  R( A->row_is(), A->col_is(), ntile );
+        auto  C = impl::matrix::copy_tiled< double >( *A, ntile );
+
+        
     }
     
     {

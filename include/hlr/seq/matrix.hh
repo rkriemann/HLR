@@ -17,6 +17,7 @@
 #include <base/TTruncAcc.hh>
 
 #include "hlr/utils/checks.hh"
+#include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr { namespace seq { namespace matrix {
 
@@ -121,6 +122,56 @@ copy ( const TMatrix &  M )
         }// for
         
         return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+template < typename value_t >
+std::unique_ptr< TMatrix >
+copy_tiled ( const TMatrix &  M,
+             const size_t     ntile )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_tiled< value_t >( * BM->block( i, j ), ntile );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else if ( is_lowrank( & M ) )
+    {
+        //
+        // copy low-rank data into tiled form
+        //
+
+        auto  RM = cptrcast( & M, TRkMatrix );
+
+        return std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                           RM->col_is(),
+                                                                           ntile,
+                                                                           blas_mat_A< value_t >( RM ),
+                                                                           blas_mat_B< value_t >( RM ) );
     }// if
     else
     {
