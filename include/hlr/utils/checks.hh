@@ -8,6 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <matrix/TMatrix.hh>
 #include <matrix/structure.hh>
 #include <base/config.hh>
 
@@ -186,6 +187,57 @@ bool is_small_all  ( T &           A )     noexcept { return is_small( A ); }
 template < typename T1, typename... T2 >
 bool is_small_all  ( T1 &          A,
                      T2...         mtrs )  noexcept { return is_small( A ) && is_small_all( mtrs... ); }
+
+
+inline
+bool is_blocked_any ( const HLIB::TMatrix &  A )     noexcept { return is_blocked( A ); }
+
+template < typename... T >
+bool is_blocked_any ( const HLIB::TMatrix &  A,
+                      T...                   mtrs )  noexcept { return is_blocked( A ) || is_blocked_any( mtrs... ); }
+
+inline
+bool is_blocked_all ( const HLIB::TMatrix &  A )     noexcept { return is_blocked( A ); }
+
+template < typename... T >
+bool is_blocked_all ( const HLIB::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_blocked( A ) && is_blocked_all( std::forward< T >( mtrs )... ); }
+
+
+inline
+bool is_dense       ( const HLIB::TMatrix &  A )     noexcept { return is_dense( & A ); }
+
+inline
+bool is_dense_any   ( const HLIB::TMatrix &  A )     noexcept { return is_dense( A ); }
+
+template < typename... T >
+bool is_dense_any   ( const HLIB::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_dense( A ) || is_dense_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_dense_all   ( const HLIB::TMatrix &  A )     noexcept { return is_dense( A ); }
+
+template < typename... T >
+bool is_dense_all   ( const HLIB::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
+
+
+inline
+bool is_lowrank     ( const HLIB::TMatrix &  A )     noexcept { return is_lowrank( & A ); }
+
+inline
+bool is_lowrank_any ( const HLIB::TMatrix &  A )     noexcept { return is_lowrank( A ); }
+
+template < typename... T >
+bool is_lowrank_any ( const HLIB::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) || is_lowrank_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_lowrank_all ( const HLIB::TMatrix &  A )     noexcept { return is_lowrank( A ); }
+
+template < typename... T >
+bool is_lowrank_all ( const HLIB::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
 
 }// namespace hlr
 

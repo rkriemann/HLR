@@ -8,13 +8,14 @@
 
 #include "common.hh"
 #include "hlr/cluster/tileh.hh"
+#include "hlr/dag/lu.hh"
 
 //
 // main function
 //
 template < typename problem_t >
 void
-mymain ( int argc, char ** argv )
+mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
@@ -31,15 +32,16 @@ mymain ( int argc, char ** argv )
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
 
+    auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
-    
+    std::cout << "    done in " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+
     if ( verbose( 3 ) )
     {
         TPSMatrixVis  mvis;
@@ -48,20 +50,46 @@ mymain ( int argc, char ** argv )
     }// if
     
     {
-        std::cout << term::bullet << term::bold << "LU ( Tile-H " << impl_name << " )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( Tile-H " << impl_name
+                  << ", " << acc.to_string()
+                  << " )" << term::reset << std::endl;
+
+        auto  C = impl::matrix::copy( *A );
         
-        auto  C = A->copy();
+        if ( HLIB::CFG::Arith::use_dag )
+        {
+            // no sparsification
+            hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
         
-        tic = Time::Wall::now();
+            tic = Time::Wall::now();
         
-        impl::tileh::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
+            
+            toc = Time::Wall::since( tic );
+            
+            std::cout << "    DAG in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
+            std::cout << "    mem   = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
+            
+            tic = Time::Wall::now();
+            
+            impl::dag::run( dag, acc );
+
+            toc = Time::Wall::since( tic );
+        }// if
+        else
+        {
+            tic = Time::Wall::now();
         
-        toc = Time::Wall::since( tic );
-        
+            impl::tileh::lu< HLIB::real >( C.get(), acc );
+            
+            toc = Time::Wall::since( tic );
+        }// else
+            
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        std::cout << "    done in " << toc << std::endl;
-        std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
+        std::cout << "    LU in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
+        std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+        std::cout << "    error = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
     }
 
 }

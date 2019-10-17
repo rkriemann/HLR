@@ -6,15 +6,37 @@
 #include "gen_problem.hh"
 #include "hlr/utils/RedirectOutput.hh"
 #include "hlr/utils/compare.hh"
+#include "hlr/matrix/luinv_eval.hh"
+#include "hlr/tbb/dag.hh"
+#include "hlr/tbb/matrix.hh"
 
 using namespace hlr;
+
+// return main memory usage as a string
+std::string
+mem_usage ()
+{
+    return term::ltgrey( " [" + Mem::to_string( Mem::usage() ) + "]" );
+}
+
+//
+// generate accuracy
+//
+TTruncAcc
+gen_accuracy ()
+{
+    if ( eps < 0 )
+        return fixed_rank( k );
+    else
+        return fixed_prec( eps );
+}
 
 //
 // main function
 //
 template < typename problem_t >
 void
-mymain ( int argc, char ** argv )
+mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
@@ -25,11 +47,12 @@ mymain ( int argc, char ** argv )
     auto  tic     = Time::Wall::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, std::max< uint >( 3, std::log2( nprocs )+2 ) );
+    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, 4 ); // std::max< uint >( 3, std::log2( nprocs )+2 ) );
     auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
+    else if ( distr == "cyclic1d"    ) cluster::distribution::cyclic_1d( nprocs, bct->root() );
     else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
     if (( pid == 0 ) && verbose( 3 ))
@@ -40,14 +63,15 @@ mymain ( int argc, char ** argv )
         bc_vis.id( false ).procs( true ).print( bct->root(), "bct_distr" );
     }// if
     
+    auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
-    auto  A      = mpi::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
+    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+    auto  A      = mpi::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     auto  toc    = Time::Wall::since( tic );
     
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    std::cout << "    done in " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -57,26 +81,52 @@ mymain ( int argc, char ** argv )
     }// if
 
     // TLR::MPI::RANK = k;
+
+    // no sparsification
+    hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
     
     {
-        std::cout << term::bullet << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( Tile-H MPI, "
+                  << impl_name << ", "
+                  << acc.to_string() << " )" << term::reset << std::endl;
         
-        auto  C = A->copy();
+        auto  C = std::shared_ptr( hlr::tbb::matrix::copy( *A ) );
         
         tic = Time::Wall::now();
-        
-        ARITH::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+
+        if ( nprocs == 1 )
+        {
+            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, hlr::tbb::dag::refine ) );
+
+            hlr::tbb::dag::run( dag, acc );
+        }// if
+        else
+        {
+            impl::lu< HLIB::real >( C.get(), acc );
+        }// else
         
         toc = Time::Wall::since( tic );
         
-        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
+        std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;
 
-        // compare with otherwise computed result
-        compare_ref_file( C.get(), "LU.hm" );
+        if ( nprocs == 1 )
+        {
+            write_matrix( C.get(), "LU.hm" );
+            
+            matrix::luinv_eval  A_inv( C, hlr::tbb::dag::refine, hlr::tbb::dag::run );
+            // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-        // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+            std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv )
+                      << term::reset << std::endl;
+        }// if
+        else
+        {
+            // compare with otherwise computed result
+            std::cout << "    error  = ";
+            compare_ref_file( C.get(), "LU.hm", ( eps != -1 ? eps : 1e-10 ) );
+        }// else
         
-        // std::cout << "    inversion error  = " << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << std::endl;
     }
 }
 
@@ -94,7 +144,7 @@ main ( int argc, char ** argv )
                                                      ? std::make_unique< RedirectOutput >( to_string( "tileh-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
-    parse_cmdline( argc, argv );
+    cmdline::parse( argc, argv );
     
     try
     {
@@ -112,8 +162,9 @@ main ( int argc, char ** argv )
         if ( nthreads != 0 )
             CFG::set_nthreads( nthreads );
 
-        if      ( appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
+        if      ( appl == "logkernel"  ) mymain< hlr::apps::log_kernel  >( argc, argv );
+        else if ( appl == "matern"     ) mymain< hlr::apps::matern_cov  >( argc, argv );
+        else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
             throw "unknown application";
 

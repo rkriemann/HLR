@@ -150,7 +150,7 @@ parse ( int argc, char ** argv )
     }// if
     
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
-    assert( ( distr == "cyclic2d" ) || ( distr == "shiftcycrow" ) );
+    assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
 }
 
 }}// namespace hlr::cmdline

@@ -87,7 +87,9 @@ build ( const HLIB::TBlockCluster *  bct,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< TBlockMatrix >( bct );
+
+        auto  B = ptrcast( M.get(), TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -95,11 +97,12 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        ::tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
-                                           0, B->nblock_cols() );
+        ::tbb::blocked_range2d< uint >  block_range( 0, B->nblock_rows(),
+                                                     0, B->nblock_cols() );
         
-        // tbb::parallel_for( r,
-        //     [&,bct] ( const tbb::blocked_range2d< uint > &  r )
+        ::tbb::parallel_for(
+            block_range,
+            [&,bct,B] ( const auto &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -113,9 +116,7 @@ build ( const HLIB::TBlockCluster *  bct,
                         }// if
                     }// for
                 }// for
-            }// );
-
-        M = std::move( B );
+            } );
     }// else
 
     // copy properties from the cluster
