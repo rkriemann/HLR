@@ -22,8 +22,8 @@ namespace hlr { namespace seq { namespace tiled2 {
 using namespace HLIB;
 
 // map HLIB namespaces to HLR
-using namespace hpro = HLIB;
-using namespace blas = HLIB::BLAS;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
 using  indexset = TIndexSet;
@@ -33,28 +33,35 @@ using  range    = HLIB::BLAS::Range;
 template < typename value_t >
 using  matrix   = HLIB::BLAS::Matrix< value_t >;
 
+// dense vector
+template < typename value_t >
+using  vector   = HLIB::BLAS::Vector< value_t >;
+
 // tile type
 template < typename value_t >
-using  tile     = matrix;
+using  tile     = matrix< value_t >;
 
 // tile mapping type
 template < typename value_t >
 using  tilemap  = std::map< indexset, tile< value_t > >;
 
+// import tiled_lrmatrix
+using hlr::matrix::tiled_lrmatrix;
+
 //
-// split given range into <n> subsets
+// split given indexset into <n> subsets
 //
 inline
-std::vector< range >
-split ( const range &  r,
-        const size_t         n )
+std::vector< TIndexSet >
+split ( const TIndexSet &  is,
+        const size_t       n )
 {
     if ( n == 2 )
     {
-        const range  r0( r.first(), r.first() + r.size() / 2 - 1 );
-        const range  r1( r0.last() + 1, r.last() );
+        const TIndexSet  is0( is.first(), is.first() + is.size() / 2 - 1 );
+        const TIndexSet  is1( is0.last() + 1, is.last() );
 
-        return { std::move(r0), std::move(r1) };
+        return { std::move(is0), std::move(is1) };
     }// if
     else
         assert( false );
@@ -72,8 +79,6 @@ dot ( const indexset &            is,
       const tilemap< value_t > &  B,
       const size_t                ntile )
 {
-    assert( A.nrows() == B.nrows() );
-
     HLR_LOG( 4, hpro::to_string( "dot( %d )", is.size() ) );
     
     if ( is.size() > ntile )
@@ -88,7 +93,9 @@ dot ( const indexset &            is,
     }// if
     else
     {
-        return std::move( blas::prod( value_t(1), blas::adjoint( A[is] ), B[is] ) );
+        assert( A.contains( is ) && B.contains( is ) );
+
+        return blas::prod( value_t(1), blas::adjoint( A.at( is ) ), B.at( is ) );
     }// else
 }
 
@@ -116,13 +123,20 @@ tprod ( const indexset &            is,
     }// if
     else
     {
-        blas::prod( alpha, A[ is ], T, beta, B[ is ] );
+        assert( A.contains( is ) );
+        assert( ( beta == value_t(0) ) || B.contains( is ) );
+
+        if ( B.contains( is ) )
+            blas::prod( alpha, A.at( is ), T, beta, B.at( is ) );
+        else
+            B[ is ] = std::move( blas::prod( alpha, A.at( is ), T ) );
     }// else
 }
 
 template < typename value_t >
 void
-tprod ( const value_t              alpha,
+tprod ( const indexset &           is,
+        const value_t              alpha,
         tilemap< value_t > &       A,
         const matrix< value_t > &  T,
         const size_t               ntile )
@@ -140,9 +154,11 @@ tprod ( const value_t              alpha,
     }// if
     else
     {
-        matrix< value_t >  Ac( A[ is ], copy_value );
+        assert( A.contains( is ) );
         
-        blas::prod( alpha, Ac, T, value_t(0), A[ is ] );
+        matrix< value_t >  Ac( A.at( is ), copy_value );
+        
+        blas::prod( alpha, Ac, T, value_t(0), A.at( is ) );
     }// else
 }
 
@@ -150,7 +166,7 @@ tprod ( const value_t              alpha,
 // compute QR factorization of [αX·T,U]
 //
 template < typename value_t >
-std::pair< matrix< value_t >,
+std::pair< tilemap< value_t >,
            matrix< value_t > >
 tsqr ( const indexset &            is,
        const value_t               alpha,
@@ -185,86 +201,36 @@ tsqr ( const indexset &            is,
 
         blas::qr( Q01, R );
 
-        matrix< value_t >  Q( X.nrows(), Q01.ncols() );
-        matrix< value_t >  Q_0( Q, rows[0], range::all );
-        matrix< value_t >  Q_1( Q, rows[1], range::all );
+        tilemap< value_t >  Q;
 
-        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
-        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
+        tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile );
+        tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
     else
     {
-        auto                     W = blas::prod( alpha, X, T );
-        matrix< value_t >  WU( W.nrows(), W.ncols() + U.ncols () );
+        assert( X.contains( is ) && U.contains( is ) );
+
+        const auto         X_is = X.at( is );
+        const auto         U_is = U.at( is );
+        auto               W    = blas::prod( alpha, X_is, T );
+        matrix< value_t >  WU( W.nrows(), W.ncols() + U_is.ncols () );
         matrix< value_t >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
         matrix< value_t >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
 
-        blas::copy( W, WU_W );
-        blas::copy( U, WU_U );
+        blas::copy( W,    WU_W );
+        blas::copy( U_is, WU_U );
 
         matrix< value_t >  R;
         
         blas::qr( WU, R );
 
-        return { std::move( WU ), std::move( R ) };
-    }// else
-}
+        tilemap< value_t >  Q;
 
-template < typename value_t >
-void
-tsqr ( const value_t                 alpha,
-       const matrix< real > &  X,
-       const matrix< real > &  T,
-       const matrix< real > &  U,
-       matrix< real > &        Q,
-       matrix< real > &        R,
-       const size_t                  ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    assert( X.ncols() == T.nrows() );
-    
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
-        //
+        Q[ is ] = std::move( WU );
         
-        const auto                     rows = split( range( 0, X.nrows()-1 ), 2 );
-        const matrix< value_t >  X0( X, rows[0], range::all );
-        const matrix< value_t >  X1( X, rows[1], range::all );
-        const matrix< value_t >  U0( U, rows[0], range::all );
-        const matrix< value_t >  U1( U, rows[1], range::all );
-        matrix< value_t >        Q0( Q, rows[0], range::all );
-        matrix< value_t >        Q1( Q, rows[1], range::all );
-        matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
-        matrix< value_t >        R0( Q01, range(          0, Q0.ncols()-1  ), range::all );
-        matrix< value_t >        R1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
-
-        tsqr( alpha, X0, T, U0, Q0, R0, ntile );
-        tsqr( alpha, X1, T, U1, Q1, R1, ntile );
-
-        // Q = | R0 |
-        //     | R1 |
-        blas::qr( Q01, R );
-
-        tprod( value_t(1), Q0, R0, ntile );
-        tprod( value_t(1), Q1, R1, ntile );
-    }// if
-    else
-    {
-        auto                     W = blas::prod( alpha, X, T );
-        matrix< value_t >  WU_W( Q, range::all, range( 0, W.ncols()-1 ) );
-        matrix< value_t >  WU_U( Q, range::all, range( W.ncols(), Q.ncols()-1 ) );
-
-        blas::copy( W, WU_W );
-        blas::copy( U, WU_U );
-
-        blas::qr( Q, R );
+        return { std::move( Q ), std::move( R ) };
     }// else
 }
 
@@ -272,32 +238,27 @@ tsqr ( const value_t                 alpha,
 // compute QR factorization of [αX,U]
 //
 template < typename value_t >
-std::pair< matrix< value_t >,
+std::pair< tilemap< value_t >,
            matrix< value_t > >
-tsqr ( const value_t                 alpha,
-       const matrix< real > &  X,
-       const matrix< real > &  U,
-       const size_t                  ntile )
+tsqr ( const indexset &            is,
+       const value_t               alpha,
+       const tilemap< value_t > &  X,
+       const tilemap< value_t > &  U,
+       const size_t                ntile )
 {
-    assert( X.nrows() == U.nrows() );
+    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", is.size() ) );
     
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
+    if ( is.size() > ntile )
     {
         //
         // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
         //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
-        const auto                     rows = split( range( 0, X.nrows()-1 ), 2 );
-        const matrix< value_t >  X0( X, rows[0], range::all );
-        const matrix< value_t >  X1( X, rows[1], range::all );
-        const matrix< value_t >  U0( U, rows[0], range::all );
-        const matrix< value_t >  U1( U, rows[1], range::all );
+        const auto  sis = split( is, 2 );
 
-        auto [ Q0, R0 ] = tsqr( alpha, X0, U0, ntile );
-        auto [ Q1, R1 ] = tsqr( alpha, X1, U1, ntile );
+        auto [ Q0, R0 ] = tsqr( sis[0], alpha, X, U, ntile );
+        auto [ Q1, R1 ] = tsqr( sis[1], alpha, X, U, ntile );
 
         // Q = | R0 |
         //     | R1 |
@@ -311,82 +272,35 @@ tsqr ( const value_t                 alpha,
 
         blas::qr( Q01, R );
 
-        matrix< value_t >  Q( X.nrows(), Q01.ncols() );
-        matrix< value_t >  Q_0( Q, rows[0], range::all );
-        matrix< value_t >  Q_1( Q, rows[1], range::all );
+        tilemap< value_t >  Q;
 
-        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
-        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
+        tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile );
+        tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
     else
     {
-        matrix< value_t >  XU( X.nrows(), X.ncols() + U.ncols () );
-        matrix< value_t >  XU_X( XU, range::all, range( 0, X.ncols()-1 ) );
-        matrix< value_t >  XU_U( XU, range::all, range( X.ncols(), XU.ncols()-1 ) );
+        assert( X.contains( is ) && U.contains( is ) );
 
-        blas::copy( X, XU_X );
-        blas::copy( U, XU_U );
+        const auto         X_is = X.at( is );
+        const auto         U_is = U.at( is );
+        matrix< value_t >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
+        matrix< value_t >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
+        matrix< value_t >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
+
+        blas::copy( X_is, XU_X );
+        blas::copy( U_is, XU_U );
 
         matrix< value_t >  R;
         
         blas::qr( XU, R );
 
-        return { std::move( XU ), std::move( R ) };
-    }// else
-}
+        tilemap< value_t >  Q;
 
-template < typename value_t >
-void
-tsqr ( const value_t                 alpha,
-       const matrix< real > &  X,
-       const matrix< real > &  U,
-       matrix< real > &        Q,
-       matrix< real > &        R,
-       const size_t                  ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
-        //
+        Q[ is ] = std::move( XU );
         
-        const auto                     rows = split( range( 0, X.nrows()-1 ), 2 );
-        const matrix< value_t >  X0( X, rows[0], range::all );
-        const matrix< value_t >  X1( X, rows[1], range::all );
-        const matrix< value_t >  U0( U, rows[0], range::all );
-        const matrix< value_t >  U1( U, rows[1], range::all );
-        matrix< value_t >        Q0( Q, rows[0], range::all );
-        matrix< value_t >        Q1( Q, rows[1], range::all );
-        matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
-        matrix< value_t >        R0( Q01, range(          0, Q0.ncols()-1  ), range::all );
-        matrix< value_t >        R1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
-
-        tsqr( alpha, X0, U0, Q0, R0, ntile );
-        tsqr( alpha, X1, U1, Q1, R1, ntile );
-        
-        // Q = | R0 |
-        //     | R1 |
-        blas::qr( Q01, R );
-
-        tprod( value_t(1), Q0, R0, ntile );
-        tprod( value_t(1), Q1, R1, ntile );
-    }// if
-    else
-    {
-        matrix< value_t >  XU_X( Q, range::all, range( 0, X.ncols()-1 ) );
-        matrix< value_t >  XU_U( Q, range::all, range( X.ncols(), Q.ncols()-1 ) );
-
-        blas::copy( X, XU_X );
-        blas::copy( U, XU_U );
-
-        blas::qr( Q, R );
+        return { std::move( Q ), std::move( R ) };
     }// else
 }
 
@@ -394,75 +308,55 @@ tsqr ( const value_t                 alpha,
 // truncate α X T Y^H + U V^H
 //
 template < typename value_t >
-std::pair< matrix< value_t >,
-           matrix< value_t > >
-truncate ( const value_t                 alpha,
-           const matrix< real > &  X,
-           const matrix< real > &  T,
-           const matrix< real > &  Y,
-           const matrix< real > &  U,
-           const matrix< real > &  V,
-           const TTruncAcc &             acc,
-           const size_t                  ntile )
+std::pair< tilemap< value_t >,
+           tilemap< value_t > >
+truncate ( const indexset &            row_is,
+           const indexset &            col_is,
+           const value_t               alpha,
+           const tilemap< value_t > &  X,
+           const matrix< value_t > &   T,
+           const tilemap< value_t > &  Y,
+           const tilemap< value_t > &  U,
+           const tilemap< value_t > &  V,
+           const TTruncAcc &           acc,
+           const size_t                ntile )
 {
-    assert( X.nrows() == U.nrows() );
-    assert( Y.nrows() == V.nrows() );
-    assert( X.ncols() == T.nrows() );
-    assert( T.ncols() == Y.ncols() );
-    assert( U.ncols() == V.ncols() );
+    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_is.size() ) );
     
-    HLR_LOG( 4, hpro::to_string( "truncate( %d )", X.nrows() ) );
-    
-    if ( Y.ncols() + V.ncols() > X.nrows() / 2 )
-    {
-        // M = α X T Y^H + U V^H
-        auto  W = blas::prod( value_t(1), X, T );
-        auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
+    // if ( Y.ncols() + V.ncols() > X.nrows() / 2 )
+    // {
+    //     // M = α X T Y^H + U V^H
+    //     auto  W = blas::prod( value_t(1), X, T );
+    //     auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
 
-        blas::prod( alpha, W, blas::adjoint( Y ), value_t(1), M );
+    //     blas::prod( alpha, W, blas::adjoint( Y ), value_t(1), M );
             
-        // truncate to rank-k
-        return std::move( hlr::approx_svd( M, acc ) );
-    }// if
-    else
+    //     // truncate to rank-k
+    //     return std::move( hlr::approx_svd( M, acc ) );
+    // }// if
+    // else
     {
-        #if 1
+        auto [ Q0, R0 ] = tsqr( row_is, alpha,      X, T, U, ntile );
+        auto [ Q1, R1 ] = tsqr( col_is, value_t(1), Y,    V, ntile );
         
-        matrix< value_t >  Q0( X.nrows(), T.ncols() + U.ncols() );
-        matrix< value_t >  Q1( Y.nrows(), Y.ncols() + V.ncols() );
-        matrix< value_t >  R0( Q0.ncols(), Q0.ncols() );
-        matrix< value_t >  R1( Q1.ncols(), Q1.ncols() );
-        
-        tsqr( alpha,      X, T, U, Q0, R0, ntile );
-        tsqr( value_t(1), Y,    V, Q1, R1, ntile );
-        
-        #else
-        
-        auto [ Q0, R0 ] = tsqr( alpha,      X, T, U, ntile );
-        auto [ Q1, R1 ] = tsqr( value_t(1), Y,    V, ntile );
-        
-        #endif
-        
-        auto R = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
-
-        auto                     Us = std::move( R );
+        auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
+        auto               Us = std::move( R );
         matrix< value_t >  Vs;
-        blas::Vector< value_t >  Ss;
+        vector< value_t >  Ss;
         
         blas::svd( Us, Ss, Vs );
         
-        auto  k  = acc.trunc_rank( Ss );
+        auto  k = acc.trunc_rank( Ss );
 
         matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
         matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
         
         blas::prod_diag( Usk, Ss, k );
 
-        matrix< value_t >  Uk( U.nrows(), k );
-        matrix< value_t >  Vk( V.nrows(), k );
+        tilemap< value_t >  Uk, Vk;
 
-        tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile );
-        tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
+        tprod( row_is, value_t(1), Q0, Usk, value_t(0), Uk, ntile );
+        tprod( col_is, value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
@@ -470,18 +364,6 @@ truncate ( const value_t                 alpha,
     
 namespace hodlr
 {
-
-template < typename value_t >       matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t >       matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t > const matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > const matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t >       matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t >       matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
-
-template < typename value_t > const matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > const matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -494,12 +376,12 @@ template < typename value_t > const matrix< value_t > &  mat_V ( const TRkMatrix
 //
 template < typename value_t >
 void
-addlr ( const matrix< value_t > &  U,
-        const matrix< value_t > &  T,
-        const matrix< value_t > &  V,
-        TMatrix *                        A,
-        const TTruncAcc &                acc,
-        const size_t                     ntile )
+addlr ( const tilemap< value_t > &  U,
+        const matrix< value_t > &   T,
+        const tilemap< value_t > &  V,
+        TMatrix *                   A,
+        const TTruncAcc &           acc,
+        const size_t                ntile )
 {
     HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
@@ -507,33 +389,44 @@ addlr ( const matrix< value_t > &  U,
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
-        matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), range::all );
-        matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), range::all );
-        matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), range::all );
-        matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), range::all );
+        // matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), range::all );
+        // matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), range::all );
+        // matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), range::all );
+        // matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), range::all );
 
-        addlr( U0, T, V0, A00, acc, ntile );
+        addlr( U, T, V, A00, acc, ntile );
         
-        auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
+        auto  [ U01, V01 ] = truncate( A01->row_is(), A01->col_is(),
+                                       value_t(-1),
+                                       U, T, V,
+                                       A01->U(), A01->V(),
+                                       acc, ntile );
 
-        A01->set_lrmat( U01, V01 );
+        // A01->set_lrmat( U01, V01 );
 
-        auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
+        auto  [ U10, V10 ] = truncate( A10->row_is(), A10->col_is(),
+                                       value_t(-1),
+                                       U, T, V,
+                                       A10->U(), A10->V(),
+                                       acc, ntile );
 
-        A10->set_lrmat( U10, V10 );
+        // A10->set_lrmat( U10, V10 );
         
-        addlr( U1, T, V1, A11, acc, ntile );
+        addlr( U, T, V, A11, acc, ntile );
     }// if
     else
     {
+        assert( U.contains( A->row_is() ) && V.contains( A->col_is() ) );
+        
         auto        D = ptrcast( A, TDenseMatrix );
-        const auto  W = blas::prod( value_t(1), U, T );
+        const auto  W = blas::prod( value_t(1), U.at( A->row_is() ), T );
 
-        blas::prod( value_t(-1), W, blas::adjoint( V ), value_t(1), blas_mat< value_t >( D ) );
+        blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
+                    value_t(1), blas_mat< value_t >( D ) );
     }// else
 }
 
@@ -543,9 +436,9 @@ addlr ( const matrix< value_t > &  U,
 //
 template < typename value_t >
 void
-trsmuh ( const TMatrix *            U,
-         matrix< value_t > &  X,
-         const size_t               ntile )
+trsmuh ( const TMatrix *       U,
+         tilemap< value_t > &  X,
+         const size_t          ntile )
 {
     HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
     
@@ -553,29 +446,29 @@ trsmuh ( const TMatrix *            U,
     {
         auto  BU  = cptrcast( U, TBlockMatrix );
         auto  U00 = BU->block( 0, 0 );
-        auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
+        auto  U01 = cptrcast( BU->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  U11 = BU->block( 1, 1 );
 
-        matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), range::all );
-        matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), range::all );
-            
-        trsmuh( U00, X0, ntile );
+        trsmuh( U00, X, ntile );
 
-        auto  T = dot( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = dot( U01->row_is(), U01->U(), X, ntile );
         
-        tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
+        tprod( U01->col_is(), value_t(-1), U01->V(), T, value_t(1), X, ntile );
 
-        trsmuh( U11, X1, ntile );
+        trsmuh( U11, X, ntile );
     }// if
     else
     {
-        auto  DU = cptrcast( U, TDenseMatrix );
+        assert( X.contains( U->row_is() ) );
         
-        matrix< value_t >  Y( X, copy_value );
+        auto  DU = cptrcast( U, TDenseMatrix );
 
-        blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+        auto               X_is = X.at( U->row_is() );
+        matrix< value_t >  Y( X_is, copy_value );
 
-        std::cout << "trsmu : " << blas::norm_F( X ) << std::endl;
+        blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
+
+        std::cout << "trsmu : " << blas::norm_F( X_is ) << std::endl;
     }// else
 }
 
@@ -585,9 +478,9 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-trsml ( const TMatrix *            L,
-        matrix< value_t > &  X,
-        const size_t               ntile )
+trsml ( const TMatrix *       L,
+        tilemap< value_t > &  X,
+        const size_t          ntile )
 {
     HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
     
@@ -595,26 +488,23 @@ trsml ( const TMatrix *            L,
     {
         auto  BL  = cptrcast( L, TBlockMatrix );
         auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  L11 = BL->block( 1, 1 );
 
-        matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), range::all );
-        matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), range::all );
-            
-        trsml( L00, X0, ntile );
+        trsml( L00, X, ntile );
 
-        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
+        auto  T = dot( L10->col_is(), L10->V(), X, ntile );
 
-        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
+        tprod( L10->row_is(), value_t(-1), L10->U(), T, value_t(1), X, ntile );
 
-        trsml( L11, X1, ntile );
+        trsml( L11, X, ntile );
     }// if
     else
     {
         //
         // UNIT DIAGONAL !!!
         //
-        std::cout << "trsml : " << blas::norm_F( X ) << std::endl;
+        std::cout << "trsml : " << blas::norm_F( X.at( L->row_is() ) ) << std::endl;
     }// else
 }
 
@@ -633,21 +523,21 @@ lu ( TMatrix *          A,
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
         lu< value_t >( A00, acc, ntile );
         
-        trsml(  A00, mat_U< value_t >( A01 ), ntile );
-        trsmuh( A00, mat_V< value_t >( A10 ), ntile );
+        trsml(  A00, A01->U(), ntile );
+        trsmuh( A00, A10->V(), ntile );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        auto  T = dot( A10->col_is(), A10->V(), A01->U(), ntile ); 
 
         std::cout << "dot : " << blas::norm_F( T ) << std::endl;
         
-        addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
+        addlr< value_t >( A10->U(), T, A01->V(), A11, acc, ntile );
         
         lu< value_t >( A11, acc, ntile );
     }// if

@@ -21,7 +21,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17'
+CXXFLAGS     = '-std=c++2a'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'

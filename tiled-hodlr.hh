@@ -68,6 +68,10 @@ mymain ( int, char ** )
         std::cout << norm_2( A.get() ) << std::endl;
         std::cout << norm_2( C.get() ) << std::endl;
 
+        impl::tiled2::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
+
+        std::cout << norm_2( C.get() ) << std::endl;
+        
         return;
     }
     
