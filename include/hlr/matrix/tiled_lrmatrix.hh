@@ -12,12 +12,15 @@
 #include <map>
 
 #include <matrix/TMatrix.hh>
+
+#include <hlr/matrix/tile_storage.hh>
 #include <hlr/utils/checks.hh>
 
 namespace std
 {
 
 // (partial) ordering of index sets
+inline
 bool
 operator < ( const HLIB::TIndexSet  is1,
              const HLIB::TIndexSet  is2 )
@@ -59,30 +62,21 @@ public:
     //
 
     // value type
-    using  value_t   = T_value;
+    using  value_t = T_value;
 
-    // map HLIB type to HLR 
-    using  indexset  = TIndexSet;
-    
-    // tile type
-    using  tile_t    = BLAS::Matrix< value_t >;
-
-    // tile mapping type
-    using  tilemap_t = std::map< indexset, tile_t >;
-        
 private:
     // local index set of matrix
-    indexset   _row_is, _col_is;
+    indexset                 _row_is, _col_is;
     
     // low-rank factors in tiled storage:
     // mapping of (sub-) index set to tile
-    tilemap_t  _U, _V;
+    tile_storage< value_t >  _U, _V;
 
     // numerical rank
-    uint       _rank;
+    uint                     _rank;
 
     // tile size
-    size_t     _ntile;
+    size_t                   _ntile;
 
 public:
     //
@@ -134,19 +128,33 @@ public:
     // access internal data
     //
 
-    tile_t &           tile_U ( const indexset &  is )       { return _U[ is ]; }
-    const tile_t &     tile_U ( const indexset &  is ) const { return _U[ is ]; }
+    tile< value_t > &                tile_U ( const indexset &  is )       { return _U.at( is ); }
+    const tile< value_t > &          tile_U ( const indexset &  is ) const { return _U.at( is ); }
     
-    tile_t &           tile_V ( const indexset &  is )       { return _V[ is ]; }
-    const tile_t &     tile_V ( const indexset &  is ) const { return _V[ is ]; }
+    tile< value_t > &                tile_V ( const indexset &  is )       { return _V.at( is ); }
+    const tile< value_t > &          tile_V ( const indexset &  is ) const { return _V.at( is ); }
 
-    tilemap_t &        U      ()       { return _U; }
-    const tilemap_t &  U      () const { return _U; }
+    tile_storage< value_t > &        U ()       { return _U; }
+    const tile_storage< value_t > &  U () const { return _U; }
 
-    tilemap_t &        V      ()       { return _V; }
-    const tilemap_t &  V      () const { return _V; }
+    tile_storage< value_t > &        V ()       { return _V; }
+    const tile_storage< value_t > &  V () const { return _V; }
     
-    uint               rank   () const { return _rank; }
+    uint                  rank      () const { return _rank; }
+
+    void                  set_lrmat ( tile_storage< value_t > &&  U,
+                                      tile_storage< value_t > &&  V )
+    {
+        _U = std::move( U );
+        _V = std::move( V );
+
+        // adjust rank (assuming all tiles have same rank)
+        for ( const auto & [ is, U_i ] : _U )
+        {
+            _rank = U_i.ncols();
+            break;
+        }// for
+    }
     
     //
     // matrix data
@@ -208,6 +216,13 @@ public:
 
     // return matrix of same class (but no content)
     virtual auto  create  () const -> std::unique_ptr< TMatrix > { return std::make_unique< tiled_lrmatrix >(); }
+
+    //
+    // misc.
+    //
+
+    // return size in bytes used by this object
+    virtual size_t byte_size  () const;
 };
 
 //
@@ -246,16 +261,16 @@ tiled_lrmatrix< value_t >::copy_tiles ( const BLAS::Matrix< value_t > &  U,
     
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
-        const tile_t    U_i( U, is_i - _row_is.first(), BLAS::Range::all );
+        const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
+        const tile< value_t >  U_i( U, is_i - _row_is.first(), BLAS::Range::all );
 
         _U[ is_i ] = BLAS::Matrix< value_t >( U_i, copy_value );
     }// for
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
-        const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
-        const tile_t    V_i( V, is_i - _col_is.first(), BLAS::Range::all );
+        const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
+        const tile< value_t >  V_i( V, is_i - _col_is.first(), BLAS::Range::all );
 
         _V[ is_i ] = BLAS::Matrix< value_t >( V_i, copy_value );
     }// for
@@ -337,6 +352,26 @@ template < typename value_t >
 void
 tiled_lrmatrix< value_t >::truncate ( const TTruncAcc & acc )
 {
+}
+
+    // return size in bytes used by this object
+template < typename value_t >
+size_t
+tiled_lrmatrix< value_t >::byte_size () const
+{
+    size_t  size = TMatrix::byte_size();
+
+    size += sizeof(_row_is) + sizeof(_col_is);
+    size += sizeof(_U) + sizeof(_V);
+    size += sizeof(_rank) + sizeof(_ntile);
+
+    for ( const auto & [ is, U_i ] : _U )
+        size += sizeof(is) + sizeof(value_t) * U_i.nrows() * U_i.ncols();
+
+    for ( const auto & [ is, V_i ] : _V )
+        size += sizeof(is) + sizeof(value_t) * V_i.nrows() * V_i.ncols();
+
+    return size;
 }
 
 }} // namespace hlr::matrix

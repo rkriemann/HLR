@@ -65,12 +65,37 @@ mymain ( int, char ** )
         
         auto  C = impl::matrix::copy_tiled< double >( *A, ntile );
 
-        std::cout << norm_2( A.get() ) << std::endl;
-        std::cout << norm_2( C.get() ) << std::endl;
+        // std::cout << norm_2( A.get() ) << std::endl;
+        // std::cout << norm_2( C.get() ) << std::endl;
 
-        impl::tiled2::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
+        std::vector< double >  runtime;
+    
+        for ( int  i = 0; i < nbench; ++i )
+        {
+            tic = Time::Wall::now();
+            
+            impl::tiled2::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
 
-        std::cout << norm_2( C.get() ) << std::endl;
+            toc = Time::Wall::since( tic );
+
+            std::cout << "    done in " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
+
+            // TODO
+            // if ( i < nbench-1 )
+            //     impl::matrix::copy_to( *A, *C );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
+
+        // std::cout << norm_2( C.get() ) << std::endl;
+        
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
         
         return;
     }

@@ -1,12 +1,14 @@
-#ifndef __HLR_SEQ_ARITH_TILED_V2_HH
-#define __HLR_SEQ_ARITH_TILED_V2_HH
+#ifndef __HLR_TBB_ARITH_TILED_V2_HH
+#define __HLR_TBB_ARITH_TILED_V2_HH
 //
 // Project     : HLib
 // File        : arith.hh
-// Description : sequential tile-based arithmetic functions v2
+// Description : tile-based arithmetic functions v2
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
+
+#include <tbb/parallel_invoke.h>
 
 #include <hlib.hh>
 
@@ -14,16 +16,20 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
-#include "hlr/seq/matrix.hh"
+#include "hlr/tbb/matrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 
-namespace hlr { namespace seq { namespace tiled2 {
+namespace hlr { namespace tbb { namespace tiled2 {
 
 using namespace HLIB;
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
+
+// map HLIB types to HLR 
+using  indexset = TIndexSet;
+using  range    = HLIB::BLAS::Range;
 
 // dense matrix
 template < typename value_t >
@@ -33,11 +39,15 @@ using  matrix   = HLIB::BLAS::Matrix< value_t >;
 template < typename value_t >
 using  vector   = HLIB::BLAS::Vector< value_t >;
 
-// import matrix types
-using hlr::matrix::indexset;
-using hlr::matrix::range;
-using hlr::matrix::tile;
-using hlr::matrix::tile_storage;
+// tile type
+template < typename value_t >
+using  tile     = matrix< value_t >;
+
+// tile mapping type
+template < typename value_t >
+using  tilemap  = std::map< indexset, tile< value_t > >;
+
+// import tiled_lrmatrix
 using hlr::matrix::tiled_lrmatrix;
 
 //
@@ -75,9 +85,11 @@ dot ( const indexset &                 is,
     
     if ( is.size() > ntile )
     {
-        const auto  sis = split( is, 2 );
-        auto        T0  = dot( sis[0], A, B, ntile );
-        auto        T1  = dot( sis[1], A, B, ntile );
+        const auto         sis = split( is, 2 );
+        matrix< value_t >  T0, T1;
+        
+        ::tbb::parallel_invoke( [&,ntile] { T0 = dot( sis[0], A, B, ntile ); },
+                                [&,ntile] { T1 = dot( sis[1], A, B, ntile ); } );
 
         blas::add( value_t(1), T0, T1 );
 
@@ -110,8 +122,8 @@ tprod ( const indexset &                 is,
     {
         const auto  sis = split( is, 2 );
 
-        tprod( sis[0], alpha, A, T, beta, B, ntile );
-        tprod( sis[1], alpha, A, T, beta, B, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( sis[0], alpha, A, T, beta, B, ntile ); },
+                                [&,ntile] { tprod( sis[1], alpha, A, T, beta, B, ntile ); } );
     }// if
     else
     {
@@ -141,8 +153,8 @@ tprod ( const indexset &           is,
     {
         const auto  sis = split( is, 2 );
 
-        tprod( sis[0], alpha, A, T, ntile );
-        tprod( sis[1], alpha, A, T, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( sis[0], alpha, A, T, ntile ); },
+                                [&,ntile] { tprod( sis[1], alpha, A, T, ntile ); } );
     }// if
     else
     {
@@ -176,10 +188,12 @@ tsqr ( const indexset &                 is,
         //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
-        const auto  sis = split( is, 2 );
+        const auto               sis = split( is, 2 );
+        tile_storage< value_t >  Q0, Q1;
+        matrix< value_t >        R0, R1;
 
-        auto [ Q0, R0 ] = tsqr( sis[0], alpha, X, T, U, ntile );
-        auto [ Q1, R1 ] = tsqr( sis[1], alpha, X, T, U, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = tsqr( sis[0], alpha, X, T, U, ntile ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = tsqr( sis[1], alpha, X, T, U, ntile ); } );
 
         // Q = | R0 |
         //     | R1 |
@@ -195,8 +209,8 @@ tsqr ( const indexset &                 is,
 
         tile_storage< value_t >  Q;
 
-        tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile );
-        tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile ); },
+                                [&,ntile] { tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile ); } );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -247,10 +261,12 @@ tsqr ( const indexset &                 is,
         //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
-        const auto  sis = split( is, 2 );
+        const auto               sis = split( is, 2 );
+        tile_storage< value_t >  Q0, Q1;
+        matrix< value_t >        R0, R1;
 
-        auto [ Q0, R0 ] = tsqr( sis[0], alpha, X, U, ntile );
-        auto [ Q1, R1 ] = tsqr( sis[1], alpha, X, U, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = tsqr( sis[0], alpha, X, U, ntile ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = tsqr( sis[1], alpha, X, U, ntile ); } );
 
         // Q = | R0 |
         //     | R1 |
@@ -266,8 +282,8 @@ tsqr ( const indexset &                 is,
 
         tile_storage< value_t >  Q;
 
-        tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile );
-        tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( sis[0], value_t(1), Q0, Q01_0, value_t(0), Q, ntile ); },
+                                [&,ntile] { tprod( sis[1], value_t(1), Q1, Q01_1, value_t(0), Q, ntile ); } );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -328,8 +344,11 @@ truncate ( const indexset &                 row_is,
     // }// if
     // else
     {
-        auto [ Q0, R0 ] = tsqr( row_is, alpha,      X, T, U, ntile );
-        auto [ Q1, R1 ] = tsqr( col_is, value_t(1), Y,    V, ntile );
+        tile_storage< value_t >  Q0, Q1;
+        matrix< value_t >        R0, R1;
+
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = tsqr( row_is, alpha,      X, T, U, ntile ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = tsqr( col_is, value_t(1), Y,    V, ntile ); } );
         
         auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
         auto               Us = std::move( R );
@@ -347,8 +366,8 @@ truncate ( const indexset &                 row_is,
 
         tile_storage< value_t >  Uk, Vk;
 
-        tprod( row_is, value_t(1), Q0, Usk, value_t(0), Uk, ntile );
-        tprod( col_is, value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( row_is, value_t(1), Q0, Usk, value_t(0), Uk, ntile ); },
+                                [&,ntile] { tprod( col_is, value_t(1), Q1, Vsk, value_t(0), Vk, ntile ); } );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
@@ -385,25 +404,38 @@ addlr ( const tile_storage< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
-        addlr( U, T, V, A00, acc, ntile );
-        
-        auto  [ U01, V01 ] = truncate( A01->row_is(), A01->col_is(),
-                                       value_t(-1),
-                                       U, T, V,
-                                       A01->U(), A01->V(),
-                                       acc, ntile );
+        ::tbb::parallel_invoke(
+            [&,ntile]
+            {
+                addlr( U, T, V, A00, acc, ntile );
+            },
+            
+            [&,ntile]
+            { 
+                auto  [ U01, V01 ] = truncate( A01->row_is(), A01->col_is(),
+                                               value_t(-1),
+                                               U, T, V,
+                                               A01->U(), A01->V(),
+                                               acc, ntile );
 
-        A01->set_lrmat( std::move( U01 ), std::move( V01 ) );
+                A01->set_lrmat( std::move( U01 ), std::move( V01 ) );
+            },
+            
+            [&,ntile]
+            { 
+                auto  [ U10, V10 ] = truncate( A10->row_is(), A10->col_is(),
+                                               value_t(-1),
+                                               U, T, V,
+                                               A10->U(), A10->V(),
+                                               acc, ntile );
+                
+                A10->set_lrmat( std::move( U10 ), std::move( V10 ) );
+            },
 
-        auto  [ U10, V10 ] = truncate( A10->row_is(), A10->col_is(),
-                                       value_t(-1),
-                                       U, T, V,
-                                       A10->U(), A10->V(),
-                                       acc, ntile );
-
-        A10->set_lrmat( std::move( U10 ), std::move( V10 ) );
-        
-        addlr( U, T, V, A11, acc, ntile );
+            [&,ntile]
+            {
+                addlr( U, T, V, A11, acc, ntile );
+            } );
     }// if
     else
     {
@@ -517,8 +549,8 @@ lu ( TMatrix *          A,
 
         lu< value_t >( A00, acc, ntile );
         
-        trsml(  A00, A01->U(), ntile );
-        trsmuh( A00, A10->V(), ntile );
+        ::tbb::parallel_invoke( [&,ntile] { trsml(  A00, A01->U(), ntile ); },
+                                [&,ntile] { trsmuh( A00, A10->V(), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
         auto  T = dot( A10->col_is(), A10->V(), A01->U(), ntile ); 
@@ -541,6 +573,6 @@ lu ( TMatrix *          A,
 
 }// namespace hodlr
 
-}}}// namespace hlr::seq::tile
+}}}// namespace hlr::tbb::tile
 
-#endif // __HLR_SEQ_ARITH_TILE_HH
+#endif // __HLR_TBB_ARITH_TILE_HH
