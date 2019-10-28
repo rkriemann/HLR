@@ -50,6 +50,7 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
@@ -63,7 +64,9 @@ mymain ( int, char ** )
         // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
-        auto  C = impl::matrix::copy_tiled< double >( *A, ntile );
+        A = impl::matrix::copy_tiled< double >( *A, ntile );
+        
+        auto  C = impl::matrix::copy( *A );
 
         // std::cout << norm_2( A.get() ) << std::endl;
         // std::cout << norm_2( C.get() ) << std::endl;
@@ -82,9 +85,8 @@ mymain ( int, char ** )
             
             runtime.push_back( toc.seconds() );
 
-            // TODO
-            // if ( i < nbench-1 )
-            //     impl::matrix::copy_to( *A, *C );
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *C );
         }// for
         
         if ( nbench > 1 )
@@ -111,7 +113,7 @@ mymain ( int, char ** )
         {
             tic = Time::Wall::now();
             
-            impl::tile::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
+            impl::tiled::hodlr::lu< HLIB::real >( C.get(), acc, ntile );
             
             toc = Time::Wall::since( tic );
 

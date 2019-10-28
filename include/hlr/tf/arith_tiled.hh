@@ -1,9 +1,9 @@
-#ifndef __HLR_SEQ_ARITH_TILE_HH
-#define __HLR_SEQ_ARITH_TILE_HH
+#ifndef __HLR_TF_ARITH_TILED_HH
+#define __HLR_TF_ARITH_TILED_HH
 //
 // Project     : HLib
 // File        : arith.hh
-// Description : sequential tile-based arithmetic functions
+// Description : tile-based arithmetic functions using TF
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -14,11 +14,32 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
-#include "hlr/seq/matrix.hh"
+#include "hlr/tf/matrix.hh"
 
-namespace hlr { namespace seq { namespace tile {
+namespace hlr { namespace tf { namespace tiled {
 
 using namespace HLIB;
+
+namespace hodlr
+{
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
+
+///////////////////////////////////////////////////////////////////////
+//
+// tile based arithmetic functions for HODLR format
+//
+///////////////////////////////////////////////////////////////////////
 
 //
 // split given range into <n> subsets
@@ -39,6 +60,39 @@ split ( const BLAS::Range &  r,
         assert( false );
 
     return {};
+}
+
+//
+// compute U := X · T
+//
+template < typename value_t >
+void
+tmul ( const BLAS::Matrix< value_t > &  X,
+       const BLAS::Matrix< value_t > &  T,
+       BLAS::Matrix< value_t > &        U,
+       const size_t                     ntile )
+{
+    assert( X.nrows() == U.nrows() );
+    assert( X.ncols() == T.nrows() );
+    assert( T.ncols() == U.ncols() );
+
+    HLR_LOG( 4, HLIB::to_string( "tmul( %d )", X.nrows() ) );
+    
+    if ( X.nrows() > ntile )
+    {
+        const auto                     R = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
+        const BLAS::Matrix< value_t >  X0( X, R[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  X1( X, R[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        U0( U, R[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >        U1( U, R[1], BLAS::Range::all );
+        
+        tmul( X0, T, U0, ntile );
+        tmul( X1, T, U1, ntile );
+    }// if
+    else
+    {
+        BLAS::prod( value_t(1), X, T, value_t(0), U );
+    }// else
 }
 
 //
@@ -67,7 +121,7 @@ dot ( const BLAS::Matrix< value_t > &  A,
 
         BLAS::add( value_t(1), T0, T1 );
 
-        return T1;
+        return std::move( T1 );
     }// if
     else
     {
@@ -76,14 +130,13 @@ dot ( const BLAS::Matrix< value_t > &  A,
 }
 
 //
-// compute B := β·B + α·A·T
+// compute B := B + α·A·T
 //
 template < typename value_t >
 void
-tprod ( const value_t                    alpha,
+tsadd ( const value_t                    alpha,
         const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t > &  T,
-        const value_t                    beta,
         BLAS::Matrix< value_t > &        B,
         const size_t                     ntile )
 {
@@ -91,7 +144,7 @@ tprod ( const value_t                    alpha,
     assert( A.ncols() == T.nrows() );
     assert( T.ncols() == B.ncols() );
 
-    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", B.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "tsadd( %d )", B.nrows() ) );
     
     if ( A.ncols() > ntile )
     {
@@ -101,40 +154,52 @@ tprod ( const value_t                    alpha,
         BLAS::Matrix< value_t >        B0( B, R[0], BLAS::Range::all );
         BLAS::Matrix< value_t >        B1( B, R[1], BLAS::Range::all );
 
-        tprod( alpha, A0, T, beta, B0, ntile );
-        tprod( alpha, A1, T, beta, B1, ntile );
+        tsadd( alpha, A0, T, B0, ntile );
+        tsadd( alpha, A1, T, B1, ntile );
     }// if
     else
     {
-        BLAS::prod( alpha, A, T, beta, B );
+        auto  W = BLAS::prod( value_t(1), A, T );
+        
+        BLAS::add( alpha, W, B );
     }// else
 }
 
+//
+// solve L X = M
+// - on input, X = M
+//
 template < typename value_t >
 void
-tprod ( const value_t                    alpha,
-        BLAS::Matrix< value_t > &        A,
-        const BLAS::Matrix< value_t > &  T,
-        const size_t                     ntile )
+trsml ( const TMatrix *            L,
+        BLAS::Matrix< value_t > &  X,
+        const size_t               ntile )
 {
-    assert( A.ncols() == T.nrows() );
-
-    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", A.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
     
-    if ( A.ncols() > ntile )
+    if ( is_blocked( L ) )
     {
-        const auto               R = split( BLAS::Range( 0, A.nrows()-1 ), 2 );
-        BLAS::Matrix< value_t >  A0( A, R[0], BLAS::Range::all );
-        BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
 
-        tprod( alpha, A0, T, ntile );
-        tprod( alpha, A1, T, ntile );
+        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+            
+        hodlr::trsml( L00, X0, ntile );
+
+        auto  T = hodlr::dot( mat_V< value_t >( L10 ), X0, ntile );
+
+        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
+
+        hodlr::trsml( L11, X1, ntile );
     }// if
     else
     {
-        BLAS::Matrix< value_t >  Ac( A, HLIB::copy_value );
-        
-        BLAS::prod( alpha, Ac, T, value_t(0), A );
+        //
+        // UNIT DIAGONAL !!!
+        //
     }// else
 }
 
@@ -158,8 +223,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
+        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -187,8 +252,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
-        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
+        tmul( Q0, Q01_0, Q_0, ntile );
+        tmul( Q1, Q01_1, Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -210,62 +275,6 @@ tsqr ( const value_t                 alpha,
     }// else
 }
 
-template < typename value_t >
-void
-tsqr ( const value_t                 alpha,
-       const BLAS::Matrix< real > &  X,
-       const BLAS::Matrix< real > &  T,
-       const BLAS::Matrix< real > &  U,
-       BLAS::Matrix< real > &        Q,
-       BLAS::Matrix< real > &        R,
-       const size_t                  ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    assert( X.ncols() == T.nrows() );
-    
-    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
-        //
-        
-        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
-        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
-        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
-        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
-
-        tsqr( alpha, X0, T, U0, Q0, R0, ntile );
-        tsqr( alpha, X1, T, U1, Q1, R1, ntile );
-
-        // Q = | R0 |
-        //     | R1 |
-        BLAS::qr( Q01, R );
-
-        tprod( value_t(1), Q0, R0, ntile );
-        tprod( value_t(1), Q1, R1, ntile );
-    }// if
-    else
-    {
-        auto                     W = BLAS::prod( alpha, X, T );
-        BLAS::Matrix< value_t >  WU_W( Q, BLAS::Range::all, BLAS::Range( 0, W.ncols()-1 ) );
-        BLAS::Matrix< value_t >  WU_U( Q, BLAS::Range::all, BLAS::Range( W.ncols(), Q.ncols()-1 ) );
-
-        BLAS::copy( W, WU_W );
-        BLAS::copy( U, WU_U );
-
-        BLAS::qr( Q, R );
-    }// else
-}
-
 //
 // compute QR factorization of [αX,U]
 //
@@ -284,8 +293,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
+        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -313,8 +322,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
-        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
+        tmul( Q0, Q01_0, Q_0, ntile );
+        tmul( Q1, Q01_1, Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -332,59 +341,6 @@ tsqr ( const value_t                 alpha,
         BLAS::qr( XU, R );
 
         return { std::move( XU ), std::move( R ) };
-    }// else
-}
-
-template < typename value_t >
-void
-tsqr ( const value_t                 alpha,
-       const BLAS::Matrix< real > &  X,
-       const BLAS::Matrix< real > &  U,
-       BLAS::Matrix< real > &        Q,
-       BLAS::Matrix< real > &        R,
-       const size_t                  ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    
-    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        //
-        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
-        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
-        //
-        
-        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
-        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
-        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
-        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
-
-        tsqr( alpha, X0, U0, Q0, R0, ntile );
-        tsqr( alpha, X1, U1, Q1, R1, ntile );
-        
-        // Q = | R0 |
-        //     | R1 |
-        BLAS::qr( Q01, R );
-
-        tprod( value_t(1), Q0, R0, ntile );
-        tprod( value_t(1), Q1, R1, ntile );
-    }// if
-    else
-    {
-        BLAS::Matrix< value_t >  XU_X( Q, BLAS::Range::all, BLAS::Range( 0, X.ncols()-1 ) );
-        BLAS::Matrix< value_t >  XU_U( Q, BLAS::Range::all, BLAS::Range( X.ncols(), Q.ncols()-1 ) );
-
-        BLAS::copy( X, XU_X );
-        BLAS::copy( U, XU_U );
-
-        BLAS::qr( Q, R );
     }// else
 }
 
@@ -424,23 +380,9 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
-        #if 1
-        
-        BLAS::Matrix< value_t >  Q0( X.nrows(), T.ncols() + U.ncols() );
-        BLAS::Matrix< value_t >  Q1( Y.nrows(), Y.ncols() + V.ncols() );
-        BLAS::Matrix< value_t >  R0( Q0.ncols(), Q0.ncols() );
-        BLAS::Matrix< value_t >  R1( Q1.ncols(), Q1.ncols() );
-        
-        tsqr( alpha,      X, T, U, Q0, R0, ntile );
-        tsqr( value_t(1), Y,    V, Q1, R1, ntile );
-        
-        #else
-        
         auto [ Q0, R0 ] = tsqr( alpha,      X, T, U, ntile );
         auto [ Q1, R1 ] = tsqr( value_t(1), Y,    V, ntile );
-        
-        #endif
-        
+
         auto R = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
 
         auto                     Us = std::move( R );
@@ -459,34 +401,13 @@ truncate ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Uk( U.nrows(), k );
         BLAS::Matrix< value_t >  Vk( V.nrows(), k );
 
-        tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile );
-        tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
+        tmul( Q0, Usk, Uk, ntile );
+        tmul( Q1, Vsk, Vk, ntile );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
 }
     
-namespace hodlr
-{
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
-
-///////////////////////////////////////////////////////////////////////
-//
-// tile based arithmetic functions for HODLR format
-//
-///////////////////////////////////////////////////////////////////////
-
 //
 // compute A := A - U·T·V^H
 //
@@ -557,13 +478,13 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), BLAS::Range::all );
             
-        trsmuh( U00, X0, ntile );
+        hodlr::trsmuh( U00, X0, ntile );
 
-        auto  T = dot( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = hodlr::dot( mat_U< value_t >( U01 ), X0, ntile );
         
-        tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
+        hodlr::tsadd( value_t(-1), mat_V< value_t >( U01 ), T, X1, ntile );
 
-        trsmuh( U11, X1, ntile );
+        hodlr::trsmuh( U11, X1, ntile );
     }// if
     else
     {
@@ -572,47 +493,6 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  Y( X, copy_value );
 
         BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
-
-        std::cout << "trsmu : " << BLAS::norm_F( X ) << std::endl;
-    }// else
-}
-
-//
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X,
-        const size_t               ntile )
-{
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
-            
-        trsml( L00, X0, ntile );
-
-        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
-
-        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
-
-        trsml( L11, X1, ntile );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
-        std::cout << "trsml : " << BLAS::norm_F( X ) << std::endl;
     }// else
 }
 
@@ -621,9 +501,10 @@ trsml ( const TMatrix *            L,
 //
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc,
-     const size_t       ntile )
+lu ( ::tf::SubflowBuilder &  tf,
+     TMatrix *               A,
+     const TTruncAcc &       acc,
+     const size_t            ntile )
 {
     HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
     
@@ -635,32 +516,46 @@ lu ( TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        lu< value_t >( A00, acc, ntile );
+        auto  lu_00   = tf.emplace( [A00,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A00, acc, ntile ); } );
         
-        trsml(  A00, mat_U< value_t >( A01 ), ntile );
-        trsmuh( A00, mat_V< value_t >( A10 ), ntile );
+        auto  trsm_01 = tf.emplace( [A00,A01,&acc,ntile] ( auto &  sf ) { trsml(  sf, A00, mat_U< value_t >( A01 ), ntile ); } );
+        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf ) { trsmuh( sf, A00, mat_V< value_t >( A10 ), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf )
+                                    {
+                                        auto  T  = hodlr::dot( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
-        std::cout << "dot : " << BLAS::norm_F( T ) << std::endl;
+                                        hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
+                                    } );
         
-        addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
-        
-        lu< value_t >( A11, acc, ntile );
+        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); };
     }// if
     else
     {
         auto  DA = ptrcast( A, TDenseMatrix );
         
         BLAS::invert( blas_mat< value_t >( DA ) );
-
-        std::cout << "lu : " << norm_F( A ) << std::endl;
     }// else
+}
+
+template < typename value_t >
+void
+lu ( TMatrix *          A,
+     const TTruncAcc &  acc,
+     const size_t       ntile )
+{
+    ::tf::Taskflow  tf;
+
+    tf.silent_emplace( [A,&acc,ntile] ( auto &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
+
+    ::tf::Executor  executor;
+    
+    executor.run( tf ).wait();
 }
 
 }// namespace hodlr
 
-}}}// namespace hlr::seq::tile
+}}}// namespace hlr::tf::tiled
 
-#endif // __HLR_SEQ_ARITH_TILE_HH
+#endif // __HLR_TF_ARITH_TILED_HH

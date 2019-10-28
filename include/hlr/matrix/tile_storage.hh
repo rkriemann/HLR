@@ -40,6 +40,7 @@ public:
     //
 
     using value_t        = T_value;
+    using size_type      = tilemap< value_t >::size_type;
     using iterator       = tilemap< value_t >::iterator;
     using const_iterator = tilemap< value_t >::const_iterator;
  
@@ -58,7 +59,10 @@ public:
             : _tiles( std::move( ts._tiles ) )
     {}
     
+    //
     // copy operators
+    //
+
     tile_storage &
     operator =  ( tile_storage &&  ts )
     {
@@ -66,8 +70,11 @@ public:
 
         return *this;
     }
-    
+
+    //
     // index operators
+    //
+    
     tile< value_t > &
     operator [] ( const indexset  is )
     {
@@ -92,9 +99,12 @@ public:
         return _tiles.at( is );
     }
 
+    //
     // iterators
+    //
+
     iterator
-    begin ()
+    begin () noexcept
     {
         std::scoped_lock  lock( _mtx );
 
@@ -102,7 +112,15 @@ public:
     }
 
     const_iterator
-    cbegin () const
+    begin () const noexcept
+    {
+        std::scoped_lock  lock( _mtx );
+
+        return _tiles.begin();
+    }
+
+    const_iterator
+    cbegin () const noexcept
     {
         std::scoped_lock  lock( _mtx );
 
@@ -110,7 +128,7 @@ public:
     }
 
     iterator
-    end ()
+    end () noexcept
     {
         std::scoped_lock  lock( _mtx );
 
@@ -118,29 +136,43 @@ public:
     }
 
     const_iterator
-    cend () const
+    end () const noexcept
     {
         std::scoped_lock  lock( _mtx );
 
         return _tiles.cend();
     }
 
+    const_iterator
+    cend () const noexcept
+    {
+        std::scoped_lock  lock( _mtx );
+
+        return _tiles.cend();
+    }
+
+    //
     // size information
-    size_t
-    size () const
+    //
+
+    size_type
+    size () const noexcept
     {
         return _tiles.size();
     }
 
     bool
-    empty () const
+    empty () const noexcept
     {
         return _tiles.empty();
     }
 
+    //
     // misc.
+    //
+
     bool
-    contains ( const indexset &  is )
+    contains ( const indexset &  is ) const
     {
         std::scoped_lock  lock( _mtx );
 

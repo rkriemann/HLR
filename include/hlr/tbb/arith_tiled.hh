@@ -1,12 +1,14 @@
-#ifndef __HLR_TF_ARITH_TILE_HH
-#define __HLR_TF_ARITH_TILE_HH
+#ifndef __HLR_TBB_ARITH_TILED_HH
+#define __HLR_TBB_ARITH_TILED_HH
 //
 // Project     : HLib
 // File        : arith.hh
-// Description : tile-based arithmetic functions using TF
+// Description : tile-based arithmetic functions using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
+
+#include <tbb/parallel_invoke.h>
 
 #include <hlib.hh>
 
@@ -14,32 +16,11 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
-#include "hlr/tf/matrix.hh"
+#include "hlr/tbb/matrix.hh"
 
-namespace hlr { namespace tf { namespace tile {
+namespace hlr { namespace tbb { namespace tiled {
 
 using namespace HLIB;
-
-namespace hodlr
-{
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
-
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
-
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
-
-///////////////////////////////////////////////////////////////////////
-//
-// tile based arithmetic functions for HODLR format
-//
-///////////////////////////////////////////////////////////////////////
 
 //
 // split given range into <n> subsets
@@ -63,39 +44,6 @@ split ( const BLAS::Range &  r,
 }
 
 //
-// compute U := X · T
-//
-template < typename value_t >
-void
-tmul ( const BLAS::Matrix< value_t > &  X,
-       const BLAS::Matrix< value_t > &  T,
-       BLAS::Matrix< value_t > &        U,
-       const size_t                     ntile )
-{
-    assert( X.nrows() == U.nrows() );
-    assert( X.ncols() == T.nrows() );
-    assert( T.ncols() == U.ncols() );
-
-    HLR_LOG( 4, HLIB::to_string( "tmul( %d )", X.nrows() ) );
-    
-    if ( X.nrows() > ntile )
-    {
-        const auto                     R = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
-        const BLAS::Matrix< value_t >  X0( X, R[0], BLAS::Range::all );
-        const BLAS::Matrix< value_t >  X1( X, R[1], BLAS::Range::all );
-        BLAS::Matrix< value_t >        U0( U, R[0], BLAS::Range::all );
-        BLAS::Matrix< value_t >        U1( U, R[1], BLAS::Range::all );
-        
-        tmul( X0, T, U0, ntile );
-        tmul( X1, T, U1, ntile );
-    }// if
-    else
-    {
-        BLAS::prod( value_t(1), X, T, value_t(0), U );
-    }// else
-}
-
-//
 // compute T := A^H · B
 //
 template < typename value_t >
@@ -115,13 +63,15 @@ dot ( const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B0( B, R[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B1( B, R[1], BLAS::Range::all );
-        
-        auto  T0 = dot( A0, B0, ntile );
-        auto  T1 = dot( A1, B1, ntile );
+
+        BLAS::Matrix< value_t >  T0, T1;
+
+        ::tbb::parallel_invoke( [&,ntile] { T0 = std::move( dot( A0, B0, ntile ) ); },
+                                [&,ntile] { T1 = std::move( dot( A1, B1, ntile ) ); } );
 
         BLAS::add( value_t(1), T0, T1 );
 
-        return std::move( T1 );
+        return T1;
     }// if
     else
     {
@@ -130,13 +80,14 @@ dot ( const BLAS::Matrix< value_t > &  A,
 }
 
 //
-// compute B := B + α·A·T
+// compute B := β·B + α·A·T
 //
 template < typename value_t >
 void
-tsadd ( const value_t                    alpha,
+tprod ( const value_t                    alpha,
         const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t > &  T,
+        const value_t                    beta,
         BLAS::Matrix< value_t > &        B,
         const size_t                     ntile )
 {
@@ -144,7 +95,7 @@ tsadd ( const value_t                    alpha,
     assert( A.ncols() == T.nrows() );
     assert( T.ncols() == B.ncols() );
 
-    HLR_LOG( 4, HLIB::to_string( "tsadd( %d )", B.nrows() ) );
+    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", B.nrows() ) );
     
     if ( A.ncols() > ntile )
     {
@@ -154,52 +105,12 @@ tsadd ( const value_t                    alpha,
         BLAS::Matrix< value_t >        B0( B, R[0], BLAS::Range::all );
         BLAS::Matrix< value_t >        B1( B, R[1], BLAS::Range::all );
 
-        tsadd( alpha, A0, T, B0, ntile );
-        tsadd( alpha, A1, T, B1, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( alpha, A0, T, beta, B0, ntile ); },
+                                [&,ntile] { tprod( alpha, A1, T, beta, B1, ntile ); } );
     }// if
     else
     {
-        auto  W = BLAS::prod( value_t(1), A, T );
-        
-        BLAS::add( alpha, W, B );
-    }// else
-}
-
-//
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X,
-        const size_t               ntile )
-{
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
-            
-        hodlr::trsml( L00, X0, ntile );
-
-        auto  T = hodlr::dot( mat_V< value_t >( L10 ), X0, ntile );
-
-        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
-
-        hodlr::trsml( L11, X1, ntile );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
+        BLAS::prod( alpha, A, T, beta, B );
     }// else
 }
 
@@ -233,8 +144,11 @@ tsqr ( const value_t                 alpha,
         const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
 
-        auto [ Q0, R0 ] = tsqr( alpha, X0, T, U0, ntile );
-        auto [ Q1, R1 ] = tsqr( alpha, X1, T, U1, ntile );
+        BLAS::Matrix< value_t >  Q0, Q1;
+        BLAS::Matrix< value_t >  R0, R1;
+        
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, T, U0, ntile ) ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, T, U1, ntile ) ); } );
 
         // Q = | R0 |
         //     | R1 |
@@ -252,8 +166,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tmul( Q0, Q01_0, Q_0, ntile );
-        tmul( Q1, Q01_1, Q_1, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
+                                [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -303,8 +217,11 @@ tsqr ( const value_t                 alpha,
         const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
 
-        auto [ Q0, R0 ] = tsqr( alpha, X0, U0, ntile );
-        auto [ Q1, R1 ] = tsqr( alpha, X1, U1, ntile );
+        BLAS::Matrix< value_t >  Q0, Q1;
+        BLAS::Matrix< value_t >  R0, R1;
+        
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, U0, ntile ) ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, U1, ntile ) ); } );
 
         // Q = | R0 |
         //     | R1 |
@@ -322,8 +239,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        tmul( Q0, Q01_0, Q_0, ntile );
-        tmul( Q1, Q01_1, Q_1, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
+                                [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -380,11 +297,13 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
-        auto [ Q0, R0 ] = tsqr( alpha,      X, T, U, ntile );
-        auto [ Q1, R1 ] = tsqr( value_t(1), Y,    V, ntile );
+        BLAS::Matrix< value_t >  Q0, Q1;
+        BLAS::Matrix< value_t >  R0, R1;
+        
+        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha,      X, T, U, ntile ) ); },
+                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( value_t(1), Y,    V, ntile ) ); } );
 
-        auto R = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
-
+        auto                     R  = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
         auto                     Us = std::move( R );
         BLAS::Matrix< value_t >  Vs;
         BLAS::Vector< value_t >  Ss;
@@ -401,13 +320,72 @@ truncate ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Uk( U.nrows(), k );
         BLAS::Matrix< value_t >  Vk( V.nrows(), k );
 
-        tmul( Q0, Usk, Uk, ntile );
-        tmul( Q1, Vsk, Vk, ntile );
+        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile ); },
+                                [&,ntile] { tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile ); } );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
 }
     
+namespace hodlr
+{
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t >       BLAS::Matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
+
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
+template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
+
+///////////////////////////////////////////////////////////////////////
+//
+// tile based arithmetic functions for HODLR format
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// solve L X = M
+// - on input, X = M
+//
+template < typename value_t >
+void
+trsml ( const TMatrix *            L,
+        BLAS::Matrix< value_t > &  X,
+        const size_t               ntile )
+{
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
+    
+    if ( is_blocked( L ) )
+    {
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
+
+        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+            
+        hodlr::trsml( L00, X0, ntile );
+
+        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
+
+        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
+
+        trsml( L11, X1, ntile );
+    }// if
+    else
+    {
+        //
+        // UNIT DIAGONAL !!!
+        //
+    }// else
+}
+
 //
 // compute A := A - U·T·V^H
 //
@@ -435,17 +413,30 @@ addlr ( const BLAS::Matrix< value_t > &  U,
         BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
 
-        addlr( U0, T, V0, A00, acc, ntile );
-        
-        auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
+        ::tbb::parallel_invoke(
+            [&,ntile]
+            {
+                addlr( U0, T, V0, A00, acc, ntile );
+            },
+            
+            [&,ntile]
+            {
+                auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
 
-        A01->set_lrmat( U01, V01 );
+                A01->set_lrmat( U01, V01 );
+            },
 
-        auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
+            [&,ntile]
+            {
+                auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
 
-        A10->set_lrmat( U10, V10 );
-        
-        addlr( U1, T, V1, A11, acc, ntile );
+                A10->set_lrmat( U10, V10 );
+            },
+
+            [&,ntile]
+            {
+                addlr( U1, T, V1, A11, acc, ntile );
+            } );
     }// if
     else
     {
@@ -478,13 +469,13 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), BLAS::Range::all );
             
-        hodlr::trsmuh( U00, X0, ntile );
+        trsmuh( U00, X0, ntile );
 
-        auto  T = hodlr::dot( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = dot( mat_U< value_t >( U01 ), X0, ntile );
         
-        hodlr::tsadd( value_t(-1), mat_V< value_t >( U01 ), T, X1, ntile );
+        tprod( value_t(-1), mat_V< value_t >( U01 ), T, value_t(1), X1, ntile );
 
-        hodlr::trsmuh( U11, X1, ntile );
+        trsmuh( U11, X1, ntile );
     }// if
     else
     {
@@ -501,10 +492,9 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-lu ( ::tf::SubflowBuilder &  tf,
-     TMatrix *               A,
-     const TTruncAcc &       acc,
-     const size_t            ntile )
+lu ( TMatrix *          A,
+     const TTruncAcc &  acc,
+     const size_t       ntile )
 {
     HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
     
@@ -516,20 +506,17 @@ lu ( ::tf::SubflowBuilder &  tf,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        auto  lu_00   = tf.emplace( [A00,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A00, acc, ntile ); } );
-        
-        auto  trsm_01 = tf.emplace( [A00,A01,&acc,ntile] ( auto &  sf ) { trsml(  sf, A00, mat_U< value_t >( A01 ), ntile ); } );
-        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf ) { trsmuh( sf, A00, mat_V< value_t >( A10 ), ntile ); } );
+        lu< value_t >( A00, acc, ntile );
+
+        ::tbb::parallel_invoke( [&,ntile] { trsml(  A00, mat_U< value_t >( A01 ), ntile ); },
+                                [&,ntile] { trsmuh( A00, mat_V< value_t >( A10 ), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf )
-                                    {
-                                        auto  T  = hodlr::dot( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
-                                        hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
-                                    } );
+        addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         
-        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); };
+        lu< value_t >( A11, acc, ntile );
     }// if
     else
     {
@@ -539,23 +526,8 @@ lu ( ::tf::SubflowBuilder &  tf,
     }// else
 }
 
-template < typename value_t >
-void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc,
-     const size_t       ntile )
-{
-    ::tf::Taskflow  tf;
-
-    tf.silent_emplace( [A,&acc,ntile] ( auto &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
-
-    ::tf::Executor  executor;
-    
-    executor.run( tf ).wait();
-}
-
 }// namespace hodlr
 
-}}}// namespace hlr::tf::tile
+}}}// namespace hlr::tbb::tiled
 
-#endif // __HLR_TF_ARITH_TILE_HH
+#endif // __HLR_TBB_ARITH_TILED_HH

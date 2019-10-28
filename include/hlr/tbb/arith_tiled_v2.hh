@@ -27,10 +27,6 @@ using namespace HLIB;
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
 
-// map HLIB types to HLR 
-using  indexset = TIndexSet;
-using  range    = HLIB::BLAS::Range;
-
 // dense matrix
 template < typename value_t >
 using  matrix   = HLIB::BLAS::Matrix< value_t >;
@@ -39,15 +35,11 @@ using  matrix   = HLIB::BLAS::Matrix< value_t >;
 template < typename value_t >
 using  vector   = HLIB::BLAS::Vector< value_t >;
 
-// tile type
-template < typename value_t >
-using  tile     = matrix< value_t >;
-
-// tile mapping type
-template < typename value_t >
-using  tilemap  = std::map< indexset, tile< value_t > >;
-
-// import tiled_lrmatrix
+// import matrix types
+using hlr::matrix::indexset;
+using hlr::matrix::range;
+using hlr::matrix::tile;
+using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
 
 //

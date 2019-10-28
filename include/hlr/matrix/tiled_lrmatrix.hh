@@ -33,8 +33,8 @@ operator < ( const HLIB::TIndexSet  is1,
 namespace hlr
 { 
 
-using namespace HLIB;
 namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 // local matrix type
 DECLARE_TYPE( tiled_lrmatrix );
@@ -217,6 +217,24 @@ public:
     // return matrix of same class (but no content)
     virtual auto  create  () const -> std::unique_ptr< TMatrix > { return std::make_unique< tiled_lrmatrix >(); }
 
+    // return copy of matrix
+    virtual auto   copy         () const -> std::unique_ptr< TMatrix >;
+
+    // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
+    virtual auto   copy         ( const TTruncAcc &  acc,
+                                  const bool         do_coarsen = false ) const -> std::unique_ptr< TMatrix >;
+
+    // return structural copy of matrix
+    virtual auto   copy_struct  () const -> std::unique_ptr< TMatrix >;
+
+    // copy matrix data to \a A
+    virtual void   copy_to      ( TMatrix *          A ) const;
+
+    // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
+    virtual void   copy_to      ( TMatrix *          A,
+                                  const TTruncAcc &  acc,
+                                  const bool         do_coarsen = false ) const;
+    
     //
     // misc.
     //
@@ -354,7 +372,116 @@ tiled_lrmatrix< value_t >::truncate ( const TTruncAcc & acc )
 {
 }
 
-    // return size in bytes used by this object
+//
+// return copy of matrix
+//
+template < typename value_t >
+std::unique_ptr< TMatrix >
+tiled_lrmatrix< value_t >::copy () const
+{
+    auto  M = std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
+
+    M->_rank = _rank;
+    
+    for ( const auto & [ is, U_i ] : _U )
+        M->_U[ is ] = std::move( blas::copy( U_i ) );
+
+    for ( const auto & [ is, V_i ] : _V )
+        M->_V[ is ] = std::move( blas::copy( V_i ) );
+
+    return M;
+}
+
+//
+// return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
+//
+template < typename value_t >
+std::unique_ptr< TMatrix >
+tiled_lrmatrix< value_t >::copy ( const TTruncAcc &,
+                                  const bool       ) const
+{
+    auto  M = std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
+
+    M->_rank = _rank;
+    
+    for ( const auto & [ is, U_i ] : _U )
+        M->_U[ is ] = std::move( blas::copy( U_i ) );
+
+    for ( const auto & [ is, V_i ] : _V )
+        M->_V[ is ] = std::move( blas::copy( V_i ) );
+
+    return M;
+}
+
+//
+// return structural copy of matrix
+//
+template < typename value_t >
+std::unique_ptr< TMatrix >
+tiled_lrmatrix< value_t >::copy_struct  () const
+{
+    return std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
+}
+
+//
+// copy matrix data to \a A
+//
+template < typename value_t >
+void
+tiled_lrmatrix< value_t >::copy_to ( TMatrix *  A ) const
+{
+    TMatrix::copy_to( A );
+    
+    assert( IS_TYPE( A, tiled_lrmatrix ) );
+
+    auto  R = ptrcast( A, tiled_lrmatrix );
+
+    R->_row_is = _row_is;
+    R->_col_is = _col_is;
+    R->_ntile  = _ntile;
+    R->_rank   = _rank;
+
+    // assuming no other tiles present
+    
+    for ( const auto & [ is, U_i ] : _U )
+        R->_U[ is ] = std::move( blas::copy( U_i ) );
+
+    for ( const auto & [ is, V_i ] : _V )
+        R->_V[ is ] = std::move( blas::copy( V_i ) );
+}
+
+//
+// copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
+//
+template < typename value_t >
+void
+tiled_lrmatrix< value_t >::copy_to ( TMatrix *          A,
+                                     const TTruncAcc &,
+                                     const bool          ) const
+{
+    TMatrix::copy_to( A );
+    
+    assert( IS_TYPE( A, tiled_lrmatrix ) );
+
+    auto  R = ptrcast( A, tiled_lrmatrix );
+
+    R->_row_is = _row_is;
+    R->_col_is = _col_is;
+    R->_ntile  = _ntile;
+    R->_rank   = _rank;
+
+    // assuming no other tiles present
+    
+    for ( const auto & [ is, U_i ] : _U )
+        R->_U[ is ] = std::move( blas::copy( U_i ) );
+
+    for ( const auto & [ is, V_i ] : _V )
+        R->_V[ is ] = std::move( blas::copy( V_i ) );
+}
+
+//
+// return size in bytes used by this object
+//
 template < typename value_t >
 size_t
 tiled_lrmatrix< value_t >::byte_size () const

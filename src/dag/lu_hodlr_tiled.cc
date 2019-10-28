@@ -864,7 +864,7 @@ lu_node::refine_ ( const size_t  min_size )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::seq::tile::hodlr::lu< real >( A, acc, ntile );
+    hlr::seq::tiled::hodlr::lu< real >( A, acc, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -926,7 +926,7 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 {
     BLAS::Matrix< real >  Xi( X.data, X.range(), BLAS::Range::all );
     
-    hlr::seq::tile::hodlr::trsmuh( U, Xi, ntile );
+    hlr::seq::tiled::hodlr::trsmuh( U, Xi, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -988,7 +988,7 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 {
     BLAS::Matrix< real >  Xi( X.data, X.range(), BLAS::Range::all );
 
-    hlr::seq::tile::hodlr::trsml( L, Xi, ntile );
+    hlr::seq::tiled::hodlr::trsml( L, Xi, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

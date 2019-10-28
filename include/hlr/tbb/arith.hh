@@ -18,7 +18,7 @@
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
 
-#include "hlr/tbb/arith_tile.hh"
+#include "hlr/tbb/arith_tiled.hh"
 #include "hlr/tbb/arith_tiled_v2.hh"
 
 namespace hlr { namespace tbb {

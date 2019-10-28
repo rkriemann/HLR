@@ -1,14 +1,12 @@
-#ifndef __HLR_TBB_ARITH_TILE_HH
-#define __HLR_TBB_ARITH_TILE_HH
+#ifndef __HLR_SEQ_ARITH_TILED_HH
+#define __HLR_SEQ_ARITH_TILED_HH
 //
 // Project     : HLib
 // File        : arith.hh
-// Description : tile-based arithmetic functions using TBB
+// Description : sequential tile-based arithmetic functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
-
-#include <tbb/parallel_invoke.h>
 
 #include <hlib.hh>
 
@@ -16,9 +14,9 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
-#include "hlr/tbb/matrix.hh"
+#include "hlr/seq/matrix.hh"
 
-namespace hlr { namespace tbb { namespace tile {
+namespace hlr { namespace seq { namespace tiled {
 
 using namespace HLIB;
 
@@ -63,11 +61,9 @@ dot ( const BLAS::Matrix< value_t > &  A,
         const BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B0( B, R[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  B1( B, R[1], BLAS::Range::all );
-
-        BLAS::Matrix< value_t >  T0, T1;
-
-        ::tbb::parallel_invoke( [&,ntile] { T0 = std::move( dot( A0, B0, ntile ) ); },
-                                [&,ntile] { T1 = std::move( dot( A1, B1, ntile ) ); } );
+        
+        auto  T0 = dot( A0, B0, ntile );
+        auto  T1 = dot( A1, B1, ntile );
 
         BLAS::add( value_t(1), T0, T1 );
 
@@ -105,12 +101,40 @@ tprod ( const value_t                    alpha,
         BLAS::Matrix< value_t >        B0( B, R[0], BLAS::Range::all );
         BLAS::Matrix< value_t >        B1( B, R[1], BLAS::Range::all );
 
-        ::tbb::parallel_invoke( [&,ntile] { tprod( alpha, A0, T, beta, B0, ntile ); },
-                                [&,ntile] { tprod( alpha, A1, T, beta, B1, ntile ); } );
+        tprod( alpha, A0, T, beta, B0, ntile );
+        tprod( alpha, A1, T, beta, B1, ntile );
     }// if
     else
     {
         BLAS::prod( alpha, A, T, beta, B );
+    }// else
+}
+
+template < typename value_t >
+void
+tprod ( const value_t                    alpha,
+        BLAS::Matrix< value_t > &        A,
+        const BLAS::Matrix< value_t > &  T,
+        const size_t                     ntile )
+{
+    assert( A.ncols() == T.nrows() );
+
+    HLR_LOG( 4, HLIB::to_string( "tprod( %d )", A.nrows() ) );
+    
+    if ( A.ncols() > ntile )
+    {
+        const auto               R = split( BLAS::Range( 0, A.nrows()-1 ), 2 );
+        BLAS::Matrix< value_t >  A0( A, R[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >  A1( A, R[1], BLAS::Range::all );
+
+        tprod( alpha, A0, T, ntile );
+        tprod( alpha, A1, T, ntile );
+    }// if
+    else
+    {
+        BLAS::Matrix< value_t >  Ac( A, HLIB::copy_value );
+        
+        BLAS::prod( alpha, Ac, T, value_t(0), A );
     }// else
 }
 
@@ -134,8 +158,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
-        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -144,11 +168,8 @@ tsqr ( const value_t                 alpha,
         const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
 
-        BLAS::Matrix< value_t >  Q0, Q1;
-        BLAS::Matrix< value_t >  R0, R1;
-        
-        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, T, U0, ntile ) ); },
-                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, T, U1, ntile ) ); } );
+        auto [ Q0, R0 ] = tsqr( alpha, X0, T, U0, ntile );
+        auto [ Q1, R1 ] = tsqr( alpha, X1, T, U1, ntile );
 
         // Q = | R0 |
         //     | R1 |
@@ -166,8 +187,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
-                                [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
+        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
+        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -189,6 +210,62 @@ tsqr ( const value_t                 alpha,
     }// else
 }
 
+template < typename value_t >
+void
+tsqr ( const value_t                 alpha,
+       const BLAS::Matrix< real > &  X,
+       const BLAS::Matrix< real > &  T,
+       const BLAS::Matrix< real > &  U,
+       BLAS::Matrix< real > &        Q,
+       BLAS::Matrix< real > &        R,
+       const size_t                  ntile )
+{
+    assert( X.nrows() == U.nrows() );
+    assert( X.ncols() == T.nrows() );
+    
+    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
+    
+    if ( X.nrows() > ntile )
+    {
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
+        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
+        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
+
+        tsqr( alpha, X0, T, U0, Q0, R0, ntile );
+        tsqr( alpha, X1, T, U1, Q1, R1, ntile );
+
+        // Q = | R0 |
+        //     | R1 |
+        BLAS::qr( Q01, R );
+
+        tprod( value_t(1), Q0, R0, ntile );
+        tprod( value_t(1), Q1, R1, ntile );
+    }// if
+    else
+    {
+        auto                     W = BLAS::prod( alpha, X, T );
+        BLAS::Matrix< value_t >  WU_W( Q, BLAS::Range::all, BLAS::Range( 0, W.ncols()-1 ) );
+        BLAS::Matrix< value_t >  WU_U( Q, BLAS::Range::all, BLAS::Range( W.ncols(), Q.ncols()-1 ) );
+
+        BLAS::copy( W, WU_W );
+        BLAS::copy( U, WU_U );
+
+        BLAS::qr( Q, R );
+    }// else
+}
+
 //
 // compute QR factorization of [αX,U]
 //
@@ -207,8 +284,8 @@ tsqr ( const value_t                 alpha,
     if ( X.nrows() > ntile )
     {
         //
-        // A = | Q0 R0 | = | Q0   | | R0 | = | Q0   | Q01 R
-        //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
         //
         
         const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
@@ -217,11 +294,8 @@ tsqr ( const value_t                 alpha,
         const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
         const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
 
-        BLAS::Matrix< value_t >  Q0, Q1;
-        BLAS::Matrix< value_t >  R0, R1;
-        
-        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, U0, ntile ) ); },
-                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, U1, ntile ) ); } );
+        auto [ Q0, R0 ] = tsqr( alpha, X0, U0, ntile );
+        auto [ Q1, R1 ] = tsqr( alpha, X1, U1, ntile );
 
         // Q = | R0 |
         //     | R1 |
@@ -239,8 +313,8 @@ tsqr ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Q_0( Q, rows[0], BLAS::Range::all );
         BLAS::Matrix< value_t >  Q_1( Q, rows[1], BLAS::Range::all );
 
-        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
-                                [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
+        tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile );
+        tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile );
 
         return { std::move( Q ), std::move( R ) };
     }// if
@@ -258,6 +332,59 @@ tsqr ( const value_t                 alpha,
         BLAS::qr( XU, R );
 
         return { std::move( XU ), std::move( R ) };
+    }// else
+}
+
+template < typename value_t >
+void
+tsqr ( const value_t                 alpha,
+       const BLAS::Matrix< real > &  X,
+       const BLAS::Matrix< real > &  U,
+       BLAS::Matrix< real > &        Q,
+       BLAS::Matrix< real > &        R,
+       const size_t                  ntile )
+{
+    assert( X.nrows() == U.nrows() );
+    
+    HLR_LOG( 4, HLIB::to_string( "tsqr( %d )", X.nrows() ) );
+    
+    if ( X.nrows() > ntile )
+    {
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        const auto                     rows = split( BLAS::Range( 0, X.nrows()-1 ), 2 );
+        const BLAS::Matrix< value_t >  X0( X, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  X1( X, rows[1], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U0( U, rows[0], BLAS::Range::all );
+        const BLAS::Matrix< value_t >  U1( U, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q0( Q, rows[0], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q1( Q, rows[1], BLAS::Range::all );
+        BLAS::Matrix< value_t >        Q01( Q0.ncols() + Q1.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >        R0( Q01, BLAS::Range(          0, Q0.ncols()-1  ), BLAS::Range::all );
+        BLAS::Matrix< value_t >        R1( Q01, BLAS::Range( R0.nrows(), Q01.nrows()-1 ), BLAS::Range::all );
+
+        tsqr( alpha, X0, U0, Q0, R0, ntile );
+        tsqr( alpha, X1, U1, Q1, R1, ntile );
+        
+        // Q = | R0 |
+        //     | R1 |
+        BLAS::qr( Q01, R );
+
+        tprod( value_t(1), Q0, R0, ntile );
+        tprod( value_t(1), Q1, R1, ntile );
+    }// if
+    else
+    {
+        BLAS::Matrix< value_t >  XU_X( Q, BLAS::Range::all, BLAS::Range( 0, X.ncols()-1 ) );
+        BLAS::Matrix< value_t >  XU_U( Q, BLAS::Range::all, BLAS::Range( X.ncols(), Q.ncols()-1 ) );
+
+        BLAS::copy( X, XU_X );
+        BLAS::copy( U, XU_U );
+
+        BLAS::qr( Q, R );
     }// else
 }
 
@@ -297,13 +424,25 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
-        BLAS::Matrix< value_t >  Q0, Q1;
-        BLAS::Matrix< value_t >  R0, R1;
+        #if 0
         
-        ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha,      X, T, U, ntile ) ); },
-                                [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( value_t(1), Y,    V, ntile ) ); } );
+        BLAS::Matrix< value_t >  Q0( X.nrows(), T.ncols() + U.ncols() );
+        BLAS::Matrix< value_t >  Q1( Y.nrows(), Y.ncols() + V.ncols() );
+        BLAS::Matrix< value_t >  R0( Q0.ncols(), Q0.ncols() );
+        BLAS::Matrix< value_t >  R1( Q1.ncols(), Q1.ncols() );
+        
+        tsqr( alpha,      X, T, U, Q0, R0, ntile );
+        tsqr( value_t(1), Y,    V, Q1, R1, ntile );
+        
+        #else
+        
+        auto [ Q0, R0 ] = tsqr( alpha,      X, T, U, ntile );
+        auto [ Q1, R1 ] = tsqr( value_t(1), Y,    V, ntile );
+        
+        #endif
+        
+        auto R = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
 
-        auto                     R  = BLAS::prod( value_t(1), R0, BLAS::adjoint( R1 ) );
         auto                     Us = std::move( R );
         BLAS::Matrix< value_t >  Vs;
         BLAS::Vector< value_t >  Ss;
@@ -320,8 +459,8 @@ truncate ( const value_t                 alpha,
         BLAS::Matrix< value_t >  Uk( U.nrows(), k );
         BLAS::Matrix< value_t >  Vk( V.nrows(), k );
 
-        ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile ); },
-                                [&,ntile] { tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile ); } );
+        tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile );
+        tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
 
         return { std::move( Uk ), std::move( Vk ) };
     }// else
@@ -347,44 +486,6 @@ template < typename value_t > const BLAS::Matrix< value_t > &  mat_V ( const TRk
 // tile based arithmetic functions for HODLR format
 //
 ///////////////////////////////////////////////////////////////////////
-
-//
-// solve L X = M
-// - on input, X = M
-//
-template < typename value_t >
-void
-trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X,
-        const size_t               ntile )
-{
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
-    
-    if ( is_blocked( L ) )
-    {
-        auto  BL  = cptrcast( L, TBlockMatrix );
-        auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
-        auto  L11 = BL->block( 1, 1 );
-
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
-            
-        hodlr::trsml( L00, X0, ntile );
-
-        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
-
-        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
-
-        trsml( L11, X1, ntile );
-    }// if
-    else
-    {
-        //
-        // UNIT DIAGONAL !!!
-        //
-    }// else
-}
 
 //
 // compute A := A - U·T·V^H
@@ -413,30 +514,17 @@ addlr ( const BLAS::Matrix< value_t > &  U,
         BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
         BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
 
-        ::tbb::parallel_invoke(
-            [&,ntile]
-            {
-                addlr( U0, T, V0, A00, acc, ntile );
-            },
-            
-            [&,ntile]
-            {
-                auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
+        addlr( U0, T, V0, A00, acc, ntile );
+        
+        auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
 
-                A01->set_lrmat( U01, V01 );
-            },
+        A01->set_lrmat( U01, V01 );
 
-            [&,ntile]
-            {
-                auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
+        auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
 
-                A10->set_lrmat( U10, V10 );
-            },
-
-            [&,ntile]
-            {
-                addlr( U1, T, V1, A11, acc, ntile );
-            } );
+        A10->set_lrmat( U10, V10 );
+        
+        addlr( U1, T, V1, A11, acc, ntile );
     }// if
     else
     {
@@ -484,6 +572,47 @@ trsmuh ( const TMatrix *            U,
         BLAS::Matrix< value_t >  Y( X, copy_value );
 
         BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+
+        // std::cout << "trsmu : " << BLAS::norm_F( X ) << std::endl;
+    }// else
+}
+
+//
+// solve L X = M
+// - on input, X = M
+//
+template < typename value_t >
+void
+trsml ( const TMatrix *            L,
+        BLAS::Matrix< value_t > &  X,
+        const size_t               ntile )
+{
+    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
+    
+    if ( is_blocked( L ) )
+    {
+        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  L00 = BL->block( 0, 0 );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
+        auto  L11 = BL->block( 1, 1 );
+
+        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
+        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+            
+        trsml( L00, X0, ntile );
+
+        auto  T = dot( mat_V< value_t >( L10 ), X0, ntile );
+
+        tprod( value_t(-1), mat_U< value_t >( L10 ), T, value_t(1), X1, ntile );
+
+        trsml( L11, X1, ntile );
+    }// if
+    else
+    {
+        //
+        // UNIT DIAGONAL !!!
+        //
+        // std::cout << "trsml : " << BLAS::norm_F( X ) << std::endl;
     }// else
 }
 
@@ -507,13 +636,15 @@ lu ( TMatrix *          A,
         auto  A11 = BA->block( 1, 1 );
 
         lu< value_t >( A00, acc, ntile );
-
-        ::tbb::parallel_invoke( [&,ntile] { trsml(  A00, mat_U< value_t >( A01 ), ntile ); },
-                                [&,ntile] { trsmuh( A00, mat_V< value_t >( A10 ), ntile ); } );
+        
+        trsml(  A00, mat_U< value_t >( A01 ), ntile );
+        trsmuh( A00, mat_V< value_t >( A10 ), ntile );
 
         // T = ( V(A_10)^H · U(A_01) )
         auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
+        // std::cout << "dot : " << BLAS::norm_F( T ) << std::endl;
+        
         addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         
         lu< value_t >( A11, acc, ntile );
@@ -523,11 +654,13 @@ lu ( TMatrix *          A,
         auto  DA = ptrcast( A, TDenseMatrix );
         
         BLAS::invert( blas_mat< value_t >( DA ) );
+
+        // std::cout << "lu : " << norm_F( A ) << std::endl;
     }// else
 }
 
 }// namespace hodlr
 
-}}}// namespace hlr::tbb::tile
+}}}// namespace hlr::seq::tiled
 
-#endif // __HLR_TBB_ARITH_TILE_HH
+#endif // __HLR_SEQ_ARITH_TILED_HH
