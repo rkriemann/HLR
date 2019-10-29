@@ -6,7 +6,7 @@ import os, sys
 
 ######################################################################
 #
-# general settings
+# general (default) settings
 #
 ######################################################################
 
@@ -79,6 +79,22 @@ def readln ( prog ):
 ######################################################################
 
 opts = Variables( opts_file )
+opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
+opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
+
+opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
+
+opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
+
+opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
+
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
 opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
@@ -86,21 +102,8 @@ opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',        
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
 
-opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
-opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
-
-opts.Add( EnumVariable( 'malloc',     'malloc library to use',             'default', allowed_values = MALLOCS, ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',     'use likwid library',                likwid ) )
-
 # read options from options file
-opt_env = Environment( options = opts )
-
-fullmsg  = opt_env['fullmsg']
-debug    = opt_env['debug']
-profile  = opt_env['profile']
-optimise = opt_env['optimise']
-warn     = opt_env['warn']
-color    = opt_env['color']
+opt_env    = Environment( options = opts )
 
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )
@@ -108,8 +111,25 @@ frameworks = Split( opt_env['frameworks'] )
 if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
 
-malloc = opt_env['malloc']
-likwid = opt_env['likwid']
+HPRO_DIR     = opt_env['hpro']
+TBB_DIR      = opt_env['tbb']
+TASKFLOW_DIR = opt_env['tf']
+HPX_DIR      = opt_env['hpx']
+GPI2_DIR     = opt_env['gpi2']
+
+JEMALLOC_DIR = opt_env['jemalloc']
+MIMALLOC_DIR = opt_env['mimalloc']
+TCMALLOC_DIR = opt_env['tcmalloc']
+
+malloc       = opt_env['malloc']
+likwid       = opt_env['likwid']
+
+fullmsg      = opt_env['fullmsg']
+debug        = opt_env['debug']
+profile      = opt_env['profile']
+optimise     = opt_env['optimise']
+warn         = opt_env['warn']
+color        = opt_env['color']
 
 opts.Save( opts_file, opt_env )
 
@@ -183,7 +203,6 @@ env.Prepend( LIBPATH = [ "." ] )
 
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
-    # env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
     env.MergeFlags( os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
     env.Append( LIBS = [ 'dl', 'pthread' ] )
 elif MIMALLOC_DIR != None and malloc == 'mimalloc' :
