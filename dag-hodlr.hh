@@ -123,7 +123,7 @@ mymain ( int, char ** )
         }// if
         else
         {
-            hlr::seq::tile::tsqr( 1.0, X, *T, U, *Q, *R, 128 );
+            hlr::seq::tiled::tsqr( 1.0, X, *T, U, *Q, *R, 128 );
         }// else
 
         DBG::write( *Q, "Q.mat", "Q" );
@@ -167,7 +167,7 @@ mymain ( int, char ** )
         {
             tic = now();
 
-            auto [ U, V ] = impl::tile::truncate( 1.0, X, *T, Y, A10->blas_rmat_A(), A10->blas_rmat_B(), acc, ntile );
+            auto [ U, V ] = impl::tiled::truncate( 1.0, X, *T, Y, A10->blas_rmat_A(), A10->blas_rmat_B(), acc, ntile );
             
             A10->set_lrmat( U, V );
 
@@ -225,7 +225,7 @@ mymain ( int, char ** )
         {
             tic = now();
 
-            impl::tile::hodlr::addlr( X, *T, Y, A11, acc, ntile );
+            impl::tiled::hodlr::addlr( X, *T, Y, A11, acc, ntile );
             
             toc = since( tic );
         }// else
