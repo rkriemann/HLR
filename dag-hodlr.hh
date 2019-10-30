@@ -248,7 +248,7 @@ mymain ( int, char ** )
     {
         tic = now();
 
-        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, impl::dag::refine ) );
         
         toc = since( tic );
         

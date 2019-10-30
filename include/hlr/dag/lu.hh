@@ -101,6 +101,7 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
 //
 graph
 gen_dag_lu_hodlr_tiled ( HLIB::TMatrix &  A,
+                         const size_t     ntile,
                          refine_func_t    refine );
 
 //

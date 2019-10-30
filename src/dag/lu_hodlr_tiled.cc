@@ -334,24 +334,39 @@ struct trsmu_node : public node
 {
     const TMatrix *  U;
     blas_matrix      X;
+    blas_matrix      M;
     const size_t     ntile;
     
     trsmu_node ( const TMatrix *  aU,
                  blas_matrix      aX,
+                 blas_matrix      aM,
                  const size_t     antile )
             : U( aU )
             , X( aX )
+            , M( aM )
             , ntile( antile )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "L = trsmu( U%d, A )", U->id() ); }
+    virtual std::string  to_string () const
+    {
+        if ( X.is.size() > ntile )
+            return HLIB::to_string( "%c[%d:%d] = trsmu( U_%d, %c[%d:%d] )",
+                                    char(X.id), X.is.first() / ntile, X.is.last() / ntile,
+                                    U->id(),
+                                    char(M.id), M.is.first() / ntile, M.is.last() / ntile );
+        else
+            return HLIB::to_string( "%c[%d] = trsmu( U_%d, %c[%d] )",
+                                    char(X.id), X.is.first() / ntile,
+                                    U->id(),
+                                    char(M.id), M.is.first() / ntile );
+    }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, X.block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_L, X.block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, M.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(trsmu_node); }
 };
 
@@ -362,24 +377,39 @@ struct trsml_node : public node
 {
     const TMatrix *  L;
     blas_matrix      X;
+    blas_matrix      M;
     const size_t     ntile;
 
     trsml_node ( const TMatrix *  aL,
                  blas_matrix      aX,
+                 blas_matrix      aM,
                  const size_t     antile )
             : L( aL )
             , X( aX )
+            , M( aM )
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "U = trsml( L%d, A )", L->id() ); }
+    virtual std::string  to_string () const
+    {
+        if ( X.is.size() > ntile )
+            return HLIB::to_string( "%c[%d:%d] = trsml( L_%d, %c[%d:%d] )",
+                                    char(X.id), X.is.first() / ntile, X.is.last() / ntile,
+                                    L->id(),
+                                    char(M.id), M.is.first() / ntile, M.is.last() / ntile );
+        else
+            return HLIB::to_string( "%c[%d] = trsml( L_%d, %c[%d] )",
+                                    char(X.id), X.is.first() / ntile,
+                                    L->id(),
+                                    char(M.id), M.is.first() / ntile );
+    }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, X.block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_U, X.block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, M.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(trsml_node); }
 };
     
@@ -409,14 +439,14 @@ struct addlr_node : public node
     virtual std::string  to_string () const
     {
         if ( U.is.size() > ntile )
-            return HLIB::to_string( "addlr( %d:%d, %d:%d, %d )",
-                                    U.is.first() / ntile, U.is.last()/ntile,
-                                    V.is.first() / ntile, V.is.last()/ntile,
+            return HLIB::to_string( "addlr( %c[%d:%d], %c[%d:%d], A%d )",
+                                    char(U.id), U.is.first() / ntile, U.is.last()/ntile,
+                                    char(V.id), V.is.first() / ntile, V.is.last()/ntile,
                                     A->id() );
         else
-            return HLIB::to_string( "addlr( %d, %d, %d )",
-                                    U.is.first() / ntile,
-                                    V.is.first() / ntile,
+            return HLIB::to_string( "addlr( %c[%d], %c[%d], A%d )",
+                                    char(U.id), U.is.first() / ntile,
+                                    char(V.id), V.is.first() / ntile,
                                     A->id() );
     }
     virtual std::string  color     () const { return "8ae234"; }
@@ -452,13 +482,15 @@ struct dot_node : public node
     virtual std::string  to_string () const
     {
         if ( A.is.size() > ntile )
-            return HLIB::to_string( "dot( %c[%d:%d], %c[%d:%d] )",
+            return HLIB::to_string( "dot( %c[%d:%d], %c[%d:%d], %d )",
                                     char(A.id), A.is.first() / ntile, A.is.last() / ntile,
-                                    char(B.id), B.is.first() / ntile, B.is.last() / ntile );
+                                    char(B.id), B.is.first() / ntile, B.is.last() / ntile,
+                                    T.id & 0xff );
         else
-            return HLIB::to_string( "dot( %c[%d], %c[%d] )",
+            return HLIB::to_string( "dot( %c[%d], %c[%d], %d )",
                                     char(A.id), A.is.first() / ntile,
-                                    char(B.id), B.is.first() / ntile );
+                                    char(B.id), B.is.first() / ntile,
+                                    T.id & 0xff );
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -497,9 +529,13 @@ struct tprod_node : public node
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "tprod( %d, %d )",
-                                                                      X.is.first() / ntile,
-                                                                      Y.is.first() / ntile ); }
+    virtual std::string  to_string () const
+    {
+        if ( X.is.size() > ntile )
+            return HLIB::to_string( "tprod( %d:%d, %d )", X.is.first() / ntile, X.is.last() / ntile, T.id & 0xff );
+        else
+            return HLIB::to_string( "tprod( %d, %d )", X.is.first() / ntile, T.id & 0xff );
+    }
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
@@ -554,27 +590,26 @@ private:
 //
 struct tadd_node : public node
 {
-    std::shared_ptr< BLAS::Matrix< real > >  T0;
-    std::shared_ptr< BLAS::Matrix< real > >  T1;
-    std::shared_ptr< BLAS::Matrix< real > >  T;
+    shared_matrix  T0;
+    shared_matrix  T1;
+    shared_matrix  T;
 
-    tadd_node ( std::shared_ptr< BLAS::Matrix< real > >  aT0,
-                std::shared_ptr< BLAS::Matrix< real > >  aT1,
-                std::shared_ptr< BLAS::Matrix< real > >  aT )
+    tadd_node ( shared_matrix  aT0,
+                shared_matrix  aT1,
+                shared_matrix  aT )
             : T0( aT0 )
             , T1( aT1 )
             , T( aT )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = tadd( %d, %d )",
-                                                                      id_t(T.get()), id_t(T0.get()), id_t(T1.get()) ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "%d = tadd( %d, %d )", T.id & 0xff, T0.id & 0xff, T1.id & 0xff ); }
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
-    virtual const block_list_t  in_blocks_   () const { return { { id_t(T0.get()), BIS_ONE }, { id_t(T1.get()), BIS_ONE } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_t(T.get()), BIS_ONE } }; }
+    virtual const block_list_t  in_blocks_   () const { return { T0.mem_block(), T1.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { T.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(tadd_node); }
 };
 
@@ -834,12 +869,18 @@ lu_node::refine_ ( const size_t  min_size )
         assert( ! is_null( A01 ) && is_lowrank( A01 ));
             
         auto  lu_00    = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
-        auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ), matrix( ID_A, A10->col_is(), mat_V< real >( A10 ) ), ntile );
-        auto  solve_01 = g.alloc_node< trsml_node >( BL->block( 0, 0 ), matrix( ID_A, A01->row_is(), mat_U< real >( A01 ) ), ntile );
+        auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
+                                                     matrix( ID_L, A10->col_is(), mat_V< real >( A10 ) ),
+                                                     matrix( ID_A, A10->col_is(), mat_V< real >( A10 ) ),
+                                                     ntile );
+        auto  solve_01 = g.alloc_node< trsml_node >( BL->block( 0, 0 ),
+                                                     matrix( ID_U, A01->row_is(), mat_U< real >( A01 ) ),
+                                                     matrix( ID_A, A01->row_is(), mat_U< real >( A01 ) ),
+                                                     ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_L, A10->col_is(), mat_V< real >( A10 ) ),
                                                    matrix( ID_U, A01->row_is(), mat_U< real >( A01 ) ),
-                                                   T,
+                                                   matrix( T ),
                                                    ntile );
         auto  addlr    = g.alloc_node< addlr_node >( matrix( ID_L, A10->row_is(), mat_U< real >( A10 ) ),
                                                      matrix( T ),
@@ -891,23 +932,28 @@ trsmu_node::refine_ ( const size_t  min_size )
         auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
         auto  U11 = BU->block( 1, 1 );
 
-        const auto  sis_X = split( X.is, 2 );
-        const auto  is1   = U11->col_is();
-        const auto  is0   = U00->col_is();
+        const auto  is0 = U00->col_is();
+        const auto  is1 = U11->col_is();
 
-        auto  solve_00 = g.alloc_node< trsmu_node >( U00, matrix( is0, X ), ntile );
+        auto  solve_00 = g.alloc_node< trsmu_node >( U00,
+                                                     matrix( is0, X ),
+                                                     matrix( is0, M ),
+                                                     ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_U, U01->row_is(), mat_U< real >( U01 ) ),
-                                                   matrix( sis_X[0], X ),
+                                                   matrix( is0, X ),
                                                    matrix( T ),
                                                    ntile );
         auto  tprod    = new tprod_node( real(-1),
                                          matrix( ID_U, U01->col_is(), mat_V< real >( U01 ) ),
                                          matrix( T ),
                                          real(1),
-                                         matrix( sis_X[1], X ),
+                                         matrix( is1, M ),
                                          ntile );
-        auto  solve_11 = g.alloc_node< trsmu_node >( U11, matrix( is1, X ), ntile );
+        auto  solve_11 = g.alloc_node< trsmu_node >( U11,
+                                                     matrix( is1, X ),
+                                                     matrix( is1, M ),
+                                                     ntile );
 
         g.add_node( tprod );
         
@@ -953,23 +999,28 @@ trsml_node::refine_ ( const size_t  min_size )
         auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
         auto  L11 = BL->block( 1, 1 );
 
-        const auto  sis_X = split( X.is, 2 );
-        const auto  is0   = L00->row_is();
-        const auto  is1   = L11->row_is();
+        const auto  is0 = L00->row_is();
+        const auto  is1 = L11->row_is();
             
-        auto  solve_00 = g.alloc_node< trsml_node >( L00, matrix( is0, X ), ntile );
+        auto  solve_00 = g.alloc_node< trsml_node >( L00,
+                                                     matrix( is0, X ),
+                                                     matrix( is0, M ),
+                                                     ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_L, L10->col_is(), mat_V< real >( L10 ) ),
-                                                   matrix( sis_X[0], X ),
+                                                   matrix( is0, X ),
                                                    matrix( T ),
                                                    ntile );
         auto  tprod    = new tprod_node( real(-1),
                                          matrix( ID_L, L10->row_is(), mat_U< real >( L10 ) ),
                                          matrix( T ),
                                          real(1),
-                                         matrix( sis_X[1], X ),
+                                         matrix( is1, M ),
                                          ntile );
-        auto  solve_11 = g.alloc_node< trsml_node >( L11, matrix( is1, X ), ntile );
+        auto  solve_11 = g.alloc_node< trsml_node >( L11,
+                                                     matrix( is1, X ),
+                                                     matrix( is1, M ),
+                                                     ntile );
 
         g.add_node( tprod );
         
@@ -1013,7 +1064,7 @@ dot_node::refine_ ( const size_t  min_size )
         auto  T1     = std::make_shared< BLAS::Matrix< real > >();
         auto  tsmul0 = g.alloc_node< dot_node  >( matrix( sis_A[0], A ), matrix( sis_B[0], B ), matrix( T0 ), ntile );
         auto  tsmul1 = g.alloc_node< dot_node  >( matrix( sis_A[1], A ), matrix( sis_B[1], B ), matrix( T1 ), ntile );
-        auto  add    = g.alloc_node< tadd_node >( T0, T1, T );
+        auto  add    = g.alloc_node< tadd_node >( matrix( T0 ), matrix( T1 ), T );
 
         add->after( tsmul0 );
         add->after( tsmul1 );
@@ -1206,13 +1257,13 @@ addlr_node::run_ ( const TTruncAcc & )
 void
 tadd_node::run_ ( const TTruncAcc &  acc )
 {
-    assert(( T0->nrows() == T1->nrows() ) && ( T0->ncols() == T1->ncols() ));
+    assert(( T0.data->nrows() == T1.data->nrows() ) && ( T0.data->ncols() == T1.data->ncols() ));
     
-    if (( T->nrows() != T0->nrows() ) || ( T->ncols() != T0->ncols() ))
-        *T = BLAS::Matrix< real >( T0->nrows(), T0->ncols() );
+    if (( T.data->nrows() != T0.data->nrows() ) || ( T.data->ncols() != T0.data->ncols() ))
+        *(T.data) = BLAS::Matrix< real >( T0.data->nrows(), T0.data->ncols() );
     
-    BLAS::add( real(1), *T0, *T );
-    BLAS::add( real(1), *T1, *T );
+    BLAS::add( real(1), *(T0.data), *(T.data) );
+    BLAS::add( real(1), *(T1.data), *(T.data) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1492,15 +1543,16 @@ assign_node::run_ ( const TTruncAcc & )
 
 graph
 gen_dag_lu_hodlr_tiled ( TMatrix &      A,
+                         const size_t   ntile,
                          refine_func_t  refine )
 {
-    BLAS::Matrix< real >  X( A.nrows(), 16 );
-    BLAS::Matrix< real >  U( A.nrows(), 16 );
-    auto                  T = std::make_shared< BLAS::Matrix< real > >();
-    auto                  Q = std::make_shared< BLAS::Matrix< real > >();
-    auto                  R = std::make_shared< BLAS::Matrix< real > >();
+    // BLAS::Matrix< real >  X( A.nrows(), 16 );
+    // BLAS::Matrix< real >  U( A.nrows(), 16 );
+    // auto                  T = std::make_shared< BLAS::Matrix< real > >();
+    // auto                  Q = std::make_shared< BLAS::Matrix< real > >();
+    // auto                  R = std::make_shared< BLAS::Matrix< real > >();
     
-    return std::move( refine( new lu_node( & A, 128 ), HLIB::CFG::Arith::max_seq_size, use_single_end_node ) );
+    return std::move( refine( new lu_node( & A, ntile ), ntile, use_single_end_node ) );
 }
 
 //
