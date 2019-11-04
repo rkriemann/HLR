@@ -33,8 +33,8 @@ namespace
 using HLIB::id_t;
 
 // dummy indexset for T operations (rank/size unknown during DAG and only object is of interest)
-const auto  IS_ONE  = TIndexSet( 0, 0 );
-const auto  BIS_ONE = TBlockIndexSet( TIndexSet( 0, 0 ), TIndexSet( 0, 0 ) );
+const auto  IS_ONE  = TIndexSet( -1, -1 );
+const auto  BIS_ONE = TBlockIndexSet( IS_ONE, IS_ONE );
 
 //
 // structure to address BLAS::Matrix
@@ -390,7 +390,7 @@ struct trsmu_node : public node
     
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( U_%d, ", U->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( U%d, ", U->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -424,7 +424,7 @@ struct trsml_node : public node
 
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsml( L_%d, ", L->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + HLIB::to_string( " = trsml( L%d, ", L->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -648,7 +648,7 @@ struct truncate_node : public node
 
     virtual std::string  to_string () const
     {
-        return ( HLIB::to_string( "trunc( %d, ", A->id() ) +
+        return ( HLIB::to_string( "trunc( A%d, ", A->id() ) +
                  X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + " )" );
     }
     virtual std::string  color     () const { return "e9b96e"; }
@@ -867,11 +867,11 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lu_node::refine_ ( const size_t  min_size )
+lu_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! hlr::is_small( ntile, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  BL  = BA;
@@ -930,11 +930,11 @@ lu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-trsmu_node::refine_ ( const size_t  min_size )
+trsmu_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( min_size, U ) )
+    if ( is_blocked( U ) && ! hlr::is_small( ntile, U ) )
     {
         //
         //  ⎡ R_00^T │        ⎤ ⎡X_0⎤   ⎡ R_00^T            │        ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -997,11 +997,11 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-trsml_node::refine_ ( const size_t  min_size )
+trsml_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( L ) )
+    if ( is_blocked( L ) && ! hlr::is_small( ntile, L ) )
     {
         //
         //  ⎡ L_00 │      ⎤ ⎡X_0⎤   ⎡ L_00              │      ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -1120,8 +1120,8 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  min_size )
         const auto  sis_X = split( X.is, 2 );
         const auto  sis_Y = split( Y.is, 2 );
 
-        g.alloc_node< tprod_node >( alpha, matrix( sis_X[0], X.data ), T, beta, matrix( sis_Y[0], Y.data ), ntile );
-        g.alloc_node< tprod_node >( alpha, matrix( sis_X[1], X.data ), T, beta, matrix( sis_Y[1], Y.data ), ntile );
+        g.alloc_node< tprod_node >( alpha, matrix( sis_X[0], X ), T, beta, matrix( sis_Y[0], Y ), ntile );
+        g.alloc_node< tprod_node >( alpha, matrix( sis_X[1], X ), T, beta, matrix( sis_Y[1], Y ), ntile );
     }// if
 
     g.finalize();
@@ -1226,11 +1226,11 @@ tprod_ip_node< std::shared_ptr< BLAS::Matrix< real > > >::run_ ( const TTruncAcc
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-addlr_node::refine_ ( const size_t  min_size )
+addlr_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( ntile, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );

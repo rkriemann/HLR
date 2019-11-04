@@ -8,6 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <map>
 #include <functional>
 
 #include "hlr/dag/node.hh"
@@ -112,8 +113,12 @@ public:
     void    print () const;
     
     // output DAG in DOT format
-    void    print_dot  ( const std::string &  filename ) const;
-
+    void    print_dot  ( const std::string &  filename ) const; 
+    
+    // output DAG in DOT format with additional node grouping
+    void    print_dot  ( const std::string &                           filename,
+                         const std::map< std::string, node_list_t > &  groups ) const; 
+    
     // output DAG in GEXF format
     void    print_gexf ( const std::string &  filename ) const;
 

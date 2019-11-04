@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <deque>
+#include <map>
 
 #include <base/System.hh>
 
@@ -36,28 +37,44 @@ refine ( node *                            root,
          const size_t                      min_size,
          const hlr::dag::end_nodes_mode_t  end_mode )
 {
+    using  group_map_t = std::map< std::string, hlr::dag::node_list_t >;
+    
     assert( root != nullptr );
     
     std::deque< node * >  nodes{ root };
     std::list< node * >   tasks, start, end;
-    const bool            output_inter = HLIB::verbose( 4 );
     uint                  step         = 0;
+    const bool            output_inter = HLIB::verbose( 4 ); // print intermediate steps
+    const bool            group_nodes  = true;               // print intermediate nodes with additional grouping
 
     while ( ! nodes.empty() )
     {
         std::deque< node * >  subnodes, del_nodes;
         bool                  any_changed = false;
+        group_map_t           group_map;                     // mapping of group to nodes
 
         HLR_LOG( 4, HLIB::to_string( "no. of nodes in refinement step    = %d", nodes.size() ) );
 
         // first refine nodes
         std::for_each( nodes.begin(), nodes.end(),
-                       [=,&any_changed] ( node *  node )
+                       [=,&any_changed,&group_map] ( node *  node )
                        {
                            node->refine( min_size );
 
                            if ( node->is_refined() )
+                           {
                                any_changed = true;
+
+                               if ( group_nodes )
+                               {
+                                   std::list< hlr::dag::node * >  group;
+                               
+                                   for ( auto  son : node->sub_nodes() )
+                                       group.push_back( son );
+
+                                   group_map[ node->to_string() ] = std::move( group );
+                               }// if
+                           }// if
                        } );
 
         // then refine dependencies and collect new nodes
@@ -125,7 +142,10 @@ refine ( node *                            root,
             
             graph  dag( ltasks, lstart, lend, hlr::dag::use_multiple_end_nodes );
 
-            dag.print_dot( HLIB::to_string( "dag_%03d.dot", step ) );
+            if ( group_nodes )
+                dag.print_dot( HLIB::to_string( "dag_%03d.dot", step ), group_map );
+            else
+                dag.print_dot( HLIB::to_string( "dag_%03d.dot", step ) );
         }// if
 
         ++step;
