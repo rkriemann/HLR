@@ -573,7 +573,7 @@ trsmuh ( const TMatrix *            U,
 
         BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
 
-        // std::cout << "trsmu : " << BLAS::norm_F( X ) << std::endl;
+        std::cout << "trsmu " << X.nrows() << " : " << BLAS::norm_F( X ) << std::endl;
     }// else
 }
 
@@ -612,7 +612,7 @@ trsml ( const TMatrix *            L,
         //
         // UNIT DIAGONAL !!!
         //
-        // std::cout << "trsml : " << BLAS::norm_F( X ) << std::endl;
+        std::cout << "trsml : " << BLAS::norm_F( X ) << std::endl;
     }// else
 }
 
@@ -643,7 +643,7 @@ lu ( TMatrix *          A,
         // T = ( V(A_10)^H · U(A_01) )
         auto  T  = dot( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
-        // std::cout << "dot : " << BLAS::norm_F( T ) << std::endl;
+        std::cout << "dot : " << BLAS::norm_F( T ) << std::endl;
         
         addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         
@@ -655,7 +655,7 @@ lu ( TMatrix *          A,
         
         BLAS::invert( blas_mat< value_t >( DA ) );
 
-        // std::cout << "lu : " << norm_F( A ) << std::endl;
+        std::cout << "lu : " << norm_F( A ) << std::endl;
     }// else
 }
 

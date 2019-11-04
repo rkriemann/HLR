@@ -42,47 +42,64 @@ const auto  BIS_ONE = TBlockIndexSet( TIndexSet( 0, 0 ), TIndexSet( 0, 0 ) );
 template < typename matrix_t >
 struct matrix
 {
+    const id_t       name;     // id of matrix
     const id_t       id;       // id of matrix
     const TIndexSet  is;       // index set of associated data
     const TIndexSet  base_is;  // index set of data this matrix is part of
     matrix_t         data;     // matrix data
 
     matrix ( matrix< matrix_t > &  aM )
-            : id( aM.id )
+            : name( aM.name )
+            , id( aM.id )
             , is( aM.is )
             , base_is( aM.base_is )
             , data( aM.data )
     {}
 
     matrix ( matrix< matrix_t > &&  aM )
-            : id( aM.id )
+            : name( aM.name )
+            , id( aM.id )
             , is( aM.is )
             , base_is( aM.base_is )
             , data( std::move( aM.data ) )
     {}
 
-    matrix ( const id_t       aid,
-             const TIndexSet  ais,
-             const TIndexSet  abase_is,
-             matrix_t         adata )
-            : id( aid )
-            , is( ais )
-            , base_is( abase_is )
-            , data( adata )
-    {}
+    // matrix ( const id_t       aname,
+    //          const TIndexSet  ais,
+    //          const TIndexSet  abase_is,
+    //          matrix_t         adata )
+    //         : name( aname )
+    //         , id( -1 )
+    //         , is( ais )
+    //         , base_is( abase_is )
+    //         , data( adata )
+    // {}
 
-    matrix ( const id_t       aid,
+    matrix ( const id_t       aname,
              const TIndexSet  ais,
              matrix_t         adata )
-            : id( aid )
+            : name( aname )
+            , id( -1 )
             , is( ais )
             , base_is( ais )
             , data( adata )
     {}
 
-    matrix ( const id_t       aid,
+    matrix ( const id_t       aname,
+             const id_t       aid,
+             const TIndexSet  ais,
              matrix_t         adata )
-            : id( aid )
+            : name( aname )
+            , id( aid )
+            , is( ais )
+            , base_is( ais )
+            , data( adata )
+    {}
+
+    matrix ( const id_t       aname,
+             matrix_t         adata )
+            : name( aname )
+            , id( -1 )
             , is( IS_ONE )
             , base_is( IS_ONE )
             , data( adata )
@@ -95,7 +112,8 @@ struct matrix
     
     matrix ( const TIndexSet  ais,
              matrix &         amat )
-            : id( amat.id )
+            : name( amat.name )
+            , id( amat.id )
             , is( ais )
             , base_is( amat.base_is )
             , data( amat.data )
@@ -107,7 +125,26 @@ struct matrix
     
     const BLAS::Range    range     () const { return is - base_is.first(); }
     const TBlockIndexSet block_is  () const { return TBlockIndexSet( is, IS_ONE ); }
-    const mem_block_t    mem_block () const { return { id, block_is() }; }
+    const mem_block_t    mem_block () const { return { name, block_is() }; }
+
+    std::string
+    to_string ( const size_t  ntile = 0 ) const
+    {
+        std::ostringstream  os;
+        
+        if ( name < 100 ) os << char(name);
+        else              os << ( name & 0xff );
+
+        if ( id != id_t(-1) ) os << id;
+
+        if (( is != IS_ONE ) && ( ntile != 0 ))
+        {
+            if ( is.size() <= ntile ) os << HLIB::to_string( "[%d]", is.first() / ntile );
+            else                      os << HLIB::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+        }// if
+
+        return os.str();
+    }
 };
 
 template <>
@@ -123,7 +160,8 @@ matrix< std::shared_ptr< BLAS::Matrix< real > > >::~matrix ()
 template <>
 matrix< BLAS::Matrix< real > >::matrix ( const TIndexSet       is,
                                          BLAS::Matrix< real >  adata )
-        : id( id_t(adata.data()) )
+        : name( id_t(adata.data()) )
+        , id( -1 )
         , is( is )
         , base_is( is )
         , data( adata )
@@ -132,7 +170,8 @@ matrix< BLAS::Matrix< real > >::matrix ( const TIndexSet       is,
 template <>
 matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( const TIndexSet                          is,
                                                             std::shared_ptr< BLAS::Matrix< real > >  adata )
-        : id( id_t(adata.get()) )
+        : name( id_t(adata.get()) )
+        , id( -1 )
         , is( is )
         , base_is( is )
         , data( adata )
@@ -140,7 +179,8 @@ matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( const TIndexSet     
 
 // template <>
 // matrix< BLAS::Matrix< real > >::matrix ( BLAS::Matrix< real >  adata )
-//         : id( id_t(adata.data()) )
+//         : name( id_t(adata.data()) )
+//         , id( -1 )
 //         , is( IS_ONE )
 //         , base_is( IS_ONE )
 //         , data( adata )
@@ -148,7 +188,8 @@ matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( const TIndexSet     
 
 template <>
 matrix< std::shared_ptr< BLAS::Matrix< real > > >::matrix ( std::shared_ptr< BLAS::Matrix< real > >  adata )
-        : id( id_t(adata.get()) )
+        : name( id_t(adata.get()) )
+        , id( -1  )
         , is( IS_ONE )
         , base_is( IS_ONE )
         , data( adata )
@@ -297,10 +338,10 @@ bis_col ( const TIndexSet &  col_is )
 ////////////////////////////////////////////////////////////////////////////////
 
 // identifiers for memory blocks
-constexpr id_t  ID_A    = 'A';
-constexpr id_t  ID_L    = 'L';
-constexpr id_t  ID_U    = 'U';
-constexpr id_t  ID_NONE = '0';
+constexpr id_t  NAME_A    = 'A';
+constexpr id_t  NAME_L    = 'L';
+constexpr id_t  NAME_U    = 'U';
+constexpr id_t  NAME_NONE = '0';
 
 //
 // compute A = LU
@@ -322,8 +363,8 @@ struct lu_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { NAME_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { NAME_L, A->block_is() }, { NAME_U, A->block_is() } }; }
     virtual size_t              mem_size_    () const { return sizeof(lu_node); }
 };
 
@@ -349,23 +390,14 @@ struct trsmu_node : public node
     
     virtual std::string  to_string () const
     {
-        if ( X.is.size() > ntile )
-            return HLIB::to_string( "%c[%d:%d] = trsmu( U_%d, %c[%d:%d] )",
-                                    char(X.id), X.is.first() / ntile, X.is.last() / ntile,
-                                    U->id(),
-                                    char(M.id), M.is.first() / ntile, M.is.last() / ntile );
-        else
-            return HLIB::to_string( "%c[%d] = trsmu( U_%d, %c[%d] )",
-                                    char(X.id), X.is.first() / ntile,
-                                    U->id(),
-                                    char(M.id), M.is.first() / ntile );
+        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( U_%d, ", U->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, M.mem_block() }; }
+    virtual const block_list_t  in_blocks_   () const { return { { NAME_U, U->block_is() }, M.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(trsmu_node); }
 };
@@ -392,23 +424,14 @@ struct trsml_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( X.is.size() > ntile )
-            return HLIB::to_string( "%c[%d:%d] = trsml( L_%d, %c[%d:%d] )",
-                                    char(X.id), X.is.first() / ntile, X.is.last() / ntile,
-                                    L->id(),
-                                    char(M.id), M.is.first() / ntile, M.is.last() / ntile );
-        else
-            return HLIB::to_string( "%c[%d] = trsml( L_%d, %c[%d] )",
-                                    char(X.id), X.is.first() / ntile,
-                                    L->id(),
-                                    char(M.id), M.is.first() / ntile );
+        return X.to_string( ntile ) + HLIB::to_string( " = trsml( L_%d, ", L->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, M.mem_block() }; }
+    virtual const block_list_t  in_blocks_   () const { return { { NAME_L, L->block_is() }, M.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(trsml_node); }
 };
@@ -438,16 +461,8 @@ struct addlr_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( U.is.size() > ntile )
-            return HLIB::to_string( "addlr( %c[%d:%d], %c[%d:%d], A%d )",
-                                    char(U.id), U.is.first() / ntile, U.is.last()/ntile,
-                                    char(V.id), V.is.first() / ntile, V.is.last()/ntile,
-                                    A->id() );
-        else
-            return HLIB::to_string( "addlr( %c[%d], %c[%d], A%d )",
-                                    char(U.id), U.is.first() / ntile,
-                                    char(V.id), V.is.first() / ntile,
-                                    A->id() );
+        return ( "addlr(" + HLIB::to_string( "A%d, ", A->id() ) +
+                 U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + ")" );
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -455,7 +470,7 @@ private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U.mem_block(), V.mem_block(), T.mem_block() }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { NAME_A, A->block_is() } }; }
     virtual size_t              mem_size_    () const { return sizeof(addlr_node); }
 };
 
@@ -481,16 +496,7 @@ struct dot_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( A.is.size() > ntile )
-            return HLIB::to_string( "dot( %c[%d:%d], %c[%d:%d], %d )",
-                                    char(A.id), A.is.first() / ntile, A.is.last() / ntile,
-                                    char(B.id), B.is.first() / ntile, B.is.last() / ntile,
-                                    T.id & 0xff );
-        else
-            return HLIB::to_string( "dot( %c[%d], %c[%d], %d )",
-                                    char(A.id), A.is.first() / ntile,
-                                    char(B.id), B.is.first() / ntile,
-                                    T.id & 0xff );
+        return T.to_string() + " = dot(" + A.to_string( ntile ) + "×" + B.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -531,10 +537,7 @@ struct tprod_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( X.is.size() > ntile )
-            return HLIB::to_string( "tprod( %d:%d, %d )", X.is.first() / ntile, X.is.last() / ntile, T.id & 0xff );
-        else
-            return HLIB::to_string( "tprod( %d, %d )", X.is.first() / ntile, T.id & 0xff );
+        return "Tprod(" + Y.to_string( ntile ) + "+" + X.to_string( ntile ) + "×" + T.to_string() + ")";
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -570,10 +573,11 @@ struct tprod_ip_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( X.is.size() > ntile )
-            return HLIB::to_string( "tprod_ip( %d:%d )", X.is.first() / ntile, X.is.last() / ntile );
-        else
-            return HLIB::to_string( "tprod_ip( %d )", X.is.first() / ntile );
+        return "Tprod_ip(" + X.to_string( ntile ) + "×" + T.to_string() + ")";
+        // if ( X.is.size() > ntile )
+        //     return HLIB::to_string( "tprod_ip( %d:%d )", X.is.first() / ntile, X.is.last() / ntile );
+        // else
+        //     return HLIB::to_string( "tprod_ip( %d )", X.is.first() / ntile );
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -602,7 +606,10 @@ struct tadd_node : public node
             , T( aT )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = tadd( %d, %d )", T.id & 0xff, T0.id & 0xff, T1.id & 0xff ); }
+    virtual std::string  to_string () const
+    {
+        return T.to_string() + " = Tadd(" + T0.to_string() + "+" + T1.to_string() + ")";
+    }
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
@@ -639,14 +646,18 @@ struct truncate_node : public node
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "truncate( %d )", A->id() ); }
+    virtual std::string  to_string () const
+    {
+        return ( HLIB::to_string( "trunc( %d, ", A->id() ) +
+                 X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + " )" );
+    }
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), T.mem_block(), Y.mem_block() }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { NAME_A, A->block_is() } }; }
     virtual size_t              mem_size_    () const { return sizeof(truncate_node); }
 };
 
@@ -687,7 +698,7 @@ struct tsqr_node : public node
                 const size_t   antile )
             : alpha( aalpha )
             , X( aX )
-            , T( shared_matrix( ID_NONE, std::shared_ptr< BLAS::Matrix< real > >() ) ) // T = 0
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< BLAS::Matrix< real > >() ) ) // T = 0
             , U( aU )
             , Q( aQ )
             , R( aR )
@@ -696,10 +707,11 @@ struct tsqr_node : public node
 
     virtual std::string  to_string () const
     {
-        if ( X.is.size() > ntile )
-            return HLIB::to_string( "tsqr( %d:%d )", X.is.first() / ntile, X.is.last() / ntile );
-        else
-            return HLIB::to_string( "tsqr( %d )", X.is.first() / ntile );
+        return "tsqr( " + X.to_string( ntile ) + ", " + T.to_string() + ", " + U.to_string( ntile ) + " )";
+        // if ( X.is.size() > ntile )
+        //     return HLIB::to_string( "tsqr( %d:%d )", X.is.first() / ntile, X.is.last() / ntile );
+        // else
+        //     return HLIB::to_string( "tsqr( %d )", X.is.first() / ntile );
     }
     virtual std::string  color     () const { return "e9b96e"; }
 
@@ -732,7 +744,10 @@ struct qr_node : public node
             , R(  aR  )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "qr( %d )", R.id ); }
+    virtual std::string  to_string () const
+    {
+        return R.to_string() + "qr( " + R0.to_string() + ", " + R1.to_string() + " )";
+    }
     virtual std::string  color     () const { return "c17d11"; }
 
 private:
@@ -775,7 +790,7 @@ struct alloc_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
-    virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), T.mem_block(), Y.mem_block(), { ID_A, A->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), T.mem_block(), Y.mem_block(), { NAME_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { Q0.mem_block(), Q1.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(alloc_node); }
 };
@@ -806,7 +821,7 @@ struct svd_node : public node
             , V( aV )
     { init(); }
 
-    virtual std::string  to_string () const { return "svd"; }
+    virtual std::string  to_string () const { return "svd( " + R0.to_string() + ", " + R1.to_string() + " )"; }
     virtual std::string  color     () const { return "ad7fa8"; }
 
 private:
@@ -841,7 +856,7 @@ private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { U.mem_block(), V.mem_block() }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { NAME_A, A->block_is() } }; }
     virtual size_t              mem_size_    () const { return sizeof(assign_node); }
 };
 
@@ -870,21 +885,21 @@ lu_node::refine_ ( const size_t  min_size )
             
         auto  lu_00    = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
-                                                     matrix( ID_L, A10->col_is(), mat_V< real >( A10 ) ),
-                                                     matrix( ID_A, A10->col_is(), mat_V< real >( A10 ) ),
+                                                     matrix( NAME_L, A10->id(), A10->col_is(), mat_V< real >( A10 ) ),
+                                                     matrix( NAME_A, A10->id(), A10->col_is(), mat_V< real >( A10 ) ),
                                                      ntile );
         auto  solve_01 = g.alloc_node< trsml_node >( BL->block( 0, 0 ),
-                                                     matrix( ID_U, A01->row_is(), mat_U< real >( A01 ) ),
-                                                     matrix( ID_A, A01->row_is(), mat_U< real >( A01 ) ),
+                                                     matrix( NAME_U, A01->id(), A01->row_is(), mat_U< real >( A01 ) ),
+                                                     matrix( NAME_A, A01->id(), A01->row_is(), mat_U< real >( A01 ) ),
                                                      ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_L, A10->col_is(), mat_V< real >( A10 ) ),
-                                                   matrix( ID_U, A01->row_is(), mat_U< real >( A01 ) ),
+        auto  tsmul    = g.alloc_node< dot_node >( matrix( NAME_L, A10->id(), A10->col_is(), mat_V< real >( A10 ) ),
+                                                   matrix( NAME_U, A01->id(), A01->row_is(), mat_U< real >( A01 ) ),
                                                    matrix( T ),
                                                    ntile );
-        auto  addlr    = g.alloc_node< addlr_node >( matrix( ID_L, A10->row_is(), mat_U< real >( A10 ) ),
+        auto  addlr    = g.alloc_node< addlr_node >( matrix( NAME_L, A10->id(), A10->row_is(), mat_U< real >( A10 ) ),
                                                      matrix( T ),
-                                                     matrix( ID_U, A01->col_is(), mat_V< real >( A01 ) ),
+                                                     matrix( NAME_U, A01->id(), A01->col_is(), mat_V< real >( A01 ) ),
                                                      BA->block( 1, 1 ),
                                                      ntile );
         auto  lu_11    = g.alloc_node< lu_node >( BA->block( 1, 1 ), ntile );
@@ -940,12 +955,12 @@ trsmu_node::refine_ ( const size_t  min_size )
                                                      matrix( is0, M ),
                                                      ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_U, U01->row_is(), mat_U< real >( U01 ) ),
+        auto  tsmul    = g.alloc_node< dot_node >( matrix( NAME_U, U01->id(), U01->row_is(), mat_U< real >( U01 ) ),
                                                    matrix( is0, X ),
                                                    matrix( T ),
                                                    ntile );
         auto  tprod    = new tprod_node( real(-1),
-                                         matrix( ID_U, U01->col_is(), mat_V< real >( U01 ) ),
+                                         matrix( NAME_U, U01->id(), U01->col_is(), mat_V< real >( U01 ) ),
                                          matrix( T ),
                                          real(1),
                                          matrix( is1, M ),
@@ -1007,12 +1022,12 @@ trsml_node::refine_ ( const size_t  min_size )
                                                      matrix( is0, M ),
                                                      ntile );
         auto  T        = std::make_shared< BLAS::Matrix< real > >();
-        auto  tsmul    = g.alloc_node< dot_node >( matrix( ID_L, L10->col_is(), mat_V< real >( L10 ) ),
+        auto  tsmul    = g.alloc_node< dot_node >( matrix( NAME_L, L10->id(), L10->col_is(), mat_V< real >( L10 ) ),
                                                    matrix( is0, X ),
                                                    matrix( T ),
                                                    ntile );
         auto  tprod    = new tprod_node( real(-1),
-                                         matrix( ID_L, L10->row_is(), mat_U< real >( L10 ) ),
+                                         matrix( NAME_L, L10->id(), L10->row_is(), mat_U< real >( L10 ) ),
                                          matrix( T ),
                                          real(1),
                                          matrix( is1, M ),
