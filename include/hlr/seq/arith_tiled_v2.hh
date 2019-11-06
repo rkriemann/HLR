@@ -133,11 +133,9 @@ tprod ( const indexset &           is,
         const matrix< value_t > &  T,
         const size_t               ntile )
 {
-    assert( A.ncols() == T.nrows() );
-
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", A.nrows() ) );
+    HLR_LOG( 4, hpro::to_string( "tprod( %d )", is.size() ) );
     
-    if ( A.ncols() > ntile )
+    if ( is.size() > ntile )
     {
         const auto  sis = split( is, 2 );
 

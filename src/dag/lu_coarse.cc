@@ -15,6 +15,7 @@
 #include <matrix/structure.hh>
 #include <algebra/solve_tri.hh>
 #include <algebra/mat_mul.hh>
+#include <algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"

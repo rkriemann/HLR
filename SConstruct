@@ -299,6 +299,7 @@ common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
                                         'src/dag/lu.cc',
                                         'src/dag/lu_coarse.cc',
                                         'src/dag/lu_hodlr_tiled.cc',
+                                        'src/dag/lu_hodlr_tiled_v2.cc',
                                         'src/dag/lu_lvl.cc',
                                         'src/dag/lu_oop.cc',
                                         'src/dag/lu_oop_accu.cc',
@@ -331,6 +332,7 @@ if 'seq' in frameworks :
     if 'dag-gauss'   in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
     if 'dag-inv'     in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
     if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
+    if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr2-seq.cc' ) )
 
 #
 # OpenMP
