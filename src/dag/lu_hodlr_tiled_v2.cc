@@ -593,7 +593,7 @@ struct tsqr_node : public node
 
     virtual std::string  to_string () const
     {
-        return "tsqr( " + X.to_string( ntile ) + ", " + T.to_string() + ", " + U.to_string( ntile ) + " )";
+        return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + ", " + T.to_string() + ", " + U.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "e9b96e"; }
 
@@ -628,7 +628,7 @@ struct qr_node : public node
 
     virtual std::string  to_string () const
     {
-        return R.to_string() + "qr( " + R0.to_string() + ", " + R1.to_string() + " )";
+        return R.to_string() + " = qr( " + R0.to_string() + ", " + R1.to_string() + " )";
     }
     virtual std::string  color     () const { return "c17d11"; }
 
@@ -660,7 +660,7 @@ struct svd_node : public node
             , Vk( aVk )
     { init(); }
 
-    virtual std::string  to_string () const { return "svd( " + R0.to_string() + ", " + R1.to_string() + " )"; }
+    virtual std::string  to_string () const { return Uk.to_string() + ", " + Vk.to_string() + " = svd( " + R0.to_string() + ", " + R1.to_string() + " )"; }
     virtual std::string  color     () const { return "ad7fa8"; }
 
 private:
@@ -1277,8 +1277,8 @@ gen_dag_tsqr2 ( const size_t                               n,
                                   matrix_info( id_t('U'), is( 0, n-1 ), & U ),
                                   matrix_info( id_t('Q'), is( 0, n-1 ), Q ),
                                   matrix_info( id_t('R'), R ),
-                                  128 ),
-                   HLIB::CFG::Arith::max_seq_size,
+                                  32 ),
+                   32,
                    use_single_end_node );
 }
 
@@ -1297,8 +1297,8 @@ gen_dag_truncate2 ( tile_storage< real > &               X,
                                       matrix_info( id_t('T'), T ),
                                       matrix_info( id_t('U'), A->col_is(), & Y ),
                                       A,
-                                      128 ),
-                   HLIB::CFG::Arith::max_seq_size,
+                                      32 ),
+                   32,
                    use_single_end_node );
 }
 
@@ -1313,8 +1313,8 @@ gen_dag_addlr2 ( tile_storage< real > &               X,
                                    matrix_info( id_t('T'), T ),
                                    matrix_info( id_t('U'), A->col_is(), & Y ),
                                    A,
-                                   128 ),
-                   HLIB::CFG::Arith::max_seq_size,
+                                   32 ),
+                   32,
                    use_single_end_node );
 }
 

@@ -328,6 +328,14 @@ truncate ( const indexset &                 row_is,
     {
         auto [ Q0, R0 ] = tsqr( row_is, alpha,      X, T, U, ntile );
         auto [ Q1, R1 ] = tsqr( col_is, value_t(1), Y,    V, ntile );
+
+        // auto  dQ0 = to_dense( Q0 );
+        // auto  dQ1 = to_dense( Q1 );
+
+        // DBG::write( dQ0, "Q0.mat", "Q0" );
+        // DBG::write( dQ1, "Q1.mat", "Q1" );
+        // DBG::write(  R0, "R0.mat", "R0" );
+        // DBG::write(  R1, "R1.mat", "R1" );
         
         auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
         auto               Us = std::move( R );
@@ -335,6 +343,10 @@ truncate ( const indexset &                 row_is,
         vector< value_t >  Ss;
         
         blas::svd( Us, Ss, Vs );
+
+        // DBG::write( Us, "Us.mat", "Us" );
+        // DBG::write( Ss, "Ss.mat", "Ss" );
+        // DBG::write( Vs, "Vs.mat", "Vs" );
         
         auto  k = acc.trunc_rank( Ss );
 

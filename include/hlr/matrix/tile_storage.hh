@@ -180,6 +180,45 @@ public:
     }
 };
 
+//
+// convert tile_storage to blas::matrix
+//
+template < typename value_t >
+HLIB::BLAS::Matrix< value_t >
+to_dense ( const tile_storage< value_t > &  st )
+{
+    //
+    // determine nrows, ncols
+    //
+
+    bool      first = true;
+    indexset  row_is;
+    size_t    ncols = 0;
+
+    for ( auto & [ is, U ] : st )
+    {
+        if ( first )
+        {
+            row_is = is;
+            ncols  = U.ncols();
+            first  = false;
+        }// if
+        else
+            row_is = join( row_is, is );
+    }// for
+
+    HLIB::BLAS::Matrix< value_t >  D( row_is.size(), ncols );
+
+    for ( auto & [ is, U ] : st )
+    {
+        HLIB::BLAS::Matrix< value_t >  D_i( D, is - row_is.first(), range::all );
+
+        HLIB::BLAS::copy( U, D_i );
+    }// for
+
+    return std::move( D );
+}
+
 }} // namespace hlr::matrix
 
 #endif  // __HLR_MATRIX_TILE_STORAGE_HH

@@ -180,6 +180,58 @@ copy_tiled ( const TMatrix &  M,
     }// else
 }
 
+template < typename value_t >
+std::unique_ptr< TMatrix >
+copy_nontiled ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_nontiled< value_t >( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else if ( IS_TYPE( & M, tiled_lrmatrix ) )
+    {
+        //
+        // copy low-rank data into tiled form
+        //
+
+        assert( M.is_real() );
+        
+        auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
+        auto  R  = std::make_unique< TRkMatrix >( RM->row_is(), RM->col_is() );
+        auto  U  = hlr::matrix::to_dense( RM->U() );
+        auto  V  = hlr::matrix::to_dense( RM->V() );
+
+        R->set_lrmat( U, V );
+
+        return R;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
 //
 // return copy of (block-wise) lower-left part of matrix
 //
