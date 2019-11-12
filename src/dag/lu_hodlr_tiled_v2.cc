@@ -227,6 +227,12 @@ split ( const indexset &  is,
     return {};
 }
 
+bool
+is_tiled_lowrank ( const TMatrix *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // tasks
@@ -270,8 +276,8 @@ private:
 struct trsmu_node : public node
 {
     const TMatrix *  U;
-    tiled_matrix       X;
-    tiled_matrix       M;
+    tiled_matrix     X;
+    tiled_matrix     M;
     const size_t     ntile;
     
     trsmu_node ( const TMatrix *  aU,
@@ -304,8 +310,8 @@ private:
 struct trsml_node : public node
 {
     const TMatrix *  L;
-    tiled_matrix       X;
-    tiled_matrix       M;
+    tiled_matrix     X;
+    tiled_matrix     M;
     const size_t     ntile;
 
     trsml_node ( const TMatrix *  aL,
@@ -691,8 +697,8 @@ lu_node::refine_ ( const size_t )
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
 
         assert(( BA->nblock_rows() == 2 ) && ( BA->nblock_cols() == 2 ));
-        assert( ! is_null( A10 ) && is_lowrank( A10 ));
-        assert( ! is_null( A01 ) && is_lowrank( A01 ));
+        assert( ! is_null( A10 ) && is_tiled_lowrank( A10 ));
+        assert( ! is_null( A01 ) && is_tiled_lowrank( A01 ));
             
         auto  lu_00    = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
@@ -705,7 +711,7 @@ lu_node::refine_ ( const size_t )
                                                      ntile );
         auto  T        = std::make_shared< matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
-                                                   tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A10->U() ),
+                                                   tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
                                                    shared_matrix( T ),
                                                    ntile );
         auto  addlr    = g.alloc_node< addlr_node >( tiled_matrix( NAME_L, A10->id(), A10->row_is(), & A10->U() ),

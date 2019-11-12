@@ -166,12 +166,15 @@ copy_tiled ( const TMatrix &  M,
         //
 
         auto  RM = cptrcast( & M, TRkMatrix );
+        auto  R  = std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                               RM->col_is(),
+                                                                               ntile,
+                                                                               blas_mat_A< value_t >( RM ),
+                                                                               blas_mat_B< value_t >( RM ) );
 
-        return std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
-                                                                           RM->col_is(),
-                                                                           ntile,
-                                                                           blas_mat_A< value_t >( RM ),
-                                                                           blas_mat_B< value_t >( RM ) );
+        R->set_id( RM->id() );
+
+        return R;
     }// if
     else
     {
@@ -222,6 +225,7 @@ copy_nontiled ( const TMatrix &  M )
         auto  V  = hlr::matrix::to_dense( RM->V() );
 
         R->set_lrmat( U, V );
+        R->set_id( RM->id() );
 
         return R;
     }// if

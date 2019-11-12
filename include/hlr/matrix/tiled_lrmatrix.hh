@@ -170,7 +170,7 @@ public:
     virtual bool    is_zero   () const { return ( _rank == 0 ); }
     
     virtual void    set_size  ( const size_t  nrows,
-                                const size_t  ncols ) { assert( false ); }
+                                const size_t  ncols ) {} // ignored
     
     //
     // tile management
@@ -380,6 +380,8 @@ std::unique_ptr< TMatrix >
 tiled_lrmatrix< value_t >::copy () const
 {
     auto  M = std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
+
+    M->copy_struct_from( this );
 
     M->_rank = _rank;
     

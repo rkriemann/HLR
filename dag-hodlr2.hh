@@ -188,7 +188,7 @@ mymain ( int, char ** )
         return;
     }
 
-    if ( true )
+    if ( false )
     {
         auto    A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
         auto    A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
