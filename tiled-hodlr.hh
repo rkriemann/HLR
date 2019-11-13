@@ -50,7 +50,7 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
@@ -64,12 +64,14 @@ mymain ( int, char ** )
         // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
+        std::cout << norm_2( A.get() ) << std::endl;
+        
         A = impl::matrix::copy_tiled< double >( *A, ntile );
         
         auto  C = impl::matrix::copy( *A );
 
-        // std::cout << norm_2( A.get() ) << std::endl;
-        // std::cout << norm_2( C.get() ) << std::endl;
+        std::cout << norm_2( A.get() ) << std::endl;
+        std::cout << norm_2( C.get() ) << std::endl;
 
         std::vector< double >  runtime;
     

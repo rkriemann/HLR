@@ -326,6 +326,19 @@ truncate ( const indexset &                 row_is,
     // }// if
     // else
     {
+        {
+            auto  DX = hlr::matrix::to_dense( X );
+            auto  DU = hlr::matrix::to_dense( U );
+            auto  DY = hlr::matrix::to_dense( Y );
+            auto  DV = hlr::matrix::to_dense( V );
+            
+            DBG::write( DX, "X2.mat", "X2" );
+            DBG::write(  T, "T2.mat", "T2" );
+            DBG::write( DU, "U2.mat", "U2" );
+            DBG::write( DY, "Y2.mat", "Y2" );
+            DBG::write( DV, "V2.mat", "V2" );
+        }
+        
         auto [ Q0, R0 ] = tsqr( row_is, alpha,      X, T, U, ntile );
         auto [ Q1, R1 ] = tsqr( col_is, value_t(1), Y,    V, ntile );
 
@@ -350,6 +363,9 @@ truncate ( const indexset &                 row_is,
         
         auto  k = acc.trunc_rank( Ss );
 
+        for ( int  i = 0; i < k; ++i )
+            std::cout << Ss(i) << std::endl;
+        
         matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
         matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
         
@@ -450,6 +466,8 @@ trsmuh ( const TMatrix *            U,
 
         auto  T = dot( U01->row_is(), U01->U(), X, ntile );
         
+        std::cout << U->id() << " dot (trsmu) : " << blas::norm_F( T ) << std::endl;
+        
         tprod( U01->col_is(), value_t(-1), U01->V(), T, value_t(1), X, ntile );
 
         trsmuh( U11, X, ntile );
@@ -465,7 +483,7 @@ trsmuh ( const TMatrix *            U,
 
         blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
-        // std::cout << "trsmu : " << blas::norm_F( X_is ) << std::endl;
+        std::cout << U->id() << " trsmu : " << blas::norm_F( X_is ) << std::endl;
     }// else
 }
 
@@ -492,6 +510,8 @@ trsml ( const TMatrix *            L,
 
         auto  T = dot( L10->col_is(), L10->V(), X, ntile );
 
+        std::cout << L->id() << " dot (trsml) : " << blas::norm_F( T ) << std::endl;
+        
         tprod( L10->row_is(), value_t(-1), L10->U(), T, value_t(1), X, ntile );
 
         trsml( L11, X, ntile );
@@ -502,7 +522,15 @@ trsml ( const TMatrix *            L,
         // UNIT DIAGONAL !!!
         //
 
-        // std::cout << "trsml : " << blas::norm_F( X.at( L->row_is() ) ) << std::endl;
+        std::cout << L->id() << " trsml : " << blas::norm_F( X.at( L->row_is() ) ) << std::endl;
+
+        // DEBUG
+        // {
+        //     auto  DX = hlr::matrix::to_dense( X );
+
+        //     DBG::write( X.at( L->row_is() ), "X.mat", "X" );
+        //     std::exit( 0 );
+        // }
     }// else
 }
 
@@ -533,7 +561,7 @@ lu ( TMatrix *          A,
         // T = ( V(A_10)^H · U(A_01) )
         auto  T = dot( A10->col_is(), A10->V(), A01->U(), ntile ); 
 
-        // std::cout << "dot : " << blas::norm_F( T ) << std::endl;
+        std::cout << A->id() << " dot : " << blas::norm_F( T ) << std::endl;
         
         addlr< value_t >( A10->U(), T, A01->V(), A11, acc, ntile );
         
@@ -545,7 +573,7 @@ lu ( TMatrix *          A,
         
         blas::invert( blas_mat< value_t >( DA ) );
 
-        // std::cout << "lu : " << norm_F( A ) << std::endl;
+        std::cout << A->id() << " lu : " << norm_F( A ) << std::endl;
     }// else
 }
 

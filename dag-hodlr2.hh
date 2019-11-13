@@ -66,9 +66,13 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    std::cout << norm_2( A.get() ) << std::endl;
+    
     // convert to tiled format
     A = impl::matrix::copy_tiled< double >( *A, ntile );
 
+    std::cout << norm_2( A.get() ) << std::endl;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // compute DAG
@@ -81,6 +85,8 @@ mymain ( int, char ** )
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
 
+    std::cout << norm_2( C.get() ) << std::endl;
+    
     //
     // set up DAG generation options optimised for different DAGs
     //
@@ -95,161 +101,161 @@ mymain ( int, char ** )
         hlr::dag::def_path_len  = 10;
     }// if
 
-    if ( false )
-    {
-        auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-        auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-        auto & X   = A01->U();
-        auto   T   = std::make_shared< BLAS::Matrix< real > >();
-        auto & U   = A10->V();
-        auto   Q   = std::make_shared< hlr::matrix::tile_storage< real > >();
-        auto   R   = std::make_shared< BLAS::Matrix< real > >();
+    // if ( false )
+    // {
+    //     auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
+    //     auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
+    //     auto & X   = A01->U();
+    //     auto   T   = std::make_shared< BLAS::Matrix< real > >();
+    //     auto & U   = A10->V();
+    //     auto   Q   = std::make_shared< hlr::matrix::tile_storage< real > >();
+    //     auto   R   = std::make_shared< BLAS::Matrix< real > >();
 
-        *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
+    //     *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
 
-        auto  DX = to_dense( X );
-        auto  DU = to_dense( U );
+    //     auto  DX = to_dense( X );
+    //     auto  DU = to_dense( U );
 
-        DBG::write( DX, "X.mat", "X" );
-        DBG::write( *T, "T.mat", "T" );
-        DBG::write( DU, "U.mat", "U" );
+    //     DBG::write( DX, "X.mat", "X" );
+    //     DBG::write( *T, "T.mat", "T" );
+    //     DBG::write( DU, "U.mat", "U" );
 
-        if ( HLIB::CFG::Arith::use_dag )
-        {
-            auto  dag_tsqr = std::move( hlr::dag::gen_dag_tsqr2( A01->ncols(), X, T, U, Q, R, impl::dag::refine ) );
+    //     if ( HLIB::CFG::Arith::use_dag )
+    //     {
+    //         auto  dag_tsqr = std::move( hlr::dag::gen_dag_tsqr2( A01->ncols(), X, T, U, Q, R, impl::dag::refine ) );
         
-            dag_tsqr.print_dot( "tsqr.dot" );
+    //         dag_tsqr.print_dot( "tsqr.dot" );
             
-            impl::dag::run( dag_tsqr, acc );
-        }// if
-        else
-        {
-            std::tie( *Q, *R ) = hlr::seq::tiled2::tsqr( A01->col_is(), 1.0, X, *T, U, 128 );
-        }// else
+    //         impl::dag::run( dag_tsqr, acc );
+    //     }// if
+    //     else
+    //     {
+    //         std::tie( *Q, *R ) = hlr::seq::tiled2::tsqr( A01->col_is(), 1.0, X, *T, U, 128 );
+    //     }// else
 
-        auto  DQ = to_dense( *Q );
+    //     auto  DQ = to_dense( *Q );
 
-        DBG::write( DQ, "Q.mat", "Q" );
-        DBG::write( *R, "R.mat", "R" );
+    //     DBG::write( DQ, "Q.mat", "Q" );
+    //     DBG::write( *R, "R.mat", "R" );
         
-        return;
-    }
+    //     return;
+    // }
     
-    if ( false )
-    {
-        auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-        auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-        auto & X   = A01->U();
-        auto   T   = std::make_shared< BLAS::Matrix< real > >();
-        auto & Y   = A01->V();
+    // if ( false )
+    // {
+    //     auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
+    //     auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
+    //     auto & X   = A01->U();
+    //     auto   T   = std::make_shared< BLAS::Matrix< real > >();
+    //     auto & Y   = A01->V();
 
-        *T = hlr::seq::tiled2::dot( A10->row_is(), A10->U(), A01->V(), ntile );
+    //     *T = hlr::seq::tiled2::dot( A10->row_is(), A10->U(), A01->V(), ntile );
 
-        auto  DX = to_dense( X );
-        auto  DY = to_dense( Y );
+    //     auto  DX = to_dense( X );
+    //     auto  DY = to_dense( Y );
 
-        DBG::write( DX, "X.mat", "X" );
-        DBG::write( *T, "T.mat", "T" );
-        DBG::write( DY, "Y.mat", "Y" );
+    //     DBG::write( DX, "X.mat", "X" );
+    //     DBG::write( *T, "T.mat", "T" );
+    //     DBG::write( DY, "Y.mat", "Y" );
         
-        if ( HLIB::CFG::Arith::use_dag )
-        {
-            auto  dag_trunc = std::move( hlr::dag::gen_dag_truncate2( X, T, Y, A01, impl::dag::refine ) );
+    //     if ( HLIB::CFG::Arith::use_dag )
+    //     {
+    //         auto  dag_trunc = std::move( hlr::dag::gen_dag_truncate2( X, T, Y, A01, impl::dag::refine ) );
         
-            std::cout << "    #nodes = " << dag_trunc.nnodes() << std::endl;
-            std::cout << "    #edges = " << dag_trunc.nedges() << std::endl;
-            dag_trunc.print_dot( "trunc.dot" );
+    //         std::cout << "    #nodes = " << dag_trunc.nnodes() << std::endl;
+    //         std::cout << "    #edges = " << dag_trunc.nedges() << std::endl;
+    //         dag_trunc.print_dot( "trunc.dot" );
 
-            tic = now();
+    //         tic = now();
             
-            impl::dag::run( dag_trunc, acc );
+    //         impl::dag::run( dag_trunc, acc );
 
-            toc = since( tic );
-        }// if
-        else
-        {
-            tic = now();
+    //         toc = since( tic );
+    //     }// if
+    //     else
+    //     {
+    //         tic = now();
 
-            auto [ U, V ] = hlr::seq::tiled2::truncate( A01->row_is(), A01->col_is(), 1.0, X, *T, Y, A01->U(), A01->V(), acc, ntile );
+    //         auto [ U, V ] = hlr::seq::tiled2::truncate( A01->row_is(), A01->col_is(), 1.0, X, *T, Y, A01->U(), A01->V(), acc, ntile );
             
-            A01->set_lrmat( std::move( U ), std::move( V ) );
+    //         A01->set_lrmat( std::move( U ), std::move( V ) );
 
-            toc = since( tic );
-        }// else
+    //         toc = since( tic );
+    //     }// else
 
-        std::cout << "  trunc in    " << format_time( toc ) << std::endl;
+    //     std::cout << "  trunc in    " << format_time( toc ) << std::endl;
 
-        auto  DU = to_dense( A01->U() );
-        auto  DV = to_dense( A01->V() );
+    //     auto  DU = to_dense( A01->U() );
+    //     auto  DV = to_dense( A01->V() );
 
-        DBG::write( DU, "U.mat", "U" );
-        DBG::write( DV, "V.mat", "V" );
+    //     DBG::write( DU, "U.mat", "U" );
+    //     DBG::write( DV, "V.mat", "V" );
         
-        return;
-    }
+    //     return;
+    // }
 
-    if ( false )
-    {
-        auto    A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-        auto    A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-        auto    A11 = ptrcast( C.get(), TBlockMatrix )->block( 1, 1 );
-        auto &  X   = A10->U();
-        auto    T   = std::make_shared< BLAS::Matrix< real > >();
-        auto &  Y   = A01->V();
+    // if ( false )
+    // {
+    //     auto    A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
+    //     auto    A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
+    //     auto    A11 = ptrcast( C.get(), TBlockMatrix )->block( 1, 1 );
+    //     auto &  X   = A10->U();
+    //     auto    T   = std::make_shared< BLAS::Matrix< real > >();
+    //     auto &  Y   = A01->V();
 
-        *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
+    //     *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
 
-        if ( A11->nrows() <= 4096 )
-        {
-            auto  dX = hlr::matrix::to_dense( X );
-            auto  dY = hlr::matrix::to_dense( Y );
-            auto  M = impl::matrix::copy_nontiled< real >( *A11 );
+    //     if ( A11->nrows() <= 4096 )
+    //     {
+    //         auto  dX = hlr::matrix::to_dense( X );
+    //         auto  dY = hlr::matrix::to_dense( Y );
+    //         auto  M = impl::matrix::copy_nontiled< real >( *A11 );
             
-            DBG::write( dX,  "X.mat", "X" );
-            DBG::write( *T,  "T.mat", "T" );
-            DBG::write( dY,  "Y.mat", "Y" );
-            DBG::write( M.get(), "A.mat", "A" );
-        }// if
+    //         DBG::write( dX,  "X.mat", "X" );
+    //         DBG::write( *T,  "T.mat", "T" );
+    //         DBG::write( dY,  "Y.mat", "Y" );
+    //         DBG::write( M.get(), "A.mat", "A" );
+    //     }// if
 
-        if ( HLIB::CFG::Arith::use_dag )
-        {
-            std::cout << "    mem    = " << mem_usage() << std::endl;
+    //     if ( HLIB::CFG::Arith::use_dag )
+    //     {
+    //         std::cout << "    mem    = " << mem_usage() << std::endl;
             
-            auto  dag_addlr = std::move( hlr::dag::gen_dag_addlr2( X, T, Y, A11, impl::dag::refine ) );
+    //         auto  dag_addlr = std::move( hlr::dag::gen_dag_addlr2( X, T, Y, A11, impl::dag::refine ) );
         
-            std::cout << "    #nodes = " << dag_addlr.nnodes() << std::endl;
-            std::cout << "    #edges = " << dag_addlr.nedges() << std::endl;
-            std::cout << "    mem    = " << Mem::to_string( dag_addlr.mem_size() ) << mem_usage() << std::endl;
+    //         std::cout << "    #nodes = " << dag_addlr.nnodes() << std::endl;
+    //         std::cout << "    #edges = " << dag_addlr.nedges() << std::endl;
+    //         std::cout << "    mem    = " << Mem::to_string( dag_addlr.mem_size() ) << mem_usage() << std::endl;
 
-            dag_addlr.print_dot( "addlr.dot" );
+    //         dag_addlr.print_dot( "addlr.dot" );
 
-            tic = now();
+    //         tic = now();
             
-            impl::dag::run( dag_addlr, acc );
+    //         impl::dag::run( dag_addlr, acc );
 
-            toc = since( tic );
-            std::cout << "    mem    = " << mem_usage() << std::endl;
-        }// if
-        else
-        {
-            tic = now();
+    //         toc = since( tic );
+    //         std::cout << "    mem    = " << mem_usage() << std::endl;
+    //     }// if
+    //     else
+    //     {
+    //         tic = now();
 
-            impl::tiled2::hodlr::addlr( X, *T, Y, A11, acc, ntile );
+    //         impl::tiled2::hodlr::addlr( X, *T, Y, A11, acc, ntile );
             
-            toc = since( tic );
-        }// else
+    //         toc = since( tic );
+    //     }// else
 
-        std::cout << "  addlr in    " << format_time( toc ) << std::endl;
+    //     std::cout << "  addlr in    " << format_time( toc ) << std::endl;
         
-        if ( A11->nrows() <= 4096 )
-        {
-            auto  M = impl::matrix::copy_nontiled< real >( *A11 );
+    //     if ( A11->nrows() <= 4096 )
+    //     {
+    //         auto  M = impl::matrix::copy_nontiled< real >( *A11 );
             
-            DBG::write( M.get(), "C.mat", "C" );
-        }// if
+    //         DBG::write( M.get(), "C.mat", "C" );
+    //     }// if
 
-        return;
-    }
+    //     return;
+    // }
     
     //
     // benchmark DAG generation
