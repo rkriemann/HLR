@@ -117,6 +117,24 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 };
 
+struct waz_node : public node
+{
+    TMatrix *  A;
+    
+    waz_node ( TMatrix *  aA )
+            : A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "waz( %d )", A->id() ); }
+    virtual std::string  color     () const { return "ef2929"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+};
+
 struct inv_node : public node
 {
     TMatrix *  A;
@@ -550,6 +568,35 @@ void
 trsml_node::run_ ( const TTruncAcc &  acc )
 {
     solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// waz_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+waz_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    auto  lu     = g.alloc_node< lu_node >( A );
+    auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_inverse );
+    auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_inverse );
+
+    inv_ll->after( lu );
+    inv_ur->after( lu );
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+waz_node::run_ ( const TTruncAcc &  acc )
+{
+    HLR_ASSERT( false );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1234,6 +1281,18 @@ gen_dag_invert_ur ( HLIB::TMatrix &    U,
                     refine_func_t      refine )
 {
     return refine( new inv_ur_node( & U, diag, store_normal ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+}
+
+//
+// compute DAG for WAZ factorization of A
+//
+dag::graph
+gen_dag_waz ( HLIB::TMatrix &  A,
+              refine_func_t    refine )
+{
+    auto  dag = refine( new waz_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
+
+    return std::move( dag );
 }
 
 //
