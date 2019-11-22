@@ -8,6 +8,7 @@
 
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/seq/arith_tiled_v2.hh"
 #include "hlr/seq/dag.hh"
 
 namespace          impl      = hlr::seq;

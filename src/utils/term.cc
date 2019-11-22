@@ -23,6 +23,8 @@ namespace term
 namespace
 {
 
+constexpr bool use_colors = false;
+
 //
 // return true, if given stream supported color codes
 //
@@ -35,6 +37,9 @@ supports_color  ( const std::ostream &  os )
     
     #else
 
+    if ( ! use_colors )
+        return false;
+    
     //
     // trivial test for cout/cerr
     //
@@ -143,48 +148,48 @@ const char *  reverse      () { return "";  }
 
 #else
 
-const char *  reset        () { return "\033[0m";  }
+const char *  reset        () { return ( use_colors ? "\033[0m" : "" ); }
 
-const char *  black        () { return "\033[30m"; }
-const char *  red          () { return "\033[31m"; }
-const char *  green        () { return "\033[32m"; }
-const char *  yellow       () { return "\033[33m"; }
-const char *  blue         () { return "\033[34m"; }
-const char *  magenta      () { return "\033[35m"; }
-const char *  cyan         () { return "\033[36m"; }
-const char *  grey         () { return "\033[90m"; }
+const char *  black        () { return ( use_colors ? "\033[30m" : "" ); }
+const char *  red          () { return ( use_colors ? "\033[31m" : "" ); }
+const char *  green        () { return ( use_colors ? "\033[32m" : "" ); }
+const char *  yellow       () { return ( use_colors ? "\033[33m" : "" ); }
+const char *  blue         () { return ( use_colors ? "\033[34m" : "" ); }
+const char *  magenta      () { return ( use_colors ? "\033[35m" : "" ); }
+const char *  cyan         () { return ( use_colors ? "\033[36m" : "" ); }
+const char *  grey         () { return ( use_colors ? "\033[90m" : "" ); }
 
-const char *  ltgrey       () { return "\033[37m"; }
-const char *  ltred        () { return "\033[91m"; }
-const char *  ltgreen      () { return "\033[92m"; }
-const char *  ltyellow     () { return "\033[93m"; }
-const char *  ltblue       () { return "\033[94m"; }
-const char *  ltmagenta    () { return "\033[95m"; }
-const char *  ltcyan       () { return "\033[96m"; }
-const char *  white        () { return "\033[97m"; }
+const char *  ltgrey       () { return ( use_colors ? "\033[37m" : "" ); }
+const char *  ltred        () { return ( use_colors ? "\033[91m" : "" ); }
+const char *  ltgreen      () { return ( use_colors ? "\033[92m" : "" ); }
+const char *  ltyellow     () { return ( use_colors ? "\033[93m" : "" ); }
+const char *  ltblue       () { return ( use_colors ? "\033[94m" : "" ); }
+const char *  ltmagenta    () { return ( use_colors ? "\033[95m" : "" ); }
+const char *  ltcyan       () { return ( use_colors ? "\033[96m" : "" ); }
+const char *  white        () { return ( use_colors ? "\033[97m" : "" ); }
 
-const char *  on_black     () { return "\033[40m"; }
-const char *  on_red       () { return "\033[41m"; }
-const char *  on_green     () { return "\033[42m"; }
-const char *  on_yellow    () { return "\033[43m"; }
-const char *  on_blue      () { return "\033[44m"; }
-const char *  on_magenta   () { return "\033[45m"; }
-const char *  on_cyan      () { return "\033[46m"; }
-const char *  on_grey      () { return "\033[47m"; }
+const char *  on_black     () { return ( use_colors ? "\033[40m" : "" ); }
+const char *  on_red       () { return ( use_colors ? "\033[41m" : "" ); }
+const char *  on_green     () { return ( use_colors ? "\033[42m" : "" ); }
+const char *  on_yellow    () { return ( use_colors ? "\033[43m" : "" ); }
+const char *  on_blue      () { return ( use_colors ? "\033[44m" : "" ); }
+const char *  on_magenta   () { return ( use_colors ? "\033[45m" : "" ); }
+const char *  on_cyan      () { return ( use_colors ? "\033[46m" : "" ); }
+const char *  on_grey      () { return ( use_colors ? "\033[47m" : "" ); }
 
-const char *  on_ltgrey    () { return "\033[100m"; }
-const char *  on_ltred     () { return "\033[101m"; }
-const char *  on_ltgreen   () { return "\033[102m"; }
-const char *  on_ltyellow  () { return "\033[103m"; }
-const char *  on_ltblue    () { return "\033[104m"; }
-const char *  on_ltmagenta () { return "\033[105m"; }
-const char *  on_ltcyan    () { return "\033[106m"; }
-const char *  on_white     () { return "\033[107m"; }
+const char *  on_ltgrey    () { return ( use_colors ? "\033[100m" : "" ); }
+const char *  on_ltred     () { return ( use_colors ? "\033[101m" : "" ); }
+const char *  on_ltgreen   () { return ( use_colors ? "\033[102m" : "" ); }
+const char *  on_ltyellow  () { return ( use_colors ? "\033[103m" : "" ); }
+const char *  on_ltblue    () { return ( use_colors ? "\033[104m" : "" ); }
+const char *  on_ltmagenta () { return ( use_colors ? "\033[105m" : "" ); }
+const char *  on_ltcyan    () { return ( use_colors ? "\033[106m" : "" ); }
+const char *  on_white     () { return ( use_colors ? "\033[107m" : "" ); }
 
-const char *  bold         () { return "\033[1m";  }
-const char *  dark         () { return "\033[2m";  }
-const char *  underline    () { return "\033[4m";  }
-const char *  reverse      () { return "\033[7m";  }
+const char *  bold         () { return ( use_colors ? "\033[1m" : "" ); }
+const char *  dark         () { return ( use_colors ? "\033[2m" : "" ); }
+const char *  underline    () { return ( use_colors ? "\033[4m" : "" ); }
+const char *  reverse      () { return ( use_colors ? "\033[7m" : "" ); }
 
 #endif
 

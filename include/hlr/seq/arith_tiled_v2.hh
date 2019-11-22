@@ -40,6 +40,30 @@ using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
 
+inline
+std::string
+idstr ( hpro::id_t    id )
+{
+    return hpro::to_string( "%3d", id );
+}
+
+inline
+std::string
+isstr ( indexset      is,
+        const size_t  ntile )
+{
+    if ( is.size() <= ntile ) return hpro::to_string( "[%d]  ",    is.first() / ntile );
+    else                      return hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+}
+
+inline
+std::string
+normstr ( double   f )
+{
+    return hpro::to_string( "%.4e", f );
+}
+
+
 //
 // split given indexset into <n> subsets
 //
@@ -119,9 +143,22 @@ tprod ( const indexset &                 is,
         assert( ( beta == value_t(0) ) || B.contains( is ) );
 
         if ( B.contains( is ) )
+        {
+            hlr::log( 0, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
+            hlr::log( 0, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
+            hlr::log( 0, "tprod :          B , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
+            
             blas::prod( alpha, A.at( is ), T, beta, B.at( is ) );
+        }// if
         else
+        {
+            hlr::log( 0, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
+            hlr::log( 0, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
+            
             B[ is ] = std::move( blas::prod( alpha, A.at( is ), T ) );
+        }// else
+
+        hlr::log( 0, "tprod :          C , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
     }// else
 }
 
@@ -220,6 +257,9 @@ tsqr ( const indexset &                 is,
 
         Q[ is ] = std::move( WU );
         
+        hlr::log( 0, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
+        hlr::log( 0, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
+        
         return { std::move( Q ), std::move( R ) };
     }// else
 }
@@ -289,6 +329,9 @@ tsqr ( const indexset &                 is,
         tile_storage< value_t >  Q;
 
         Q[ is ] = std::move( XU );
+        
+        hlr::log( 0, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
+        hlr::log( 0, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
         return { std::move( Q ), std::move( R ) };
     }// else
@@ -440,6 +483,8 @@ addlr ( const tile_storage< value_t > &  U,
 
         blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
                     value_t(1), blas_mat< value_t >( D ) );
+
+        hlr::log( 0, "addlr :         " + idstr( A->id() ) + ",       = " + normstr( hpro::norm_F( D ) ) );
     }// else
 }
 
@@ -465,8 +510,8 @@ trsmuh ( const TMatrix *            U,
         trsmuh( U00, X, ntile );
 
         auto  T = dot( U01->row_is(), U01->U(), X, ntile );
-        
-        std::cout << U->id() << " dot (trsmu) : " << blas::norm_F( T ) << std::endl;
+
+        hlr::log( 0, "trsmu :  dot :  " + idstr( U->id() ) + ", " + isstr( U01->row_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         tprod( U01->col_is(), value_t(-1), U01->V(), T, value_t(1), X, ntile );
 
@@ -483,7 +528,7 @@ trsmuh ( const TMatrix *            U,
 
         blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
-        std::cout << U->id() << " trsmu : " << blas::norm_F( X_is ) << std::endl;
+        hlr::log( 0, "trsmu :         " + idstr( U->id() ) + "        = " + normstr( blas::normF( X_is ) ) );
     }// else
 }
 
@@ -510,7 +555,7 @@ trsml ( const TMatrix *            L,
 
         auto  T = dot( L10->col_is(), L10->V(), X, ntile );
 
-        std::cout << L->id() << " dot (trsml) : " << blas::norm_F( T ) << std::endl;
+        hlr::log( 0, "trsml :  dot :  " + idstr( L->id() ) + ", " + isstr( L10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         tprod( L10->row_is(), value_t(-1), L10->U(), T, value_t(1), X, ntile );
 
@@ -522,7 +567,7 @@ trsml ( const TMatrix *            L,
         // UNIT DIAGONAL !!!
         //
 
-        std::cout << L->id() << " trsml : " << blas::norm_F( X.at( L->row_is() ) ) << std::endl;
+        hlr::log( 0, "trsml :         " + idstr( L->id() ) + "        = " + normstr( blas::normF( X.at( L->row_is() ) ) ) );
 
         // DEBUG
         // {
@@ -561,7 +606,7 @@ lu ( TMatrix *          A,
         // T = ( V(A_10)^H · U(A_01) )
         auto  T = dot( A10->col_is(), A10->V(), A01->U(), ntile ); 
 
-        std::cout << A->id() << " dot : " << blas::norm_F( T ) << std::endl;
+        hlr::log( 0, "lu    :  dot :  " + idstr( A->id() ) + ", " + isstr( A10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         addlr< value_t >( A10->U(), T, A01->V(), A11, acc, ntile );
         
@@ -573,7 +618,7 @@ lu ( TMatrix *          A,
         
         blas::invert( blas_mat< value_t >( DA ) );
 
-        std::cout << A->id() << " lu : " << norm_F( A ) << std::endl;
+        hlr::log( 0, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
     }// else
 }
 

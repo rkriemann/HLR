@@ -10,6 +10,7 @@
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/seq/norm.hh"
+#include "hlr/seq/arith_tiled_v3.hh"
 
 //
 // main function
@@ -51,6 +52,67 @@ mymain ( int, char ** )
     }// if
 
     if ( true )
+    {
+        std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v3 " << impl_name << " )" << term::reset << std::endl;
+
+        // auto  B   = ptrcast( A.get(), TBlockMatrix );
+        // auto  A01 = ptrcast( B->block( 0, 1 ), TRkMatrix );
+
+        // DBG::write( A01, "A.mat", "A" );
+        
+        // auto  C01 = std::make_unique< matrix::tiled_lrmatrix< double > >( A01->row_is(), A01->col_is(), ntile, A01->blas_rmat_A(), A01->blas_rmat_B() );
+            
+        // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
+        // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
+        
+        std::cout << norm_2( A.get() ) << std::endl;
+        
+        A = impl::matrix::copy_tiled< double >( *A, ntile );
+        
+        auto  C = impl::matrix::copy( *A );
+
+        std::cout << norm_2( A.get() ) << std::endl;
+        std::cout << norm_2( C.get() ) << std::endl;
+
+        std::vector< double >  runtime;
+    
+        for ( int  i = 0; i < nbench; ++i )
+        {
+            tic = Time::Wall::now();
+            
+            hlr::seq::tiled3::hodlr::lu( C.get(), acc, ntile );
+
+            toc = Time::Wall::since( tic );
+
+            std::cout << "    done in " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *C );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
+
+        {
+            auto  T1 = hlr::seq::matrix::copy_nontiled< double >( *C );
+            auto  T2 = hpro::to_dense( T1.get() );
+
+            write_matrix( T2.get(), "A.mat", "A" );
+        }
+    
+        // std::cout << norm_2( C.get() ) << std::endl;
+        
+        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        
+        return;
+    }// if
+    
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
@@ -94,6 +156,13 @@ mymain ( int, char ** )
         if ( nbench > 1 )
             std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
 
+        {
+            auto  T1 = hlr::seq::matrix::copy_nontiled< double >( *C );
+            auto  T2 = hpro::to_dense( T1.get() );
+
+            write_matrix( T2.get(), "A.mat", "A" );
+        }
+    
         // std::cout << norm_2( C.get() ) << std::endl;
         
         TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );

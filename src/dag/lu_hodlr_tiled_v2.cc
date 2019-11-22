@@ -22,6 +22,7 @@
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/seq/arith_tiled_v2.hh"
 
 namespace hlr { namespace dag {
 
@@ -197,15 +198,24 @@ matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr<
 //  { return { name, block_is() }; }
 template <>
 const mem_block_t
-matrix_info< tile_storage< real > * >::mem_block () const { return { id_t(data), block_is() }; }
+matrix_info< tile_storage< real > * >::mem_block () const
+{
+    return { id_t(data), block_is() };
+}
 
 template <>
 const mem_block_t
-matrix_info< std::shared_ptr< tile_storage< real > > >::mem_block () const { return { id_t(data.get()), block_is() }; }
+matrix_info< std::shared_ptr< tile_storage< real > > >::mem_block () const
+{
+    return { id_t(data.get()), block_is() };
+}
 
 template <>
 const mem_block_t
-matrix_info< std::shared_ptr< matrix< real > > >::mem_block () const { return { id_t(data.get()), block_is() }; }
+matrix_info< std::shared_ptr< matrix< real > > >::mem_block () const
+{
+    return { id_t(data.get()), block_is() };
+}
 
 
 using dense_matrix        = matrix_info< matrix< real > >;
@@ -254,8 +264,8 @@ is_tiled_lowrank ( const TMatrix *  M )
 
 // identifiers for memory blocks
 constexpr id_t  NAME_A    = 'A';
-constexpr id_t  NAME_L    = 'L';
-constexpr id_t  NAME_U    = 'U';
+constexpr id_t  NAME_L    = 'A';
+constexpr id_t  NAME_U    = 'A';
 constexpr id_t  NAME_NONE = '0';
 
 //
@@ -305,7 +315,7 @@ struct trsmu_node : public node
     
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( U%d, ", U->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( %c%d, ", char(NAME_U), U->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -339,7 +349,7 @@ struct trsml_node : public node
 
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsml( L%d, ", L->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + HLIB::to_string( " = trsml( %c%d, ", char(NAME_L), L->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -376,8 +386,8 @@ struct addlr_node : public node
 
     virtual std::string  to_string () const
     {
-        return ( "addlr(" + HLIB::to_string( "A%d, ", A->id() ) +
-                 U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + ")" );
+        return ( "addlr(" + U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + " + \n" +
+                 HLIB::to_string( "A%d", A->id() ) + ")" );
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -452,7 +462,7 @@ struct tprod_node : public node
 
     virtual std::string  to_string () const 
     {
-        return "Tprod(" + Y.to_string( ntile ) + "+" + X.to_string( ntile ) + "×" + T.to_string() + ")";
+        return "Tprod(" + X.to_string( ntile ) + "×" + T.to_string() + "+" + Y.to_string( ntile ) + ")";
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -556,7 +566,7 @@ struct truncate_node : public node
 
     virtual std::string  to_string () const
     {
-        return ( "trunc( " + X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + ", " +
+        return ( "trunc( " + X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + ",\n " +
                  U.to_string( ntile ) + "×" + V.to_string( ntile ) + " )" );
     }
     virtual std::string  color     () const { return "e9b96e"; }
@@ -618,7 +628,7 @@ struct tsqr_node : public node
         if ( is_null( T.data ) )
             return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + ", " + U.to_string( ntile ) + " )";
         else
-            return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + " · " + T.to_string() + ", " + U.to_string( ntile ) + " )";
+            return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + "×" + T.to_string() + ", " + U.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "e9b96e"; }
 
@@ -935,7 +945,7 @@ dot_node::run_ ( const TTruncAcc &  acc )
 {
     *(T.data) = hlr::seq::tiled2::dot( A.is, *(A.data), *(B.data), ntile );
 
-    std::cout << "dot : " << BLAS::norm_F( *(T.data) ) << std::endl;
+    hlr::log( 0, "         dot :       " + hlr::seq::tiled2::isstr( A.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1072,7 +1082,7 @@ tadd_node::run_ ( const TTruncAcc &  acc )
     BLAS::add( real(1), *(T0.data), *(T.data) );
     BLAS::add( real(1), *(T1.data), *(T.data) );
 
-    std::cout << " tadd : " << blas::norm_F( *(T.data) ) << std::endl;
+    hlr::log( 0, "        tadd :             = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1211,6 +1221,9 @@ tsqr_node::run_ ( const TTruncAcc & )
 
         blas::qr( XU, *(R.data) );
 
+        hlr::log( 0, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( XU ) ) );
+        hlr::log( 0, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        
         (*(Q.data))[ X.is ] = std::move( XU );
     }// if
     else
@@ -1238,6 +1251,9 @@ tsqr_node::run_ ( const TTruncAcc & )
 
         blas::qr( WU, *(R.data) );
 
+        hlr::log( 0, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( WU ) ) );
+        hlr::log( 0, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        
         (*(Q.data))[ X.is ] = std::move( WU );
     }// else
 }

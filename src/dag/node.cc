@@ -211,6 +211,10 @@ refine_loc_deps ( node *  node )
                         HLR_LOG( 6, indent + node->to_string() + " ⟶ " + succ_sub->to_string() );
                         new_out.push_back( succ_sub );
                     }// if
+                    else
+                    {
+                        HLR_LOG( 6, indent + term::red( "NOT " ) + node->to_string() + " ⟶ " + succ_sub->to_string() );
+                    }// else
                 }// for
 
                 ++succ;
@@ -277,6 +281,10 @@ refine_sub_deps ( node *  node )
                         HLR_LOG( 6, indent + sub->to_string() + " ⟶ " + succ_sub->to_string() );
                         sub->successors().push_back( succ_sub );
                     }// if
+                    else
+                    {
+                        HLR_LOG( 6, indent + term::red( "NOT " ) + sub->to_string() + " ⟶ " + succ_sub->to_string() );
+                    }// else
                 }// for
             }// if
             else
@@ -286,6 +294,10 @@ refine_sub_deps ( node *  node )
                     HLR_LOG( 6, indent + sub->to_string() + " → " + succ->to_string() );
                     sub->successors().push_back( succ );
                 }// if
+                else
+                {
+                    HLR_LOG( 6, indent + term::red( "NOT " ) + sub->to_string() + " ⟶ " + succ->to_string() );
+                }// else
             }// for
         }// else
     }// for

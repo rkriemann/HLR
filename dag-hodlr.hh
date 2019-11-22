@@ -85,7 +85,8 @@ mymain ( int, char ** )
     }// if
     else
     {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all_ext;
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+        // hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all_ext;
         hlr::dag::def_path_len  = 10;
     }// if
 

@@ -324,7 +324,14 @@ mymain ( int, char ** )
         std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        
+
+    {
+        auto  T1 = impl::matrix::copy_nontiled< double >( *C );
+        auto  T2 = hpro::to_dense( T1.get() );
+
+        write_matrix( T2.get(), "B.mat", "B" );
+    }
+    
     TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
     // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
         
