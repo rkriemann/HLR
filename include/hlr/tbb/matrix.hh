@@ -118,6 +118,7 @@ build ( const TBlockCluster *  bct,
 // return copy of matrix
 // - copy operation is performed in parallel for sub blocks
 //
+inline
 std::unique_ptr< TMatrix >
 copy ( const TMatrix &  M )
 {
@@ -158,6 +159,10 @@ copy ( const TMatrix &  M )
     }// else
 }
 
+//
+// return copy of matrix with TRkMatrix replaced by tiled_lrmatrix
+// - copy operation is performed in parallel for sub blocks
+//
 template < typename value_t >
 std::unique_ptr< TMatrix >
 copy_tiled ( const TMatrix &  M,
@@ -206,6 +211,69 @@ copy_tiled ( const TMatrix &  M,
                                                                            ntile,
                                                                            blas_mat_A< value_t >( RM ),
                                                                            blas_mat_B< value_t >( RM ) );
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of matrix with tiled_lrmatrix replaced by TRkMatrix
+// - copy operation is performed in parallel for sub blocks
+//
+template < typename value_t >
+std::unique_ptr< TMatrix >
+copy_nontiled ( const TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, TBlockMatrix );
+        auto  N  = std::make_unique< TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = copy_nontiled< value_t >( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else if ( IS_TYPE( & M, tiled_lrmatrix ) )
+    {
+        //
+        // copy low-rank data into tiled form
+        //
+
+        assert( M.is_real() );
+        
+        auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
+        auto  R  = std::make_unique< TRkMatrix >( RM->row_is(), RM->col_is() );
+        auto  U  = hlr::matrix::to_dense( RM->U() );
+        auto  V  = hlr::matrix::to_dense( RM->V() );
+
+        R->set_lrmat( U, V );
+        R->set_id( RM->id() );
+
+        return R;
     }// if
     else
     {
@@ -342,6 +410,7 @@ copy_ur ( const TMatrix &    M,
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //
+inline
 void
 copy_to ( const TMatrix &  A,
           TMatrix &        B )
@@ -387,6 +456,7 @@ copy_to ( const TMatrix &  A,
 // - frees old data
 // - local operation thereby limiting extra memory usage
 //
+inline
 std::unique_ptr< TMatrix >
 realloc ( TMatrix *  A )
 {

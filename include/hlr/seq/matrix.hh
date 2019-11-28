@@ -130,6 +130,9 @@ copy ( const TMatrix &  M )
     }// else
 }
 
+//
+// return copy of matrix with TRkMatrix replaced by tiled_lrmatrix
+//
 template < typename value_t >
 std::unique_ptr< TMatrix >
 copy_tiled ( const TMatrix &  M,
@@ -183,6 +186,9 @@ copy_tiled ( const TMatrix &  M,
     }// else
 }
 
+//
+// return copy of matrix with tiled_lrmatrix replaced by TRkMatrix
+//
 template < typename value_t >
 std::unique_ptr< TMatrix >
 copy_nontiled ( const TMatrix &  M )

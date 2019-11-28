@@ -23,7 +23,7 @@ namespace term
 namespace
 {
 
-constexpr bool use_colors = false;
+constexpr bool use_colors = true;
 
 //
 // return true, if given stream supported color codes

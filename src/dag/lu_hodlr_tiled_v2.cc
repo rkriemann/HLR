@@ -23,6 +23,7 @@
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_tiled_v2.hh"
+#include "hlr/tbb/arith_tiled_v2.hh"
 
 namespace hlr { namespace dag {
 
@@ -540,13 +541,14 @@ private:
 //
 struct truncate_node : public node
 {
-    const real     alpha;
-    tiled_matrix   X;
-    shared_matrix  T;
-    tiled_matrix   Y;
-    tiled_matrix   U;
-    tiled_matrix   V;
-    const size_t   ntile;
+    const real                alpha;
+    tiled_matrix              X;
+    shared_matrix             T;
+    tiled_matrix              Y;
+    tiled_matrix              U;
+    tiled_matrix              V;
+    tiled_lrmatrix< real > *  A;
+    const size_t              ntile;
 
     truncate_node ( const real                aalpha,
                     tiled_matrix              aX,
@@ -554,6 +556,7 @@ struct truncate_node : public node
                     tiled_matrix              aY,
                     tiled_matrix              aU,
                     tiled_matrix              aV,
+                    tiled_lrmatrix< real > *  aA,
                     const size_t              antile )
             : alpha( aalpha )
             , X( aX )
@@ -561,6 +564,7 @@ struct truncate_node : public node
             , Y( aY )
             , U( aU )
             , V( aV )
+            , A( aA )
             , ntile( antile )
     { init(); }
 
@@ -766,7 +770,7 @@ lu_node::refine_ ( const size_t )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::seq::tiled2::hodlr::lu< real >( A, acc, ntile );
+    hlr::tbb::tiled2::hodlr::lu< real >( A, acc, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -945,7 +949,7 @@ dot_node::run_ ( const TTruncAcc &  acc )
 {
     *(T.data) = hlr::seq::tiled2::dot( A.is, *(A.data), *(B.data), ntile );
 
-    hlr::log( 0, "         dot :       " + hlr::seq::tiled2::isstr( A.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
+    HLR_LOG( 5, "         dot :       " + hlr::seq::tiled2::isstr( A.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1039,6 +1043,7 @@ addlr_node::refine_ ( const size_t )
                                        tiled_matrix( A01->col_is(), V ),
                                        tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                        tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
+                                       A01,
                                        ntile );
         g.alloc_node< truncate_node >( real(-1),
                                        tiled_matrix( A10->row_is(), U ),
@@ -1046,6 +1051,7 @@ addlr_node::refine_ ( const size_t )
                                        tiled_matrix( A10->col_is(), V ),
                                        tiled_matrix( NAME_A, A10->id(), A10->row_is(), & A10->U() ),
                                        tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
+                                       A10,
                                        ntile );
         g.alloc_node< addlr_node    >( tiled_matrix( A11->row_is(), U ),
                                        T,
@@ -1062,6 +1068,8 @@ addlr_node::refine_ ( const size_t )
 void
 addlr_node::run_ ( const TTruncAcc &  acc )
 {
+    hpro::TScopedLock  lock( *A );
+    
     hlr::seq::tiled2::hodlr::addlr( *(U.data), *(T.data), *(V.data), A, acc, ntile );
 }
 
@@ -1082,7 +1090,7 @@ tadd_node::run_ ( const TTruncAcc &  acc )
     BLAS::add( real(1), *(T0.data), *(T.data) );
     BLAS::add( real(1), *(T1.data), *(T.data) );
 
-    hlr::log( 0, "        tadd :             = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
+    HLR_LOG( 5, "        tadd :             = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1136,6 +1144,8 @@ truncate_node::refine_ ( const size_t  min_size )
 void
 truncate_node::run_ ( const TTruncAcc &  acc )
 {
+    hpro::TScopedLock  lock( *A );
+    
     auto [ U2, V2 ] = hlr::seq::tiled2::truncate( U.is, V.is, alpha, *(X.data), *(T.data), *(Y.data), *(U.data), *(V.data), acc, ntile );
 
     *(U.data) = std::move( U2 );
@@ -1204,13 +1214,13 @@ tsqr_node::run_ ( const TTruncAcc & )
     
     if ( is_null( T.data ) )
     {
-        {
-            auto  DX = hlr::matrix::to_dense( *(X.data) );
-            auto  DU = hlr::matrix::to_dense( *(U.data) );
+        // {
+        //     auto  DX = hlr::matrix::to_dense( *(X.data) );
+        //     auto  DU = hlr::matrix::to_dense( *(U.data) );
             
-            DBG::write( DX, "Y1.mat", "Y1" );
-            DBG::write( DU, "V1.mat", "V1" );
-        }
+        //     DBG::write( DX, "Y1.mat", "Y1" );
+        //     DBG::write( DU, "V1.mat", "V1" );
+        // }
     
         assert( X.data->contains( X.is ) && U.data->contains( U.is ) );
 
@@ -1225,21 +1235,21 @@ tsqr_node::run_ ( const TTruncAcc & )
 
         blas::qr( XU, *(R.data) );
 
-        hlr::log( 0, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( XU ) ) );
-        hlr::log( 0, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        HLR_LOG( 5, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( XU ) ) );
+        HLR_LOG( 5, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
         
         (*(Q.data))[ X.is ] = std::move( XU );
     }// if
     else
     {
-        {
-            auto  DX = hlr::matrix::to_dense( *(X.data) );
-            auto  DU = hlr::matrix::to_dense( *(U.data) );
+        // {
+        //     auto  DX = hlr::matrix::to_dense( *(X.data) );
+        //     auto  DU = hlr::matrix::to_dense( *(U.data) );
             
-            DBG::write( DX,        "X1.mat", "X1" );
-            DBG::write( *(T.data), "T1.mat", "T1" );
-            DBG::write( DU,        "U1.mat", "U1" );
-        }
+        //     DBG::write( DX,        "X1.mat", "X1" );
+        //     DBG::write( *(T.data), "T1.mat", "T1" );
+        //     DBG::write( DU,        "U1.mat", "U1" );
+        // }
     
         assert( X.data->contains( X.is ) && U.data->contains( U.is ) );
 
@@ -1255,8 +1265,8 @@ tsqr_node::run_ ( const TTruncAcc & )
 
         blas::qr( WU, *(R.data) );
 
-        hlr::log( 0, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( WU ) ) );
-        hlr::log( 0, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        HLR_LOG( 5, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( WU ) ) );
+        HLR_LOG( 5, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
         
         (*(Q.data))[ X.is ] = std::move( WU );
     }// else
@@ -1307,8 +1317,8 @@ svd_node::run_ ( const TTruncAcc &  acc )
         
     const auto      k  = acc.trunc_rank( Ss );
 
-    for ( int  i = 0; i < k; ++i )
-        std::cout << Ss(i) << std::endl;
+    // for ( size_t  i = 0; i < k; ++i )
+    //     std::cout << Ss(i) << std::endl;
     
     matrix< real >  Usk( Us, range::all, range( 0, k-1 ) );
     matrix< real >  Vsk( Vs, range::all, range( 0, k-1 ) );
@@ -1383,6 +1393,7 @@ gen_dag_truncate2 ( tile_storage< real > &               X,
                                       matrix_info( id_t('U'), A->col_is(), & Y ),
                                       matrix_info( A->row_is(), & A->U() ),
                                       matrix_info( A->col_is(), & A->V() ),
+                                      A,
                                       32 ),
                    32,
                    use_single_end_node );

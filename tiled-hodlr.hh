@@ -51,7 +51,7 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( onlydag )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v3 " << impl_name << " )" << term::reset << std::endl;
 
@@ -65,14 +65,14 @@ mymain ( int, char ** )
         // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
-        std::cout << norm_2( A.get() ) << std::endl;
+        // std::cout << norm_2( A.get() ) << std::endl;
         
         A = impl::matrix::copy_tiled< double >( *A, ntile );
         
         auto  C = impl::matrix::copy( *A );
 
-        std::cout << norm_2( A.get() ) << std::endl;
-        std::cout << norm_2( C.get() ) << std::endl;
+        // std::cout << norm_2( A.get() ) << std::endl;
+        // std::cout << norm_2( C.get() ) << std::endl;
 
         std::vector< double >  runtime;
     
@@ -111,7 +111,7 @@ mymain ( int, char ** )
         
         return;
     }// if
-    else
+    else if ( true )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 
@@ -125,14 +125,14 @@ mymain ( int, char ** )
         // std::cout << norm_2( A01 ) << ", " << seq::norm::norm_F( *A01 ) << std::endl;
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
-        std::cout << norm_2( A.get() ) << std::endl;
+        // std::cout << norm_2( A.get() ) << std::endl;
         
         A = impl::matrix::copy_tiled< double >( *A, ntile );
         
         auto  C = impl::matrix::copy( *A );
 
-        std::cout << norm_2( A.get() ) << std::endl;
-        std::cout << norm_2( C.get() ) << std::endl;
+        // std::cout << norm_2( A.get() ) << std::endl;
+        // std::cout << norm_2( C.get() ) << std::endl;
 
         std::vector< double >  runtime;
     
@@ -155,12 +155,12 @@ mymain ( int, char ** )
         if ( nbench > 1 )
             std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
 
-        {
-            auto  T1 = hlr::seq::matrix::copy_nontiled< double >( *C );
-            auto  T2 = hpro::to_dense( T1.get() );
+        // {
+        //     auto  T1 = hlr::seq::matrix::copy_nontiled< double >( *C );
+        //     auto  T2 = hpro::to_dense( T1.get() );
 
-            write_matrix( T2.get(), "A.mat", "A" );
-        }
+        //     write_matrix( T2.get(), "A.mat", "A" );
+        // }
     
         // std::cout << norm_2( C.get() ) << std::endl;
         
@@ -171,7 +171,7 @@ mymain ( int, char ** )
         
         return;
     }
-    
+    else
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR " << impl_name << " )" << term::reset << std::endl;
         
