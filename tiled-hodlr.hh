@@ -51,7 +51,7 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( true )
+    if ( onlydag )
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v3 " << impl_name << " )" << term::reset << std::endl;
 
@@ -111,8 +111,7 @@ mymain ( int, char ** )
         
         return;
     }// if
-    
-    if ( false )
+    else
     {
         std::cout << term::bullet << term::bold << "LU ( Tiled-HODLR v2 " << impl_name << " )" << term::reset << std::endl;
 

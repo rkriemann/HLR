@@ -1099,34 +1099,34 @@ truncate_node::refine_ ( const size_t  min_size )
     assert( X.is == U.is );
     assert( Y.is == V.is );
 
-    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
-    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
+    // auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
+    // auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
+    // auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
+    // auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
 
-    // perform QR for U/V
-    auto  qr_U   = g.alloc_node< tsqr_node >( alpha,   X, T, U, Q0, R0, ntile );
-    auto  qr_V   = g.alloc_node< tsqr_node >( real(1), Y,    V, Q1, R1, ntile );
+    // // perform QR for U/V
+    // auto  qr_U   = g.alloc_node< tsqr_node >( alpha,   X, T, U, Q0, R0, ntile );
+    // auto  qr_V   = g.alloc_node< tsqr_node >( real(1), Y,    V, Q1, R1, ntile );
 
-    // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
+    // // determine truncated rank and allocate destination matrices
+    // auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    // auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    // auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
-    svd->after( qr_U );
-    svd->after( qr_V );
+    // svd->after( qr_U );
+    // svd->after( qr_V );
 
-    // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+    // // compute final result
+    // auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
+    // auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
 
-    g.add_node( mul_U );
-    g.add_node( mul_V );
+    // g.add_node( mul_U );
+    // g.add_node( mul_V );
     
-    mul_U->after( qr_U );
-    mul_U->after( svd );
-    mul_V->after( qr_V );
-    mul_V->after( svd );
+    // mul_U->after( qr_U );
+    // mul_U->after( svd );
+    // mul_V->after( qr_V );
+    // mul_V->after( svd );
 
     g.finalize();
 
@@ -1136,6 +1136,10 @@ truncate_node::refine_ ( const size_t  min_size )
 void
 truncate_node::run_ ( const TTruncAcc &  acc )
 {
+    auto [ U2, V2 ] = hlr::seq::tiled2::truncate( U.is, V.is, alpha, *(X.data), *(T.data), *(Y.data), *(U.data), *(V.data), acc, ntile );
+
+    *(U.data) = std::move( U2 );
+    *(V.data) = std::move( V2 );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

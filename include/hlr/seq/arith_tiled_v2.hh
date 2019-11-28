@@ -144,21 +144,21 @@ tprod ( const indexset &                 is,
 
         if ( B.contains( is ) )
         {
-            hlr::log( 0, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
-            hlr::log( 0, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
-            hlr::log( 0, "tprod :          B , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
+            hlr::log( 5, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
+            hlr::log( 5, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
+            hlr::log( 5, "tprod :          B , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
             
             blas::prod( alpha, A.at( is ), T, beta, B.at( is ) );
         }// if
         else
         {
-            hlr::log( 0, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
-            hlr::log( 0, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
+            hlr::log( 5, "tprod :          A , " + isstr( is, ntile ) + " = " + normstr( blas::normF( A.at( is ) ) ) );
+            hlr::log( 5, "tprod :          T , " + isstr( is, ntile ) + " = " + normstr( blas::normF( T ) ) );
             
             B[ is ] = std::move( blas::prod( alpha, A.at( is ), T ) );
         }// else
 
-        hlr::log( 0, "tprod :          C , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
+        hlr::log( 5, "tprod :          C , " + isstr( is, ntile ) + " = " + normstr( blas::normF( B.at( is ) ) ) );
     }// else
 }
 
@@ -246,6 +246,10 @@ tsqr ( const indexset &                 is,
         matrix< value_t >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
         matrix< value_t >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
 
+        hlr::log( 5, "tsqr  :          X , " + isstr( is, ntile ) + " = " + normstr( blas::normF( X.at( is ) ) ) );
+        hlr::log( 5, "tsqr  :          W , " + isstr( is, ntile ) + " = " + normstr( blas::normF( W ) ) );
+        hlr::log( 5, "tsqr  :          U , " + isstr( is, ntile ) + " = " + normstr( blas::normF( U.at( is ) ) ) );
+        
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
 
@@ -257,8 +261,8 @@ tsqr ( const indexset &                 is,
 
         Q[ is ] = std::move( WU );
         
-        hlr::log( 0, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
-        hlr::log( 0, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
+        hlr::log( 5, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
+        hlr::log( 5, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
         return { std::move( Q ), std::move( R ) };
     }// else
@@ -319,6 +323,9 @@ tsqr ( const indexset &                 is,
         matrix< value_t >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
         matrix< value_t >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
 
+        hlr::log( 5, "tsqr  :          X , " + isstr( is, ntile ) + " = " + normstr( blas::normF( X.at( is ) ) ) );
+        hlr::log( 5, "tsqr  :          U , " + isstr( is, ntile ) + " = " + normstr( blas::normF( U.at( is ) ) ) );
+
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
 
@@ -330,8 +337,8 @@ tsqr ( const indexset &                 is,
 
         Q[ is ] = std::move( XU );
         
-        hlr::log( 0, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
-        hlr::log( 0, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
+        hlr::log( 5, "tsqr  :          Q , " + isstr( is, ntile ) + " = " + normstr( blas::normF( Q.at( is ) ) ) );
+        hlr::log( 5, "tsqr  :          R , " + isstr( is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
         return { std::move( Q ), std::move( R ) };
     }// else
@@ -481,10 +488,15 @@ addlr ( const tile_storage< value_t > &  U,
         auto        D = ptrcast( A, TDenseMatrix );
         const auto  W = blas::prod( value_t(1), U.at( A->row_is() ), T );
 
+        hlr::log( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        hlr::log( 5, "addlr :         " + idstr( A->id() ) + ",     U = " + normstr( blas::norm_F( U.at( A->row_is() ) ) ) );
+        hlr::log( 5, "addlr :         " + idstr( A->id() ) + ",     T = " + normstr( blas::norm_F( T ) ) );
+        hlr::log( 5, "addlr :         " + idstr( A->id() ) + ",     W = " + normstr( blas::norm_F( W ) ) );
+
         blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
                     value_t(1), blas_mat< value_t >( D ) );
 
-        hlr::log( 0, "addlr :         " + idstr( A->id() ) + ",       = " + normstr( hpro::norm_F( D ) ) );
+        hlr::log( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
     }// else
 }
 
@@ -511,7 +523,7 @@ trsmuh ( const TMatrix *            U,
 
         auto  T = dot( U01->row_is(), U01->U(), X, ntile );
 
-        hlr::log( 0, "trsmu :  dot :  " + idstr( U->id() ) + ", " + isstr( U01->row_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
+        hlr::log( 5, "trsmu :  dot :  " + idstr( U->id() ) + ", " + isstr( U01->row_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         tprod( U01->col_is(), value_t(-1), U01->V(), T, value_t(1), X, ntile );
 
@@ -528,7 +540,7 @@ trsmuh ( const TMatrix *            U,
 
         blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
-        hlr::log( 0, "trsmu :         " + idstr( U->id() ) + "        = " + normstr( blas::normF( X_is ) ) );
+        hlr::log( 5, "trsmu :         " + idstr( U->id() ) + "        = " + normstr( blas::normF( X_is ) ) );
     }// else
 }
 
@@ -555,7 +567,7 @@ trsml ( const TMatrix *            L,
 
         auto  T = dot( L10->col_is(), L10->V(), X, ntile );
 
-        hlr::log( 0, "trsml :  dot :  " + idstr( L->id() ) + ", " + isstr( L10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
+        hlr::log( 5, "trsml :  dot :  " + idstr( L->id() ) + ", " + isstr( L10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         tprod( L10->row_is(), value_t(-1), L10->U(), T, value_t(1), X, ntile );
 
@@ -567,7 +579,7 @@ trsml ( const TMatrix *            L,
         // UNIT DIAGONAL !!!
         //
 
-        hlr::log( 0, "trsml :         " + idstr( L->id() ) + "        = " + normstr( blas::normF( X.at( L->row_is() ) ) ) );
+        hlr::log( 5, "trsml :         " + idstr( L->id() ) + "        = " + normstr( blas::normF( X.at( L->row_is() ) ) ) );
 
         // DEBUG
         // {
@@ -606,7 +618,7 @@ lu ( TMatrix *          A,
         // T = ( V(A_10)^H · U(A_01) )
         auto  T = dot( A10->col_is(), A10->V(), A01->U(), ntile ); 
 
-        hlr::log( 0, "lu    :  dot :  " + idstr( A->id() ) + ", " + isstr( A10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
+        hlr::log( 5, "lu    :  dot :  " + idstr( A->id() ) + ", " + isstr( A10->col_is(), ntile ) + " = " + normstr( blas::normF( T ) ) );
         
         addlr< value_t >( A10->U(), T, A01->V(), A11, acc, ntile );
         
@@ -618,7 +630,7 @@ lu ( TMatrix *          A,
         
         blas::invert( blas_mat< value_t >( DA ) );
 
-        hlr::log( 0, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
+        hlr::log( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
     }// else
 }
 
