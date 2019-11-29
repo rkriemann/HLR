@@ -8,8 +8,7 @@
 
 #include "hlr/tbb/matrix.hh"
 #include "hlr/tbb/arith.hh"
-#include "hlr/seq/arith_tiled.hh"
-#include "hlr/tbb/arith_tiled.hh"
+#include "hlr/tbb/arith_tiled_v2.hh"
 #include "hlr/tbb/dag.hh"
 
 namespace          impl      = hlr::tbb;

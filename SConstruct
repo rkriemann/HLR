@@ -178,7 +178,7 @@ if not debug :
 
 # add internal paths and libraries
 env.Append(  CPPPATH = [ '#include' ] )
-env.Prepend( LIBS    = [ "common" ] )
+env.Prepend( LIBS    = [ "hlr" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
 # include malloc library
@@ -280,40 +280,39 @@ env.Alias( 'options', options_cmd )
 
 ######################################################################
 #
-# common library and framework dependent targets
+# HLR library and framework dependent targets
 #
 ######################################################################
 
-common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
-                                        'src/apps/log_kernel.cc',
-                                        'src/apps/matern_cov.cc',
-                                        'src/cluster/distr.cc',
-                                        'src/cluster/h.cc',
-                                        'src/cluster/hodlr.cc',
-                                        'src/cluster/tileh.cc',
-                                        'src/cluster/tlr.cc',
-                                        'src/dag/gauss_elim.cc',
-                                        'src/dag/graph.cc',
-                                        'src/dag/invert.cc',
-                                        'src/dag/local_graph.cc',
-                                        'src/dag/lu.cc',
-                                        'src/dag/lu_coarse.cc',
-                                        'src/dag/lu_hodlr_tiled.cc',
-                                        'src/dag/lu_hodlr_tiled_v2.cc',
-                                        'src/dag/lu_lvl.cc',
-                                        'src/dag/lu_oop.cc',
-                                        'src/dag/lu_oop_accu.cc',
-                                        'src/dag/lu_oop_accu_sep.cc',
-                                        'src/dag/lu_oop_auto.cc',
-                                        'src/dag/node.cc',
-                                        'src/dag/solve.cc',
-                                        'src/matrix/level_matrix.cc',
-                                        'src/matrix/luinv_eval.cc',
-                                        'src/seq/dag.cc',
-                                        'src/seq/solve.cc',
-                                        'src/utils/compare.cc',
-                                        'src/utils/log.cc',
-                                        'src/utils/term.cc' ] )
+libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
+                                     'src/apps/log_kernel.cc',
+                                     'src/apps/matern_cov.cc',
+                                     'src/cluster/distr.cc',
+                                     'src/cluster/h.cc',
+                                     'src/cluster/hodlr.cc',
+                                     'src/cluster/tileh.cc',
+                                     'src/cluster/tlr.cc',
+                                     'src/dag/gauss_elim.cc',
+                                     'src/dag/graph.cc',
+                                     'src/dag/invert.cc',
+                                     'src/dag/local_graph.cc',
+                                     'src/dag/lu.cc',
+                                     'src/dag/lu_coarse.cc',
+                                     'src/dag/lu_hodlr_tiled.cc',
+                                     'src/dag/lu_lvl.cc',
+                                     'src/dag/lu_oop.cc',
+                                     'src/dag/lu_oop_accu.cc',
+                                     'src/dag/lu_oop_accu_sep.cc',
+                                     'src/dag/lu_oop_auto.cc',
+                                     'src/dag/node.cc',
+                                     'src/dag/solve.cc',
+                                     'src/matrix/level_matrix.cc',
+                                     'src/matrix/luinv_eval.cc',
+                                     'src/seq/dag.cc',
+                                     'src/seq/solve.cc',
+                                     'src/utils/compare.cc',
+                                     'src/utils/log.cc',
+                                     'src/utils/term.cc' ] )
 
 Default( None )
 
@@ -332,7 +331,6 @@ if 'seq' in frameworks :
     if 'dag-gauss'   in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
     if 'dag-inv'     in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
     if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
-    if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr2-seq.cc' ) )
 
 #
 # OpenMP
@@ -366,7 +364,6 @@ if 'tbb' in frameworks :
     if 'dag-gauss'   in programs : Default( tbb.Program( 'dag-gauss-tbb',  [ 'dag-gauss-tbb.cc',  'src/tbb/dag.cc' ] ) )
     if 'dag-inv'     in programs : Default( tbb.Program( 'dag-inv-tbb',    [ 'dag-inv-tbb.cc',    'src/tbb/dag.cc' ] ) )
     if 'dag-hodlr'   in programs : Default( tbb.Program( 'dag-hodlr-tbb',  [ 'dag-hodlr-tbb.cc',  'src/tbb/dag.cc' ] ) )
-    if 'dag-hodlr'   in programs : Default( tbb.Program( 'dag-hodlr2-tbb', [ 'dag-hodlr2-tbb.cc', 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
