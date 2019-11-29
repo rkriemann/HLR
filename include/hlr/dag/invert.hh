@@ -37,6 +37,13 @@ gen_dag_invert_ur ( HLIB::TMatrix &          U,
                     refine_func_t            refine );
 
 //
+// compute DAG for WAZ factorization of A
+//
+dag::graph
+gen_dag_waz       ( HLIB::TMatrix &          A,
+                    refine_func_t            refine );
+
+//
 // compute DAG for inversion of A
 //
 dag::graph

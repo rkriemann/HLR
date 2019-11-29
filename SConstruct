@@ -6,7 +6,7 @@ import os, sys
 
 ######################################################################
 #
-# general settings
+# general (default) settings
 #
 ######################################################################
 
@@ -79,6 +79,22 @@ def readln ( prog ):
 ######################################################################
 
 opts = Variables( opts_file )
+opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
+opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
+
+opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
+
+opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
+
+opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
+
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
 opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
@@ -86,21 +102,8 @@ opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',        
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
 
-opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
-opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
-
-opts.Add( EnumVariable( 'malloc',     'malloc library to use',             'default', allowed_values = MALLOCS, ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',     'use likwid library',                likwid ) )
-
 # read options from options file
-opt_env = Environment( options = opts )
-
-fullmsg  = opt_env['fullmsg']
-debug    = opt_env['debug']
-profile  = opt_env['profile']
-optimise = opt_env['optimise']
-warn     = opt_env['warn']
-color    = opt_env['color']
+opt_env    = Environment( options = opts )
 
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )
@@ -108,8 +111,25 @@ frameworks = Split( opt_env['frameworks'] )
 if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
 
-malloc = opt_env['malloc']
-likwid = opt_env['likwid']
+HPRO_DIR     = opt_env['hpro']
+TBB_DIR      = opt_env['tbb']
+TASKFLOW_DIR = opt_env['tf']
+HPX_DIR      = opt_env['hpx']
+GPI2_DIR     = opt_env['gpi2']
+
+JEMALLOC_DIR = opt_env['jemalloc']
+MIMALLOC_DIR = opt_env['mimalloc']
+TCMALLOC_DIR = opt_env['tcmalloc']
+
+malloc       = opt_env['malloc']
+likwid       = opt_env['likwid']
+
+fullmsg      = opt_env['fullmsg']
+debug        = opt_env['debug']
+profile      = opt_env['profile']
+optimise     = opt_env['optimise']
+warn         = opt_env['warn']
+color        = opt_env['color']
 
 opts.Save( opts_file, opt_env )
 
@@ -183,7 +203,6 @@ env.Prepend( LIBPATH = [ "." ] )
 
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
-    # env.Append( LIBPATH = os.path.join( JEMALLOC_DIR, 'lib' ) )
     env.MergeFlags( os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
     env.Append( LIBS = [ 'dl', 'pthread' ] )
 elif MIMALLOC_DIR != None and malloc == 'mimalloc' :
@@ -323,14 +342,12 @@ Default( None )
 if 'seq' in frameworks :
     seq = env.Clone()
         
-    if 'tlr'         in programs : Default( seq.Program( 'tlr-seq.cc' ) )
-    if 'hodlr'       in programs : Default( seq.Program( 'hodlr-seq.cc' ) )
-    if 'tiled-hodlr' in programs : Default( seq.Program( 'tiled-hodlr-seq.cc' ) )
-    if 'tileh'       in programs : Default( seq.Program( 'tileh-seq.cc' ) )
-    if 'dag-lu'      in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
-    if 'dag-gauss'   in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
-    if 'dag-inv'     in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
-    if 'dag-hodlr'   in programs : Default( seq.Program( 'dag-hodlr-seq.cc' ) )
+    for program in programs :
+        name   = program + '-seq'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( seq.Program( name, [ source ] ) )
 
 #
 # OpenMP
@@ -341,11 +358,12 @@ if 'omp' in frameworks :
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
 
-    if 'tlr'        in programs : Default( omp.Program( 'tlr-omp.cc' ) )
-    if 'hodlr'      in programs : Default( omp.Program( 'hodlr-omp.cc' ) )
-    if 'tileh'      in programs : Default( omp.Program( 'tileh-omp.cc' ) )
-    if 'dag-lu'     in programs : Default( omp.Program( 'dag-lu-omp',    [ 'dag-lu-omp.cc',    'src/omp/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( omp.Program( 'dag-gauss-omp', [ 'dag-gauss-omp.cc', 'src/omp/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-omp'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( omp.Program( name, [ source, 'src/omp/dag.cc' ] ) )
 
 #
 # TBB
@@ -356,14 +374,12 @@ if 'tbb' in frameworks :
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
 
-    if 'tlr'         in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
-    if 'hodlr'       in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
-    if 'tiled-hodlr' in programs : Default( tbb.Program( 'tiled-hodlr-tbb.cc' ) )
-    if 'tileh'       in programs : Default( tbb.Program( 'tileh-tbb',      [ 'tileh-tbb.cc',      'src/tbb/dag.cc' ] ) )
-    if 'dag-lu'      in programs : Default( tbb.Program( 'dag-lu-tbb',     [ 'dag-lu-tbb.cc',     'src/tbb/dag.cc' ] ) )
-    if 'dag-gauss'   in programs : Default( tbb.Program( 'dag-gauss-tbb',  [ 'dag-gauss-tbb.cc',  'src/tbb/dag.cc' ] ) )
-    if 'dag-inv'     in programs : Default( tbb.Program( 'dag-inv-tbb',    [ 'dag-inv-tbb.cc',    'src/tbb/dag.cc' ] ) )
-    if 'dag-hodlr'   in programs : Default( tbb.Program( 'dag-hodlr-tbb',  [ 'dag-hodlr-tbb.cc',  'src/tbb/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-tbb'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( tbb.Program( name, [ source, 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -374,11 +390,12 @@ if 'tf' in frameworks :
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'         in programs : Default( tf.Program( 'tlr-tf.cc' ) )
-    if 'hodlr'       in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
-    if 'tiled-hodlr' in programs : Default( tf.Program( 'tiled-hodlr-tf.cc' ) )
-    if 'dag-lu'      in programs : Default( tf.Program( 'dag-lu-tf',    [ 'dag-lu-tf.cc',    'src/tf/dag.cc' ] ) )
-    if 'dag-gauss'   in programs : Default( tf.Program( 'dag-gauss-tf', [ 'dag-gauss-tf.cc', 'src/tf/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-tf'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( tf.Program( name, [ source, 'src/tf/dag.cc' ] ) )
 
 #
 # HPX

@@ -43,8 +43,7 @@ void
 lu ( hpro::TMatrix *          A,
      const hpro::TTruncAcc &  acc )
 {
-    if ( hpro::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
+    HLR_LOG( 4, hpro::to_string( ( "lu( %d )", A->id() ) ) );
     
     assert( is_blocked( A ) );
 
@@ -98,8 +97,7 @@ addlr ( blas::Matrix< value_t > &  U,
         hpro::TMatrix *            A,
         const hpro::TTruncAcc &    acc )
 {
-    if ( hpro::verbose( 4 ) )
-        DBG::printf( "addlr( %d )", A->id() );
+    HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -156,8 +154,7 @@ void
 lu ( hpro::TMatrix *          A,
      const hpro::TTruncAcc &  acc )
 {
-    if ( hpro::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -276,9 +273,9 @@ namespace detail
 {
 
 inline void
-gauss_elim_helper ( hpro::TMatrix *    A,
-                    hpro::TMatrix *    T,
-                    const TTruncAcc &  acc )
+gauss_elim_helper ( hpro::TMatrix *          A,
+                    hpro::TMatrix *          T,
+                    const hpro::TTruncAcc &  acc )
 {
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
@@ -342,9 +339,9 @@ gauss_elim_helper ( hpro::TMatrix *    A,
 }// namespace detail
 
 inline void
-gauss_elim ( hpro::TMatrix *    A,
-             hpro::TMatrix *    T,
-             const TTruncAcc &  acc )
+gauss_elim ( hpro::TMatrix *          A,
+             hpro::TMatrix *          T,
+             const hpro::TTruncAcc &  acc )
 {
     #pragma omp parallel
     {

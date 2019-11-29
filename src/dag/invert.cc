@@ -57,6 +57,102 @@ constexpr id_t  ID_C('A');
 constexpr id_t  ID_L('A');
 constexpr id_t  ID_U('A');
 
+struct lu_node : public node
+{
+    TMatrix *  A;
+    
+    lu_node ( TMatrix *  aA )
+            : A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  color     () const { return "ef2929"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
+};
+
+struct trsmu_node : public node
+{
+    const TMatrix *  U;
+    TMatrix *        A;
+    
+    trsmu_node ( const TMatrix *  aU,
+                 TMatrix *        aA )
+            : U( aU )
+            , A( aA )
+    { init(); }
+    
+    virtual std::string  to_string () const { return HLIB::to_string( "L%d = trsmu( U%d, A%d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  color     () const { return "729fcf"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
+};
+
+struct trsml_node : public node
+{
+    const TMatrix *  L;
+    TMatrix *        A;
+
+    trsml_node ( const TMatrix *  aL,
+                 TMatrix *        aA )
+            : L( aL )
+            , A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "U%d = trsml( L%d, A%d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  color     () const { return "729fcf"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
+};
+
+struct waz_node : public node
+{
+    TMatrix *  A;
+    
+    waz_node ( TMatrix *  aA )
+            : A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "waz( %d )", A->id() ); }
+    virtual std::string  color     () const { return "ef2929"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+};
+
+struct inv_node : public node
+{
+    TMatrix *  A;
+    
+    inv_node ( TMatrix *  aA )
+            : A( aA )
+    { init(); }
+
+    virtual std::string  to_string () const { return HLIB::to_string( "inv( %d )", A->id() ); }
+    virtual std::string  color     () const { return "ef2929"; }
+    
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
+};
+
 struct inv_ll_node : public node
 {
     TMatrix *             L;
@@ -219,28 +315,38 @@ private:
 struct update_node : public node
 {
     const real       alpha;
+    const id_t       id_A;
     const TMatrix *  A;
+    const id_t       id_B;
     const TMatrix *  B;
+    const id_t       id_C;
     TMatrix *        C;
 
     update_node ( const real       aalpha,
+                  const id_t       aid_A,
                   const TMatrix *  aA,
+                  const id_t       aid_B,
                   const TMatrix *  aB,
+                  const id_t       aid_C,
                   TMatrix *        aC )
             : alpha( aalpha )
+            , id_A( aid_A )
             , A( aA )
+            , id_B( aid_B )
             , B( aB )
+            , id_C( aid_C )
             , C( aC )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = upd( %d, %d )", C->id(), A->id(), B->id() ); }
+    virtual std::string  to_string () const { return HLIB::to_string( "%c%d = upd( %c%d, %c%d )",
+                                                                      char(id_C), C->id(), char(id_A), A->id(), char(id_B), B->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() }, { ID_B, B->block_is() }, { ID_C, C->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() }, { ID_B, B->block_is() }, { ID_C, C->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_B, B->block_is() }, { id_C, C->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() }, { id_B, B->block_is() }, { id_C, C->block_is() } }; }
 };
 
 struct mul_ur_ll_node : public node
@@ -260,6 +366,271 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// lu_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+lu_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    {
+        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BL  = BA;
+        auto        BU  = BA;
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
+
+        tensor2< node * >  finished( nbr, nbc );
+        
+        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+        {
+            //
+            // factorise diagonal block
+            //
+            
+            auto  A_ii  = BA->block( i, i );
+            auto  L_ii  = A_ii;
+            auto  U_ii  = A_ii;
+
+            assert( ! is_null_any( A_ii, L_ii, U_ii ) );
+
+            finished( i, i ) = g.alloc_node< lu_node >( A_ii );
+
+            for ( uint j = i+1; j < nbr; j++ )
+                if ( ! is_null( BA->block( j, i ) ) )
+                {
+                    finished( j, i ) = g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
+                    finished( j, i )->after( finished( i, i ) );
+                }// if
+
+            for ( uint j = i+1; j < nbc; j++ )
+                if ( ! is_null( BA->block( i, j ) ) )
+                {
+                    finished( i, j ) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+                    finished( i, j )->after( finished( i, i ) );
+                }// if
+        }// for
+        
+        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+        {
+            for ( uint j = i+1; j < nbr; j++ )
+            {
+                for ( uint l = i+1; l < nbc; l++ )
+                {
+                    if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
+                    {
+                        auto  update = g.alloc_node< update_node >( real(-1),
+                                                                    ID_L, BL->block( j, i ),
+                                                                    ID_U, BU->block( i, l ),
+                                                                    ID_A, BA->block( j, l ) );
+
+                        update->after( finished( j, i ) );
+                        update->after( finished( i, l ) );
+                        finished( j, l )->after( update );
+                    }// if
+                }// for
+            }// for
+        }// for
+    }// if
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+lu_node::run_ ( const TTruncAcc &  acc )
+{
+    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// trsmu_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+trsmu_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    {
+        auto        BU  = cptrcast( U, TBlockMatrix );
+        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BX  = BA;
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
+
+        tensor2< node * >  finished( nbr, nbc );
+        
+        for ( uint j = 0; j < nbc; ++j )
+        {
+            const auto  U_jj = BU->block( j, j );
+        
+            assert( ! is_null( U_jj ) );
+
+            for ( uint i = 0; i < nbr; ++i )
+                if ( ! is_null( BA->block(i,j) ) )
+                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
+        }// for
+        
+        for ( uint j = 0; j < nbc; ++j )
+        {
+            for ( uint  k = j+1; k < nbc; ++k )
+                for ( uint  i = 0; i < nbr; ++i )
+                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+                    {
+                        auto  update = g.alloc_node< update_node >( real(-1),
+                                                                    ID_L, BX->block( i, j ),
+                                                                    ID_U, BU->block( j, k ),
+                                                                    ID_A, BA->block( i, k ) );
+
+                        update->after( finished( i, j ) );
+                        finished( i, k )->after( update );
+                    }// if
+        }// for
+    }// if
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+trsmu_node::run_ ( const TTruncAcc &  acc )
+{
+    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// trsml_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+trsml_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    {
+        auto        BL  = cptrcast( L, TBlockMatrix );
+        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BX  = BA;
+        const auto  nbr = BA->nblock_rows();
+        const auto  nbc = BA->nblock_cols();
+
+        tensor2< node * >  finished( nbr, nbc );
+        
+        for ( uint i = 0; i < nbr; ++i )
+        {
+            const auto  L_ii = BL->block( i, i );
+        
+            assert( ! is_null( L_ii ) );
+
+            for ( uint j = 0; j < nbc; ++j )
+                if ( ! is_null( BA->block( i, j ) ) )
+                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
+        }// for
+        
+        for ( uint i = 0; i < nbr; ++i )
+        {
+            for ( uint  k = i+1; k < nbr; ++k )
+                for ( uint  j = 0; j < nbc; ++j )
+                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
+                    {
+                        auto  update = g.alloc_node< update_node >( real(-1),
+                                                                    ID_L, BL->block( k, i ),
+                                                                    ID_U, BX->block( i, j ),
+                                                                    ID_A, BA->block( k, j ) );
+
+                        update->after( finished( i, j ) );
+                        finished( k, j )->after( update );
+                    }// if
+        }// for
+    }// if
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+trsml_node::run_ ( const TTruncAcc &  acc )
+{
+    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// waz_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+waz_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    auto  lu     = g.alloc_node< lu_node >( A );
+    auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_inverse );
+    auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_inverse );
+
+    inv_ll->after( lu );
+    inv_ur->after( lu );
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+waz_node::run_ ( const TTruncAcc &  acc )
+{
+    HLR_ASSERT( false );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+//
+// inv_node
+//
+///////////////////////////////////////////////////////////////////////////////////////
+
+local_graph
+inv_node::refine_ ( const size_t  min_size )
+{
+    local_graph  g;
+
+    auto  lu     = g.alloc_node< lu_node >( A );
+    auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_inverse );
+    auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_inverse );
+    auto  mul    = g.alloc_node< mul_ur_ll_node >( A );
+
+    inv_ll->after( lu );
+    inv_ur->after( lu );
+
+    mul->after( inv_ll );
+    mul->after( inv_ur );
+
+    g.finalize();
+    
+    return g;
+}
+
+void
+inv_node::run_ ( const TTruncAcc &  acc )
+{
+    HLR_ASSERT( false );
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
@@ -332,9 +703,9 @@ inv_ll_node::refine_ ( const size_t  min_size )
                     if ( ! is_null_any( BL->block(i,l), BL->block(l,j) ) )
                     {
                         auto  update = g.alloc_node< update_node >( real(1),
-                                                                    BL->block(i,l), // unmodified
-                                                                    BL->block(l,j), // finished
-                                                                    BL->block(i,j) ); // TODO: check ids
+                                                                    ID_A, BL->block(i,l), // unmodified
+                                                                    ID_A, BL->block(l,j), // finished
+                                                                    ID_A, BL->block(i,j) ); // TODO: check ids
 
                         update->after( mul_ll_right(i,j) );
                         update->after( finished(l,j) );
@@ -412,9 +783,9 @@ mul_ll_right_node::refine_ ( const size_t  min_size )
                         continue;
 
                     auto  update = g.alloc_node< update_node >( alpha,
-                                                                BA->block(i,l), // unmodified block needed
-                                                                BL->block(l,j),
-                                                                BC->block(i,j) );
+                                                                ID_A, BA->block(i,l), // unmodified block needed
+                                                                ID_A, BL->block(l,j),
+                                                                ID_A, BC->block(i,j) );
 
                     mul_ll_right(i,l)->after( update ); // change only after unmodified matrix was used in update
                     update->after( mul_ll_right(i,j) ); // apply update only after initial change
@@ -485,9 +856,9 @@ mul_ll_left_node::refine_ ( const size_t  min_size )
                         continue;
                     
                     auto  update = g.alloc_node< update_node >( alpha,
-                                                                BL->block(i,l),
-                                                                BA->block(l,j), // unmodified block needed
-                                                                BC->block(i,j) );
+                                                                ID_A, BL->block(i,l),
+                                                                ID_A, BA->block(l,j), // unmodified block needed
+                                                                ID_A, BC->block(i,j) );
                     
                     mul_ll_left(l,j)->after( update );
                     update->after( mul_ll_left(i,j) ); // apply update only after initial change
@@ -578,9 +949,9 @@ inv_ur_node::refine_ ( const size_t  min_size )
                     if ( ! is_null_any( BU->block(i,l), BU->block(l,j) ) )
                     {
                         auto  update = g.alloc_node< update_node >( real(1),
-                                                                    BU->block(i,l), // unmodified
-                                                                    BU->block(l,j), // finished
-                                                                    BU->block(i,j) );
+                                                                    ID_A, BU->block(i,l), // unmodified
+                                                                    ID_A, BU->block(l,j), // finished
+                                                                    ID_A, BU->block(i,j) );
 
                         update->after( mul_ur_right(i,j) );
                         update->after( finished(l,j) );
@@ -657,9 +1028,9 @@ mul_ur_right_node::refine_ ( const size_t  min_size )
                         continue;
 
                     auto  update = g.alloc_node< update_node >( alpha,
-                                                                BA->block(i,l), // unmodified block needed
-                                                                BU->block(l,j),
-                                                                BA->block(i,j) );
+                                                                ID_A, BA->block(i,l), // unmodified block needed
+                                                                ID_A, BU->block(l,j),
+                                                                ID_A, BA->block(i,j) );
 
                     mul_ur_right(i,l)->after( update );
                     update->after( mul_ur_right(i,j) ); // apply update only after initial change
@@ -729,9 +1100,9 @@ mul_ur_left_node::refine_ ( const size_t  min_size )
                         continue;
 
                     auto  update = g.alloc_node< update_node >( alpha,
-                                                                BU->block(i,l),
-                                                                BA->block(l,j), // unmodified block needed
-                                                                BA->block(i,j) );
+                                                                ID_A, BU->block(i,l),
+                                                                ID_B, BA->block(l,j), // unmodified block needed
+                                                                ID_C, BA->block(i,j) );
                     
                     mul_ur_left(l,j)->after( update );
                     update->after( mul_ur_left(i,j) ); // apply update only after initial change
@@ -779,9 +1150,9 @@ update_node::refine_ ( const size_t  min_size )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
                         g.alloc_node< update_node >( alpha,
-                                                     BA->block( i, k ),
-                                                     BB->block( k, j ),
-                                                     BC->block( i, j ) );
+                                                     ID_A, BA->block( i, k ),
+                                                     ID_B, BB->block( k, j ),
+                                                     ID_C, BC->block( i, j ) );
                 }// for
             }// for
         }// for
@@ -856,9 +1227,9 @@ mul_ur_ll_node::refine_ ( const size_t  min_size )
                     if ( ! is_null_any( BA->block( i, k ), BA->block( k, j ) ) )
                     {
                         auto  update = g.alloc_node< update_node >( real(1),
-                                                                    BA->block( i, k ),
-                                                                    BA->block( k, j ),
-                                                                    BA->block( i, j ) );
+                                                                    ID_A, BA->block( i, k ),
+                                                                    ID_B, BA->block( k, j ),
+                                                                    ID_C, BA->block( i, j ) );
 
                         update->after( mul_tri(i,j) );
                         mul_tri(i,k)->after( update );
@@ -913,12 +1284,31 @@ gen_dag_invert_ur ( HLIB::TMatrix &    U,
 }
 
 //
+// compute DAG for WAZ factorization of A
+//
+dag::graph
+gen_dag_waz ( HLIB::TMatrix &  A,
+              refine_func_t    refine )
+{
+    auto  dag = refine( new waz_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
+
+    return std::move( dag );
+}
+
+//
 // compute DAG for inversion of A
 //
 dag::graph
 gen_dag_invert ( HLIB::TMatrix &  A,
                  refine_func_t    refine )
 {
+    auto  dag = refine( new inv_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
+
+    return std::move( dag );
+
+
+
+    
     auto  dag_lu     = gen_dag_lu_oop_auto( A, refine );
     
     // if ( verbose( 3 ) )
