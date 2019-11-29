@@ -66,13 +66,9 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    std::cout << norm_2( A.get() ) << std::endl;
-    
     // convert to tiled format
     A = impl::matrix::copy_tiled< double >( *A, ntile );
 
-    std::cout << norm_2( A.get() ) << std::endl;
-    
     //////////////////////////////////////////////////////////////////////
     //
     // compute DAG
@@ -85,8 +81,6 @@ mymain ( int, char ** )
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
 
-    std::cout << norm_2( C.get() ) << std::endl;
-    
     //
     // set up DAG generation options optimised for different DAGs
     //
