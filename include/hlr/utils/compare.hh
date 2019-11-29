@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include <matrix/TMatrix.hh>
+#include <hpro/matrix/TMatrix.hh>
 
 namespace hlr
 {

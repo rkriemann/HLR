@@ -6,7 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <vector/TScalarVector.hh>
+#include <hpro/vector/TScalarVector.hh>
+#include <hpro/algebra/mul_vec.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/seq/arith.hh"

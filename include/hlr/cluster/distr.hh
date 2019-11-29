@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <cluster/TBlockCluster.hh>
+#include <hpro/cluster/TBlockCluster.hh>
 
 namespace hlr { namespace cluster { namespace distribution {
 

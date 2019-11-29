@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <matrix/TMatrix.hh>
+#include <hpro/matrix/TMatrix.hh>
 
 #include "hlr/dag/graph.hh"
 

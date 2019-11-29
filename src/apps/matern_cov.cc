@@ -12,8 +12,8 @@
 
 using namespace std;
 
-#include <misc/TMaternCovCoeffFn.hh>
-#include <io/TGridIO.hh>
+#include <hpro/misc/TMaternCovCoeffFn.hh>
+#include <hpro/io/TGridIO.hh>
 
 #include "hlr/apps/matern_cov.hh"
 

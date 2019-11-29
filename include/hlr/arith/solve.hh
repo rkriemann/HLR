@@ -8,14 +8,17 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <matrix/TMatrix.hh>
-#include <matrix/TDenseMatrix.hh>
-#include <matrix/TRkMatrix.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+
+#include <hlr/utils/log.hh>
 
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 //
 // solve X U = M
@@ -23,27 +26,26 @@ using namespace HLIB;
 //
 template < typename value_t >
 void
-trsmuh ( const TDenseMatrix *  U,
-         TMatrix *             X )
+trsmuh ( const hpro::TDenseMatrix *  U,
+         hpro::TMatrix *             X )
 {
-    if ( verbose( 4 ) )
-        DBG::printf( "trsmuh( %d, %d )", U->id(), X->id() );
+    HLR_LOG( 4, hpro::to_string( "trsmuh( %d, %d )", U->id(), X->id() ) );
     
     if ( is_lowrank( X ) )
     {
-        auto  RX = ptrcast( X, TRkMatrix );
-        auto  Y  = copy( blas_mat_B< value_t >( RX ) );
+        auto  RX = ptrcast( X, hpro::TRkMatrix );
+        auto  Y  = blas::copy( hpro::blas_mat_B< value_t >( RX ) );
 
-        BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( U ) ), Y,
-                    value_t(0), blas_mat_B< value_t >( RX ) );
+        blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( U ) ), Y,
+                    value_t(0), hpro::blas_mat_B< value_t >( RX ) );
     }// else
     else if ( is_dense( X ) )
     {
-        auto  DX = ptrcast( X, TDenseMatrix );
-        auto  Y  = copy( blas_mat< value_t >( DX ) );
+        auto  DX = ptrcast( X, hpro::TDenseMatrix );
+        auto  Y  = copy( hpro::blas_mat< value_t >( DX ) );
     
-        BLAS::prod( value_t(1), Y, blas_mat< value_t >( U ),
-                    value_t(0), blas_mat< value_t >( DX ) );
+        blas::prod( value_t(1), Y, hpro::blas_mat< value_t >( U ),
+                    value_t(0), hpro::blas_mat< value_t >( DX ) );
     }// else
 }
 

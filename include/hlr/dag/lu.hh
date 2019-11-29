@@ -8,11 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <matrix/TMatrix.hh>
-#include <algebra/mat_fac.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+// #include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/dag/graph.hh"
-#include "hlr/matrix/level_matrix.hh"
+#include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr
 {
@@ -100,8 +101,41 @@ gen_dag_update       ( const HLIB::TMatrix *  A,
 // compute DAG for tile-based LU of <A> in HODLR format
 //
 graph
-gen_dag_lu_hodlr_tile ( HLIB::TMatrix *  A,
-                        refine_func_t    refine );
+gen_dag_lu_hodlr_tiled  ( HLIB::TMatrix &  A,
+                          const size_t     ntile,
+                          refine_func_t    refine );
+
+//
+// compute DAG for TSQR( X·T, U )
+//
+graph
+gen_dag_tsqr ( const size_t                                                  n,
+               hlr::matrix::tile_storage< HLIB::real > &                     X,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &         T,
+               hlr::matrix::tile_storage< HLIB::real > &                     U,
+               std::shared_ptr< hlr::matrix::tile_storage< HLIB::real > > &  Q,
+               std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &         R,
+               refine_func_t                                                 refine );
+
+//
+// compute DAG for truncation of [X·T,U(A)] • [Y,V(A)]'
+//
+graph
+gen_dag_truncate ( hlr::matrix::tile_storage< HLIB::real > &              X,
+                   std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  T,
+                   hlr::matrix::tile_storage< HLIB::real > &              Y,
+                   hlr::matrix::tiled_lrmatrix< HLIB::real > *            A,
+                   refine_func_t                                          refine );
+
+//
+// compute DAG for truncation of [X·T,U(A)] • [Y,V(A)]'
+//
+graph
+gen_dag_addlr ( hlr::matrix::tile_storage< HLIB::real > &              X,
+                std::shared_ptr< HLIB::BLAS::Matrix< HLIB::real > > &  T,
+                hlr::matrix::tile_storage< HLIB::real > &              Y,
+                HLIB::TMatrix *                                        A,
+                refine_func_t                                          refine );
 
 }// namespace dag
 

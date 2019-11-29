@@ -10,34 +10,34 @@
 
 #include <memory>
 
-#include <bem/TGrid.hh>
-#include <bem/TFnSpace.hh>
-#include <bem/TBEMBF.hh>
+#include <hpro/bem/TGrid.hh>
+#include <hpro/bem/TFnSpace.hh>
+#include <hpro/bem/TBEMBF.hh>
 
 #include "hlr/apps/application.hh"
 
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
 
 namespace apps
 {
 
-class laplace_slp : public application< HLIB::real >
+class laplace_slp : public application< hpro::real >
 {
 public:
     //
     // public types
     //
     
-    using  value_t = HLIB::real;
+    using  value_t = hpro::real;
 
 private:
     // BEM data
-    std::unique_ptr< TGrid >                     _grid;
-    std::unique_ptr< TFnSpace >                  _fnspace;
-    std::unique_ptr< TBilinearForm< value_t > >  _bf;
+    std::unique_ptr< hpro::TGrid >                     _grid;
+    std::unique_ptr< hpro::TFnSpace >                  _fnspace;
+    std::unique_ptr< hpro::TBilinearForm< value_t > >  _bf;
 
 public:
     //
@@ -54,13 +54,13 @@ public:
     //
     // return coordinates for problem indices
     //
-    std::unique_ptr< HLIB::TCoordinate >
+    std::unique_ptr< hpro::TCoordinate >
     coordinates () const;
     
     //
     // return coefficient function to evaluate matrix entries
     //
-    std::unique_ptr< HLIB::TCoeffFn< value_t > >
+    std::unique_ptr< hpro::TCoeffFn< value_t > >
     coeff_func  () const;
 };
 

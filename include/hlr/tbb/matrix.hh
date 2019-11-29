@@ -14,17 +14,18 @@
 #include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
 
-#include <matrix/TMatrix.hh>
-#include <matrix/TBlockMatrix.hh>
-#include <matrix/structure.hh>
-#include <base/TTruncAcc.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/seq/matrix.hh"
 
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
     
 namespace tbb
 {
@@ -40,11 +41,11 @@ namespace matrix
 //
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< TMatrix >
-build ( const TBlockCluster *  bct,
-        const coeff_t &        coeff,
-        const lrapx_t &        lrapx,
-        const TTruncAcc &      acc )
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
+        const coeff_t &              coeff,
+        const lrapx_t &              lrapx,
+        const hpro::TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -56,7 +57,7 @@ build ( const TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    auto        M     = std::unique_ptr< TMatrix >();
+    auto        M     = std::unique_ptr< hpro::TMatrix >();
     const auto  rowis = bct->is().row_is();
     const auto  colis = bct->is().col_is();
 
@@ -77,9 +78,9 @@ build ( const TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
         
-        auto  B = ptrcast( M.get(), TBlockMatrix );
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -118,14 +119,15 @@ build ( const TBlockCluster *  bct,
 // return copy of matrix
 // - copy operation is performed in parallel for sub blocks
 //
-std::unique_ptr< TMatrix >
-copy ( const TMatrix &  M )
+inline
+std::unique_ptr< hpro::TMatrix >
+copy ( const hpro::TMatrix &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, TBlockMatrix );
-        auto  N  = std::make_unique< TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), TBlockMatrix );
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
 
         B->copy_struct_from( BM );
         
@@ -159,18 +161,141 @@ copy ( const TMatrix &  M )
 }
 
 //
-// return copy of (block-wise) lower-left part of matrix
+// return copy of matrix with TRkMatrix replaced by tiled_lrmatrix
+// - copy operation is performed in parallel for sub blocks
 //
-inline
-std::unique_ptr< TMatrix >
-copy_ll ( const TMatrix &    M,
-          const diag_type_t  diag = general_diag )
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+copy_tiled ( const hpro::TMatrix &  M,
+             const size_t           ntile )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, TBlockMatrix );
-        auto  N  = std::make_unique< TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), TBlockMatrix );
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM,ntile] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = copy_tiled< value_t >( * BM->block( i, j ), ntile );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        //
+        // copy low-rank data into tiled form
+        //
+
+        auto  RM = cptrcast( & M, hpro::TRkMatrix );
+
+        return std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                           RM->col_is(),
+                                                                           ntile,
+                                                                           hpro::blas_mat_A< value_t >( RM ),
+                                                                           hpro::blas_mat_B< value_t >( RM ) );
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of matrix with tiled_lrmatrix replaced by TRkMatrix
+// - copy operation is performed in parallel for sub blocks
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+copy_nontiled ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = copy_nontiled< value_t >( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else if ( IS_TYPE( & M, tiled_lrmatrix ) )
+    {
+        //
+        // copy low-rank data into tiled form
+        //
+
+        assert( M.is_real() );
+        
+        auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
+        auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
+        auto  U  = hlr::matrix::to_dense( RM->U() );
+        auto  V  = hlr::matrix::to_dense( RM->V() );
+
+        R->set_lrmat( U, V );
+        R->set_id( RM->id() );
+
+        return R;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of (block-wise) lower-left part of matrix
+//
+inline
+std::unique_ptr< hpro::TMatrix >
+copy_ll ( const hpro::TMatrix &    M,
+          const hpro::diag_type_t  diag = hpro::general_diag )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
 
         B->copy_struct_from( BM );
         
@@ -201,18 +326,18 @@ copy_ll ( const TMatrix &    M,
         // assuming non-structured block
         auto  T = M.copy();
 
-        if ( diag == unit_diag )
+        if ( diag == hpro::unit_diag )
         {
             if ( T->row_is() == T->col_is() )
             {
                 assert( is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), TDenseMatrix );
+                auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
                 if ( D->is_complex() )
-                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                    D->blas_cmat() = blas::identity< hpro::complex >( D->nrows() );
                 else
-                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+                    D->blas_rmat() = blas::identity< hpro::real >( D->nrows() );
             }// if
         }// if
 
@@ -224,15 +349,15 @@ copy_ll ( const TMatrix &    M,
 // return copy of (block-wise) upper-right part of matrix
 //
 inline
-std::unique_ptr< TMatrix >
-copy_ur ( const TMatrix &    M,
-          const diag_type_t  diag = general_diag )
+std::unique_ptr< hpro::TMatrix >
+copy_ur ( const hpro::TMatrix &    M,
+          const hpro::diag_type_t  diag = hpro::general_diag )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, TBlockMatrix );
-        auto  N  = std::make_unique< TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), TBlockMatrix );
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
 
         B->copy_struct_from( BM );
         
@@ -263,18 +388,18 @@ copy_ur ( const TMatrix &    M,
         // assuming non-structured block
         auto  T = M.copy();
 
-        if ( diag == unit_diag )
+        if ( diag == hpro::unit_diag )
         {
             if ( T->row_is() == T->col_is() )
             {
                 assert( is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), TDenseMatrix );
+                auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
                 if ( D->is_complex() )
-                    D->blas_cmat() = BLAS::identity< HLIB::complex >( D->nrows() );
+                    D->blas_cmat() = blas::identity< hpro::complex >( D->nrows() );
                 else
-                    D->blas_rmat() = BLAS::identity< HLIB::real >( D->nrows() );
+                    D->blas_rmat() = blas::identity< hpro::real >( D->nrows() );
             }// if
         }// if
 
@@ -286,17 +411,18 @@ copy_ur ( const TMatrix &    M,
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //
+inline
 void
-copy_to ( const TMatrix &  A,
-          TMatrix &        B )
+copy_to ( const hpro::TMatrix &  A,
+          hpro::TMatrix &        B )
 {
     assert( A.type()     == B.type() );
     assert( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, TBlockMatrix );
-        auto  BB = ptrcast(  &B, TBlockMatrix );
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
         assert( BA->nblock_rows() == BB->nblock_rows() );
         assert( BA->nblock_cols() == BB->nblock_cols() );
@@ -331,17 +457,18 @@ copy_to ( const TMatrix &  A,
 // - frees old data
 // - local operation thereby limiting extra memory usage
 //
-std::unique_ptr< TMatrix >
-realloc ( TMatrix *  A )
+inline
+std::unique_ptr< hpro::TMatrix >
+realloc ( hpro::TMatrix *  A )
 {
     if ( is_null( A ) )
         return nullptr;
     
     if ( is_blocked( A ) )
     {
-        auto  B  = ptrcast( A, TBlockMatrix );
-        auto  C  = std::make_unique< TBlockMatrix >();
-        auto  BC = ptrcast( C.get(), TBlockMatrix );
+        auto  B  = ptrcast( A, hpro::TBlockMatrix );
+        auto  C  = std::make_unique< hpro::TBlockMatrix >();
+        auto  BC = ptrcast( C.get(), hpro::TBlockMatrix );
 
         C->copy_struct_from( B );
 

@@ -12,7 +12,7 @@
 #include <map>
 #include <mutex>
 
-#include <matrix/TLinearOperator.hh>
+#include <hpro/matrix/TLinearOperator.hh>
 
 #include <hlr/dag/graph.hh>
 #include <hlr/dag/solve.hh>
@@ -20,20 +20,23 @@
 
 namespace hlr { namespace matrix {
 
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
+
 // local matrix type
 DECLARE_TYPE( luinv_eval );
 
 //
 // implements vector solving for LU using DAGs
 //
-class luinv_eval : public HLIB::TLinearOperator
+class luinv_eval : public hpro::TLinearOperator
 {
 private:
     // matrix containing LU data
-    std::shared_ptr< HLIB::TMatrix >  _mat;
+    std::shared_ptr< hpro::TMatrix >  _mat;
 
     // holds pointer to vector to solve
-    mutable HLIB::TScalarVector *     _vec;
+    mutable hpro::TScalarVector *     _vec;
     
     // DAGs for solving with LU
     mutable hlr::dag::graph           _dag_trsvl, _dag_trsvlt, _dag_trsvlh;
@@ -50,7 +53,7 @@ public:
     // ctor
     //
 
-    luinv_eval ( std::shared_ptr< HLIB::TMatrix > &  M,
+    luinv_eval ( std::shared_ptr< hpro::TMatrix > &  M,
                  hlr::dag::refine_func_t             refine_func = seq::dag::refine,
                  hlr::dag::exec_func_t               exec_func   = seq::dag::run );
     
@@ -78,44 +81,61 @@ public:
     // mapping function of linear operator A, e.g. y ≔ A(x).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply       ( const HLIB::TVector *  x,
-                                HLIB::TVector *        y,
-                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
+    virtual void  apply       ( const hpro::TVector *  x,
+                                hpro::TVector *        y,
+                                const hpro::matop_t    op = hpro::apply_normal ) const;
 
     //
     // mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply_add   ( const HLIB::real       alpha,
-                                const HLIB::TVector *  x,
-                                HLIB::TVector *        y,
-                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
-    virtual void  capply_add  ( const HLIB::complex    alpha,
-                                const HLIB::TVector *  x,
-                                HLIB::TVector *        y,
-                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
+    virtual void  apply_add   ( const hpro::real       alpha,
+                                const hpro::TVector *  x,
+                                hpro::TVector *        y,
+                                const hpro::matop_t    op = hpro::apply_normal ) const;
+    virtual void  capply_add  ( const hpro::complex    alpha,
+                                const hpro::TVector *  x,
+                                hpro::TVector *        y,
+                                const hpro::matop_t    op = hpro::apply_normal ) const;
 
-    virtual void  apply_add   ( const HLIB::real       alpha,
-                                const HLIB::TMatrix *  X,
-                                HLIB::TMatrix *        Y,
-                                const HLIB::matop_t    op = HLIB::apply_normal ) const;
+    virtual void  apply_add   ( const hpro::real       alpha,
+                                const hpro::TMatrix *  X,
+                                hpro::TMatrix *        Y,
+                                const hpro::matop_t    op = hpro::apply_normal ) const;
     
+    // same as above but only the dimension of the vector spaces is tested,
+    // not the corresponding index sets
+    virtual void  apply_add   ( const hpro::real                       alpha,
+                                const blas::Vector< hpro::real > &     x,
+                                blas::Vector< hpro::real > &           y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const hpro::complex                    alpha,
+                                const blas::Vector< hpro::complex > &  x,
+                                blas::Vector< hpro::complex > &        y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+
     //
-    // access to vector space elements
+    // access vector space data
     //
 
+    // return dimension of domain
+    virtual size_t  domain_dim     () const { return _mat->nrows(); }
+    
+    // return dimension of range
+    virtual size_t  range_dim      () const { return _mat->ncols(); }
+    
     // return vector in domain space
-    virtual auto domain_vector  () const -> std::unique_ptr< HLIB::TVector > { return _mat->row_vector(); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return _mat->row_vector(); }
 
     // return vector in range space
-    virtual auto range_vector   () const -> std::unique_ptr< HLIB::TVector > { return _mat->col_vector(); }
+    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return _mat->col_vector(); }
 
     //
     // misc.
     //
 
     // RTTI
-    HLIB_RTTI_DERIVED( luinv_eval, HLIB::TLinearOperator )
+    HLIB_RTTI_DERIVED( luinv_eval, hpro::TLinearOperator )
 };
 
 

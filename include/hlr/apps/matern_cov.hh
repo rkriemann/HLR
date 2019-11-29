@@ -16,21 +16,21 @@ namespace hlr
 namespace apps
 {
 
-class matern_cov : public application< HLIB::real >
+class matern_cov : public application< hpro::real >
 {
 public:
     //
     // public types
     //
     
-    using  value_t = HLIB::real;
+    using  value_t = hpro::real;
 
 private:
     // problem size
     size_t                        _n;
     
     // coordinates
-    std::vector< HLIB::T3Point >  _vertices;
+    std::vector< hpro::T3Point >  _vertices;
 
 public:
     //
@@ -52,21 +52,21 @@ public:
     //
     // set up coordinates
     //
-    std::unique_ptr< HLIB::TCoordinate >
+    std::unique_ptr< hpro::TCoordinate >
     coordinates () const;
     
     //
     // return coefficient function to evaluate matrix entries
     //
-    std::unique_ptr< HLIB::TCoeffFn< value_t > >
+    std::unique_ptr< hpro::TCoeffFn< value_t > >
     coeff_func () const;
     
     // //
     // // build matrix
     // //
-    // std::unique_ptr< HLIB::TMatrix >
-    // build_matrix ( const HLIB::TBlockClusterTree *  bct,
-    //                const HLIB::TTruncAcc &          acc );
+    // std::unique_ptr< hpro::TMatrix >
+    // build_matrix ( const hpro::TBlockClusterTree *  bct,
+    //                const hpro::TTruncAcc &          acc );
 };
 
 }// namespace apps

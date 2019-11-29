@@ -2,8 +2,7 @@
 #include "hlr/mpi/mpi.hh"
 #include "hlr/cluster/distr.hh"
 #include "hlr/cluster/tileh.hh"
-#include "cmdline.hh"
-#include "gen_problem.hh"
+#include "common.hh"
 #include "hlr/utils/RedirectOutput.hh"
 #include "hlr/utils/compare.hh"
 #include "hlr/matrix/luinv_eval.hh"
@@ -11,25 +10,6 @@
 #include "hlr/tbb/matrix.hh"
 
 using namespace hlr;
-
-// return main memory usage as a string
-std::string
-mem_usage ()
-{
-    return term::ltgrey( " [" + Mem::to_string( Mem::usage() ) + "]" );
-}
-
-//
-// generate accuracy
-//
-TTruncAcc
-gen_accuracy ()
-{
-    if ( eps < 0 )
-        return fixed_rank( k );
-    else
-        return fixed_prec( eps );
-}
 
 //
 // main function
@@ -44,7 +24,7 @@ mymain ( int, char ** )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
 
-    auto  tic     = Time::Wall::now();
+    auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = cluster::tileh::cluster( coord.get(), ntile, 4 ); // std::max< uint >( 3, std::log2( nprocs )+2 ) );
@@ -55,9 +35,9 @@ mymain ( int, char ** )
     else if ( distr == "cyclic1d"    ) cluster::distribution::cyclic_1d( nprocs, bct->root() );
     else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
-    if (( pid == 0 ) && verbose( 3 ))
+    if (( pid == 0 ) && hpro::verbose( 3 ))
     {
-        TPSBlockClusterVis   bc_vis;
+        hpro::TPSBlockClusterVis   bc_vis;
         
         bc_vis.id( true ).procs( false ).print( bct->root(), "bct" );
         bc_vis.id( false ).procs( true ).print( bct->root(), "bct_distr" );
@@ -65,17 +45,17 @@ mymain ( int, char ** )
     
     auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
     auto  A      = mpi::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
-    std::cout << "    done in " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-    std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    done in " << format_time( toc ) << std::endl;
+    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
     
         mvis.svd( false ).id( true ).print( A.get(), to_string( "A_%03d", pid ) );
     }// if
@@ -92,7 +72,7 @@ mymain ( int, char ** )
         
         auto  C = std::shared_ptr( hlr::tbb::matrix::copy( *A ) );
         
-        tic = Time::Wall::now();
+        tic = timer::now();
 
         if ( nprocs == 1 )
         {
@@ -105,7 +85,7 @@ mymain ( int, char ** )
             impl::lu< HLIB::real >( C.get(), acc );
         }// else
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
         
         std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
         std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;

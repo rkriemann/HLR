@@ -221,6 +221,74 @@ graph::print_dot ( const std::string &  filename ) const
     out << "}" << std::endl;
 }// if
 
+void
+graph::print_dot ( const std::string &                           filename,
+                   const std::map< std::string, node_list_t > &  groups ) const
+{
+    std::ofstream  out( filename );
+
+    out << "digraph G {" << std::endl
+        << "  size  = \"16,16\";" << std::endl
+        << "  ratio = \"1.5\";" << std::endl
+        << "  node [ shape = box, style = \"filled,rounded\", fontsize = 20, fontname = \"Noto Sans\", height = 1.5, width = 4, fixedsize = true ];" << std::endl
+        << "  edge [ arrowhead = open, color = \"#000000\" ];" << std::endl; // #babdb6
+
+    std::map< node *, HLIB::id_t >  node_ids;
+    HLIB::id_t                      id = 0;
+    
+    for ( auto node : _nodes )
+    {
+        node_ids[ node ] = id;
+        
+        out << "  " << id << " [ label = \"" << node->to_string() << "\", ";
+
+        ++id;
+        
+        if ( node->successors().empty()  )
+            out << "shape = parallelogram, ";
+
+        if ( node->dep_cnt() == 0 )
+            out << "penwidth = 5, fillcolor = \"#" << node->color();
+        else 
+            out << "color = \"#" << node->color();
+        
+        out << "\" ];" << std::endl;
+    }// for
+
+    HLIB::id_t  group_id = 0;
+    
+    for ( auto & [ name, group ] :  groups )
+    {
+        out << "  subgraph cluster_" << group_id++ << " {" << std::endl
+            << "    label = \"" << name << "\";" << std::endl;
+
+        out << "    ";
+        for ( auto  node : group )
+            out << node_ids[ node ] << "; ";
+        
+        out << std::endl << "  };" << std::endl;
+    }// for
+    
+    for ( auto node : _nodes )
+    {
+        auto  succ = node->successors().begin();
+
+        if ( succ != node->successors().end() )
+        {
+            out << "  " << node_ids[node] << " -> {";
+
+            out << node_ids[*succ];
+        
+            while ( ++succ != node->successors().end() )
+                out << ";" << node_ids[*succ];
+            
+            out << "};" << std::endl;
+        }// if
+    }// for
+
+    out << "}" << std::endl;
+}// if
+
 //
 // output DAG in GEXF format
 //
@@ -316,12 +384,7 @@ graph::mem_size  () const
     size_t  size = sizeof(_nodes) + sizeof(_start) + sizeof(_end);
 
     for ( auto  n : _nodes )
-    {
-        size += sizeof(node) + sizeof(node*);
-        size += sizeof(node*) * n->successors().size();
-        size += sizeof(std::mutex);
-        size += sizeof(mem_block_t) * ( n->in_blocks().size() + n->out_blocks().size() );
-    }// for
+        size += n->mem_size() + sizeof(node*);
 
     size += sizeof(node*) * _start.size();
     size += sizeof(node*) * _end.size();

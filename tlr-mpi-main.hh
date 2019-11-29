@@ -2,8 +2,7 @@
 #include "hlr/mpi/mpi.hh"
 #include "hlr/cluster/distr.hh"
 #include "hlr/cluster/tlr.hh"
-#include "cmdline.hh"
-#include "gen_problem.hh"
+#include "common.hh"
 #include "hlr/utils/RedirectOutput.hh"
 #include "hlr/utils/compare.hh"
 
@@ -22,7 +21,7 @@ mymain ( int argc, char ** argv )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
 
-    auto  tic     = Time::Wall::now();
+    auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = cluster::tlr::cluster( coord.get(), ntile );
@@ -32,26 +31,26 @@ mymain ( int argc, char ** argv )
     if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
     else if ( distr == "shiftcycrow" ) cluster::distribution::shifted_cyclic_1d( nprocs, bct->root() );
     
-    if (( pid == 0 ) && verbose( 3 ))
+    if (( pid == 0 ) && hpro::verbose( 3 ))
     {
-        TPSBlockClusterVis   bc_vis;
+        hpro::TPSBlockClusterVis   bc_vis;
         
         bc_vis.id( true ).procs( false ).print( bct->root(), "bct" );
         bc_vis.id( false ).procs( true ).print( bct->root(), "bct_distr" );
     }// if
     
     auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( coeff.get() );
+    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( coeff.get() );
     auto  A      = mpi::matrix::build( bct->root(), *pcoeff, *lrapx, fixed_rank( k ) );
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
-    std::cout << "    done in " << format( "%.2fs" ) % toc.seconds() << std::endl;
-    std::cout << "    size of H-matrix = " << Mem::to_string( A->byte_size() ) << std::endl;
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
     
         mvis.svd( false ).id( true ).print( A.get(), to_string( "A_%03d", pid ) );
     }// if
@@ -63,16 +62,16 @@ mymain ( int argc, char ** argv )
         
         auto  C = A->copy();
         
-        tic = Time::Wall::now();
+        tic = timer::now();
         
-        ARITH::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+        ARITH::lu< hpro::real >( C.get(), fixed_rank( k ) );
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
         
-        std::cout << "    done in " << toc << std::endl;
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
 
         // compare with otherwise computed result
-        compare_ref_file( C.get(), "LU.hm" );
+        compare_ref_file( C.get(), "LU.hm", 1e-8 );
         
         // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
@@ -89,7 +88,7 @@ main ( int argc, char ** argv )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    parse_cmdline( argc, argv );
+    hlr::cmdline::parse( argc, argv );
     
     // redirect output for all except proc 0
     std::unique_ptr< RedirectOutput >  redir_out = ( ! noredir && (pid != 0)
@@ -98,29 +97,29 @@ main ( int argc, char ** argv )
 
     try
     {
-        INIT();
+        hpro::INIT();
 
         // adjust HLIB network data
         NET::set_nprocs( nprocs );
         NET::set_pid( pid );
     
-        std::cout << term::bullet << term::bold << Mach::hostname() << term::reset << std::endl
-                  << "    CPU cores : " << Mach::cpuset() << std::endl;
+        std::cout << term::bullet << term::bold << hpro::Mach::hostname() << term::reset << std::endl
+                  << "    CPU cores : " << hpro::Mach::cpuset() << std::endl;
         
-        CFG::set_verbosity( verbosity );
+        hpro::CFG::set_verbosity( verbosity );
 
-        if ( nthreads != 0 )
-            CFG::set_nthreads( nthreads );
+        if ( hlr::nthreads != 0 )
+            hpro::CFG::set_nthreads( hlr::nthreads );
 
-        if      ( appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
-        else if ( appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
+        if      ( hlr::appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
+        else if ( hlr::appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
         else
             throw "unknown application";
 
-        DONE();
+        hpro::DONE();
     }// try
-    catch ( char const *  e ) { std::cout << e << std::endl; }
-    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
+    catch ( char const *   e ) { std::cout << e << std::endl; }
+    catch ( hpro::Error &  e ) { std::cout << e.to_string() << std::endl; }
 
     return 0;
 }

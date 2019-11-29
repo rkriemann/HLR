@@ -12,13 +12,16 @@
 #include <list>
 #include <utility>
 
-#include <blas/Vector.hh>
-#include <blas/Matrix.hh>
+#include <hpro/blas/Vector.hh>
+#include <hpro/blas/Matrix.hh>
 
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
+
+using hpro::idx_t;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -32,16 +35,16 @@ using namespace HLIB;
 //
 template < typename value_t >
 void
-subtract ( const std::list< B::Vector< value_t > > &  U,
-           const int                                  i,
-           const std::list< B::Vector< value_t > > &  V,
-           B::Vector< value_t > &                     col )
+subtract ( const std::list< blas::Vector< value_t > > &  U,
+           const int                                     i,
+           const std::list< blas::Vector< value_t > > &  V,
+           blas::Vector< value_t > &                     col )
 {
     auto  U_k = U.begin();
     auto  V_k = V.begin();
     
     for ( ; ( U_k != U.end() ) && ( V_k != V.end() ); ++U_k, ++V_k )
-        B::add( -conj( (*V_k)( i ) ), (*U_k), col );
+        blas::add( -conj( (*V_k)( i ) ), (*U_k), col );
 }
 
 //
@@ -50,16 +53,16 @@ subtract ( const std::list< B::Vector< value_t > > &  U,
 //
 template < typename value_t >
 void
-subtract ( const int                                  i,
-           const std::list< B::Vector< value_t > > &  U,
-           const std::list< B::Vector< value_t > > &  V,
-           B::Vector< value_t > &                     row )
+subtract ( const int                                     i,
+           const std::list< blas::Vector< value_t > > &  U,
+           const std::list< blas::Vector< value_t > > &  V,
+           blas::Vector< value_t > &                     row )
 {
     auto  U_k = U.begin();
     auto  V_k = V.begin();
     
     for ( ; ( U_k != U.end() ) && ( V_k != V.end() ); ++U_k, ++V_k )
-        B::add( -conj( (*U_k)( i ) ), (*V_k), row );
+        blas::add( -conj( (*U_k)( i ) ), (*V_k), row );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +175,7 @@ template < typename value_t,
 std::pair< BLAS::Matrix< value_t >,
            BLAS::Matrix< value_t > >
 approx_aca  ( const operator_t &                        M,
-              const TTruncAcc &                         acc,
+              const hpro::TTruncAcc &                   acc,
               std::list< std::pair< idx_t, idx_t > > *  pivots )
 {
     using  real_t = typename real_type< value_t >::type_t;

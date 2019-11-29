@@ -13,7 +13,7 @@
 #include <vector>
 #include <map>
 
-#include <matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
 
 namespace hlr { namespace matrix {
 

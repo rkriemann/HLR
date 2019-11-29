@@ -11,8 +11,8 @@
 #include <map>
 #include <mutex>
 
-#include <matrix/TMatrix.hh>
-#include <vector/TScalarVector.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/vector/TScalarVector.hh>
 
 #include "hlr/dag/graph.hh"
 

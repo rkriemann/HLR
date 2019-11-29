@@ -10,11 +10,16 @@
 
 #include <taskflow/taskflow.hpp>
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
+
+#include "hlr/tf/arith_tiled.hh"
 
 namespace hlr
 {

@@ -21,7 +21,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17'
+CXXFLAGS     = '-std=c++2a'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
@@ -29,13 +29,13 @@ LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # directories for the various external libraries
-HPRO_DIR     = 'hlibpro'
+HPRO_DIR     = '/home/rok/programming/hpro/devel'
 TBB_DIR      = '/usr'
 TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
 HPX_DIR      = '/opt/local/hpx'
 GPI2_DIR     = '/opt/local/gpi2'
 
-JEMALLOC_DIR = '/opt/local/jemalloc/5.2.0'
+JEMALLOC_DIR = '/opt/local/jemalloc/5.2.1'
 MIMALLOC_DIR = '/opt/local/mimalloc'
 TCMALLOC_DIR = '/usr'
 
@@ -43,7 +43,7 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tile-hodlr' ]
+PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tiled-hodlr', 'dag-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
@@ -198,7 +198,7 @@ if not debug :
 
 # add internal paths and libraries
 env.Append(  CPPPATH = [ '#include' ] )
-env.Prepend( LIBS    = [ "common" ] )
+env.Prepend( LIBS    = [ "hlr" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
 # include malloc library
@@ -277,20 +277,20 @@ def show_options ( target, source, env ):
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
-    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), opt_env['programs'] )
-    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), opt_env['frameworks'] )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), opt_env['malloc'] )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['likwid'] ] )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['optimise'] ] )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['debug'] ] )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['profile'] ] )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['warn'] ] )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['fullmsg'] ] )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ opt_env['color'] ] )
+    print( '  {0}Option{1}     │ {0}Value{1}                   │ {0}Description{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
+    print( '  {0}programs{1}   │ {2:<23} │ programs to build'.format( colors['bold'], colors['reset'], opt_env['programs'] ) )
+    print( '  {0}frameworks{1} │ {2:<23} │ software frameworks to use'.format( colors['bold'], colors['reset'], opt_env['frameworks'] ) )
+    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
+    print( '  {0}malloc{1}     │ {2:<23} │ malloc library to use'.format( colors['bold'], colors['reset'], opt_env['malloc'] ) )
+    print( '  {0}likwid{1}     │ {2}                       │ use LikWid library'.format( colors['bold'], colors['reset'], bool_str[ opt_env['likwid'] ] ) )
+    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
+    print( '  {0}optimise{1}   │ {2}                       │ enable compiler optimisations'.format( colors['bold'], colors['reset'], bool_str[ opt_env['optimise'] ] ) )
+    print( '  {0}debug{1}      │ {2}                       │ enable debug information'.format( colors['bold'], colors['reset'], bool_str[ opt_env['debug'] ] ) )
+    print( '  {0}profile{1}    │ {2}                       │ enable profile information'.format( colors['bold'], colors['reset'], bool_str[ opt_env['profile'] ] ) )
+    print( '  {0}warn{1}       │ {2}                       │ enable compiler warnings'.format( colors['bold'], colors['reset'], bool_str[ opt_env['warn'] ] ) )
+    print( '  {0}fullmsg{1}    │ {2}                       │ full command line output'.format( colors['bold'], colors['reset'], bool_str[ opt_env['fullmsg'] ] ) )
+    print( '  {0}color{1}      │ {2}                       │ use colored output'.format( colors['bold'], colors['reset'], bool_str[ opt_env['color'] ] ) )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )
@@ -299,38 +299,39 @@ env.Alias( 'options', options_cmd )
 
 ######################################################################
 #
-# common library and framework dependent targets
+# HLR library and framework dependent targets
 #
 ######################################################################
 
-common = env.StaticLibrary( 'common', [ 'src/apps/laplace.cc',
-                                        'src/apps/log_kernel.cc',
-                                        'src/apps/matern_cov.cc',
-                                        'src/cluster/distr.cc',
-                                        'src/cluster/h.cc',
-                                        'src/cluster/hodlr.cc',
-                                        'src/cluster/tileh.cc',
-                                        'src/cluster/tlr.cc',
-                                        'src/dag/gauss_elim.cc',
-                                        'src/dag/graph.cc',
-                                        'src/dag/invert.cc',
-                                        'src/dag/local_graph.cc',
-                                        'src/dag/lu.cc',
-                                        'src/dag/lu_coarse.cc',
-                                        'src/dag/lu_lvl.cc',
-                                        'src/dag/lu_oop.cc',
-                                        'src/dag/lu_oop_accu.cc',
-                                        'src/dag/lu_oop_accu_sep.cc',
-                                        'src/dag/lu_oop_auto.cc',
-                                        'src/dag/node.cc',
-                                        'src/dag/solve.cc',
-                                        'src/matrix/level_matrix.cc',
-                                        'src/matrix/luinv_eval.cc',
-                                        'src/seq/dag.cc',
-                                        'src/seq/solve.cc',
-                                        'src/utils/compare.cc',
-                                        'src/utils/log.cc',
-                                        'src/utils/term.cc' ] )
+libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
+                                     'src/apps/log_kernel.cc',
+                                     'src/apps/matern_cov.cc',
+                                     'src/cluster/distr.cc',
+                                     'src/cluster/h.cc',
+                                     'src/cluster/hodlr.cc',
+                                     'src/cluster/tileh.cc',
+                                     'src/cluster/tlr.cc',
+                                     'src/dag/gauss_elim.cc',
+                                     'src/dag/graph.cc',
+                                     'src/dag/invert.cc',
+                                     'src/dag/local_graph.cc',
+                                     'src/dag/lu.cc',
+                                     'src/dag/lu_coarse.cc',
+                                     'src/dag/lu_hodlr_tiled.cc',
+                                     'src/dag/lu_lvl.cc',
+                                     'src/dag/lu_oop.cc',
+                                     'src/dag/lu_oop_accu.cc',
+                                     'src/dag/lu_oop_accu_sep.cc',
+                                     'src/dag/lu_oop_auto.cc',
+                                     'src/dag/node.cc',
+                                     'src/dag/solve.cc',
+                                     'src/matrix/level_matrix.cc',
+                                     'src/matrix/luinv_eval.cc',
+                                     'src/seq/dag.cc',
+                                     'src/seq/solve.cc',
+                                     'src/utils/compare.cc',
+                                     'src/utils/log.cc',
+                                     'src/utils/term.cc' ] )
 
 Default( None )
 
@@ -341,13 +342,12 @@ Default( None )
 if 'seq' in frameworks :
     seq = env.Clone()
         
-    if 'tlr'        in programs : Default( seq.Program( 'tlr-seq.cc' ) )
-    if 'hodlr'      in programs : Default( seq.Program( 'hodlr-seq.cc' ) )
-    if 'tile-hodlr' in programs : Default( seq.Program( 'tile-hodlr-seq.cc' ) )
-    if 'tileh'      in programs : Default( seq.Program( 'tileh-seq.cc' ) )
-    if 'dag-lu'     in programs : Default( seq.Program( 'dag-lu-seq.cc' ) )
-    if 'dag-gauss'  in programs : Default( seq.Program( 'dag-gauss-seq.cc' ) )
-    if 'dag-inv'    in programs : Default( seq.Program( 'dag-inv-seq.cc' ) )
+    for program in programs :
+        name   = program + '-seq'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( seq.Program( name, [ source ] ) )
 
 #
 # OpenMP
@@ -358,11 +358,12 @@ if 'omp' in frameworks :
     omp.Append( CXXFLAGS  = "-fopenmp" )
     omp.Append( LINKFLAGS = "-fopenmp" )
 
-    if 'tlr'        in programs : Default( omp.Program( 'tlr-omp.cc' ) )
-    if 'hodlr'      in programs : Default( omp.Program( 'hodlr-omp.cc' ) )
-    if 'tileh'      in programs : Default( omp.Program( 'tileh-omp.cc' ) )
-    if 'dag-lu'     in programs : Default( omp.Program( 'dag-lu-omp',    [ 'dag-lu-omp.cc',    'src/omp/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( omp.Program( 'dag-gauss-omp', [ 'dag-gauss-omp.cc', 'src/omp/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-omp'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( omp.Program( name, [ source, 'src/omp/dag.cc' ] ) )
 
 #
 # TBB
@@ -373,13 +374,12 @@ if 'tbb' in frameworks :
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
 
-    if 'tlr'        in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
-    if 'hodlr'      in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
-    if 'tile-hodlr' in programs : Default( tbb.Program( 'tile-hodlr-tbb.cc' ) )
-    if 'tileh'      in programs : Default( tbb.Program( 'tileh-tbb',     [ 'tileh-tbb.cc',     'src/tbb/dag.cc' ] ) )
-    if 'dag-lu'     in programs : Default( tbb.Program( 'dag-lu-tbb',    [ 'dag-lu-tbb.cc',    'src/tbb/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( tbb.Program( 'dag-gauss-tbb', [ 'dag-gauss-tbb.cc', 'src/tbb/dag.cc' ] ) )
-    if 'dag-inv'    in programs : Default( tbb.Program( 'dag-inv-tbb',   [ 'dag-inv-tbb.cc',   'src/tbb/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-tbb'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( tbb.Program( name, [ source, 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -390,11 +390,12 @@ if 'tf' in frameworks :
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'        in programs : Default( tf.Program( 'tlr-tf.cc' ) )
-    if 'hodlr'      in programs : Default( tf.Program( 'hodlr-tf.cc' ) )
-    if 'tile-hodlr' in programs : Default( tf.Program( 'tile-hodlr-tf.cc' ) )
-    if 'dag-lu'     in programs : Default( tf.Program( 'dag-lu-tf',    [ 'dag-lu-tf.cc',    'src/tf/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( tf.Program( 'dag-gauss-tf', [ 'dag-gauss-tf.cc', 'src/tf/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-tf'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( tf.Program( name, [ source, 'src/tf/dag.cc' ] ) )
 
 #
 # HPX
@@ -406,10 +407,12 @@ if 'hpx' in frameworks :
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.Append( LIBS = [ "hpx_iostreams" ] )
     
-    if 'tlr'        in programs : Default( hpx.Program( 'tlr-hpx.cc' ) )
-    if 'hodlr'      in programs : Default( hpx.Program( 'hodlr-hpx.cc' ) )
-    if 'dag-lu'     in programs : Default( hpx.Program( 'dag-lu-hpx',    [ 'dag-lu-hpx.cc',    'src/hpx/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( hpx.Program( 'dag-gauss-hpx', [ 'dag-gauss-hpx.cc', 'src/hpx/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-hpx'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( hpx.Program( name, [ source, 'src/hpx/dag.cc' ] ) )
 
 #
 # MPI

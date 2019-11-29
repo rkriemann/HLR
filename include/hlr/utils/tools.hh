@@ -13,7 +13,7 @@
 #include <set>
 #include <unordered_set>
 
-#include <base/config.hh>
+#include <hpro/base/config.hh>
 
 namespace hlr
 {

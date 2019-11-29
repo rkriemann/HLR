@@ -12,9 +12,10 @@
 #include <unordered_set>
 #include <map>
 
-#include <matrix/structure.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/algebra/solve_tri.hh>
+#include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"

@@ -11,7 +11,7 @@
 #include <iostream>
 #include <mutex>
 
-#include <base/config.hh>
+#include <hpro/base/config.hh>
 
 #include <hlr/utils/term.hh>
 
@@ -31,7 +31,7 @@ error ( const msg_t &  msg )
 
 // always-on-assert
 #define HLR_ASSERT( expr )                                              \
-    if ( ! expr )                                                       \
+    if ( ! ( expr ) )                                                   \
         hlr::error( hlr::term::on_red( hlr::term::white( "[ERROR]" ) ) + " " + \
                     __FILE__ + HLIB::to_string( ":%d", __LINE__ ) +     \
                     std::string( " in " ) + __PRETTY_FUNCTION__ +       \
@@ -56,6 +56,10 @@ log ( const int      lvl,
     }// if
 }
 
+void
+log ( const int            lvl,
+      const std::string &  msg );
+
 //
 // logging enabled/disabled via NDEBUG
 //
@@ -64,10 +68,11 @@ log ( const int      lvl,
 #else
 #  define HLR_LOG( lvl, msg ) \
     hlr::log( lvl,                                                      \
-              hlr::term::green( __FILE__  ) + HLIB::to_string( ":%d", __LINE__ ) + \
-              std::string( " in " ) + hlr::term::yellow( __func__ ) +   \
-              std::string( " : " ) + msg )
+              std::string( "                                          " ) + msg )
 #endif
+              // hlr::term::green( __FILE__  ) + HLIB::to_string( ":%d", __LINE__ ) +
+              // std::string( " in " ) + hlr::term::yellow( __func__ ) + 
+              // std::string( " : " ) + msg )
 
 }// namespace hlr
 

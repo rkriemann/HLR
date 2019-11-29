@@ -16,10 +16,10 @@
 
 namespace fs = boost::filesystem;
 
-#include <algebra/mat_norm.hh>
-#include <matrix/TBlockMatrix.hh>
-#include <matrix/structure.hh>
-#include <io/TMatrixIO.hh>
+#include <hpro/algebra/mat_norm.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/io/TMatrixIO.hh>
 
 #include "hlr/utils/term.hh"
 #include "hlr/utils/compare.hh"

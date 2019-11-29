@@ -8,11 +8,13 @@
 
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/seq/arith_tiled.hh"
+#include "hlr/seq/arith_tiled_v2.hh"
 
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "tile-hodlr.hh"
+#include "tiled-hodlr.hh"
 
 int
 main ( int argc, char ** argv )
