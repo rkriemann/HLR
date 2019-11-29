@@ -316,9 +316,9 @@ tiled_lrmatrix< value_t >::mul_vec ( const real             alpha,
     assert( is_scalar_all( ax, ay ) );
 
     // exclude complex value and transposed operation for now
-    assert( (  op == apply_normal     ) ||
-            (  op == apply_adjoint    ) ||
-            (( op == apply_transposed ) && ! is_complex_type< value_t >::value ) );
+    assert( (  op == hpro::apply_normal     ) ||
+            (  op == hpro::apply_adjoint    ) ||
+            (( op == hpro::apply_transposed ) && ! hpro::is_complex_type< value_t >::value ) );
 
     const auto  x = cptrcast( ax, hpro::TScalarVector );
     const auto  y = ptrcast(  ay, hpro::TScalarVector );

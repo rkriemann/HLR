@@ -7,6 +7,7 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/dag/gauss_elim.hh"
 

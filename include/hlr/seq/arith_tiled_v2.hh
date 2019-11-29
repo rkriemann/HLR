@@ -11,6 +11,7 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
+#include <hpro/algebra/mat_norm.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"

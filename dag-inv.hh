@@ -7,9 +7,12 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/dag/invert.hh"
 #include "hlr/dag/lu.hh"
+
+using namespace hlr;
 
 //
 // main function
@@ -22,7 +25,7 @@ mymain ( int, char ** )
     
     auto  tic = timer::now();
     auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< TMatrix >();
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
 
     if ( matrixfile == "" )
     {
@@ -31,17 +34,16 @@ mymain ( int, char ** )
         auto  ct      = cluster::h::cluster( coord.get(), ntile );
         auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
-        if ( verbose( 3 ) )
+        if ( hpro::verbose( 3 ) )
         {
-            TPSBlockClusterVis   bc_vis;
+            hpro::TPSBlockClusterVis   bc_vis;
         
             bc_vis.id( true ).print( bct->root(), "bct" );
-            print_vtk( coord.get(), "coord" );
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     }// if
@@ -51,7 +53,7 @@ mymain ( int, char ** )
                   << "    matrix = " << matrixfile
                   << std::endl;
 
-        A = read_matrix( matrixfile );
+        A = hpro::read_matrix( matrixfile );
     }// else
 
     auto  toc    = timer::since( tic );
@@ -60,9 +62,9 @@ mymain ( int, char ** )
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
@@ -78,9 +80,7 @@ mymain ( int, char ** )
     
     auto  A_inv = impl::matrix::copy( *A );
 
-    double  tmin = 0;
-    double  tmax = 0;
-    double  tsum = 0;
+    std::vector< double >  runtime;
     
     std::cout << "    DAG" << std::endl;
     
@@ -92,29 +92,27 @@ mymain ( int, char ** )
         
         toc = timer::since( tic );
         
-        if ( verbose( 1 ) )
+        if ( hpro::verbose( 1 ) )
             std::cout << "      done in  " << format_time( toc ) << std::endl;
         
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
         
         if ( i < nbench-1 )
             dag = std::move( hlr::dag::graph() );
     }// for
         
-    if ( verbose( 1 ) )
+    if ( hpro::verbose( 1 ) )
     {
         if ( nbench > 1 )
-            std::cout << "      time =   "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        std::cout << "      #nodes = " << dag.nnodes() << std::endl;
-        std::cout << "      #edges = " << dag.nedges() << std::endl;
-        std::cout << "      mem    = " << format_mem( dag.mem_size() ) << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
         
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
         dag.print_dot( "inv.dot" );
 
     if ( onlydag )
@@ -128,7 +126,7 @@ mymain ( int, char ** )
     
     std::cout << "    Inversion" << std::endl;
     
-    tmin = tmax = tsum = 0;
+    runtime.clear();
         
     for ( int  i = 0; i < 1; ++i ) // nbench
     {
@@ -140,17 +138,17 @@ mymain ( int, char ** )
 
         std::cout << "      done in  " << format_time( toc ) << std::endl;
 
-        tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
-        tmax  = std::max( tmax, toc.seconds() );
-        tsum += toc.seconds();
+        runtime.push_back( toc.seconds() );
 
         if ( i < (nbench-1) )
             impl::matrix::copy_to( *A, *A_inv );
     }// for
         
     if ( nbench > 1 )
-        std::cout << "      time =   " << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax << std::endl;
+        std::cout << "  runtime  = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
         
     std::cout << "      mem    = " << format_mem( A_inv->byte_size() ) << std::endl;
-    std::cout << "      error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), A_inv.get() ) << term::reset << std::endl;
+    std::cout << "      error  = " << format_error( hpro::inv_approx_2( A.get(), A_inv.get() ) ) << std::endl;
 }

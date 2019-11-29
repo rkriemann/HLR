@@ -10,7 +10,7 @@
 #include <list>
 #include <unordered_map>
 
-#include <matrix/structure.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/tools.hh"
 

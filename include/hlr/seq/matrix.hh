@@ -562,9 +562,9 @@ clear ( hpro::TMatrix &  M )
         auto  D = ptrcast( & M, hpro::TDenseMatrix );
 
         if ( D->is_complex() )
-            blas::fill( hpro::complex(0), blas_mat< hpro::complex >( D ) );
+            blas::fill( hpro::complex(0), hpro::blas_mat< hpro::complex >( D ) );
         else
-            blas::fill( hpro::real(0), blas_mat< hpro::real >( D ) );
+            blas::fill( hpro::real(0), hpro::blas_mat< hpro::real >( D ) );
     }// if
     else
         assert( false );

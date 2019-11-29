@@ -8,9 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <matrix/TDenseMatrix.hh>
-#include <matrix/TRkMatrix.hh>
-#include <matrix/TGhostMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/matrix/TGhostMatrix.hh>
 
 #include <hlr/utils/tensor.hh>
 #include <hlr/utils/log.hh>

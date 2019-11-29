@@ -39,9 +39,9 @@ namespace hlr { namespace gaspi { namespace tlr {
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
 
-const typeid_t  TYPE_DENSE = hpro::RTTI::type_to_id( "TDenseMatrix" );
-const typeid_t  TYPE_LR    = hpro::RTTI::type_to_id( "TRkMatrix" );
-const typeid_t  TYPE_GHOST = hpro::RTTI::type_to_id( "TGhostMatrix" );
+const hpro::typeid_t  TYPE_DENSE = hpro::RTTI::type_to_id( "TDenseMatrix" );
+const hpro::typeid_t  TYPE_LR    = hpro::RTTI::type_to_id( "TRkMatrix" );
+const hpro::typeid_t  TYPE_GHOST = hpro::RTTI::type_to_id( "TGhostMatrix" );
 
 constexpr segment_id_t  ID_DENSE = 1;
 constexpr segment_id_t  ID_LR_A  = 2;
@@ -50,25 +50,25 @@ constexpr segment_id_t  ID_LR_B  = 3;
 //
 // create n×m block matrix type info for full block matrix
 //
-tensor2< typeid_t >
+tensor2< hpro::typeid_t >
 build_type_matrix ( const hpro::TBlockMatrix *  A )
 {
-    const auto           nbr = A->nblock_rows();
-    const auto           nbc = A->nblock_cols();
-    gaspi::process  proc;
-    const auto           pid    = proc.rank();
-    const auto           nprocs = proc.size();
-    tensor2< typeid_t >  mat_types( nbr, nbc );
+    const auto                 nbr = A->nblock_rows();
+    const auto                 nbc = A->nblock_cols();
+    gaspi::process             proc;
+    const auto                 pid    = proc.rank();
+    const auto                 nprocs = proc.size();
+    tensor2< hpro::typeid_t >  mat_types( nbr, nbc );
 
     for ( uint  i = 0; i < nbr; ++i )
         for ( uint  j = 0; j < nbc; ++j )
             mat_types(i,j) = A->block( i, j )->type();
 
-    tensor2< typeid_t >  rem_types( nbr, nbc );
-    gaspi::group         world;
-    gaspi::segment       loc_seg( 0, & mat_types(0,0), nbr*nbc, world );
-    gaspi::segment       rem_seg( 1, & rem_types(0,0), nbr*nbc, world );
-    gaspi::queue         queue;
+    tensor2< hpro::typeid_t >  rem_types( nbr, nbc );
+    gaspi::group               world;
+    gaspi::segment             loc_seg( 0, & mat_types(0,0), nbr*nbc, world );
+    gaspi::segment             rem_seg( 1, & rem_types(0,0), nbr*nbc, world );
+    gaspi::queue               queue;
     
     for ( uint  p = 0; p < nprocs; ++p )
     {
@@ -87,12 +87,12 @@ build_type_matrix ( const hpro::TBlockMatrix *  A )
         world.barrier();
     }// for
 
-    if ( verbose( 5 ) )
+    if ( hpro::verbose( 5 ) )
     {
         for ( uint  i = 0; i < nbr; ++i )
         {
             for ( uint  j = 0; j < nbc; ++j )
-                std::cout << RTTI::id_to_type( mat_types(i,j) ) << "  ";
+                std::cout << hpro::RTTI::id_to_type( mat_types(i,j) ) << "  ";
             std::cout << std::endl;
         }// for
     }// if
@@ -108,7 +108,7 @@ build_type_matrix ( const hpro::TBlockMatrix *  A )
 //
 std::unique_ptr< hpro::TMatrix >
 create_matrix ( const hpro::TMatrix *  A,
-                const typeid_t         type,
+                const hpro::typeid_t   type,
                 const int              proc )
 {
     assert(( type == TYPE_DENSE ) || ( type == TYPE_LR ));
@@ -127,7 +127,7 @@ create_matrix ( const hpro::TMatrix *  A,
     }// if
 
     T->set_id( A->id() );
-    T->set_procs( ps_single( proc ) );
+    T->set_procs( hpro::ps_single( proc ) );
     
     return T;
 }
@@ -164,7 +164,7 @@ create_segments ( const segment_id_t  sid,
         
         segs.reserve( 2 );
         segs.push_back( gaspi::segment( sid,   hpro::blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group ) );
-        segs.push_back( gaspi::segment( sid+1, blas_hpro::mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
+        segs.push_back( gaspi::segment( sid+1, hpro::blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
     }// if
     else
         hlr::error( "(create_segments) unsupported matrix type : " + A->typestr() ) ;
@@ -190,7 +190,8 @@ read_matrix ( std::vector< gaspi::segment > &  segs,
     }// if
     else if ( is_lowrank( A ) )
     {
-        hlr::log( 4, hpro::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), source ) );
+        hlr::log( 4, hpro::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(),
+                                      ptrcast( A, hpro::TRkMatrix )->rank(), source ) );
         
         queue.read( segs[0], source, segs[0].id() );
         queue.read( segs[1], source, segs[1].id() );
@@ -217,7 +218,8 @@ send_matrix ( std::vector< gaspi::segment > &  segs,
     }// if
     else if ( is_lowrank( A ) )
     {
-        hlr::log( 4, hpro::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), dest ) );
+        hlr::log( 4, hpro::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(),
+                                      ptrcast( A, hpro::TRkMatrix )->rank(), dest ) );
         
         queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
         queue.write_notify( segs[1], dest, segs[1].id(), segs[1].id() );
@@ -386,7 +388,7 @@ lu ( hpro::TMatrix *          A,
     
     hlr::log( 4, hpro::to_string( "lu( %d )", A->id() ) );
 
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
@@ -459,13 +461,13 @@ lu ( hpro::TMatrix *          A,
         // factorization of diagonal block
         //
         
-        auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
 
         if ( pid == p_ii )
         {
             hlr::log( 4, hpro::to_string( "  invert( %d )", A_ii->id() ) );
-            BLAS::invert( blas_mat< value_t >( A_ii ) );
+            blas::invert( hpro::blas_mat< value_t >( A_ii ) );
         }// if
 
         //
@@ -483,8 +485,8 @@ lu ( hpro::TMatrix *          A,
             // set up destination matrices and GASPI segments
             //
 
-            std::unique_ptr< TMatrix >   T_ii;        // temporary storage with auto-delete
-            TMatrix *                    H_ii = A_ii; // handle for A_ii/T_ii
+            std::unique_ptr< hpro::TMatrix >   T_ii;        // temporary storage with auto-delete
+            hpro::TMatrix *                    H_ii = A_ii; // handle for A_ii/T_ii
             
             if ( ! is_local )
             {
@@ -535,7 +537,7 @@ lu ( hpro::TMatrix *          A,
                     }// if
                     
                     // DBG::printf( "solving %d", A_ji->id() );
-                    trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
+                    trsmuh< value_t >( ptrcast( H_ii, hpro::TDenseMatrix ), A_ji );
                 }// if
             }// for
             
@@ -550,12 +552,12 @@ lu ( hpro::TMatrix *          A,
         // start sending matrices to remote processors
         //
 
-        std::vector< std::unique_ptr< TMatrix > >     row_i_mat( nbr );        // for autodeletion of temp. matrices
-        std::vector< std::unique_ptr< TMatrix > >     col_i_mat( nbc );
-        std::vector< TMatrix * >                      row_i( nbr, nullptr );   // actual matrix handles
-        std::vector< TMatrix * >                      col_i( nbc, nullptr );
-        std::vector< std::vector< gaspi::segment > >  row_segs( nbr );         // holds GASPI segments for matrices
-        std::vector< std::vector< gaspi::segment > >  col_segs( nbc );
+        std::vector< std::unique_ptr< hpro::TMatrix > >  row_i_mat( nbr );        // for autodeletion of temp. matrices
+        std::vector< std::unique_ptr< hpro::TMatrix > >  col_i_mat( nbc );
+        std::vector< hpro::TMatrix * >                   row_i( nbr, nullptr );   // actual matrix handles
+        std::vector< hpro::TMatrix * >                   col_i( nbc, nullptr );
+        std::vector< std::vector< gaspi::segment > >     row_segs( nbr );         // holds GASPI segments for matrices
+        std::vector< std::vector< gaspi::segment > >     col_segs( nbc );
 
         for ( uint  j = i+1; j < nbr; ++j )
         {
@@ -689,7 +691,7 @@ lu ( hpro::TMatrix *          A,
         world.barrier();
     }// for
 
-    std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
+    std::cout << "  add memory  : " << hpro::Mem::to_string( max_add_mem ) << std::endl;
 }
 
 }}}// namespace hlr::gaspi::tlr

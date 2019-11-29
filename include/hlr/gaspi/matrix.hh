@@ -14,10 +14,10 @@
 #include <unordered_map>
 #include <type_traits>
 
-#include <matrix/TMatrix.hh>
-#include <matrix/TBlockMatrix.hh>
-#include <matrix/TGhostMatrix.hh>
-#include <base/TTruncAcc.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TGhostMatrix.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/seq/matrix.hh"
@@ -25,6 +25,9 @@
 #include "hlr/gaspi/gaspi.hh"
 
 namespace hlr { namespace gaspi { namespace matrix {
+
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 //
 // build representation of dense matrix with
@@ -34,11 +37,11 @@ namespace hlr { namespace gaspi { namespace matrix {
 //
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+        const hpro::TTruncAcc &      acc )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -52,12 +55,12 @@ build ( const HLIB::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    gaspi::process              proc;
-    const auto                  pid   = proc.rank();
+    gaspi::process                    proc;
+    const auto                        pid   = proc.rank();
     
-    std::unique_ptr< TMatrix >  M;
-    const auto                  rowis = bct->is().row_is();
-    const auto                  colis = bct->is().col_is();
+    std::unique_ptr< hpro::TMatrix >  M;
+    const auto                        rowis = bct->is().row_is();
+    const auto                        colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
@@ -65,7 +68,7 @@ build ( const HLIB::TBlockCluster *  bct,
 
     if ( ! bct->procs().contains( pid ) )
     {
-        M = std::make_unique< TGhostMatrix >( bct->is(), bct->procs(), value_type< value_t >::value );
+        M = std::make_unique< hpro::TGhostMatrix >( bct->is(), bct->procs(), hpro::value_type< value_t >::value );
     }// if
     else if ( bct->is_leaf() )
     {
@@ -80,7 +83,7 @@ build ( const HLIB::TBlockCluster *  bct,
     }// if
     else
     {
-        auto  B = std::make_unique< TBlockMatrix >( bct );
+        auto  B = std::make_unique< hpro::TBlockMatrix >( bct );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||

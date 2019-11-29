@@ -11,8 +11,8 @@
 #include <map>
 #include <mutex>
 
-#include <cluster/TIndexSet.hh>
-#include <blas/Matrix.hh>
+#include <hpro/cluster/TIndexSet.hh>
+#include <hpro/blas/Matrix.hh>
 
 namespace hlr { namespace matrix {
 
@@ -40,9 +40,9 @@ public:
     //
 
     using value_t        = T_value;
-    using size_type      = tilemap< value_t >::size_type;
-    using iterator       = tilemap< value_t >::iterator;
-    using const_iterator = tilemap< value_t >::const_iterator;
+    using size_type      = typename tilemap< value_t >::size_type;
+    using iterator       = typename tilemap< value_t >::iterator;
+    using const_iterator = typename tilemap< value_t >::const_iterator;
  
 private:
     // the map of tiles

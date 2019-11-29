@@ -11,7 +11,7 @@
 #include <iostream>
 #include <mutex>
 
-#include <base/config.hh>
+#include <hpro/base/config.hh>
 
 #include <hlr/utils/term.hh>
 

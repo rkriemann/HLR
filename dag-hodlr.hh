@@ -7,6 +7,7 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/luinv_eval.hh"
 #include "hlr/dag/lu.hh"

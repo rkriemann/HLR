@@ -7,6 +7,7 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/seq/norm.hh"

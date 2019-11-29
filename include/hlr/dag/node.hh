@@ -15,8 +15,8 @@
 #include <atomic>
 #include <cassert>
 
-#include <cluster/TIndexSet.hh>
-#include <base/TTruncAcc.hh>
+#include <hpro/cluster/TIndexSet.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/log.hh"
 #include "hlr/dag/local_graph.hh"

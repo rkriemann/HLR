@@ -8,10 +8,10 @@
 
 #include <cassert>
 
-#include <bem/TLaplaceBF.hh>
-#include <bem/TRefinableGrid.hh>
-#include <bem/TBFCoeffFn.hh>
-#include <io/TGridIO.hh>
+#include <hpro/bem/TLaplaceBF.hh>
+#include <hpro/bem/TRefinableGrid.hh>
+#include <hpro/bem/TBFCoeffFn.hh>
+#include <hpro/io/TGridIO.hh>
 
 #include "hlr/utils/log.hh"
 

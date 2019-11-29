@@ -14,10 +14,10 @@
 #include <unordered_map>
 #include <type_traits>
 
-#include <matrix/TMatrix.hh>
-#include <matrix/TBlockMatrix.hh>
-#include <matrix/TGhostMatrix.hh>
-#include <base/TTruncAcc.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TGhostMatrix.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/seq/matrix.hh"
@@ -59,12 +59,12 @@ build ( const HLIB::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    mpi::communicator           world;
-    const auto                  pid    = world.rank();
+    mpi::communicator                 world;
+    const auto                        pid    = world.rank();
     
-    std::unique_ptr< TMatrix >  M;
-    const auto                  rowis = bct->is().row_is();
-    const auto                  colis = bct->is().col_is();
+    std::unique_ptr< hpro::TMatrix >  M;
+    const auto                        rowis = bct->is().row_is();
+    const auto                        colis = bct->is().col_is();
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
@@ -72,7 +72,7 @@ build ( const HLIB::TBlockCluster *  bct,
 
     if ( ! bct->procs().contains( pid ) )
     {
-        M = std::make_unique< TGhostMatrix >( bct->is(), bct->procs(), HLIB::value_type< value_t >::value );
+        M = std::make_unique< hpro::TGhostMatrix >( bct->is(), bct->procs(), HLIB::value_type< value_t >::value );
     }// if
     else if ( bct->is_leaf() )
     {
@@ -87,9 +87,9 @@ build ( const HLIB::TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< TBlockMatrix >( bct );
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
 
-        auto  B = ptrcast( M.get(), TBlockMatrix );
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -131,7 +131,7 @@ build ( const HLIB::TBlockCluster *  bct,
 // - if processor sets of different rows are identical, so are the communicators
 //
 void
-build_row_comms ( const TBlockMatrix *                             A,
+build_row_comms ( const hpro::TBlockMatrix *                       A,
                   std::vector< mpi::communicator > &               row_comms,  // communicator per row
                   std::vector< std::list< int > > &                row_procs,  // set of processors per row
                   std::vector< std::unordered_map< int, int > > &  row_maps )  // mapping of global rank to per communicator rank
@@ -190,7 +190,7 @@ build_row_comms ( const TBlockMatrix *                             A,
 // - if processor sets of different columns are identical, so are the communicators
 //
 void
-build_col_comms ( const TBlockMatrix *                             A,
+build_col_comms ( const hpro::TBlockMatrix *                       A,
                   std::vector< mpi::communicator > &               col_comms,  // communicator per column                           
                   std::vector< std::list< int > > &                col_procs,  // set of processors per column                      
                   std::vector< std::unordered_map< int, int > > &  col_maps )  // mapping of global rank to per communicator rank

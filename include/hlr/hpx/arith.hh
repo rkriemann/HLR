@@ -42,20 +42,20 @@ namespace tlr
 // 
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
     assert( is_blocked( A ) );
     
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
     
     for ( uint  i = 0; i < nbr; ++i )
     {
-        auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
 
-        blas::invert( blas_mat< value_t >( A_ii ) );
+        blas::invert( hpro::blas_mat< value_t >( A_ii ) );
         
         ::hpx::parallel::v2::define_task_block(
             [i,nbc,A_ii,BA] ( auto &  tb )
@@ -104,8 +104,7 @@ addlr ( blas::Matrix< value_t > &  U,
         hpro::TMatrix *            A,
         const hpro::TTruncAcc &    acc )
 {
-    if ( hpro::verbose( 4 ) )
-        DBG::printf( "addlr( %d )", A->id() );
+    HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -142,7 +141,7 @@ addlr ( blas::Matrix< value_t > &  U,
     }// if
     else
     {
-        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), hpro::blas_mat< value_t >( ptrcast( A, hpro::TDenseMatrix ) ) );
     }// else
 }
 
@@ -154,8 +153,7 @@ void
 lu ( hpro::TMatrix *          A,
      const hpro::TTruncAcc &  acc )
 {
-    if ( hpro::verbose( 4 ) )
-        DBG::printf( "lu( %d )", A->id() );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -183,7 +181,7 @@ lu ( hpro::TMatrix *          A,
     }// if
     else
     {
-        blas::invert( blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ) );
+        blas::invert( hpro::blas_mat< value_t >( ptrcast( A, hpro::TDenseMatrix ) ) );
     }// else
 }
 
@@ -212,9 +210,9 @@ namespace tileh
 //   structure as A
 //
 inline void
-gauss_elim ( hpro::TMatrix *    A,
-             hpro::TMatrix *    T,
-             const TTruncAcc &  acc )
+gauss_elim ( hpro::TMatrix *          A,
+             hpro::TMatrix *          T,
+             const hpro::TTruncAcc &  acc )
 {
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
@@ -235,14 +233,14 @@ gauss_elim ( hpro::TMatrix *    A,
             [&] ( auto &  tb )
             {
                 // T_01 = A_00⁻¹ · A_01
-                tb.run( [&] () { hpro::multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
+                tb.run( [&] () { hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
         
                 // T_10 = A_10 · A_00⁻¹
-                tb.run( [&] () { hpro::multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
+                tb.run( [&] () { hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
             } );
 
         // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
     
         // A_11 = A_11⁻¹
         hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
@@ -251,14 +249,14 @@ gauss_elim ( hpro::TMatrix *    A,
             [&] ( auto &  tb )
             {
                 // A_01 = - T_01 · A_11
-                tb.run( [&] () { hpro::multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
+                tb.run( [&] () { hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
             
                 // A_10 = - A_11 · T_10
-                tb.run( [&] () { hpro::multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
+                tb.run( [&] () { hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
             } );
         
         // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
     }// if
     else if ( is_dense( A ) )
     {

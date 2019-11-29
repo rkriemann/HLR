@@ -15,11 +15,11 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 
-#include <matrix/structure.hh>
-#include <matrix/TBSHMBuilder.hh>
-#include <algebra/mat_fac.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/matrix/TBSHMBuilder.hh>
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/algebra/solve_tri.hh>
+#include <hpro/algebra/mat_mul.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/arith/multiply.hh"

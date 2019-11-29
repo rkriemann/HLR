@@ -521,18 +521,18 @@ lu ( ::tf::SubflowBuilder &  tf,
 
         auto  lu_00   = tf.emplace( [A00,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A00, acc, ntile ); } );
         
-        auto  trsm_01 = tf.emplace( [A00,A01,&acc,ntile] ( auto &  sf ) { trsml(  sf, A00, mat_U< value_t >( A01 ), ntile ); } );
-        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf ) { trsmuh( sf, A00, mat_V< value_t >( A10 ), ntile ); } );
+        // auto  trsm_01 = tf.emplace( [A00,A01,&acc,ntile] ( auto &  sf ) { trsml(  sf, A00, mat_U< value_t >( A01 ), ntile ); } );
+        // auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf ) { trsmuh( sf, A00, mat_V< value_t >( A10 ), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf )
-                                    {
-                                        auto  T  = hodlr::dot( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
+        // auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf )
+        //                             {
+        //                                 auto  T  = hodlr::dot( sf, mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); 
 
-                                        hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
-                                    } );
+        //                                 hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
+        //                             } );
         
-        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); };
+        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); } );
     }// if
     else
     {

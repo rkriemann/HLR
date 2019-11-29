@@ -10,7 +10,7 @@
 #include <deque>
 #include <map>
 
-#include <base/System.hh>
+#include <hpro/base/System.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/utils/log.hh"

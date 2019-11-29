@@ -7,6 +7,7 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/tlr.hh"
 
 using namespace hlr;

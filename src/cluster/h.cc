@@ -6,10 +6,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <cluster/TBSPCTBuilder.hh>
-#include <cluster/TBSPPartStrat.hh>
-#include <cluster/TBCBuilder.hh>
-#include <cluster/TGeomAdmCond.hh>
+#include <hpro/cluster/TBSPCTBuilder.hh>
+#include <hpro/cluster/TBSPPartStrat.hh>
+#include <hpro/cluster/TBCBuilder.hh>
+#include <hpro/cluster/TGeomAdmCond.hh>
 
 #include "hlr/cluster/h.hh"
 

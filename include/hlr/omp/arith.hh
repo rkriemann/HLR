@@ -43,7 +43,7 @@ void
 lu ( hpro::TMatrix *          A,
      const hpro::TTruncAcc &  acc )
 {
-    HLR_LOG( 4, hpro::to_string( ( "lu( %d )", A->id() ) ) );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     assert( is_blocked( A ) );
 

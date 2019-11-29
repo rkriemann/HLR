@@ -7,6 +7,7 @@
 //
 
 #include "common.hh"
+#include "common-main.hh"
 #include "hlr/cluster/tileh.hh"
 #include "hlr/dag/lu.hh"
 

@@ -15,11 +15,11 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 
-#include <matrix/structure.hh>
-#include <matrix/TBSHMBuilder.hh>
-#include <algebra/mat_fac.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/matrix/TBSHMBuilder.hh>
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/algebra/solve_tri.hh>
+#include <hpro/algebra/mat_mul.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/utils/log.hh"
@@ -32,7 +32,8 @@
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 namespace mpi
 {
@@ -55,11 +56,11 @@ namespace tlr
 template < typename value_t >
 std::vector< mpi::request >
 ibroadcast ( mpi::communicator &  comm,
-             TMatrix *            A,
+             hpro::TMatrix *      A,
              const int            root_proc,
              const int            rank )
 {
-    log( 4, HLIB::to_string( "broadcast( %d ) from %d", A->id(), root_proc ) );
+    log( 4, hpro::to_string( "broadcast( %d ) from %d", A->id(), root_proc ) );
 
     std::vector< mpi::request >  reqs;
     
@@ -67,14 +68,14 @@ ibroadcast ( mpi::communicator &  comm,
     
     if ( is_dense( A ) )
     {
-        auto  D = ptrcast( A, TDenseMatrix );
+        auto  D = ptrcast( A, hpro::TDenseMatrix );
         
         reqs.reserve( 1 );
-        reqs.push_back( comm.ibroadcast( blas_mat< value_t >( D ).data(), D->nrows() * D->ncols(), root_proc ) );
+        reqs.push_back( comm.ibroadcast( hpro::blas_mat< value_t >( D ).data(), D->nrows() * D->ncols(), root_proc ) );
     }// if
     else if ( is_lowrank( A ) )
     {
-        auto  R = ptrcast( A, TRkMatrix );
+        auto  R = ptrcast( A, hpro::TRkMatrix );
         auto  k = R->rank();
 
         R->set_rank( rank );
@@ -84,8 +85,8 @@ ibroadcast ( mpi::communicator &  comm,
         // reqs.push_back( comm.ibroadcast( k, root_proc ) );
         // std::cout << "ibcast : " << reqs[0] << std::endl;
 
-        reqs.push_back( comm.ibroadcast( blas_mat_A< value_t >( R ).data(), R->nrows() * rank, root_proc ) );
-        reqs.push_back( comm.ibroadcast( blas_mat_B< value_t >( R ).data(), R->ncols() * rank, root_proc ) );
+        reqs.push_back( comm.ibroadcast( hpro::blas_mat_A< value_t >( R ).data(), R->nrows() * rank, root_proc ) );
+        reqs.push_back( comm.ibroadcast( hpro::blas_mat_B< value_t >( R ).data(), R->ncols() * rank, root_proc ) );
     }// if
     else
         assert( false );
@@ -98,8 +99,8 @@ ibroadcast ( mpi::communicator &  comm,
 //
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
     assert( is_blocked( A ) );
     // assert( RANK != 0 );
@@ -108,10 +109,10 @@ lu ( TMatrix *          A,
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    if ( HLIB::verbose( 4 ) )
+    if ( hpro::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
 
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
@@ -151,15 +152,15 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, hpro::to_string( "──────────────── step %d ────────────────", i ) );
         
-        auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  p_ii = A_ii->procs().master();
 
         if ( pid == p_ii )
         {
             // DBG::printf( "invert( %d )", A_ii->id() );
-            BLAS::invert( blas_mat< value_t >( A_ii ) );
+            blas::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
         // nothing to solve/update at last step
@@ -172,8 +173,8 @@ lu ( TMatrix *          A,
             // broadcast diagonal block
             //
 
-            std::unique_ptr< TMatrix >  T_ii;        // temporary storage with auto-delete
-            TMatrix *                   H_ii = A_ii; // handle for A_ii/T_ii
+            std::unique_ptr< hpro::TMatrix >  T_ii;        // temporary storage with auto-delete
+            TMatrix *                         H_ii = A_ii; // handle for A_ii/T_ii
             
             if ( pid != p_ii )
             {
@@ -214,7 +215,7 @@ lu ( TMatrix *          A,
                             }// if
                         }
                     
-                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
+                        trsmuh< value_t >( ptrcast( H_ii, hpro::TDenseMatrix ), A_ji );
                     }// if
                 } // );
 
@@ -225,7 +226,7 @@ lu ( TMatrix *          A,
             for ( auto & req : diag_reqs )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, hpro::to_string( "open request at %d", __LINE__ ) );
             }// for
         }
         
@@ -233,12 +234,12 @@ lu ( TMatrix *          A,
         // broadcast blocks in row/column for update phase
         //
         
-        std::vector< std::unique_ptr< TMatrix > >   row_i_mat( nbr );        // for autodeletion of temp. matrices
-        std::vector< std::unique_ptr< TMatrix > >   col_i_mat( nbc );
-        std::vector< TMatrix * >                    row_i( nbr, nullptr );   // actual matrix handles
-        std::vector< TMatrix * >                    col_i( nbc, nullptr );
-        std::vector< std::vector< mpi::request > >  row_reqs( nbr );         // holds MPI requests for matrices
-        std::vector< std::vector< mpi::request > >  col_reqs( nbc );
+        std::vector< std::unique_ptr< hpro::TMatrix > >   row_i_mat( nbr );        // for autodeletion of temp. matrices
+        std::vector< std::unique_ptr< hpro::TMatrix > >   col_i_mat( nbc );
+        std::vector< hpro::TMatrix * >                    row_i( nbr, nullptr );   // actual matrix handles
+        std::vector< hpro::TMatrix * >                    col_i( nbc, nullptr );
+        std::vector< std::vector< mpi::request > >        row_reqs( nbr );         // holds MPI requests for matrices
+        std::vector< std::vector< mpi::request > >        col_reqs( nbc );
         
         for ( uint  j = i+1; j < nbr; ++j )
         {
@@ -374,7 +375,7 @@ lu ( TMatrix *          A,
             for ( auto & req : row_reqs[j] )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, hpro::to_string( "open request at %d", __LINE__ ) );
             }// for
         }// for
 
@@ -383,7 +384,7 @@ lu ( TMatrix *          A,
             for ( auto & req : col_reqs[l] )
             {
                 if ( req.mpi_request != MPI_REQUEST_NULL )
-                    hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                    hlr::log( 0, hpro::to_string( "open request at %d", __LINE__ ) );
             }// for
         }// for
     }// for
@@ -416,7 +417,7 @@ namespace tileh
 
 mpi::request
 ibroadcast ( mpi::communicator &  comm,
-             TByteStream &        bs,
+             hpro::TByteStream &  bs,
              const int            root_proc )
 {
     // first exchange size information
@@ -424,7 +425,7 @@ ibroadcast ( mpi::communicator &  comm,
 
     comm.broadcast( size, root_proc );
 
-    log( 5, HLIB::to_string( "bs size = %d", size ) );
+    log( 5, hpro::to_string( "bs size = %d", size ) );
     
     if ( bs.size() != size )
         bs.set_size( size );
@@ -437,8 +438,8 @@ size_t  max_add_mem = 0;
 
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
     assert( is_blocked( A ) );
 
@@ -446,9 +447,9 @@ lu ( TMatrix *          A,
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    log( 4, hpro::to_string( "lu( %d )", A->id() ) );
 
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
@@ -472,7 +473,7 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, hpro::to_string( "──────────────── step %d ────────────────", i ) );
         
         auto  A_ii = BA->block( i, i );
         auto  p_ii = A_ii->procs().master();
@@ -481,9 +482,9 @@ lu ( TMatrix *          A,
         
         if ( pid == p_ii )
         {
-            log( 4, HLIB::to_string( "lu( %d )", A_ii->id() ) );
+            log( 4, hpro::to_string( "lu( %d )", A_ii->id() ) );
 
-            // HLIB::LU::factorise_rec( A_ii, acc );
+            // hpro::LU::factorise_rec( A_ii, acc );
             auto  dag = std::move( dag::gen_dag_lu_oop_auto( *A_ii, tbb::dag::refine ) );
 
             tbb::dag::run( dag, acc );
@@ -499,14 +500,14 @@ lu ( TMatrix *          A,
             // broadcast diagonal block
             //
 
-            std::unique_ptr< TMatrix >  T_ii;        // temporary storage with auto-delete
-            TMatrix *                   H_ii = A_ii; // handle for A_ii/T_ii
-            TByteStream                 bs;
-            mpi::request                col_req_ii, row_req_ii;
+            std::unique_ptr< hpro::TMatrix >  T_ii;        // temporary storage with auto-delete
+            hpro::TMatrix *                   H_ii = A_ii; // handle for A_ii/T_ii
+            hpro::TByteStream                 bs;
+            mpi::request                      col_req_ii, row_req_ii;
 
             if ( pid == p_ii )
             {
-                log( 4, HLIB::to_string( "serialization of %d ", A_ii->id() ) );
+                log( 4, hpro::to_string( "serialization of %d ", A_ii->id() ) );
                 
                 bs.set_size( A_ii->bs_size() );
                 A_ii->write( bs );
@@ -515,13 +516,13 @@ lu ( TMatrix *          A,
             // broadcast serialized data
             if ( contains( col_procs[i], pid ) )
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( col_procs[i] ) );
+                log( 4, hpro::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( col_procs[i] ) );
                 col_req_ii = ibroadcast( col_comms[i], bs, col_maps[i][p_ii] );
             }// if
 
             if (( col_procs[i] != row_procs[i] ) && contains( row_procs[i], pid ))
             {
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( row_procs[i] ) );
+                log( 4, hpro::to_string( "broadcast %d from %d to ", A_ii->id(), p_ii ) + hlr::to_string( row_procs[i] ) );
                 row_req_ii = ibroadcast( row_comms[i], bs, row_maps[i][p_ii] );
             }// if
             
@@ -536,12 +537,12 @@ lu ( TMatrix *          A,
                 {
                     if ( ! recv_ii )
                     {
-                        log( 4, HLIB::to_string( "construction of %d ", A_ii->id() ) );
+                        log( 4, hpro::to_string( "construction of %d ", A_ii->id() ) );
 
                         if ( contains( col_procs[i], pid ) ) col_req_ii.wait();
                         else                                 row_req_ii.wait();
                         
-                        TBSHMBuilder  bs_hbuild;
+                        hpro::TBSHMBuilder  bs_hbuild;
 
                         T_ii    = bs_hbuild.build( bs );
                         T_ii->set_procs( ps_single( pid ) );
@@ -565,7 +566,7 @@ lu ( TMatrix *          A,
                     if ( pid != p_ii )
                         wait_ii();
             
-                    log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
+                    log( 4, hpro::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
 
                     // solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
                     auto  dag = std::move( gen_dag_solve_upper( H_ii, A_ji, tbb::dag::refine ) );
@@ -587,7 +588,7 @@ lu ( TMatrix *          A,
                     if ( pid != p_ii )
                         wait_ii();
                     
-                    log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
+                    log( 4, hpro::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
 
                     //solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
                     auto  dag = std::move( gen_dag_solve_lower( H_ii, A_il, tbb::dag::refine ) );
@@ -608,14 +609,14 @@ lu ( TMatrix *          A,
         // broadcast blocks in row/column for update phase
         //
 
-        std::vector< TByteStream >                 row_i_bs( nbr );       // bytestreams for communication
-        std::vector< TByteStream >                 col_i_bs( nbc );       // 
-        std::vector< std::unique_ptr< TMatrix > >  row_i_mat( nbr );      // for autodeletion
-        std::vector< std::unique_ptr< TMatrix > >  col_i_mat( nbc );
-        std::vector< TMatrix * >                   row_i( nbr, nullptr ); // matrix handles
-        std::vector< TMatrix * >                   col_i( nbc, nullptr );
-        std::vector< mpi::request >                row_reqs( nbr );       // holds MPI requests for matrices
-        std::vector< mpi::request >                col_reqs( nbc );
+        std::vector< hpro::TByteStream >                 row_i_bs( nbr );       // bytestreams for communication
+        std::vector< hpro::TByteStream >                 col_i_bs( nbc );       // 
+        std::vector< std::unique_ptr< hpro::TMatrix > >  row_i_mat( nbr );      // for autodeletion
+        std::vector< std::unique_ptr< hpro::TMatrix > >  col_i_mat( nbc );
+        std::vector< hpro::TMatrix * >                   row_i( nbr, nullptr ); // matrix handles
+        std::vector< hpro::TMatrix * >                   col_i( nbc, nullptr );
+        std::vector< mpi::request >                      row_reqs( nbr );       // holds MPI requests for matrices
+        std::vector< mpi::request >                      col_reqs( nbc );
         
         for ( uint  j = i+1; j < nbr; ++j )
         {
@@ -627,14 +628,14 @@ lu ( TMatrix *          A,
             {
                 if ( pid == p_ji )
                 {
-                    log( 4, HLIB::to_string( "serialisation of %d ", A_ji->id() ) );
+                    log( 4, hpro::to_string( "serialisation of %d ", A_ji->id() ) );
                     
                     row_i_bs[j].set_size( A_ji->bs_size() );
                     A_ji->write( row_i_bs[j] );
                     row_i[j] = A_ji;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + hlr::to_string( row_procs[j] ) );
+                log( 4, hpro::to_string( "broadcast %d from %d to ", A_ji->id(), p_ji ) + hlr::to_string( row_procs[j] ) );
 
                 row_reqs[j] = ibroadcast( row_comms[j], row_i_bs[j], row_maps[j][p_ji] );
                 add_mem    += row_i_bs[j].size();
@@ -651,14 +652,14 @@ lu ( TMatrix *          A,
             {
                 if ( pid == p_il )
                 {
-                    log( 4, HLIB::to_string( "serialisation of %d ", A_il->id() ) );
+                    log( 4, hpro::to_string( "serialisation of %d ", A_il->id() ) );
                     
                     col_i_bs[l].set_size( A_il->bs_size() );
                     A_il->write( col_i_bs[l] );
                     col_i[l] = A_il;
                 }// if
                 
-                log( 4, HLIB::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + hlr::to_string( col_procs[l] ) );
+                log( 4, hpro::to_string( "broadcast %d from %d to ", A_il->id(), p_il ) + hlr::to_string( col_procs[l] ) );
                 
                 col_reqs[l] = ibroadcast( col_comms[l], col_i_bs[l], col_maps[l][p_il] );
                 add_mem    += col_i_bs[l].size();
@@ -694,9 +695,9 @@ lu ( TMatrix *          A,
                         // DBG::printf( "waiting for %d", A->block(j,i)->id() );
                         row_reqs[j].wait();
                         
-                        log( 4, HLIB::to_string( "construction of %d ", BA->block( j, i )->id() ) );
+                        log( 4, hpro::to_string( "construction of %d ", BA->block( j, i )->id() ) );
                         
-                        TBSHMBuilder  bs_hbuild;
+                        hpro::TBSHMBuilder  bs_hbuild;
                         
                         row_i_mat[j] = bs_hbuild.build( row_i_bs[j] );
                         row_i_mat[j]->set_procs( ps_single( pid ) );
@@ -710,9 +711,9 @@ lu ( TMatrix *          A,
                         // DBG::printf( "waiting for %d", A->block(i,l)->id() );
                         col_reqs[l].wait();
 
-                        log( 4, HLIB::to_string( "construction of %d ", BA->block( i, l )->id() ) );
+                        log( 4, hpro::to_string( "construction of %d ", BA->block( i, l )->id() ) );
                     
-                        TBSHMBuilder  bs_hbuild;
+                        hpro::TBSHMBuilder  bs_hbuild;
 
                         col_i_mat[l] = bs_hbuild.build( col_i_bs[l] );
                         col_i_mat[l]->set_procs( ps_single( pid ) );
@@ -725,7 +726,7 @@ lu ( TMatrix *          A,
                     // update local matrix block
                     //
                 
-                    log( 4, HLIB::to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
+                    log( 4, hpro::to_string( "update of %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() ) );
                     
                     // recursive method has same degree of parallelism as DAG method
                     multiply( -1.0, row_i[j], col_i[l], 1.0, A_jl, acc );
@@ -756,17 +757,17 @@ lu ( TMatrix *          A,
         for ( uint  j = i+1; j < nbr; ++j )
         {
             if ( row_reqs[j].mpi_request != MPI_REQUEST_NULL )
-                hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                hlr::log( 0, hpro::to_string( "open request at %d", __LINE__ ) );
         }// for
 
         for ( uint  l = i+1; l < nbc; ++l )
         {
             if ( col_reqs[l].mpi_request != MPI_REQUEST_NULL )
-                hlr::log( 0, HLIB::to_string( "open request at %d", __LINE__ ) );
+                hlr::log( 0, hpro::to_string( "open request at %d", __LINE__ ) );
         }// for
     }// for
 
-    // std::cout << "  time in MPI : " << HLIB::to_string( "%.2fs", time_mpi ) << std::endl;
+    // std::cout << "  time in MPI : " << hpro::to_string( "%.2fs", time_mpi ) << std::endl;
     std::cout << "  add memory  : " << Mem::to_string( max_add_mem ) << std::endl;
 }
 

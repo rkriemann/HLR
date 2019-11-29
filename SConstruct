@@ -407,10 +407,12 @@ if 'hpx' in frameworks :
     hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
     hpx.Append( LIBS = [ "hpx_iostreams" ] )
     
-    if 'tlr'        in programs : Default( hpx.Program( 'tlr-hpx.cc' ) )
-    if 'hodlr'      in programs : Default( hpx.Program( 'hodlr-hpx.cc' ) )
-    if 'dag-lu'     in programs : Default( hpx.Program( 'dag-lu-hpx',    [ 'dag-lu-hpx.cc',    'src/hpx/dag.cc' ] ) )
-    if 'dag-gauss'  in programs : Default( hpx.Program( 'dag-gauss-hpx', [ 'dag-gauss-hpx.cc', 'src/hpx/dag.cc' ] ) )
+    for program in programs :
+        name   = program + '-hpx'
+        source = name + '.cc'
+
+        if os.path.exists( source ) and os.path.isfile( source ) :
+            Default( hpx.Program( name, [ source, 'src/hpx/dag.cc' ] ) )
 
 #
 # MPI

@@ -8,9 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <cluster/TCoordinate.hh>
-#include <cluster/TClusterTree.hh>
-#include <cluster/TBlockClusterTree.hh>
+#include <hpro/cluster/TCoordinate.hh>
+#include <hpro/cluster/TClusterTree.hh>
+#include <hpro/cluster/TBlockClusterTree.hh>
 
 namespace hlr { namespace cluster { namespace tileh {
 
