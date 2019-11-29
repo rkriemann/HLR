@@ -306,7 +306,7 @@ mymain ( int, char ** )
         
         toc = since( tic );
 
-        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "  LU in      " << format_time( toc ) << std::endl;
 
         runtime.push_back( toc.seconds() );
 

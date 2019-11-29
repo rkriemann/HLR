@@ -45,7 +45,7 @@ refine ( node *                            root,
     std::list< node * >   tasks, start, end;
     uint                  step         = 0;
     const bool            output_inter = HLIB::verbose( 4 ); // print intermediate steps
-    const bool            group_nodes  = true;               // print intermediate nodes with additional grouping
+    const bool            group_nodes  = HLIB::verbose( 5 ); // print intermediate nodes with additional grouping
 
     while ( ! nodes.empty() )
     {
@@ -205,8 +205,6 @@ run ( graph &                  dag,
         worklist.push_back( t );
 
     size_t  old_mem = HLIB::Mem::usage();
-    
-    std::cout << "==================================================" << std::endl;
     
     while ( ! worklist.empty() )
     {

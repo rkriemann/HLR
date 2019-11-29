@@ -179,14 +179,14 @@ matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is,
         , data( adata )
 {}
 
-template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
-                                                                      std::shared_ptr< tile_storage< real > >  adata )
-        : name( id_t(adata.get()) )
-        , id( -1 )
-        , is( is )
-        , data( adata )
-{}
+// template <>
+// matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
+//                                                                       std::shared_ptr< tile_storage< real > >  adata )
+//         : name( id_t(adata.get()) )
+//         , id( -1 )
+//         , is( is )
+//         , data( adata )
+// {}
 
 template <>
 matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr< matrix< real > >  adata )
@@ -717,11 +717,11 @@ private:
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-lu_node::refine_ ( const size_t )
+lu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( ntile, A ) )
+    if ( is_blocked( A ) && ! hlr::is_small( tile_size, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  BL  = BA;
@@ -780,11 +780,11 @@ lu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-trsmu_node::refine_ ( const size_t )
+trsmu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( ntile, U ) )
+    if ( is_blocked( U ) && ! hlr::is_small( tile_size, U ) )
     {
         //
         //  ⎡ R_00^T │        ⎤ ⎡X_0⎤   ⎡ R_00^T            │        ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -845,11 +845,11 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-trsml_node::refine_ ( const size_t )
+trsml_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( ntile, L ) )
+    if ( is_blocked( L ) && ! hlr::is_small( tile_size, L ) )
     {
         //
         //  ⎡ L_00 │      ⎤ ⎡X_0⎤   ⎡ L_00              │      ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -910,13 +910,13 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-dot_node::refine_ ( const size_t  min_size )
+dot_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
     assert( A.is.size() == B.is.size() );
 
-    if ( A.is.size() > ntile )
+    if ( A.is.size() > tile_size )
     {
         const auto  sis_A = split( A.is, 2 );
         const auto  sis_B = split( B.is, 2 );
@@ -960,13 +960,13 @@ dot_node::run_ ( const TTruncAcc &  acc )
 
 template < typename matrixX_t, typename matrixY_t >
 local_graph
-tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  min_size )
+tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
     assert( X.is.size() == Y.is.size() );
 
-    if ( X.is.size() > ntile )
+    if ( X.is.size() > tile_size )
     {
         const auto  sis_X = split( X.is, 2 );
         const auto  sis_Y = split( Y.is, 2 );
@@ -989,11 +989,11 @@ tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc &  acc )
 
 template < typename matrix_t >
 local_graph
-tprod_ip_node< matrix_t >::refine_ ( const size_t  min_size )
+tprod_ip_node< matrix_t >::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( X.is.size() > ntile )
+    if ( X.is.size() > tile_size )
     {
         const auto  sis_X = split( X.is, 2 );
 
@@ -1020,11 +1020,11 @@ tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-addlr_node::refine_ ( const size_t )
+addlr_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( ntile, A ) )
+    if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
@@ -1100,7 +1100,7 @@ tadd_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-truncate_node::refine_ ( const size_t  min_size )
+truncate_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -1159,11 +1159,11 @@ truncate_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-tsqr_node::refine_ ( const size_t  min_size )
+tsqr_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( X.is.size() > ntile )
+    if ( X.is.size() > tile_size )
     {
         //
         // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
@@ -1342,8 +1342,8 @@ svd_node::run_ ( const TTruncAcc &  acc )
 
 graph
 gen_dag_lu_hodlr_tiled2 ( TMatrix &      A,
-                         const size_t   ntile,
-                         refine_func_t  refine )
+                          const size_t   ntile,
+                          refine_func_t  refine )
 {
     // matrix< real >  X( A.nrows(), 16 );
     // matrix< real >  U( A.nrows(), 16 );
