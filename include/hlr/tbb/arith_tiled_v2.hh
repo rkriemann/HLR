@@ -10,7 +10,9 @@
 
 #include <tbb/parallel_invoke.h>
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -20,8 +22,6 @@
 #include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr { namespace tbb { namespace tiled2 {
-
-using namespace HLIB;
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
@@ -46,14 +46,14 @@ using hlr::matrix::tiled_lrmatrix;
 // split given indexset into <n> subsets
 //
 inline
-std::vector< TIndexSet >
-split ( const TIndexSet &  is,
+std::vector< indexset >
+split ( const indexset &  is,
         const size_t       n )
 {
     if ( n == 2 )
     {
-        const TIndexSet  is0( is.first(), is.first() + is.size() / 2 - 1 );
-        const TIndexSet  is1( is0.last() + 1, is.last() );
+        const indexset  is0( is.first(), is.first() + is.size() / 2 - 1 );
+        const indexset  is1( is0.last() + 1, is.last() );
 
         return { std::move(is0), std::move(is1) };
     }// if
@@ -152,7 +152,7 @@ tprod ( const indexset &           is,
     {
         assert( A.contains( is ) );
         
-        matrix< value_t >  Ac( A.at( is ), copy_value );
+        matrix< value_t >  Ac( A.at( is ), hpro::copy_value );
         
         blas::prod( alpha, Ac, T, value_t(0), A.at( is ) );
     }// else
@@ -318,7 +318,7 @@ truncate ( const indexset &                 row_is,
            const tile_storage< value_t > &  Y,
            const tile_storage< value_t > &  U,
            const tile_storage< value_t > &  V,
-           const TTruncAcc &                acc,
+           const hpro::TTruncAcc &          acc,
            const size_t                     ntile )
 {
     HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_is.size() ) );
@@ -382,15 +382,15 @@ void
 addlr ( const tile_storage< value_t > &  U,
         const matrix< value_t > &        T,
         const tile_storage< value_t > &  V,
-        TMatrix *                        A,
-        const TTruncAcc &                acc,
+        hpro::TMatrix *                  A,
+        const hpro::TTruncAcc &          acc,
         const size_t                     ntile )
 {
     HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
@@ -433,11 +433,11 @@ addlr ( const tile_storage< value_t > &  U,
     {
         assert( U.contains( A->row_is() ) && V.contains( A->col_is() ) );
         
-        auto        D = ptrcast( A, TDenseMatrix );
+        auto        D = ptrcast( A, hpro::TDenseMatrix );
         const auto  W = blas::prod( value_t(1), U.at( A->row_is() ), T );
 
         blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
-                    value_t(1), blas_mat< value_t >( D ) );
+                    value_t(1), hpro::blas_mat< value_t >( D ) );
     }// else
 }
 
@@ -447,7 +447,7 @@ addlr ( const tile_storage< value_t > &  U,
 //
 template < typename value_t >
 void
-trsmuh ( const TMatrix *            U,
+trsmuh ( const hpro::TMatrix *      U,
          tile_storage< value_t > &  X,
          const size_t               ntile )
 {
@@ -455,7 +455,7 @@ trsmuh ( const TMatrix *            U,
     
     if ( is_blocked( U ) )
     {
-        auto  BU  = cptrcast( U, TBlockMatrix );
+        auto  BU  = cptrcast( U, hpro::TBlockMatrix );
         auto  U00 = BU->block( 0, 0 );
         auto  U01 = cptrcast( BU->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  U11 = BU->block( 1, 1 );
@@ -472,12 +472,12 @@ trsmuh ( const TMatrix *            U,
     {
         assert( X.contains( U->row_is() ) );
         
-        auto  DU = cptrcast( U, TDenseMatrix );
+        auto  DU = cptrcast( U, hpro::TDenseMatrix );
 
         auto               X_is = X.at( U->row_is() );
-        matrix< value_t >  Y( X_is, copy_value );
+        matrix< value_t >  Y( X_is, hpro::copy_value );
 
-        blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
+        blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
         // std::cout << "trsmu : " << blas::norm_F( X_is ) << std::endl;
     }// else
@@ -489,7 +489,7 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-trsml ( const TMatrix *            L,
+trsml ( const hpro::TMatrix *      L,
         tile_storage< value_t > &  X,
         const size_t               ntile )
 {
@@ -497,7 +497,7 @@ trsml ( const TMatrix *            L,
     
     if ( is_blocked( L ) )
     {
-        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  BL  = cptrcast( L, hpro::TBlockMatrix );
         auto  L00 = BL->block( 0, 0 );
         auto  L10 = cptrcast( BL->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  L11 = BL->block( 1, 1 );
@@ -525,15 +525,15 @@ trsml ( const TMatrix *            L,
 //
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc,
-     const size_t       ntile )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc,
+     const size_t             ntile )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
@@ -555,9 +555,9 @@ lu ( TMatrix *          A,
     }// if
     else
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
+        auto  DA = ptrcast( A, hpro::TDenseMatrix );
         
-        blas::invert( blas_mat< value_t >( DA ) );
+        blas::invert( hpro::blas_mat< value_t >( DA ) );
 
         // std::cout << "lu : " << norm_F( A ) << std::endl;
     }// else

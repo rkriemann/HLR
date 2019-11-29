@@ -8,21 +8,26 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/algebra/solve_tri.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/matrix.hh"
-// #include "hlr/seq/mat_mul.hh"
-
-// #include "hlr/seq/arith_tiled.hh"
-// #include "hlr/seq/arith_tiled_v2.hh"
 
 namespace hlr { namespace seq {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
+
+using namespace hpro;
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -41,7 +46,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     assert( is_blocked( A ) );
 
@@ -53,7 +58,7 @@ lu ( TMatrix *          A,
     {
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
             
-        BLAS::invert( blas_mat< value_t >( A_ii ) );
+        blas::invert( blas_mat< value_t >( A_ii ) );
 
         for ( uint  j = i+1; j < nbc; ++j )
         {
@@ -90,9 +95,9 @@ namespace hodlr
 template < typename value_t >
 void
 trsml ( const TMatrix *            L,
-        BLAS::Matrix< value_t > &  X )
+        blas::Matrix< value_t > &  X )
 {
-    HLR_LOG( 4, HLIB::to_string( "trsml( %d )", L->id() ) );
+    HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
     
     if ( is_blocked( L ) )
     {
@@ -101,14 +106,14 @@ trsml ( const TMatrix *            L,
         auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
         auto  L11 = BL->block( 1, 1 );
 
-        BLAS::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), BLAS::Range::all );
+        blas::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), blas::Range::all );
             
         trsml( L00, X0 );
 
-        auto  T = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( L10 ) ), X0 );
+        auto  T = blas::prod( value_t(1), blas::adjoint( blas_mat_B< value_t >( L10 ) ), X0 );
         
-        BLAS::prod( value_t(-1), blas_mat_A< value_t >( L10 ), T, value_t(1), X1 );
+        blas::prod( value_t(-1), blas_mat_A< value_t >( L10 ), T, value_t(1), X1 );
 
         trsml( L11, X1 );
     }// if
@@ -120,9 +125,9 @@ trsml ( const TMatrix *            L,
         
         // auto  DL = cptrcast( L, TDenseMatrix );
         
-        // BLAS::Matrix< value_t >  Y( X, copy_value );
+        // blas::Matrix< value_t >  Y( X, copy_value );
 
-        // BLAS::prod( value_t(1), blas_mat< value_t >( DL ), Y, value_t(0), X );
+        // blas::prod( value_t(1), blas_mat< value_t >( DL ), Y, value_t(0), X );
     }// else
 }
 
@@ -133,9 +138,9 @@ trsml ( const TMatrix *            L,
 template < typename value_t >
 void
 trsmuh ( const TMatrix *            U,
-         BLAS::Matrix< value_t > &  X )
+         blas::Matrix< value_t > &  X )
 {
-    HLR_LOG( 4, HLIB::to_string( "trsmuh( %d )", U->id() ) );
+    HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
     
     if ( is_blocked( U ) )
     {
@@ -144,14 +149,14 @@ trsmuh ( const TMatrix *            U,
         auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
         auto  U11 = BU->block( 1, 1 );
 
-        BLAS::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), BLAS::Range::all );
+        blas::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), blas::Range::all );
             
         trsmuh( U00, X0 );
 
-        auto  T = BLAS::prod( value_t(1), BLAS::adjoint( blas_mat_A< value_t >( U01 ) ), X0 );
+        auto  T = blas::prod( value_t(1), blas::adjoint( blas_mat_A< value_t >( U01 ) ), X0 );
         
-        BLAS::prod( value_t(-1), blas_mat_B< value_t >( U01 ), T, value_t(1), X1 );
+        blas::prod( value_t(-1), blas_mat_B< value_t >( U01 ), T, value_t(1), X1 );
 
         trsmuh( U11, X1 );
     }// if
@@ -159,9 +164,9 @@ trsmuh ( const TMatrix *            U,
     {
         auto  DU = cptrcast( U, TDenseMatrix );
         
-        BLAS::Matrix< value_t >  Y( X, copy_value );
+        blas::Matrix< value_t >  Y( X, copy_value );
 
-        BLAS::prod( value_t(1), BLAS::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+        blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
     }// else
 }
 
@@ -170,12 +175,12 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-addlr ( BLAS::Matrix< value_t > &  U,
-        BLAS::Matrix< value_t > &  V,
+addlr ( blas::Matrix< value_t > &  U,
+        blas::Matrix< value_t > &  V,
         TMatrix *                  A,
         const TTruncAcc &          acc )
 {
-    HLR_LOG( 4, HLIB::to_string( "addlr( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -185,10 +190,10 @@ addlr ( BLAS::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        BLAS::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
+        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
 
         addlr( U0, V0, A00, acc );
         addlr( U1, V1, A11, acc );
@@ -212,7 +217,7 @@ addlr ( BLAS::Matrix< value_t > &  U,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
 
-        BLAS::prod( value_t(1), U, BLAS::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
     }// else
 }
 
@@ -224,7 +229,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -240,8 +245,8 @@ lu ( TMatrix *          A,
         trsmuh( A00, blas_mat_B< value_t >( A10 ) );
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
-        auto  UT = BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
+        auto  T  = blas::prod(  value_t(1), blas::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
+        auto  UT = blas::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
         seq::hodlr::addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         
@@ -251,7 +256,7 @@ lu ( TMatrix *          A,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
         
-        BLAS::invert( blas_mat< value_t >( DA ) );
+        blas::invert( blas_mat< value_t >( DA ) );
     }// else
 }
 
@@ -274,7 +279,7 @@ void
 lu ( TMatrix *          A,
      const TTruncAcc &  acc )
 {
-    HLR_LOG( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     assert( is_blocked( A ) );
 
@@ -326,8 +331,8 @@ void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
           const TMatrix *                  M,
-          const BLAS::Vector< value_t > &  x,
-          BLAS::Vector< value_t > &        y )
+          const blas::Vector< value_t > &  x,
+          blas::Vector< value_t > &        y )
 {
     assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
@@ -362,7 +367,7 @@ mul_vec ( const value_t                    alpha,
     {
         auto  D = cptrcast( M, TDenseMatrix );
         
-        BLAS::mulvec( alpha, BLAS::mat_view( op_M, blas_mat< value_t >( D ) ), x, value_t(1), y );
+        blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x, value_t(1), y );
     }// if
     else if ( is_lowrank( M ) )
     {
@@ -370,23 +375,23 @@ mul_vec ( const value_t                    alpha,
 
         if ( op_M == apply_normal )
         {
-            auto  t = BLAS::mulvec( value_t(1), BLAS::adjoint( blas_mat_B< value_t >( R ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::adjoint( blas_mat_B< value_t >( R ) ), x );
 
-            BLAS::mulvec( alpha, blas_mat_A< value_t >( R ), t, value_t(1), y );
+            blas::mulvec( alpha, blas_mat_A< value_t >( R ), t, value_t(1), y );
         }// if
         else if ( op_M == apply_transposed )
         {
             assert( is_complex_type< value_t >::value == false );
             
-            auto  t = BLAS::mulvec( value_t(1), BLAS::transposed( blas_mat_A< value_t >( R ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::transposed( blas_mat_A< value_t >( R ) ), x );
 
-            BLAS::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
+            blas::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
         }// if
         else if ( op_M == apply_adjoint )
         {
-            auto  t = BLAS::mulvec( value_t(1), BLAS::adjoint( blas_mat_A< value_t >( R ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::adjoint( blas_mat_A< value_t >( R ) ), x );
 
-            BLAS::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
+            blas::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
         }// if
     }// if
     else
@@ -397,19 +402,19 @@ mul_vec ( const value_t                    alpha,
 // solve op(L) x = y with lower triangular L
 //
 void
-trsvl ( const HLIB::matop_t      op_L,
-        const HLIB::TMatrix &    L,
-        HLIB::TScalarVector &    x,
-        const HLIB::diag_type_t  diag_mode );
+trsvl ( const matop_t      op_L,
+        const TMatrix &    L,
+        TScalarVector &    x,
+        const diag_type_t  diag_mode );
 
 //
 // solve op(U) x = y with upper triangular U
 //
 void
-trsvu ( const HLIB::matop_t      op_U,
-        const HLIB::TMatrix &    U,
-        HLIB::TScalarVector &    x,
-        const HLIB::diag_type_t  diag_mode );
+trsvu ( const matop_t      op_U,
+        const TMatrix &    U,
+        TScalarVector &    x,
+        const diag_type_t  diag_mode );
 
 //
 // Gaussian elimination of A, e.g. A = A^-1
@@ -417,14 +422,14 @@ trsvu ( const HLIB::matop_t      op_U,
 //   structure as A
 //
 inline void
-gauss_elim ( HLIB::TMatrix *    A,
-             HLIB::TMatrix *    T,
+gauss_elim ( TMatrix *          A,
+             TMatrix *          T,
              const TTruncAcc &  acc )
 {
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
@@ -435,7 +440,7 @@ gauss_elim ( HLIB::TMatrix *    A,
 
         // A_00 = A_00⁻¹
         hlr::seq::gauss_elim( MA(0,0), MT(0,0), acc );
-        // hlr::log( 0, HLIB::to_string( "                               %d = %.8e", MA(0,0)->id(), HLIB::norm_F( MA(0,0) ) ) );
+        // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(0,0)->id(), norm_F( MA(0,0) ) ) );
 
         // T_01 = A_00⁻¹ · A_01
         multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc );
@@ -453,7 +458,7 @@ gauss_elim ( HLIB::TMatrix *    A,
     
         // A_11 = A_11⁻¹
         hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
-        // hlr::log( 0, HLIB::to_string( "                               %d = %.8e", MA(1,1)->id(), HLIB::norm_F( MA(1,1) ) ) );
+        // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(1,1)->id(), norm_F( MA(1,1) ) ) );
 
         // A_01 = - T_01 · A_11
         multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc );
@@ -473,13 +478,13 @@ gauss_elim ( HLIB::TMatrix *    A,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
         
-        if ( A->is_complex() ) HLIB::BLAS::invert( DA->blas_cmat() );
-        else                   HLIB::BLAS::invert( DA->blas_rmat() );
+        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
+        else                   blas::invert( DA->blas_rmat() );
     }// if
     else
         assert( false );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
 }
 
 }}// namespace hlr::seq

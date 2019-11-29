@@ -8,7 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -18,8 +20,6 @@
 #include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr { namespace seq { namespace tiled2 {
-
-using namespace HLIB;
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
@@ -68,14 +68,14 @@ normstr ( double   f )
 // split given indexset into <n> subsets
 //
 inline
-std::vector< TIndexSet >
-split ( const TIndexSet &  is,
+std::vector< indexset >
+split ( const indexset &  is,
         const size_t       n )
 {
     if ( n == 2 )
     {
-        const TIndexSet  is0( is.first(), is.first() + is.size() / 2 - 1 );
-        const TIndexSet  is1( is0.last() + 1, is.last() );
+        const indexset  is0( is.first(), is.first() + is.size() / 2 - 1 );
+        const indexset  is1( is0.last() + 1, is.last() );
 
         return { std::move(is0), std::move(is1) };
     }// if

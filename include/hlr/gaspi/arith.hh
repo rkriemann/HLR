@@ -15,11 +15,11 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 
-#include <matrix/structure.hh>
-#include <matrix/TBSHMBuilder.hh>
-#include <algebra/mat_fac.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/matrix/TBSHMBuilder.hh>
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/algebra/solve_tri.hh>
+#include <hpro/algebra/mat_mul.hh>
 
 #include "hlr/utils/tools.hh"
 #include "hlr/utils/tensor.hh"
@@ -36,11 +36,12 @@ namespace hlr { namespace gaspi { namespace tlr {
 //
 ///////////////////////////////////////////////////////////////////////
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
-const typeid_t  TYPE_DENSE = RTTI::type_to_id( "TDenseMatrix" );
-const typeid_t  TYPE_LR    = RTTI::type_to_id( "TRkMatrix" );
-const typeid_t  TYPE_GHOST = RTTI::type_to_id( "TGhostMatrix" );
+const typeid_t  TYPE_DENSE = hpro::RTTI::type_to_id( "TDenseMatrix" );
+const typeid_t  TYPE_LR    = hpro::RTTI::type_to_id( "TRkMatrix" );
+const typeid_t  TYPE_GHOST = hpro::RTTI::type_to_id( "TGhostMatrix" );
 
 constexpr segment_id_t  ID_DENSE = 1;
 constexpr segment_id_t  ID_LR_A  = 2;
@@ -50,7 +51,7 @@ constexpr segment_id_t  ID_LR_B  = 3;
 // create n×m block matrix type info for full block matrix
 //
 tensor2< typeid_t >
-build_type_matrix ( const TBlockMatrix *  A )
+build_type_matrix ( const hpro::TBlockMatrix *  A )
 {
     const auto           nbr = A->nblock_rows();
     const auto           nbc = A->nblock_cols();
@@ -105,24 +106,24 @@ build_type_matrix ( const TBlockMatrix *  A )
 //
 // create matrix defined by <type>
 //
-std::unique_ptr< TMatrix >
-create_matrix ( const TMatrix *  A,
-                const typeid_t   type,
-                const int        proc )
+std::unique_ptr< hpro::TMatrix >
+create_matrix ( const hpro::TMatrix *  A,
+                const typeid_t         type,
+                const int              proc )
 {
     assert(( type == TYPE_DENSE ) || ( type == TYPE_LR ));
     
-    std::unique_ptr< TMatrix >  T;
+    std::unique_ptr< hpro::TMatrix >  T;
 
     if ( type == TYPE_DENSE )
     {
-        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : dense", A->id() ) );
-        T = std::make_unique< TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
+        hlr::log( 4, hpro::to_string( "create_matrix( %d ) : dense", A->id() ) );
+        T = std::make_unique< hpro::TDenseMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
     else if ( type == TYPE_LR )
     {
-        hlr::log( 4, HLIB::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
-        T = std::make_unique< TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
+        hlr::log( 4, hpro::to_string( "create_matrix( %d ) : lowrank", A->id() ) );
+        T = std::make_unique< hpro::TRkMatrix >( A->row_is(), A->col_is(), A->is_complex() );
     }// if
 
     T->set_id( A->id() );
@@ -137,7 +138,7 @@ create_matrix ( const TMatrix *  A,
 template < typename value_t >
 std::vector< gaspi::segment >
 create_segments ( const segment_id_t  sid,
-                  TMatrix *           A,
+                  hpro::TMatrix *     A,
                   const uint          rank,
                   gaspi::group &      group )
 {
@@ -148,22 +149,22 @@ create_segments ( const segment_id_t  sid,
     
     if ( is_dense( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "create_segments: dense, %d, %d × %d on ", A->id(), A->nrows(), A->ncols() ) + group.to_string() );
+        hlr::log( 4, hpro::to_string( "create_segments: dense, %d, %d × %d on ", A->id(), A->nrows(), A->ncols() ) + group.to_string() );
 
         segs.reserve( 1 );
-        segs.push_back( gaspi::segment( sid, blas_mat< value_t >( ptrcast( A, TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
+        segs.push_back( gaspi::segment( sid, hpro::blas_mat< value_t >( ptrcast( A, hpro::TDenseMatrix ) ).data(), A->nrows() * A->ncols(), group ) );
     }// if
     else if ( is_lowrank( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "create_segments: lowrank, %d, %d × %d, %d on ", A->id(), A->nrows(), A->ncols(), rank ) + group.to_string() );
+        hlr::log( 4, hpro::to_string( "create_segments: lowrank, %d, %d × %d, %d on ", A->id(), A->nrows(), A->ncols(), rank ) + group.to_string() );
         
-        auto  R = ptrcast( A, TRkMatrix );
+        auto  R = ptrcast( A, hpro::TRkMatrix );
         
         R->set_rank( rank );
         
         segs.reserve( 2 );
-        segs.push_back( gaspi::segment( sid,   blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group ) );
-        segs.push_back( gaspi::segment( sid+1, blas_mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
+        segs.push_back( gaspi::segment( sid,   hpro::blas_mat_A< value_t >( R ).data(), R->nrows() * rank, group ) );
+        segs.push_back( gaspi::segment( sid+1, blas_hpro::mat_B< value_t >( R ).data(), R->ncols() * rank, group ) );
     }// if
     else
         hlr::error( "(create_segments) unsupported matrix type : " + A->typestr() ) ;
@@ -177,19 +178,19 @@ create_segments ( const segment_id_t  sid,
 template < typename value_t >
 void
 read_matrix ( std::vector< gaspi::segment > &  segs,
-              TMatrix *                        A,
+              hpro::TMatrix *                  A,
               const int                        source,
               gaspi::queue &                   queue )
 {
     if ( is_dense( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "read_matrix: dense, %d, %d × %d from %d", A->id(), A->nrows(), A->ncols(), source ) );
+        hlr::log( 4, hpro::to_string( "read_matrix: dense, %d, %d × %d from %d", A->id(), A->nrows(), A->ncols(), source ) );
 
         queue.read( segs[0], source, segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), source ) );
+        hlr::log( 4, hpro::to_string( "read_matrix: lowrank, %d, %d × %d, %d from %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), source ) );
         
         queue.read( segs[0], source, segs[0].id() );
         queue.read( segs[1], source, segs[1].id() );
@@ -204,19 +205,19 @@ read_matrix ( std::vector< gaspi::segment > &  segs,
 template < typename value_t >
 void
 send_matrix ( std::vector< gaspi::segment > &  segs,
-              TMatrix *                        A,
+              hpro::TMatrix *                  A,
               const int                        dest,
               gaspi::queue &                   queue )
 {
     if ( is_dense( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "send_matrix: dense, %d, %d × %d to %d", A->id(), A->nrows(), A->ncols(), dest ) );
+        hlr::log( 4, hpro::to_string( "send_matrix: dense, %d, %d × %d to %d", A->id(), A->nrows(), A->ncols(), dest ) );
 
         queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        hlr::log( 4, HLIB::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), dest ) );
+        hlr::log( 4, hpro::to_string( "send_matrix: lowrank, %d, %d × %d, %d to %d", A->id(), A->nrows(), A->ncols(), ptrcast( A, TRkMatrix )->rank(), dest ) );
         
         queue.write_notify( segs[0], dest, segs[0].id(), segs[0].id() );
         queue.write_notify( segs[1], dest, segs[1].id(), segs[1].id() );
@@ -241,15 +242,15 @@ wait_matrix ( std::vector< gaspi::segment > &  segs )
         gaspi::notify_wait( segs[1], segs[1].id() );
     }// if
     else
-        hlr::error( HLIB::to_string( "(wait_matrix) unsupported number of segments: %d", segs.size() ) );
+        hlr::error( hpro::to_string( "(wait_matrix) unsupported number of segments: %d", segs.size() ) );
 }
 
 //
 // return list of processors in row <row> starting after diagonal block
 //
 std::list< gaspi::rank_t >
-get_row_procs ( const TBlockMatrix *  A,
-                const uint            row )
+get_row_procs ( const hpro::TBlockMatrix *  A,
+                const uint                  row )
 {
     const auto                  nbr = A->nblock_rows();
     const auto                  nbc = A->nblock_cols();
@@ -268,8 +269,8 @@ get_row_procs ( const TBlockMatrix *  A,
 // return list of processors in column <col> starting after diagonal block
 //
 std::list< gaspi::rank_t >
-get_col_procs ( const TBlockMatrix *  A,
-                const uint            col )
+get_col_procs ( const hpro::TBlockMatrix *  A,
+                const uint                  col )
 {
     const auto                  nbr = A->nblock_rows();
     const auto                  nbc = A->nblock_cols();
@@ -289,7 +290,7 @@ get_col_procs ( const TBlockMatrix *  A,
 // - if processor sets of different rows are identical, so are the groups
 //
 void
-build_row_groups ( const TBlockMatrix *                         A,
+build_row_groups ( const hpro::TBlockMatrix *                   A,
                    std::vector< gaspi::group > &                groups,  // communicator per row
                    std::vector< std::list< gaspi::rank_t > > &  procs )  // set of processors per row
 {
@@ -312,7 +313,7 @@ build_row_groups ( const TBlockMatrix *                         A,
             }// if
         }// for
 
-        if ( HLIB::verbose( 4 ) )
+        if ( hpro::verbose( 4 ) )
             std::cout << i << " : " << to_string( procs_i ) << " (" << ( pos == nbr ? i : pos ) << ")" << std::endl;
             
         // use previously created communicator or create new if none found
@@ -332,7 +333,7 @@ build_row_groups ( const TBlockMatrix *                         A,
 // same as above but for block columns
 //
 void
-build_col_groups ( const TBlockMatrix *                         A,
+build_col_groups ( const hpro::TBlockMatrix *                   A,
                    std::vector< gaspi::group > &                groups,  // group per column
                    std::vector< std::list< gaspi::rank_t > > &  procs )  // set of processors per column
 {
@@ -355,7 +356,7 @@ build_col_groups ( const TBlockMatrix *                         A,
             }// if
         }// for
 
-        if ( HLIB::verbose( 4 ) )
+        if ( hpro::verbose( 4 ) )
             std::cout << i << " : " << to_string( procs_i ) << " (" << ( pos == nbc ? i : pos ) << ")" << std::endl;
             
         // use previously created group or create new if none found
@@ -373,8 +374,8 @@ build_col_groups ( const TBlockMatrix *                         A,
 
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
     // assert( RANK != 0 );
     assert( is_blocked( A ) );
@@ -383,7 +384,7 @@ lu ( TMatrix *          A,
     const auto      pid    = process.rank();
     const auto      nprocs = process.size();
     
-    hlr::log( 4, HLIB::to_string( "lu( %d )", A->id() ) );
+    hlr::log( 4, hpro::to_string( "lu( %d )", A->id() ) );
 
     auto  BA  = ptrcast( A, TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -428,7 +429,7 @@ lu ( TMatrix *          A,
         for ( uint  j = 0; j < nbc; ++j )
             id(i,j) = ( nid += 2 );
 
-    hlr::log( 4, HLIB::to_string( "maximal ID: %d", nid ) );
+    hlr::log( 4, hpro::to_string( "maximal ID: %d", nid ) );
     
     //
     // LU factorization
@@ -450,9 +451,9 @@ lu ( TMatrix *          A,
         // counts additional memory per step due to non-local data
         size_t  add_mem = 0;
         
-        hlr::log( 4, HLIB::to_string( "──────────────── step %d ────────────────", i ) );
+        hlr::log( 4, hpro::to_string( "──────────────── step %d ────────────────", i ) );
 
-        hlr::log( 5, HLIB::to_string( "#alloc. segments: %d of %d", process.nalloc_segments(), process.nmax_segments() ) );
+        hlr::log( 5, hpro::to_string( "#alloc. segments: %d of %d", process.nalloc_segments(), process.nmax_segments() ) );
 
         //
         // factorization of diagonal block
@@ -463,7 +464,7 @@ lu ( TMatrix *          A,
 
         if ( pid == p_ii )
         {
-            hlr::log( 4, HLIB::to_string( "  invert( %d )", A_ii->id() ) );
+            hlr::log( 4, hpro::to_string( "  invert( %d )", A_ii->id() ) );
             BLAS::invert( blas_mat< value_t >( A_ii ) );
         }// if
 
@@ -519,13 +520,13 @@ lu ( TMatrix *          A,
                 auto        A_ji = BA->block( j, i );
                 const auto  p_ji = A_ji->procs().master();
                 
-                hlr::log( 4, HLIB::to_string( "  solve( %d )", A_ji->id() ) );
+                hlr::log( 4, hpro::to_string( "  solve( %d )", A_ji->id() ) );
                 
                 if ( pid == p_ji )
                 {
                     if ( ! have_diag )
                     {
-                        hlr::log( 4, HLIB::to_string( "waiting for %d", H_ii->id() ) );
+                        hlr::log( 4, hpro::to_string( "waiting for %d", H_ii->id() ) );
                         wait_matrix( diag_seg );
                         have_diag = true;
                         
@@ -647,7 +648,7 @@ lu ( TMatrix *          A,
 
                     if (( p_ji != pid ) && ! row_done[j] )
                     {
-                        hlr::log( 5, HLIB::to_string( "waiting for row matrix %d", BA->block(j,i)->id() ) );
+                        hlr::log( 5, hpro::to_string( "waiting for row matrix %d", BA->block(j,i)->id() ) );
                         wait_matrix( row_segs[j] );
                         row_done[j] = true;
                         add_mem += row_i[j]->byte_size();
@@ -655,7 +656,7 @@ lu ( TMatrix *          A,
                             
                     if (( p_il != pid ) && ! col_done[l] )
                     {
-                        hlr::log( 5, HLIB::to_string( "waiting for col matrix %d", BA->block(i,l)->id() ) );
+                        hlr::log( 5, hpro::to_string( "waiting for col matrix %d", BA->block(i,l)->id() ) );
                         wait_matrix( col_segs[l] );
                         col_done[l] = true;
                         add_mem += col_i[l]->byte_size();

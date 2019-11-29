@@ -204,7 +204,7 @@ run ( graph &                  dag,
     for ( auto  t : dag.start() )
         worklist.push_back( t );
 
-    size_t  old_mem = HLIB::Mem::usage();
+    // size_t  old_mem = HLIB::Mem::usage();
     
     while ( ! worklist.empty() )
     {

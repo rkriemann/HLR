@@ -8,7 +8,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
@@ -17,7 +20,8 @@
 namespace hlr
 {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 namespace omp
 {
@@ -36,23 +40,23 @@ namespace tlr
 // 
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
-    if ( HLIB::verbose( 4 ) )
+    if ( hpro::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
     
     assert( is_blocked( A ) );
 
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
             
-        BLAS::invert( blas_mat< value_t >( A_ii ) );
+        blas::invert( hpro::blas_mat< value_t >( A_ii ) );
 
         #pragma omp parallel for
         for ( uint  j = i+1; j < nbc; ++j )
@@ -89,26 +93,26 @@ namespace hodlr
 //
 template < typename value_t >
 void
-addlr ( BLAS::Matrix< value_t > &  U,
-        BLAS::Matrix< value_t > &  V,
-        TMatrix *                  A,
-        const TTruncAcc &          acc )
+addlr ( blas::Matrix< value_t > &  U,
+        blas::Matrix< value_t > &  V,
+        hpro::TMatrix *            A,
+        const hpro::TTruncAcc &    acc )
 {
-    if ( HLIB::verbose( 4 ) )
+    if ( hpro::verbose( 4 ) )
         DBG::printf( "addlr( %d )", A->id() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), hpro::TRkMatrix );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        BLAS::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
+        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
+        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
 
         #pragma omp parallel sections
         {
@@ -120,8 +124,8 @@ addlr ( BLAS::Matrix< value_t > &  U,
 
             #pragma omp section
             {
-                auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
-                                                                    { blas_mat_B< value_t >( A01 ), V1 },
+                auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                                                    { hpro::blas_mat_B< value_t >( A01 ), V1 },
                                                                     acc );
                 
                 A01->set_lrmat( U01, V01 );
@@ -129,8 +133,8 @@ addlr ( BLAS::Matrix< value_t > &  U,
             
             #pragma omp section
             {
-                auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
-                                                                    { blas_mat_B< value_t >( A10 ), V0 },
+                auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                                                    { hpro::blas_mat_B< value_t >( A10 ), V0 },
                                                                     acc );
                 A10->set_lrmat( U10, V10 );
             }
@@ -138,9 +142,9 @@ addlr ( BLAS::Matrix< value_t > &  U,
     }// if
     else
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
+        auto  DA = ptrcast( A, hpro::TDenseMatrix );
 
-        BLAS::prod( value_t(1), U, BLAS::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), hpro::blas_mat< value_t >( DA ) );
     }// else
 }
 
@@ -149,18 +153,18 @@ addlr ( BLAS::Matrix< value_t > &  U,
 //
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
-    if ( HLIB::verbose( 4 ) )
+    if ( hpro::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), hpro::TRkMatrix );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
         lu< value_t >( A00, acc );
@@ -168,25 +172,25 @@ lu ( TMatrix *          A,
         #pragma omp parallel sections
         {
             #pragma omp section
-            { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); }
+            { seq::hodlr::trsml(  A00, hpro::blas_mat_A< value_t >( A01 ) ); }
             
             #pragma omp section
-            { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); }
+            { seq::hodlr::trsmuh( A00, hpro::blas_mat_B< value_t >( A10 ) ); }
         }
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); 
-        auto  UT = BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
+        auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
+        auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
+        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc );
         
         lu< value_t >( A11, acc );
     }// if
     else
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
+        auto  DA = ptrcast( A, hpro::TDenseMatrix );
         
-        BLAS::invert( blas_mat< value_t >( DA ) );
+        blas::invert( hpro::blas_mat< value_t >( DA ) );
     }// else
 }
 
@@ -206,18 +210,18 @@ namespace tileh
 //
 template < typename value_t >
 void
-lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+lu ( hpro::TMatrix *          A,
+     const hpro::TTruncAcc &  acc )
 {
     assert( is_blocked( A ) );
 
-    auto  BA  = ptrcast( A, TBlockMatrix );
+    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        LU::factorise_rec( BA->block( i, i ), acc );
+        hpro::LU::factorise_rec( BA->block( i, i ), acc );
 
         // #pragma omp parallel sections
         {
@@ -226,9 +230,9 @@ lu ( TMatrix *          A,
                 #pragma omp parallel for
                 for ( uint j = i+1; j < nbr; ++j )
                 {
-                    solve_upper_right( BA->block( j, i ),
-                                       BA->block( i, i ), nullptr, acc,
-                                       solve_option_t( block_wise, general_diag, store_inverse ) );
+                    hpro::solve_upper_right( BA->block( j, i ),
+                                             BA->block( i, i ), nullptr, acc,
+                                             hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) );
                 }// for
             }
             
@@ -237,9 +241,9 @@ lu ( TMatrix *          A,
                 #pragma omp parallel for
                 for ( uint  l = i+1; l < nbc; ++l )
                 {
-                    solve_lower_left( apply_normal, BA->block( i, i ), nullptr,
-                                      BA->block( i, l ), acc,
-                                      solve_option_t( block_wise, unit_diag, store_inverse ) );
+                    hpro::solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
+                                            BA->block( i, l ), acc,
+                                            hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
                 }// for
             }
         }
@@ -249,7 +253,7 @@ lu ( TMatrix *          A,
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                multiply( -1.0, BA->block( j, i ), BA->block( i, l ), 1.0, BA->block( j, l ), acc );
+                hpro::multiply( -1.0, BA->block( j, i ), BA->block( i, l ), 1.0, BA->block( j, l ), acc );
             }// for
         }// for
     }// for
@@ -272,19 +276,19 @@ namespace detail
 {
 
 inline void
-gauss_elim_helper ( HLIB::TMatrix *    A,
-                    HLIB::TMatrix *    T,
+gauss_elim_helper ( hpro::TMatrix *    A,
+                    hpro::TMatrix *    T,
                     const TTruncAcc &  acc )
 {
     assert( ! is_null_any( A, T ) );
     assert( A->type() == T->type() );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( A, TBlockMatrix );
-        auto  BT = ptrcast( T, TBlockMatrix );
+        auto  BA = ptrcast( A, hpro::TBlockMatrix );
+        auto  BT = ptrcast( T, hpro::TBlockMatrix );
         auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
@@ -295,15 +299,15 @@ gauss_elim_helper ( HLIB::TMatrix *    A,
         #pragma omp taskgroup
         {
             #pragma omp task
-            multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+            hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
         
             // T_10 = A_10 · A_00⁻¹
             #pragma omp task
-            multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+            hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
         }// taskgroup
         
         // A_11 = A_11 - T_10 · A_01
-        multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
     
         // A_11 = A_11⁻¹
         hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
@@ -312,34 +316,34 @@ gauss_elim_helper ( HLIB::TMatrix *    A,
         {
             // A_01 = - T_01 · A_11
             #pragma omp task
-            multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+            hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
             
             // A_10 = - A_11 · T_10
             #pragma omp task
-            multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+            hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
         }// taskgroup
 
         // A_00 = T_00 - A_01 · T_10
-        multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
     }// if
     else if ( is_dense( A ) )
     {
-        auto  DA = ptrcast( A, TDenseMatrix );
+        auto  DA = ptrcast( A, hpro::TDenseMatrix );
         
-        if ( A->is_complex() ) HLIB::BLAS::invert( DA->blas_cmat() );
-        else                   HLIB::BLAS::invert( DA->blas_rmat() );
+        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
+        else                   blas::invert( DA->blas_rmat() );
     }// if
     else
         assert( false );
 
-    HLR_LOG( 4, HLIB::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
 }
 
 }// namespace detail
 
 inline void
-gauss_elim ( HLIB::TMatrix *    A,
-             HLIB::TMatrix *    T,
+gauss_elim ( hpro::TMatrix *    A,
+             hpro::TMatrix *    T,
              const TTruncAcc &  acc )
 {
     #pragma omp parallel

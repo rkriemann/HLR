@@ -13,9 +13,9 @@
 
 #include <taskflow/taskflow.hpp>
 
-#include <matrix/TMatrix.hh>
-#include <matrix/TBlockMatrix.hh>
-#include <base/TTruncAcc.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/seq/matrix.hh"

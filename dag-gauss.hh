@@ -25,7 +25,7 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic = Time::Wall::now();
+    auto  tic = timer::now();
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< TMatrix >();
 
@@ -63,11 +63,11 @@ mymain ( int, char ** )
             A = impl::matrix::realloc( A.release() );
     }// else
 
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
-    std::cout << "    done in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
     if ( verbose( 3 ) )
     {
@@ -89,14 +89,14 @@ mymain ( int, char ** )
     
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = Time::Wall::now();
+        tic = timer::now();
         
         dag = std::move( hlr::dag::gen_dag_gauss_elim( C.get(), T.get(), impl::dag::refine ) );
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
         
         if ( verbose( 1 ) )
-            std::cout << "  DAG in     " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  DAG in     " << format_time( toc ) << std::endl;
         
         tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
         tmax  = std::max( tmax, toc.seconds() );
@@ -114,7 +114,7 @@ mymain ( int, char ** )
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
         
     if ( verbose( 3 ) )
@@ -133,16 +133,16 @@ mymain ( int, char ** )
         
     for ( int  i = 0; i < 1; ++i ) // nbench
     {
-        tic = Time::Wall::now();
+        tic = timer::now();
 
         if ( HLIB::CFG::Arith::use_dag )
             impl::dag::run( dag, acc );
         else
             impl::gauss_elim( C.get(), T.get(), acc );
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
 
-        std::cout << "  Gauss in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  Gauss in   " << format_time( toc ) << std::endl;
 
         tmin  = ( tmin == 0 ? toc.seconds() : std::min( tmin, toc.seconds() ) );
         tmax  = std::max( tmax, toc.seconds() );
@@ -157,7 +157,7 @@ mymain ( int, char ** )
                   << format( "%.3e s / %.3e s / %.3e s" ) % tmin % ( tsum / double(nbench) ) % tmax
                   << std::endl;
         
-    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << " / " << Mem::to_string( Mem::usage() ) << std::endl;
+    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "    error  = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), C.get() ) << term::reset << std::endl;
 
     // DBG::write( C.get(), "C.mat", "C" );

@@ -9,6 +9,8 @@
 #include "common.hh"
 #include "hlr/cluster/hodlr.hh"
 
+using namespace hlr;
+
 //
 // main function
 //
@@ -18,32 +20,32 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic     = Time::Wall::now();
+    auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
     auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSBlockClusterVis   bc_vis;
+        hpro::TPSBlockClusterVis   bc_vis;
         
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
     
     auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
     auto  acc    = gen_accuracy();
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
@@ -57,11 +59,11 @@ mymain ( int, char ** )
     
         for ( int  i = 0; i < nbench; ++i )
         {
-            tic = Time::Wall::now();
+            tic = timer::now();
             
-            impl::hodlr::lu< HLIB::real >( C.get(), fixed_rank( k ) );
+            impl::hodlr::lu< HLIB::real >( C.get(), hpro::fixed_rank( k ) );
             
-            toc = Time::Wall::since( tic );
+            toc = timer::since( tic );
 
             std::cout << "    done in " << format_time( toc ) << std::endl;
             
@@ -74,7 +76,7 @@ mymain ( int, char ** )
         if ( nbench > 1 )
             std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
 
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
         std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;

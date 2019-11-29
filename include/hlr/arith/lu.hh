@@ -8,20 +8,25 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <algebra/mat_fac.hh>
+#include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/algebra/solve_tri.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/matrix/level_matrix.hh"
 
 namespace hlr { namespace arith {
 
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
+
 //
 // compute LU factorization of A within L
 //
 void
-lu ( TMatrix &               A,
-     matrix::level_matrix &  L,
-     const TTruncAcc &       acc )
+lu ( hpro::TMatrix &          A,
+     matrix::level_matrix &   L,
+     const hpro::TTruncAcc &  acc )
 {
     // DBG::printf( "lu( %d )", A.id() );
 
@@ -36,11 +41,11 @@ lu ( TMatrix &               A,
     
     if ( A_is_leaf )
     {
-        HLIB::LU::factorise_rec( & A, acc, fac_options_t( block_wise, store_inverse, false ) );
+        hpro::LU::factorise_rec( & A, acc, hpro::fac_options_t( hpro::block_wise, hpro::store_inverse, false ) );
     }// if
     else
     {
-        auto        B      = ptrcast( & A, TBlockMatrix );
+        auto        B      = ptrcast( & A, hpro::TBlockMatrix );
         const uint  nbrows = B->nblock_rows();
         const uint  nbcols = B->nblock_cols();
 
@@ -87,7 +92,7 @@ lu ( TMatrix &               A,
         {
             // DBG::printf( "solve_lower_left( %d, %d )", A.id(), L_ij->id() );
 
-            solve_lower_left( apply_normal, & A, L_ij, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+            hpro::solve_lower_left( hpro::apply_normal, & A, L_ij, acc, hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
         }// if
     }// for
         
@@ -99,7 +104,7 @@ lu ( TMatrix &               A,
         {
             // DBG::printf( "solve_upper_right( %d, %d )", A.id(), L_ji->id() );
 
-            solve_upper_right( L_ji, & A, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+            hpro::solve_upper_right( L_ji, & A, nullptr, acc, hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) );
         }// if
     }// for
 
@@ -120,10 +125,10 @@ lu ( TMatrix &               A,
             {
                 // DBG::printf( "update( %d, %d, %d )", L_ji->id(), L_il->id(), L_jl->id() );
                 
-                multiply( real(-1),
-                          apply_normal, L_ji,
-                          apply_normal, L_il,
-                          real(1), L_jl, acc );
+                hpro::multiply( real(-1),
+                                hpro::apply_normal, L_ji,
+                                hpro::apply_normal, L_il,
+                                real(1), L_jl, acc );
             }// if
         }// for
     }// for
@@ -134,8 +139,8 @@ lu ( TMatrix &               A,
 // - only calls actual LU algorithm for all diagonal blocks
 //
 void
-lu ( matrix::level_matrix &  A,
-     const TTruncAcc &       acc )
+lu ( matrix::level_matrix &   A,
+     const hpro::TTruncAcc &  acc )
 {
     const uint  nbrows = A.nblock_rows();
     const uint  nbcols = A.nblock_cols();

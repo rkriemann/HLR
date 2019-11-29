@@ -12,13 +12,10 @@
 #include <unordered_set>
 #include <map>
 
-#include <tbb/blocked_range2d.h>
-#include <tbb/parallel_for.h>
-
-#include <matrix/structure.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
-#include <algebra/mat_fac.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/algebra/solve_tri.hh>
+#include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"

@@ -8,7 +8,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"

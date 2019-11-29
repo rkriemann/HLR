@@ -8,7 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hlib.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
+#include <hpro/matrix/TDenseMatrix.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -18,8 +20,6 @@
 #include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr { namespace seq { namespace tiled3 {
-
-using namespace HLIB;
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;

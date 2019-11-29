@@ -19,6 +19,8 @@
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
 
+using namespace hlr;
+
 //
 // main function
 //
@@ -28,9 +30,9 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic = Time::Wall::now();
+    auto  tic = timer::now();
     auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< TMatrix >();
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
 
     if ( matrixfile == "" )
     {
@@ -39,17 +41,16 @@ mymain ( int, char ** )
         auto  ct      = cluster::h::cluster( coord.get(), ntile );
         auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
-        if ( verbose( 3 ) )
+        if ( hpro::verbose( 3 ) )
         {
-            TPSBlockClusterVis   bc_vis;
+            hpro::TPSBlockClusterVis   bc_vis;
         
             bc_vis.id( true ).print( bct->root(), "bct" );
-            print_vtk( coord.get(), "coord" );
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     }// if
@@ -59,22 +60,22 @@ mymain ( int, char ** )
                   << "    matrix = " << matrixfile
                   << std::endl;
 
-        A = read_matrix( matrixfile );
+        A = hpro::read_matrix( matrixfile );
 
         // for spreading memory usage
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
     }// else
 
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
-    std::cout << "    done in  " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem    = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
@@ -121,7 +122,7 @@ mymain ( int, char ** )
         }// if
         else if ( oop_lu )
         {
-            if ( CFG::Arith::use_accu )
+            if ( hpro::CFG::Arith::use_accu )
             {
                 hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
                 hlr::dag::def_path_len  = 10;
@@ -149,7 +150,7 @@ mymain ( int, char ** )
         
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = Time::Wall::now();
+        tic = timer::now();
         
         // LIKWID_MARKER_START( "dag" );
 
@@ -159,7 +160,7 @@ mymain ( int, char ** )
             dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, impl::dag::refine, impl::dag::run, ncoarse ) );
         else if ( oop_lu )
         {
-            if ( CFG::Arith::use_accu )
+            if ( hpro::CFG::Arith::use_accu )
                 dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, impl::dag::refine ) );
             else
                 dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
@@ -169,11 +170,11 @@ mymain ( int, char ** )
         
         // LIKWID_MARKER_STOP( "dag" );
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
         
-        if ( verbose( 1 ) )
+        if ( hpro::verbose( 1 ) )
         {
-            std::cout << "  DAG in     " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+            std::cout << "  DAG in     " << format_time( toc ) << std::endl;
             
             // std::cout << "    #coll  = " << hlr::dag::collisions << std::endl;
         }// if
@@ -186,7 +187,7 @@ mymain ( int, char ** )
 
     // LIKWID_MARKER_CLOSE;
         
-    if ( verbose( 1 ) )
+    if ( hpro::verbose( 1 ) )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = "
@@ -194,10 +195,10 @@ mymain ( int, char ** )
                       << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
-        std::cout << "    mem    = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
 
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
         dag.print_dot( "lu.dot" );
     
     if ( onlydag )
@@ -213,13 +214,13 @@ mymain ( int, char ** )
         
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = Time::Wall::now();
+        tic = timer::now();
         
         impl::dag::run( dag, acc );
         
-        toc = Time::Wall::since( tic );
+        toc = timer::since( tic );
 
-        std::cout << "  LU in      " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+        std::cout << "  LU in      " << format_time( toc ) << std::endl;
 
         runtime.push_back( toc.seconds() );
 
@@ -232,12 +233,12 @@ mymain ( int, char ** )
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
         
-    std::cout << "    mem    = " << Mem::to_string( C->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
     matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
     // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
         
-    std::cout << "    error  = " << term::red << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
+    std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -258,7 +259,7 @@ mymain ( int, char ** )
     {
         std::cout << term::bullet << term::bold << "Vector Solves" << term::reset << std::endl;
     
-        HLIB::CFG::Arith::vector_solve_method = 1;
+        hpro::CFG::Arith::vector_solve_method = 1;
 
         auto   mtx_map = std::map< idx_t, std::unique_ptr< std::mutex > >();
         idx_t  last    = -1;
@@ -275,25 +276,25 @@ mymain ( int, char ** )
         }// for
         
         {
-            TScalarVector  x( A->col_is() );
+            hpro::TScalarVector  x( A->col_is() );
 
             x.fill_rand( 1 );
 
-            const TScalarVector  xcopy( x );
-            TScalarVector        xref( x );
+            const hpro::TScalarVector  xcopy( x );
+            hpro::TScalarVector        xref( x );
 
             runtime.clear();
                 
             for ( int  i = 0; i < nbench; ++i )
             {
-                tic = Time::Wall::now();
+                tic = timer::now();
         
-                hlr::seq::trsvu( apply_trans, *C, xref, general_diag );
-                hlr::seq::trsvl( apply_trans, *C, xref, unit_diag );
+                hlr::seq::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
+                hlr::seq::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
         
-                toc = Time::Wall::since( tic );
+                toc = timer::since( tic );
 
-                std::cout << "  trsv in    " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  trsv in    " << format_time( toc ) << std::endl;
 
                 runtime.push_back( toc.seconds() );
 
@@ -306,20 +307,20 @@ mymain ( int, char ** )
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            matrix::luinv_eval  A_inv2( C, impl::dag::refine, impl::dag::run );
-            TScalarVector       v( x );
+            matrix::luinv_eval   A_inv2( C, impl::dag::refine, impl::dag::run );
+            hpro::TScalarVector  v( x );
         
             runtime.clear();
             
             for ( int  i = 0; i < nbench; ++i )
             {
-                tic = Time::Wall::now();
+                tic = timer::now();
 
-                A_inv2.apply( & x, & v, apply_trans );
+                A_inv2.apply( & x, & v, hpro::apply_trans );
 
-                toc = Time::Wall::since( tic );
+                toc = timer::since( tic );
 
-                std::cout << "  solve in   " << term::cyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
+                std::cout << "  solve in   " << format_time( toc ) << std::endl;
 
                 runtime.push_back( toc.seconds() );
             }// for
@@ -333,7 +334,7 @@ mymain ( int, char ** )
             // DBG::write( & xref, "y.mat", "y" );
 
             v.axpy( -1, & xref );
-            std::cout << "  error =    " << term::red << format( "%.3e s" ) % ( v.norm2() / xref.norm2() ) << term::reset << std::endl;
+            std::cout << "  error =    " << format_error( v.norm2() / xref.norm2() ) << std::endl;
         }
     }// if
 }

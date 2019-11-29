@@ -29,7 +29,7 @@ LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # directories for the various external libraries
-HPRO_DIR     = '/home/rok/programming/hpro/main'
+HPRO_DIR     = '/home/rok/programming/hpro/devel'
 TBB_DIR      = '/usr'
 TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
 HPX_DIR      = '/opt/local/hpx'
@@ -359,7 +359,7 @@ if 'tbb' in frameworks :
     if 'tlr'         in programs : Default( tbb.Program( 'tlr-tbb.cc' ) )
     if 'hodlr'       in programs : Default( tbb.Program( 'hodlr-tbb.cc' ) )
     if 'tiled-hodlr' in programs : Default( tbb.Program( 'tiled-hodlr-tbb.cc' ) )
-    if 'tileh'       in programs : Default( tbb.Program( 'tileh-tbb.cc' ) )
+    if 'tileh'       in programs : Default( tbb.Program( 'tileh-tbb',      [ 'tileh-tbb.cc',      'src/tbb/dag.cc' ] ) )
     if 'dag-lu'      in programs : Default( tbb.Program( 'dag-lu-tbb',     [ 'dag-lu-tbb.cc',     'src/tbb/dag.cc' ] ) )
     if 'dag-gauss'   in programs : Default( tbb.Program( 'dag-gauss-tbb',  [ 'dag-gauss-tbb.cc',  'src/tbb/dag.cc' ] ) )
     if 'dag-inv'     in programs : Default( tbb.Program( 'dag-inv-tbb',    [ 'dag-inv-tbb.cc',    'src/tbb/dag.cc' ] ) )

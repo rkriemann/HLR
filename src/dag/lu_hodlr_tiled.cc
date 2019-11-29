@@ -12,9 +12,7 @@
 #include <unordered_set>
 #include <map>
 
-#include <matrix/structure.hh>
-#include <algebra/solve_tri.hh>
-#include <algebra/mat_mul.hh>
+#include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
@@ -27,22 +25,22 @@
 
 namespace hlr { namespace dag {
 
-// using namespace HLIB;
-
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
 
-using HLIB::id_t;
-using HLIB::real;
+using namespace hpro;
+
+using hpro::id_t;
+using hpro::real;
 
 // dense matrix
 template < typename value_t >
-using  matrix   = HLIB::BLAS::Matrix< value_t >;
+using  matrix   = blas::Matrix< value_t >;
 
 // dense vector
 template < typename value_t >
-using  vector   = HLIB::BLAS::Vector< value_t >;
+using  vector   = blas::Vector< value_t >;
 
 // import matrix types
 using hlr::matrix::indexset;
@@ -55,7 +53,7 @@ namespace
 {
 
 // dummy indexset for T operations (rank/size unknown during DAG and only object is of interest)
-const auto  IS_ONE  = TIndexSet( -1, -1 );
+const auto  IS_ONE  = indexset( -1, -1 );
 const auto  BIS_ONE = TBlockIndexSet( IS_ONE, IS_ONE );
 
 //
@@ -127,8 +125,8 @@ struct matrix_info
 
     operator matrix_t () { return data; }
     
-    const TBlockIndexSet block_is  () const { return TBlockIndexSet( is, IS_ONE ); }
-    const mem_block_t    mem_block () const;
+    const TBlockIndexSet  block_is  () const { return TBlockIndexSet( is, IS_ONE ); }
+    const mem_block_t     mem_block () const;
 
     std::string
     to_string ( const size_t  ntile = 0 ) const
@@ -142,8 +140,8 @@ struct matrix_info
 
         if (( is != IS_ONE ) && ( ntile != 0 ))
         {
-            if ( is.size() <= ntile ) os << HLIB::to_string( "[%d]", is.first() / ntile );
-            else                      os << HLIB::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+            if ( is.size() <= ntile ) os << hpro::to_string( "[%d]", is.first() / ntile );
+            else                      os << hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
         }// if
 
         return os.str();
@@ -251,11 +249,13 @@ split ( const indexset &  is,
     return {};
 }
 
+#if ! defined(NDEBUG)
 bool
 is_tiled_lowrank ( const TMatrix *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -283,7 +283,7 @@ struct lu_node : public node
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
@@ -316,7 +316,7 @@ struct trsmu_node : public node
     
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsmu( %c%d, ", char(NAME_U), U->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + hpro::to_string( " = trsmu( %c%d, ", char(NAME_U), U->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -350,7 +350,7 @@ struct trsml_node : public node
 
     virtual std::string  to_string () const
     {
-        return X.to_string( ntile ) + HLIB::to_string( " = trsml( %c%d, ", char(NAME_L), L->id() ) + M.to_string( ntile ) + " )";
+        return X.to_string( ntile ) + hpro::to_string( " = trsml( %c%d, ", char(NAME_L), L->id() ) + M.to_string( ntile ) + " )";
     }
     virtual std::string  color     () const { return "729fcf"; }
     
@@ -388,7 +388,7 @@ struct addlr_node : public node
     virtual std::string  to_string () const
     {
         return ( "addlr(" + U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + " + \n" +
-                 HLIB::to_string( "A%d", A->id() ) + ")" );
+                 hpro::to_string( "A%d", A->id() ) + ")" );
     }
     virtual std::string  color     () const { return "8ae234"; }
 
@@ -730,8 +730,8 @@ lu_node::refine_ ( const size_t  tile_size )
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
 
         assert(( BA->nblock_rows() == 2 ) && ( BA->nblock_cols() == 2 ));
-        assert( ! is_null( A10 ) && is_tiled_lowrank( A10 ));
-        assert( ! is_null( A01 ) && is_tiled_lowrank( A01 ));
+        assert( is_tiled_lowrank( A10 ));
+        assert( is_tiled_lowrank( A01 ));
             
         auto  lu_00    = g.alloc_node< lu_node >( BA->block( 0, 0 ), ntile );
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
@@ -797,6 +797,8 @@ trsmu_node::refine_ ( const size_t  tile_size )
         auto  U01 = ptrcast( const_cast< TBlockMatrix * >( BU )->block( 0, 1 ), tiled_lrmatrix< real > );
         auto  U11 = BU->block( 1, 1 );
 
+        assert( is_tiled_lowrank( U01 ) );
+        
         const auto  is0 = U00->col_is();
         const auto  is1 = U11->col_is();
 
@@ -862,6 +864,8 @@ trsml_node::refine_ ( const size_t  tile_size )
         auto  L10 = ptrcast( const_cast< TBlockMatrix * >( BL )->block( 1, 0 ), tiled_lrmatrix< real > );
         auto  L11 = BL->block( 1, 1 );
 
+        assert( is_tiled_lowrank( L10 ) );
+        
         const auto  is0 = L00->row_is();
         const auto  is1 = L11->row_is();
             
@@ -1032,6 +1036,9 @@ addlr_node::refine_ ( const size_t  tile_size )
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< real > );
         auto  A11 = BA->block( 1, 1 );
         
+        assert( is_tiled_lowrank( A01 ) );
+        assert( is_tiled_lowrank( A10 ) );
+        
         g.alloc_node< addlr_node    >( tiled_matrix( A00->row_is(), U ),
                                        T,
                                        tiled_matrix( A00->col_is(), V ),
@@ -1087,8 +1094,8 @@ tadd_node::run_ ( const TTruncAcc &  acc )
     if (( T.data->nrows() != T0.data->nrows() ) || ( T.data->ncols() != T0.data->ncols() ))
         *(T.data) = matrix< real >( T0.data->nrows(), T0.data->ncols() );
     
-    BLAS::add( real(1), *(T0.data), *(T.data) );
-    BLAS::add( real(1), *(T1.data), *(T.data) );
+    blas::add( real(1), *(T0.data), *(T.data) );
+    blas::add( real(1), *(T1.data), *(T.data) );
 
     HLR_LOG( 5, "        tadd :             = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
@@ -1287,17 +1294,17 @@ qr_node::run_ ( const TTruncAcc & )
     matrix< real >  Q_0( Q, range(                0, R0.data->nrows()-1 ), range::all );
     matrix< real >  Q_1( Q, range( R0.data->nrows(), Q.nrows()-1        ), range::all );
         
-    BLAS::copy( *(R0.data), Q_0 );
-    BLAS::copy( *(R1.data), Q_1 );
+    blas::copy( *(R0.data), Q_0 );
+    blas::copy( *(R1.data), Q_1 );
 
     // DBG::write( Q, "R1.mat", "R1" );
     
-    BLAS::qr( Q, *(R.data) );
+    blas::qr( Q, *(R.data) );
 
     // DBG::write( Q, "Q1.mat", "Q1" );
 
-    BLAS::copy( Q_0, *(R0.data) );
-    BLAS::copy( Q_1, *(R1.data) );
+    blas::copy( Q_0, *(R0.data) );
+    blas::copy( Q_1, *(R1.data) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1309,11 +1316,11 @@ qr_node::run_ ( const TTruncAcc & )
 void
 svd_node::run_ ( const TTruncAcc &  acc )
 {
-    auto            Us = BLAS::prod( real(1), *(R0.data), BLAS::adjoint( *(R1.data) ) );
+    auto            Us = blas::prod( real(1), *(R0.data), blas::adjoint( *(R1.data) ) );
     matrix< real >  Vs;
     vector< real >  Ss;
         
-    BLAS::svd( Us, Ss, Vs );
+    blas::svd( Us, Ss, Vs );
         
     const auto      k  = acc.trunc_rank( Ss );
 
@@ -1323,13 +1330,13 @@ svd_node::run_ ( const TTruncAcc &  acc )
     matrix< real >  Usk( Us, range::all, range( 0, k-1 ) );
     matrix< real >  Vsk( Vs, range::all, range( 0, k-1 ) );
         
-    BLAS::prod_diag( Usk, Ss, k );
+    blas::prod_diag( Usk, Ss, k );
 
     *(Uk.data) = std::move( matrix< real >( Usk.nrows(), Usk.ncols() ) );
     *(Vk.data) = std::move( matrix< real >( Vsk.nrows(), Vsk.ncols() ) );
 
-    BLAS::copy( Usk, *(Uk.data) );
-    BLAS::copy( Vsk, *(Vk.data) );
+    blas::copy( Usk, *(Uk.data) );
+    blas::copy( Vsk, *(Vk.data) );
 }
 
 }// namespace anonymous
@@ -1351,7 +1358,7 @@ gen_dag_lu_hodlr_tiled ( TMatrix &      A,
     // auto                  Q = std::make_shared< matrix< real > >();
     // auto                  R = std::make_shared< matrix< real > >();
     
-    return std::move( refine( new lu_node( & A, ntile ), ntile, use_multiple_end_nodes ) );
+    return std::move( refine( new lu_node( & A, ntile ), ntile, use_single_end_node ) );
 }
 
 //

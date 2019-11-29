@@ -10,6 +10,8 @@
 #include "hlr/cluster/tileh.hh"
 #include "hlr/dag/lu.hh"
 
+using namespace hlr;
+
 //
 // main function
 //
@@ -19,32 +21,32 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic     = Time::Wall::now();
+    auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = cluster::tileh::cluster( coord.get(), ntile, 4 );
     auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
 
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSBlockClusterVis   bc_vis;
+        hpro::TPSBlockClusterVis   bc_vis;
         
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
 
     auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
-    auto  toc    = Time::Wall::since( tic );
+    auto  toc    = timer::since( tic );
     
-    std::cout << "    done in " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset << std::endl;
-    std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
+    std::cout << "    done in " << format_time( toc ) << std::endl;
+    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
 
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "tileh_A" );
     }// if
@@ -61,35 +63,35 @@ mymain ( int, char ** )
             // no sparsification
             hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
         
-            tic = Time::Wall::now();
+            tic = timer::now();
         
             auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
             
-            toc = Time::Wall::since( tic );
+            toc = timer::since( tic );
             
-            std::cout << "    DAG in  " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
-            std::cout << "    mem   = " << Mem::to_string( dag.mem_size() ) << mem_usage() << std::endl;
+            std::cout << "    DAG in  " << format_time( toc ) << std::endl;
+            std::cout << "    mem   = " << format_mem( dag.mem_size() ) << std::endl;
             
-            tic = Time::Wall::now();
+            tic = timer::now();
             
             impl::dag::run( dag, acc );
 
-            toc = Time::Wall::since( tic );
+            toc = timer::since( tic );
         }// if
         else
         {
-            tic = Time::Wall::now();
+            tic = timer::now();
         
             impl::tileh::lu< HLIB::real >( C.get(), acc );
             
-            toc = Time::Wall::since( tic );
+            toc = timer::since( tic );
         }// else
             
-        TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
-        std::cout << "    LU in   " << term::ltcyan << format( "%.3e s" ) % toc.seconds() << term::reset() << std::endl;
-        std::cout << "    mem   = " << Mem::to_string( A->byte_size() ) << mem_usage() << std::endl;
-        std::cout << "    error = " << term::ltred << format( "%.4e" ) % inv_approx_2( A.get(), & A_inv ) << term::reset << std::endl;
+        std::cout << "    LU in   " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
 
 }

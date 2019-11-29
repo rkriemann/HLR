@@ -11,7 +11,8 @@
 #include <cassert>
 #include <map>
 
-#include <matrix/TMatrix.hh>
+#include <hpro/matrix/TMatrix.hh>
+#include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/matrix/tile_storage.hh>
 #include <hlr/utils/checks.hh>
@@ -34,7 +35,11 @@ namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
+namespace blas = hpro::BLAS;
+
+using hpro::real;
+using hpro::complex;
+using hpro::idx_t;
 
 // local matrix type
 DECLARE_TYPE( tiled_lrmatrix );
@@ -54,7 +59,7 @@ namespace matrix
 // and s = #cols / ntile.
 //
 template < typename T_value >
-class tiled_lrmatrix : public TMatrix
+class tiled_lrmatrix : public hpro::TMatrix
 {
 public:
     //
@@ -108,8 +113,8 @@ public:
     tiled_lrmatrix ( const indexset                   arow_is,
                      const indexset                   acol_is,
                      const size_t                     antile,
-                     const BLAS::Matrix< value_t > &  aU,
-                     const BLAS::Matrix< value_t > &  aV )
+                     const blas::Matrix< value_t > &  aU,
+                     const blas::Matrix< value_t > &  aV )
             : TMatrix( hpro::value_type< value_t >::value )
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -180,8 +185,8 @@ public:
     void  init_tiles ();
 
     // copy data from given factors to local tiles (allocate if needed)
-    void  copy_tiles ( const BLAS::Matrix< value_t > &  U,
-                       const BLAS::Matrix< value_t > &  V );
+    void  copy_tiles ( const blas::Matrix< value_t > &  U,
+                       const blas::Matrix< value_t > &  V );
     
     //
     // change field type 
@@ -195,14 +200,14 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec ( const real       alpha,
-                           const TVector *  x,
-                           const real       beta,
-                           TVector       *  y,
-                           const matop_t    op = apply_normal ) const;
+    virtual void mul_vec ( const real             alpha,
+                           const hpro::TVector *  x,
+                           const real             beta,
+                           hpro::TVector       *  y,
+                           const hpro::matop_t    op = hpro::apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
-    virtual void truncate ( const TTruncAcc & acc );
+    virtual void truncate ( const hpro::TTruncAcc & acc );
 
     //
     // RTTI
@@ -215,25 +220,25 @@ public:
     //
 
     // return matrix of same class (but no content)
-    virtual auto  create  () const -> std::unique_ptr< TMatrix > { return std::make_unique< tiled_lrmatrix >(); }
+    virtual auto  create  () const -> std::unique_ptr< hpro::TMatrix > { return std::make_unique< tiled_lrmatrix >(); }
 
     // return copy of matrix
-    virtual auto   copy         () const -> std::unique_ptr< TMatrix >;
+    virtual auto   copy         () const -> std::unique_ptr< hpro::TMatrix >;
 
     // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const TTruncAcc &  acc,
-                                  const bool         do_coarsen = false ) const -> std::unique_ptr< TMatrix >;
+    virtual auto   copy         ( const hpro::TTruncAcc &  acc,
+                                  const bool               do_coarsen = false ) const -> std::unique_ptr< hpro::TMatrix >;
 
     // return structural copy of matrix
-    virtual auto   copy_struct  () const -> std::unique_ptr< TMatrix >;
+    virtual auto   copy_struct  () const -> std::unique_ptr< hpro::TMatrix >;
 
     // copy matrix data to \a A
-    virtual void   copy_to      ( TMatrix *          A ) const;
+    virtual void   copy_to      ( hpro::TMatrix *          A ) const;
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
-    virtual void   copy_to      ( TMatrix *          A,
-                                  const TTruncAcc &  acc,
-                                  const bool         do_coarsen = false ) const;
+    virtual void   copy_to      ( hpro::TMatrix *          A,
+                                  const hpro::TTruncAcc &  acc,
+                                  const bool               do_coarsen = false ) const;
     
     //
     // misc.
@@ -254,14 +259,14 @@ tiled_lrmatrix< value_t >::init_tiles ()
     {
         const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
 
-        _U[ is_i ] = BLAS::Matrix< value_t >( is_i.size(), _rank );
+        _U[ is_i ] = blas::Matrix< value_t >( is_i.size(), _rank );
     }// for
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
         const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
 
-        _V[ is_i ] = BLAS::Matrix< value_t >( is_i.size(), _rank );
+        _V[ is_i ] = blas::Matrix< value_t >( is_i.size(), _rank );
     }// for
 }
 
@@ -270,8 +275,8 @@ tiled_lrmatrix< value_t >::init_tiles ()
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::copy_tiles ( const BLAS::Matrix< value_t > &  U,
-                                        const BLAS::Matrix< value_t > &  V )
+tiled_lrmatrix< value_t >::copy_tiles ( const blas::Matrix< value_t > &  U,
+                                        const blas::Matrix< value_t > &  V )
 {
     assert( U.ncols() == V.ncols() );
 
@@ -280,29 +285,29 @@ tiled_lrmatrix< value_t >::copy_tiles ( const BLAS::Matrix< value_t > &  U,
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
         const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
-        const tile< value_t >  U_i( U, is_i - _row_is.first(), BLAS::Range::all );
+        const tile< value_t >  U_i( U, is_i - _row_is.first(), blas::Range::all );
 
-        _U[ is_i ] = BLAS::Matrix< value_t >( U_i, copy_value );
+        _U[ is_i ] = blas::Matrix< value_t >( U_i, hpro::copy_value );
     }// for
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
         const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
-        const tile< value_t >  V_i( V, is_i - _col_is.first(), BLAS::Range::all );
+        const tile< value_t >  V_i( V, is_i - _col_is.first(), blas::Range::all );
 
-        _V[ is_i ] = BLAS::Matrix< value_t >( V_i, copy_value );
+        _V[ is_i ] = blas::Matrix< value_t >( V_i, hpro::copy_value );
     }// for
 }
 
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::mul_vec ( const real       alpha,
-                                     const TVector *  ax,
-                                     const real       beta,
-                                     TVector       *  ay,
-                                     const matop_t    op ) const
+tiled_lrmatrix< value_t >::mul_vec ( const real             alpha,
+                                     const hpro::TVector *  ax,
+                                     const real             beta,
+                                     hpro::TVector       *  ay,
+                                     const hpro::matop_t    op ) const
 {
-    using  vector = BLAS::Vector< value_t >;
+    using  vector = blas::Vector< value_t >;
         
     assert( ax->is_complex() == this->is_complex() );
     assert( ay->is_complex() == this->is_complex() );
@@ -315,31 +320,31 @@ tiled_lrmatrix< value_t >::mul_vec ( const real       alpha,
             (  op == apply_adjoint    ) ||
             (( op == apply_transposed ) && ! is_complex_type< value_t >::value ) );
 
-    const auto  x = cptrcast( ax, TScalarVector );
-    const auto  y = ptrcast(  ay, TScalarVector );
+    const auto  x = cptrcast( ax, hpro::TScalarVector );
+    const auto  y = ptrcast(  ay, hpro::TScalarVector );
 
     // y := β·y
     if ( beta != value_t(1) )
-        BLAS::scale( beta, blas_vec< value_t >( y ) );
+        blas::scale( beta, hpro::blas_vec< value_t >( y ) );
                      
     vector  t( _rank );
             
-    if ( op == apply_normal )
+    if ( op == hpro::apply_normal )
     {
         // t := Σ V_i^H x_i
         for ( const auto & [ is, V_i ] : _V )
         {
-            const auto  x_i = vector( blas_vec< value_t >( x ), is - _col_is.first() );
+            const auto  x_i = vector( hpro::blas_vec< value_t >( x ), is - _col_is.first() );
 
-            BLAS::mulvec( value_t(1), BLAS::adjoint( V_i ), x_i, value_t(1), t );
+            blas::mulvec( value_t(1), blas::adjoint( V_i ), x_i, value_t(1), t );
         }// for
 
         // y_i := y_i + α U_i t
         for ( const auto & [ is, U_i ] : _U )
         {
-            auto  y_i = vector( blas_vec< value_t >( y ), is - _row_is.first() );
+            auto  y_i = vector( hpro::blas_vec< value_t >( y ), is - _row_is.first() );
 
-            BLAS::mulvec( value_t(alpha), U_i, t, value_t(1), y_i );
+            blas::mulvec( value_t(alpha), U_i, t, value_t(1), y_i );
         }// for
     }// if
     else
@@ -347,17 +352,17 @@ tiled_lrmatrix< value_t >::mul_vec ( const real       alpha,
         // t := Σ U_i^H x_i
         for ( const auto & [ is, U_i ] : _U )
         {
-            const auto  x_i = vector( blas_vec< value_t >( x ), is - _row_is.first() );
+            const auto  x_i = vector( hpro::blas_vec< value_t >( x ), is - _row_is.first() );
 
-            BLAS::mulvec( value_t(1), BLAS::adjoint( U_i ), x_i, value_t(1), t );
+            blas::mulvec( value_t(1), blas::adjoint( U_i ), x_i, value_t(1), t );
         }// for
 
         // y_i := y_i + α V_i t
         for ( const auto & [ is, V_i ] : _V )
         {
-            auto  y_i = vector( blas_vec< value_t >( y ), is - _col_is.first() );
+            auto  y_i = vector( hpro::blas_vec< value_t >( y ), is - _col_is.first() );
 
-            BLAS::mulvec( value_t(alpha), V_i, t, value_t(1), y_i );
+            blas::mulvec( value_t(alpha), V_i, t, value_t(1), y_i );
         }// for
     }// if
 }
@@ -368,7 +373,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const real       alpha,
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::truncate ( const TTruncAcc & acc )
+tiled_lrmatrix< value_t >::truncate ( const hpro::TTruncAcc & acc )
 {
 }
 
@@ -376,7 +381,7 @@ tiled_lrmatrix< value_t >::truncate ( const TTruncAcc & acc )
 // return copy of matrix
 //
 template < typename value_t >
-std::unique_ptr< TMatrix >
+std::unique_ptr< hpro::TMatrix >
 tiled_lrmatrix< value_t >::copy () const
 {
     auto  M = std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
@@ -398,8 +403,8 @@ tiled_lrmatrix< value_t >::copy () const
 // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
 //
 template < typename value_t >
-std::unique_ptr< TMatrix >
-tiled_lrmatrix< value_t >::copy ( const TTruncAcc &,
+std::unique_ptr< hpro::TMatrix >
+tiled_lrmatrix< value_t >::copy ( const hpro::TTruncAcc &,
                                   const bool       ) const
 {
     auto  M = std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
@@ -419,7 +424,7 @@ tiled_lrmatrix< value_t >::copy ( const TTruncAcc &,
 // return structural copy of matrix
 //
 template < typename value_t >
-std::unique_ptr< TMatrix >
+std::unique_ptr< hpro::TMatrix >
 tiled_lrmatrix< value_t >::copy_struct  () const
 {
     return std::make_unique< tiled_lrmatrix >( _row_is, _col_is, _ntile );
@@ -430,9 +435,9 @@ tiled_lrmatrix< value_t >::copy_struct  () const
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::copy_to ( TMatrix *  A ) const
+tiled_lrmatrix< value_t >::copy_to ( hpro::TMatrix *  A ) const
 {
-    TMatrix::copy_to( A );
+    hpro::TMatrix::copy_to( A );
     
     assert( IS_TYPE( A, tiled_lrmatrix ) );
 
@@ -457,11 +462,11 @@ tiled_lrmatrix< value_t >::copy_to ( TMatrix *  A ) const
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::copy_to ( TMatrix *          A,
-                                     const TTruncAcc &,
+tiled_lrmatrix< value_t >::copy_to ( hpro::TMatrix *          A,
+                                     const hpro::TTruncAcc &,
                                      const bool          ) const
 {
-    TMatrix::copy_to( A );
+    hpro::TMatrix::copy_to( A );
     
     assert( IS_TYPE( A, tiled_lrmatrix ) );
 
@@ -488,7 +493,7 @@ template < typename value_t >
 size_t
 tiled_lrmatrix< value_t >::byte_size () const
 {
-    size_t  size = TMatrix::byte_size();
+    size_t  size = hpro::TMatrix::byte_size();
 
     size += sizeof(_row_is) + sizeof(_col_is);
     size += sizeof(_U) + sizeof(_V);

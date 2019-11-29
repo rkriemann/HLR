@@ -8,9 +8,10 @@
 
 #include <cassert>
 
-#include <matrix/structure.hh>
-#include <algebra/mat_mul.hh>
-#include <algebra/mat_inv.hh>
+#include <hpro/matrix/structure.hh>
+#include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_inv.hh>
+#include <hpro/algebra/mat_norm.hh>
 
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/checks.hh"

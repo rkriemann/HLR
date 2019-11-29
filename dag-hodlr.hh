@@ -13,8 +13,7 @@
 #include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
 
-using Time::Wall::now;
-using Time::Wall::since;
+using namespace hlr;
 
 using hlr::matrix::tiled_lrmatrix;
 using hlr::matrix::to_dense;
@@ -28,9 +27,9 @@ mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     
-    auto  tic = now();
+    auto  tic = timer::now();
     auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< TMatrix >();
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
 
     {
         auto  problem = gen_problem< problem_t >();
@@ -38,30 +37,29 @@ mymain ( int, char ** )
         auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
         auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
     
-        if ( verbose( 3 ) )
+        if ( hpro::verbose( 3 ) )
         {
-            TPSBlockClusterVis   bc_vis;
+            hpro::TPSBlockClusterVis   bc_vis;
         
             bc_vis.id( true ).print( bct->root(), "bct" );
-            print_vtk( coord.get(), "coord" );
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
     }// if
 
-    auto  toc    = since( tic );
+    auto  toc    = timer::since( tic );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
@@ -160,21 +158,21 @@ mymain ( int, char ** )
     //         std::cout << "    #edges = " << dag_trunc.nedges() << std::endl;
     //         dag_trunc.print_dot( "trunc.dot" );
 
-    //         tic = now();
+    //         tic = timer::now();
             
     //         impl::dag::run( dag_trunc, acc );
 
-    //         toc = since( tic );
+    //         toc = timer::since( tic );
     //     }// if
     //     else
     //     {
-    //         tic = now();
+    //         tic = timer::now();
 
     //         auto [ U, V ] = hlr::seq::tiled2::truncate( A01->row_is(), A01->col_is(), 1.0, X, *T, Y, A01->U(), A01->V(), acc, ntile );
             
     //         A01->set_lrmat( std::move( U ), std::move( V ) );
 
-    //         toc = since( tic );
+    //         toc = timer::since( tic );
     //     }// else
 
     //     std::cout << "  trunc in    " << format_time( toc ) << std::endl;
@@ -223,20 +221,20 @@ mymain ( int, char ** )
 
     //         dag_addlr.print_dot( "addlr.dot" );
 
-    //         tic = now();
+    //         tic = timer::now();
             
     //         impl::dag::run( dag_addlr, acc );
 
-    //         toc = since( tic );
+    //         toc = timer::since( tic );
     //         std::cout << "    mem    = " << mem_usage() << std::endl;
     //     }// if
     //     else
     //     {
-    //         tic = now();
+    //         tic = timer::now();
 
     //         impl::tiled2::hodlr::addlr( X, *T, Y, A11, acc, ntile );
             
-    //         toc = since( tic );
+    //         toc = timer::since( tic );
     //     }// else
 
     //     std::cout << "  addlr in    " << format_time( toc ) << std::endl;
@@ -259,13 +257,13 @@ mymain ( int, char ** )
     
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = now();
+        tic = timer::now();
 
         dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, impl::dag::refine ) );
         
-        toc = since( tic );
+        toc = timer::since( tic );
         
-        if ( verbose( 1 ) )
+        if ( hpro::verbose( 1 ) )
             std::cout << "  DAG in     " << format_time( toc ) << std::endl;
         
         runtime.push_back( toc.seconds() );
@@ -274,7 +272,7 @@ mymain ( int, char ** )
             dag = std::move( hlr::dag::graph() );
     }// for
         
-    if ( verbose( 1 ) )
+    if ( hpro::verbose( 1 ) )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
@@ -284,7 +282,7 @@ mymain ( int, char ** )
         std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
 
-    if ( verbose( 3 ) )
+    if ( hpro::verbose( 3 ) )
         dag.print_dot( "lu.dot" );
     
     if ( onlydag )
@@ -300,11 +298,11 @@ mymain ( int, char ** )
         
     for ( int  i = 0; i < nbench; ++i )
     {
-        tic = now();
+        tic = timer::now();
         
         impl::dag::run( dag, acc );
         
-        toc = since( tic );
+        toc = timer::since( tic );
 
         std::cout << "  LU in      " << format_time( toc ) << std::endl;
 
@@ -326,8 +324,8 @@ mymain ( int, char ** )
     //     write_matrix( T2.get(), "B.mat", "B" );
     // }
     
-    TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
     // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
         
-    std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << term::reset << std::endl;
+    std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << term::reset << std::endl;
 }

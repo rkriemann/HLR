@@ -12,9 +12,9 @@ using std::string;
 using boost::format;
 using namespace boost::program_options;
 
-#include <hlib.hh>
+#include <hpro/base/config.hh>
 
-using namespace HLIB;
+namespace hpro = HLIB;
 
 namespace hlr { namespace cmdline {
 
@@ -102,8 +102,8 @@ parse ( int argc, char ** argv )
         exit( 1 );
     }// if
 
-    if ( vm.count( "nodag"      ) ) HLIB::CFG::Arith::use_dag = false;
-    if ( vm.count( "accu"       ) ) HLIB::CFG::Arith::use_accu = true;
+    if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
+    if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();

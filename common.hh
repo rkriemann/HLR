@@ -9,16 +9,22 @@ using std::string;
 
 using boost::format;
 
-#include <hlib.hh>
+#include <hpro/base/init.hh>
+#include <hpro/base/System.hh>
+#include <hpro/algebra/TLowRankApx.hh>
+#include <hpro/algebra/mat_norm.hh>
+#include <hpro/algebra/mat_conv.hh>
+#include <hpro/io/TMatrixIO.hh>
+#include <hpro/io/TMatrixVis.hh>
+#include <hpro/io/TClusterVis.hh>
 
-using namespace HLIB;
-
-namespace B = HLIB::BLAS;
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
 
 #include "cmdline.hh"
 #include "gen_problem.hh"
 
-using namespace hlr;
+// using namespace hlr;
 
 //
 // default formating
@@ -29,7 +35,7 @@ inline
 std::string
 mem_usage ()
 {
-    return term::yellow( " [" + Mem::to_string( Mem::usage() ) + "]" );
+    return hlr::term::yellow( " [" + hpro::Mem::to_string( hpro::Mem::usage() ) + "]" );
 }
 
 // return default formated memory string
@@ -37,14 +43,14 @@ inline
 std::string
 format_mem ( const size_t  m )
 {
-    return term::black( HLIB::Mem::to_string( m ) ) + mem_usage();
+    return hlr::term::black( hpro::Mem::to_string( m ) ) + mem_usage();
 }
 
 // return default formated timing string
 std::string
 format_time ( const double  t )
 {
-    return term::cyan( str( format( "%.3e s" ) % t ) );
+    return hlr::term::cyan( str( format( "%.3e s" ) % t ) );
 }
 
 template < typename duration_t >
@@ -58,7 +64,7 @@ template < typename... T >
 std::string
 format_time ( const double  t, const T... ts )
 {
-    return term::cyan( str( format( "%.3e s" ) % t ) ) + " / " + format_time( ts... );
+    return hlr::term::cyan( str( format( "%.3e s" ) % t ) ) + " / " + format_time( ts... );
 }
 
 // return default formated error string
@@ -66,8 +72,14 @@ inline
 std::string
 format_error ( const double  e )
 {
-    return term::red( str( format( "%.4e s" ) % e ) );
+    return hlr::term::red( str( format( "%.4e s" ) % e ) );
 }
+
+//
+// timing
+//
+
+namespace timer = hpro::Time::Wall;
 
 //
 // return min/max/median of elements in container
@@ -102,30 +114,30 @@ inline
 int
 hlrmain ( int argc, char ** argv )
 {
-    cmdline::parse( argc, argv );
+    hlr::cmdline::parse( argc, argv );
     
     try
     {
-        INIT();
+        hpro::INIT();
 
-        std::cout << term::bullet << term::bold << Mach::hostname() << term::reset << std::endl
-                  << "    CPU cores : " << Mach::cpuset() << std::endl;
+        std::cout << hlr::term::bullet << hlr::term::bold << hpro::Mach::hostname() << hlr::term::reset << std::endl
+                  << "    CPU cores : " << hpro::Mach::cpuset() << std::endl;
         
-        CFG::set_verbosity( verbosity );
+        hpro::CFG::set_verbosity( hlr::verbosity );
 
-        if ( nthreads != 0 )
-            CFG::set_nthreads( nthreads );
+        if ( hlr::nthreads != 0 )
+            hpro::CFG::set_nthreads( hlr::nthreads );
 
-        if      ( appl == "logkernel"  ) mymain< hlr::apps::log_kernel >( argc, argv );
-        else if ( appl == "materncov"  ) mymain< hlr::apps::matern_cov >( argc, argv );
-        else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
+        if      ( hlr::appl == "logkernel"  ) mymain< hlr::apps::log_kernel >( argc, argv );
+        else if ( hlr::appl == "materncov"  ) mymain< hlr::apps::matern_cov >( argc, argv );
+        else if ( hlr::appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
             throw "unknown application";
 
-        DONE();
+        hpro::DONE();
     }// try
-    catch ( char const *  e ) { std::cout << e << std::endl; }
-    catch ( Error &       e ) { std::cout << e.to_string() << std::endl; }
+    catch ( char const *   e ) { std::cout << e << std::endl; }
+    catch ( hpro::Error &  e ) { std::cout << e.to_string() << std::endl; }
     
     return 0;
 }
@@ -134,11 +146,11 @@ hlrmain ( int argc, char ** argv )
 // generate accuracy
 //
 inline
-TTruncAcc
+hpro::TTruncAcc
 gen_accuracy ()
 {
-    if ( eps < 0 ) return fixed_rank( cmdline::k );
-    else           return fixed_prec( cmdline::eps );
+    if ( hlr::cmdline::eps < 0 ) return hpro::fixed_rank( hlr::cmdline::k );
+    else                         return hpro::fixed_prec( hlr::cmdline::eps );
 }
 
 // Local Variables:

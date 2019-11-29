@@ -178,4 +178,26 @@ luinv_eval::apply_add  ( const real       , // alpha,
     assert( false );
 }
 
+//
+// same as above but only the dimension of the vector spaces is tested,
+// not the corresponding index sets
+//
+void
+luinv_eval::apply_add   ( const real                       alpha,
+                          const blas::Vector< real > &     x,
+                          blas::Vector< real > &           y,
+                          const matop_t                    op ) const
+{
+    HLR_ASSERT( false );
+}
+
+void
+luinv_eval::apply_add   ( const complex                    alpha,
+                          const blas::Vector< complex > &  x,
+                          blas::Vector< complex > &        y,
+                          const matop_t                    op ) const
+{
+    HLR_ASSERT( false );
+}
+
 }} // namespace hlr::matrix

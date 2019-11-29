@@ -26,9 +26,9 @@ print_problem_desc ( const std::string &  name )
 {
     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << name
-              << ( gridfile == "" ? HLIB::to_string( ", n = %d", n ) : ", grid = " + gridfile )
+              << ( gridfile == "" ? hpro::to_string( ", n = %d", n ) : ", grid = " + gridfile )
               << ", ntile = " << ntile
-              << ( eps > 0 ? HLIB::to_string( ", ε = %.2e", eps ) : HLIB::to_string( ", k = %d", k ) )
+              << ( eps > 0 ? hpro::to_string( ", ε = %.2e", eps ) : hpro::to_string( ", k = %d", k ) )
               << std::endl;
 }
 
