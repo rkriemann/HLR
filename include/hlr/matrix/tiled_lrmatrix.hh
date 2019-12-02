@@ -508,6 +508,15 @@ tiled_lrmatrix< value_t >::byte_size () const
     return size;
 }
 
+//
+// type test
+inline
+bool
+is_tiled_lowrank ( const hpro::TMatrix *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
+}
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_TILED_LRMATRIX_HH

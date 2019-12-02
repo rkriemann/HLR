@@ -17,8 +17,9 @@
 namespace hlr { namespace matrix {
 
 // map HLIB types to HLR 
-using  indexset = HLIB::TIndexSet;
-using  range    = HLIB::BLAS::Range;
+using  indexset       = HLIB::TIndexSet;
+using  range          = HLIB::BLAS::Range;
+using  block_indexset = HLIB::TBlockIndexSet;
 
 // tile type
 template < typename value_t >

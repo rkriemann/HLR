@@ -260,7 +260,7 @@ mymain ( int, char ** )
     {
         tic = timer::now();
 
-        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled_lazy( *C, ntile, impl::dag::refine ) );
         
         toc = timer::since( tic );
         
