@@ -15,21 +15,8 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/matrix/tile_storage.hh>
+#include <hlr/vector/tiled_scalarvector.hh>
 #include <hlr/utils/checks.hh>
-
-namespace std
-{
-
-// (partial) ordering of index sets
-inline
-bool
-operator < ( const HLIB::TIndexSet  is1,
-             const HLIB::TIndexSet  is2 )
-{
-    return is1.is_strictly_left_of( is2 );
-}
-
-}// namespace std
 
 namespace hlr
 { 

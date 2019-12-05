@@ -129,9 +129,31 @@ mymain ( int, char ** )
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
         // std::cout << norm_2( A.get() ) << std::endl;
+
+        {
+            auto  x = A->row_vector();
+            auto  y = A->row_vector();
+
+            x->fill( 1.0 );
+
+            A->apply( x.get(), y.get() );
+
+            std::cout << y->norm2() << std::endl;
+        }
         
         A = impl::matrix::copy_tiled< double >( *A, ntile );
         
+        {
+            vector::tiled_scalarvector< double >  x( A->row_is(), ntile );
+            vector::tiled_scalarvector< double >  y( A->row_is(), ntile );
+
+            x.fill( 1.0 );
+
+            seq::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, A.get(), x, y );
+
+            std::cout << y.norm2() << std::endl;
+        }
+
         auto  C = impl::matrix::copy( *A );
 
         // std::cout << norm_2( A.get() ) << std::endl;

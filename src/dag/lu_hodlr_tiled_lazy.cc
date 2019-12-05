@@ -805,24 +805,31 @@ lu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
                                                      tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                                      update_map, ntile );
+
+        solve_01->after( apply_01 );
+        solve_10->after( apply_10 );
+        solve_10->after( lu_00 );
+        solve_01->after( lu_00 );
         
         auto  T        = std::make_shared< matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
                                                    tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
                                                    shared_matrix( T ),
                                                    ntile );
+
+        tsmul->after( solve_10 );
+        tsmul->after( solve_01 );
+
         auto  addlr    = g.alloc_node< addlr_node >( tiled_matrix( NAME_L, A10->id(), A10->row_is(), & A10->U() ),
                                                      shared_matrix( T ),
                                                      tiled_matrix( NAME_U, A01->id(), A01->col_is(), & A01->V() ),
                                                      BA->block( 1, 1 ),
                                                      update_map, ntile );
+
+        addlr->after( tsmul );
+
         auto  lu_11    = g.alloc_node< lu_node >( BA->block( 1, 1 ), update_map, ntile );
 
-        solve_10->after( lu_00 );
-        solve_01->after( lu_00 );
-        tsmul->after( solve_10 );
-        tsmul->after( solve_01 );
-        addlr->after( tsmul );
         lu_11->after( addlr );
     }// if
 
@@ -1428,7 +1435,7 @@ gen_dag_lu_hodlr_tiled_lazy ( TMatrix &      A,
                               refine_func_t  refine )
 {
     update_map_t  update_map;
-    
+
     return std::move( refine( new lu_node( & A, update_map, ntile ), ntile, use_single_end_node ) );
 }
 
