@@ -122,7 +122,7 @@ public:
     tile_storage< value_t > &        tiles ()       { return _tiles; }
     const tile_storage< value_t > &  tiles () const { return _tiles; }
 
-    std::mutex &  tile_mtx ( const indexset & is ) { return _tile_mutices.at( is ); }
+    std::mutex &                     tile_mtx ( const indexset & is ) { return _tile_mutices.at( is ); }
     
     void
     set_tiles ( tile_storage< value_t > &&  atiles )

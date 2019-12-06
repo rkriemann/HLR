@@ -582,14 +582,6 @@ trsml ( const TMatrix *            L,
         //
 
         HLR_LOG( 5, "trsml :         " + idstr( L->id() ) + "        = " + normstr( blas::normF( X.at( L->row_is() ) ) ) );
-
-        // DEBUG
-        // {
-        //     auto  DX = hlr::matrix::to_dense( X );
-
-        //     DBG::write( X.at( L->row_is() ), "X.mat", "X" );
-        //     std::exit( 0 );
-        // }
     }// else
 }
 
@@ -651,11 +643,10 @@ template < typename value_t >
 void
 mul_vec ( const value_t                          alpha,
           const hpro::matop_t                    op_M,
-          const hpro::TMatrix *                  M,
+          const hpro::TMatrix &                  M,
           const tiled_scalarvector< value_t > &  x,
           tiled_scalarvector< value_t > &        y )
 {
-    assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
     // assert( M->nrows( op_M ) == y.length() );
 
@@ -664,7 +655,7 @@ mul_vec ( const value_t                          alpha,
 
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -673,13 +664,13 @@ mul_vec ( const value_t                          alpha,
                 auto  B_ij = B->block( i, j );
                 
                 if ( ! is_null( B_ij ) )
-                    mul_vec( alpha, op_M, B_ij, x, y );
+                    mul_vec( alpha, op_M, *B_ij, x, y );
             }// for
         }// for
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D = cptrcast( M, hpro::TDenseMatrix );
+        auto  D = cptrcast( &M, hpro::TDenseMatrix );
         
         blas::mulvec( alpha,
                       blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ),
@@ -689,7 +680,7 @@ mul_vec ( const value_t                          alpha,
     }// if
     else if ( hlr::matrix::is_tiled_lowrank( M ) )
     {
-        auto                     R = cptrcast( M, tiled_lrmatrix< value_t > );
+        auto                     R = cptrcast( &M, tiled_lrmatrix< value_t > );
         blas::Vector< value_t >  t( R->rank() );
 
         if ( op_M == hpro::apply_normal )

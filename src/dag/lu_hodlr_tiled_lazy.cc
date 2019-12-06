@@ -57,6 +57,63 @@ namespace
 const auto  IS_ONE  = indexset( -1, -1 );
 const auto  BIS_ONE = block_indexset( IS_ONE, IS_ONE );
 
+size_t
+largest_power10_smaller_than ( const size_t  n )
+{
+    size_t  p = 1;
+
+    while (( 10*p ) < n )
+        p *= 10;
+
+    return p;
+}
+
+std::string
+subscript ( size_t  n )
+{
+    static const std::string   subs[] = { "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉" };
+
+    if ( n == 0 )
+        return subs[0];
+
+    std::ostringstream  out;
+    size_t              pot = largest_power10_smaller_than( n );
+
+    while ( pot > 0 )
+    {
+        const auto  n_i = n / pot;
+
+        out << subs[ n_i ];
+
+        pot /= 10;
+    }// while
+
+    return out.str();
+}
+
+std::string
+superscript ( size_t  n )
+{
+    static const std::string   sups[] = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" };
+    
+    if ( n == 0 )
+        return sups[0];
+
+    std::ostringstream  out;
+    size_t              pot = largest_power10_smaller_than( n );
+
+    while ( pot > 0 )
+    {
+        const auto  n_i = n / pot;
+
+        out << sups[ n_i ];
+
+        pot /= 10;
+    }// while
+
+    return out.str();
+}
+
 //
 // structure to address matrix
 //
@@ -141,8 +198,8 @@ struct matrix_info
 
         if (( is != IS_ONE ) && ( ntile != 0 ))
         {
-            if ( is.size() <= ntile ) os << hpro::to_string( "[%d]", is.first() / ntile );
-            else                      os << hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+            if ( is.size() <= ntile ) os << superscript( is.first() / ntile );
+            else                      os << superscript( is.first() / ntile ) << "ʼ" << superscript( is.last() / ntile );
         }// if
 
         return os.str();
@@ -206,7 +263,7 @@ using shared_matrix       = matrix_info< std::shared_ptr< matrix< real > > >;
 using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< real > > >;
 
 //
-// update to low-rank matrix
+// update U·T·V^H to low-rank matrix
 //
 struct lr_update_t
 {
@@ -218,7 +275,7 @@ struct lr_update_t
 //
 // mapping of updates to matrix blocks
 //
-using  update_list_t = std::list< lr_update_t >;
+using  update_list_t = std::list< node * >;
 using  update_map_t  = std::map< id_t, update_list_t >;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -390,7 +447,7 @@ struct addlr_node : public node
 
     virtual std::string  to_string () const
     {
-        return ( "addlr(" + U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + " + \n" +
+        return ( "addlr(" + U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + " + " +
                  hpro::to_string( "A%d", A->id() ) + ")" );
     }
     virtual std::string  color     () const { return "8ae234"; }
@@ -573,7 +630,7 @@ struct truncate_node : public node
 
     virtual std::string  to_string () const
     {
-        return ( "trunc( " + X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + ",\n " +
+        return ( "trunc( " + X.to_string( ntile ) + "×" + T.to_string() + "×" + Y.to_string( ntile ) + ", " +
                  U.to_string( ntile ) + "×" + V.to_string( ntile ) + " )" );
     }
     virtual std::string  color     () const { return "e9b96e"; }
@@ -719,18 +776,20 @@ private:
 struct apply_node : public node
 {
     tiled_lrmatrix< real > *  M;
-    update_list_t &           updates;
+    lr_update_t               upd;
     size_t                    ntile;
 
     apply_node ( tiled_lrmatrix< real > *  aM,
-                 update_list_t &           aupdates,
+                 tiled_matrix              aU,
+                 shared_matrix             aT,
+                 tiled_matrix              aV,
                  size_t                    antile )
             : M( aM )
-            , updates( aupdates )
+            , upd{ aU, aT, aV }
             , ntile( antile )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "update( %d )", M->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "%d = apply( ", M->id() ) + upd.U.to_string() + "×" + upd.T.to_string() + "×" + upd.V.to_string() + " )"; }
     virtual std::string  color     () const { return "c4a000"; }
 
 private:
@@ -738,16 +797,7 @@ private:
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const
     {
-        block_list_t  mem_blocks;
-
-        for ( auto &  upd : updates )
-        {
-            mem_blocks.push_back( upd.U.mem_block() );
-            mem_blocks.push_back( upd.T.mem_block() );
-            mem_blocks.push_back( upd.V.mem_block() );
-        }// for
-        
-        return mem_blocks;
+        return { upd.U.mem_block(), upd.T.mem_block(), upd.V.mem_block() };
     }
     virtual const block_list_t  out_blocks_  () const
     {
@@ -786,8 +836,8 @@ lu_node::refine_ ( const size_t  tile_size )
         // std::cout << A10->id() << " " << update_map[ A10->id() ].size() << std::endl;
         // std::cout << A01->id() << " " << update_map[ A01->id() ].size() << std::endl;
 
-        auto  apply_10 = g.alloc_node< apply_node >( A10, update_map[ A10->id() ], ntile );
-        auto  apply_01 = g.alloc_node< apply_node >( A01, update_map[ A01->id() ], ntile );
+        // auto  apply_10 = g.alloc_node< apply_node >( A10, update_map[ A10->id() ], ntile );
+        // auto  apply_01 = g.alloc_node< apply_node >( A01, update_map[ A01->id() ], ntile );
         
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
                                                      tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
@@ -798,8 +848,8 @@ lu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                                      update_map, ntile );
 
-        solve_01->after( apply_01 );
-        solve_10->after( apply_10 );
+        // solve_01->after( apply_01 );
+        // solve_10->after( apply_10 );
         solve_10->after( lu_00 );
         solve_01->after( lu_00 );
         
@@ -1109,13 +1159,21 @@ addlr_node::refine_ ( const size_t  tile_size )
                                        update_map, ntile );
 
         // TO CHECK: happens "push_back" before handling of updates (trsml,trsmu)
-        update_map[ A01->id() ].push_back( { tiled_matrix( A01->row_is(), U ),
-                                             T,
-                                             tiled_matrix( A01->col_is(), V ) } );
+        auto apply_01 = g.alloc_node< apply_node >( A01,
+                                                    tiled_matrix( A01->row_is(), U ),
+                                                    T,
+                                                    tiled_matrix( A01->col_is(), V ),
+                                                    ntile );
+        
+        update_map[ A01->id() ].push_back( apply_01 );
 
-        update_map[ A10->id() ].push_back( { tiled_matrix( A10->row_is(), U ),
-                                             T,
-                                             tiled_matrix( A10->col_is(), V ) } );
+        auto  apply_10 = g.alloc_node< apply_node >( A10,
+                                                     tiled_matrix( A10->row_is(), U ),
+                                                     T,
+                                                     tiled_matrix( A10->col_is(), V ),
+                                                     ntile );
+        
+        update_map[ A10->id() ].push_back( apply_10 );
         
         // g.alloc_node< truncate_node >( real(-1),
         //                                tiled_matrix( A01->row_is(), U ),

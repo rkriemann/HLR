@@ -179,12 +179,12 @@ mymain ( int, char ** )
 
             // burnin
             for ( uint i = 0; i < 10; ++i )
-                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, A.get(), x, y );
+                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, *A, x, y );
             
             tic = timer::now();
 
             for ( uint i = 0; i < 100; ++i )
-                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, A.get(), x, y );
+                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, *A, x, y );
 
             toc = timer::since( tic );
             

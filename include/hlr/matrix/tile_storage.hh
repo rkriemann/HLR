@@ -9,6 +9,7 @@
 //
 
 #include <map>
+#include <vector>
 #include <mutex>
 
 #include <hpro/cluster/TIndexSet.hh>
@@ -49,6 +50,8 @@ private:
     // the map of tiles
     tilemap< value_t >  _tiles;
 
+    std::vector< indexset >  _tile_is;
+    
     // lock for concurrent access protection
     mutable std::mutex  _mtx;
 
@@ -152,6 +155,15 @@ public:
         return _tiles.cend();
     }
 
+    //
+    // access to index sets
+    //
+
+    std::vector< indexset > &        tile_is ()       { return _tile_is; }
+    const std::vector< indexset > &  tile_is () const { return _tile_is; }
+
+    const indexset                   tile_is ( const size_t  i ) const { return _tile_is[i]; }
+    
     //
     // size information
     //
