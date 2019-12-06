@@ -248,14 +248,6 @@ split ( const indexset &  is,
     return {};
 }
 
-#if ! defined(NDEBUG)
-bool
-is_tiled_lowrank ( const TMatrix *  M )
-{
-    return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
-}
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // tasks

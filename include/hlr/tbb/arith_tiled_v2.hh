@@ -9,6 +9,7 @@
 //
 
 #include <tbb/parallel_invoke.h>
+#include <tbb/task_group.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
@@ -20,6 +21,7 @@
 #include "hlr/arith/solve.hh"
 #include "hlr/tbb/matrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
+#include "hlr/vector/tiled_scalarvector.hh"
 
 namespace hlr { namespace tbb { namespace tiled2 {
 
@@ -41,6 +43,7 @@ using hlr::matrix::range;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
+using hlr::vector::tiled_scalarvector;
 
 //
 // split given indexset into <n> subsets
@@ -564,6 +567,139 @@ lu ( hpro::TMatrix *          A,
 }
 
 }// namespace hodlr
+
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                          alpha,
+          const hpro::matop_t                    op_M,
+          const hpro::TMatrix *                  M,
+          const tiled_scalarvector< value_t > &  x,
+          tiled_scalarvector< value_t > &        y )
+{
+    assert( ! is_null( M ) );
+    // assert( M->ncols( op_M ) == x.length() );
+    // assert( M->nrows( op_M ) == y.length() );
+
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( M, hpro::TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [alpha,op_M,B,&x,&y] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  B_ij = B->block( i, j );
+                        
+                        if ( ! is_null( B_ij ) )
+                            mul_vec( alpha, op_M, B_ij, x, y );
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto              D = cptrcast( M, hpro::TDenseMatrix );
+        std::scoped_lock  lock( y.tile_mtx( D->row_is( op_M ) ) );
+        
+        blas::mulvec( alpha,
+                      blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ),
+                      x.at( D->col_is( op_M ) ),
+                      value_t(1),
+                      y.at( D->row_is( op_M ) ) );
+    }// if
+    else if ( hlr::matrix::is_tiled_lowrank( M ) )
+    {
+        auto                     R = cptrcast( M, tiled_lrmatrix< value_t > );
+        blas::Vector< value_t >  t( R->rank() );
+
+        if ( op_M == hpro::apply_normal )
+        {
+            {
+                ::tbb::task_group  g;
+                std::mutex         mtx;
+                
+                for ( auto  [ is, V_is ] : R->V() )
+                {
+                    g.run( [&x,&t,is,R,&mtx] () 
+                           {
+                               blas::Vector< value_t >  t_is( R->rank() );
+                               
+                               blas::mulvec( value_t(1), blas::adjoint( R->V().at( is ) ), x.at( is ), value_t(1), t_is );
+
+                               {
+                                   std::scoped_lock  lock( mtx );
+
+                                   blas::add( 1.0, t_is, t );
+                               }
+                           } );
+                }// for
+
+                g.wait();
+            }
+
+            {
+                ::tbb::task_group  g;
+                
+                for ( auto  [ is, U_is ] : R->U() )
+                {
+                    g.run( [alpha,&y,&t,is,R] () 
+                           {
+                               std::scoped_lock  lock( y.tile_mtx( is ) );
+                               
+                               blas::mulvec( alpha, R->U().at( is ), t, value_t(1), y.at( is ) );
+                           } );
+                }// for
+
+                g.wait();
+            }
+        }// if
+        else if ( op_M == hpro::apply_transposed )
+        {
+            assert( hpro::is_complex_type< value_t >::value == false );
+            
+            for ( auto  [ is, U_is ] : R->U() )
+                blas::mulvec( value_t(1), blas::transposed( U_is ), x.at( is ), value_t(1), t );
+
+            for ( auto  [ is, V_is ] : R->V() )
+            {
+                std::scoped_lock  lock( y.tile_mtx( is ) );
+                
+                blas::mulvec( alpha, V_is, t, value_t(1), y.at( is ) );
+            }// for
+        }// if
+        else if ( op_M == hpro::apply_adjoint )
+        {
+            for ( auto  [ is, U_is ] : R->U() )
+                blas::mulvec( value_t(1), blas::adjoint( U_is ), x.at( is ), value_t(1), t );
+
+            for ( auto  [ is, V_is ] : R->V() )
+            {
+                std::scoped_lock  lock( y.tile_mtx( is ) );
+                
+                blas::mulvec( alpha, V_is, t, value_t(1), y.at( is ) );
+            }// for
+        }// if
+    }// if
+    else
+        assert( false );
+}
 
 }}}// namespace hlr::tbb::tile
 

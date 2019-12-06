@@ -73,6 +73,8 @@ private:
     // mapping of (sub-) index set to tile
     tile_storage< value_t >  _tiles;
 
+    std::map< indexset, std::mutex >  _tile_mutices;
+    
     // tile size
     size_t                   _ntile;
 
@@ -120,6 +122,8 @@ public:
     tile_storage< value_t > &        tiles ()       { return _tiles; }
     const tile_storage< value_t > &  tiles () const { return _tiles; }
 
+    std::mutex &  tile_mtx ( const indexset & is ) { return _tile_mutices.at( is ); }
+    
     void
     set_tiles ( tile_storage< value_t > &&  atiles )
     {
@@ -190,7 +194,7 @@ public:
         for ( auto [ is, v_is ] : _tiles )
             f += blas::dot( v_is, v_is );
         
-        return re( math::sqrt( f ) );
+        return hpro::re( math::sqrt( f ) );
     }
 
     // return infimum norm
@@ -296,6 +300,8 @@ tiled_scalarvector< value_t >::init_tiles ()
         const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _is.last() ) );
 
         _tiles[ is_i ] = tile< value_t >( is_i.size() );
+        _tile_mutices[ is_i ].lock();  // ensure mutex exists in map
+        _tile_mutices[ is_i ].unlock();
     }// for
 }
 
@@ -306,7 +312,7 @@ template < typename value_t >
 void
 tiled_scalarvector< value_t >::copy_tiles ( const blas::Vector< value_t > &  v )
 {
-    assert( v.size() == _is.size() );
+    assert( v.length() == _is.size() );
     
     for ( idx_t  i = _is.first(); i < _is.last(); i += _ntile )
     {
@@ -314,6 +320,8 @@ tiled_scalarvector< value_t >::copy_tiles ( const blas::Vector< value_t > &  v )
         const tile< value_t >  v_i( v, is_i - _is.first() );
 
         _tiles[ is_i ] = tile< value_t >( v_i, hpro::copy_value );
+        _tile_mutices[ is_i ].lock();
+        _tile_mutices[ is_i ].unlock();
     }// for
 }
 
@@ -376,7 +384,7 @@ tiled_scalarvector< value_t >::byte_size () const
 // type test
 inline
 bool
-is_tiled_lowrank ( const hpro::TVector *  M )
+is_tiled_scalar ( const hpro::TVector *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, tiled_scalarvector );
 }
