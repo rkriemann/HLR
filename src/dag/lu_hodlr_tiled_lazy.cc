@@ -85,6 +85,7 @@ subscript ( size_t  n )
 
         out << subs[ n_i ];
 
+        n    = n - ( n_i * pot );
         pot /= 10;
     }// while
 
@@ -95,7 +96,7 @@ std::string
 superscript ( size_t  n )
 {
     static const std::string   sups[] = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" };
-    
+
     if ( n == 0 )
         return sups[0];
 
@@ -108,6 +109,7 @@ superscript ( size_t  n )
 
         out << sups[ n_i ];
 
+        n    = n - ( n_i * pot );
         pot /= 10;
     }// while
 
@@ -277,6 +279,8 @@ struct lr_update_t
 //
 using  update_list_t = std::list< node * >;
 using  update_map_t  = std::map< id_t, update_list_t >;
+
+std::mutex  upd_mtx;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -838,7 +842,7 @@ lu_node::refine_ ( const size_t  tile_size )
 
         // auto  apply_10 = g.alloc_node< apply_node >( A10, update_map[ A10->id() ], ntile );
         // auto  apply_01 = g.alloc_node< apply_node >( A01, update_map[ A01->id() ], ntile );
-        
+
         auto  solve_10 = g.alloc_node< trsmu_node >( BU->block( 0, 0 ),
                                                      tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
                                                      tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
@@ -848,10 +852,62 @@ lu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                                      update_map, ntile );
 
-        // solve_01->after( apply_01 );
-        // solve_10->after( apply_10 );
         solve_10->after( lu_00 );
         solve_01->after( lu_00 );
+        
+        node *  old_upd = nullptr;
+
+        {
+            std::scoped_lock  lock( upd_mtx );
+        
+            for ( auto  upd : update_map[ A10->id() ] )
+            {
+                auto  apply    = static_cast< apply_node * >( upd );
+                auto  upd_node = g.alloc_node< truncate_node >( real(-1),
+                                                                apply->upd.U,
+                                                                apply->upd.T,
+                                                                apply->upd.V,
+                                                                tiled_matrix( NAME_A, A10->id(), A10->row_is(), & A10->U() ),
+                                                                tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
+                                                                A10,
+                                                                ntile );
+                
+                upd_node->after( apply );
+                solve_10->after( upd_node );
+                
+                if ( old_upd != nullptr )
+                    upd_node->after( old_upd );
+                
+                old_upd = upd_node;
+            }// for
+        }
+        
+        old_upd = nullptr;
+
+        {
+            std::scoped_lock  lock( upd_mtx );
+        
+            for ( auto  upd : update_map[ A01->id() ] )
+            {
+                auto  apply    = static_cast< apply_node * >( upd );
+                auto  upd_node = g.alloc_node< truncate_node >( real(-1),
+                                                                apply->upd.U,
+                                                                apply->upd.T,
+                                                                apply->upd.V,
+                                                                tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
+                                                                tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
+                                                                A01,
+                                                                ntile );
+                
+                upd_node->after( apply );
+                solve_01->after( upd_node );
+                
+                if ( old_upd != nullptr )
+                    upd_node->after( old_upd );
+                
+                old_upd = upd_node;
+            }// for
+        }
         
         auto  T        = std::make_shared< matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
@@ -1158,14 +1214,18 @@ addlr_node::refine_ ( const size_t  tile_size )
                                        A00,
                                        update_map, ntile );
 
-        // TO CHECK: happens "push_back" before handling of updates (trsml,trsmu)
+        // TO CHECK: is "push_back" before handling of updates (trsml,trsmu)???
         auto apply_01 = g.alloc_node< apply_node >( A01,
                                                     tiled_matrix( A01->row_is(), U ),
                                                     T,
                                                     tiled_matrix( A01->col_is(), V ),
                                                     ntile );
-        
-        update_map[ A01->id() ].push_back( apply_01 );
+
+        {
+            std::scoped_lock  lock( upd_mtx );
+            
+            update_map[ A01->id() ].push_back( apply_01 );
+        }
 
         auto  apply_10 = g.alloc_node< apply_node >( A10,
                                                      tiled_matrix( A10->row_is(), U ),
@@ -1173,7 +1233,11 @@ addlr_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( A10->col_is(), V ),
                                                      ntile );
         
-        update_map[ A10->id() ].push_back( apply_10 );
+        {
+            std::scoped_lock  lock( upd_mtx );
+            
+            update_map[ A10->id() ].push_back( apply_10 );
+        }
         
         // g.alloc_node< truncate_node >( real(-1),
         //                                tiled_matrix( A01->row_is(), U ),
@@ -1283,7 +1347,7 @@ truncate_node::refine_ ( const size_t )
 void
 truncate_node::run_ ( const TTruncAcc &  acc )
 {
-    hpro::TScopedLock  lock( *A );
+    // hpro::TScopedLock  lock( *A );
     
     auto [ U2, V2 ] = hlr::seq::tiled2::truncate( U.is, V.is, alpha, *(X.data), *(T.data), *(Y.data), *(U.data), *(V.data), acc, ntile );
 
@@ -1486,7 +1550,7 @@ gen_dag_lu_hodlr_tiled_lazy ( TMatrix &      A,
 {
     update_map_t  update_map;
 
-    return std::move( refine( new lu_node( & A, update_map, ntile ), ntile, use_single_end_node ) );
+    return refine( new lu_node( & A, update_map, ntile ), ntile, use_single_end_node );
 }
 
 }// namespace dag

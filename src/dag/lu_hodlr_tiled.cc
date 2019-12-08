@@ -1350,7 +1350,7 @@ gen_dag_lu_hodlr_tiled ( TMatrix &      A,
     // auto                  Q = std::make_shared< matrix< real > >();
     // auto                  R = std::make_shared< matrix< real > >();
     
-    return std::move( refine( new lu_node( & A, ntile ), ntile, use_single_end_node ) );
+    return refine( new lu_node( & A, ntile ), ntile, use_single_end_node );
 }
 
 //

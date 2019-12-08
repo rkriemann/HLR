@@ -206,12 +206,15 @@ copy_tiled ( const hpro::TMatrix &  M,
         //
 
         auto  RM = cptrcast( & M, hpro::TRkMatrix );
+        auto  R  = std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                               RM->col_is(),
+                                                                               ntile,
+                                                                               hpro::blas_mat_A< value_t >( RM ),
+                                                                               hpro::blas_mat_B< value_t >( RM ) );
 
-        return std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
-                                                                           RM->col_is(),
-                                                                           ntile,
-                                                                           hpro::blas_mat_A< value_t >( RM ),
-                                                                           hpro::blas_mat_B< value_t >( RM ) );
+        R->set_id( RM->id() );
+
+        return R;
     }// if
     else
     {

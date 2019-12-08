@@ -555,7 +555,7 @@ gen_dag_lu_oop_accu ( TMatrix &      A,
     
     auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
-    return std::move( dag );
+    return dag;
     
     //
     // loop over accumulator nodes from top to bottom and remove nodes without updates
@@ -624,7 +624,7 @@ gen_dag_lu_oop_accu ( TMatrix &      A,
         }// else
     }// for
     
-    return  std::move( dag::graph( std::move( nodes ), std::move( start ), std::move( end ) ) );
+    return  dag::graph( std::move( nodes ), std::move( start ), std::move( end ) );
 }
 
 }// namespace dag

@@ -134,6 +134,36 @@ mymain ( int, char ** )
         // std::cout << norm_2( A.get() ) << std::endl;
 
         {
+            auto  get_vec = [] ()
+            {
+                blas::Vector< double >  v( 10 );
+
+                return v;
+            };
+            
+            auto  t  = get_vec();
+            auto  t1 = t.copy();
+            auto  t2 = t.reference();
+
+            std::cout << t(0) << std::endl;
+        }
+        
+        {
+            auto  get_mat = [] ()
+            {
+                blas::Matrix< double >  M( 10, 10 );
+
+                return M;
+            };
+            
+            auto  T  = get_mat();
+            auto  T1 = T.copy();
+            auto  T2 = T.reference();
+
+            std::cout << T(0,0) << std::endl;
+        }
+        
+        {
             auto  x = A->row_vector();
             auto  y = A->row_vector();
 

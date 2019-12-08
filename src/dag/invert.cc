@@ -1292,7 +1292,7 @@ gen_dag_waz ( HLIB::TMatrix &  A,
 {
     auto  dag = refine( new waz_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
 
-    return std::move( dag );
+    return dag;
 }
 
 //
@@ -1304,7 +1304,7 @@ gen_dag_invert ( HLIB::TMatrix &  A,
 {
     auto  dag = refine( new inv_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
 
-    return std::move( dag );
+    return dag;
 
 
 
@@ -1331,7 +1331,7 @@ gen_dag_invert ( HLIB::TMatrix &  A,
     
     auto  dag_all    = concat( dag_lu_inv, dag_mul );
 
-    return std::move( dag_all );
+    return dag_all;
 }
 
 }}// namespace hlr::dag

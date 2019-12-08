@@ -500,7 +500,7 @@ gen_dag_lu_rec ( TMatrix &      A,
     auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     if ( ! CFG::Arith::use_accu )
-        return std::move( dag );
+        return dag;
     else
     {
         //
@@ -519,7 +519,7 @@ gen_dag_lu_rec ( TMatrix &      A,
         dag.start().clear();
         dag.start().push_back( apply_map[ A.id() ] );
 
-        return std::move( dag );
+        return dag;
     }// else
 
     //

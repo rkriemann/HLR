@@ -632,7 +632,7 @@ gen_dag_lu_lvl ( TMatrix &  A )
             start.push_back( node );
     }// for
 
-    return std::move( dag::graph( nodes, start, end ) );
+    return dag::graph( nodes, start, end );
 }
 
 }}// namespace hlr::dag
