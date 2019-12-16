@@ -197,7 +197,6 @@ public:
     auto  sub_nodes () const -> decltype(_sub_nodes) const & { return _sub_nodes; };
     
     // split node into subnodes and update dependencies
-    // if retval is empty, no refinement was done
     void  refine ( const size_t  min_size = HLIB::CFG::Arith::max_seq_size );
 
     // refine dependencies of <node>, either local or of sub nodes
