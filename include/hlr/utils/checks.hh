@@ -2,7 +2,7 @@
 #define __HLR_UTILS_CHECKS_HH
 //
 // Project     : HLib
-// File        : log.hh
+// File        : checks.hh
 // Description : testing/checking functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.

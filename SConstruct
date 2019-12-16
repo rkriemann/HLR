@@ -332,7 +332,8 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
                                      'src/seq/solve.cc',
                                      'src/utils/compare.cc',
                                      'src/utils/log.cc',
-                                     'src/utils/term.cc' ] )
+                                     'src/utils/term.cc',
+                                     'src/utils/text.cc' ] )
 
 Default( None )
 

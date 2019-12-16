@@ -48,6 +48,13 @@ public:
     {
         push_back( node );
     }
+    template < typename... Nodes >
+    void  add_node                  ( node *   node,
+                                      Nodes... nodes )
+    {
+        add_node( node );
+        add_node( nodes... );
+    }
 
     // set dependencies between all nodes in graph based on
     // in/out data blocks of nodes

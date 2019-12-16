@@ -17,6 +17,7 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
+#include "hlr/utils/text.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
@@ -56,65 +57,6 @@ namespace
 // dummy indexset for T operations (rank/size unknown during DAG and only object is of interest)
 const auto  IS_ONE  = indexset( -1, -1 );
 const auto  BIS_ONE = block_indexset( IS_ONE, IS_ONE );
-
-size_t
-largest_power10_smaller_than ( const size_t  n )
-{
-    size_t  p = 1;
-
-    while (( 10*p ) < n )
-        p *= 10;
-
-    return p;
-}
-
-std::string
-subscript ( size_t  n )
-{
-    static const std::string   subs[] = { "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉" };
-
-    if ( n == 0 )
-        return subs[0];
-
-    std::ostringstream  out;
-    size_t              pot = largest_power10_smaller_than( n );
-
-    while ( pot > 0 )
-    {
-        const auto  n_i = n / pot;
-
-        out << subs[ n_i ];
-
-        n    = n - ( n_i * pot );
-        pot /= 10;
-    }// while
-
-    return out.str();
-}
-
-std::string
-superscript ( size_t  n )
-{
-    static const std::string   sups[] = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" };
-
-    if ( n == 0 )
-        return sups[0];
-
-    std::ostringstream  out;
-    size_t              pot = largest_power10_smaller_than( n );
-
-    while ( pot > 0 )
-    {
-        const auto  n_i = n / pot;
-
-        out << sups[ n_i ];
-
-        n    = n - ( n_i * pot );
-        pot /= 10;
-    }// while
-
-    return out.str();
-}
 
 //
 // structure to address matrix
@@ -227,6 +169,15 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
 {
 //    std::cout << "matrix : " << data.get() << ", #" << data.use_count() << std::endl;
 }
+
+template <>
+matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
+                                                                      std::shared_ptr< tile_storage< real > >  adata )
+        : name( id_t(adata.get()) )
+        , id( -1 )
+        , is( is )
+        , data( adata )
+{}
 
 template <>
 matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr< matrix< real > >  adata )
@@ -648,22 +599,209 @@ private:
 };
 
 //
+// truncate U₁ V₁^H + U₂ V₂^H
+//
+struct truncate2_node : public node
+{
+    shared_tiled_matrix       U1;
+    shared_tiled_matrix       V1;
+    shared_tiled_matrix       U2;
+    shared_tiled_matrix       V2;
+    shared_tiled_matrix       U;
+    shared_tiled_matrix       V;
+    const size_t              ntile;
+
+    truncate2_node ( shared_tiled_matrix   aU1,
+                     shared_tiled_matrix   aV1,
+                     shared_tiled_matrix   aU2,
+                     shared_tiled_matrix   aV2,
+                     shared_tiled_matrix   aU,
+                     shared_tiled_matrix   aV,
+                     const size_t          antile )
+            : U1( aU1 )
+            , V1( aV1 )
+            , U2( aU2 )
+            , V2( aV2 )
+            , U( aU )
+            , V( aV )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        return ( "trunc( " +
+                 U1.to_string( ntile ) + "×" + V1.to_string( ntile ) + " + " +
+                 U2.to_string( ntile ) + "×" + V2.to_string( ntile ) +
+                 " )" );
+    }
+    virtual std::string  color     () const { return "e9b96e"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), V1.mem_block(), U2.mem_block(), V2.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
+    virtual size_t              mem_size_    () const { return sizeof(truncate2_node); }
+};
+
+//
+// truncate U₁ T₁ V₁^H + U₂ T₁ V₂^H
+//
+struct truncate3_node : public node
+{
+    tiled_matrix              U1;
+    shared_matrix             T1;
+    tiled_matrix              V1;
+    tiled_matrix              U2;
+    shared_matrix             T2;
+    tiled_matrix              V2;
+    shared_tiled_matrix       U;
+    shared_tiled_matrix       V;
+    const size_t              ntile;
+
+    truncate3_node ( tiled_matrix         aU1,
+                     shared_matrix        aT1,
+                     tiled_matrix         aV1,
+                     tiled_matrix         aU2,
+                     shared_matrix        aT2,
+                     tiled_matrix         aV2,
+                     shared_tiled_matrix  aU,
+                     shared_tiled_matrix  aV,
+                     const size_t         antile )
+            : U1( aU1 )
+            , T1( aT1 )
+            , V1( aV1 )
+            , U2( aU2 )
+            , T2( aT2 )
+            , V2( aV2 )
+            , U( aU )
+            , V( aV )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        return ( "trunc( " +
+                 U1.to_string( ntile ) + "×" + T1.to_string() + "×" + V1.to_string( ntile ) + " + " +
+                 U2.to_string( ntile ) + "×" + T2.to_string() + "×" + V2.to_string( ntile ) +
+                 " )" );
+    }
+    virtual std::string  color     () const { return "e9b96e"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block(),
+                                                                 U2.mem_block(), T2.mem_block(), V2.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
+    virtual size_t              mem_size_    () const { return sizeof(truncate3_node); }
+};
+
+//
+// truncate U₁ T₁ V₁^H
+//
+struct truncate4_node : public node
+{
+    tiled_matrix              U1;
+    shared_matrix             T1;
+    tiled_matrix              V1;
+    shared_tiled_matrix       U;
+    shared_tiled_matrix       V;
+    const size_t              ntile;
+
+    truncate4_node ( tiled_matrix         aU1,
+                     shared_matrix        aT1,
+                     tiled_matrix         aV1,
+                     shared_tiled_matrix  aU,
+                     shared_tiled_matrix  aV,
+                     const size_t         antile )
+            : U1( aU1 )
+            , T1( aT1 )
+            , V1( aV1 )
+            , U( aU )
+            , V( aV )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        return ( "trunc( " +
+                 U1.to_string( ntile ) + "×" + T1.to_string() + "×" + V1.to_string( ntile ) + 
+                 " )" );
+    }
+    virtual std::string  color     () const { return "e9b96e"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
+    virtual size_t              mem_size_    () const { return sizeof(truncate4_node); }
+};
+
+//
+// truncate α X Y^H + U(A) V(A)^H
+//
+struct truncate5_node : public node
+{
+    const real                alpha;
+    shared_tiled_matrix       X;
+    shared_tiled_matrix       Y;
+    tiled_matrix              U;
+    tiled_matrix              V;
+    tiled_lrmatrix< real > *  A;
+    const size_t              ntile;
+
+    truncate5_node ( const real                aalpha,
+                     shared_tiled_matrix       aX,
+                     shared_tiled_matrix       aY,
+                     tiled_matrix              aU,
+                     tiled_matrix              aV,
+                     tiled_lrmatrix< real > *  aA,
+                     const size_t              antile )
+            : alpha( aalpha )
+            , X( aX )
+            , Y( aY )
+            , U( aU )
+            , V( aV )
+            , A( aA )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        return ( "trunc( " + X.to_string( ntile ) + "×" + Y.to_string( ntile ) + ", " +
+                 U.to_string( ntile ) + "×" + V.to_string( ntile ) + " )" );
+    }
+    virtual std::string  color     () const { return "e9b96e"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), Y.mem_block() }; }
+    virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
+    virtual size_t              mem_size_    () const { return sizeof(truncate_node); }
+};
+
+//
 // QR factorization of [αX·T,U]
 //
+template < typename  matrixX_t,
+           typename  matrixU_t >
 struct tsqr_node : public node
 {
     const real           alpha;
-    tiled_matrix         X;
+    matrixX_t            X;
     shared_matrix        T;
-    tiled_matrix         U;
+    matrixU_t            U;
     shared_tiled_matrix  Q;
     shared_matrix        R;
     const size_t         ntile;
 
     tsqr_node ( const real           aalpha,
-                tiled_matrix         aX,
+                matrixX_t            aX,
                 shared_matrix        aT,
-                tiled_matrix         aU,
+                matrixU_t            aU,
                 shared_tiled_matrix  aQ,
                 shared_matrix        aR,
                 const size_t         antile )
@@ -677,8 +815,8 @@ struct tsqr_node : public node
     { init(); }
 
     tsqr_node ( const real           aalpha,
-                tiled_matrix         aX,
-                tiled_matrix         aU,
+                matrixX_t            aX,
+                matrixU_t            aU,
                 shared_tiled_matrix  aQ,
                 shared_matrix        aR,
                 const size_t         antile )
@@ -710,6 +848,64 @@ private:
     }
     virtual const block_list_t  out_blocks_  () const { return { Q.mem_block(), R.mem_block() }; }
     virtual size_t              mem_size_    () const { return sizeof(tsqr_node); }
+};
+
+template < typename  matrixX_t >
+struct tsqr1_node : public node
+{
+    const real           alpha;
+    matrixX_t            X;
+    shared_matrix        T;
+    shared_tiled_matrix  Q;
+    shared_matrix        R;
+    const size_t         ntile;
+
+    tsqr1_node ( const real           aalpha,
+                 matrixX_t            aX,
+                 shared_matrix        aT,
+                 shared_tiled_matrix  aQ,
+                 shared_matrix        aR,
+                 const size_t         antile )
+            : alpha( aalpha )
+            , X( aX )
+            , T( aT )
+            , Q( aQ )
+            , R( aR )
+            , ntile( antile )
+    { init(); }
+
+    tsqr1_node ( const real           aalpha,
+                 matrixX_t            aX,
+                 shared_tiled_matrix  aQ,
+                 shared_matrix        aR,
+                 const size_t         antile )
+            : alpha( aalpha )
+            , X( aX )
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< matrix< real > >() ) ) // T = 0
+            , Q( aQ )
+            , R( aR )
+            , ntile( antile )
+    { init(); }
+
+    virtual std::string  to_string () const
+    {
+        if ( is_null( T.data ) )
+            return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + " )";
+        else 
+            return Q.to_string( ntile ) + ", " + R.to_string() + " = tsqr( " + X.to_string( ntile ) + "×" + T.to_string() + " )";
+    }
+    virtual std::string  color     () const { return "e9b96e"; }
+
+private:
+    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual local_graph         refine_      ( const size_t  min_size );
+    virtual const block_list_t  in_blocks_   () const
+    {
+        if ( is_null( T.data ) ) return { X.mem_block(), Q.mem_block() };
+        else                     return { X.mem_block(), Q.mem_block(), T.mem_block() };
+    }
+    virtual const block_list_t  out_blocks_  () const { return { Q.mem_block(), R.mem_block() }; }
+    virtual size_t              mem_size_    () const { return sizeof(tsqr1_node); }
 };
 
 //
@@ -818,6 +1014,75 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+std::tuple< node *,
+            shared_tiled_matrix,
+            shared_tiled_matrix >
+build_upd_nodes_pairwise_svd ( local_graph &    g,
+                               TMatrix *        M,
+                               update_list_t &  upds,
+                               const size_t     ntile )
+{
+    const auto  nupds = upds.size();
+    
+    if ( nupds > 2 )
+    {
+        const auto     mid = nupds / 2;
+        size_t         pos = 0;
+        update_list_t  upds1, upds2;
+
+        for ( auto upd : upds )
+        {
+            if ( pos++ < mid ) upds1.push_back( upd );
+            else               upds2.push_back( upd );
+        }// for
+
+        auto  [ upd1, U1, V1 ] = build_upd_nodes_pairwise_svd( g, M, upds1, ntile );
+        auto  [ upd2, U2, V2 ] = build_upd_nodes_pairwise_svd( g, M, upds2, ntile );
+
+        auto  first = ptrcast( upds.front(), apply_node );
+        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< real > >() );
+        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  sum   = g.alloc_node< truncate2_node >( U1, V1, U2, V2,
+                                                      U, V, ntile );
+
+        sum->after( upd1, upd2 );
+
+        return { sum, U, V };
+    }// if
+    else if ( nupds == 2 )
+    {
+        auto  first = ptrcast( upds.front(), apply_node );
+        auto  last  = ptrcast( upds.back(),  apply_node );
+        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< real > >() );
+        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  trunc = g.alloc_node< truncate3_node >( first->upd.U, first->upd.T, first->upd.V,
+                                                      last->upd.U,  last->upd.T,  last->upd.V,
+                                                      U, V, ntile );
+
+        trunc->after( first, last );
+        
+        return { trunc, U, V };
+    }// if
+    else if ( nupds == 1 )
+    {
+        auto  upd   = ptrcast( upds.front(), apply_node );
+        auto  U     = shared_tiled_matrix( upd->upd.U.is, std::make_shared< tile_storage< real > >() );
+        auto  V     = shared_tiled_matrix( upd->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  trunc = g.alloc_node< truncate4_node >( upd->upd.U, upd->upd.T, upd->upd.V,
+                                                      U, V, ntile );
+
+        trunc->after( upd );
+        
+        return { trunc, U, V };
+    }// if
+    else
+    {
+        std::cout << nupds << std::endl;
+        
+        assert( false );
+    }// else
+}
+
 local_graph
 lu_node::refine_ ( const size_t  tile_size )
 {
@@ -852,63 +1117,36 @@ lu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                                      update_map, ntile );
 
-        solve_10->after( lu_00 );
-        solve_01->after( lu_00 );
+        lu_00->before( solve_10, solve_01 );
         
-        node *  old_upd = nullptr;
-
+        if ( update_map[ A10->id() ].size() > 0 )
         {
-            std::scoped_lock  lock( upd_mtx );
-        
-            for ( auto  upd : update_map[ A10->id() ] )
-            {
-                auto  apply    = static_cast< apply_node * >( upd );
-                auto  upd_node = g.alloc_node< truncate_node >( real(-1),
-                                                                apply->upd.U,
-                                                                apply->upd.T,
-                                                                apply->upd.V,
-                                                                tiled_matrix( NAME_A, A10->id(), A10->row_is(), & A10->U() ),
-                                                                tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
-                                                                A10,
-                                                                ntile );
-                
-                upd_node->after( apply );
-                solve_10->after( upd_node );
-                
-                if ( old_upd != nullptr )
-                    upd_node->after( old_upd );
-                
-                old_upd = upd_node;
-            }// for
-        }
-        
-        old_upd = nullptr;
+            auto  [ sum_10, U10, V10 ] = build_upd_nodes_pairwise_svd( g, A10, update_map[ A10->id() ], ntile );
+            auto  upd_10               = g.alloc_node< truncate5_node >( real(-1),
+                                                                         U10, V10,
+                                                                         tiled_matrix( NAME_A, A10->id(), A10->row_is(), & A10->U() ),
+                                                                         tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
+                                                                         A10,
+                                                                         ntile );
+            
+            upd_10->after( sum_10 );
+            solve_10->after( upd_10 );
+        }// if
 
+        if ( update_map[ A01->id() ].size() > 0 )
         {
-            std::scoped_lock  lock( upd_mtx );
-        
-            for ( auto  upd : update_map[ A01->id() ] )
-            {
-                auto  apply    = static_cast< apply_node * >( upd );
-                auto  upd_node = g.alloc_node< truncate_node >( real(-1),
-                                                                apply->upd.U,
-                                                                apply->upd.T,
-                                                                apply->upd.V,
-                                                                tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
-                                                                tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
-                                                                A01,
-                                                                ntile );
-                
-                upd_node->after( apply );
-                solve_01->after( upd_node );
-                
-                if ( old_upd != nullptr )
-                    upd_node->after( old_upd );
-                
-                old_upd = upd_node;
-            }// for
-        }
-        
+            auto  [ sum_01, U01, V01 ] = build_upd_nodes_pairwise_svd( g, A01, update_map[ A01->id() ], ntile );
+            auto  upd_01               = g.alloc_node< truncate5_node >( real(-1),
+                                                                         U01, V01,
+                                                                         tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
+                                                                         tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
+                                                                         A01,
+                                                                         ntile );
+            
+            upd_01->after( sum_01 );
+            solve_01->after( upd_01 );
+        }// if
+
         auto  T        = std::make_shared< matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
                                                    tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
@@ -939,7 +1177,7 @@ lu_node::refine_ ( const size_t  tile_size )
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::tbb::tiled2::hodlr::lu< real >( A, acc, ntile );
+    hlr::seq::tiled2::hodlr::lu< real >( A, acc, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1310,34 +1548,196 @@ truncate_node::refine_ ( const size_t )
     assert( X.is == U.is );
     assert( Y.is == V.is );
 
-    // auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    // auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
-    // auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    // auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
+    auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
+    auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
 
-    // // perform QR for U/V
-    // auto  qr_U   = g.alloc_node< tsqr_node >( alpha,   X, T, U, Q0, R0, ntile );
-    // auto  qr_V   = g.alloc_node< tsqr_node >( real(1), Y,    V, Q1, R1, ntile );
+    // perform QR for U/V
+    auto  qr_U   = new tsqr_node( alpha,   X, T, U, Q0, R0, ntile );
+    auto  qr_V   = new tsqr_node( real(1), Y,    V, Q1, R1, ntile );
 
-    // // determine truncated rank and allocate destination matrices
-    // auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    // auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
-    // auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
-
-    // svd->after( qr_U );
-    // svd->after( qr_V );
-
-    // // compute final result
-    // auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
-    // auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
-
-    // g.add_node( mul_U );
-    // g.add_node( mul_V );
+    g.add_node( qr_U, qr_V );
     
-    // mul_U->after( qr_U );
-    // mul_U->after( svd );
-    // mul_V->after( qr_V );
-    // mul_V->after( svd );
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
+
+    svd->after( qr_U, qr_V );
+
+    // compute final result
+    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
+    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+
+    g.add_node( mul_U );
+    g.add_node( mul_V );
+    
+    mul_U->after( qr_U, svd );
+    mul_V->after( qr_V, svd );
+
+    g.finalize();
+
+    return g;
+}
+
+local_graph
+truncate2_node::refine_ ( const size_t )
+{
+    local_graph  g;
+
+    assert( U1.is == U2.is );
+    assert( U1.is == U.is );
+    assert( V1.is == V2.is );
+    assert( V1.is == V.is );
+
+    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
+    auto  R2 = shared_matrix(              std::make_shared< matrix< real > >() );
+
+    // perform QR for U/V
+    auto  qr_U   = new tsqr_node( real(1), U1, U2, Q1, R1, ntile );
+    auto  qr_V   = new tsqr_node( real(1), V1, V2, Q2, R2, ntile );
+
+    g.add_node( qr_U, qr_V );
+    
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
+
+    svd->after( qr_U, qr_V );
+
+    // compute final result
+    auto  mul_U  = new tprod_node( real(1), Q1, Uk, real(0), U, ntile );
+    auto  mul_V  = new tprod_node( real(1), Q2, Vk, real(0), V, ntile );
+
+    g.add_node( mul_U, mul_V );
+    
+    mul_U->after( qr_U, svd );
+    mul_V->after( qr_V, svd );
+
+    g.finalize();
+
+    return g;
+}
+
+local_graph
+truncate3_node::refine_ ( const size_t )
+{
+    local_graph  g;
+
+    assert( U1.is == U2.is );
+    assert( U1.is == U.is );
+    assert( V1.is == V2.is );
+    assert( V1.is == V.is );
+
+    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
+    auto  R2 = shared_matrix(              std::make_shared< matrix< real > >() );
+
+    // perform QR for U/V
+    auto  qr_U   = new tsqr_node( real(1), U1, T1, U2, Q1, R1, ntile ); // TODO: check if order is correct
+    auto  qr_V   = new tsqr_node( real(1), V2, T2, V1, Q2, R2, ntile );
+
+    g.add_node( qr_U, qr_V );
+    
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
+
+    svd->after( qr_U, qr_V );
+
+    // compute final result
+    auto  mul_U  = new tprod_node( real(1), Q1, Uk, real(0), U, ntile );
+    auto  mul_V  = new tprod_node( real(1), Q2, Vk, real(0), V, ntile );
+
+    g.add_node( mul_U, mul_V );
+    
+    mul_U->after( qr_U, svd );
+    mul_V->after( qr_V, svd );
+
+    g.finalize();
+
+    return g;
+}
+
+local_graph
+truncate4_node::refine_ ( const size_t )
+{
+    local_graph  g;
+
+    auto  Q0 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
+    auto  R0 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  Q1 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+
+    // perform QR for U/V
+    auto  qr_U   = new tsqr1_node( real(1), U1, T1, Q0, R0, ntile );
+    auto  qr_V   = new tsqr1_node( real(1), V1,     Q1, R1, ntile );
+
+    g.add_node( qr_U, qr_V );
+    
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
+
+    svd->after( qr_U, qr_V );
+
+    // compute final result
+    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
+    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+
+    g.add_node( mul_U );
+    g.add_node( mul_V );
+    
+    mul_U->after( qr_U, svd );
+    mul_V->after( qr_V, svd );
+
+    g.finalize();
+
+    return g;
+}
+
+local_graph
+truncate5_node::refine_ ( const size_t )
+{
+    local_graph  g;
+
+    assert( X.is == U.is );
+    assert( Y.is == V.is );
+
+    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
+    auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
+    auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
+
+    // perform QR for U/V
+    auto  qr_U   = new tsqr_node( real(1), X, U, Q0, R0, ntile );
+    auto  qr_V   = new tsqr_node( real(1), Y, V, Q1, R1, ntile );
+
+    g.add_node( qr_U, qr_V );
+    
+    // determine truncated rank and allocate destination matrices
+    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
+
+    svd->after( qr_U, qr_V );
+
+    // compute final result
+    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
+    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+
+    g.add_node( mul_U );
+    g.add_node( mul_V );
+    
+    mul_U->after( qr_U, svd );
+    mul_V->after( qr_V, svd );
 
     g.finalize();
 
@@ -1349,10 +1749,10 @@ truncate_node::run_ ( const TTruncAcc &  acc )
 {
     // hpro::TScopedLock  lock( *A );
     
-    auto [ U2, V2 ] = hlr::seq::tiled2::truncate( U.is, V.is, alpha, *(X.data), *(T.data), *(Y.data), *(U.data), *(V.data), acc, ntile );
+    // auto [ U2, V2 ] = hlr::seq::tiled2::truncate( U.is, V.is, alpha, *(X.data), *(T.data), *(Y.data), *(U.data), *(V.data), acc, ntile );
 
-    *(U.data) = std::move( U2 );
-    *(V.data) = std::move( V2 );
+    // *(U.data) = std::move( U2 );
+    // *(V.data) = std::move( V2 );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1361,8 +1761,10 @@ truncate_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename  matrixX_t,
+           typename  matrixU_t >
 local_graph
-tsqr_node::refine_ ( const size_t  tile_size )
+tsqr_node< matrixX_t, matrixU_t >::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
@@ -1408,8 +1810,10 @@ tsqr_node::refine_ ( const size_t  tile_size )
     return g;
 }
 
+template < typename  matrixX_t,
+           typename  matrixU_t >
 void
-tsqr_node::run_ ( const TTruncAcc & )
+tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
 {
     // DBG::write( Xi, "X1.mat", "X1" );
     // DBG::write( *T, "T1.mat", "T1" );
@@ -1472,6 +1876,86 @@ tsqr_node::run_ ( const TTruncAcc & )
         HLR_LOG( 5, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
         
         (*(Q.data))[ X.is ] = std::move( WU );
+    }// else
+}
+
+template < typename  matrixX_t >
+local_graph
+tsqr1_node< matrixX_t >::refine_ ( const size_t  tile_size )
+{
+    local_graph  g;
+
+    if ( X.is.size() > tile_size )
+    {
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        const auto  sis_X = split( X.is, 2 );
+        const auto  sis_Q = split( Q.is, 2 );
+        auto        Q0    = matrix_info( sis_Q[0], Q );
+        auto        Q1    = matrix_info( sis_Q[1], Q );
+        auto        R0    = matrix_info( std::make_shared< matrix< real > >() );
+        auto        R1    = matrix_info( std::make_shared< matrix< real > >() );
+
+        // std::cout << "R0 = " << R0.data.get() << std::endl;
+        // std::cout << "R1 = " << R1.data.get() << std::endl;
+        
+        auto  tsqr0 = g.alloc_node< tsqr1_node >( alpha, matrix_info( sis_X[0], X ), T, Q0, R0, ntile );
+        auto  tsqr1 = g.alloc_node< tsqr1_node >( alpha, matrix_info( sis_X[1], X ), T, Q1, R1, ntile );
+        auto  qr01  = g.alloc_node< qr_node >( R0, R1, R );
+
+        qr01->after( tsqr0 );
+        qr01->after( tsqr1 );
+        
+        auto  mul0 = new tprod_ip_node( real(1), matrix_info( sis_Q[0], Q ), R0, ntile );
+        auto  mul1 = new tprod_ip_node( real(1), matrix_info( sis_Q[1], Q ), R1, ntile );
+
+        g.add_node( mul0 );
+        g.add_node( mul1 );
+        
+        mul0->after( tsqr0 );
+        mul0->after( qr01 );
+        mul1->after( tsqr1 );
+        mul1->after( qr01 );
+    }// if
+
+    g.finalize();
+
+    return g;
+}
+
+template < typename  matrixX_t >
+void
+tsqr1_node< matrixX_t >::run_ ( const TTruncAcc & )
+{
+    if ( is_null( T.data ) )
+    {
+        assert( X.data->contains( X.is ) );
+
+        auto  X_is = X.data->at( X.is );
+
+        blas::qr( X_is, *(R.data) );
+
+        HLR_LOG( 5, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( X_is ) ) );
+        HLR_LOG( 5, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        
+        (*(Q.data))[ X.is ] = std::move( X_is );
+    }// if
+    else
+    {
+        assert( X.data->contains( X.is ) );
+
+        const auto  X_is = X.data->at( X.is );
+        auto        W    = blas::prod( alpha, X_is, *(T.data) );
+
+        blas::qr( W, *(R.data) );
+
+        HLR_LOG( 5, "tsqr  :          Q , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( W ) ) );
+        HLR_LOG( 5, "tsqr  :          R , " + hlr::seq::tiled2::isstr( X.is, ntile ) + " = " + hlr::seq::tiled2::normstr( blas::normF( *(R.data) ) ) );
+        
+        (*(Q.data))[ X.is ] = std::move( W );
     }// else
 }
 

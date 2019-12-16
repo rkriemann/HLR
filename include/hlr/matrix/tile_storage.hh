@@ -17,14 +17,17 @@
 
 namespace hlr { namespace matrix {
 
+namespace hpro = HLIB;
+namespace blas = HLIB::BLAS;
+
 // map HLIB types to HLR 
-using  indexset       = HLIB::TIndexSet;
-using  range          = HLIB::BLAS::Range;
-using  block_indexset = HLIB::TBlockIndexSet;
+using  indexset       = hpro::TIndexSet;
+using  range          = blas::Range;
+using  block_indexset = hpro::TBlockIndexSet;
 
 // tile type
 template < typename value_t >
-using  tile     = HLIB::BLAS::Matrix< value_t >;
+using  tile     = blas::Matrix< value_t >;
 
 // tile mapping type
 template < typename value_t >
@@ -48,12 +51,13 @@ public:
  
 private:
     // the map of tiles
-    tilemap< value_t >  _tiles;
+    tilemap< value_t >       _tiles;
 
+    // index sets for loops
     std::vector< indexset >  _tile_is;
     
-    // lock for concurrent access protection
-    mutable std::mutex  _mtx;
+    // lock for concurrent access protection to map
+    mutable std::mutex       _mtx;
 
 public:
     // ctors
@@ -197,7 +201,7 @@ public:
 // convert tile_storage to blas::matrix
 //
 template < typename value_t >
-HLIB::BLAS::Matrix< value_t >
+blas::Matrix< value_t >
 to_dense ( const tile_storage< value_t > &  st )
 {
     //
@@ -220,16 +224,16 @@ to_dense ( const tile_storage< value_t > &  st )
             row_is = join( row_is, is );
     }// for
 
-    HLIB::BLAS::Matrix< value_t >  D( row_is.size(), ncols );
+    blas::Matrix< value_t >  D( row_is.size(), ncols );
 
     for ( auto & [ is, U ] : st )
     {
-        HLIB::BLAS::Matrix< value_t >  D_i( D, is - row_is.first(), range::all );
+        blas::Matrix< value_t >  D_i( D, is - row_is.first(), range::all );
 
-        HLIB::BLAS::copy( U, D_i );
+        blas::copy( U, D_i );
     }// for
 
-    return std::move( D );
+    return D;
 }
 
 }} // namespace hlr::matrix

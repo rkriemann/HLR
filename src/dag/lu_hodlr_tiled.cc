@@ -17,6 +17,7 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
+#include "hlr/utils/text.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"

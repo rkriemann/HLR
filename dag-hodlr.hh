@@ -318,12 +318,12 @@ mymain ( int, char ** )
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
 
-    // {
-    //     auto  T1 = impl::matrix::copy_nontiled< double >( *C );
-    //     auto  T2 = hpro::to_dense( T1.get() );
+    {
+        auto  T1 = impl::matrix::copy_nontiled< double >( *C );
+        auto  T2 = hpro::to_dense( T1.get() );
 
-    //     write_matrix( T2.get(), "B.mat", "B" );
-    // }
+        write_matrix( T2.get(), "B.mat", "B" );
+    }
     
     hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
     // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
