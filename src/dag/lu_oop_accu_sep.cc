@@ -514,7 +514,7 @@ gen_dag_lu_oop_accu_sep ( TMatrix &      A,
     dag.start().clear();
     dag.start().push_back( apply_map[ A.id() ] );
         
-    return std::move( dag );
+    return dag;
 }
 
 }// namespace dag

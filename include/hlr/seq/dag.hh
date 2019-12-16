@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <base/TTruncAcc.hh>
+#include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/dag/graph.hh"
 

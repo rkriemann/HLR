@@ -9,6 +9,7 @@
 //
 
 #include <tbb/parallel_invoke.h>
+#include <tbb/task_group.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
@@ -20,6 +21,7 @@
 #include "hlr/arith/solve.hh"
 #include "hlr/tbb/matrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
+#include "hlr/vector/tiled_scalarvector.hh"
 
 namespace hlr { namespace tbb { namespace tiled2 {
 
@@ -41,6 +43,7 @@ using hlr::matrix::range;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
+using hlr::vector::tiled_scalarvector;
 
 //
 // split given indexset into <n> subsets
@@ -564,6 +567,142 @@ lu ( hpro::TMatrix *          A,
 }
 
 }// namespace hodlr
+
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+template < typename value_t >
+blas::Vector< value_t >
+dot_vec ( const size_t                           lb,
+          const size_t                           ub,
+          const std::vector< indexset > &        is_vec,
+          const tile_storage< value_t > &        M,
+          const tiled_scalarvector< value_t > &  x )
+{
+    if ( ub - lb > 1 )
+    {
+        const auto  mid = (ub + lb) / 2;
+        blas::Vector< value_t >  t0, t1;
+
+        ::tbb::parallel_invoke( [&t0,lb,mid,&is_vec,&M,&x] () { t0 = dot_vec( lb, mid, is_vec, M, x ); },
+                                [&t1,mid,ub,&is_vec,&M,&x] () { t1 = dot_vec( mid, ub, is_vec, M, x ); } );
+
+        blas::add( value_t(1), t0, t1 );
+
+        return t1;
+    }// if
+    else
+    {
+        return blas::mulvec( value_t(1), blas::adjoint( M.at( is_vec[lb] ) ), x.at( is_vec[lb] ) );
+    }// else
+}
+
+}// namespace anonymous
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                          alpha,
+          const hpro::matop_t                    op_M,
+          const hpro::TMatrix &                  M,
+          const tiled_scalarvector< value_t > &  x,
+          tiled_scalarvector< value_t > &        y )
+{
+    // assert( M->ncols( op_M ) == x.length() );
+    // assert( M->nrows( op_M ) == y.length() );
+
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [alpha,op_M,B,&x,&y] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  B_ij = B->block( i, j );
+                        
+                        if ( ! is_null( B_ij ) )
+                            mul_vec( alpha, op_M, *B_ij, x, y );
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto              D = cptrcast( &M, hpro::TDenseMatrix );
+        std::scoped_lock  lock( y.tile_mtx( D->row_is( op_M ) ) );
+        
+        blas::mulvec( alpha,
+                      blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ),
+                      x.at( D->col_is( op_M ) ),
+                      value_t(1),
+                      y.at( D->row_is( op_M ) ) );
+    }// if
+    else if ( hlr::matrix::is_tiled_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, tiled_lrmatrix< value_t > );
+
+        if ( op_M == hpro::apply_normal )
+        {
+            const auto  t = dot_vec( 0, R->V().tile_is().size(), R->V().tile_is(), R->V(), x );
+
+            ::tbb::parallel_for< size_t >( 0, R->U().tile_is().size(),
+                                           [alpha,R,&t,&y] ( const auto  i )
+                                           {
+                                               const auto        is = R->U().tile_is( i );
+                                               std::scoped_lock  lock( y.tile_mtx( is ) );
+                                               
+                                               blas::mulvec( alpha, R->U().at( is ), t, value_t(1), y.at( is ) );
+                                           } );
+        }// if
+        else if ( op_M == hpro::apply_transposed )
+        {
+            assert( hpro::is_complex_type< value_t >::value == false );
+            
+            const auto  t = dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x ); // TODO: transposed !!!
+            
+            ::tbb::parallel_for< size_t >( 0, R->V().tile_is().size(),
+                                           [alpha,R,&t,&y] ( const auto  i )
+                                           {
+                                               const auto        is = R->V().tile_is( i );
+                                               std::scoped_lock  lock( y.tile_mtx( is ) );
+                
+                                               blas::mulvec( alpha, R->V().at( is ), t, value_t(1), y.at( is ) );
+                                           } );
+        }// if
+        else if ( op_M == hpro::apply_adjoint )
+        {
+            const auto  t = dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x );
+            
+            ::tbb::parallel_for< size_t >( 0, R->V().tile_is().size(),
+                                           [alpha,R,&t,&y] ( const auto  i )
+                                           {
+                                               const auto        is = R->V().tile_is( i );
+                                               std::scoped_lock  lock( y.tile_mtx( is ) );
+                
+                                               blas::mulvec( alpha, R->V().at( is ), t, value_t(1), y.at( is ) );
+                                           } );
+        }// if
+    }// if
+    else
+        assert( false );
+}
 
 }}}// namespace hlr::tbb::tile
 

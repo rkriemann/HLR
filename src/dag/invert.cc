@@ -577,7 +577,7 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-waz_node::refine_ ( const size_t  min_size )
+waz_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -594,7 +594,7 @@ waz_node::refine_ ( const size_t  min_size )
 }
 
 void
-waz_node::run_ ( const TTruncAcc &  acc )
+waz_node::run_ ( const TTruncAcc & )
 {
     HLR_ASSERT( false );
 }
@@ -606,7 +606,7 @@ waz_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 local_graph
-inv_node::refine_ ( const size_t  min_size )
+inv_node::refine_ ( const size_t )
 {
     local_graph  g;
 
@@ -627,7 +627,7 @@ inv_node::refine_ ( const size_t  min_size )
 }
 
 void
-inv_node::run_ ( const TTruncAcc &  acc )
+inv_node::run_ ( const TTruncAcc & )
 {
     HLR_ASSERT( false );
 }
@@ -1292,7 +1292,7 @@ gen_dag_waz ( HLIB::TMatrix &  A,
 {
     auto  dag = refine( new waz_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
 
-    return std::move( dag );
+    return dag;
 }
 
 //
@@ -1304,7 +1304,7 @@ gen_dag_invert ( HLIB::TMatrix &  A,
 {
     auto  dag = refine( new inv_node( &A ), HLIB::CFG::Arith::max_seq_size, use_multiple_end_nodes );
 
-    return std::move( dag );
+    return dag;
 
 
 
@@ -1331,7 +1331,7 @@ gen_dag_invert ( HLIB::TMatrix &  A,
     
     auto  dag_all    = concat( dag_lu_inv, dag_mul );
 
-    return std::move( dag_all );
+    return dag_all;
 }
 
 }}// namespace hlr::dag

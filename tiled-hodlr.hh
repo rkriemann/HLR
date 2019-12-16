@@ -6,11 +6,14 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <hpro/algebra/mul_vec.hh>
+
 #include "common.hh"
 #include "common-main.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/seq/norm.hh"
+#include "hlr/seq/arith_tiled_v2.hh"
 #include "hlr/seq/arith_tiled_v3.hh"
 
 using namespace hlr;
@@ -129,9 +132,96 @@ mymain ( int, char ** )
         // std::cout << norm_2( C01.get() ) << ", " << seq::norm::norm_F( *C01 ) << std::endl;
         
         // std::cout << norm_2( A.get() ) << std::endl;
+
+        {
+            auto  get_vec = [] ()
+            {
+                blas::Vector< double >  v( 10 );
+
+                return v;
+            };
+            
+            auto  t  = get_vec();
+            auto  t1 = t.copy();
+            auto  t2 = t.reference();
+
+            std::cout << t(0) << std::endl;
+        }
+        
+        {
+            auto  get_mat = [] ()
+            {
+                blas::Matrix< double >  M( 10, 10 );
+
+                return M;
+            };
+            
+            auto  T  = get_mat();
+            auto  T1 = T.copy();
+            auto  T2 = T.reference();
+
+            std::cout << T(0,0) << std::endl;
+        }
+        
+        {
+            auto  x = A->row_vector();
+            auto  y = A->row_vector();
+
+            for ( size_t  i = 0; i < A->nrows(); ++i )
+                x->set_entry( i, i ); // fill( 1.0 );
+
+            y->fill( 0.0 );
+
+            std::cout << A->typestr() << std::endl;
+            std::cout << x->norm2() << std::endl;
+
+            A->set_hierarchy_data();
+
+            // burnin
+            for ( uint i = 0; i < 10; ++i )
+                hpro::mul_vec( hpro::ps_single( 0 ), 1.0, A.get(), x.get(), 1.0, y.get(), hpro::apply_normal );
+            
+            tic = timer::now();
+            
+            for ( uint i = 0; i < 100; ++i )
+                hpro::mul_vec( hpro::ps_single( 0 ), 1.0, A.get(), x.get(), 1.0, y.get(), hpro::apply_normal ); 
+
+            toc = timer::since( tic );
+            
+            std::cout << y->norm2() << std::endl;
+            std::cout << format_time( toc ) << std::endl;
+        }
         
         A = impl::matrix::copy_tiled< double >( *A, ntile );
         
+        {
+            blas::Vector< double >  ref( A->nrows() );
+
+            for ( size_t  i = 0; i < A->nrows(); ++i )
+                ref(i) = i;
+            
+            vector::tiled_scalarvector< double >  x( A->row_is(), ntile, ref );
+            vector::tiled_scalarvector< double >  y( A->row_is(), ntile, ref );
+
+            y.fill( 0.0 );
+
+            std::cout << x.norm2() << std::endl;
+
+            // burnin
+            for ( uint i = 0; i < 10; ++i )
+                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, *A, x, y );
+            
+            tic = timer::now();
+
+            for ( uint i = 0; i < 100; ++i )
+                impl::tiled2::mul_vec< double >( 1.0, hpro::apply_normal, *A, x, y );
+
+            toc = timer::since( tic );
+            
+            std::cout << y.norm2() << std::endl;
+            std::cout << format_time( toc ) << std::endl;
+        }
+
         auto  C = impl::matrix::copy( *A );
 
         // std::cout << norm_2( A.get() ) << std::endl;

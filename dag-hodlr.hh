@@ -94,162 +94,6 @@ mymain ( int, char ** )
         hlr::dag::def_path_len  = 10;
     }// if
 
-    // if ( false )
-    // {
-    //     auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-    //     auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-    //     auto & X   = A01->U();
-    //     auto   T   = std::make_shared< BLAS::Matrix< real > >();
-    //     auto & U   = A10->V();
-    //     auto   Q   = std::make_shared< hlr::matrix::tile_storage< real > >();
-    //     auto   R   = std::make_shared< BLAS::Matrix< real > >();
-
-    //     *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
-
-    //     auto  DX = to_dense( X );
-    //     auto  DU = to_dense( U );
-
-    //     DBG::write( DX, "X.mat", "X" );
-    //     DBG::write( *T, "T.mat", "T" );
-    //     DBG::write( DU, "U.mat", "U" );
-
-    //     if ( HLIB::CFG::Arith::use_dag )
-    //     {
-    //         auto  dag_tsqr = std::move( hlr::dag::gen_dag_tsqr( A01->ncols(), X, T, U, Q, R, impl::dag::refine ) );
-        
-    //         dag_tsqr.print_dot( "tsqr.dot" );
-            
-    //         impl::dag::run( dag_tsqr, acc );
-    //     }// if
-    //     else
-    //     {
-    //         std::tie( *Q, *R ) = hlr::seq::tiled2::tsqr( A01->col_is(), 1.0, X, *T, U, 128 );
-    //     }// else
-
-    //     auto  DQ = to_dense( *Q );
-
-    //     DBG::write( DQ, "Q.mat", "Q" );
-    //     DBG::write( *R, "R.mat", "R" );
-        
-    //     return;
-    // }
-    
-    // if ( false )
-    // {
-    //     auto   A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-    //     auto   A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-    //     auto & X   = A01->U();
-    //     auto   T   = std::make_shared< BLAS::Matrix< real > >();
-    //     auto & Y   = A01->V();
-
-    //     *T = hlr::seq::tiled2::dot( A10->row_is(), A10->U(), A01->V(), ntile );
-
-    //     auto  DX = to_dense( X );
-    //     auto  DY = to_dense( Y );
-
-    //     DBG::write( DX, "X.mat", "X" );
-    //     DBG::write( *T, "T.mat", "T" );
-    //     DBG::write( DY, "Y.mat", "Y" );
-        
-    //     if ( HLIB::CFG::Arith::use_dag )
-    //     {
-    //         auto  dag_trunc = std::move( hlr::dag::gen_dag_truncate( X, T, Y, A01, impl::dag::refine ) );
-        
-    //         std::cout << "    #nodes = " << dag_trunc.nnodes() << std::endl;
-    //         std::cout << "    #edges = " << dag_trunc.nedges() << std::endl;
-    //         dag_trunc.print_dot( "trunc.dot" );
-
-    //         tic = timer::now();
-            
-    //         impl::dag::run( dag_trunc, acc );
-
-    //         toc = timer::since( tic );
-    //     }// if
-    //     else
-    //     {
-    //         tic = timer::now();
-
-    //         auto [ U, V ] = hlr::seq::tiled2::truncate( A01->row_is(), A01->col_is(), 1.0, X, *T, Y, A01->U(), A01->V(), acc, ntile );
-            
-    //         A01->set_lrmat( std::move( U ), std::move( V ) );
-
-    //         toc = timer::since( tic );
-    //     }// else
-
-    //     std::cout << "  trunc in    " << format_time( toc ) << std::endl;
-
-    //     auto  DU = to_dense( A01->U() );
-    //     auto  DV = to_dense( A01->V() );
-
-    //     DBG::write( DU, "U.mat", "U" );
-    //     DBG::write( DV, "V.mat", "V" );
-        
-    //     return;
-    // }
-
-    // if ( false )
-    // {
-    //     auto    A01 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 0, 1 ), tiled_lrmatrix< real > );
-    //     auto    A10 = ptrcast( ptrcast( C.get(), TBlockMatrix )->block( 1, 0 ), tiled_lrmatrix< real > );
-    //     auto    A11 = ptrcast( C.get(), TBlockMatrix )->block( 1, 1 );
-    //     auto &  X   = A10->U();
-    //     auto    T   = std::make_shared< BLAS::Matrix< real > >();
-    //     auto &  Y   = A01->V();
-
-    //     *T = hlr::seq::tiled2::dot( A10->col_is(), A10->V(), A01->U(), ntile );
-
-    //     if ( A11->nrows() <= 4096 )
-    //     {
-    //         auto  dX = hlr::matrix::to_dense( X );
-    //         auto  dY = hlr::matrix::to_dense( Y );
-    //         auto  M = impl::matrix::copy_nontiled< real >( *A11 );
-            
-    //         DBG::write( dX,  "X.mat", "X" );
-    //         DBG::write( *T,  "T.mat", "T" );
-    //         DBG::write( dY,  "Y.mat", "Y" );
-    //         DBG::write( M.get(), "A.mat", "A" );
-    //     }// if
-
-    //     if ( HLIB::CFG::Arith::use_dag )
-    //     {
-    //         std::cout << "    mem    = " << mem_usage() << std::endl;
-            
-    //         auto  dag_addlr = std::move( hlr::dag::gen_dag_addlr( X, T, Y, A11, impl::dag::refine ) );
-        
-    //         std::cout << "    #nodes = " << dag_addlr.nnodes() << std::endl;
-    //         std::cout << "    #edges = " << dag_addlr.nedges() << std::endl;
-    //         std::cout << "    mem    = " << Mem::to_string( dag_addlr.mem_size() ) << mem_usage() << std::endl;
-
-    //         dag_addlr.print_dot( "addlr.dot" );
-
-    //         tic = timer::now();
-            
-    //         impl::dag::run( dag_addlr, acc );
-
-    //         toc = timer::since( tic );
-    //         std::cout << "    mem    = " << mem_usage() << std::endl;
-    //     }// if
-    //     else
-    //     {
-    //         tic = timer::now();
-
-    //         impl::tiled2::hodlr::addlr( X, *T, Y, A11, acc, ntile );
-            
-    //         toc = timer::since( tic );
-    //     }// else
-
-    //     std::cout << "  addlr in    " << format_time( toc ) << std::endl;
-        
-    //     if ( A11->nrows() <= 4096 )
-    //     {
-    //         auto  M = impl::matrix::copy_nontiled< real >( *A11 );
-            
-    //         DBG::write( M.get(), "C.mat", "C" );
-    //     }// if
-
-    //     return;
-    // }
-    
     //
     // benchmark DAG generation
     //
@@ -260,7 +104,7 @@ mymain ( int, char ** )
     {
         tic = timer::now();
 
-        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, hlr::seq::dag::refine ) );
         
         toc = timer::since( tic );
         
@@ -318,12 +162,12 @@ mymain ( int, char ** )
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
 
-    // {
-    //     auto  T1 = impl::matrix::copy_nontiled< double >( *C );
-    //     auto  T2 = hpro::to_dense( T1.get() );
+    {
+        auto  T1 = impl::matrix::copy_nontiled< double >( *C );
+        auto  T2 = hpro::to_dense( T1.get() );
 
-    //     write_matrix( T2.get(), "B.mat", "B" );
-    // }
+        write_matrix( T2.get(), "B.mat", "B" );
+    }
     
     hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
     // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );

@@ -150,6 +150,12 @@ public:
                      
         _successors.push_back( t );
     }
+    template < typename... Nodes >
+    void  before   ( node * t, Nodes... nodes )
+    {
+        before( t );
+        before( nodes... );
+    }
     
     // run <this> after <t>
     void  after    ( node *  t )
@@ -158,6 +164,12 @@ public:
         HLR_LOG( 6, t->to_string() + " → " + this->to_string() );
                      
         t->_successors.push_back( this );
+    }
+    template < typename... Nodes >
+    void  after    ( node *  t, Nodes... nodes )
+    {
+        after( t );
+        after( nodes... );
     }
 
     // return dependency counter

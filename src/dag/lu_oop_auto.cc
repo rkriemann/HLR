@@ -339,7 +339,7 @@ graph
 gen_dag_lu_oop_auto ( TMatrix &      A,
                       refine_func_t  refine )
 {
-    return std::move( refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node ) );
+    return refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 }
 
 }// namespace dag

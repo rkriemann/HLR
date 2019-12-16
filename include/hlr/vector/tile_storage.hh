@@ -1,5 +1,5 @@
-#ifndef __HLR_MATRIX_TILE_STORAGE_HH
-#define __HLR_MATRIX_TILE_STORAGE_HH
+#ifndef __HLR_VECTOR_TILE_STORAGE_HH
+#define __HLR_VECTOR_TILE_STORAGE_HH
 //
 // Project     : HLib
 // File        : arith.hh
@@ -9,25 +9,23 @@
 //
 
 #include <map>
-#include <vector>
 #include <mutex>
 
 #include <hpro/cluster/TIndexSet.hh>
-#include <hpro/blas/Matrix.hh>
+#include <hpro/blas/Vector.hh>
 
-namespace hlr { namespace matrix {
+namespace hlr { namespace vector {
 
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
-using  indexset       = hpro::TIndexSet;
-using  range          = blas::Range;
-using  block_indexset = hpro::TBlockIndexSet;
+using  indexset = hpro::TIndexSet;
+using  range    = blas::Range;
 
 // tile type
 template < typename value_t >
-using  tile     = blas::Matrix< value_t >;
+using  tile     = blas::Vector< value_t >;
 
 // tile mapping type
 template < typename value_t >
@@ -51,13 +49,10 @@ public:
  
 private:
     // the map of tiles
-    tilemap< value_t >       _tiles;
+    tilemap< value_t >  _tiles;
 
-    // index sets for loops
-    std::vector< indexset >  _tile_is;
-    
-    // lock for concurrent access protection to map
-    mutable std::mutex       _mtx;
+    // lock for concurrent access protection
+    mutable std::mutex  _mtx;
 
 public:
     // ctors
@@ -160,15 +155,6 @@ public:
     }
 
     //
-    // access to index sets
-    //
-
-    std::vector< indexset > &        tile_is ()       { return _tile_is; }
-    const std::vector< indexset > &  tile_is () const { return _tile_is; }
-
-    const indexset                   tile_is ( const size_t  i ) const { return _tile_is[i]; }
-    
-    //
     // size information
     //
 
@@ -198,44 +184,42 @@ public:
 };
 
 //
-// convert tile_storage to blas::matrix
+// convert tile_storage to blas::vector
 //
 template < typename value_t >
-blas::Matrix< value_t >
-to_dense ( const tile_storage< value_t > &  st )
+blas::Vector< value_t >
+to_dense ( const tile_storage< value_t > &  ts )
 {
     //
-    // determine nrows, ncols
+    // determine length
     //
 
     bool      first = true;
     indexset  row_is;
-    size_t    ncols = 0;
 
-    for ( auto & [ is, U ] : st )
+    for ( auto & [ is, ts_i ] : ts )
     {
         if ( first )
         {
             row_is = is;
-            ncols  = U.ncols();
             first  = false;
         }// if
         else
             row_is = join( row_is, is );
     }// for
 
-    blas::Matrix< value_t >  D( row_is.size(), ncols );
+    blas::Vector< value_t >  v( row_is.size() );
 
-    for ( auto & [ is, U ] : st )
+    for ( auto & [ is, ts_i ] : ts )
     {
-        blas::Matrix< value_t >  D_i( D, is - row_is.first(), range::all );
+        blas::Vector< value_t >  v_i( v, is - row_is.first() );
 
-        blas::copy( U, D_i );
+        blas::copy( ts_i, v_i );
     }// for
 
-    return D;
+    return std::move( v );
 }
 
-}} // namespace hlr::matrix
+}} // namespace hlr::vector
 
-#endif  // __HLR_MATRIX_TILE_STORAGE_HH
+#endif  // __HLR_VECTOR_TILE_STORAGE_HH

@@ -15,21 +15,8 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/matrix/tile_storage.hh>
+#include <hlr/vector/tiled_scalarvector.hh>
 #include <hlr/utils/checks.hh>
-
-namespace std
-{
-
-// (partial) ordering of index sets
-inline
-bool
-operator < ( const HLIB::TIndexSet  is1,
-             const HLIB::TIndexSet  is2 )
-{
-    return is1.is_strictly_left_of( is2 );
-}
-
-}// namespace std
 
 namespace hlr
 { 
@@ -171,11 +158,15 @@ public:
     virtual size_t  rows      () const { return nrows(); }
     virtual size_t  cols      () const { return ncols(); }
 
+    // use "op" versions from TMatrix
+    using TMatrix::nrows;
+    using TMatrix::ncols;
+    
     // return true, if matrix is zero
     virtual bool    is_zero   () const { return ( _rank == 0 ); }
     
-    virtual void    set_size  ( const size_t  nrows,
-                                const size_t  ncols ) {} // ignored
+    virtual void    set_size  ( const size_t  ,
+                                const size_t   ) {} // ignored
     
     //
     // tile management
@@ -255,18 +246,24 @@ template < typename value_t >
 void
 tiled_lrmatrix< value_t >::init_tiles ()
 {
+    _U.tile_is().reserve( _row_is.size() / _ntile + 1 );
+    
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
         const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
 
         _U[ is_i ] = blas::Matrix< value_t >( is_i.size(), _rank );
+        _U.tile_is().push_back( is_i );
     }// for
+
+    _V.tile_is().reserve( _col_is.size() / _ntile + 1 );
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
         const indexset  is_i( i, std::min< idx_t >( i + _ntile - 1, _col_is.last() ) );
 
         _V[ is_i ] = blas::Matrix< value_t >( is_i.size(), _rank );
+        _V.tile_is().push_back( is_i );
     }// for
 }
 
@@ -282,13 +279,18 @@ tiled_lrmatrix< value_t >::copy_tiles ( const blas::Matrix< value_t > &  U,
 
     _rank = U.ncols();
     
+    _U.tile_is().reserve( _row_is.size() / _ntile + 1 );
+    
     for ( idx_t  i = _row_is.first(); i < _row_is.last(); i += _ntile )
     {
         const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _row_is.last() ) );
         const tile< value_t >  U_i( U, is_i - _row_is.first(), blas::Range::all );
 
         _U[ is_i ] = blas::Matrix< value_t >( U_i, hpro::copy_value );
+        _U.tile_is().push_back( is_i );
     }// for
+
+    _V.tile_is().reserve( _col_is.size() / _ntile + 1 );
 
     for ( idx_t  i = _col_is.first(); i < _col_is.last(); i += _ntile )
     {
@@ -296,6 +298,7 @@ tiled_lrmatrix< value_t >::copy_tiles ( const blas::Matrix< value_t > &  U,
         const tile< value_t >  V_i( V, is_i - _col_is.first(), blas::Range::all );
 
         _V[ is_i ] = blas::Matrix< value_t >( V_i, hpro::copy_value );
+        _V.tile_is().push_back( is_i );
     }// for
 }
 
@@ -373,7 +376,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const real             alpha,
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::truncate ( const hpro::TTruncAcc & acc )
+tiled_lrmatrix< value_t >::truncate ( const hpro::TTruncAcc & )
 {
 }
 
@@ -506,6 +509,23 @@ tiled_lrmatrix< value_t >::byte_size () const
         size += sizeof(is) + sizeof(value_t) * V_i.nrows() * V_i.ncols();
 
     return size;
+}
+
+//
+// type test
+//
+inline
+bool
+is_tiled_lowrank ( const hpro::TMatrix &  M )
+{
+    return ! IS_TYPE( &M, tiled_lrmatrix );
+}
+
+inline
+bool
+is_tiled_lowrank ( const hpro::TMatrix *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
 }
 
 }} // namespace hlr::matrix

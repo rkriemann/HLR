@@ -337,6 +337,7 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
                                      'src/dag/lu.cc',
                                      'src/dag/lu_coarse.cc',
                                      'src/dag/lu_hodlr_tiled.cc',
+                                     'src/dag/lu_hodlr_tiled_lazy.cc',
                                      'src/dag/lu_lvl.cc',
                                      'src/dag/lu_oop.cc',
                                      'src/dag/lu_oop_accu.cc',
@@ -350,7 +351,8 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
                                      'src/seq/solve.cc',
                                      'src/utils/compare.cc',
                                      'src/utils/log.cc',
-                                     'src/utils/term.cc' ] )
+                                     'src/utils/term.cc',
+                                     'src/utils/text.cc' ] )
 
 Default( None )
 
