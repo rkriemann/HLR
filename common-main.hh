@@ -1,3 +1,5 @@
+#include <hlr/utils/mach.hh>
+
 //
 // main function specific to arithmetic
 //
@@ -17,7 +19,8 @@ hlrmain ( int argc, char ** argv )
         hlr::cmdline::parse( argc, argv );
     
         std::cout << hlr::term::bullet << hlr::term::bold << hpro::Mach::hostname() << hlr::term::reset << std::endl
-                  << "    CPU cores : " << hpro::Mach::cpuset() << std::endl;
+                  << "    processor : " << hlr::mach::cpu() << std::endl
+                  << "    cores     : " << hlr::mach::cpuset() << std::endl;
         
         hpro::CFG::set_verbosity( hlr::verbosity );
 

@@ -11,11 +11,7 @@
 #include <ostream>
 #include <string>
 
-namespace hlr
-{
-
-namespace term
-{
+namespace hlr { namespace term {
 
 //
 // change color or attribute of output stream
@@ -158,8 +154,6 @@ const char *  dark         ();
 const char *  underline    ();
 const char *  reverse      ();
 
-}// namespace term
-
-}// namespace hlr
+}}// namespace hlr::term
 
 #endif  // __HLR_UTILS_TERM_HH
