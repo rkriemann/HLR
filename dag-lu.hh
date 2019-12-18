@@ -53,7 +53,7 @@ mymain ( int, char ** )
         auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
     else
     {
@@ -157,18 +157,18 @@ mymain ( int, char ** )
         // LIKWID_MARKER_START( "dag" );
 
         if ( levelwise )
-            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
+            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C, nseq ) );
         else if ( coarse > 0 )
-            dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, impl::dag::refine, impl::dag::run, ncoarse ) );
+            dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, ncoarse, impl::dag::refine, impl::dag::run ) );
         else if ( oop_lu )
         {
             if ( hpro::CFG::Arith::use_accu )
-                dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, impl::dag::refine ) );
+                dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, nseq, impl::dag::refine ) );
             else
-                dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
+                dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
         }// if
         else 
-            dag = std::move( hlr::dag::gen_dag_lu_rec( *C, impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_lu_rec( *C, nseq, impl::dag::refine ) );
         
         // LIKWID_MARKER_STOP( "dag" );
         

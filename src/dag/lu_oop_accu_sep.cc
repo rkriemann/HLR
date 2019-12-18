@@ -485,6 +485,7 @@ build_apply_dag ( TMatrix *           A,
 
 graph
 gen_dag_lu_oop_accu_sep ( TMatrix &      A,
+                          const size_t   min_size,
                           refine_func_t  refine )
 {
     //
@@ -496,7 +497,7 @@ gen_dag_lu_oop_accu_sep ( TMatrix &      A,
 
     build_apply_dag( & A, nullptr, apply_map, apply_nodes );
     
-    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto  dag = refine( new lu_node( & A, apply_map ), min_size, use_single_end_node );
 
     //
     // add apply/shift nodes with shift(A) as new start

@@ -49,7 +49,7 @@ mymain ( int, char ** )
         auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
 
     auto  toc    = timer::since( tic );

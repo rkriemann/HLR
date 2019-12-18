@@ -49,7 +49,7 @@ mymain ( int, char ** )
         auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
     else
     {
@@ -92,7 +92,7 @@ mymain ( int, char ** )
     {
         tic = timer::now();
         
-        dag = std::move( hlr::dag::gen_dag_gauss_elim( C.get(), T.get(), impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_gauss_elim( C.get(), T.get(), nseq, impl::dag::refine ) );
         
         toc = timer::since( tic );
         

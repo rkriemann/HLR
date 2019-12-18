@@ -45,7 +45,8 @@ std::unique_ptr< hpro::TMatrix >
 build ( const hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const hpro::TTruncAcc &      acc )
+        const hpro::TTruncAcc &      acc,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -76,6 +77,10 @@ build ( const hpro::TBlockCluster *  bct,
             M = coeff.build( rowis, colis );
         }// else
     }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, nseq );
+    }// if
     else
     {
         M = std::make_unique< hpro::TBlockMatrix >( bct );
@@ -91,7 +96,7 @@ build ( const hpro::TBlockCluster *  bct,
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
                                             0, B->nblock_cols() ),
-            [&,B,bct] ( const ::tbb::blocked_range2d< uint > &  r )
+            [&,B,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -99,7 +104,7 @@ build ( const hpro::TBlockCluster *  bct,
                     {
                         if ( bct->son( i, j ) != nullptr )
                         {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if

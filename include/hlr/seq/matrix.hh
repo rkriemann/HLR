@@ -36,7 +36,8 @@ std::unique_ptr< hpro::TMatrix >
 build ( const hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const hpro::TTruncAcc &      acc )
+        const hpro::TTruncAcc &      acc,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                                  typename lrapx_t::value_t >::value,
@@ -79,7 +80,7 @@ build ( const hpro::TBlockCluster *  bct,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if

@@ -509,14 +509,10 @@ build_apply_dag ( TMatrix *           A,
 
 graph
 gen_dag_lu_oop_coarse ( TMatrix &            A,
+                        const size_t         ncoarse,
                         const refine_func_t  refine,
-                        const exec_func_t    fine_run,
-                        const size_t         ncoarse )
+                        const exec_func_t    fine_run )
 {
-    // if coarse size if too small, generate standard LU DAG
-    if ( ncoarse <= HLIB::CFG::Arith::max_seq_size )
-        return gen_dag_lu_oop_auto( A, refine );
-            
     apply_map_t  apply_map;
     auto         dag = refine( new lu_node( & A, apply_map, fine_run ), ncoarse, use_single_end_node );
 

@@ -154,9 +154,6 @@ parse ( int argc, char ** argv )
     
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
-
-    // adjust hpro variables
-    hpro::CFG::Arith::max_seq_size = nseq;
 }
 
 }}// namespace hlr::cmdline

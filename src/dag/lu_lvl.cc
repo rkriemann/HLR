@@ -24,7 +24,9 @@
 
 namespace hlr { namespace dag {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+
+using namespace hpro;
 
 namespace
 {
@@ -37,7 +39,7 @@ struct lu_node : public node
             : A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
@@ -58,7 +60,7 @@ struct solve_upper_node : public node
             , A( aA )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "solve_U( %d, %d )", U->id(), A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "solve_U( %d, %d )", U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
@@ -79,7 +81,7 @@ struct solve_lower_node : public node
             , A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "solve_L( %d, %d )", L->id(), A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "solve_L( %d, %d )", L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
@@ -103,7 +105,7 @@ struct update_node : public node
             , C( aC )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "update( %d, %d, %d )", A->id(), B->id(), C->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "update( %d, %d, %d )", A->id(), B->id(), C->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
@@ -123,7 +125,7 @@ struct apply_node : public node
             , is_recursive( false )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "apply( %d )", A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "apply( %d )", A->id() ); }
     virtual std::string  color     () const { return "edd400"; }
 
     void set_recursive () { is_recursive = true; }
@@ -146,7 +148,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 {
     if ( is_small( A ) || is_dense( A ) )
     {
-        HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+        hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
     }// if
 }
 
@@ -301,7 +303,7 @@ dag_lu_lvl ( TMatrix *         A,
              node_list_t &     nodes,
              node_map_t &      final_map,
              nodelist_map_t &  updates,
-             std::mutex &      mtx_nodes )
+             const size_t      min_size )
 {
     local_graph  g;
 
@@ -311,14 +313,8 @@ dag_lu_lvl ( TMatrix *         A,
     //
     ///////////////////////////////////////////////////////////////
 
-    const bool  A_is_leaf = ( is_leaf( A ) || is_small( A ) );
-    node *      node_A    = nullptr;
-
-    {
-        std::scoped_lock  lock( mtx_nodes );
-        
-        node_A = hlr::dag::alloc_node< lu_node >( nodes, A );
-    }
+    const bool  A_is_leaf = ( is_leaf( A ) || is_small( min_size, A ) );
+    node *      node_A    = hlr::dag::alloc_node< lu_node >( nodes, A );
 
     final_map[ A->id() ] = node_A;
     
@@ -327,22 +323,18 @@ dag_lu_lvl ( TMatrix *         A,
         auto        B      = ptrcast( A, TBlockMatrix );
         const uint  nbrows = B->nblock_rows();
         const uint  nbcols = B->nblock_cols();
-        std::mutex  mtx;
 
         for ( uint  i = 0; i < std::min( nbrows, nbcols ); ++i )
-        // ::tbb::parallel_for< uint >(
-        //     0, std::min( nbrows, nbcols ),
-        //     [&,node_A,B] ( const uint  i )
-            {
-                auto  A_ii = B->block( i, i );
-                
-                assert( ! is_null( A_ii ) );
-                
-                auto  node_A_ii = dag_lu_lvl( A_ii, nodes, final_map, updates, mtx_nodes );
-
-                node_A->after( node_A_ii );
-                node_A->inc_dep_cnt();
-            }
+        {
+            auto  A_ii = B->block( i, i );
+            
+            assert( ! is_null( A_ii ) );
+            
+            auto  node_A_ii = dag_lu_lvl( A_ii, nodes, final_map, updates, min_size );
+            
+            node_A->after( node_A_ii );
+            node_A->inc_dep_cnt();
+        }// for
     }// if
 
     ///////////////////////////////////////////////////////////////
@@ -412,7 +404,8 @@ void
 assign_dependencies ( TMatrix *            A,
                       node_map_t &         final_map,
                       nodelist_map_t &     updates,
-                      const node_list_t &  parent_deps = {} )
+                      const node_list_t &  parent_deps,
+                      const size_t         min_size )
 {
     if ( A == nullptr )
         return;
@@ -420,7 +413,7 @@ assign_dependencies ( TMatrix *            A,
     auto        node_A       = final_map[ A->id() ];
     const bool  is_final     = ( node_A != nullptr );
     // inner factorisation nodes are only dummies, hence exclude them
-    const bool  is_inner_fac = ( is_on_diag( A ) && is_blocked( A ) && ! is_small( A ) );
+    const bool  is_inner_fac = ( is_on_diag( A ) && is_blocked( A ) && ! is_small( min_size, A ) );
 
     if ( is_final && ! is_inner_fac )
     {
@@ -457,7 +450,7 @@ assign_dependencies ( TMatrix *            A,
                     auto  B_ij = B->block( i, j );
                 
                     if ( B_ij != nullptr )
-                        assign_dependencies( B_ij, final_map, updates, deps_A );
+                        assign_dependencies( B_ij, final_map, updates, deps_A, min_size );
                 }// for
             }// for
         }// if
@@ -516,13 +509,14 @@ build_apply_dep ( TMatrix *         M,
                   node *            parent_apply,
                   node_list_t &     nodes,
                   node_map_t &      final_map,
-                  nodelist_map_t &  updates )
+                  nodelist_map_t &  updates,
+                  const size_t      min_size )
 {
     if ( M == nullptr )
         return;
 
     auto          M_final      = final_map[ M->id() ];
-    const bool    is_inner_fac = ( is_on_diag( M ) && is_blocked( M ) && ! is_small( M ) );
+    const bool    is_inner_fac = ( is_on_diag( M ) && is_blocked( M ) && ! is_small( min_size, M ) );
     apply_node *  M_apply      = nullptr;
 
     //
@@ -590,7 +584,7 @@ build_apply_dep ( TMatrix *         M,
 
             for ( uint  i = 0; i < B->block_rows(); ++i )
                 for ( uint  j = 0; j < B->block_cols(); ++j )
-                    build_apply_dep( B->block( i, j ), M_apply, nodes, final_map, updates );
+                    build_apply_dep( B->block( i, j ), M_apply, nodes, final_map, updates, min_size );
         }// if
         else
             assert( false );
@@ -600,7 +594,8 @@ build_apply_dep ( TMatrix *         M,
 }// namespace anonymous
 
 graph
-gen_dag_lu_lvl ( TMatrix &  A )
+gen_dag_lu_lvl ( TMatrix &     A,
+                 const size_t  min_size )
 {
     //
     // construct DAG for LU
@@ -609,18 +604,17 @@ gen_dag_lu_lvl ( TMatrix &  A )
     node_list_t     nodes;
     node_map_t      final_map;
     nodelist_map_t  updates;
-    std::mutex      mtx_nodes;
     const auto      nid = max_id( & A ) + 1;
 
     final_map.resize( nid );
     updates.resize( nid );
 
-    auto  final = dag_lu_lvl( & A, nodes, final_map, updates, mtx_nodes );
+    auto  final = dag_lu_lvl( & A, nodes, final_map, updates, min_size );
 
     if ( CFG::Arith::use_accu )
-        build_apply_dep( & A, nullptr, nodes, final_map, updates );
+        build_apply_dep( & A, nullptr, nodes, final_map, updates, min_size );
     else
-        assign_dependencies( & A, final_map, updates );
+        assign_dependencies( & A, final_map, updates, {}, min_size );
     
     dag::node_list_t  start, end{ final };
 

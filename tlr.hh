@@ -38,7 +38,7 @@ mymain ( int, char ** )
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     auto  toc    = timer::since( tic );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;

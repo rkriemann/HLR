@@ -382,9 +382,10 @@ update_node::run_ ( const TTruncAcc &  acc )
 
 graph
 gen_dag_lu_oop ( TMatrix &      A,
+                 const size_t   min_size,
                  refine_func_t  refine )
 {
-    return refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    return refine( new lu_node( & A ), min_size, use_single_end_node );
 }
 
 }// namespace dag

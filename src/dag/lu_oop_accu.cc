@@ -544,6 +544,7 @@ shift_node::run_ ( const TTruncAcc &  acc )
 
 graph
 gen_dag_lu_oop_accu ( TMatrix &      A,
+                      const size_t   min_size,
                       refine_func_t  refine )
 {
     if ( hlr::dag::sparsify_mode != hlr::dag::sparsify_none )
@@ -553,7 +554,7 @@ gen_dag_lu_oop_accu ( TMatrix &      A,
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto  dag = refine( new lu_node( & A ), min_size, use_single_end_node );
 
     return dag;
     
