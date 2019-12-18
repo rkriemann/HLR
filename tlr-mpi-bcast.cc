@@ -11,4 +11,4 @@
 
 namespace ARITH = hlr::mpi::bcast::tlr;
 
-#include "tlr-mpi-main.hh"
+#include "tlr-mpi.hh"

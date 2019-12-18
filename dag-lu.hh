@@ -87,6 +87,7 @@ mymain ( int, char ** )
               << ( levelwise ? "Level LU (DAG)" : ( coarse > 0 ? HLIB::to_string( "LU (Coarse-%d DAG)", ncoarse ) : "LU (DAG)" ) )
               << term::reset
               << ", " << acc.to_string()
+              << ", nseq = " << nseq
               << std::endl;
 
     //////////////////////////////////////////////////////////////////////

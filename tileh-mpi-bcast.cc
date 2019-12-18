@@ -12,4 +12,4 @@
 namespace          impl      = hlr::mpi::bcast::tileh;
 const std::string  impl_name = "bcast";
 
-#include "tileh-mpi-main.hh"
+#include "tileh-mpi.hh"

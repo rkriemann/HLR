@@ -10,12 +10,12 @@ inline
 int
 hlrmain ( int argc, char ** argv )
 {
-    hlr::cmdline::parse( argc, argv );
-    
     try
     {
         hpro::INIT();
 
+        hlr::cmdline::parse( argc, argv );
+    
         std::cout << hlr::term::bullet << hlr::term::bold << hpro::Mach::hostname() << hlr::term::reset << std::endl
                   << "    CPU cores : " << hpro::Mach::cpuset() << std::endl;
         

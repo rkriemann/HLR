@@ -124,12 +124,12 @@ main ( int argc, char ** argv )
                                                      ? std::make_unique< RedirectOutput >( to_string( "tileh-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
-    cmdline::parse( argc, argv );
-    
     try
     {
         INIT();
 
+        cmdline::parse( argc, argv );
+    
         // adjust HLIB network data
         NET::set_nprocs( nprocs );
         NET::set_pid( pid );

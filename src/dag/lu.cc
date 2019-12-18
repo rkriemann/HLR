@@ -496,7 +496,7 @@ gen_dag_lu_rec ( TMatrix &      A,
     //
     // construct DAG for LU
     //
-    
+
     auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
 
     if ( ! CFG::Arith::use_accu )

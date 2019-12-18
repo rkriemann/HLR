@@ -18,24 +18,25 @@ namespace hpro = HLIB;
 
 namespace hlr { namespace cmdline {
 
-size_t  n          = 1024;
-size_t  ntile      = 128;
-size_t  k          = 16;
-double  eps        = -1;
-string  appl       = "logkernel";
-string  distr      = "cyclic2d";
-uint    nthreads   = 0;
-uint    verbosity  = 1;
-bool    noredir    = false;
-string  gridfile   = "";
-string  matrixfile = "";
-bool    onlydag    = false;
-bool    docopy     = true;
-bool    levelwise  = false;
-bool    oop_lu     = false;
-bool    nosparsify = false;
-int     coarse     = 0;
-int     nbench     = 1;
+size_t  n          = 1024;         // problem size
+size_t  ntile      = 128;          // tile size (nmin)
+size_t  nseq       = 128;          // use sequential arithmetic below
+size_t  k          = 16;           // constant rank
+double  eps        = -1;           // constant precision
+string  appl       = "logkernel";  // application
+string  distr      = "cyclic2d";   // block distribution
+uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
+uint    verbosity  = 1;            // verbosity level
+bool    noredir    = false;        // prevent stdout redirection in distributed mode
+string  gridfile   = "";           // gridfile for corresponding applications
+string  matrixfile = "";           // use matrix from file instead of application
+bool    onlydag    = false;        // only compute task graph, no DAG execution
+bool    docopy     = true;         // copy matrix before further comp. to distr. memory
+bool    levelwise  = false;        // use levelwise task graph construction
+bool    oop_lu     = false;        // use out-of-place task graph
+bool    nosparsify = false;        // do not sparsify task graph
+int     coarse     = 0;            // use coarse sparse graph
+int     nbench     = 1;            // perform computations <nbench> times
 
 void
 parse ( int argc, char ** argv )
@@ -51,6 +52,7 @@ parse ( int argc, char ** argv )
     opts.add_options()
         ( "help,h",                       ": print this help text" )
         ( "ntile",       value<int>(),    ": set tile size" )
+        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
@@ -65,7 +67,7 @@ parse ( int argc, char ** argv )
         ( "noredir",                      ": do not redirect output (MPI only)" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
-        ( "lvlwise",                      ": do level-wise LU" )
+        ( "lvl",                          ": do level-wise LU" )
         ( "oop",                          ": do out-of-place LU" )
         ( "nosparsify",                   ": do not sparsify DAG" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
@@ -108,6 +110,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
     if ( vm.count( "ntile"      ) ) ntile      = vm["ntile"].as<int>();
+    if ( vm.count( "nseq"       ) ) nseq       = vm["nseq"].as<int>();
     if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
@@ -117,7 +120,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "noredir"    ) ) noredir    = true;
     if ( vm.count( "onlydag"    ) ) onlydag    = true;
     if ( vm.count( "nocopy"     ) ) docopy     = false;
-    if ( vm.count( "lvlwise"    ) ) levelwise  = true;
+    if ( vm.count( "lvl"        ) ) levelwise  = true;
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
@@ -126,10 +129,10 @@ parse ( int argc, char ** argv )
     if ( appl == "help" )
     {
         std::cout << "Applications:" << std::endl
-                  << "  - logkernel  : 1D integral equation over [0,1] with log |x-y| kernel;" << std::endl
+                  << "  - logkernel  : 1D integral equation ∫_[0,1] log |x-y| dx;" << std::endl
                   << "                 n defines number of DoFs" << std::endl
                   << "  - materncov  : Matérn covariance over given number of spatial points;" << std::endl
-                  << "                 if grid is defined, use grid points otherwise n random points in 3D" << std::endl
+                  << "                 if grid is defined use grid points, otherwise n random points in 3D" << std::endl
                   << "  - laplaceslp : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl;
 
         std::exit( 0 );
@@ -151,12 +154,11 @@ parse ( int argc, char ** argv )
     
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
+
+    // adjust hpro variables
+    hpro::CFG::Arith::max_seq_size = nseq;
 }
 
 }}// namespace hlr::cmdline
 
 #endif // __HLR_CMDLINE_HH
-
-// Local Variables:
-// mode: c++
-// End:
