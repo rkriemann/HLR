@@ -714,7 +714,7 @@ lu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( tile_size, A ) )
+    if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  BL  = BA;
@@ -777,7 +777,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( tile_size, U ) )
+    if ( is_blocked( U ) && ! is_small( tile_size, U ) )
     {
         //
         //  ⎡ R_00^T │        ⎤ ⎡X_0⎤   ⎡ R_00^T            │        ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -844,7 +844,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( tile_size, L ) )
+    if ( is_blocked( L ) && ! is_small( tile_size, L ) )
     {
         //
         //  ⎡ L_00 │      ⎤ ⎡X_0⎤   ⎡ L_00              │      ⎤ ⎡X_0⎤   ⎡M_0⎤

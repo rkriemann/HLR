@@ -174,7 +174,7 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
@@ -241,7 +241,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -271,7 +271,7 @@ trsmu_node::refine_ ( const size_t  min_size )
     else if ( CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ A->id() ];
-        
+
         assert( apply != nullptr );
 
         apply->before( this );
@@ -300,7 +300,7 @@ trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -363,7 +363,7 @@ update_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
+    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -427,7 +427,7 @@ update_node::run_ ( const TTruncAcc &  acc )
 void
 apply_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! hpro::is_small( A ) )
         A->apply_updates( acc, nonrecursive );
     else
         A->apply_updates( acc, recursive );
@@ -446,7 +446,8 @@ void
 build_apply_dag ( TMatrix *           A,
                   node *              parent,
                   apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes )
+                  dag::node_list_t &  apply_nodes,
+                  const size_t        min_size )
 {
     if ( is_null( A ) )
         return;
@@ -458,7 +459,7 @@ build_apply_dag ( TMatrix *           A,
     if ( parent != nullptr )
         apply->after( parent );
     
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto  BA = ptrcast( A, TBlockMatrix );
 
@@ -467,7 +468,7 @@ build_apply_dag ( TMatrix *           A,
             for ( uint  j = 0; j < BA->nblock_cols(); ++j )
             {
                 if ( BA->block( i, j ) != nullptr )
-                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes );
+                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes, min_size );
             }// for
         }// for
     }// if
@@ -494,7 +495,7 @@ gen_dag_lu_rec ( TMatrix &      A,
     dag::node_list_t  apply_nodes;
 
     if ( CFG::Arith::use_accu )
-        build_apply_dag( & A, nullptr, apply_map, apply_nodes );
+        build_apply_dag( & A, nullptr, apply_map, apply_nodes, min_size );
     
     //
     // construct DAG for LU

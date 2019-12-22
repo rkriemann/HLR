@@ -378,7 +378,7 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        BA  = ptrcast( A, TBlockMatrix );
         auto        BL  = BA;
@@ -461,7 +461,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -521,7 +521,7 @@ trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );

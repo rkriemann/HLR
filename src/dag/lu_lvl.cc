@@ -146,7 +146,7 @@ private:
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_small( A ) || is_dense( A ) )
+    if ( hpro::is_small( A ) || is_dense( A ) )
     {
         hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
     }// if
@@ -212,7 +212,7 @@ apply_node::run_ ( const TTruncAcc &  acc )
     if ( ! is_recursive )
         A->apply_updates( acc, nonrecursive );
     
-    // if ( is_blocked( A ) && ! is_small( A ) )
+    // if ( is_blocked( A ) && ! hpro::is_small( A ) )
     //     A->apply_updates( acc, nonrecursive );
     // else
     //     A->apply_updates( acc, recursive );
