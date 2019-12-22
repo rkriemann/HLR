@@ -34,9 +34,11 @@ namespace
 struct lu_node : public node
 {
     TMatrix *  A;
+    bool       is_leaf;
     
     lu_node ( TMatrix *  aA )
             : A( aA )
+            , is_leaf{ false }
     { init(); }
 
     virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
@@ -146,7 +148,7 @@ private:
 void
 lu_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( hpro::is_small( A ) || is_dense( A ) )
+    if ( is_leaf || is_dense( A ) )
     {
         hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
     }// if
@@ -314,11 +316,15 @@ dag_lu_lvl ( TMatrix *         A,
     ///////////////////////////////////////////////////////////////
 
     const bool  A_is_leaf = ( is_leaf( A ) || is_small( min_size, A ) );
-    node *      node_A    = hlr::dag::alloc_node< lu_node >( nodes, A );
+    auto        node_A    = hlr::dag::alloc_node< lu_node >( nodes, A );
 
     final_map[ A->id() ] = node_A;
     
-    if ( ! A_is_leaf )
+    if ( A_is_leaf )
+    {
+        node_A->is_leaf = true;
+    }// if
+    else
     {
         auto        B      = ptrcast( A, TBlockMatrix );
         const uint  nbrows = B->nblock_rows();
@@ -335,7 +341,7 @@ dag_lu_lvl ( TMatrix *         A,
             node_A->after( node_A_ii );
             node_A->inc_dep_cnt();
         }// for
-    }// if
+    }// else
 
     ///////////////////////////////////////////////////////////////
     //
@@ -352,7 +358,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
         {
-            node *  solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij );
+            auto  solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -364,7 +370,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
         {
-            node *  solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji );
+            auto  solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -384,7 +390,7 @@ dag_lu_lvl ( TMatrix *         A,
             
             if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
             {
-                node *  upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl );
+                auto  upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl );
                 
                 updates[ L_jl->id() ].push_back( upd_node );
 
