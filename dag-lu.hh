@@ -163,12 +163,15 @@ mymain ( int, char ** )
         else if ( oop_lu )
         {
             if ( hpro::CFG::Arith::use_accu )
-                dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, nseq, impl::dag::refine ) );
+                if ( fused )
+                    dag = std::move( hlr::dag::gen_dag_lu_oop_accu( *C, nseq, impl::dag::refine ) );
+                else
+                    dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, nseq, impl::dag::refine ) );
             else
                 dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
         }// if
         else 
-            dag = std::move( hlr::dag::gen_dag_lu_rec( *C, nseq, impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
         
         // LIKWID_MARKER_STOP( "dag" );
         

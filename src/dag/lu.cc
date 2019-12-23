@@ -483,9 +483,9 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_rec ( TMatrix &      A,
-                 const size_t   min_size,
-                 refine_func_t  refine )
+gen_dag_lu_ip ( TMatrix &      A,
+                const size_t   min_size,
+                refine_func_t  refine )
 {
     //
     // generate DAG for shifting and applying updates

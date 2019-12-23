@@ -34,6 +34,7 @@ bool    onlydag    = false;        // only compute task graph, no DAG execution
 bool    docopy     = true;         // copy matrix before further comp. to distr. memory
 bool    levelwise  = false;        // use levelwise task graph construction
 bool    oop_lu     = false;        // use out-of-place task graph
+bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times
@@ -69,6 +70,7 @@ parse ( int argc, char ** argv )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
         ( "lvl",                          ": do level-wise LU" )
         ( "oop",                          ": do out-of-place LU" )
+        ( "fused",                        ": compute fused DAG for LU and accumulators" )
         ( "nosparsify",                   ": do not sparsify DAG" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
@@ -122,6 +124,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nocopy"     ) ) docopy     = false;
     if ( vm.count( "lvl"        ) ) levelwise  = true;
     if ( vm.count( "oop"        ) ) oop_lu     = true;
+    if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();

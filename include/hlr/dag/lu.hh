@@ -24,7 +24,7 @@ namespace dag
 // compute DAG for in-place LU of <A>
 //
 graph
-gen_dag_lu_rec    ( HLIB::TMatrix &    A,
+gen_dag_lu_ip     ( HLIB::TMatrix &    A,
                     const size_t       min_size,
                     refine_func_t      refine );
 
