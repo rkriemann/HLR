@@ -67,8 +67,6 @@ mymain ( int, char ** )
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
-
-        hpro::write_matrix( C.get(), "LU.hm" );
     }
 
 }

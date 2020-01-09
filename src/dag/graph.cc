@@ -189,14 +189,16 @@ graph::print_dot ( const std::string &  filename ) const
         out << "  " << id << " [ label = \"" << node->to_string() << "\", ";
 
         ++id;
-        
+
+        // end nodes
         if ( node->successors().empty()  )
             out << "shape = parallelogram, ";
 
+        // start nodes
         if ( node->dep_cnt() == 0 )
-            out << "penwidth = 5, fillcolor = \"#" << node->color();
-        else 
-            out << "color = \"#" << node->color();
+            out << "penwidth = 5, ";
+
+        out << "color = \"#" << node->color();
         
         out << "\" ];" << std::endl;
     }// for

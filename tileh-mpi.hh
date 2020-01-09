@@ -92,7 +92,7 @@ mymain ( int, char ** )
 
         if ( nprocs == 1 )
         {
-            write_matrix( C.get(), "LU.hm" );
+            // write_matrix( C.get(), "LU.hm" );
             
             matrix::luinv_eval  A_inv( C, hlr::tbb::dag::refine, hlr::tbb::dag::run );
             // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
