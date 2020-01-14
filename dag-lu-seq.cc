@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-seq.cc
 // Description : sequential H-LU using DAG
 // Author      : Ronald Kriemann

@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-omp.cc
 // Description : ompuential Tile-H arithmetic
 // Author      : Ronald Kriemann

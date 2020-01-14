@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr.hh
 // Description : TLR-LU
 // Author      : Ronald Kriemann

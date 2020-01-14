@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-hpx.cc
 // Description : DAG based H-LU using HPX
 // Author      : Ronald Kriemann

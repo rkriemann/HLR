@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss-tf.cc
 // Description : DAG based Gaussian Elimination using C++-TaskFlow
 // Author      : Ronald Kriemann

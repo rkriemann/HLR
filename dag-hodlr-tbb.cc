@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-hodlr-tbb.cc
 // Description : tiled HODLR-LU using DAG with TBB
 // Author      : Ronald Kriemann

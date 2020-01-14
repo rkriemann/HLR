@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr-seq.cc
 // Description : sequential HODLR arithmetic
 // Author      : Ronald Kriemann

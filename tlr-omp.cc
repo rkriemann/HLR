@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-omp.cc
 // Description : TLR LU using OpenMP
 // Author      : Ronald Kriemann

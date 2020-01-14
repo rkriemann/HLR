@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-seq.cc
 // Description : sequential TLR-LU
 // Author      : Ronald Kriemann

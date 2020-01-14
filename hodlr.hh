@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr.hh
 // Description : generic code for HODLR LU
 // Author      : Ronald Kriemann

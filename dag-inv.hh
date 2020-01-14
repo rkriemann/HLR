@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-inv.hh
 // Description : DAG example for matrix inversion
 // Author      : Ronald Kriemann

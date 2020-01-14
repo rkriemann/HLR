@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-omp.cc
 // Description : DAG based H-LU using OpenMP
 // Author      : Ronald Kriemann

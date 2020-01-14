@@ -43,13 +43,32 @@ LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tiled-hodlr', 'dag-hodlr' ]
+PROGRAMS     = [ 'tlr',
+                 'hodlr',
+                 'tileh',
+                 'tiled-hodlr',
+                 'dag-lu',
+                 'dag-gauss',
+                 'dag-inv',
+                 'dag-waz',
+                 'dag-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
-FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
+FRAMEWORKS   = [ 'seq',
+                 'omp',
+                 'tbb',
+                 'tf',
+                 'hpx',
+                 'mpi',
+                 'gpi2' ]
 
 # malloc libraries (also depends on directories above)
-MALLOCS      = [ 'default', 'system', 'jemalloc', 'mimalloc', 'tbbmalloc', 'tcmalloc' ]
+MALLOCS      = [ 'default',
+                 'system',
+                 'jemalloc',
+                 'mimalloc',
+                 'tbbmalloc',
+                 'tcmalloc' ]
 
 ######################################################################
 #
@@ -78,9 +97,21 @@ def readln ( prog ):
 #
 ######################################################################
 
+# prepare program and framework options (for +opt, -opt)
+# opt_programs = [ [ prog, '-' + prog, '+' + prog ] for prog in PROGRAMS ]
+# opt_programs = [ prog for sublist in opt_programs for prog in sublist  ]
+
+# opt_frameworks = [ [ fwrk, '-' + fwrk, '+' + fwrk ] for fwrk in FRAMEWORKS ]
+# opt_frameworks = [ fwrk for sublist in opt_frameworks for fwrk in sublist  ]
+
+# set up command line parameters
 opts = Variables( opts_file )
-opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
-opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
+opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
+opts.Add( ListVariable( 'addprograms',   'programs to build',                 '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'subprograms',   'programs to build',                 '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'all', FRAMEWORKS ) )
+opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
+opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
 opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
@@ -104,6 +135,17 @@ opts.Add( BoolVariable( 'color',    'use colored output during compilation',    
 
 # read options from options file
 opt_env    = Environment( options = opts )
+
+# apply modifiers
+for opt in Split( opt_env['addprograms'] ) :
+    opt_env['programs'].append( opt )
+for opt in Split( opt_env['subprograms'] ) :
+    opt_env['programs'].remove( opt )
+    
+for opt in Split( opt_env['addframeworks'] ) :
+    opt_env['frameworks'].append( opt )
+for opt in Split( opt_env['subframeworks'] ) :
+    opt_env['frameworks'].remove( opt )
 
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )
@@ -130,6 +172,12 @@ profile      = opt_env['profile']
 optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
+
+# remove entries to prevent saving
+del opt_env['addprograms']
+del opt_env['subprograms']
+del opt_env['addframeworks']
+del opt_env['subframeworks']
 
 opts.Save( opts_file, opt_env )
 
@@ -174,7 +222,7 @@ if profile :
 if warn :
     WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
     
-env = Environment( options    = opts,
+env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),

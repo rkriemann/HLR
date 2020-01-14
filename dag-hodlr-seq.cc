@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-hodlr-seq.cc
 // Description : sequential tiled HODLR-LU using DAG
 // Author      : Ronald Kriemann

@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-tbb.cc
 // Description : tbbuential Tile-H arithmetic
 // Author      : Ronald Kriemann

@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-mpi-bcast.cc
 // Description : Tile-H arithmetic with MPI broadcast
 // Author      : Ronald Kriemann

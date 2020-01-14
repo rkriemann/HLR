@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tile-hodlr.hh
 // Description : geeric code for tile-based HODLR LU
 // Author      : Ronald Kriemann

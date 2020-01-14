@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-mpi.cc
 // Description : TLR arithmetic with MPI
 // Author      : Ronald Kriemann

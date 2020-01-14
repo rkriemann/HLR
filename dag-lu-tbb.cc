@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-tbb.cc
 // Description : DAG based H-LU using TBB
 // Author      : Ronald Kriemann

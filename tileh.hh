@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-seq.cc
 // Description : sequential Tile-H arithmetic
 // Author      : Ronald Kriemann

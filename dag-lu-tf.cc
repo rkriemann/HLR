@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-tf.cc
 // Description : DAG based H-LU using TF
 // Author      : Ronald Kriemann

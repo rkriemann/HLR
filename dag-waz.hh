@@ -1,23 +1,19 @@
 //
 // Project     : HLR
-// File        : dag-hodlr.hh
-// Description : main function for tiled HODLR LU
+// File        : dag-waz.hh
+// Description : main function for DAG examples
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
+
+// #include <likwid.h>
 
 #include "common.hh"
 #include "common-main.hh"
-#include "hlr/cluster/hodlr.hh"
-#include "hlr/matrix/luinv_eval.hh"
-#include "hlr/dag/lu.hh"
-#include "hlr/dag/solve.hh"
-#include "hlr/arith/lu.hh"
+#include "hlr/cluster/h.hh"
+#include "hlr/dag/invert.hh"
 
 using namespace hlr;
-
-using hlr::matrix::tiled_lrmatrix;
-using hlr::matrix::to_dense;
 
 //
 // main function
@@ -32,11 +28,12 @@ mymain ( int, char ** )
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< hpro::TMatrix >();
 
+    if ( matrixfile == "" )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
-        auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::h::cluster( coord.get(), ntile );
+        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
         if ( hpro::verbose( 3 ) )
         {
@@ -51,8 +48,20 @@ mymain ( int, char ** )
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
+    else
+    {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    matrix = " << matrixfile
+                  << std::endl;
 
-    auto  toc    = timer::since( tic );
+        A = hpro::read_matrix( matrixfile );
+
+        // for spreading memory usage
+        if ( docopy )
+            A = impl::matrix::realloc( A.release() );
+    }// else
+
+    auto  toc = timer::since( tic );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -65,8 +74,12 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    // convert to tiled format
-    A = impl::matrix::copy_tiled< double >( *A, ntile );
+    const size_t  ncoarse = ( coarse > 0 ? A->nrows() / coarse : A->nrows() / 50 );
+    
+    std::cout << term::bullet << term::bold << "WAZ (DAG)" << term::reset
+              << ", " << acc.to_string()
+              << ", nseq = " << nseq
+              << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -74,14 +87,12 @@ mymain ( int, char ** )
     //
     //////////////////////////////////////////////////////////////////////
     
-    std::cout << term::bullet << term::bold << "Tiled HODLR LU (DAG)" << term::reset << ", " << acc.to_string() << std::endl;
-
     hlr::dag::graph  dag;
     
     auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
 
     //
-    // set up DAG generation options optimised for different DAGs
+    // set up DAG generation options
     //
 
     if ( nosparsify )
@@ -90,7 +101,7 @@ mymain ( int, char ** )
     }// if
     else
     {
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all_ext;
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
         hlr::dag::def_path_len  = 10;
     }// if
 
@@ -100,11 +111,17 @@ mymain ( int, char ** )
     
     std::vector< double >  runtime;
     
+    // LIKWID_MARKER_INIT;
+        
     for ( int  i = 0; i < nbench; ++i )
     {
         tic = timer::now();
+        
+        // LIKWID_MARKER_START( "dag" );
 
-        dag = std::move( hlr::dag::gen_dag_lu_hodlr_tiled( *C, ntile, hlr::seq::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_waz( *C, nseq, impl::dag::refine ) );
+        
+        // LIKWID_MARKER_STOP( "dag" );
         
         toc = timer::since( tic );
         
@@ -116,19 +133,22 @@ mymain ( int, char ** )
         if ( i < nbench-1 )
             dag = std::move( hlr::dag::graph() );
     }// for
+
+    // LIKWID_MARKER_CLOSE;
         
     if ( hpro::verbose( 1 ) )
     {
         if ( nbench > 1 )
-            std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
-
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
         std::cout << "    #nodes = " << dag.nnodes() << std::endl;
         std::cout << "    #edges = " << dag.nedges() << std::endl;
         std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
 
     if ( hpro::verbose( 3 ) )
-        dag.print_dot( "lu.dot" );
+        dag.print_dot( "waz.dot" );
     
     if ( onlydag )
         return;
@@ -149,7 +169,7 @@ mymain ( int, char ** )
         
         toc = timer::since( tic );
 
-        std::cout << "  LU in      " << format_time( toc ) << std::endl;
+        std::cout << "  WAZ in     " << format_time( toc ) << std::endl;
 
         runtime.push_back( toc.seconds() );
 
@@ -158,19 +178,13 @@ mymain ( int, char ** )
     }// for
         
     if ( nbench > 1 )
-        std::cout << "  runtime  = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
+        std::cout << "  runtime  = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-
-    // {
-    //     auto  T1 = impl::matrix::copy_nontiled< double >( *C );
-    //     auto  T2 = hpro::to_dense( T1.get() );
-    //
-    //     write_matrix( T2.get(), "B.mat", "B" );
-    // }
-    
-    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
     // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
         
-    std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << term::reset << std::endl;
+    // std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
 }

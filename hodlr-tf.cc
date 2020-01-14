@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr-tf.cc
 // Description : HODLR LU using cpp-taskflow
 // Author      : Ronald Kriemann

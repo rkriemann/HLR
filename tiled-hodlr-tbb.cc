@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr-tbb.cc
 // Description : tile-based HODLR-LU using TBB
 // Author      : Ronald Kriemann

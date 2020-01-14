@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag.hh
 // Description : main function for DAG examples
 // Author      : Ronald Kriemann

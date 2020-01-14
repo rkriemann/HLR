@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss.hh
 // Description : DAG example for Gaussian elimination
 // Author      : Ronald Kriemann
