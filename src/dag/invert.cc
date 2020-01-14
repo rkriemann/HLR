@@ -57,6 +57,7 @@ constexpr id_t  ID_C('A');
 constexpr id_t  ID_L('A');
 constexpr id_t  ID_U('A');
 
+template < storage_type_t  store_mode >
 struct lu_node : public node
 {
     TMatrix *  A;
@@ -75,6 +76,7 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 };
 
+template < storage_type_t  store_mode >
 struct trsmu_node : public node
 {
     const TMatrix *  U;
@@ -96,6 +98,7 @@ private:
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 };
 
+template < storage_type_t  store_mode >
 struct trsml_node : public node
 {
     const TMatrix *  L;
@@ -345,8 +348,8 @@ struct update_node : public node
 private:
     virtual void                run_         ( const TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
-    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_B, B->block_is() }, { id_C, C->block_is() } }; }
-    virtual const block_list_t  out_blocks_  () const { return { { id_A, A->block_is() }, { id_B, B->block_is() }, { id_C, C->block_is() } }; }
+    virtual const block_list_t  in_blocks_   () const { return { { id_A, A->block_is() }, { id_B, B->block_is() } }; }
+    virtual const block_list_t  out_blocks_  () const { return { { id_C, C->block_is() } }; }
 };
 
 struct mul_ur_ll_node : public node
@@ -373,8 +376,9 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < storage_type_t  store_mode >
 local_graph
-lu_node::refine_ ( const size_t  min_size )
+lu_node< store_mode >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -400,19 +404,19 @@ lu_node::refine_ ( const size_t  min_size )
 
             assert( ! is_null_any( A_ii, L_ii, U_ii ) );
 
-            finished( i, i ) = g.alloc_node< lu_node >( A_ii );
+            finished( i, i ) = g.alloc_node< lu_node< store_mode > >( A_ii );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( BA->block( j, i ) ) )
                 {
-                    finished( j, i ) = g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
+                    finished( j, i ) = g.alloc_node< trsmu_node< store_mode > >( U_ii, BA->block( j, i ) );
                     finished( j, i )->after( finished( i, i ) );
                 }// if
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( BA->block( i, j ) ) )
                 {
-                    finished( i, j ) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsml_node< store_mode > >( L_ii, BA->block( i, j ) );
                     finished( i, j )->after( finished( i, i ) );
                 }// if
         }// for
@@ -444,10 +448,11 @@ lu_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < storage_type_t  store_mode >
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_mode, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -456,8 +461,9 @@ lu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < storage_type_t  store_mode >
 local_graph
-trsmu_node::refine_ ( const size_t  min_size )
+trsmu_node< store_mode >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -479,7 +485,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsmu_node< store_mode > >(  U_jj, BA->block( i, j ) );
         }// for
         
         for ( uint j = 0; j < nbc; ++j )
@@ -504,10 +510,11 @@ trsmu_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < storage_type_t  store_mode >
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_mode ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -516,8 +523,9 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < storage_type_t  store_mode >
 local_graph
-trsml_node::refine_ ( const size_t  min_size )
+trsml_node< store_mode >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -539,7 +547,7 @@ trsml_node::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsml_node< store_mode > >(  L_ii, BA->block( i, j ) );
         }// for
         
         for ( uint i = 0; i < nbr; ++i )
@@ -564,10 +572,11 @@ trsml_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < storage_type_t  store_mode >
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_mode ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -581,7 +590,7 @@ waz_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    auto  lu     = g.alloc_node< lu_node >( A );
+    auto  lu     = g.alloc_node< lu_node< store_inverse > >( A );
     auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_inverse );
     auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_inverse );
 
@@ -610,9 +619,9 @@ inv_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    auto  lu     = g.alloc_node< lu_node >( A );
-    auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_inverse );
-    auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_inverse );
+    auto  lu     = g.alloc_node< lu_node< store_normal > >( A );
+    auto  inv_ll = g.alloc_node< inv_ll_node >( A, unit_diag,    store_normal );
+    auto  inv_ur = g.alloc_node< inv_ur_node >( A, general_diag, store_normal );
     auto  mul    = g.alloc_node< mul_ur_ll_node >( A );
 
     inv_ll->after( lu );
@@ -1293,7 +1302,7 @@ gen_dag_waz ( HLIB::TMatrix &  A,
               const size_t     min_size,
               refine_func_t    refine )
 {
-    auto  dag = refine( new waz_node( &A ), min_size, use_multiple_end_nodes );
+    auto  dag = refine( new waz_node( &A ), min_size, use_single_end_node );
 
     return dag;
 }

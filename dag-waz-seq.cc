@@ -1,7 +1,7 @@
 //
 // Project     : HLR
 // File        : dag-seq.cc
-// Description : sequential H-LU using DAG
+// Description : sequential H-WAZ using DAG
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

@@ -8,10 +8,17 @@
 
 // #include <likwid.h>
 
+#include <hpro/algebra/mat_fac.hh>
+#include <hpro/matrix/TMatrixProduct.hh>
+#include <hpro/matrix/TMatrixSum.hh>
+
 #include "common.hh"
 #include "common-main.hh"
 #include "hlr/cluster/h.hh"
+#include "hlr/dag/lu.hh"
 #include "hlr/dag/invert.hh"
+#include "hlr/seq/norm.hh"
+#include "hlr/matrix/identity.hh"
 
 using namespace hlr;
 
@@ -66,7 +73,8 @@ mymain ( int, char ** )
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
-    
+    std::cout << "    norm   = " << format_error( hlr::seq::norm::norm_2( *A ) ) << std::endl;
+
     if ( hpro::verbose( 3 ) )
     {
         hpro::TPSMatrixVis  mvis;
@@ -74,8 +82,6 @@ mymain ( int, char ** )
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    const size_t  ncoarse = ( coarse > 0 ? A->nrows() / coarse : A->nrows() / 50 );
-    
     std::cout << term::bullet << term::bold << "WAZ (DAG)" << term::reset
               << ", " << acc.to_string()
               << ", nseq = " << nseq
@@ -105,6 +111,20 @@ mymain ( int, char ** )
         hlr::dag::def_path_len  = 10;
     }// if
 
+    {
+        //
+        // single DAGs
+        //
+
+        auto  dag_lu     = hlr::dag::gen_dag_lu_ip(     *C,                     nseq, impl::dag::refine );
+        auto  dag_inv_ll = hlr::dag::gen_dag_invert_ll( *C, hpro::unit_diag,    nseq, impl::dag::refine );
+        auto  dag_inv_ur = hlr::dag::gen_dag_invert_ur( *C, hpro::general_diag, nseq, impl::dag::refine );
+
+        dag_lu.print_dot( "lu.dot" );
+        dag_inv_ll.print_dot( "invll.dot" );
+        dag_inv_ur.print_dot( "invur.dot" );
+    }
+    
     //
     // benchmark DAG generation
     //
@@ -183,8 +203,15 @@ mymain ( int, char ** )
                   << std::endl;
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        
-    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
-        
-    // std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+
+    hpro::DBG::write( C.get(), "A.mat", "A" );
+
+    auto  I     = hlr::matrix::identity( C->row_is() );
+    auto  W     = impl::matrix::copy_ll( *C, hpro::unit_diag );
+    auto  Z     = impl::matrix::copy_ur( *C, hpro::general_diag );
+    auto  A_inv = hpro::matrix_product( Z.get(), W.get() );
+    auto  I_apx = hpro::matrix_product( A.get(), A_inv.get() );
+    auto  I_err = hpro::matrix_sum( 1.0, I.get(), -1.0, I_apx.get() );
+
+    std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *I_err ) ) << std::endl;
 }

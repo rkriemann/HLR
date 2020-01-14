@@ -14,6 +14,7 @@
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
+#include "hlr/utils/text.hh"
 
 namespace hlr { namespace seq { namespace norm {
 
@@ -284,53 +285,72 @@ norm_F ( const double           alpha,
 }
 
 //
-// compute spectral norm of A, e.g. |A|_2
+// compute spectral norm of A, e.g. |A|_2, via power iteration
 //
-// double
-// norm_2 ( const TMatrix &  A )
-// {
-//     blas::Vector< real >  x(     A.ncols() );
-//     blas::Vector< real >  x_old( A.ncols() );
-//     blas::Vector< real >  y(     A.nrows() );
+template < typename matrix_t >
+double
+norm_2 ( const matrix_t &  A,
+         const bool        squared = false,
+         const real        atol    = 0,
+         const size_t      amax_it = 0 )
+{
+    auto  x = A.domain_vector();
+    auto  y = A.domain_vector();
+    auto  t = A.range_vector();
 
-//     std::random_device          rd{};
-//     std::mt19937                generator{ rd() };
-//     std::normal_distribution<>  distr{ 0, 1 };
-    
-//     blas::fill( x, [&] () { return distr( generator ); } );
-    
-//     // normalise x
-//     blas::scale( real(1) / blas::norm_2( x ),  );
-    
-//     real  lambda_old = 1.0;
-    
-//     for ( uint i = 0; i < _max_it; i++ )
-//     {
-//         x_old->assign( real(1), x.get() );
+    // x = rand with |x| = 1
+    x->fill_rand( 0 );
+    x->scale( real(1) / x->norm2() );
 
-//         mulvec( apply_normal,  A, x, y );
-//         mulvec( apply_adjoint, A, y, x ); 
-
-//         const auto  lambda = Math::abs( Math::sqrt( dot( x_old, x ) ) );
-
-//         HLR_LOG( 4, hpro::to_string( "%3d : %.6e", i, lambda ) );
+    const size_t  max_it  = ( amax_it == 0 ? std::min( A.range_dim(), A.domain_dim() ) / 10 : amax_it );
+    const real    tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
+    const real    abs_tol = std::min( 1e1 * std::numeric_limits< real >::epsilon(), tol );
+    const real    zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
+    real          lambda  = 1.0;
+    
+    for ( uint i = 0; i < max_it; i++ )
+    {
+        real  lambda_new = 0;
+        real  norm_y     = 0;
         
-//         const auto  norm_x = blas::norm_2( x );
+        if ( squared )
+        {
+            A.apply( x.get(), t.get(), hpro::apply_normal );
+            A.apply( t.get(), y.get(), hpro::apply_adjoint );
+
+            lambda_new = hpro::Math::abs( hpro::Math::sqrt( hpro::dot( x.get(), y.get() ) ) );
+            norm_y     = y->norm2();
+        }// if
+        else
+        {
+            A.apply( x.get(), y.get(), hpro::apply_normal );
+            norm_y = lambda_new = y->norm2();
+        }// else
+
+        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.4e (%.4e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
         
-//         if ( norm_x <= Math::square( Limits::epsilon< real >() ) )
-//             break;
+        // test against given tolerance
+        if ( std::abs( ( lambda_new - lambda ) / lambda ) < tol )
+            return lambda_new;
+
+        // test for machine precision
+        if (( i > 5 ) && ( std::abs( lambda_new - lambda ) < abs_tol ))
+            return lambda_new;
+
+        if ( lambda_new < zero )
+            return lambda_new;
         
-//         blas::scale( real(1) / norm_x, x );
+        lambda = lambda_new;
 
-//         if (( Math::abs( ( lambda - lambda_old ) / lambda_old ) < 1e-4 ) ||
-//             (( i > 5 ) && ( Math::abs( lambda - lambda_old ) < Math::square( Limits::epsilon< real >() ) )))
-//             return lambda;
+        if ( norm_y <= zero )
+            break;
+        
+        y->scale( real(1) / norm_y );
+        y->copy_to( x.get() );
+    }// for
 
-//         lambda_old = lambda;
-//     }// for
-
-//     return lambda_old;
-// }
+    return lambda;
+}
 
 //
 // compute inversion error of A vs A^-1 in spectral norm, e.g. |A-A^-1|_2
