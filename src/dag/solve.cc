@@ -457,7 +457,7 @@ update_node< value_t >::run_ ( const TTruncAcc & )
 {
     HLR_LOG( 4, HLIB::to_string( "update( %d )", A->id() ) );
 
-    TScalarVector  t( row_is( A, op_A ) );
+    TScalarVector  t( row_is( A, op_A ), A->value_type() );
     TScalarVector  x( std::move( sub_vec( *v, col_is( A, op_A ) ) ) );
     TScalarVector  y( std::move( sub_vec( *v, row_is( A, op_A ) ) ) );
     
