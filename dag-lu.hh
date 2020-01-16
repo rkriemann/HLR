@@ -281,7 +281,7 @@ mymain ( int, char ** )
         }// for
         
         {
-            hpro::TScalarVector  x( A->col_is() );
+            hpro::TScalarVector  x( A->col_is(), A->value_type() );
 
             x.fill_rand( 1 );
 

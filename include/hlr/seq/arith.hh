@@ -330,11 +330,11 @@ template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
-          const TMatrix *                  M,
+          const TMatrix &                  M,
           const blas::Vector< value_t > &  x,
           blas::Vector< value_t > &        y )
 {
-    assert( ! is_null( M ) );
+    // assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
     // assert( M->nrows( op_M ) == y.length() );
 
@@ -343,7 +343,7 @@ mul_vec ( const value_t                    alpha,
 
     if ( is_blocked( M ) )
     {
-        auto        B       = cptrcast( M, TBlockMatrix );
+        auto        B       = cptrcast( &M, TBlockMatrix );
         const auto  row_ofs = B->row_is( op_M ).first();
         const auto  col_ofs = B->col_is( op_M ).first();
 
@@ -356,22 +356,22 @@ mul_vec ( const value_t                    alpha,
                 if ( ! is_null( B_ij ) )
                 {
                     auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
-                    auto  y_i = x( B_ij->row_is( op_M ) - row_ofs );
+                    auto  y_i = y( B_ij->row_is( op_M ) - row_ofs );
 
-                    mul_vec( alpha, op_M, B_ij, x_j, y_i );
+                    mul_vec( alpha, op_M, *B_ij, x_j, y_i );
                 }// if
             }// for
         }// for
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D = cptrcast( M, TDenseMatrix );
+        auto  D = cptrcast( &M, TDenseMatrix );
         
         blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x, value_t(1), y );
     }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R = cptrcast( M, TRkMatrix );
+        auto  R = cptrcast( &M, TRkMatrix );
 
         if ( op_M == apply_normal )
         {

@@ -704,6 +704,6 @@ mul_vec ( const value_t                          alpha,
         assert( false );
 }
 
-}}}// namespace hlr::tbb::tile
+}}}// namespace hlr::tbb::tiled2
 
 #endif // __HLR_TBB_ARITH_TILE_HH

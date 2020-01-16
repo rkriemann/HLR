@@ -24,6 +24,8 @@
 #include "hlr/tbb/arith_tiled.hh"
 #include "hlr/tbb/arith_tiled_v2.hh"
 
+#include <hlr/tbb/arith_impl.hh>
+
 namespace hlr { namespace tbb {
 
 namespace hpro = HLIB;
@@ -265,72 +267,17 @@ template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
           const hpro::matop_t              op_M,
-          const hpro::TMatrix *            M,
+          const hpro::TMatrix &            M,
           const blas::Vector< value_t > &  x,
           blas::Vector< value_t > &        y )
 {
-    assert( ! is_null( M ) );
-    // assert( M->ncols( op_M ) == x.length() );
-    // assert( M->nrows( op_M ) == y.length() );
+    auto        mtx_map = detail::mutex_map_t();
+    const auto  is      = M.row_is( op_M );
 
-    if ( alpha == value_t(0) )
-        return;
-
-    if ( is_blocked( M ) )
-    {
-        auto        B       = cptrcast( M, hpro::TBlockMatrix );
-        const auto  row_ofs = B->row_is( op_M ).first();
-        const auto  col_ofs = B->col_is( op_M ).first();
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto  B_ij = B->block( i, j );
-                
-                if ( ! is_null( B_ij ) )
-                {
-                    auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
-                    auto  y_i = x( B_ij->row_is( op_M ) - row_ofs );
-
-                    mul_vec( alpha, op_M, B_ij, x_j, y_i );
-                }// if
-            }// for
-        }// for
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D = cptrcast( M, hpro::TDenseMatrix );
-        
-        blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x, value_t(1), y );
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = cptrcast( M, hpro::TRkMatrix );
-
-        if ( op_M == hpro::apply_normal )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_A< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_transposed )
-        {
-            assert( hpro::is_complex_type< value_t >::value == false );
-            
-            auto  t = blas::mulvec( value_t(1), blas::transposed( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_adjoint )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-    }// if
-    else
-        assert( false );
+    for ( idx_t  i = is.first() / detail::CHUNK_SIZE; i <= idx_t(is.last() / detail::CHUNK_SIZE); ++i )
+        mtx_map[ i ] = std::make_unique< std::mutex >();
+    
+    detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
 }
 
 //
