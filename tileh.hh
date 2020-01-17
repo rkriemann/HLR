@@ -16,14 +16,13 @@ using namespace hlr;
 //
 // main function
 //
-template < typename problem_t >
 void
-mymain ( int, char ** )
+program_main ()
 {
-    using value_t = typename problem_t::value_t;
+    using value_t = hpro::real; // typename problem_t::value_t;
     
     auto  tic     = timer::now();
-    auto  problem = gen_problem< problem_t >();
+    auto  problem = gen_problem();
     auto  coord   = problem->coordinates();
     auto  ct      = cluster::tileh::cluster( coord.get(), ntile, 4 );
     auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
