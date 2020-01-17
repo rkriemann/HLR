@@ -14,8 +14,13 @@ const std::string  impl_name = "omp";
 
 #include "dag-lu.hh"
 
-int
-main ( int argc, char ** argv )
+void
+framework_main ()
 {
-    return hlrmain( argc, argv );
+    // limit HLIBpro parallelism
+    ::tbb::global_control  tbb_control( ::tbb::global_control::max_allowed_parallelism, 1 );
+
+    program_main();
 }
+
+HLR_DEFAULT_MAIN

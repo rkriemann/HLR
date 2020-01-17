@@ -1077,9 +1077,7 @@ build_upd_nodes_pairwise_svd ( local_graph &    g,
     }// if
     else
     {
-        std::cout << nupds << std::endl;
-        
-        assert( false );
+        throw std::runtime_error( hpro::to_string( "unsupported number of updates (%d)", nupds ) );
     }// else
 }
 

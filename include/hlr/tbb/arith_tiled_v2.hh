@@ -701,7 +701,9 @@ mul_vec ( const value_t                          alpha,
         }// if
     }// if
     else
-        assert( false );
+    {
+        throw std::runtime_error( M.typestr() );
+    }// else
 }
 
 }}}// namespace hlr::tbb::tiled2

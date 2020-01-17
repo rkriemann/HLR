@@ -1,16 +1,25 @@
 #include <hlr/utils/mach.hh>
 
 //
-// main function specific to arithmetic
+// forward for framework specific main function
 //
+void framework_main ();
 
-template < typename problem_t >
-void
-mymain ( int, char ** );
+//
+// default main function
+//
+#define HLR_DEFAULT_MAIN                        \
+    int                                         \
+    main ( int argc, char ** argv )             \
+    {                                           \
+        return hlr_main( argc, argv );          \
+    } 
 
-inline
+//
+// actual HLR main function 
+//
 int
-hlrmain ( int argc, char ** argv )
+hlr_main ( int argc, char ** argv )
 {
     try
     {
@@ -24,14 +33,10 @@ hlrmain ( int argc, char ** argv )
         
         hpro::CFG::set_verbosity( hlr::verbosity );
 
-        if ( hlr::nthreads != 0 )
-            hpro::CFG::set_nthreads( hlr::nthreads );
+        // if ( hlr::nthreads != 0 )
+        //     hpro::CFG::set_nthreads( hlr::nthreads );
 
-        if      ( hlr::appl == "logkernel"  ) mymain< hlr::apps::log_kernel >( argc, argv );
-        else if ( hlr::appl == "materncov"  ) mymain< hlr::apps::matern_cov >( argc, argv );
-        else if ( hlr::appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
-        else
-            throw "unknown application";
+        framework_main();
 
         hpro::DONE();
     }// try

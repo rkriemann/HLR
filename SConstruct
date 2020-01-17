@@ -46,6 +46,7 @@ likwid       = False
 PROGRAMS     = [ 'tlr',
                  'hodlr',
                  'tileh',
+                 'tiled-h',
                  'tiled-hodlr',
                  'dag-lu',
                  'dag-gauss',

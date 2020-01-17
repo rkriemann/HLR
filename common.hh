@@ -1,4 +1,6 @@
 
+#include <tbb/global_control.h>
+
 #include <iostream>
 #include <string>
 #include <algorithm>

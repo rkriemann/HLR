@@ -518,7 +518,7 @@ inline
 bool
 is_tiled_lowrank ( const hpro::TMatrix &  M )
 {
-    return ! IS_TYPE( &M, tiled_lrmatrix );
+    return IS_TYPE( &M, tiled_lrmatrix );
 }
 
 inline
