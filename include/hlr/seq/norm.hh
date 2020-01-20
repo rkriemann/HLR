@@ -24,6 +24,7 @@ namespace blas = HLIB::BLAS;
 //
 // return Frobenius norm of A, e.g. |A|_F
 //
+inline
 double
 norm_F ( const hpro::TMatrix &  A )
 {
@@ -151,6 +152,7 @@ norm_F ( const hpro::TMatrix &  A )
 //
 // return Frobenius norm of αA+βB, e.g. |αA+βB|_F
 //
+inline
 double
 norm_F ( const double           alpha,
          const hpro::TMatrix &  A,
@@ -290,7 +292,7 @@ norm_F ( const double           alpha,
 template < typename matrix_t >
 double
 norm_2 ( const matrix_t &  A,
-         const bool        squared = false,
+         const bool        squared = true,
          const real        atol    = 0,
          const size_t      amax_it = 0 )
 {

@@ -11,6 +11,7 @@
 #include <tbb/parallel_invoke.h>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
+#include <tbb/blocked_range3d.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -24,12 +25,17 @@
 #include "hlr/tbb/arith_tiled.hh"
 #include "hlr/tbb/arith_tiled_v2.hh"
 
+#include <hlr/dag/lu.hh>
+#include <hlr/tbb/dag.hh>
+
 #include <hlr/tbb/arith_impl.hh>
 
 namespace hlr { namespace tbb {
 
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
+
+using namespace hpro;
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -212,7 +218,15 @@ lu ( hpro::TMatrix *          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        hpro::LU::factorise_rec( BA->block( i, i ), acc );
+        {
+            auto  dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *(BA->block( i, i )),
+                                                                  128,
+                                                                  tbb::dag::refine ) );
+
+            hlr::tbb::dag::run( dag, acc );
+
+            // hpro::LU::factorise_rec( BA->block( i, i ), acc );
+        }
 
         ::tbb::parallel_invoke(
             [BA,i,nbr,&acc] ()
@@ -220,9 +234,15 @@ lu ( hpro::TMatrix *          A,
                 ::tbb::parallel_for( i+1, nbr,
                                      [BA,i,&acc] ( uint  j )
                                      {
-                                         hpro::solve_upper_right( BA->block( j, i ),
-                                                                  BA->block( i, i ), nullptr, acc,
-                                                                  hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) );
+                                         auto  dag = std::move( hlr::dag::gen_dag_solve_upper( BA->block( i, i ),
+                                                                                               BA->block( j, i ),
+                                                                                               128,
+                                                                                               tbb::dag::refine ) );
+                                                     
+                                         hlr::tbb::dag::run( dag, acc );
+                                         // hpro::solve_upper_right( BA->block( j, i ),
+                                         //                          BA->block( i, i ), nullptr, acc,
+                                         //                          hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) ); 
                                      } );
             },
                 
@@ -231,9 +251,15 @@ lu ( hpro::TMatrix *          A,
                 ::tbb::parallel_for( i+1, nbc,
                                      [BA,i,&acc] ( uint  l )
                                      {
-                                         hpro::solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
-                                                                 BA->block( i, l ), acc,
-                                                                 hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
+                                         auto  dag = std::move( hlr::dag::gen_dag_solve_lower( BA->block( i, i ),
+                                                                                               BA->block( i, l ),
+                                                                                               128,
+                                                                                               tbb::dag::refine ) );
+                                                     
+                                         hlr::tbb::dag::run( dag, acc );
+                                         // hpro::solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
+                                         //                         BA->block( i, l ), acc,
+                                         //                         hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
                                      } );
             } );
 
@@ -278,6 +304,56 @@ mul_vec ( const value_t                    alpha,
         mtx_map[ i ] = std::make_unique< std::mutex >();
     
     detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
+}
+
+//
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BC->nblock_rows(),
+                                              0, BC->nblock_cols(),
+                                              0, BA->nblock_cols( op_A ) ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.pages().begin(); i != r.pages().end(); ++i )
+                {
+                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                    {
+                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                        {
+                            auto  C_ij = BC->block( i, j );
+                            auto  A_il = BA->block( i, l, op_A );
+                            auto  B_lj = BB->block( l, j, op_B );
+                
+                            if ( is_null_any( A_il, B_lj ) )
+                                continue;
+                    
+                            HLR_ASSERT( ! is_null( C_ij ) );
+            
+                            multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
 }
 
 //

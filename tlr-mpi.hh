@@ -114,7 +114,7 @@ main ( int argc, char ** argv )
         if      ( hlr::appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
         else if ( hlr::appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
         else
-            throw "unknown application";
+            HLR_ERROR( "unknown application" );
 
         hpro::DONE();
     }// try

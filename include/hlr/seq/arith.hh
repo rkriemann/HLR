@@ -399,6 +399,50 @@ mul_vec ( const value_t                    alpha,
 }
 
 //
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+        
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            {
+                auto  C_ij = BC->block(i,j);
+            
+                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                {
+                    auto  A_il = BA->block( i, l, op_A );
+                    auto  B_lj = BB->block( l, j, op_B );
+                
+                    if ( is_null_any( A_il, B_lj ) )
+                        continue;
+                    
+                    HLR_ASSERT( ! is_null( C_ij ) );
+            
+                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                }// for
+            }// for
+        }// for
+    }// if
+    else
+        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+}
+
+//
 // solve op(L) x = y with lower triangular L
 //
 void

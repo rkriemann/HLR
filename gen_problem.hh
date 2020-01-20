@@ -61,7 +61,7 @@ gen_problem ()
     else if ( hlr::appl == "materncov"  ) return gen_matern_cov();
     else if ( hlr::appl == "laplaceslp" ) return gen_laplace_slp();
     else
-        throw std::runtime_error( "unknown application (" + hlr::appl + ")" );
+        HLR_ERROR( "unknown application (" + hlr::appl + ")" );
 }
 
 }// namespace hlr

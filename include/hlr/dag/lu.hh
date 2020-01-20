@@ -49,7 +49,7 @@ gen_dag_lu_oop_auto ( HLIB::TMatrix &  A,
 //
 graph
 gen_dag_lu_oop_accu ( HLIB::TMatrix &  A,
-                      const size_t       min_size,
+                      const size_t     min_size,
                       refine_func_t    refine );
 
 //
@@ -57,7 +57,7 @@ gen_dag_lu_oop_accu ( HLIB::TMatrix &  A,
 //
 graph
 gen_dag_lu_oop_accu_sep ( HLIB::TMatrix &  A,
-                          const size_t       min_size,
+                          const size_t     min_size,
                           refine_func_t    refine );
 
 //
@@ -76,6 +76,15 @@ gen_dag_lu_oop_coarse  ( HLIB::TMatrix &    A,
 graph
 gen_dag_lu_lvl    ( HLIB::TMatrix &  A,
                     const size_t     min_size );
+
+//
+// generate DAG for Tile-H LU factorisation
+//
+graph
+gen_dag_lu_tileh ( HLIB::TMatrix &  A,
+                   const size_t     min_size,
+                   refine_func_t    refine,
+                   exec_func_t      exec );
 
 //
 // compute DAG for solving L X = A with lower-triangular L

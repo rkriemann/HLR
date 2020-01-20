@@ -146,7 +146,7 @@ main ( int argc, char ** argv )
         else if ( appl == "matern"     ) mymain< hlr::apps::matern_cov  >( argc, argv );
         else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
-            throw "unknown application";
+            HLR_ERROR( "unknown application" );
 
         DONE();
     }// try

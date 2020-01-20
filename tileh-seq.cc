@@ -21,6 +21,8 @@ framework_main ()
     // limit HLIBpro parallelism
     ::tbb::global_control  tbb_control( ::tbb::global_control::max_allowed_parallelism, 1 );
 
+    hpro::CFG::set_nthreads( 1 );
+
     program_main();
 }
 

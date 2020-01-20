@@ -1,7 +1,7 @@
 //
 // Project     : HLR
 // File        : tileh-tbb.cc
-// Description : tbbuential Tile-H arithmetic
+// Description : Tile-H arithmetic using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

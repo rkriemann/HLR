@@ -40,8 +40,8 @@ hlr_main ( int argc, char ** argv )
 
         hpro::DONE();
     }// try
-    catch ( char const *   e ) { std::cout << e << std::endl; }
-    catch ( hpro::Error &  e ) { std::cout << e.to_string() << std::endl; }
+    catch ( std::exception &  e ) { std::cout << e.what() << std::endl; }
+    catch ( char const *      e ) { std::cout << hlr::term::red( hlr::term::bold( e ) ) << std::endl; }
     
     return 0;
 }

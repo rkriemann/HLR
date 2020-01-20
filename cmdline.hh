@@ -20,7 +20,7 @@ namespace hlr { namespace cmdline {
 
 size_t  n          = 1024;         // problem size
 size_t  ntile      = 128;          // tile size (nmin)
-size_t  nseq       = 128;          // use sequential arithmetic below
+size_t  nseq       = 0;            // use sequential arithmetic below
 size_t  k          = 16;           // constant rank
 double  eps        = -1;           // constant precision
 string  appl       = "logkernel";  // application

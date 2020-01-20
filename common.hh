@@ -115,3 +115,12 @@ gen_accuracy ()
     else                         return hpro::fixed_prec( hlr::cmdline::eps );
 }
 
+//
+// test verbosity
+//
+inline
+bool
+verbose ( const int  lvl )
+{
+    return hpro::verbose( lvl );
+}

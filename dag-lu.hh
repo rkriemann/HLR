@@ -239,8 +239,8 @@ program_main ()
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
-    matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
-    // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
     std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
 
