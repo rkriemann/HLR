@@ -21,6 +21,7 @@ namespace hlr { namespace cmdline {
 size_t  n          = 1024;         // problem size
 size_t  ntile      = 128;          // tile size (nmin)
 size_t  nseq       = 0;            // use sequential arithmetic below
+size_t  nlvl       = 0;            // number of level, e.g., for Tile-H or MBLR
 size_t  k          = 16;           // constant rank
 double  eps        = -1;           // constant precision
 string  appl       = "logkernel";  // application
@@ -55,6 +56,7 @@ parse ( int argc, char ** argv )
         ( "ntile",       value<int>(),    ": set tile size" )
         ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
+        ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -113,6 +115,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
     if ( vm.count( "ntile"      ) ) ntile      = vm["ntile"].as<int>();
     if ( vm.count( "nseq"       ) ) nseq       = vm["nseq"].as<int>();
+    if ( vm.count( "nlvl"       ) ) nlvl       = vm["nlvl"].as<int>();
     if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();

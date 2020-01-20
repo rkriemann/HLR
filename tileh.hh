@@ -11,6 +11,7 @@
 #include "common.hh"
 #include "common-main.hh"
 #include "hlr/cluster/tileh.hh"
+#include "hlr/cluster/mblr.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/norm.hh"
 
@@ -24,12 +25,13 @@ program_main ()
 {
     using value_t = hpro::real; // typename problem_t::value_t;
 
-    const auto  tileh_lvl = std::min< size_t >( std::log2( n ) - std::log2( ntile ), 4 );
-
     auto  tic     = timer::now();
     auto  problem = gen_problem();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, tileh_lvl );
+
+    HLR_ASSERT( std::log2( coord->ncoord() ) - std::log2( ntile ) >= nlvl );
+
+    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, nlvl );
     auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
 
     std::cout << "    tiling = " << ct->root()->nsons() << " × " << ct->root()->nsons() << std::endl;
@@ -58,28 +60,59 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    std::cout << term::bullet << term::bold << "Matrix Multiplication ( Tile-H " << impl_name
+              << ", " << acc.to_string()
+              << " )" << term::reset << std::endl;
+    
+    std::vector< double >  runtime;
+    
+    auto  C1 = impl::matrix::copy( *A );
+
     {
-        auto  C1 = impl::matrix::copy( *A );
-        auto  C2 = impl::matrix::copy( *A );
-
-        tic = timer::now();
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
         
-        impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C1, acc );
+            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C1, acc );
 
-        toc = timer::since( tic );
-        std::cout << "    mult in " << format_time( toc ) << std::endl;
+            toc = timer::since( tic );
+            std::cout << "    mult in " << format_time( toc ) << std::endl;
+
+            runtime.push_back( toc.seconds() );
+        }// for
         
-        tic = timer::now();
-
-        hpro::multiply< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(), value_t(1), C2.get(), acc );
-
-        toc = timer::since( tic );
-        std::cout << "    mult in " << format_time( toc ) << std::endl;
-
-        auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
-
-        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
     }
+
+    auto  C2 = impl::matrix::copy( *A );
+
+    {
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            hpro::multiply< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(), value_t(1), C2.get(), acc );
+
+            toc = timer::since( tic );
+            std::cout << "    mult in " << format_time( toc ) << std::endl;
+            runtime.push_back( toc.seconds() );
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
+    }
+    
+    auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
+
+    std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     
     {
         auto  C = impl::matrix::copy( *A );
