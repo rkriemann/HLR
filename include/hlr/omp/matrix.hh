@@ -135,10 +135,13 @@ build ( const HLIB::TBlockCluster *  bct,
     // spawn parallel region for tasks
     #pragma omp parallel
     {
-        #pragma omp task
+        #pragma omp single
         {
-            res = detail::build_task( bct, coeff, lrapx, acc, nseq );
-        }// omp task
+            #pragma omp task
+            {
+                res = detail::build_task( bct, coeff, lrapx, acc, nseq );
+            }// omp task
+        }// omp single
     }// omp parallel
 
     return res;

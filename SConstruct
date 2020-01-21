@@ -29,15 +29,15 @@ LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # directories for the various external libraries
-HPRO_DIR     = '/home/rok/programming/hpro/devel'
-TBB_DIR      = '/usr'
-TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
-HPX_DIR      = '/opt/local/hpx'
-GPI2_DIR     = '/opt/local/gpi2'
+HPRO_DIR     = '/'
+TBB_DIR      = '/'
+TASKFLOW_DIR = '/'
+HPX_DIR      = '/'
+GPI2_DIR     = '/'
 
-JEMALLOC_DIR = '/opt/local/jemalloc/5.2.1'
-MIMALLOC_DIR = '/opt/local/mimalloc'
-TCMALLOC_DIR = '/usr'
+JEMALLOC_DIR = '/'
+MIMALLOC_DIR = '/'
+TCMALLOC_DIR = '/'
 
 LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False

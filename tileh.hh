@@ -7,6 +7,7 @@
 //
 
 #include <hpro/matrix/TMatrixSum.hh>
+#include <hpro/matrix/TMatrixProduct.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -71,12 +72,55 @@ program_main ()
               << " )" << term::reset << std::endl;
     
     std::vector< double >  runtime;
+    auto                   mul_res = hpro::matrix_product( A.get(), A.get() );
     
-    auto  C1 = impl::matrix::copy( *A );
+    {
+        std::cout << "  " << term::bullet << " DAG" << std::endl;
+        
+        auto  C0 = impl::matrix::copy( *A );
+
+        tic = timer::now();
+        
+        auto  dag = std::move( dag::gen_dag_update( A.get(), A.get(), C0.get(), nseq, impl::dag::refine ) );
+            
+        toc = timer::since( tic );
+            
+        std::cout << "    DAG in   " << format_time( toc ) << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "mul.dot" );
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+            
+            impl::dag::run( dag, acc );
+            
+            toc = timer::since( tic );
+            std::cout << "    mult in " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
+
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C0.get() );
+
+        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+    }
 
     {
         std::cout << "  " << term::bullet << " HLR" << std::endl;
         
+        auto  C1 = impl::matrix::copy( *A );
+
         for ( int i = 0; i < nbench; ++i )
         {
             tic = timer::now();
@@ -90,17 +134,22 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
+            std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         runtime.clear();
+
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C1.get() );
+
+        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
 
-    auto  C2 = impl::matrix::copy( *A );
-
+    if (( impl_name == "seq" ) || ( impl_name == "tbb" )) // otherwise sequential !!!
     {
         std::cout << "  " << term::bullet << " Hpro" << std::endl;
         
+        auto  C2 = impl::matrix::copy( *A );
+
         for ( int i = 0; i < nbench; ++i )
         {
             tic = timer::now();
@@ -113,15 +162,19 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
+            std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         runtime.clear();
+
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C2.get() );
+
+        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
     
-    auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
+    // auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
 
-    std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+    // std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -174,7 +227,7 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
+            std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         runtime.clear();
@@ -224,7 +277,7 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
+            std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         runtime.clear();
@@ -256,7 +309,7 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "  runtime  = "
+            std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         runtime.clear();

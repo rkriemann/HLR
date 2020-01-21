@@ -1,7 +1,7 @@
 //
 // Project     : HLR
 // File        : tileh-omp.cc
-// Description : ompuential Tile-H arithmetic
+// Description : Tile-H arithmetic using OpenMP
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //

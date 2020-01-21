@@ -115,6 +115,8 @@ graph::make_single_end ()
             new_end->inc_dep_cnt();
         }// for
 
+        new_end->finalize();
+        
         _nodes.push_back( new_end );
         _end.clear();
         _end.push_back( new_end );
