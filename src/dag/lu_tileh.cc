@@ -286,6 +286,9 @@ dag_lu_tileh ( TMatrix *      A,
             }// for
         }// for
 
+        for ( auto  node : nodes )
+            node->finalize();
+
         return dag::graph( nodes, start, end );
     }// else
 }

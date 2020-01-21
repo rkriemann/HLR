@@ -60,6 +60,12 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // matrix multiplication
+    //
+    //////////////////////////////////////////////////////////////////////
+    
     std::cout << term::bullet << term::bold << "Matrix Multiplication ( Tile-H " << impl_name
               << ", " << acc.to_string()
               << " )" << term::reset << std::endl;
@@ -69,6 +75,8 @@ program_main ()
     auto  C1 = impl::matrix::copy( *A );
 
     {
+        std::cout << "  " << term::bullet << " HLR" << std::endl;
+        
         for ( int i = 0; i < nbench; ++i )
         {
             tic = timer::now();
@@ -91,6 +99,7 @@ program_main ()
     auto  C2 = impl::matrix::copy( *A );
 
     {
+        std::cout << "  " << term::bullet << " Hpro" << std::endl;
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -114,57 +123,147 @@ program_main ()
 
     std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     
+    //////////////////////////////////////////////////////////////////////
+    //
+    // LU factorization
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << term::bullet << term::bold << "LU ( Tile-H DAG " << impl_name
+              << ", " << acc.to_string()
+              << " )" << term::reset << std::endl;
+    
+    auto  C = impl::matrix::copy( *A );
+        
     {
-        auto  C = impl::matrix::copy( *A );
+        std::cout << "  " << term::bullet << " full DAG" << std::endl;
         
-        if ( HLIB::CFG::Arith::use_dag )
+        impl::matrix::copy_to( *A, *C );
+        
+        // no sparsification
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+        
+        tic = timer::now();
+        
+        // auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
+        auto  dag = std::move( dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
+            
+        toc = timer::since( tic );
+            
+        std::cout << "    DAG in   " << format_time( toc ) << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "lu.dot" );
+        
+        for ( int i = 0; i < nbench; ++i )
         {
-            std::cout << term::bullet << term::bold << "LU ( Tile-H DAG " << impl_name
-                      << ", " << acc.to_string()
-                      << " )" << term::reset << std::endl;
-
-            // no sparsification
-            hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
-        
-            tic = timer::now();
-        
-            // auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
-            auto  dag = std::move( dag::gen_dag_lu_tileh( *C, nseq, impl::dag::refine, impl::dag::run ) );
-            
-            toc = timer::since( tic );
-            
-            std::cout << "    DAG in   " << format_time( toc ) << std::endl;
-            std::cout << "    #nodes = " << dag.nnodes() << std::endl;
-            std::cout << "    #edges = " << dag.nedges() << std::endl;
-            std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
-            
-            if ( verbose( 3 ) )
-                dag.print_dot( "lu.dot" );
-            
             tic = timer::now();
             
             impl::dag::run( dag, acc );
 
             toc = timer::since( tic );
-        }// if
-        else
-        {
-            std::cout << term::bullet << term::bold << "LU ( Tile-H flat " << impl_name
-                      << ", " << acc.to_string()
-                      << " )" << term::reset << std::endl;
+            std::cout << "  LU in      " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
 
-            tic = timer::now();
-        
-            impl::tileh::lu< HLIB::real >( C.get(), acc );
-            
-            toc = timer::since( tic );
-        }// else
-            
+            if ( i < (nbench-1) )
+                impl::matrix::copy_to( *A, *C );
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
+
         hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
-        std::cout << "    LU in   " << format_time( toc ) << std::endl;
         std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
+    
+    {
+        std::cout << "  " << term::bullet << " Tile-H DAG" << std::endl;
+        
+        impl::matrix::copy_to( *A, *C );
+        
+        // no sparsification
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+        
+        tic = timer::now();
+        
+        // auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
+        auto  dag = std::move( dag::gen_dag_lu_tileh( *C, nseq, impl::dag::refine, impl::dag::run ) );
+            
+        toc = timer::since( tic );
+            
+        std::cout << "    DAG in   " << format_time( toc ) << std::endl;
+        std::cout << "    #nodes = " << dag.nnodes() << std::endl;
+        std::cout << "    #edges = " << dag.nedges() << std::endl;
+        std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            dag.print_dot( "lu.dot" );
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+            
+            impl::dag::run( dag, acc );
 
+            toc = timer::since( tic );
+            std::cout << "  LU in      " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
+
+            if ( i < (nbench-1) )
+                impl::matrix::copy_to( *A, *C );
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
+
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    }
+    
+    {
+        std::cout << "  " << term::bullet << " recursive+DAG" << std::endl;
+        
+        impl::matrix::copy_to( *A, *C );
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+        
+            impl::tileh::lu< HLIB::real >( C.get(), acc );
+        
+            toc = timer::since( tic );
+            std::cout << "  LU in      " << format_time( toc ) << std::endl;
+            
+            runtime.push_back( toc.seconds() );
+
+            if ( i < (nbench-1) )
+                impl::matrix::copy_to( *A, *C );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        runtime.clear();
+
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    }
 }
