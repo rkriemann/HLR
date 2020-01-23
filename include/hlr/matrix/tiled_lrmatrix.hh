@@ -84,6 +84,20 @@ public:
     {
     }
     
+    tiled_lrmatrix ( const indexset              arow_is,
+                     const indexset              acol_is,
+                     tile_storage< value_t > &&  aU,
+                     tile_storage< value_t > &&  aV )
+            : TMatrix( hpro::value_type< value_t >::value )
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
+            , _ntile( 0 )
+    {
+        set_ofs( _row_is.first(), _col_is.first() );
+        set_lrmat( std::move( aU ), std::move( aV ) );
+    }
+
     tiled_lrmatrix ( const indexset  arow_is,
                      const indexset  acol_is,
                      const size_t    antile )

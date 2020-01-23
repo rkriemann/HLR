@@ -74,7 +74,7 @@ inline
 std::string
 format_error ( const double  e )
 {
-    return hlr::term::red( str( format( "%.4e s" ) % e ) );
+    return hlr::term::red( str( format( "%.4e" ) % e ) );
 }
 
 //
