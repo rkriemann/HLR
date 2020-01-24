@@ -34,7 +34,7 @@ struct indexset_hash
 };
 
 // mapping of clusters (indexsets) to tile indexsets
-using  tile_is_map_t = std::unordered_map< indexset, std::list< indexset >, indexset_hash >;
+using  tile_is_map_t = std::unordered_map< indexset, std::deque< indexset >, indexset_hash >;
 
 //
 // Construct map of cluster to tile-indexsets for all clusters

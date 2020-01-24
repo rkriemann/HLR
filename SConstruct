@@ -20,7 +20,7 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'clang++-9'
+CXX          = 'g++'
 CXXFLAGS     = '-std=c++2a'
 
 OPTFLAGS     = '-O3 -march=native'

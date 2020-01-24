@@ -12,6 +12,9 @@
 #include <array>
 #include <cmath>
 
+#include <tbb/parallel_invoke.h>
+#include <tbb/parallel_for.h>
+
 #include <boost/math/constants/constants.hpp>
 
 #include <hpro/cluster/TGeomCluster.hh>
@@ -108,8 +111,7 @@ cheblobat_points ( const size_t  k )
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_coeff,
-           typename T_generator_fn,
-           typename T_interpolation_fn >
+           typename T_generator_fn >
 class tiled_hca : public hpro::TLowRankApx
 {
     static_assert( std::is_same< typename T_coeff::value_t, typename T_generator_fn::value_t >::value,
@@ -124,7 +126,7 @@ public:
     using  value_t            = typename coeff_fn_t::value_t;
     using  real_t             = typename real_type< value_t >::type_t;
     using  generator_fn_t     = T_generator_fn;
-    using  interpolation_fn_t = T_interpolation_fn;
+    using  interpolation_fn_t = std::function< std::vector< double > ( const size_t ) >;
     using  pivot_arr_t        = std::vector< std::pair< idx_t, idx_t > >;
 
 protected:
@@ -208,7 +210,7 @@ protected:
     const uint               _ipol_order;
 
     // function generating 1D interpolation points
-    interpolation_fn_t &     _ipol_fn;
+    interpolation_fn_t       _ipol_fn;
     
     // row/column tile indexsets
     matrix::tile_is_map_t &  _row_tile_map;
@@ -224,9 +226,9 @@ public:
                 const generator_fn_t &   agenerator,
                 const real_t             aaca_eps,
                 const uint               aipol_order,
-                interpolation_fn_t &&    aipol_fn,
                 matrix::tile_is_map_t &  arow_tile_map,
-                matrix::tile_is_map_t &  acol_tile_map )
+                matrix::tile_is_map_t &  acol_tile_map,
+                interpolation_fn_t       aipol_fn = chebyshev_points )
             : _coeff( acoeff )
             , _generator_fn( agenerator )
             , _aca_eps( aaca_eps )
@@ -297,9 +299,22 @@ protected:
         //
         // compute low-rank matrix as (U·G) × V^H
         //
-    
-        auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
-        auto  V = compute_V( colcl, k, pivots, row_grid, order );
+
+        matrix::tile_storage< value_t >  U, V;
+
+        ::tbb::parallel_invoke(
+            [&,k,order] ()
+            {
+                U = std::move( compute_U( rowcl, k, pivots, col_grid, order, G ) );
+            },
+            
+            [&,k,order] ()
+            {
+                V = std::move( compute_V( colcl, k, pivots, row_grid, order ) );
+            } );
+
+        // auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
+        // auto  V = compute_V( colcl, k, pivots, row_grid, order );
         auto  R = std::make_unique< matrix::tiled_lrmatrix< value_t > >( rowcl,
                                                                          colcl,
                                                                          std::move( U ),
@@ -452,54 +467,6 @@ protected:
     //
     // compute collocation matrices
     //
-    
-    // blas::Matrix< value_t >
-    // compute_U  ( const TIndexSet &    rowis,
-    //              const size_t         rank,
-    //              const pivot_arr_t &  pivots,
-    //              const tensor_grid &  colcl_grid,
-    //              const uint           order ) const
-    // {
-    //     //
-    //     // set up collocation points and evaluate
-    //     //
-    
-    //     std::vector< T3Point >  y_pts( rank );
-
-    //     for ( size_t j = 0; j < rank; j++ )
-    //         y_pts[j] = colcl_grid( unfold( pivots[j].second, order ) );
-    
-    //     blas::Matrix< value_t >  U( rowis.size(), rank );
-            
-    //     _generator_fn.integrate_dx( rowis, y_pts, U );
-
-    //     return U;
-    // }
-    
-    // blas::Matrix< value_t >
-    // compute_V  ( const TIndexSet &    colis,
-    //              const size_t         rank,
-    //              const pivot_arr_t &  pivots,
-    //              const tensor_grid &  row_grid,
-    //              const uint           order ) const
-    // {
-    //     //
-    //     // set up collocation points and evaluate
-    //     //
-    
-    //     std::vector< T3Point >  x_pts( rank );
-    
-    //     for ( size_t j = 0; j < rank; j++ )
-    //         x_pts[j] = row_grid( unfold( pivots[j].first, order ) );
-
-    //     blas::Matrix< value_t >  V( colis.size(), rank );
-        
-    //     _generator_fn.integrate_dy( colis, x_pts, V );
-
-    //     blas::conj( V );
-        
-    //     return V;
-    // }
 
     matrix::tile_storage< value_t >
     compute_U  ( const TIndexSet &                rowis,
@@ -511,6 +478,7 @@ protected:
     {
         //
         // set up collocation points and evaluate
+        // - also multiply with G
         //
 
         matrix::tile_storage< value_t >  U;
@@ -520,15 +488,20 @@ protected:
             y_pts[j] = col_grid( unfold( pivots[j].second, order ) );
 
         HLR_ASSERT( _row_tile_map.contains( rowis ) );
-        
-        for ( auto  is : _row_tile_map.at( rowis ) )
-        {
-            blas::Matrix< value_t >  U_is( is.size(), rank );
-            
-            _generator_fn.integrate_dx( is, y_pts, U_is );
 
-            U[ is ] = std::move( blas::prod( value_t(1), U_is, G ) );
-        }// for
+        const auto &  tiles = _row_tile_map.at( rowis );
+
+        // for ( auto  is : tiles )
+        ::tbb::parallel_for( size_t(0), tiles.size(),
+            [&,rank] ( const auto  i )
+            {
+                const auto               is = tiles[ i ];
+                blas::Matrix< value_t >  U_is( is.size(), rank );
+            
+                _generator_fn.integrate_dx( is, y_pts, U_is );
+
+                U[ is ] = std::move( blas::prod( value_t(1), U_is, G ) );
+            } );
 
         return U;
     }
@@ -552,15 +525,20 @@ protected:
 
         HLR_ASSERT( _col_tile_map.contains( colis ) );
         
-        for ( auto  is : _col_tile_map.at( colis ) )
-        {
-            blas::Matrix< value_t >  V_is( is.size(), rank );
-            
-            _generator_fn.integrate_dy( is, x_pts, V_is );
-            blas::conj( V_is );
+        const auto &  tiles = _col_tile_map.at( colis );
 
-            V[ is ] = std::move( V_is );
-        }// for
+        // for ( auto  is : _col_tile_map.at( colis ) )
+        ::tbb::parallel_for( size_t(0), tiles.size(),
+            [&,rank] ( const auto  i )
+            {
+                const auto               is = tiles[ i ];
+                blas::Matrix< value_t >  V_is( is.size(), rank );
+            
+               _generator_fn.integrate_dy( is, x_pts, V_is );
+                blas::conj( V_is );
+
+               V[ is ] = std::move( V_is );
+            } );
         
         return V;
     }

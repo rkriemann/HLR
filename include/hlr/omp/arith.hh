@@ -564,10 +564,10 @@ lu ( hpro::TMatrix *          A,
             {
                 for ( uint  l = i+1; l < nbc; ++l )
                 {
-                    hlr::omp::multiply< hpro::real >( -1.0,
-                                                      apply_normal, * BA->block( j, i ),
-                                                      apply_normal, * BA->block( i, l ),
-                                                      * BA->block( j, l ), acc );
+                    hlr::omp::detail::multiply_parfor( -1.0,
+                                                       apply_normal, * BA->block( j, i ),
+                                                       apply_normal, * BA->block( i, l ),
+                                                       * BA->block( j, l ), acc );
                 }// for
             }// for
         }// for
