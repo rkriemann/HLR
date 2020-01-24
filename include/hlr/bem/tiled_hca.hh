@@ -26,6 +26,8 @@
 
 #include <hlr/bem/interpolation.hh>
 
+#include <hlr/seq/arith_tiled_v2.hh>
+
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
@@ -196,11 +198,12 @@ public:
 protected:
     //
     // actual HCA algorithm
+    // - <acc> only used for recompression
     //
     TMatrix *
     approx ( const TGeomCluster &  rowcl,
              const TGeomCluster &  colcl,
-             const TTruncAcc &      ) const // acc not used! precision defined by aca_eps and ipol_order
+             const TTruncAcc &     acc ) const
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
@@ -243,12 +246,15 @@ protected:
                 V = std::move( compute_V( colcl, k, pivots, row_grid, order ) );
             } );
 
+        // recompression
+        auto [ U_tr, V_tr ] = seq::tiled2::truncate( rowcl, colcl, U, V, acc );
+        
         // auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
         // auto  V = compute_V( colcl, k, pivots, row_grid, order );
         auto  R = std::make_unique< matrix::tiled_lrmatrix< value_t > >( rowcl,
                                                                          colcl,
-                                                                         std::move( U ),
-                                                                         std::move( V ) );
+                                                                         std::move( U_tr ),
+                                                                         std::move( V_tr ) );
 
         return R.release();
     }
@@ -464,7 +470,7 @@ protected:
                 const auto               is = tiles[ i ];
                 blas::Matrix< value_t >  V_is( is.size(), rank );
             
-               _generator_fn.integrate_dy( is, x_pts, V_is );
+                _generator_fn.integrate_dy( is, x_pts, V_is );
                 blas::conj( V_is );
 
                V[ is ] = std::move( V_is );

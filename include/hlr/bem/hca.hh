@@ -184,11 +184,12 @@ public:
 protected:
     //
     // actual HCA algorithm
+    // - <acc> only used for recompression
     //
     TMatrix *
     approx ( const TGeomCluster &  rowcl,
              const TGeomCluster &  colcl,
-             const TTruncAcc &      ) const // acc not used! precision defined by aca_eps and ipol_order
+             const TTruncAcc &     acc ) const 
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
@@ -237,6 +238,7 @@ protected:
 
         // std::move not working above for TRkMatrix ???
         R->set_lrmat( U, V );
+        R->truncate( acc );
 
         return R.release();
     }
