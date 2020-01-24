@@ -19,6 +19,7 @@
 #include "hlr/vector/tiled_scalarvector.hh"
 #include "hlr/seq/norm.hh"
 #include "hlr/seq/arith_tiled_v2.hh"
+#include "hlr/bem/hca.hh"
 #include "hlr/bem/tiled_hca.hh"
 
 using namespace hlr;
@@ -75,8 +76,9 @@ program_main ()
                                                                                          ct->perm_i2e(),
                                                                                          ct->perm_i2e(),
                                                                                          4 ); // quad order
-    auto  thca   = new bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map, bem::chebyshev_points );
-    auto  hca    = new THCA< value_t >( pcoeff.get(), genfn.get(), cmdline::eps / 100.0, 5 );
+    auto  thca   = new bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
+    auto  hca    = new bem::hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5 );
+    // auto  hca    = new THCA< value_t >( pcoeff.get(), genfn.get(), cmdline::eps / 100.0, 5 );
     auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff.get() );
     auto  exact  = std::make_unique< TDenseLRApx< value_t > >( pcoeff.get() );

@@ -115,6 +115,8 @@ opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'a
 opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
 opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
+opts.Add(               'cxx',      'C++ compiler to use',           CXX )
+
 opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
@@ -154,6 +156,8 @@ frameworks = Split( opt_env['frameworks'] )
 
 if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
+
+CXX          = opt_env['cxx']
 
 HPRO_DIR     = opt_env['hpro']
 TBB_DIR      = opt_env['tbb']

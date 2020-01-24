@@ -1,8 +1,8 @@
-#ifndef __HLR_BEM_TILED_HCA_HH
-#define __HLR_BEM_TILED_HCA_HH
+#ifndef __HLR_BEM_HCA_HH
+#define __HLR_BEM_HCA_HH
 //
 // Project     : HLR
-// File        : tiled_hca.hh
+// File        : hca.hh
 // Description : HCA implementation using tiled low-rank matrices
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
@@ -21,9 +21,6 @@
 #include <hpro/algebra/TLowRankApx.hh>
 #include <hpro/blas/Algebra.hh>
 
-#include <hlr/matrix/tiling.hh>
-#include <hlr/matrix/tiled_lrmatrix.hh>
-
 #include <hlr/bem/interpolation.hh>
 
 namespace hlr { namespace bem {
@@ -35,14 +32,13 @@ using namespace hpro;
 
 //////////////////////////////////////////////////////////////////////
 //
-// implement hybrid cross approximation but construct
-// low-rank matrices in tiled format
+// implement hybrid cross approximation
 //
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_coeff,
            typename T_generator_fn >
-class tiled_hca : public hpro::TLowRankApx
+class hca : public hpro::TLowRankApx
 {
     static_assert( std::is_same< typename T_coeff::value_t, typename T_generator_fn::value_t >::value,
                    "value types of coefficient and generator must be equal" );
@@ -142,33 +138,25 @@ protected:
     // function generating 1D interpolation points
     interpolation_fn_t       _ipol_fn;
     
-    // row/column tile indexsets
-    matrix::tile_is_map_t &  _row_tile_map;
-    matrix::tile_is_map_t &  _col_tile_map;
-    
 public:
     //////////////////////////////////////
     //
     // constructor and destructor
     //
 
-    tiled_hca ( const coeff_fn_t &       acoeff,
-                const generator_fn_t &   agenerator,
-                const real_t             aaca_eps,
-                const uint               aipol_order,
-                matrix::tile_is_map_t &  arow_tile_map,
-                matrix::tile_is_map_t &  acol_tile_map,
-                interpolation_fn_t       aipol_fn = chebyshev_points )
+    hca ( const coeff_fn_t &       acoeff,
+          const generator_fn_t &   agenerator,
+          const real_t             aaca_eps,
+          const uint               aipol_order,
+          interpolation_fn_t       aipol_fn = chebyshev_points )
             : _coeff( acoeff )
             , _generator_fn( agenerator )
             , _aca_eps( aaca_eps )
             , _ipol_order( aipol_order )
             , _ipol_fn( aipol_fn )
-            , _row_tile_map( arow_tile_map )
-            , _col_tile_map( acol_tile_map )
     {}
 
-    virtual ~tiled_hca () {}
+    virtual ~hca () {}
 
     //////////////////////////////////////
     //
@@ -190,7 +178,7 @@ public:
     virtual TMatrix * build ( const TBlockIndexSet & ,
                               const TTruncAcc & ) const
     {
-        HLR_ERROR( "tiled_hca::build : block index set not supported" );
+        HLR_ERROR( "hca::build : block index set not supported" );
     }
     
 protected:
@@ -204,7 +192,7 @@ protected:
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
-            HLR_ERROR( "tiled_hca::approx : unsupported dimension of cluster" );
+            HLR_ERROR( "hca::approx : unsupported dimension of cluster" );
 
         const uint  order    = _ipol_order;
 
@@ -230,7 +218,7 @@ protected:
         // compute low-rank matrix as (U·G) × V^H
         //
 
-        matrix::tile_storage< value_t >  U, V;
+        blas::Matrix< value_t >  U, V;
 
         ::tbb::parallel_invoke(
             [&,k,order] ()
@@ -245,10 +233,10 @@ protected:
 
         // auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
         // auto  V = compute_V( colcl, k, pivots, row_grid, order );
-        auto  R = std::make_unique< matrix::tiled_lrmatrix< value_t > >( rowcl,
-                                                                         colcl,
-                                                                         std::move( U ),
-                                                                         std::move( V ) );
+        auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type< value_t >::value );
+
+        // std::move not working above for TRkMatrix ???
+        R->set_lrmat( U, V );
 
         return R.release();
     }
@@ -398,7 +386,7 @@ protected:
     // compute collocation matrices
     //
 
-    matrix::tile_storage< value_t >
+    blas::Matrix< value_t >
     compute_U  ( const TIndexSet &                rowis,
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
@@ -411,32 +399,19 @@ protected:
         // - also multiply with G
         //
 
-        matrix::tile_storage< value_t >  U;
-        std::vector< T3Point >           y_pts( rank );
+        std::vector< T3Point >  y_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( unfold( pivots[j].second, order ) );
 
-        HLR_ASSERT( _row_tile_map.contains( rowis ) );
+        blas::Matrix< value_t >  U( rowis.size(), rank );
 
-        const auto &  tiles = _row_tile_map.at( rowis );
+        _generator_fn.integrate_dx( rowis, y_pts, U );
 
-        // for ( auto  is : tiles )
-        ::tbb::parallel_for( size_t(0), tiles.size(),
-            [&,rank] ( const auto  i )
-            {
-                const auto               is = tiles[ i ];
-                blas::Matrix< value_t >  U_is( is.size(), rank );
-            
-                _generator_fn.integrate_dx( is, y_pts, U_is );
-
-                U[ is ] = std::move( blas::prod( value_t(1), U_is, G ) );
-            } );
-
-        return U;
+        return blas::prod( value_t(1), U, G );
     }
-    
-    matrix::tile_storage< value_t >
+
+    blas::Matrix< value_t >
     compute_V  ( const TIndexSet &    colis,
                  const size_t         rank,
                  const pivot_arr_t &  pivots,
@@ -446,34 +421,22 @@ protected:
         //
         // set up collocation points and evaluate
         //
-        
-        matrix::tile_storage< value_t >  V;
-        std::vector< T3Point >           x_pts( rank );
-    
+
+        std::vector< T3Point >  x_pts( rank );
+
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( unfold( pivots[j].first, order ) );
 
-        HLR_ASSERT( _col_tile_map.contains( colis ) );
-        
-        const auto &  tiles = _col_tile_map.at( colis );
+        blas::Matrix< value_t >  V( colis.size(), rank );
 
-        // for ( auto  is : _col_tile_map.at( colis ) )
-        ::tbb::parallel_for( size_t(0), tiles.size(),
-            [&,rank] ( const auto  i )
-            {
-                const auto               is = tiles[ i ];
-                blas::Matrix< value_t >  V_is( is.size(), rank );
-            
-               _generator_fn.integrate_dy( is, x_pts, V_is );
-                blas::conj( V_is );
+        _generator_fn.integrate_dy( colis, x_pts, V );
 
-               V[ is ] = std::move( V_is );
-            } );
-        
+        blas::conj( V );
+
         return V;
     }
 };
 
 }}// namespace hlr::bem
 
-#endif // __HLR_BEM_TILED_HCA_HH
+#endif // __HLR_BEM_HCA_HH
