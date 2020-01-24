@@ -12,6 +12,9 @@
 
 #include <hpro/cluster/TCluster.hh>
 
+#include <hlr/utils/checks.hh>
+#include <hlr/utils/log.hh>
+
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
@@ -63,8 +66,8 @@ setup_tiling ( const hpro::TCluster &  cl,
                 if ( tile_map.at( *son ).size() == 0 )
                     HLR_ERROR( "setup_tiling : no son tiles" );
                 
-                for ( auto  i : tile_map.at( *son ) )
-                    tile_map[ cl ].push_back( i );
+                for ( auto  is : tile_map.at( *son ) )
+                    tile_map[ cl ].push_back( is );
             }// if
         }// for
     }// if

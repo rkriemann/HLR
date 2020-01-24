@@ -268,67 +268,38 @@ protected:
     TMatrix *
     hca ( const TGeomCluster &  rowcl,
           const TGeomCluster &  colcl,
-          const TTruncAcc &     acc ) const
+          const TTruncAcc &      ) const // acc not used! precision defined by aca_eps and ipol_order
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
             HLR_ERROR( "tiled_hca::hca : unsupported dimension of cluster" );
 
-        const uint  order      = _ipol_order;
+        const uint  order    = _ipol_order;
 
         // generate grid for local clusters for evaluation of kernel generator function
-        const auto  rowcl_grid = tensor_grid( rowcl.bbox(), _ipol_fn( order ) );
-        const auto  colcl_grid = tensor_grid( colcl.bbox(), _ipol_fn( order ) );
+        const auto  row_grid = tensor_grid( rowcl.bbox(), _ipol_fn( order ) );
+        const auto  col_grid = tensor_grid( colcl.bbox(), _ipol_fn( order ) );
 
         // determine ACA pivot elements for the kernel generator matrix
-        const auto   pivots    = comp_aca_pivots( rowcl_grid, colcl_grid, _aca_eps, order );
-        const auto   k         = pivots.size();
+        const auto  pivots   = comp_aca_pivots( row_grid, col_grid, _aca_eps, order );
+        const auto  k        = pivots.size();
 
         // immediately return empty matrix
         if ( k == 0 )
             return new TRkMatrix( rowcl, colcl );
     
         //
-        // if rank is too high compute matrix by other means
-        //
-
-        // if (( k >= std::min( n, m ) ) || ( order4 >= n * m ))
-        // {
-        //     TSVDLRApx< value_t >   svd( _coeff );
-        //     unique_ptr< TMatrix >  M( svd.build( bcl, acc ) );
-        
-        //     return M.release();
-        // }// if
-
-        //
-        // otherwise continue with HCA by computing S and G:
-        //   G = (S|_pivot_row,pivot_col)^-1
+        // compute G = (S|_pivot_row,pivot_col)^-1
         //
     
-        blas::Matrix< value_t >  G( k, k );
-    
-        for ( idx_t  j = 0; j < idx_t(k); j++ )
-        {
-            const idx3_t   mj = unfold( pivots[j].second, order );
-            const T3Point  y  = colcl_grid( mj );
-        
-            for ( idx_t  i = 0; i < idx_t(k); i++ )
-            {
-                const idx3_t   mi = unfold( pivots[i].first, order );
-                const T3Point  x  = rowcl_grid( mi );
-            
-                G(i,j) = _generator_fn.eval( x, y );
-            }// for
-        }// for
-
-        blas::invert( G );
+        const auto  G = compute_G( pivots, row_grid, col_grid, order );
 
         //
         // compute low-rank matrix as (U·G) × V^H
         //
     
-        auto  U = compute_U( rowcl, k, pivots, colcl_grid, order, G );
-        auto  V = compute_V( colcl, k, pivots, rowcl_grid, order );
+        auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
+        auto  V = compute_V( colcl, k, pivots, row_grid, order );
         auto  R = std::make_unique< matrix::tiled_lrmatrix< value_t > >( rowcl,
                                                                          colcl,
                                                                          std::move( U ),
@@ -339,42 +310,36 @@ protected:
         
 
     //
-    // compute ACA pivots for approximating the generator function
+    // compute ACA(-Full) pivots for approximating the generator function
     // in local block as defined by row- and column grid
     //
     
     pivot_arr_t
-    comp_aca_pivots  ( const tensor_grid &  rowcl_grid,
-                       const tensor_grid &  colcl_grid,
+    comp_aca_pivots  ( const tensor_grid &  row_grid,
+                       const tensor_grid &  col_grid,
                        const real_t         eps,
-                       const uint           ipol_order ) const
+                       const uint           order ) const
     {
-        ///////////////////////////////////////////////////////////
-        //
-        // use ACA-Full
-        //
-
-        const size_t  max_rank = ipol_order * ipol_order * ipol_order;
-
         //
         // compute full tensor
         //
 
+        const size_t             max_rank = order * order * order;
         blas::Matrix< value_t >  D( max_rank, max_rank );
         idx_t                    j = 0;
 
-        for ( uint  jz = 0; jz < ipol_order; jz++ )
-            for ( uint  jy = 0; jy < ipol_order; jy++ )
-                for ( uint  jx = 0; jx < ipol_order; jx++, j++ )
+        for ( uint  jz = 0; jz < order; jz++ )
+            for ( uint  jy = 0; jy < order; jy++ )
+                for ( uint  jx = 0; jx < order; jx++, j++ )
                 {
                     idx_t       i = 0;
-                    const auto  y = colcl_grid( jx, jy, jz );
+                    const auto  y = col_grid( jx, jy, jz );
                 
-                    for ( uint  iz = 0; iz < ipol_order; iz++ )
-                        for ( uint  iy = 0; iy < ipol_order; iy++ )
-                            for ( uint  ix = 0; ix < ipol_order; ix++, i++ )
+                    for ( uint  iz = 0; iz < order; iz++ )
+                        for ( uint  iy = 0; iy < order; iy++ )
+                            for ( uint  ix = 0; ix < order; ix++, i++ )
                             {
-                                const auto  x = rowcl_grid( ix, iy, iz );
+                                const auto  x = row_grid( ix, iy, iz );
 
                                 D( i, j ) = _generator_fn.eval( x, y );
                             }// for
@@ -453,6 +418,38 @@ protected:
     }
 
     //
+    // compute generator matrix G
+    //
+
+    blas::Matrix< value_t >
+    compute_G ( const pivot_arr_t &  pivots,
+                const tensor_grid &  row_grid,
+                const tensor_grid &  col_grid,
+                const size_t         order ) const
+    {
+        const auto               k = pivots.size();
+        blas::Matrix< value_t >  G( k, k );
+    
+        for ( idx_t  j = 0; j < idx_t(k); j++ )
+        {
+            const idx3_t   mj = unfold( pivots[j].second, order );
+            const T3Point  y  = col_grid( mj );
+        
+            for ( idx_t  i = 0; i < idx_t(k); i++ )
+            {
+                const idx3_t   mi = unfold( pivots[i].first, order );
+                const T3Point  x  = row_grid( mi );
+            
+                G(i,j) = _generator_fn.eval( x, y );
+            }// for
+        }// for
+
+        blas::invert( G );
+
+        return G;
+    }
+    
+    //
     // compute collocation matrices
     //
     
@@ -461,7 +458,7 @@ protected:
     //              const size_t         rank,
     //              const pivot_arr_t &  pivots,
     //              const tensor_grid &  colcl_grid,
-    //              const uint           ipol_order ) const
+    //              const uint           order ) const
     // {
     //     //
     //     // set up collocation points and evaluate
@@ -470,7 +467,7 @@ protected:
     //     std::vector< T3Point >  y_pts( rank );
 
     //     for ( size_t j = 0; j < rank; j++ )
-    //         y_pts[j] = colcl_grid( unfold( pivots[j].second, ipol_order ) );
+    //         y_pts[j] = colcl_grid( unfold( pivots[j].second, order ) );
     
     //     blas::Matrix< value_t >  U( rowis.size(), rank );
             
@@ -483,8 +480,8 @@ protected:
     // compute_V  ( const TIndexSet &    colis,
     //              const size_t         rank,
     //              const pivot_arr_t &  pivots,
-    //              const tensor_grid &  rowcl_grid,
-    //              const uint           ipol_order ) const
+    //              const tensor_grid &  row_grid,
+    //              const uint           order ) const
     // {
     //     //
     //     // set up collocation points and evaluate
@@ -493,7 +490,7 @@ protected:
     //     std::vector< T3Point >  x_pts( rank );
     
     //     for ( size_t j = 0; j < rank; j++ )
-    //         x_pts[j] = rowcl_grid( unfold( pivots[j].first, ipol_order ) );
+    //         x_pts[j] = row_grid( unfold( pivots[j].first, order ) );
 
     //     blas::Matrix< value_t >  V( colis.size(), rank );
         
@@ -508,8 +505,8 @@ protected:
     compute_U  ( const TIndexSet &                rowis,
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
-                 const tensor_grid &              colcl_grid,
-                 const uint                       ipol_order,
+                 const tensor_grid &              col_grid,
+                 const uint                       order,
                  const blas::Matrix< value_t > &  G ) const
     {
         //
@@ -520,7 +517,7 @@ protected:
         std::vector< T3Point >           y_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
-            y_pts[j] = colcl_grid( unfold( pivots[j].second, ipol_order ) );
+            y_pts[j] = col_grid( unfold( pivots[j].second, order ) );
 
         HLR_ASSERT( _row_tile_map.contains( rowis ) );
         
@@ -540,8 +537,8 @@ protected:
     compute_V  ( const TIndexSet &    colis,
                  const size_t         rank,
                  const pivot_arr_t &  pivots,
-                 const tensor_grid &  rowcl_grid,
-                 const uint           ipol_order ) const
+                 const tensor_grid &  row_grid,
+                 const uint           order ) const
     {
         //
         // set up collocation points and evaluate
@@ -551,7 +548,7 @@ protected:
         std::vector< T3Point >           x_pts( rank );
     
         for ( size_t j = 0; j < rank; j++ )
-            x_pts[j] = rowcl_grid( unfold( pivots[j].first, ipol_order ) );
+            x_pts[j] = row_grid( unfold( pivots[j].first, order ) );
 
         HLR_ASSERT( _col_tile_map.contains( colis ) );
         
