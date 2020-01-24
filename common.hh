@@ -77,6 +77,14 @@ format_error ( const double  e )
     return hlr::term::red( str( format( "%.4e" ) % e ) );
 }
 
+// return default formated norm string
+inline
+std::string
+format_norm ( const double  e )
+{
+    return hlr::term::italic( str( format( "%.4e" ) % e ) );
+}
+
 //
 // timing
 //

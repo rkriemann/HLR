@@ -347,6 +347,59 @@ tsqr ( const indexset &                 is,
 }
 
 //
+// truncate U V^H
+//
+template < typename value_t >
+std::pair< tile_storage< value_t >,
+           tile_storage< value_t > >
+truncate ( const indexset &                 row_is,
+           const indexset &                 col_is,
+           const tile_storage< value_t > &  U,
+           const tile_storage< value_t > &  V,
+           const TTruncAcc &                acc )
+{
+    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_is.size() ) );
+    
+    // if ( Y.ncols() + V.ncols() > X.nrows() / 2 )
+    // {
+    //     // M = α X T Y^H + U V^H
+    //     auto  W = blas::prod( value_t(1), X, T );
+    //     auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
+
+    //     blas::prod( alpha, W, blas::adjoint( Y ), value_t(1), M );
+            
+    //     // truncate to rank-k
+    //     return std::move( hlr::approx_svd( M, acc ) );
+    // }// if
+    // else
+    {
+        auto [ Q0, R0 ] = tsqr( row_is, value_t(1), U );
+        auto [ Q1, R1 ] = tsqr( col_is, value_t(1), V );
+
+        auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
+        auto               Us = std::move( R );
+        matrix< value_t >  Vs;
+        vector< value_t >  Ss;
+        
+        blas::svd( Us, Ss, Vs );
+
+        auto  k = acc.trunc_rank( Ss );
+
+        matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
+        matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
+        
+        blas::prod_diag( Usk, Ss, k );
+
+        tile_storage< value_t >  Uk, Vk;
+
+        // tprod( row_is, value_t(1), Q0, Usk, value_t(0), Uk, ntile );
+        // tprod( col_is, value_t(1), Q1, Vsk, value_t(0), Vk, ntile );
+
+        return { std::move( Uk ), std::move( Vk ) };
+    }// else
+}
+
+//
 // truncate α X T Y^H + U V^H
 //
 template < typename value_t >

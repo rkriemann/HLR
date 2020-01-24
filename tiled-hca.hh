@@ -36,10 +36,17 @@ program_main ()
     auto                   tic = timer::now();
     auto                   toc = timer::since( tic );
 
+    std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+              << "    grid = " << gridfile
+              << std::endl;
+    
     auto  acc     = gen_accuracy();
     auto  grid    = make_grid( gridfile );
     auto  fnspace = std::make_unique< TConstFnSpace >( grid.get() );
     auto  coord   = fnspace->build_coord();
+
+    std::cout << "    dims = " << coord->ncoord() << " × " << coord->ncoord() << std::endl;
+    
     auto  ct      = cluster::h::cluster( coord.get(), ntile );
     auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
     
@@ -50,6 +57,14 @@ program_main ()
         bc_vis.id( true ).print( bct->root(), "bct" );
     }// if
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // Tiled HCA
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    std::cout << term::bullet << term::bold << "Tiled HCA" << term::reset << std::endl;
+    
     auto  tile_map = matrix::setup_tiling( * ct->root() );
 
     auto  bf     = std::make_unique< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > >( fnspace.get(), fnspace.get(), 4 );
@@ -64,39 +79,67 @@ program_main ()
     auto  hca    = new THCA< value_t >( pcoeff.get(), genfn.get(), 1e-6, 5 );
     auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff.get() );
+    auto  exact  = std::make_unique< TDenseLRApx< value_t > >( pcoeff.get() );
 
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset << std::endl;
+    
+    tic = timer::now();
+    
+    auto  REF    = impl::matrix::build( bct->root(), *pcoeff, *exact, acc, nseq );
+
+    toc = timer::since( tic );
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( REF->byte_size() ) << std::endl;
+
+    auto  norm_REF = hlr::seq::norm::norm_2( *REF );
+
+    std::cout << "    norm   = " << format_norm( norm_REF ) << std::endl;
+
+    
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << "  " << term::bullet << term::bold << "tHCA" << term::reset << std::endl;
+    
     tic = timer::now();
     
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *thca, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *A ) ) << std::endl;
 
+    auto  diff_thca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), A.get() );
+    auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
+    
+    std::cout << "    error  = " << format_error( error_tHCA )
+              << " / "
+              << format_error( error_tHCA / norm_REF )
+              << std::endl;
+    
+
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
+    
     tic = timer::now();
     
     auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hca, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    
-    tic = timer::now();
-    
-    auto  REF    = impl::matrix::build( bct->root(), *pcoeff, *svd, fixed_prec( 1e-8 ), nseq );
-
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    
-    std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_error( hlr::seq::norm::norm_F( *A ) ) << std::endl;
-    std::cout << "    norm   = " << format_error( hlr::seq::norm::norm_F( *B ) ) << std::endl;
-
-    auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), A.get() );
-    auto  diff_thca = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
-
-    std::cout << "    diff HCA  = " << format_error( hlr::seq::norm::norm_2( *diff_hca  ) ) << std::endl;
-    std::cout << "    diff tHCA = " << format_error( hlr::seq::norm::norm_2( *diff_thca ) ) << std::endl;
+    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *B ) ) << std::endl;
+    
+    auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
+    auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
+    
+    std::cout << "    error  = " << format_error( error_HCA )
+              << " / "
+              << format_error( error_HCA / norm_REF )
+              << std::endl;
     
     // hpro::DBG::write( A.get(), "A.mat", "A" );
     // hpro::DBG::write( B.get(), "B.mat", "B" );

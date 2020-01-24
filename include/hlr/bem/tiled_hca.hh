@@ -125,27 +125,57 @@ public:
     using  real_t             = typename real_type< value_t >::type_t;
     using  generator_fn_t     = T_generator_fn;
     using  interpolation_fn_t = T_interpolation_fn;
+    using  pivot_arr_t        = std::vector< std::pair< idx_t, idx_t > >;
 
 protected:
     //
-    // multiindex of dimension three
+    // multi-index of dimension three
     //
 
-    using idx3_t = std::array< idx_t, 3 >;
+    using  idx3_t = std::array< idx_t, 3 >;
+    
+    // unfold given index i into (i₀,i₁,i₂) with
+    // constant dimension <dim> per index dimension
+    idx3_t
+    unfold ( const idx_t   i,
+             const size_t  dim ) const
+    {
+        idx_t   idx = i;
+        idx3_t  midx;
+        
+        midx[0] = idx % dim; idx /= dim;
+        midx[1] = idx % dim; idx /= dim;
+        midx[2] = idx % dim;
+
+        return  midx;
+    };
     
     //
     // store tensor grid, e.g. grid defined by (x_i,y_j,z_k)
     //
     struct  tensor_grid
     {
-        std::vector< double >  x, y, z;
+        std::vector< real_t >  x, y, z;
 
-        // setup grid with <n> points
-        tensor_grid ( const size_t  n )
-                : x( n )
-                , y( n )
-                , z( n )
-        {}
+        // setup grid for given bbox and interpolation points
+        tensor_grid ( const TBBox &                  bbox,
+                      const std::vector< real_t > &  ipol_points )
+        {
+            const auto  middle = 0.5 * ( T3Point( bbox.max() ) + T3Point( bbox.min() ) );
+            const auto  diam   = 0.5 * ( T3Point( bbox.max() ) - T3Point( bbox.min() ) );
+            const auto  n      = ipol_points.size();
+
+            x.reserve( n );
+            y.reserve( n );
+            z.reserve( n );
+            
+            for( auto  p : ipol_points )
+            {
+                x.push_back( middle.x() + p * diam.x() );
+                y.push_back( middle.y() + p * diam.y() );
+                z.push_back( middle.z() + p * diam.z() );
+            }// for
+        }
         
         // return point at index (i,j,k)
         T3Point
@@ -156,7 +186,7 @@ protected:
             return T3Point( x[i], y[j], z[k] );
         }
 
-        // return point at (multi-) index \a midx = (i,j,k)
+        // return point at (multi-) index midx = (i,j,k)
         T3Point
         operator () ( const idx3_t  midx ) const
         {
@@ -176,14 +206,14 @@ protected:
 
     // interpolation order to use
     const uint               _ipol_order;
-    
-    // unit interval interpolation points
-    std::vector< double >    _ipol_points;
 
+    // function generating 1D interpolation points
+    interpolation_fn_t &     _ipol_fn;
+    
     // row/column tile indexsets
     matrix::tile_is_map_t &  _row_tile_map;
     matrix::tile_is_map_t &  _col_tile_map;
-
+    
 public:
     //////////////////////////////////////
     //
@@ -194,14 +224,14 @@ public:
                 const generator_fn_t &   agenerator,
                 const real_t             aaca_eps,
                 const uint               aipol_order,
-                interpolation_fn_t &&    ipol_fn,
+                interpolation_fn_t &&    aipol_fn,
                 matrix::tile_is_map_t &  arow_tile_map,
                 matrix::tile_is_map_t &  acol_tile_map )
             : _coeff( acoeff )
             , _generator_fn( agenerator )
             , _aca_eps( aaca_eps )
             , _ipol_order( aipol_order )
-            , _ipol_points( ipol_fn( _ipol_order ) )
+            , _ipol_fn( aipol_fn )
             , _row_tile_map( arow_tile_map )
             , _col_tile_map( acol_tile_map )
     {}
@@ -213,8 +243,8 @@ public:
     // build low-rank matrix
     //
 
-    // build low rank matrix for block cluster \a bct with
-    // rank defined by accuracy \a acc
+    // build low rank matrix for block cluster bct with
+    // rank defined by accuracy acc
     virtual TMatrix * build ( const TBlockCluster *   bc,
                               const TTruncAcc &       acc ) const
     {
@@ -244,15 +274,15 @@ protected:
             ( colcl.bbox().max().dim() != 3 ))
             HLR_ERROR( "tiled_hca::hca : unsupported dimension of cluster" );
 
-        const uint  order = _ipol_order;
+        const uint  order      = _ipol_order;
 
         // generate grid for local clusters for evaluation of kernel generator function
-        const auto  rowcl_grid = gen_grid( rowcl, order );
-        const auto  colcl_grid = gen_grid( colcl, order );
+        const auto  rowcl_grid = tensor_grid( rowcl.bbox(), _ipol_fn( order ) );
+        const auto  colcl_grid = tensor_grid( colcl.bbox(), _ipol_fn( order ) );
 
         // determine ACA pivot elements for the kernel generator matrix
-        const auto   pivots = comp_pivot( rowcl_grid, colcl_grid, _aca_eps, order );
-        const auto   k      = pivots.size();
+        const auto   pivots    = comp_aca_pivots( rowcl_grid, colcl_grid, _aca_eps, order );
+        const auto   k         = pivots.size();
 
         // immediately return empty matrix
         if ( k == 0 )
@@ -277,14 +307,14 @@ protected:
     
         blas::Matrix< value_t >  G( k, k );
     
-        for ( idx_t j = 0; j < idx_t(k); j++ )
+        for ( idx_t  j = 0; j < idx_t(k); j++ )
         {
-            const idx3_t   mj = idx_to_idx3( pivots[j].second, order );
+            const idx3_t   mj = unfold( pivots[j].second, order );
             const T3Point  y  = colcl_grid( mj );
         
-            for ( idx_t i = 0; i < idx_t(k); i++ )
+            for ( idx_t  i = 0; i < idx_t(k); i++ )
             {
-                const idx3_t   mi = idx_to_idx3( pivots[i].first, order );
+                const idx3_t   mi = unfold( pivots[i].first, order );
                 const T3Point  x  = rowcl_grid( mi );
             
                 G(i,j) = _generator_fn.eval( x, y );
@@ -297,190 +327,141 @@ protected:
         // compute low-rank matrix as (U·G) × V^H
         //
     
-        auto  U  = compute_U( rowcl, k, pivots, colcl_grid, order, G );
-        // auto  UG = blas::prod( value_t(1), U, G );
-        auto  V  = compute_V( colcl, k, pivots, rowcl_grid, order );
-    
-        // auto  aca = std::make_unique< TACAPlus< value_t > >( & _coeff );
-        
-        // auto  D  = _coeff.build( rowcl, colcl );
-        // auto  RA = aca->build( bis( rowcl, colcl ), acc );
-        // auto  M  = blas::prod( value_t(1), UG, blas::adjoint(V) );
-        // auto  MR = blas::prod( value_t(1),
-        //                        blas_mat_A< value_t >( ptrcast( RA, TRkMatrix ) ),
-        //                        blas::adjoint( blas_mat_B< value_t >( ptrcast( RA, TRkMatrix ) ) ) );
-
-        // // blas::add( value_t(-1), hpro::blas_mat< value_t >( ptrcast( D.get(), TDenseMatrix ) ), M );
-        // blas::add( value_t(-1), M, MR );
-
-        // std::cout << blas::norm_F( MR ) << std::endl;
-        
-        // hpro::DBG::write( D.get(), "D.mat", "D" );
-        // hpro::DBG::write( UG, "U.mat", "U" );
-        // hpro::DBG::write( V, "V.mat", "V" );
-
-        // auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type< value_t >::value );
+        auto  U = compute_U( rowcl, k, pivots, colcl_grid, order, G );
+        auto  V = compute_V( colcl, k, pivots, rowcl_grid, order );
         auto  R = std::make_unique< matrix::tiled_lrmatrix< value_t > >( rowcl,
                                                                          colcl,
                                                                          std::move( U ),
                                                                          std::move( V ) );
-
-        // std::move not working above for TRkMatrix ???
-        // R->set_lrmat( U, V );
 
         return R.release();
     }
         
 
     //
-    // compute pivot points for generator function approximation
+    // compute ACA pivots for approximating the generator function
+    // in local block as defined by row- and column grid
     //
-    std::vector< std::pair< idx_t, idx_t > >
-    comp_pivot  ( const tensor_grid &  rowcl_grid,
-                  const tensor_grid &  colcl_grid,
-                  const real_t         eps,
-                  const uint           ipol_order ) const
+    
+    pivot_arr_t
+    comp_aca_pivots  ( const tensor_grid &  rowcl_grid,
+                       const tensor_grid &  colcl_grid,
+                       const real_t         eps,
+                       const uint           ipol_order ) const
     {
+        ///////////////////////////////////////////////////////////
+        //
+        // use ACA-Full
+        //
+
         const size_t  max_rank = ipol_order * ipol_order * ipol_order;
 
+        //
+        // compute full tensor
+        //
+
+        blas::Matrix< value_t >  D( max_rank, max_rank );
+        idx_t                    j = 0;
+
+        for ( uint  jz = 0; jz < ipol_order; jz++ )
+            for ( uint  jy = 0; jy < ipol_order; jy++ )
+                for ( uint  jx = 0; jx < ipol_order; jx++, j++ )
+                {
+                    idx_t       i = 0;
+                    const auto  y = colcl_grid( jx, jy, jz );
+                
+                    for ( uint  iz = 0; iz < ipol_order; iz++ )
+                        for ( uint  iy = 0; iy < ipol_order; iy++ )
+                            for ( uint  ix = 0; ix < ipol_order; ix++, i++ )
+                            {
+                                const auto  x = rowcl_grid( ix, iy, iz );
+
+                                D( i, j ) = _generator_fn.eval( x, y );
+                            }// for
+                }// for
+    
+        //
+        // perform ACA-Full on matrix, e.g. choosing maximal element of matrix
+        // and compute next rank-1 matrix for low-rank approximation
+        //
+    
+        size_t                   k           = 0;
+        const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
+        real_t                   apr         = eps;
+        blas::Vector< value_t >  row( D.nrows() );
+        blas::Vector< value_t >  col( D.ncols() );
+        pivot_arr_t              pivots;
+                
+        pivots.reserve( max_rank );
+    
+        while ( k < max_rank )
         {
-            ///////////////////////////////////////////////////////////
             //
-            // use ACA-Full
+            // look for maximal element
             //
+
+            idx_t  pivot_row, pivot_col;
+
+            blas::max_idx( D, pivot_row, pivot_col );
+
+            const value_t  pivot_val = D( pivot_row, pivot_col );
+
+            // stop if maximal element is almost 0
+            if ( std::abs( pivot_val ) < almost_zero )
+                return pivots;
         
             //
-            // compute full tensor
+            // copy row and column into A/B and update D
             //
 
-            blas::Matrix< value_t >  D( max_rank, max_rank );
-            idx_t                    j = 0;
+            const auto  D_row = D.row( pivot_row );
+            const auto  D_col = D.column( pivot_col );
 
-            for ( uint  jz = 0; jz < ipol_order; jz++ )
-                for ( uint  jy = 0; jy < ipol_order; jy++ )
-                    for ( uint  jx = 0; jx < ipol_order; jx++, j++ )
-                    {
-                        idx_t       i = 0;
-                        const auto  y = colcl_grid( jx, jy, jz );
+            blas::copy( D_row, row );
+            blas::copy( D_col, col );
+        
+            blas::conj( row );
+            blas::scale( value_t(1) / conj(pivot_val), row );
+        
+            //
+            // look at norm of residual
+            //
+            
+            const auto  norm = blas::norm2( col ) * blas::norm2( row );
                 
-                        for ( uint  iz = 0; iz < ipol_order; iz++ )
-                            for ( uint  iy = 0; iy < ipol_order; iy++ )
-                                for ( uint  ix = 0; ix < ipol_order; ix++, i++ )
-                                {
-                                    const auto  x = rowcl_grid( ix, iy, iz );
-
-                                    D( i, j ) = _generator_fn.eval( x, y );
-                                }// for
-                    }// for
-    
-            //
-            // perform ACA-Full on matrix, e.g. choosing maximal element of matrix
-            // and compute next rank-1 matrix for low-rank approximation
-            //
-    
-            size_t                   k           = 0;
-            const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
-            real_t                   apr         = eps;
-            blas::Vector< value_t >  row( D.nrows() );
-            blas::Vector< value_t >  col( D.ncols() );
-    
-            std::vector< std::pair< idx_t, idx_t > > pivots;
-                
-            pivots.reserve( max_rank );
-    
-            while ( k < max_rank )
+            pivots.push_back( { pivot_row, pivot_col } );
+            ++k;
+            
+            if ( k == 1 )
             {
-                //
-                // look for maximal element
-                //
+                // adjust stop criterion with norm-estimate of initial matrix
+                apr *= norm;
+            }// if
+            else if ( norm < apr ) 
+            {
+                return pivots;
+            }// else
 
-                idx_t  pivot_row, pivot_col;
-
-                blas::max_idx( D, pivot_row, pivot_col );
-
-                const value_t  pivot_val = D( pivot_row, pivot_col );
-
-                // stop if maximal element is almost 0
-                if ( std::abs( pivot_val ) < almost_zero )
-                    return pivots;
+            //
+            // update dense matrix
+            //
         
-                //
-                // copy row and column into A/B and update D
-                //
+            blas::add_r1( value_t(-1), col, row, D );
+        }// while
 
-                const auto  D_row = D.row( pivot_row );
-                const auto  D_col = D.column( pivot_col );
-
-                blas::copy( D_row, row );
-                blas::copy( D_col, col );
-        
-                blas::conj( row );
-                blas::scale( value_t(1) / conj(pivot_val), row );
-        
-                //
-                // look at norm of residual
-                //
-            
-                const auto  norm = blas::norm2( col ) * blas::norm2( row );
-                
-                pivots.push_back( { pivot_row, pivot_col } );
-                ++k;
-            
-                if ( k == 1 )
-                {
-                    // adjust stop criterion with norm-estimate of initial matrix
-                    apr *= norm;
-                }// if
-                else if ( norm < apr ) 
-                {
-                    return pivots;
-                }// else
-
-                //
-                // update dense matrix
-                //
-        
-                blas::add_r1( value_t(-1), col, row, D );
-            }// while
-
-            return pivots;
-        }// if
+        return pivots;
     }
 
-    //
-    // interpolation management
-    //
-    
-    // generate grid points in <cl> as defined by interpolation points
-    tensor_grid
-    gen_grid  ( const TGeomCluster &  cl,
-                const uint            ipol_order ) const
-    {
-        const auto  middle = 0.5 * ( T3Point( cl.bbox().max() ) + T3Point( cl.bbox().min() ) );
-        const auto  diam   = 0.5 * ( T3Point( cl.bbox().max() ) - T3Point( cl.bbox().min() ) );
-
-        tensor_grid  grid( ipol_order );
-    
-        for( uint  i = 0; i < ipol_order;  ++i )
-        {
-            grid.x[ i ] = middle.x() + _ipol_points[i] * diam.x();
-            grid.y[ i ] = middle.y() + _ipol_points[i] * diam.y();
-            grid.z[ i ] = middle.z() + _ipol_points[i] * diam.z();
-        }// for
-
-        return grid;
-    }
-    
     //
     // compute collocation matrices
     //
     
     // blas::Matrix< value_t >
-    // compute_U  ( const TIndexSet &             rowis,
-    //              const size_t                  rank,
-    //              const std::vector< std::pair< idx_t, idx_t > > &  pivots,
-    //              const tensor_grid &           colcl_grid,
-    //              const uint                    ipol_order ) const
+    // compute_U  ( const TIndexSet &    rowis,
+    //              const size_t         rank,
+    //              const pivot_arr_t &  pivots,
+    //              const tensor_grid &  colcl_grid,
+    //              const uint           ipol_order ) const
     // {
     //     //
     //     // set up collocation points and evaluate
@@ -489,7 +470,7 @@ protected:
     //     std::vector< T3Point >  y_pts( rank );
 
     //     for ( size_t j = 0; j < rank; j++ )
-    //         y_pts[j] = colcl_grid( idx_to_idx3( pivots[j].second, ipol_order ) );
+    //         y_pts[j] = colcl_grid( unfold( pivots[j].second, ipol_order ) );
     
     //     blas::Matrix< value_t >  U( rowis.size(), rank );
             
@@ -499,11 +480,11 @@ protected:
     // }
     
     // blas::Matrix< value_t >
-    // compute_V  ( const TIndexSet &             colis,
-    //              const size_t                  rank,
-    //              const std::vector< std::pair< idx_t, idx_t > > &  pivots,
-    //              const tensor_grid &           rowcl_grid,
-    //              const uint                    ipol_order ) const
+    // compute_V  ( const TIndexSet &    colis,
+    //              const size_t         rank,
+    //              const pivot_arr_t &  pivots,
+    //              const tensor_grid &  rowcl_grid,
+    //              const uint           ipol_order ) const
     // {
     //     //
     //     // set up collocation points and evaluate
@@ -512,7 +493,7 @@ protected:
     //     std::vector< T3Point >  x_pts( rank );
     
     //     for ( size_t j = 0; j < rank; j++ )
-    //         x_pts[j] = rowcl_grid( idx_to_idx3( pivots[j].first, ipol_order ) );
+    //         x_pts[j] = rowcl_grid( unfold( pivots[j].first, ipol_order ) );
 
     //     blas::Matrix< value_t >  V( colis.size(), rank );
         
@@ -526,7 +507,7 @@ protected:
     matrix::tile_storage< value_t >
     compute_U  ( const TIndexSet &                rowis,
                  const size_t                     rank,
-                 const std::vector< std::pair< idx_t, idx_t > > &  pivots,
+                 const pivot_arr_t &              pivots,
                  const tensor_grid &              colcl_grid,
                  const uint                       ipol_order,
                  const blas::Matrix< value_t > &  G ) const
@@ -539,7 +520,7 @@ protected:
         std::vector< T3Point >           y_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
-            y_pts[j] = colcl_grid( idx_to_idx3( pivots[j].second, ipol_order ) );
+            y_pts[j] = colcl_grid( unfold( pivots[j].second, ipol_order ) );
 
         HLR_ASSERT( _row_tile_map.contains( rowis ) );
         
@@ -556,11 +537,11 @@ protected:
     }
     
     matrix::tile_storage< value_t >
-    compute_V  ( const TIndexSet &             colis,
-                 const size_t                  rank,
-                 const std::vector< std::pair< idx_t, idx_t > > &  pivots,
-                 const tensor_grid &           rowcl_grid,
-                 const uint                    ipol_order ) const
+    compute_V  ( const TIndexSet &    colis,
+                 const size_t         rank,
+                 const pivot_arr_t &  pivots,
+                 const tensor_grid &  rowcl_grid,
+                 const uint           ipol_order ) const
     {
         //
         // set up collocation points and evaluate
@@ -570,7 +551,7 @@ protected:
         std::vector< T3Point >           x_pts( rank );
     
         for ( size_t j = 0; j < rank; j++ )
-            x_pts[j] = rowcl_grid( idx_to_idx3( pivots[j].first, ipol_order ) );
+            x_pts[j] = rowcl_grid( unfold( pivots[j].first, ipol_order ) );
 
         HLR_ASSERT( _col_tile_map.contains( colis ) );
         
@@ -585,20 +566,6 @@ protected:
         }// for
         
         return V;
-    }
-
-    // convert unfolded index to 3-index
-    const idx3_t
-    idx_to_idx3  ( idx_t         idx,
-                   const size_t  order ) const
-    {
-        idx3_t  midx;
-        
-        midx[0] = idx % order; idx /= order;
-        midx[1] = idx % order; idx /= order;
-        midx[2] = idx % order;
-        
-        return midx;
     }
 };
 
