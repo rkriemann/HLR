@@ -102,6 +102,28 @@ program_main ()
     
     //////////////////////////////////////////////////////////////////////
     
+    std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
+    
+    tic = timer::now();
+    
+    auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hca, acc, nseq );
+
+    toc = timer::since( tic );
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
+    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *B ) ) << std::endl;
+    
+    auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
+    auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
+    
+    std::cout << "    error  = " << format_error( error_HCA )
+              << " / "
+              << format_error( error_HCA / norm_REF )
+              << std::endl;
+    
+
+    //////////////////////////////////////////////////////////////////////
+    
     std::cout << "  " << term::bullet << term::bold << "tHCA" << term::reset << std::endl;
     
     tic = timer::now();
@@ -122,27 +144,6 @@ program_main ()
               << std::endl;
     
 
-    //////////////////////////////////////////////////////////////////////
-    
-    std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
-    
-    tic = timer::now();
-    
-    auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hca, acc, nseq );
-
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *B ) ) << std::endl;
-    
-    auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
-    auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
-    
-    std::cout << "    error  = " << format_error( error_HCA )
-              << " / "
-              << format_error( error_HCA / norm_REF )
-              << std::endl;
-    
     // hpro::DBG::write( A.get(), "A.mat", "A" );
     // hpro::DBG::write( B.get(), "B.mat", "B" );
     

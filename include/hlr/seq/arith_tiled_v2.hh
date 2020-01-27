@@ -205,7 +205,7 @@ tprod ( const cluster &                  cl,
         const matrix< value_t > &        T,
         tile_storage< value_t > &        B )
 {
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", is.size() ) );
+    HLR_LOG( 4, hpro::to_string( "tprod( %d )", cl.size() ) );
     
     if ( cl.is_leaf() )
     {
@@ -447,7 +447,7 @@ truncate ( const cluster &                  row_cl,
            const tile_storage< value_t > &  V,
            const TTruncAcc &                acc )
 {
-    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_is.size() ) );
+    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_cl.size() ) );
     
     auto [ Q0, R0 ] = tsqr( row_cl, U );
     auto [ Q1, R1 ] = tsqr( col_cl, V );

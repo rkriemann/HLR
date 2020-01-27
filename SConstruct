@@ -22,6 +22,7 @@ opts_file    = '.scons.options'
 
 CXX          = 'g++'
 CXXFLAGS     = '-std=c++2a'
+CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
@@ -116,6 +117,7 @@ opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    ''
 opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
 opts.Add(               'cxx',      'C++ compiler to use',           CXX )
+opts.Add(               'cpuflags', 'path to cpuflags',              CPUFLAGS )
 
 opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
@@ -158,6 +160,7 @@ if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
 
 CXX          = opt_env['cxx']
+CPUFLAGS     = opt_env['cpuflags']
 
 HPRO_DIR     = opt_env['hpro']
 TBB_DIR      = opt_env['tbb']
@@ -226,7 +229,7 @@ if profile :
     DEFINES   = ''
 
 if warn :
-    WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
+    WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
     
 env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
