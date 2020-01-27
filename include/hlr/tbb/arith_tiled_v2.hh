@@ -29,6 +29,9 @@ namespace hlr { namespace tbb { namespace tiled2 {
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
 
+// cluster
+using  cluster  = hpro::TCluster;
+
 // dense matrix
 template < typename value_t >
 using  matrix   = HLIB::BLAS::Matrix< value_t >;
@@ -158,6 +161,34 @@ tprod ( const indexset &           is,
         matrix< value_t >  Ac( A.at( is ), hpro::copy_value );
         
         blas::prod( alpha, Ac, T, value_t(0), A.at( is ) );
+    }// else
+}
+
+//
+// compute B := A·T
+// - assumption: binary cluster tree
+//
+template < typename value_t >
+void
+tprod ( const cluster &                  cl,
+        const tile_storage< value_t > &  A,
+        const matrix< value_t > &        T,
+        tile_storage< value_t > &        B )
+{
+    HLR_LOG( 4, hpro::to_string( "tprod( %d )", cl.size() ) );
+    
+    if ( cl.is_leaf() )
+    {
+        assert( A.contains( cl ) );
+
+        B[ cl ] = std::move( blas::prod( value_t(1), A.at( cl ), T ) );
+    }// if
+    else
+    {
+        assert(( cl.nsons() == 2 ) && ! is_null_any( cl.son( 0 ), cl.son( 1 )) );
+        
+        ::tbb::parallel_invoke( [&] { tprod( *cl.son( 0 ), A, T, B ); },
+                                [&] { tprod( *cl.son( 1 ), A, T, B ); } );
     }// else
 }
 
@@ -305,6 +336,116 @@ tsqr ( const indexset &                 is,
         
         return { std::move( Q ), std::move( R ) };
     }// else
+}
+
+//
+// compute QR factorization of X
+// - assumption: binary cluster tree
+//
+template < typename value_t >
+std::pair< tile_storage< value_t >,
+           matrix< value_t > >
+tsqr ( const cluster &                  cl,
+       const tile_storage< value_t > &  X )
+{
+    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", cl.size() ) );
+    
+    if ( cl.is_leaf() )
+    {
+        assert( X.contains( cl ) );
+
+        auto                     X_cl = blas::copy( X.at( cl ) );
+        matrix< value_t >        R;
+        tile_storage< value_t >  Q;
+
+        if ( X_cl.nrows() < X_cl.ncols() )
+        {
+            HLR_ERROR( "nrows < ncols" );
+        }// if
+        else
+        {
+            blas::qr( X_cl, R );
+            Q[ cl ] = std::move( X_cl );
+        }// else
+        
+        return { std::move( Q ), std::move( R ) };
+    }// if
+    else
+    {
+        assert(( cl.nsons() == 2 ) && ! is_null_any( cl.son( 0 ), cl.son( 1 )) );
+        
+        //
+        // qr(A) = ⎡Q0  ⎤ qr⎡R0⎤ = ⎡⎡Q0  ⎤ Q01⎤ R
+        //         ⎣  Q1⎦   ⎣R1⎦   ⎣⎣  Q1⎦    ⎦ 
+        //
+        
+        tile_storage< value_t >  Q0, Q1;
+        matrix< value_t >        R0, R1;
+
+        ::tbb::parallel_invoke( [&] { std::tie( Q0, R0 ) = std::move( tsqr( *cl.son(0), X ) ); },
+                                [&] { std::tie( Q1, R1 ) = std::move( tsqr( *cl.son(1), X ) ); } );
+
+        // Q = | R0 |
+        //     | R1 |
+        matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        matrix< value_t >  Q01_0( Q01, range( 0,          R0.nrows()-1  ), range::all );
+        matrix< value_t >  Q01_1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
+        matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        
+        blas::copy( R0, Q01_0 );
+        blas::copy( R1, Q01_1 );
+
+        blas::qr( Q01, R );
+
+        tile_storage< value_t >  Q;
+
+        ::tbb::parallel_invoke( [&] { tprod( *cl.son(0), Q0, Q01_0, Q ); },
+                                [&] { tprod( *cl.son(1), Q1, Q01_1, Q ); } );
+
+        return { std::move( Q ), std::move( R ) };
+    }// else
+}
+
+//
+// truncate U V^H
+//
+template < typename value_t >
+std::pair< tile_storage< value_t >,
+           tile_storage< value_t > >
+truncate ( const cluster &                  row_cl,
+           const cluster &                  col_cl,
+           const tile_storage< value_t > &  U,
+           const tile_storage< value_t > &  V,
+           const hpro::TTruncAcc &          acc )
+{
+    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_cl.size() ) );
+    
+    tile_storage< value_t >  Q0, Q1;
+    matrix< value_t >        R0, R1;
+
+    ::tbb::parallel_invoke( [&] { std::tie( Q0, R0 ) = std::move( tsqr( row_cl, U ) ); },
+                            [&] { std::tie( Q1, R1 ) = std::move( tsqr( col_cl, V ) ); } );
+
+    auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
+    auto               Us = std::move( R );
+    matrix< value_t >  Vs;
+    vector< value_t >  Ss;
+        
+    blas::svd( Us, Ss, Vs );
+
+    auto  k = acc.trunc_rank( Ss );
+
+    matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
+    matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
+        
+    blas::prod_diag( Usk, Ss, k );
+
+    tile_storage< value_t >  Uk, Vk;
+
+    ::tbb::parallel_invoke( [&] { tprod( row_cl, Q0, Usk, Uk ); },
+                            [&] { tprod( col_cl, Q1, Vsk, Vk ); } );
+
+    return { std::move( Uk ), std::move( Vk ) };
 }
 
 //

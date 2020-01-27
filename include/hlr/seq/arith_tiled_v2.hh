@@ -396,9 +396,16 @@ tsqr ( const cluster &                  cl,
         auto                     X_cl = blas::copy( X.at( cl ) );
         matrix< value_t >        R;
         tile_storage< value_t >  Q;
-        
-        blas::qr( X_cl, R );
-        Q[ cl ] = std::move( X_cl );
+
+        if ( X_cl.nrows() < X_cl.ncols() )
+        {
+            HLR_ERROR( "nrows < ncols" );
+        }// if
+        else
+        {
+            blas::qr( X_cl, R );
+            Q[ cl ] = std::move( X_cl );
+        }// else
         
         return { std::move( Q ), std::move( R ) };
     }// if

@@ -9,12 +9,9 @@
 //
 
 #include <vector>
-#include <cmath>
 
 #include <tbb/parallel_invoke.h>
 #include <tbb/parallel_for.h>
-
-#include <boost/math/constants/constants.hpp>
 
 #include <hpro/cluster/TGeomCluster.hh>
 #include <hpro/algebra/TLowRankApx.hh>
@@ -25,8 +22,10 @@
 
 #include <hlr/bem/interpolation.hh>
 #include <hlr/bem/tensor_grid.hh>
+#include <hlr/bem/aca.hh>
 
 #include <hlr/seq/arith_tiled_v2.hh>
+#include <hlr/tbb/arith_tiled_v2.hh>
 
 namespace hlr { namespace bem {
 
@@ -59,7 +58,6 @@ public:
     using  real_t             = typename real_type< value_t >::type_t;
     using  generator_fn_t     = T_generator_fn;
     using  interpolation_fn_t = std::function< std::vector< double > ( const size_t ) >;
-    using  pivot_arr_t        = std::vector< std::pair< idx_t, idx_t > >;
 
 protected:
     // function for matrix evaluation
@@ -180,7 +178,7 @@ protected:
             } );
 
         // recompression
-        auto [ U_tr, V_tr ] = seq::tiled2::truncate( rowcl, colcl, U, V, acc );
+        auto [ U_tr, V_tr ] = tbb::tiled2::truncate( rowcl, colcl, U, V, acc );
         
         // auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
         // auto  V = compute_V( colcl, k, pivots, row_grid, order );
@@ -199,9 +197,9 @@ protected:
     //
     
     pivot_arr_t
-    comp_aca_pivots  ( const tensor_grid< real_t > &  row_grid,
-                       const tensor_grid< real_t > &  col_grid,
-                       const real_t                   eps ) const
+    comp_aca_pivots ( const tensor_grid< real_t > &  row_grid,
+                      const tensor_grid< real_t > &  col_grid,
+                      const real_t                   eps ) const
     {
         //
         // compute full tensor
@@ -209,7 +207,6 @@ protected:
 
         const size_t             nrows    = row_grid.nvertices();
         const size_t             ncols    = col_grid.nvertices();
-        const size_t             max_rank = std::min( nrows, ncols );
         blas::Matrix< value_t >  D( nrows, ncols );
         idx_t                    j = 0;
 
@@ -230,78 +227,9 @@ protected:
                             }// for
                 }// for
 
-        //
-        // perform ACA-Full on matrix, e.g. choosing maximal element of matrix
-        // and compute next rank-1 matrix for low-rank approximation
-        //
-    
-        size_t                   k           = 0;
-        const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
-        real_t                   apr         = eps;
-        blas::Vector< value_t >  row( D.nrows() );
-        blas::Vector< value_t >  col( D.ncols() );
-        pivot_arr_t              pivots;
-                
-        pivots.reserve( max_rank );
-    
-        while ( k < max_rank )
-        {
-            //
-            // look for maximal element
-            //
-
-            idx_t  pivot_row, pivot_col;
-
-            blas::max_idx( D, pivot_row, pivot_col );
-
-            const value_t  pivot_val = D( pivot_row, pivot_col );
-
-            // stop if maximal element is almost 0
-            if ( std::abs( pivot_val ) < almost_zero )
-                return pivots;
-        
-            //
-            // copy row and column into A/B and update D
-            //
-
-            const auto  D_row = D.row( pivot_row );
-            const auto  D_col = D.column( pivot_col );
-
-            blas::copy( D_row, row );
-            blas::copy( D_col, col );
-        
-            blas::conj( row );
-            blas::scale( value_t(1) / conj(pivot_val), row );
-        
-            //
-            // look at norm of residual
-            //
-            
-            const auto  norm = blas::norm2( col ) * blas::norm2( row );
-                
-            pivots.push_back( { pivot_row, pivot_col } );
-            ++k;
-            
-            if ( k == 1 )
-            {
-                // adjust stop criterion with norm-estimate of initial matrix
-                apr *= norm;
-            }// if
-            else if ( norm < apr ) 
-            {
-                return pivots;
-            }// else
-
-            //
-            // update dense matrix
-            //
-        
-            blas::add_r1( value_t(-1), col, row, D );
-        }// while
-
-        return pivots;
+        return aca_full_pivots( D, eps );
     }
-
+    
     //
     // compute generator matrix G
     //

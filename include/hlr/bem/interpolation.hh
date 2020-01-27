@@ -9,6 +9,9 @@
 //
 
 #include <vector>
+#include <cmath>
+
+#include <boost/math/constants/constants.hpp>
 
 namespace hlr { namespace bem {
 

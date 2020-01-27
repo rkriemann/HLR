@@ -46,7 +46,7 @@ unfold ( const idx_t   i,
     midx[2] = idx % dim;
 
     return  midx;
-};
+}
 
 //
 // represent axis aligned tensor grid X × Y × Z with
