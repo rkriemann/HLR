@@ -25,13 +25,16 @@
 using namespace hlr;
 using namespace hpro;
 
+using function_space = hpro::TConstFnSpace;
+
 //
 // main function
 //
 void
 program_main ()
 {
-    using value_t = hpro::real; // typename problem_t::value_t;
+    using  value_t = hpro::real; // typename problem_t::value_t;
+    using  real_t  = typename hpro::real_type< value_t >::type_t;
     
     std::vector< double >  runtime;
     auto                   tic = timer::now();
@@ -43,7 +46,7 @@ program_main ()
     
     auto  acc     = gen_accuracy();
     auto  grid    = make_grid( gridfile );
-    auto  fnspace = std::make_unique< TConstFnSpace >( grid.get() );
+    auto  fnspace = std::make_unique< function_space >( grid.get() );
     auto  coord   = fnspace->build_coord();
 
     std::cout << "    dims = " << coord->ncoord() << " × " << coord->ncoord() << std::endl;
@@ -71,38 +74,44 @@ program_main ()
     
     auto  tile_map = matrix::setup_tiling( * ct->root() );
 
-    auto  bf     = std::make_unique< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > >( fnspace.get(), fnspace.get(), 4 );
-    auto  coeff  = std::make_unique< TBFCoeffFn< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > > >( bf.get() );
-    auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  genfn  = std::make_unique< TLaplaceSLPGenFn< TConstFnSpace, TConstFnSpace > >( fnspace.get(),
-                                                                                         fnspace.get(),
-                                                                                         ct->perm_i2e(),
-                                                                                         ct->perm_i2e(),
-                                                                                         4 ); // quad order
-    auto  hca    = new bem::hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5 );
+    auto  bf     = new TLaplaceSLPBF( fnspace.get(), fnspace.get(), 4 );
+    auto  coeff  = new TBFCoeffFn( bf );
+    auto  pcoeff = new TPermCoeffFn( coeff, ct->perm_i2e(), ct->perm_i2e() );
+    auto  genfn  = new TLaplaceSLPGenFn( fnspace.get(),
+                                         fnspace.get(),
+                                         ct->perm_i2e(),
+                                         ct->perm_i2e(),
+                                         4 ); // quad order
+    auto  hca    = new impl::bem::hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5 );
     auto  hcalr  = new bem::hca_lrapx( *hca );
-    auto  thca   = new bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
+    auto  thca   = new impl::bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
     auto  thcalr = new bem::hca_lrapx( *thca );
-    auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
-    auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff.get() );
-    auto  exact  = std::make_unique< TDenseLRApx< value_t > >( pcoeff.get() );
+    auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff );
+    auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff );
+    auto  dense  = std::make_unique< TDenseLRApx< value_t > >( pcoeff );
 
     //////////////////////////////////////////////////////////////////////
     
-    std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset << std::endl;
+    const bool                        build_ref = (( ref != "" ) && ( ref != "none" ));
+    std::unique_ptr< hpro::TMatrix >  REF;
+    real_t                            norm_REF = 0;
+
+    if ( build_ref )
+    {
+        std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset << std::endl;
+
+        tic = timer::now();
     
-    tic = timer::now();
-    
-    auto  REF    = impl::matrix::build( bct->root(), *pcoeff, *exact, acc, nseq );
+        REF = impl::matrix::build( bct->root(), *pcoeff, *svd, acc, nseq );
 
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( REF->byte_size() ) << std::endl;
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( REF->byte_size() ) << std::endl;
 
-    auto  norm_REF = hlr::seq::norm::norm_2( *REF );
+        norm_REF = hlr::seq::norm::norm_2( *REF );
 
-    std::cout << "    norm   = " << format_norm( norm_REF ) << std::endl;
-
+        std::cout << "    norm   = " << format_norm( norm_REF ) << std::endl;
+    }// if
     
     //////////////////////////////////////////////////////////////////////
     
@@ -117,14 +126,16 @@ program_main ()
     std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
     std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *B ) ) << std::endl;
     
-    auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
-    auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
-    
-    std::cout << "    error  = " << format_error( error_HCA )
-              << " / "
-              << format_error( error_HCA / norm_REF )
-              << std::endl;
-    
+    if ( build_ref )
+    {
+        auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
+        auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
+
+        std::cout << "    error  = " << format_error( error_HCA )
+                  << " / "
+                  << format_error( error_HCA / norm_REF )
+                  << std::endl;
+    }// if    
 
     //////////////////////////////////////////////////////////////////////
     
@@ -139,18 +150,17 @@ program_main ()
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *A ) ) << std::endl;
 
-    auto  diff_thca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), A.get() );
-    auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
+    if ( build_ref )
+    {
+        auto  diff_thca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), A.get() );
+        auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
     
-    std::cout << "    error  = " << format_error( error_tHCA )
-              << " / "
-              << format_error( error_tHCA / norm_REF )
-              << std::endl;
-    
+        std::cout << "    error  = " << format_error( error_tHCA )
+                  << " / "
+                  << format_error( error_tHCA / norm_REF )
+                  << std::endl;
+    }// if
 
-    // hpro::DBG::write( A.get(), "A.mat", "A" );
-    // hpro::DBG::write( B.get(), "B.mat", "B" );
-    
     if ( verbose( 3 ) )
     {
         TPSMatrixVis  mvis;

@@ -39,6 +39,7 @@ bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times
+string  ref        = "";           // reference matrix, algorithm, etc.
 
 void
 parse ( int argc, char ** argv )
@@ -76,6 +77,7 @@ parse ( int argc, char ** argv )
         ( "nosparsify",                   ": do not sparsify DAG" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
+        ( "ref",         value<string>(), ": reference matrix or algorithm" )
         ;
 
     //
@@ -131,6 +133,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
+    if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
 
     if ( appl == "help" )
     {

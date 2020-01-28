@@ -10,9 +10,6 @@
 
 #include <vector>
 
-#include <tbb/parallel_invoke.h>
-#include <tbb/parallel_for.h>
-
 #include <hlr/bem/base_hca.hh>
 
 namespace hlr { namespace bem {
@@ -91,13 +88,8 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
         // compute low-rank matrix as (U·G) × V^H
         //
 
-        blas::Matrix< value_t >  U, V;
-
-        ::tbb::parallel_invoke( [&,k] { U = std::move( compute_U( rowcl, k, pivots, col_grid, G ) ); },
-                                [&,k] { V = std::move( compute_V( colcl, k, pivots, row_grid    ) ); } );
-
-        // auto  U = compute_U( rowcl, k, pivots, col_grid, G );
-        // auto  V = compute_V( colcl, k, pivots, row_grid );
+        auto  U = compute_U( rowcl, k, pivots, col_grid, G );
+        auto  V = compute_V( colcl, k, pivots, row_grid );
         auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type< value_t >::value );
 
         // std::move not working above for TRkMatrix ???

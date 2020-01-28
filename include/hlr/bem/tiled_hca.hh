@@ -10,16 +10,12 @@
 
 #include <vector>
 
-#include <tbb/parallel_invoke.h>
-#include <tbb/parallel_for.h>
-
 #include <hlr/matrix/tiling.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
 
 #include <hlr/bem/base_hca.hh>
 
 #include <hlr/seq/arith_tiled_v2.hh>
-#include <hlr/tbb/arith_tiled_v2.hh>
 
 namespace hlr { namespace bem {
 
@@ -66,12 +62,10 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
                 matrix::tile_is_map_t &  arow_tile_map,
                 matrix::tile_is_map_t &  acol_tile_map,
                 interpolation_fn_t       aipol_fn = chebyshev_points )
-            : base_hca< T_coeff, T_generator_fn >( acoeff, agenerator, aaca_eps, aipol_order, aipol_fn )
+            : base_class( acoeff, agenerator, aaca_eps, aipol_order, aipol_fn )
             , _row_tile_map( arow_tile_map )
             , _col_tile_map( acol_tile_map )
     {}
-
-    virtual ~tiled_hca () {}
 
     //
     // actual HCA algorithm
@@ -108,13 +102,11 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
         // compute low-rank matrix as (U·G) × V^H
         //
 
-        matrix::tile_storage< value_t >  U, V;
-
-        ::tbb::parallel_invoke( [&,k] { U = std::move( compute_U( rowcl, k, pivots, col_grid, G ) ); },
-                                [&,k] { V = std::move( compute_V( colcl, k, pivots, row_grid    ) ); } );
+        auto  U = compute_U( rowcl, k, pivots, col_grid, G );
+        auto  V = compute_V( colcl, k, pivots, row_grid    );
 
         // recompression
-        auto [ U_tr, V_tr ] = tbb::tiled2::truncate( rowcl, colcl, U, V, acc );
+        auto [ U_tr, V_tr ] = seq::tiled2::truncate( rowcl, colcl, U, V, acc );
         
         // auto  U = compute_U( rowcl, k, pivots, col_grid, order, G );
         // auto  V = compute_V( colcl, k, pivots, row_grid, order );
@@ -152,17 +144,14 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
 
         const auto &  tiles = _row_tile_map.at( rowis );
 
-        // for ( auto  is : tiles )
-        ::tbb::parallel_for( size_t(0), tiles.size(),
-            [&,rank] ( const auto  i )
-            {
-                const auto               is = tiles[ i ];
-                blas::Matrix< value_t >  U_is( is.size(), rank );
+        for ( auto  is : tiles )
+        {
+            blas::Matrix< value_t >  U_is( is.size(), rank );
             
-                base_class::generator_fn().integrate_dx( is, y_pts, U_is );
-
-                U[ is ] = std::move( blas::prod( value_t(1), U_is, G ) );
-            } );
+            base_class::generator_fn().integrate_dx( is, y_pts, U_is );
+            
+            U[ is ] = std::move( blas::prod( value_t(1), U_is, G ) );
+        }// for
 
         return U;
     }
@@ -187,18 +176,15 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
         
         const auto &  tiles = _col_tile_map.at( colis );
 
-        // for ( auto  is : _col_tile_map.at( colis ) )
-        ::tbb::parallel_for( size_t(0), tiles.size(),
-            [&,rank] ( const auto  i )
-            {
-                const auto               is = tiles[ i ];
-                blas::Matrix< value_t >  V_is( is.size(), rank );
+        for ( auto  is : tiles )
+        {
+            blas::Matrix< value_t >  V_is( is.size(), rank );
             
-                base_class::generator_fn().integrate_dy( is, x_pts, V_is );
-                blas::conj( V_is );
-
-               V[ is ] = std::move( V_is );
-            } );
+            base_class::generator_fn().integrate_dy( is, x_pts, V_is );
+            blas::conj( V_is );
+            
+            V[ is ] = std::move( V_is );
+        }// for
         
         return V;
     }
