@@ -93,8 +93,8 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
     
     const bool                        build_ref = (( ref != "" ) && ( ref != "none" ));
-    std::unique_ptr< hpro::TMatrix >  REF;
-    real_t                            norm_REF = 0;
+    std::unique_ptr< hpro::TMatrix >  M_ref;
+    real_t                            norm_ref = 0;
 
     if ( build_ref )
     {
@@ -102,62 +102,94 @@ program_main ()
 
         tic = timer::now();
     
-        REF = impl::matrix::build( bct->root(), *pcoeff, *svd, acc, nseq );
+        M_ref = impl::matrix::build( bct->root(), *pcoeff, *svd, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( REF->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( M_ref->byte_size() ) << std::endl;
 
-        norm_REF = hlr::seq::norm::norm_2( *REF );
+        norm_ref = hlr::seq::norm::norm_2( *M_ref );
 
-        std::cout << "    norm   = " << format_norm( norm_REF ) << std::endl;
+        std::cout << "    norm   = " << format_norm( norm_ref ) << std::endl;
     }// if
     
     //////////////////////////////////////////////////////////////////////
     
     std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
-    
-    tic = timer::now();
-    
-    auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hcalr, acc, nseq );
 
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *B ) ) << std::endl;
+    auto  M_hca = std::unique_ptr< hpro::TMatrix >();
+
+    for ( int i = 0; i < nbench; ++i )
+    {
+        tic = timer::now();
+    
+        M_hca = impl::matrix::build( bct->root(), *pcoeff, *hcalr, acc, nseq );
+
+        toc = timer::since( tic );
+        runtime.push_back( toc.seconds() );
+        
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+        if ( i < nbench-1 )
+            M_hca.reset( nullptr );
+    }// for
+    
+    if ( nbench > 1 )
+        std::cout << "  runtime  = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+    std::cout << "    mem    = " << format_mem( M_hca->byte_size() ) << std::endl;
+    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_hca ) ) << std::endl;
     
     if ( build_ref )
     {
-        auto  diff_hca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), B.get() );
+        auto  diff_hca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_hca.get() );
         auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
 
         std::cout << "    error  = " << format_error( error_HCA )
                   << " / "
-                  << format_error( error_HCA / norm_REF )
+                  << format_error( error_HCA / norm_ref )
                   << std::endl;
     }// if    
 
+    runtime.clear();
+    
     //////////////////////////////////////////////////////////////////////
     
     std::cout << "  " << term::bullet << term::bold << "tHCA" << term::reset << std::endl;
     
-    tic = timer::now();
+    auto  M_thca = std::unique_ptr< hpro::TMatrix >();
     
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *thcalr, acc, nseq );
+    for ( int i = 0; i < nbench; ++i )
+    {
+        tic = timer::now();
+    
+        M_thca = impl::matrix::build( bct->root(), *pcoeff, *thcalr, acc, nseq );
 
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *A ) ) << std::endl;
+        toc = timer::since( tic );
+        runtime.push_back( toc.seconds() );
+
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+        if ( i < nbench-1 )
+            M_thca.reset( nullptr );
+    }// for
+    
+    if ( nbench > 1 )
+        std::cout << "  runtime  = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+    std::cout << "    mem    = " << format_mem( M_thca->byte_size() ) << std::endl;
+    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_thca ) ) << std::endl;
 
     if ( build_ref )
     {
-        auto  diff_thca  = hpro::matrix_sum( value_t(1), REF.get(), value_t(-1), A.get() );
+        auto  diff_thca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_thca.get() );
         auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
     
         std::cout << "    error  = " << format_error( error_tHCA )
                   << " / "
-                  << format_error( error_tHCA / norm_REF )
+                  << format_error( error_tHCA / norm_ref )
                   << std::endl;
     }// if
 
@@ -165,6 +197,6 @@ program_main ()
     {
         TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
+        mvis.svd( false ).id( true ).print( M_thca.get(), "A" );
     }// if
 }
