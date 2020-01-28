@@ -49,7 +49,7 @@ TScalarVector
 sub_vec ( TScalarVector *    v,
           const TIndexSet &  is )
 {
-    return std::move( v->sub_vector( is ) );
+    return v->sub_vector( is );
 }
 
 TIndexSet
@@ -265,7 +265,7 @@ solve_lower_node::run_ ( const TTruncAcc & )
     HLR_LOG( 4, HLIB::to_string( "trsvl( %d )", L->id() ) );
     
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-    TScalarVector  v_l( std::move( sub_vec( *v, row_is( L, op_L ) ) ) );
+    TScalarVector  v_l = sub_vec( *v, row_is( L, op_L ) );
     
     hlr::seq::trsvl( op_L, * L, v_l, unit_diag );
 }
@@ -372,7 +372,7 @@ solve_upper_node::run_ ( const TTruncAcc & )
     HLR_LOG( 4, HLIB::to_string( "trsvu( %d )", U->id() ) );
     
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-    TScalarVector  v_u( std::move( sub_vec( *v, row_is( U, op_U ) ) ) );
+    TScalarVector  v_u = sub_vec( *v, row_is( U, op_U ) );
         
     hlr::seq::trsvu( op_U, * U, v_u, general_diag );
 }

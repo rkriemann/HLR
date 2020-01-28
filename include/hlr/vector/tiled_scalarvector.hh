@@ -159,7 +159,7 @@ public:
     }
 
     // fill with random numbers
-    virtual void fill_rand ( const uint  seed )
+    virtual void fill_rand ( const uint  /* seed */ )
     {
         assert( false );
     }
@@ -172,8 +172,8 @@ public:
     }
 
     // this ≔ a · vector
-    virtual void assign ( const real             a,
-                          const hpro::TVector *  v )
+    virtual void assign ( const real             /* a */,
+                          const hpro::TVector *  /* v */ )
     {
         assert( false );
     }
@@ -205,8 +205,8 @@ public:
     }
     
     // this ≔ this + α·x
-    virtual void axpy ( const real             a,
-                        const hpro::TVector *  x )
+    virtual void axpy ( const real             /* a */,
+                        const hpro::TVector *  /* x */ )
     {
         assert( false );
     }
@@ -236,14 +236,14 @@ public:
     { assert( false ); }
 
     // return dot-product, <x,y> = x^H · y, where x = this
-    virtual complex dot  ( const TVector *  x ) const
+    virtual complex dot  ( const TVector *  ) const
     {
         assert( false );
         return complex(0);
     }
 
     // return dot-product, <x,y> = x^T · y, where x = this
-    virtual complex dotu ( const TVector * ) const
+    virtual complex dotu ( const TVector *  ) const
     {
         assert( false );
         return complex(0);

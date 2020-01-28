@@ -31,24 +31,6 @@ using  bounding_box = hpro::TBBox;
 using  idx3_t = std::array< idx_t, 3 >;
 
 //
-// unfold given index i into (i₀,i₁,i₂) with
-// constant dimension <dim> per index dimension
-//
-idx3_t
-unfold ( const idx_t   i,
-         const size_t  dim )
-{
-    idx_t   idx = i;
-    idx3_t  midx;
-        
-    midx[0] = idx % dim; idx /= dim;
-    midx[1] = idx % dim; idx /= dim;
-    midx[2] = idx % dim;
-
-    return  midx;
-}
-
-//
 // represent axis aligned tensor grid X × Y × Z with
 //
 //     X = (x_0,...,x_n-1),
@@ -119,6 +101,26 @@ struct tensor_grid
         return point( x[ midx[0] ],
                       y[ midx[1] ],
                       z[ midx[2] ] );
+    }
+
+    // unfold given multi index (i₀,i₁,i₂) into i
+    idx3_t
+    unfold ( const idx3_t  mi ) const
+    {
+        // 0: xz plane → 1: z fibre → 2: entry
+        return (mi[2] * x.size() + mi[1]) * y.size() + mi[0];
+    }
+
+    // unfold given index i into (i₀,i₁,i₂) 
+    idx3_t
+    fold ( const idx_t  i ) const
+    {
+        const idx_t  i2 = i  / x.size();
+        const idx_t  i3 = i2 / y.size();
+
+        return { idx_t( i  % x.size() ),
+                 idx_t( i2 % y.size() ),
+                 idx_t( i3 % z.size() ) };
     }
 };
 

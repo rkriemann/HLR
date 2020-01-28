@@ -64,7 +64,10 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    std::cout << term::bullet << term::bold << "Tiled HCA" << term::reset << std::endl;
+    std::cout << term::bullet << term::bold << "H-matrix construction" << term::reset
+              << ", " << acc.to_string()
+              << ", ntile = " << ntile
+              << std::endl;
     
     auto  tile_map = matrix::setup_tiling( * ct->root() );
 
@@ -76,9 +79,10 @@ program_main ()
                                                                                          ct->perm_i2e(),
                                                                                          ct->perm_i2e(),
                                                                                          4 ); // quad order
-    auto  thca   = new bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
     auto  hca    = new bem::hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5 );
-    // auto  hca    = new THCA< value_t >( pcoeff.get(), genfn.get(), cmdline::eps / 100.0, 5 );
+    auto  hcalr  = new bem::hca_lrapx( *hca );
+    auto  thca   = new bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
+    auto  thcalr = new bem::hca_lrapx( *thca );
     auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
     auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff.get() );
     auto  exact  = std::make_unique< TDenseLRApx< value_t > >( pcoeff.get() );
@@ -106,7 +110,7 @@ program_main ()
     
     tic = timer::now();
     
-    auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hca, acc, nseq );
+    auto  B      = impl::matrix::build( bct->root(), *pcoeff, *hcalr, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -128,7 +132,7 @@ program_main ()
     
     tic = timer::now();
     
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *thca, acc, nseq );
+    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *thcalr, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
