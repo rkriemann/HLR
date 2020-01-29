@@ -8,11 +8,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <map>
+#include <unordered_map>
 #include <mutex>
 
 #include <hpro/cluster/TIndexSet.hh>
 #include <hpro/blas/Vector.hh>
+
+#include <hlr/matrix/tiling.hh>
 
 namespace hlr { namespace vector {
 
@@ -23,13 +25,16 @@ namespace blas = HLIB::BLAS;
 using  indexset = hpro::TIndexSet;
 using  range    = blas::Range;
 
+using hlr::matrix::indexset_hash;
+using hlr::matrix::tile_is_map_t;
+
 // tile type
 template < typename value_t >
 using  tile     = blas::Vector< value_t >;
 
 // tile mapping type
 template < typename value_t >
-using  tilemap  = std::map< indexset, tile< value_t > >;
+using  tilemap  = std::unordered_map< indexset, tile< value_t >, matrix::indexset_hash >;
 
 //
 // represents storage for consecutive tiles

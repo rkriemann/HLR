@@ -715,7 +715,7 @@ lu ( hpro::TMatrix *          A,
 //
 ///////////////////////////////////////////////////////////////////////
 
-namespace
+namespace detail
 {
 
 template < typename value_t >
@@ -744,7 +744,7 @@ dot_vec ( const size_t                           lb,
     }// else
 }
 
-}// namespace anonymous
+}// namespace detail
 
 //
 // compute y = y + α op( M ) x
@@ -801,7 +801,7 @@ mul_vec ( const value_t                          alpha,
 
         if ( op_M == hpro::apply_normal )
         {
-            const auto  t = dot_vec( 0, R->V().tile_is().size(), R->V().tile_is(), R->V(), x );
+            const auto  t = detail::dot_vec( 0, R->V().tile_is().size(), R->V().tile_is(), R->V(), x );
 
             ::tbb::parallel_for< size_t >( 0, R->U().tile_is().size(),
                                            [alpha,R,&t,&y] ( const auto  i )
@@ -816,7 +816,7 @@ mul_vec ( const value_t                          alpha,
         {
             assert( hpro::is_complex_type< value_t >::value == false );
             
-            const auto  t = dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x ); // TODO: transposed !!!
+            const auto  t = detail::dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x ); // TODO: transposed !!!
             
             ::tbb::parallel_for< size_t >( 0, R->V().tile_is().size(),
                                            [alpha,R,&t,&y] ( const auto  i )
@@ -829,7 +829,7 @@ mul_vec ( const value_t                          alpha,
         }// if
         else if ( op_M == hpro::apply_adjoint )
         {
-            const auto  t = dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x );
+            const auto  t = detail::dot_vec( 0, R->U().tile_is().size(), R->U().tile_is(), R->U(), x );
             
             ::tbb::parallel_for< size_t >( 0, R->V().tile_is().size(),
                                            [alpha,R,&t,&y] ( const auto  i )

@@ -100,9 +100,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset << std::endl;
 
+        
         tic = timer::now();
     
-        M_ref = impl::matrix::build( bct->root(), *pcoeff, *svd, acc, nseq );
+        if      ( ref == "svd" ) M_ref = impl::matrix::build( bct->root(), *pcoeff, *svd, acc, nseq );
+        else if ( ref == "aca" ) M_ref = impl::matrix::build( bct->root(), *pcoeff, *aca, acc, nseq );
+        else                     M_ref = impl::matrix::build( bct->root(), *pcoeff, *dense, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -114,89 +117,157 @@ program_main ()
     }// if
     
     //////////////////////////////////////////////////////////////////////
-    
-    std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
 
-    auto  M_hca = std::unique_ptr< hpro::TMatrix >();
-
-    for ( int i = 0; i < nbench; ++i )
     {
-        tic = timer::now();
-    
-        M_hca = impl::matrix::build( bct->root(), *pcoeff, *hcalr, acc, nseq );
+        std::cout << "  " << term::bullet << term::bold << "HCA" << term::reset << std::endl;
 
-        toc = timer::since( tic );
-        runtime.push_back( toc.seconds() );
+        auto  M_hca = std::unique_ptr< hpro::TMatrix >();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            M_hca = impl::matrix::build( bct->root(), *pcoeff, *hcalr, acc, nseq );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
         
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-        if ( i < nbench-1 )
-            M_hca.reset( nullptr );
-    }// for
+            if ( i < nbench-1 )
+                M_hca.reset( nullptr );
+        }// for
     
-    if ( nbench > 1 )
-        std::cout << "  runtime  = "
-                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                  << std::endl;
-    std::cout << "    mem    = " << format_mem( M_hca->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_hca ) ) << std::endl;
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        std::cout << "    mem    = " << format_mem( M_hca->byte_size() ) << std::endl;
+        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_hca ) ) << std::endl;
     
-    if ( build_ref )
-    {
-        auto  diff_hca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_hca.get() );
-        auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
+        if ( build_ref )
+        {
+            auto  diff_hca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_hca.get() );
+            auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
 
-        std::cout << "    error  = " << format_error( error_HCA )
-                  << " / "
-                  << format_error( error_HCA / norm_ref )
-                  << std::endl;
-    }// if    
+            std::cout << "    error  = " << format_error( error_HCA )
+                      << " / "
+                      << format_error( error_HCA / norm_ref )
+                      << std::endl;
+        }// if    
 
-    runtime.clear();
+        runtime.clear();
+        
+        //
+        // mat-vec benchmark
+        //
+
+        blas::Vector< value_t >  x( M_hca->ncols() );
+        blas::Vector< value_t >  y( M_hca->nrows() );
+
+        blas::fill( value_t(1), x );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                impl::mul_vec( 1.0, hpro::apply_normal, *M_hca, x, y );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                blas::fill( value_t(0), y );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
+    }
     
     //////////////////////////////////////////////////////////////////////
-    
-    std::cout << "  " << term::bullet << term::bold << "tHCA" << term::reset << std::endl;
-    
-    auto  M_thca = std::unique_ptr< hpro::TMatrix >();
-    
-    for ( int i = 0; i < nbench; ++i )
+
     {
-        tic = timer::now();
+        std::cout << "  " << term::bullet << term::bold << "tHCA" << term::reset << std::endl;
     
-        M_thca = impl::matrix::build( bct->root(), *pcoeff, *thcalr, acc, nseq );
-
-        toc = timer::since( tic );
-        runtime.push_back( toc.seconds() );
-
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-
-        if ( i < nbench-1 )
-            M_thca.reset( nullptr );
-    }// for
+        auto  M_thca = std::unique_ptr< hpro::TMatrix >();
     
-    if ( nbench > 1 )
-        std::cout << "  runtime  = "
-                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                  << std::endl;
-    std::cout << "    mem    = " << format_mem( M_thca->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_thca ) ) << std::endl;
-
-    if ( build_ref )
-    {
-        auto  diff_thca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_thca.get() );
-        auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
     
-        std::cout << "    error  = " << format_error( error_tHCA )
-                  << " / "
-                  << format_error( error_tHCA / norm_ref )
-                  << std::endl;
-    }// if
+            M_thca = impl::matrix::build( bct->root(), *pcoeff, *thcalr, acc, nseq );
 
-    if ( verbose( 3 ) )
-    {
-        TPSMatrixVis  mvis;
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                M_thca.reset( nullptr );
+        }// for
+    
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        std::cout << "    mem    = " << format_mem( M_thca->byte_size() ) << std::endl;
+        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_thca ) ) << std::endl;
+
+        if ( build_ref )
+        {
+            auto  diff_thca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_thca.get() );
+            auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
+    
+            std::cout << "    error  = " << format_error( error_tHCA )
+                      << " / "
+                      << format_error( error_tHCA / norm_ref )
+                      << std::endl;
+        }// if
+
+        if ( verbose( 3 ) )
+        {
+            TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( M_thca.get(), "A" );
-    }// if
+            mvis.svd( false ).id( true ).print( M_thca.get(), "A" );
+        }// if
+
+        //
+        // mat-vec benchmark
+        //
+
+        vector::tiled_scalarvector< value_t >  x( M_thca->col_is(), tile_map );
+        vector::tiled_scalarvector< value_t >  y( M_thca->row_is(), tile_map );
+
+        x.fill( real_t(1) );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                impl::tiled2::mul_vec( 1.0, hpro::apply_normal, *M_thca, x, y );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                y.fill( real_t(0) );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
+    }
 }

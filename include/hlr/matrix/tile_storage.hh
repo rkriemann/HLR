@@ -77,6 +77,12 @@ public:
     {
         _tiles = std::move( ts._tiles );
 
+        // update vector of index sets
+        _tile_is.clear();
+        
+        for ( auto &  [ is, M ] : _tiles )
+            _tile_is.push_back( is );
+
         return *this;
     }
 
