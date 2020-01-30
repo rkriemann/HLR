@@ -379,7 +379,8 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
+libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/helmholtz.cc',
+                                     'src/apps/laplace.cc',
                                      'src/apps/log_kernel.cc',
                                      'src/apps/matern_cov.cc',
                                      'src/cluster/distr.cc',

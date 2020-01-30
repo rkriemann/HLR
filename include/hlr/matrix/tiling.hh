@@ -44,6 +44,7 @@ using  tile_is_map_t = std::unordered_map< indexset, std::deque< indexset >, ind
 namespace detail
 {
 
+inline
 void
 setup_tiling ( const hpro::TCluster &  cl,
                tile_is_map_t &         tile_map )
@@ -77,6 +78,7 @@ setup_tiling ( const hpro::TCluster &  cl,
 
 }// namespace detail
 
+inline
 tile_is_map_t
 setup_tiling ( const hpro::TCluster &  cl )
 {
