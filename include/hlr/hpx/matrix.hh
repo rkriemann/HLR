@@ -107,6 +107,9 @@ build ( const HLIB::TBlockCluster *  bct,
                     }// for
                 }// for
             } );
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
     }// else
 
     // copy properties from the cluster

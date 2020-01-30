@@ -13,6 +13,7 @@
 using namespace std;
 
 #include <hpro/misc/TMaternCovCoeffFn.hh>
+#include <hpro/bem/TRefinableGrid.hh>
 #include <hpro/io/TGridIO.hh>
 
 #include "hlr/apps/matern_cov.hh"
@@ -26,10 +27,6 @@ namespace apps
 {
 
 using  point_t = T3Point;
-
-// external grid generation function (see Laplace.cc)
-std::unique_ptr< TGrid >
-make_grid ( const std::string &  grid );
 
 //
 // ctor

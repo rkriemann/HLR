@@ -40,6 +40,7 @@ bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times
 string  ref        = "";           // reference matrix, algorithm, etc.
+auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 
 void
 parse ( int argc, char ** argv )

@@ -6,6 +6,7 @@
 #include "hlr/apps/log_kernel.hh"
 #include "hlr/apps/matern_cov.hh"
 #include "hlr/apps/laplace.hh"
+#include "hlr/apps/helmholtz.hh"
 
 #include "hlr/utils/term.hh"
 
@@ -25,16 +26,25 @@ print_problem_desc ( const std::string &  name )
               << std::endl;
 }
 
+template < typename problem_t >
+std::unique_ptr< problem_t >
+gen_problem ()
+{
+    HLR_ASSERT( "undefined problem chosen" );
+}
+
+template <>
 std::unique_ptr< hlr::apps::log_kernel >
-gen_log_kernel ()
+gen_problem< hlr::apps::log_kernel > ()
 {
     print_problem_desc( "LogKernel" );
 
     return std::make_unique< hlr::apps::log_kernel >( n );
 }
 
+template <>
 std::unique_ptr< hlr::apps::matern_cov >
-gen_matern_cov ()
+gen_problem< hlr::apps::matern_cov > ()
 {
     print_problem_desc( "Matern Covariance" );
 
@@ -44,8 +54,9 @@ gen_matern_cov ()
         return std::make_unique< hlr::apps::matern_cov >( n );
 }
 
+template <>
 std::unique_ptr< hlr::apps::laplace_slp >
-gen_laplace_slp ()
+gen_problem< hlr::apps::laplace_slp > ()
 {
     print_problem_desc( "Laplace SLP" );
 
@@ -54,14 +65,15 @@ gen_laplace_slp ()
     return std::make_unique< hlr::apps::laplace_slp >( gridfile );
 }
 
-std::unique_ptr< hlr::apps::application< hpro::real > >
-gen_problem ()
+template <>
+std::unique_ptr< hlr::apps::helmholtz_slp >
+gen_problem< hlr::apps::helmholtz_slp > ()
 {
-    if      ( hlr::appl == "logkernel"  ) return gen_log_kernel();
-    else if ( hlr::appl == "materncov"  ) return gen_matern_cov();
-    else if ( hlr::appl == "laplaceslp" ) return gen_laplace_slp();
-    else
-        HLR_ERROR( "unknown application (" + hlr::appl + ")" );
+    print_problem_desc( "Helmholtz SLP" );
+
+    assert( gridfile != "" );
+    
+    return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile );
 }
 
 }// namespace hlr

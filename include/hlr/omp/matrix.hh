@@ -110,6 +110,9 @@ build_task ( const HLIB::TBlockCluster *  bct,
 
         // wait for child tasks
         // #pragma omp taskwait
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
     }// else
 
     // copy properties from the cluster

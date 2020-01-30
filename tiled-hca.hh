@@ -30,6 +30,7 @@ using function_space = hpro::TConstFnSpace;
 //
 // main function
 //
+template < typename problem_t >
 void
 program_main ()
 {

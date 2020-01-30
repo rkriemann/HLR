@@ -86,6 +86,9 @@ build ( const hpro::TBlockCluster *  bct,
                 }// if
             }// for
         }// for
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
     }// else
 
     M->set_id( bct->id() );
