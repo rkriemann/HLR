@@ -144,14 +144,18 @@ opt_env    = Environment( options = opts )
 
 # apply modifiers
 for opt in Split( opt_env['addprograms'] ) :
-    opt_env['programs'].append( opt )
+    if opt not in opt_env['programs'] :
+        opt_env['programs'].append( opt )
 for opt in Split( opt_env['subprograms'] ) :
-    opt_env['programs'].remove( opt )
+    if opt in opt_env['programs'] :
+        opt_env['programs'].remove( opt )
     
 for opt in Split( opt_env['addframeworks'] ) :
-    opt_env['frameworks'].append( opt )
+    if opt not in opt_env['frameworks'] :
+        opt_env['frameworks'].append( opt )
 for opt in Split( opt_env['subframeworks'] ) :
-    opt_env['frameworks'].remove( opt )
+    if opt in opt_env['frameworks'] :
+        opt_env['frameworks'].remove( opt )
 
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )

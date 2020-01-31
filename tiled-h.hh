@@ -21,10 +21,11 @@ using namespace hlr;
 //
 // main function
 //
+template < typename problem_t >
 void
 program_main ()
 {
-    using value_t = hpro::real; // typename problem_t::value_t;
+    using value_t = typename problem_t::value_t;
     
     std::vector< double >  runtime;
     
@@ -34,7 +35,7 @@ program_main ()
 
     if ( matrixfile == "" )
     {
-        auto  problem = gen_problem();
+        auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
         auto  ct      = cluster::h::cluster( coord.get(), ntile );
         auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
