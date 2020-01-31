@@ -21,13 +21,14 @@ using namespace hlr;
 //
 // main function
 //
+template < typename problem_t >
 void
 program_main ()
 {
-    using value_t = hpro::real; // typename problem_t::value_t;
+    using value_t = typename problem_t::value_t;
 
     auto  tic     = timer::now();
-    auto  problem = gen_problem();
+    auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
 
     HLR_ASSERT( std::log2( coord->ncoord() ) - std::log2( ntile ) >= nlvl );

@@ -17,6 +17,7 @@ const std::string  impl_name = "hpx";
 
 #include "tileh.hh"
 
+template < typename problem_t >
 void
 framework_main ()
 {
@@ -25,7 +26,7 @@ framework_main ()
 
     hpro::CFG::set_nthreads( 1 );
 
-    program_main();
+    program_main< problem_t >();
 }
 
 
