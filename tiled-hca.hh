@@ -88,6 +88,7 @@ program_main ()
     auto  thca   = new impl::bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
     auto  thcalr = new bem::hca_lrapx( *thca );
     auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff );
+    auto  aca2   = new bem::aca_lrapx( *pcoeff );
     auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff );
     auto  dense  = std::make_unique< TDenseLRApx< value_t > >( pcoeff );
 
@@ -99,8 +100,8 @@ program_main ()
 
     if ( build_ref )
     {
-        std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset << std::endl;
-
+        std::cout << "  " << term::bullet << term::bold << "Reference" << term::reset
+                  << " (" << ref << ")" << std::endl;
         
         tic = timer::now();
     
@@ -115,6 +116,21 @@ program_main ()
         norm_ref = hlr::seq::norm::norm_2( *M_ref );
 
         std::cout << "    norm   = " << format_norm( norm_ref ) << std::endl;
+    }// if
+
+    //////////////////////////////////////////////////////////////////////
+
+    {
+        std::cout << "  " << term::bullet << term::bold << "HLR ACA" << term::reset << std::endl;
+        
+        tic = timer::now();
+    
+        auto  M_aca = impl::matrix::build( bct->root(), *pcoeff, *aca2, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( M_aca->byte_size() ) << std::endl;
+        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_aca ) ) << std::endl;
     }// if
     
     //////////////////////////////////////////////////////////////////////
