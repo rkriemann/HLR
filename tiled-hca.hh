@@ -6,6 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <hpro/cluster/TGeomAdmCond.hh>
 #include <hpro/algebra/mul_vec.hh>
 #include <hpro/bem/TLaplaceBF.hh>
 #include <hpro/bem/TRefinableGrid.hh>
@@ -52,8 +53,8 @@ program_main ()
 
     std::cout << "    dims = " << coord->ncoord() << " × " << coord->ncoord() << std::endl;
     
-    auto  ct      = cluster::h::cluster( coord.get(), ntile );
-    auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::h::cluster( *coord, ntile );
+    auto  bct     = cluster::h::blockcluster( *ct, *ct );
     
     if ( verbose( 3 ) )
     {
@@ -87,8 +88,7 @@ program_main ()
     auto  hcalr  = new bem::hca_lrapx( *hca );
     auto  thca   = new impl::bem::tiled_hca( *pcoeff, *genfn, cmdline::eps / 100.0, 5, tile_map, tile_map );
     auto  thcalr = new bem::hca_lrapx( *thca );
-    auto  aca    = std::make_unique< TACAPlus< value_t > >( pcoeff );
-    auto  aca2   = new bem::aca_lrapx( *pcoeff );
+    auto  aca    = new bem::aca_lrapx( *pcoeff );
     auto  svd    = std::make_unique< TSVDLRApx< value_t > >( pcoeff );
     auto  dense  = std::make_unique< TDenseLRApx< value_t > >( pcoeff );
 
@@ -121,11 +121,11 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     {
-        std::cout << "  " << term::bullet << term::bold << "HLR ACA" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
         
         tic = timer::now();
     
-        auto  M_aca = impl::matrix::build( bct->root(), *pcoeff, *aca2, acc, nseq );
+        auto  M_aca = impl::matrix::build( bct->root(), *pcoeff, *aca, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
