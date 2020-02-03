@@ -46,12 +46,65 @@ struct tensor_grid
     
     // setup grid for given bounding box and 1D points
     tensor_grid ( const bounding_box &           box,
+                  const uint                     order,
+                  const std::function< std::vector< double > ( const size_t ) > &  func )
+    {
+        const auto  middle = 0.5 * ( point( box.max() ) + point( box.min() ) );
+        const auto  diam   = 0.5 * ( point( box.max() ) - point( box.min() ) );
+        const auto  dmax   = std::max( std::max( diam.x(), diam.y() ), diam.z() );
+        auto        nx     = order;
+        auto        ny     = order;
+        auto        nz     = order;
+
+        auto  d = diam.x();
+        
+        while (( nx > 0 ) && ( d / dmax < 0.5 ))
+        {
+            d *= 2;
+            nx--;
+        }// while
+        nx = std::max< uint >( 1, nx );
+
+        d = diam.y();
+        while (( ny > 0 ) &&  d / dmax < 0.5 )
+        {
+            d *= 2;
+            ny--;
+        }// while
+        ny = std::max< uint >( 1, ny );
+        
+        d = diam.z();
+        while (( nz > 0 ) &&  d / dmax < 0.5 )
+        {
+            d *= 2;
+            nz--;
+        }// while
+        nz = std::max< uint >( 1, nz );
+        
+        x.reserve( nx );
+        y.reserve( ny );
+        z.reserve( nz );
+
+        // std::cout << nx << ", " << ny << ", " << nz << std::endl;
+        
+        for( auto  p : func( nx ) )
+            x.push_back( middle.x() + p * diam.x() );
+        
+        for( auto  p : func( ny ) )
+            y.push_back( middle.y() + p * diam.y() );
+        
+        for( auto  p : func( nz ) )
+            z.push_back( middle.z() + p * diam.z() );
+    }
+
+    // setup grid for given bounding box and 1D points
+    tensor_grid ( const bounding_box &           box,
                   const std::vector< real_t > &  pts1d )
     {
         const auto  middle = 0.5 * ( point( box.max() ) + point( box.min() ) );
         const auto  diam   = 0.5 * ( point( box.max() ) - point( box.min() ) );
         const auto  n      = pts1d.size();
-        
+
         x.reserve( n );
         y.reserve( n );
         z.reserve( n );

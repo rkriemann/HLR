@@ -90,6 +90,8 @@ public:
     const coeff_fn_t &           coeff_fn     () const { return _coeff; }
     const generator_fn_t &       generator_fn () const { return _generator_fn; }
     real_t                       aca_eps      () const { return _aca_eps; }
+    uint                         ipol_order   () const { return _ipol_order; }
+    const interpolation_fn_t &   ipol_func    () const { return _ipol_fn; }
     const std::vector< double >  ipol_points  () const { return _ipol_fn( _ipol_order ); }
     
     //

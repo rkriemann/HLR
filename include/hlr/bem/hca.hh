@@ -67,8 +67,10 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
             HLR_ERROR( "hca::approx : unsupported dimension of cluster" );
 
         // generate grid for local clusters for evaluation of kernel generator function
-        const auto  row_grid = tensor_grid< real_t >( rowcl.bbox(), base_class::ipol_points() );
-        const auto  col_grid = tensor_grid< real_t >( colcl.bbox(), base_class::ipol_points() );
+        // const auto  row_grid = tensor_grid< real_t >( rowcl.bbox(), base_class::ipol_points() );
+        // const auto  col_grid = tensor_grid< real_t >( colcl.bbox(), base_class::ipol_points() );
+        const auto  row_grid = tensor_grid< real_t >( rowcl.bbox(), base_class::ipol_order(), base_class::ipol_func() );
+        const auto  col_grid = tensor_grid< real_t >( colcl.bbox(), base_class::ipol_order(), base_class::ipol_func() );
 
         // determine ACA pivot elements for the kernel generator matrix
         const auto  pivots   = base_class::comp_aca_pivots( row_grid, col_grid, base_class::aca_eps() );

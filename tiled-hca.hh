@@ -120,18 +120,18 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
 
-    {
-        std::cout << "  " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
+    // {
+    //     std::cout << "  " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
         
-        tic = timer::now();
+    //     tic = timer::now();
     
-        auto  M_aca = impl::matrix::build( bct->root(), *pcoeff, *aca, acc, nseq );
+    //     auto  M_aca = impl::matrix::build( bct->root(), *pcoeff, *aca, acc, nseq );
 
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( M_aca->byte_size() ) << std::endl;
-        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_aca ) ) << std::endl;
-    }// if
+    //     toc = timer::since( tic );
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+    //     std::cout << "    mem    = " << format_mem( M_aca->byte_size() ) << std::endl;
+    //     std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_aca ) ) << std::endl;
+    // }// if
     
     //////////////////////////////////////////////////////////////////////
 

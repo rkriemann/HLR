@@ -309,8 +309,8 @@ aca_full_pivots  ( blas::Matrix< value_t > &                          M,
     size_t                   k           = 0;
     const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
     real_t                   apr         = eps;
-    blas::Vector< value_t >  row( M.nrows() );
-    blas::Vector< value_t >  col( M.ncols() );
+    blas::Vector< value_t >  row( M.ncols() );
+    blas::Vector< value_t >  col( M.nrows() );
     pivot_arr_t              pivots;
                 
     pivots.reserve( max_rank );
