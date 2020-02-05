@@ -1121,6 +1121,8 @@ lu_node::refine_ ( const size_t  tile_size )
         
         if ( update_map[ A10->id() ].size() > 0 )
         {
+            HLR_LOG( 5, term::magenta( term::bold( "build_upd_nodes" ) ) + "( " + this->to_string() + " )" );
+            
             auto  [ sum_10, U10, V10 ] = build_upd_nodes_pairwise_svd( g, A10, update_map[ A10->id() ], ntile );
             auto  upd_10               = g.alloc_node< truncate5_node >( real(-1),
                                                                          U10, V10,
@@ -1135,6 +1137,8 @@ lu_node::refine_ ( const size_t  tile_size )
 
         if ( update_map[ A01->id() ].size() > 0 )
         {
+            HLR_LOG( 5, term::magenta( term::bold( "build_upd_nodes" ) ) + "( " + this->to_string() + " )" );
+            
             auto  [ sum_01, U01, V01 ] = build_upd_nodes_pairwise_svd( g, A01, update_map[ A01->id() ], ntile );
             auto  upd_01               = g.alloc_node< truncate5_node >( real(-1),
                                                                          U01, V01,
