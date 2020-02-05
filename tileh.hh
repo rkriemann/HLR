@@ -11,6 +11,7 @@
 
 #include "common.hh"
 #include "common-main.hh"
+#include "hlr/cluster/h.hh"
 #include "hlr/cluster/tileh.hh"
 #include "hlr/cluster/mblr.hh"
 #include "hlr/dag/lu.hh"
@@ -33,16 +34,18 @@ program_main ()
 
     HLR_ASSERT( std::log2( coord->ncoord() ) - std::log2( ntile ) >= nlvl );
 
-    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, nlvl );
-    auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::tileh::cluster( *coord, ntile, nlvl );
+    auto  bct     = cluster::tileh::blockcluster( *ct, *ct );
 
-    std::cout << "    tiling = " << ct->root()->nsons() << " × " << ct->root()->nsons() << std::endl;
+    hpro::flatten_leaf( bct->root() );
+    
+    std::cout << "    tiling = " << bct->root()->nrows() << " × " << bct->root()->ncols() << std::endl;
     
     if ( verbose( 3 ) )
     {
         hpro::TPSBlockClusterVis   bc_vis;
         
-        bc_vis.id( true ).print( bct->root(), "bct" );
+        bc_vis.id( false ).print( bct->root(), "bct" );
     }// if
 
     auto  acc    = gen_accuracy();

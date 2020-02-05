@@ -19,7 +19,7 @@ namespace hlr { namespace cluster { namespace tileh {
 // and top <nlvl> levels being combined (flattened)
 //
 std::unique_ptr< HLIB::TClusterTree >
-cluster      ( HLIB::TCoordinate *   coords,
+cluster      ( HLIB::TCoordinate &   coords,
                const size_t          ntile,
                const size_t          nlvl );
 
@@ -27,8 +27,8 @@ cluster      ( HLIB::TCoordinate *   coords,
 // build block cluster tree based on given row/column cluster trees
 //
 std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree *  rowct,
-               HLIB::TClusterTree *  colct );
+blockcluster ( HLIB::TClusterTree &  rowct,
+               HLIB::TClusterTree &  colct );
 
 }}}// namespace hlr::cluster::tileh
 

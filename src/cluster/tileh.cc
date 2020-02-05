@@ -103,14 +103,14 @@ flatten ( TCluster *  cl,
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< HLIB::TClusterTree >
-cluster ( HLIB::TCoordinate *   coords,
+cluster ( HLIB::TCoordinate &   coords,
           const size_t          ntile,
           const size_t          nlvl )
 {
     TCardBSPPartStrat  part_strat;
     TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
-    auto  ct = ct_builder.build( coords );
+    auto  ct = ct_builder.build( & coords );
 
     // flatten top levels to set up Tile-H
     flatten( ct->root(), nlvl );
@@ -122,13 +122,13 @@ cluster ( HLIB::TCoordinate *   coords,
 // build block cluster tree based on given row/column cluster trees
 //
 std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree *  rowct,
-               HLIB::TClusterTree *  colct )
+blockcluster ( HLIB::TClusterTree &  rowct,
+               HLIB::TClusterTree &  colct )
 {
     TWeakStdGeomAdmCond  adm_cond;
     TBCBuilder           bct_builder;
 
-    return bct_builder.build( rowct, colct, & adm_cond );
+    return bct_builder.build( & rowct, & colct, & adm_cond );
 }
 
 }}}// namespace hlr::cluster::tileh
