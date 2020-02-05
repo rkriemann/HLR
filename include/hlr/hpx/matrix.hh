@@ -40,7 +40,8 @@ std::unique_ptr< HLIB::TMatrix >
 build ( const HLIB::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+        const HLIB::TTruncAcc &      acc,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -71,6 +72,10 @@ build ( const HLIB::TBlockCluster *  bct,
             M = coeff.build( rowis, colis );
         }// else
     }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, nseq );
+    }// if
     else
     {
         M = std::make_unique< HLIB::TBlockMatrix >( bct );
@@ -92,9 +97,9 @@ build ( const HLIB::TBlockCluster *  bct,
                     {
                         if ( bct->son( i, j ) != nullptr )
                         {
-                            tb.run( [bct,i,j,B,&coeff,&lrapx,&acc]
+                            tb.run( [=,&coeff,&lrapx,&acc]
                                     {
-                                        auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc );
+                                        auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
 
                                         B->set_block( i, j, B_ij.release() );
                                     } );
@@ -102,6 +107,9 @@ build ( const HLIB::TBlockCluster *  bct,
                     }// for
                 }// for
             } );
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
     }// else
 
     // copy properties from the cluster

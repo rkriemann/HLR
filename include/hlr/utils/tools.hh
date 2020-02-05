@@ -9,6 +9,8 @@
 //
 
 #include <algorithm>
+#include <vector>
+#include <list>
 #include <set>
 #include <unordered_set>
 
@@ -18,11 +20,18 @@ namespace hlr
 //
 // simplifies test if <val> is in <cont>
 //
-template < template < typename > typename container_t,
-           typename value_t >
+template < typename value_t >
 bool
-contains ( const container_t< value_t > &  cont,
+contains ( const std::vector< value_t > &  cont,
            const value_t &                 val )
+{
+    return std::find( cont.begin(), cont.end(), val ) != cont.end();
+}
+
+template < typename value_t >
+bool
+contains ( const std::list< value_t > &  cont,
+           const value_t &               val )
 {
     return std::find( cont.begin(), cont.end(), val ) != cont.end();
 }

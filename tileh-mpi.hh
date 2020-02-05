@@ -92,7 +92,7 @@ mymain ( int, char ** )
 
         if ( nprocs == 1 )
         {
-            write_matrix( C.get(), "LU.hm" );
+            // write_matrix( C.get(), "LU.hm" );
             
             matrix::luinv_eval  A_inv( C, hlr::tbb::dag::refine, hlr::tbb::dag::run );
             // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
@@ -124,12 +124,12 @@ main ( int argc, char ** argv )
                                                      ? std::make_unique< RedirectOutput >( to_string( "tileh-mpi_%03d.out", pid ) )
                                                      : nullptr );
 
-    cmdline::parse( argc, argv );
-    
     try
     {
         INIT();
 
+        cmdline::parse( argc, argv );
+    
         // adjust HLIB network data
         NET::set_nprocs( nprocs );
         NET::set_pid( pid );
@@ -146,7 +146,7 @@ main ( int argc, char ** argv )
         else if ( appl == "matern"     ) mymain< hlr::apps::matern_cov  >( argc, argv );
         else if ( appl == "laplaceslp" ) mymain< hlr::apps::laplace_slp >( argc, argv );
         else
-            throw "unknown application";
+            HLR_ERROR( "unknown application" );
 
         DONE();
     }// try

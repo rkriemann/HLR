@@ -170,11 +170,11 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
 }
 
 template <>
-matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is,
+matrix_info< tile_storage< real > * >::matrix_info ( const indexset          ais,
                                                      tile_storage< real > *  adata )
         : name( id_t(adata) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
@@ -714,7 +714,7 @@ lu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( tile_size, A ) )
+    if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  BL  = BA;
@@ -777,7 +777,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( tile_size, U ) )
+    if ( is_blocked( U ) && ! is_small( tile_size, U ) )
     {
         //
         //  ⎡ R_00^T │        ⎤ ⎡X_0⎤   ⎡ R_00^T            │        ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -828,7 +828,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsmuh( U, *(X.data), ntile );
 }
@@ -844,7 +844,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( tile_size, L ) )
+    if ( is_blocked( L ) && ! is_small( tile_size, L ) )
     {
         //
         //  ⎡ L_00 │      ⎤ ⎡X_0⎤   ⎡ L_00              │      ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -895,7 +895,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsml( L, *(X.data), ntile );
 }
@@ -942,7 +942,7 @@ dot_node::refine_ ( const size_t  tile_size )
 }
 
 void
-dot_node::run_ ( const TTruncAcc &  acc )
+dot_node::run_ ( const TTruncAcc & )
 {
     *(T.data) = hlr::seq::tiled2::dot( A.is, *(A.data), *(B.data), ntile );
 
@@ -1005,7 +1005,7 @@ tprod_ip_node< matrix_t >::refine_ ( const size_t  tile_size )
 
 template <>
 void
-tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc &  acc )
+tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), ntile );
 }
@@ -1080,7 +1080,7 @@ addlr_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-tadd_node::run_ ( const TTruncAcc &  acc )
+tadd_node::run_ ( const TTruncAcc & )
 {
     assert(( T0.data->nrows() == T1.data->nrows() ) && ( T0.data->ncols() == T1.data->ncols() ));
     

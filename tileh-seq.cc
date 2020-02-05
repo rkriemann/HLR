@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-seq.cc
 // Description : sequential Tile-H arithmetic
 // Author      : Ronald Kriemann
@@ -15,8 +15,16 @@ const std::string  impl_name = "seq";
 
 #include "tileh.hh"
 
-int
-main ( int argc, char ** argv )
+template < typename problem_t >
+void
+framework_main ()
 {
-    return hlrmain( argc, argv );
+    // limit HLIBpro parallelism
+    ::tbb::global_control  tbb_control( ::tbb::global_control::max_allowed_parallelism, 1 );
+
+    hpro::CFG::set_nthreads( 1 );
+
+    program_main< problem_t >();
 }
+
+HLR_DEFAULT_MAIN

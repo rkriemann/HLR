@@ -25,6 +25,7 @@ namespace dag
 dag::graph
 gen_dag_invert_ll ( HLIB::TMatrix &          L,
                     const HLIB::diag_type_t  diag,
+                    const size_t             min_size,
                     refine_func_t            refine );
 
 //
@@ -34,6 +35,7 @@ gen_dag_invert_ll ( HLIB::TMatrix &          L,
 dag::graph
 gen_dag_invert_ur ( HLIB::TMatrix &          U,
                     const HLIB::diag_type_t  diag,
+                    const size_t             min_size,
                     refine_func_t            refine );
 
 //
@@ -41,6 +43,7 @@ gen_dag_invert_ur ( HLIB::TMatrix &          U,
 //
 dag::graph
 gen_dag_waz       ( HLIB::TMatrix &          A,
+                    const size_t             min_size,
                     refine_func_t            refine );
 
 //
@@ -48,6 +51,7 @@ gen_dag_waz       ( HLIB::TMatrix &          A,
 //
 dag::graph
 gen_dag_invert    ( HLIB::TMatrix &          A,
+                    const size_t             min_size,
                     refine_func_t            refine );
 
 }// namespace dag

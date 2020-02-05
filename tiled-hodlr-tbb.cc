@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : hodlr-tbb.cc
 // Description : tile-based HODLR-LU using TBB
 // Author      : Ronald Kriemann
@@ -14,9 +14,14 @@ const std::string  impl_name = "tbb";
 
 #include "tiled-hodlr.hh"
 
-int
-main ( int argc, char ** argv )
+template < typename problem_t >
+void
+framework_main ()
 {
-    return hlrmain( argc, argv );
+    auto                   param = ::tbb::global_control::max_allowed_parallelism;
+    ::tbb::global_control  tbb_control( param, ( nthreads > 0 ? nthreads : ::tbb::global_control::active_value( param ) ) );
+
+    program_main< problem_t >();
 }
 
+HLR_DEFAULT_MAIN

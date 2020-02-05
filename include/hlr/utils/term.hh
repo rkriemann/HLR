@@ -11,11 +11,7 @@
 #include <ostream>
 #include <string>
 
-namespace hlr
-{
-
-namespace term
-{
+namespace hlr { namespace term {
 
 //
 // change color or attribute of output stream
@@ -60,6 +56,7 @@ std::ostream &  on_ltwhite   ( std::ostream &  os );
 
 std::ostream &  bold         ( std::ostream &  os );
 std::ostream &  dark         ( std::ostream &  os );
+std::ostream &  italic       ( std::ostream &  os );
 std::ostream &  underline    ( std::ostream &  os );
 std::ostream &  reverse      ( std::ostream &  os );
 
@@ -109,6 +106,7 @@ std::string  on_white     ( const std::string &  text );
 
 std::string  bold         ( const std::string &  text );
 std::string  dark         ( const std::string &  text );
+std::string  italic       ( const std::string &  text );
 std::string  underline    ( const std::string &  text );
 std::string  reverse      ( const std::string &  text );
 
@@ -155,11 +153,10 @@ const char *  on_white     ();
 
 const char *  bold         ();
 const char *  dark         ();
+const char *  italic       ();
 const char *  underline    ();
 const char *  reverse      ();
 
-}// namespace term
-
-}// namespace hlr
+}}// namespace hlr::term
 
 #endif  // __HLR_UTILS_TERM_HH

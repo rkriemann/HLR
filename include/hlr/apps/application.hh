@@ -24,6 +24,10 @@ class application
 {
 public:
     using  value_t = T_value;
+
+    // return true if problem is real/complex valued
+    bool  is_real_valued    () const { return ! hpro::is_complex_type< value_t >::value; }
+    bool  is_complex_valued () const { return   hpro::is_complex_type< value_t >::value; }
     
     //
     // set up coordinates
@@ -38,14 +42,6 @@ public:
     virtual
     std::unique_ptr< hpro::TCoeffFn< value_t > >
     coeff_func  () const = 0;
-    
-    // //
-    // // build matrix
-    // //
-    // virtual
-    // std::unique_ptr< hpro::TMatrix >
-    // build_matrix ( const hpro::TBlockClusterTree *  bct,
-    //                const hpro::TTruncAcc &          acc ) = 0;
 };
 
 }// namespace apps

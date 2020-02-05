@@ -88,16 +88,16 @@ main ( int argc, char ** argv )
     const auto         pid    = world.rank();
     const auto         nprocs = world.size();
     
-    hlr::cmdline::parse( argc, argv );
-    
-    // redirect output for all except proc 0
-    std::unique_ptr< RedirectOutput >  redir_out = ( ! noredir && (pid != 0)
-                                                     ? std::make_unique< RedirectOutput >( to_string( "tlr-mpi_%03d.out", pid ) )
-                                                     : nullptr );
-
     try
     {
         hpro::INIT();
+
+        hlr::cmdline::parse( argc, argv );
+    
+        // redirect output for all except proc 0
+        std::unique_ptr< RedirectOutput >  redir_out = ( ! noredir && (pid != 0)
+                                                         ? std::make_unique< RedirectOutput >( to_string( "tlr-mpi_%03d.out", pid ) )
+                                                         : nullptr );
 
         // adjust HLIB network data
         NET::set_nprocs( nprocs );
@@ -114,7 +114,7 @@ main ( int argc, char ** argv )
         if      ( hlr::appl == "logkernel" ) mymain< hlr::apps::log_kernel >( argc, argv );
         else if ( hlr::appl == "matern"    ) mymain< hlr::apps::matern_cov >( argc, argv );
         else
-            throw "unknown application";
+            HLR_ERROR( "unknown application" );
 
         hpro::DONE();
     }// try

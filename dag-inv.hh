@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-inv.hh
 // Description : DAG example for matrix inversion
 // Author      : Ronald Kriemann
@@ -45,7 +45,7 @@ mymain ( int, char ** )
         auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
     else
     {
@@ -88,7 +88,7 @@ mymain ( int, char ** )
     {
         tic = timer::now();
         
-        dag = std::move( hlr::dag::gen_dag_invert( *A_inv, impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_invert( *A_inv, nseq, impl::dag::refine ) );
         
         toc = timer::since( tic );
         

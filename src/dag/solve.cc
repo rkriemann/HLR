@@ -49,7 +49,7 @@ TScalarVector
 sub_vec ( TScalarVector *    v,
           const TIndexSet &  is )
 {
-    return std::move( v->sub_vector( is ) );
+    return v->sub_vector( is );
 }
 
 TIndexSet
@@ -174,7 +174,7 @@ solve_lower_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( min_size, L ) )
+    if ( is_blocked( L ) && ! is_small( min_size, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         const auto  nbr = BL->nblock_rows();
@@ -265,7 +265,7 @@ solve_lower_node::run_ ( const TTruncAcc & )
     HLR_LOG( 4, HLIB::to_string( "trsvl( %d )", L->id() ) );
     
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-    TScalarVector  v_l( std::move( sub_vec( *v, row_is( L, op_L ) ) ) );
+    TScalarVector  v_l = sub_vec( *v, row_is( L, op_L ) );
     
     hlr::seq::trsvl( op_L, * L, v_l, unit_diag );
 }
@@ -281,7 +281,7 @@ solve_upper_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( min_size, U ) )
+    if ( is_blocked( U ) && ! is_small( min_size, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         const auto  nbr = BU->nblock_rows();
@@ -372,7 +372,7 @@ solve_upper_node::run_ ( const TTruncAcc & )
     HLR_LOG( 4, HLIB::to_string( "trsvu( %d )", U->id() ) );
     
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-    TScalarVector  v_u( std::move( sub_vec( *v, row_is( U, op_U ) ) ) );
+    TScalarVector  v_u = sub_vec( *v, row_is( U, op_U ) );
         
     hlr::seq::trsvu( op_U, * U, v_u, general_diag );
 }
@@ -389,7 +389,7 @@ update_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -457,7 +457,7 @@ update_node< value_t >::run_ ( const TTruncAcc & )
 {
     HLR_LOG( 4, HLIB::to_string( "update( %d )", A->id() ) );
 
-    TScalarVector  t( row_is( A, op_A ) );
+    TScalarVector  t( row_is( A, op_A ), A->value_type() );
     TScalarVector  x( std::move( sub_vec( *v, col_is( A, op_A ) ) ) );
     TScalarVector  y( std::move( sub_vec( *v, row_is( A, op_A ) ) ) );
     

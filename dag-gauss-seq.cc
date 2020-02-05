@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss-seq.cc
 // Description : DAG based Gaussian Elimination using sequential execution
 // Author      : Ronald Kriemann

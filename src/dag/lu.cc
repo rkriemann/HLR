@@ -24,15 +24,17 @@
 
 namespace hlr { namespace dag {
 
-using namespace HLIB;
+namespace hpro = HLIB;
+
+using namespace hpro;
 
 namespace
 {
 
-using HLIB::id_t;
+using hpro::id_t;
 
 // map for apply_node nodes
-using  apply_map_t = std::unordered_map< HLIB::id_t, node * >;
+using  apply_map_t = std::unordered_map< hpro::id_t, node * >;
 
 // identifiers for memory blocks
 const id_t  ID_A    = 'A';
@@ -49,7 +51,7 @@ struct lu_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
@@ -73,7 +75,7 @@ struct trsmu_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = trsmu( %d, %d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "%d = trsmu( %d, %d )", A->id(), U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
@@ -97,7 +99,7 @@ struct trsml_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = trsml( %d, %d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "%d = trsml( %d, %d )", A->id(), L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
@@ -124,7 +126,7 @@ struct update_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "%d = mul( %d, %d )",
+    virtual std::string  to_string () const { return hpro::to_string( "%d = mul( %d, %d )",
                                                                       C->id(), A->id(), B->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
@@ -147,7 +149,7 @@ struct apply_node : public node
             : A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "apply( %d )", A->id() ); }
+    virtual std::string  to_string () const { return hpro::to_string( "apply( %d )", A->id() ); }
     virtual std::string  color     () const { return "edd400"; }
     
 private:
@@ -172,7 +174,7 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
@@ -225,7 +227,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
     
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -239,7 +241,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -269,7 +271,7 @@ trsmu_node::refine_ ( const size_t  min_size )
     else if ( CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ A->id() ];
-        
+
         assert( apply != nullptr );
 
         apply->before( this );
@@ -298,7 +300,7 @@ trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -361,7 +363,7 @@ update_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
+    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -425,7 +427,7 @@ update_node::run_ ( const TTruncAcc &  acc )
 void
 apply_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! hpro::is_small( A ) )
         A->apply_updates( acc, nonrecursive );
     else
         A->apply_updates( acc, recursive );
@@ -444,7 +446,8 @@ void
 build_apply_dag ( TMatrix *           A,
                   node *              parent,
                   apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes )
+                  dag::node_list_t &  apply_nodes,
+                  const size_t        min_size )
 {
     if ( is_null( A ) )
         return;
@@ -456,7 +459,7 @@ build_apply_dag ( TMatrix *           A,
     if ( parent != nullptr )
         apply->after( parent );
     
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto  BA = ptrcast( A, TBlockMatrix );
 
@@ -465,7 +468,7 @@ build_apply_dag ( TMatrix *           A,
             for ( uint  j = 0; j < BA->nblock_cols(); ++j )
             {
                 if ( BA->block( i, j ) != nullptr )
-                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes );
+                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes, min_size );
             }// for
         }// for
     }// if
@@ -480,8 +483,9 @@ build_apply_dag ( TMatrix *           A,
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_rec ( TMatrix &      A,
-                 refine_func_t  refine )
+gen_dag_lu_ip ( TMatrix &      A,
+                const size_t   min_size,
+                refine_func_t  refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -491,13 +495,13 @@ gen_dag_lu_rec ( TMatrix &      A,
     dag::node_list_t  apply_nodes;
 
     if ( CFG::Arith::use_accu )
-        build_apply_dag( & A, nullptr, apply_map, apply_nodes );
+        build_apply_dag( & A, nullptr, apply_map, apply_nodes, min_size );
     
     //
     // construct DAG for LU
     //
-    
-    auto  dag = refine( new lu_node( & A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+
+    auto  dag = refine( new lu_node( & A, apply_map ), min_size, use_single_end_node );
 
     if ( ! CFG::Arith::use_accu )
         return dag;
@@ -589,12 +593,13 @@ gen_dag_lu_rec ( TMatrix &      A,
 // return graph representing compute DAG for solving L X = A
 //
 graph
-gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
-                       HLIB::TMatrix *        A,
+gen_dag_solve_lower  ( const hpro::TMatrix *  L,
+                       hpro::TMatrix *        A,
+                       const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsml_node( L, A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto         dag = refine( new trsml_node( L, A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -603,12 +608,13 @@ gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
 // return graph representing compute DAG for solving X U = A
 //
 graph
-gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
-                       HLIB::TMatrix *        A,
+gen_dag_solve_upper  ( const hpro::TMatrix *  U,
+                       hpro::TMatrix *        A,
+                       const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsmu_node( U, A, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto         dag = refine( new trsmu_node( U, A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -617,13 +623,14 @@ gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
 // return graph representing compute DAG for C = A B + C
 //
 graph
-gen_dag_update       ( const HLIB::TMatrix *  A,
-                       const HLIB::TMatrix *  B,
-                       HLIB::TMatrix *        C,
+gen_dag_update       ( const hpro::TMatrix *  A,
+                       const hpro::TMatrix *  B,
+                       hpro::TMatrix *        C,
+                       const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new update_node( A, B, C, apply_map ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto         dag = refine( new update_node( A, B, C, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }

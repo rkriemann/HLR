@@ -236,7 +236,7 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        B   = ptrcast( A, TBlockMatrix );
         const auto  nbr = B->block_rows();
@@ -321,7 +321,7 @@ trsmu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! hlr::is_small_any( min_size, A, U ) )
+    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -394,7 +394,7 @@ trsml_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! hlr::is_small_any( min_size, A, L ) )
+    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, TBlockMatrix );
         auto        BA  = ptrcast( A, TBlockMatrix );
@@ -467,7 +467,7 @@ add_prod_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! hlr::is_small_any( min_size, A, B, C ) )
+    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
@@ -544,6 +544,7 @@ shift_node::run_ ( const TTruncAcc &  acc )
 
 graph
 gen_dag_lu_oop_accu ( TMatrix &      A,
+                      const size_t   min_size,
                       refine_func_t  refine )
 {
     if ( hlr::dag::sparsify_mode != hlr::dag::sparsify_none )
@@ -553,7 +554,7 @@ gen_dag_lu_oop_accu ( TMatrix &      A,
     // construct DAG for LU
     //
     
-    auto  dag = refine( new lu_node( & A ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    auto  dag = refine( new lu_node( & A ), min_size, use_single_end_node );
 
     return dag;
     

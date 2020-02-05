@@ -22,6 +22,7 @@ opts_file    = '.scons.options'
 
 CXX          = 'g++'
 CXXFLAGS     = '-std=c++2a'
+CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
@@ -29,27 +30,48 @@ LINKFLAGS    = ''
 DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
 
 # directories for the various external libraries
-HPRO_DIR     = '/home/rok/programming/hpro/devel'
-TBB_DIR      = '/usr'
-TASKFLOW_DIR = '/opt/local/cpp-taskflow/2.2.0'
-HPX_DIR      = '/opt/local/hpx'
-GPI2_DIR     = '/opt/local/gpi2'
+HPRO_DIR     = '/'
+TBB_DIR      = '/'
+TASKFLOW_DIR = '/'
+HPX_DIR      = '/'
+GPI2_DIR     = '/'
 
-JEMALLOC_DIR = '/opt/local/jemalloc/5.2.1'
-MIMALLOC_DIR = '/opt/local/mimalloc'
-TCMALLOC_DIR = '/usr'
+JEMALLOC_DIR = '/'
+MIMALLOC_DIR = '/'
+TCMALLOC_DIR = '/'
 
 LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
-PROGRAMS     = [ 'tlr', 'hodlr', 'tileh', 'dag-lu', 'dag-gauss', 'dag-inv', 'tiled-hodlr', 'dag-hodlr' ]
+PROGRAMS     = [ 'tlr',
+                 'hodlr',
+                 'tileh',
+                 'tiled-h',
+                 'tiled-hca',
+                 'tiled-hodlr',
+                 'dag-lu',
+                 'dag-gauss',
+                 'dag-inv',
+                 'dag-waz',
+                 'dag-hodlr' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
-FRAMEWORKS   = [ 'seq', 'omp', 'tbb', 'tf', 'hpx', 'mpi', 'gpi2' ]
+FRAMEWORKS   = [ 'seq',
+                 'omp',
+                 'tbb',
+                 'tf',
+                 'hpx',
+                 'mpi',
+                 'gpi2' ]
 
 # malloc libraries (also depends on directories above)
-MALLOCS      = [ 'default', 'system', 'jemalloc', 'mimalloc', 'tbbmalloc', 'tcmalloc' ]
+MALLOCS      = [ 'default',
+                 'system',
+                 'jemalloc',
+                 'mimalloc',
+                 'tbbmalloc',
+                 'tcmalloc' ]
 
 ######################################################################
 #
@@ -78,9 +100,24 @@ def readln ( prog ):
 #
 ######################################################################
 
+# prepare program and framework options (for +opt, -opt)
+# opt_programs = [ [ prog, '-' + prog, '+' + prog ] for prog in PROGRAMS ]
+# opt_programs = [ prog for sublist in opt_programs for prog in sublist  ]
+
+# opt_frameworks = [ [ fwrk, '-' + fwrk, '+' + fwrk ] for fwrk in FRAMEWORKS ]
+# opt_frameworks = [ fwrk for sublist in opt_frameworks for fwrk in sublist  ]
+
+# set up command line parameters
 opts = Variables( opts_file )
-opts.Add( ListVariable( 'programs',   'programs to build',                 'all',     PROGRAMS   ) )
-opts.Add( ListVariable( 'frameworks', 'parallelization frameworks to use', 'all',     FRAMEWORKS ) )
+opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
+opts.Add( ListVariable( 'addprograms',   'programs to build',                 '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'subprograms',   'programs to build',                 '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'all', FRAMEWORKS ) )
+opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
+opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
+
+opts.Add(               'cxx',      'C++ compiler to use',           CXX )
+opts.Add(               'cpuflags', 'path to cpuflags',              CPUFLAGS )
 
 opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
@@ -105,11 +142,29 @@ opts.Add( BoolVariable( 'color',    'use colored output during compilation',    
 # read options from options file
 opt_env    = Environment( options = opts )
 
+# apply modifiers
+for opt in Split( opt_env['addprograms'] ) :
+    if opt not in opt_env['programs'] :
+        opt_env['programs'].append( opt )
+for opt in Split( opt_env['subprograms'] ) :
+    if opt in opt_env['programs'] :
+        opt_env['programs'].remove( opt )
+    
+for opt in Split( opt_env['addframeworks'] ) :
+    if opt not in opt_env['frameworks'] :
+        opt_env['frameworks'].append( opt )
+for opt in Split( opt_env['subframeworks'] ) :
+    if opt in opt_env['frameworks'] :
+        opt_env['frameworks'].remove( opt )
+
 programs   = Split( opt_env['programs'] )
 frameworks = Split( opt_env['frameworks'] )
 
 if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
+
+CXX          = opt_env['cxx']
+CPUFLAGS     = opt_env['cpuflags']
 
 HPRO_DIR     = opt_env['hpro']
 TBB_DIR      = opt_env['tbb']
@@ -131,6 +186,12 @@ optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
 
+# remove entries to prevent saving
+del opt_env['addprograms']
+del opt_env['subprograms']
+del opt_env['addframeworks']
+del opt_env['subframeworks']
+
 opts.Save( opts_file, opt_env )
 
 ######################################################################
@@ -141,6 +202,7 @@ opts.Save( opts_file, opt_env )
 
 colors = { 'reset'  : '\033[0m',
            'bold'   : '\033[1m',
+           'italic' : '\033[3m',
            'red'    : '\033[31m',
            'green'  : '\033[32m',
            'yellow' : '\033[33m',
@@ -171,9 +233,9 @@ if profile :
     DEFINES   = ''
 
 if warn :
-    WARNFLAGS = readln( 'cpuflags --comp %s --warn' % CXX )
+    WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
     
-env = Environment( options    = opts,
+env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
@@ -236,10 +298,10 @@ def show_help ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), PROGRAMS )
-    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), FRAMEWORKS )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( PROGRAMS ) )
+    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), MALLOCS )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), "0/1" )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), "0/1" )
@@ -248,16 +310,25 @@ def show_help ( target, source, env ):
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), "0/1" )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), "0/1" )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
     print() 
     print( 'The parameters {0}programs{1} and {0}frameworks{1} can get comma separated values:'.format( colors['bold'], colors['reset'] ) ) 
     print() 
-    print( '    scons programs=dag-lu,dag-inv frameworks=seq,tbb,omp' ) 
+    print( '    scons {0}programs{2}={1}dag-lu,dag-inv{2} {0}frameworks{2}={1}seq,tbb,omp{2}'.format( colors['bold'], colors['italic'], colors['reset'] ) ) 
     print() 
     print( 'For {0}malloc{1} only a single value is valid:'.format( colors['bold'], colors['reset'] ) )
     print() 
-    print( '    scons malloc=jemalloc' ) 
+    print( '    scons {0}malloc{2}={1}jemalloc{2}'.format( colors['bold'], colors['italic'], colors['reset'] ) ) 
     print() 
-    print( 'Don\'t forget to adjust paths for all software frameworks in the file {0}SConstruct{1}.'.format( colors['bold'], colors['reset'] ) ) 
+    print( 'Paths for all software frameworks may also be adjusted in the {0}SConstruct{1} file.'.format( colors['bold'], colors['reset'] ) ) 
     print() 
 
 help_cmd = env.Command( 'phony-target-help', None, show_help )
@@ -277,20 +348,29 @@ def show_options ( target, source, env ):
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
-    print( '  {0}Option{1}     │ {0}Value{1}                   │ {0}Description{1}'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
-    print( '  {0}programs{1}   │ {2:<23} │ programs to build'.format( colors['bold'], colors['reset'], opt_env['programs'] ) )
-    print( '  {0}frameworks{1} │ {2:<23} │ software frameworks to use'.format( colors['bold'], colors['reset'], opt_env['frameworks'] ) )
-    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
-    print( '  {0}malloc{1}     │ {2:<23} │ malloc library to use'.format( colors['bold'], colors['reset'], opt_env['malloc'] ) )
-    print( '  {0}likwid{1}     │ {2}                       │ use LikWid library'.format( colors['bold'], colors['reset'], bool_str[ opt_env['likwid'] ] ) )
-    print( ' ────────────┼─────────────────────────┼──────────────────────────' )
-    print( '  {0}optimise{1}   │ {2}                       │ enable compiler optimisations'.format( colors['bold'], colors['reset'], bool_str[ opt_env['optimise'] ] ) )
-    print( '  {0}debug{1}      │ {2}                       │ enable debug information'.format( colors['bold'], colors['reset'], bool_str[ opt_env['debug'] ] ) )
-    print( '  {0}profile{1}    │ {2}                       │ enable profile information'.format( colors['bold'], colors['reset'], bool_str[ opt_env['profile'] ] ) )
-    print( '  {0}warn{1}       │ {2}                       │ enable compiler warnings'.format( colors['bold'], colors['reset'], bool_str[ opt_env['warn'] ] ) )
-    print( '  {0}fullmsg{1}    │ {2}                       │ full command line output'.format( colors['bold'], colors['reset'], bool_str[ opt_env['fullmsg'] ] ) )
-    print( '  {0}color{1}      │ {2}                       │ use colored output'.format( colors['bold'], colors['reset'], bool_str[ opt_env['color'] ] ) )
+    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( programs ) )
+    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
+    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
+    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
+    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
+    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
+    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
+    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
+    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
+    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )
@@ -303,12 +383,14 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
+libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/helmholtz.cc',
+                                     'src/apps/laplace.cc',
                                      'src/apps/log_kernel.cc',
                                      'src/apps/matern_cov.cc',
                                      'src/cluster/distr.cc',
                                      'src/cluster/h.cc',
                                      'src/cluster/hodlr.cc',
+                                     'src/cluster/mblr.cc',
                                      'src/cluster/tileh.cc',
                                      'src/cluster/tlr.cc',
                                      'src/dag/gauss_elim.cc',
@@ -324,6 +406,7 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
                                      'src/dag/lu_oop_accu.cc',
                                      'src/dag/lu_oop_accu_sep.cc',
                                      'src/dag/lu_oop_auto.cc',
+                                     'src/dag/lu_tileh.cc',
                                      'src/dag/node.cc',
                                      'src/dag/solve.cc',
                                      'src/matrix/level_matrix.cc',
@@ -332,6 +415,7 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/laplace.cc',
                                      'src/seq/solve.cc',
                                      'src/utils/compare.cc',
                                      'src/utils/log.cc',
+                                     'src/utils/mach.cc',
                                      'src/utils/term.cc',
                                      'src/utils/text.cc' ] )
 

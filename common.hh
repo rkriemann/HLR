@@ -1,4 +1,6 @@
 
+#include <tbb/global_control.h>
+
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -72,7 +74,15 @@ inline
 std::string
 format_error ( const double  e )
 {
-    return hlr::term::red( str( format( "%.4e s" ) % e ) );
+    return hlr::term::red( str( format( "%.4e" ) % e ) );
+}
+
+// return default formated norm string
+inline
+std::string
+format_norm ( const double  e )
+{
+    return hlr::term::italic( str( format( "%.4e" ) % e ) );
 }
 
 //
@@ -113,3 +123,12 @@ gen_accuracy ()
     else                         return hpro::fixed_prec( hlr::cmdline::eps );
 }
 
+//
+// test verbosity
+//
+inline
+bool
+verbose ( const int  lvl )
+{
+    return hpro::verbose( lvl );
+}

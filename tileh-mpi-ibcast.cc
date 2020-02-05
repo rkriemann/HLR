@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tileh-mpi-bcast.cc
 // Description : Tile-H arithmetic with MPI broadcast
 // Author      : Ronald Kriemann
@@ -12,4 +12,4 @@
 namespace          impl      = hlr::mpi::ibcast::tileh;
 const std::string  impl_name = "ibcast";
 
-#include "tileh-mpi-main.hh"
+#include "tileh-mpi.hh"

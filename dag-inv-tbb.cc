@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-inv-tbb.cc
 // Description : DAG based inversion using TBB
 // Author      : Ronald Kriemann

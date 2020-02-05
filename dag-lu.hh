@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag.hh
 // Description : main function for DAG examples
 // Author      : Ronald Kriemann
@@ -27,7 +27,7 @@ using namespace hlr;
 //
 template < typename problem_t >
 void
-mymain ( int, char ** )
+program_main ()
 {
     using value_t = typename problem_t::value_t;
     
@@ -39,8 +39,8 @@ mymain ( int, char ** )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::h::cluster( coord.get(), ntile );
-        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::h::cluster( *coord, ntile );
+        auto  bct     = cluster::h::blockcluster( *ct, *ct );
     
         if ( hpro::verbose( 3 ) )
         {
@@ -53,7 +53,7 @@ mymain ( int, char ** )
         auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
     else
     {
@@ -87,6 +87,7 @@ mymain ( int, char ** )
               << ( levelwise ? "Level LU (DAG)" : ( coarse > 0 ? HLIB::to_string( "LU (Coarse-%d DAG)", ncoarse ) : "LU (DAG)" ) )
               << term::reset
               << ", " << acc.to_string()
+              << ", nseq = " << nseq
               << std::endl;
 
     //////////////////////////////////////////////////////////////////////
@@ -156,18 +157,21 @@ mymain ( int, char ** )
         // LIKWID_MARKER_START( "dag" );
 
         if ( levelwise )
-            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C ) );
+            dag = std::move( hlr::dag::gen_dag_lu_lvl( *C, nseq ) );
         else if ( coarse > 0 )
-            dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, impl::dag::refine, impl::dag::run, ncoarse ) );
+            dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, ncoarse, impl::dag::refine, impl::dag::run ) );
         else if ( oop_lu )
         {
             if ( hpro::CFG::Arith::use_accu )
-                dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, impl::dag::refine ) );
+                if ( fused )
+                    dag = std::move( hlr::dag::gen_dag_lu_oop_accu( *C, nseq, impl::dag::refine ) );
+                else
+                    dag = std::move( hlr::dag::gen_dag_lu_oop_accu_sep( *C, nseq, impl::dag::refine ) );
             else
-                dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, impl::dag::refine ) );
+                dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
         }// if
         else 
-            dag = std::move( hlr::dag::gen_dag_lu_rec( *C, impl::dag::refine ) );
+            dag = std::move( hlr::dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
         
         // LIKWID_MARKER_STOP( "dag" );
         
@@ -236,8 +240,8 @@ mymain ( int, char ** )
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
-    matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
-    // TLUInvMatrix  A_inv( C.get(), block_wise, store_inverse );
+    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
     std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
 
@@ -277,7 +281,7 @@ mymain ( int, char ** )
         }// for
         
         {
-            hpro::TScalarVector  x( A->col_is() );
+            hpro::TScalarVector  x( A->col_is(), A->value_type() );
 
             x.fill_rand( 1 );
 

@@ -18,15 +18,15 @@ namespace hlr { namespace cluster { namespace tlr {
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< HLIB::TClusterTree >
-cluster      ( HLIB::TCoordinate *   coords,
+cluster      ( HLIB::TCoordinate &   coords,
                const size_t          ntile );
 
 //
 // build block cluster tree based on given row/column cluster trees
 //
 std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree *  rowct,
-               HLIB::TClusterTree *  colct );
+blockcluster ( HLIB::TClusterTree &  rowct,
+               HLIB::TClusterTree &  colct );
 
 }}}// namespace hlr::cluster::tlr
 

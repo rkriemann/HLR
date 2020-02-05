@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-hodlr-seq.cc
 // Description : sequential tiled HODLR-LU using DAG
 // Author      : Ronald Kriemann
@@ -16,10 +16,14 @@ const std::string  impl_name = "seq";
 
 #include "dag-hodlr.hh"
 
-int
-main ( int argc, char ** argv )
+template < typename problem_t >
+void
+framework_main ()
 {
-    HLIB::CFG::set_nthreads( 1 );
+    // limit HLIBpro parallelism
+    ::tbb::global_control  tbb_control( ::tbb::global_control::max_allowed_parallelism, 1 );
 
-    return hlrmain( argc, argv );
+    program_main< problem_t >();
 }
+
+HLR_DEFAULT_MAIN

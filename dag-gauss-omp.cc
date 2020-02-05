@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss-omp.cc
 // Description : DAG based Gaussian Elimination using OpenMP
 // Author      : Ronald Kriemann

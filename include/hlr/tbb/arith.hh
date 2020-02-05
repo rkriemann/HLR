@@ -11,6 +11,7 @@
 #include <tbb/parallel_invoke.h>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
+#include <tbb/blocked_range3d.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -24,19 +25,175 @@
 #include "hlr/tbb/arith_tiled.hh"
 #include "hlr/tbb/arith_tiled_v2.hh"
 
+#include <hlr/dag/lu.hh>
+#include <hlr/tbb/dag.hh>
+
+#include <hlr/tbb/arith_impl.hh>
+
 namespace hlr { namespace tbb {
 
 namespace hpro = HLIB;
 namespace blas = HLIB::BLAS;
+
+using namespace hpro;
+
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                    alpha,
+          const hpro::matop_t              op_M,
+          const hpro::TMatrix &            M,
+          const blas::Vector< value_t > &  x,
+          blas::Vector< value_t > &        y )
+{
+    auto        mtx_map = detail::mutex_map_t();
+    const auto  is      = M.row_is( op_M );
+
+    for ( idx_t  i = is.first() / detail::CHUNK_SIZE; i <= idx_t(is.last() / detail::CHUNK_SIZE); ++i )
+        mtx_map[ i ] = std::make_unique< std::mutex >();
+    
+    detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
+}
+
+//
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BC->nblock_rows(),
+                                              0, BC->nblock_cols(),
+                                              0, BA->nblock_cols( op_A ) ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.pages().begin(); i != r.pages().end(); ++i )
+                {
+                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                    {
+                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                        {
+                            auto  C_ij = BC->block( i, j );
+                            auto  A_il = BA->block( i, l, op_A );
+                            auto  B_lj = BB->block( l, j, op_B );
+                
+                            if ( is_null_any( A_il, B_lj ) )
+                                continue;
+                    
+                            HLR_ASSERT( ! is_null( C_ij ) );
+            
+                            multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+}
+
+//
+// Gaussian elimination of A, e.g. A = A^-1
+// - T is used as temporary space and has to have the same
+//   structure as A
+//
+inline void
+gauss_elim ( hpro::TMatrix *          A,
+             hpro::TMatrix *          T,
+             const hpro::TTruncAcc &  acc )
+{
+    assert( ! is_null_any( A, T ) );
+    assert( A->type() == T->type() );
+    
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d ) {", A->id() ) );
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( A, hpro::TBlockMatrix );
+        auto  BT = ptrcast( T, hpro::TBlockMatrix );
+        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
+        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
+
+        // A_00 = A_00⁻¹
+        tbb::gauss_elim( MA(0,0), MT(0,0), acc );
+
+        ::tbb::parallel_invoke(
+            [&]
+            { 
+                // T_01 = A_00⁻¹ · A_01
+                hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+            },
+
+            [&]
+            {
+                // T_10 = A_10 · A_00⁻¹
+                hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+            } );
+
+        // A_11 = A_11 - T_10 · A_01
+        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+    
+        // A_11 = A_11⁻¹
+        gauss_elim( MA(1,1), MT(1,1), acc );
+
+        ::tbb::parallel_invoke(
+            [&]
+            { 
+                // A_01 = - T_01 · A_11
+                hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+            },
+            
+            [&]
+            { 
+                // A_10 = - A_11 · T_10
+                hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+            } );
+
+        // A_00 = T_00 - A_01 · T_10
+        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  DA = ptrcast( A, hpro::TDenseMatrix );
+        
+        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
+        else                   blas::invert( DA->blas_rmat() );
+    }// if
+    else
+        assert( false );
+
+    HLR_LOG( 4, hpro::to_string( "} gauss_elim( %d )", A->id() ) );
+}
+
+namespace tlr
+{
 
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for tile low-rank format
 //
 ///////////////////////////////////////////////////////////////////////
-
-namespace tlr
-{
 
 //
 // LU factorization for TLR block format
@@ -83,14 +240,14 @@ lu ( hpro::TMatrix *          A,
 
 }// namespace tlr
 
+namespace hodlr
+{
+
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for HODLR format
 //
 ///////////////////////////////////////////////////////////////////////
-
-namespace hodlr
-{
 
 //
 // add U·V' to matrix A
@@ -183,14 +340,14 @@ lu ( hpro::TMatrix *          A,
 
 }// namespace hodlr
 
+namespace tileh
+{
+
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for tile H format
 //
 ///////////////////////////////////////////////////////////////////////
-
-namespace tileh
-{
 
 //
 // compute LU factorization of A
@@ -210,7 +367,15 @@ lu ( hpro::TMatrix *          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        hpro::LU::factorise_rec( BA->block( i, i ), acc );
+        {
+            auto  dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *(BA->block( i, i )),
+                                                                  128,
+                                                                  tbb::dag::refine ) );
+
+            hlr::tbb::dag::run( dag, acc );
+
+            // hpro::LU::factorise_rec( BA->block( i, i ), acc );
+        }
 
         ::tbb::parallel_invoke(
             [BA,i,nbr,&acc] ()
@@ -218,9 +383,15 @@ lu ( hpro::TMatrix *          A,
                 ::tbb::parallel_for( i+1, nbr,
                                      [BA,i,&acc] ( uint  j )
                                      {
-                                         hpro::solve_upper_right( BA->block( j, i ),
-                                                                  BA->block( i, i ), nullptr, acc,
-                                                                  hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) );
+                                         auto  dag = std::move( hlr::dag::gen_dag_solve_upper( BA->block( i, i ),
+                                                                                               BA->block( j, i ),
+                                                                                               128,
+                                                                                               tbb::dag::refine ) );
+                                                     
+                                         hlr::tbb::dag::run( dag, acc );
+                                         // hpro::solve_upper_right( BA->block( j, i ),
+                                         //                          BA->block( i, i ), nullptr, acc,
+                                         //                          hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) ); 
                                      } );
             },
                 
@@ -229,9 +400,15 @@ lu ( hpro::TMatrix *          A,
                 ::tbb::parallel_for( i+1, nbc,
                                      [BA,i,&acc] ( uint  l )
                                      {
-                                         hpro::solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
-                                                                 BA->block( i, l ), acc,
-                                                                 hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
+                                         auto  dag = std::move( hlr::dag::gen_dag_solve_lower( BA->block( i, i ),
+                                                                                               BA->block( i, l ),
+                                                                                               128,
+                                                                                               tbb::dag::refine ) );
+                                                     
+                                         hlr::tbb::dag::run( dag, acc );
+                                         // hpro::solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
+                                         //                         BA->block( i, l ), acc,
+                                         //                         hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
                                      } );
             } );
 
@@ -243,7 +420,10 @@ lu ( hpro::TMatrix *          A,
                                  {
                                      for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
                                      {
-                                         hpro::multiply( -1.0, BA->block( j, i ), BA->block( i, l ), 1.0, BA->block( j, l ), acc );
+                                         hlr::tbb::multiply( -1.0,
+                                                             apply_normal, * BA->block( j, i ),
+                                                             apply_normal, * BA->block( i, l ),
+                                                             * BA->block( j, l ), acc );
                                      }// for
                                  }// for
                              } );
@@ -251,160 +431,6 @@ lu ( hpro::TMatrix *          A,
 }
 
 }// namespace tileh
-
-///////////////////////////////////////////////////////////////////////
-//
-// general arithmetic functions
-//
-///////////////////////////////////////////////////////////////////////
-
-//
-// compute y = y + α op( M ) x
-//
-template < typename value_t >
-void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TMatrix *            M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
-{
-    assert( ! is_null( M ) );
-    // assert( M->ncols( op_M ) == x.length() );
-    // assert( M->nrows( op_M ) == y.length() );
-
-    if ( alpha == value_t(0) )
-        return;
-
-    if ( is_blocked( M ) )
-    {
-        auto        B       = cptrcast( M, hpro::TBlockMatrix );
-        const auto  row_ofs = B->row_is( op_M ).first();
-        const auto  col_ofs = B->col_is( op_M ).first();
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto  B_ij = B->block( i, j );
-                
-                if ( ! is_null( B_ij ) )
-                {
-                    auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
-                    auto  y_i = x( B_ij->row_is( op_M ) - row_ofs );
-
-                    mul_vec( alpha, op_M, B_ij, x_j, y_i );
-                }// if
-            }// for
-        }// for
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D = cptrcast( M, hpro::TDenseMatrix );
-        
-        blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x, value_t(1), y );
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = cptrcast( M, hpro::TRkMatrix );
-
-        if ( op_M == hpro::apply_normal )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_A< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_transposed )
-        {
-            assert( hpro::is_complex_type< value_t >::value == false );
-            
-            auto  t = blas::mulvec( value_t(1), blas::transposed( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_adjoint )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-    }// if
-    else
-        assert( false );
-}
-
-//
-// Gaussian elimination of A, e.g. A = A^-1
-// - T is used as temporary space and has to have the same
-//   structure as A
-//
-inline void
-gauss_elim ( hpro::TMatrix *          A,
-             hpro::TMatrix *          T,
-             const hpro::TTruncAcc &  acc )
-{
-    assert( ! is_null_any( A, T ) );
-    assert( A->type() == T->type() );
-    
-    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d ) {", A->id() ) );
-    
-    if ( is_blocked( A ) )
-    {
-        auto  BA = ptrcast( A, hpro::TBlockMatrix );
-        auto  BT = ptrcast( T, hpro::TBlockMatrix );
-        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
-        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
-
-        // A_00 = A_00⁻¹
-        tbb::gauss_elim( MA(0,0), MT(0,0), acc );
-
-        ::tbb::parallel_invoke(
-            [&]
-            { 
-                // T_01 = A_00⁻¹ · A_01
-                hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
-            },
-
-            [&]
-            {
-                // T_10 = A_10 · A_00⁻¹
-                hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
-            } );
-
-        // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
-    
-        // A_11 = A_11⁻¹
-        gauss_elim( MA(1,1), MT(1,1), acc );
-
-        ::tbb::parallel_invoke(
-            [&]
-            { 
-                // A_01 = - T_01 · A_11
-                hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
-            },
-            
-            [&]
-            { 
-                // A_10 = - A_11 · T_10
-                hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
-            } );
-
-        // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
-    }// if
-    else if ( is_dense( A ) )
-    {
-        auto  DA = ptrcast( A, hpro::TDenseMatrix );
-        
-        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
-        else                   blas::invert( DA->blas_rmat() );
-    }// if
-    else
-        assert( false );
-
-    HLR_LOG( 4, hpro::to_string( "} gauss_elim( %d )", A->id() ) );
-}
 
 }}// namespace hlr::tbb
 

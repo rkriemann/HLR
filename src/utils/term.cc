@@ -94,6 +94,7 @@ std::string  on_white     ( const std::string &  text ) { return on_white()     
                                                                             
 std::string  bold         ( const std::string &  text ) { return bold()         + text + reset(); }
 std::string  dark         ( const std::string &  text ) { return dark()         + text + reset(); }
+std::string  italic       ( const std::string &  text ) { return italic()       + text + reset(); }
 std::string  underline    ( const std::string &  text ) { return underline()    + text + reset(); }
 std::string  reverse      ( const std::string &  text ) { return reverse()      + text + reset(); }
 
@@ -143,6 +144,7 @@ const char *  on_white     () { return ""; }
 
 const char *  bold         () { return "";  }
 const char *  dark         () { return "";  }
+const char *  italic       () { return "";  }
 const char *  underline    () { return "";  }
 const char *  reverse      () { return "";  }
 
@@ -188,6 +190,7 @@ const char *  on_white     () { return ( use_colors ? "\033[107m" : "" ); }
 
 const char *  bold         () { return ( use_colors ? "\033[1m" : "" ); }
 const char *  dark         () { return ( use_colors ? "\033[2m" : "" ); }
+const char *  italic       () { return ( use_colors ? "\033[3m" : "" ); }
 const char *  underline    () { return ( use_colors ? "\033[4m" : "" ); }
 const char *  reverse      () { return ( use_colors ? "\033[7m" : "" ); }
 
@@ -239,6 +242,7 @@ std::ostream &  on_white     ( std::ostream &  os ) { IS_TTY( os, on_white ); }
 
 std::ostream &  bold         ( std::ostream &  os ) { IS_TTY( os, bold ); }
 std::ostream &  dark         ( std::ostream &  os ) { IS_TTY( os, dark ); }
+std::ostream &  italic       ( std::ostream &  os ) { IS_TTY( os, italic ); }
 std::ostream &  underline    ( std::ostream &  os ) { IS_TTY( os, underline ); }
 std::ostream &  reverse      ( std::ostream &  os ) { IS_TTY( os, reverse ); }
 

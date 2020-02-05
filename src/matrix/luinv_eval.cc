@@ -169,11 +169,10 @@ luinv_eval::capply_add  ( const complex    alpha,
 }
 
 void
-luinv_eval::apply_add  ( const real       , // alpha,
-                         const TMatrix *  , // X,
-                         TMatrix *        , // Y,
-                         const matop_t      // op
-                         ) const
+luinv_eval::apply_add  ( const real       /* alpha */,
+                         const TMatrix *  /* X */,
+                         TMatrix *        /* Y */,
+                         const matop_t    /* op */ ) const
 {
     assert( false );
 }
@@ -183,19 +182,19 @@ luinv_eval::apply_add  ( const real       , // alpha,
 // not the corresponding index sets
 //
 void
-luinv_eval::apply_add   ( const real                       alpha,
-                          const blas::Vector< real > &     x,
-                          blas::Vector< real > &           y,
-                          const matop_t                    op ) const
+luinv_eval::apply_add   ( const real                       /* alpha */,
+                          const blas::Vector< real > &     /* x */,
+                          blas::Vector< real > &           /* y */,
+                          const matop_t                    /* op */ ) const
 {
     HLR_ASSERT( false );
 }
 
 void
-luinv_eval::apply_add   ( const complex                    alpha,
-                          const blas::Vector< complex > &  x,
-                          blas::Vector< complex > &        y,
-                          const matop_t                    op ) const
+luinv_eval::apply_add   ( const complex                    /* alpha */,
+                          const blas::Vector< complex > &  /* x */,
+                          blas::Vector< complex > &        /* y */,
+                          const matop_t                    /* op */ ) const
 {
     HLR_ASSERT( false );
 }

@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-hpx.cc
 // Description : TLR LU with HPX
 // Author      : Ronald Kriemann

@@ -84,6 +84,20 @@ public:
     {
     }
     
+    tiled_lrmatrix ( const indexset              arow_is,
+                     const indexset              acol_is,
+                     tile_storage< value_t > &&  aU,
+                     tile_storage< value_t > &&  aV )
+            : TMatrix( hpro::value_type< value_t >::value )
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
+            , _ntile( 0 )
+    {
+        set_ofs( _row_is.first(), _col_is.first() );
+        set_lrmat( std::move( aU ), std::move( aV ) );
+    }
+
     tiled_lrmatrix ( const indexset  arow_is,
                      const indexset  acol_is,
                      const size_t    antile )
@@ -158,11 +172,15 @@ public:
     virtual size_t  rows      () const { return nrows(); }
     virtual size_t  cols      () const { return ncols(); }
 
+    // use "op" versions from TMatrix
+    using TMatrix::nrows;
+    using TMatrix::ncols;
+    
     // return true, if matrix is zero
     virtual bool    is_zero   () const { return ( _rank == 0 ); }
     
-    virtual void    set_size  ( const size_t  nrows,
-                                const size_t  ncols ) {} // ignored
+    virtual void    set_size  ( const size_t  ,
+                                const size_t   ) {} // ignored
     
     //
     // tile management
@@ -372,7 +390,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const real             alpha,
 //
 template < typename value_t >
 void
-tiled_lrmatrix< value_t >::truncate ( const hpro::TTruncAcc & acc )
+tiled_lrmatrix< value_t >::truncate ( const hpro::TTruncAcc & )
 {
 }
 
@@ -514,7 +532,7 @@ inline
 bool
 is_tiled_lowrank ( const hpro::TMatrix &  M )
 {
-    return ! IS_TYPE( &M, tiled_lrmatrix );
+    return IS_TYPE( &M, tiled_lrmatrix );
 }
 
 inline

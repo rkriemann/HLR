@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss-tbb.cc
 // Description : DAG based Gaussian Elimination using TBB
 // Author      : Ronald Kriemann

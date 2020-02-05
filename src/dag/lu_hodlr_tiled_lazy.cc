@@ -171,11 +171,11 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
 }
 
 template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
+matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           ais,
                                                                       std::shared_ptr< tile_storage< real > >  adata )
         : name( id_t(adata.get()) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
@@ -637,7 +637,7 @@ struct truncate2_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), V1.mem_block(), U2.mem_block(), V2.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -689,7 +689,7 @@ struct truncate3_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block(),
                                                                  U2.mem_block(), T2.mem_block(), V2.mem_block() }; }
@@ -732,7 +732,7 @@ struct truncate4_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -776,7 +776,7 @@ struct truncate5_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc ) { assert( false ); }
+    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), Y.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -993,7 +993,7 @@ struct apply_node : public node
     virtual std::string  color     () const { return "c4a000"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc ) {}
+    virtual void                run_         ( const TTruncAcc & ) {}
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const
     {
@@ -1077,9 +1077,7 @@ build_upd_nodes_pairwise_svd ( local_graph &    g,
     }// if
     else
     {
-        std::cout << nupds << std::endl;
-        
-        assert( false );
+        throw std::runtime_error( hpro::to_string( "unsupported number of updates (%d)", nupds ) );
     }// else
 }
 
@@ -1088,7 +1086,7 @@ lu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! hlr::is_small( tile_size, A ) )
+    if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
         auto  BA  = ptrcast( A, TBlockMatrix );
         auto  BL  = BA;
@@ -1195,7 +1193,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( U ) && ! hlr::is_small( tile_size, U ) )
+    if ( is_blocked( U ) && ! is_small( tile_size, U ) )
     {
         //
         //  ⎡ R_00^T │        ⎤ ⎡X_0⎤   ⎡ R_00^T            │        ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -1246,7 +1244,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsmuh( U, *(X.data), ntile );
 }
@@ -1262,7 +1260,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 {
     local_graph  g;
 
-    if ( is_blocked( L ) && ! hlr::is_small( tile_size, L ) )
+    if ( is_blocked( L ) && ! is_small( tile_size, L ) )
     {
         //
         //  ⎡ L_00 │      ⎤ ⎡X_0⎤   ⎡ L_00              │      ⎤ ⎡X_0⎤   ⎡M_0⎤
@@ -1313,7 +1311,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsml( L, *(X.data), ntile );
 }
@@ -1360,7 +1358,7 @@ dot_node::refine_ ( const size_t  tile_size )
 }
 
 void
-dot_node::run_ ( const TTruncAcc &  acc )
+dot_node::run_ ( const TTruncAcc & )
 {
     *(T.data) = hlr::seq::tiled2::dot( A.is, *(A.data), *(B.data), ntile );
 
@@ -1397,7 +1395,7 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  tile_size )
 
 template < typename matrixX_t, typename matrixY_t >
 void
-tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc &  acc )
+tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), beta, *(Y.data), ntile );
 }
@@ -1423,7 +1421,7 @@ tprod_ip_node< matrix_t >::refine_ ( const size_t  tile_size )
 
 template <>
 void
-tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc &  acc )
+tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), ntile );
 }
@@ -1525,7 +1523,7 @@ addlr_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-tadd_node::run_ ( const TTruncAcc &  acc )
+tadd_node::run_ ( const TTruncAcc & )
 {
     assert(( T0.data->nrows() == T1.data->nrows() ) && ( T0.data->ncols() == T1.data->ncols() ));
     
@@ -1749,7 +1747,7 @@ truncate5_node::refine_ ( const size_t )
 }
 
 void
-truncate_node::run_ ( const TTruncAcc &  acc )
+truncate_node::run_ ( const TTruncAcc & )
 {
     // hpro::TScopedLock  lock( *A );
     

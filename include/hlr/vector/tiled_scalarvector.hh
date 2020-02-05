@@ -11,22 +11,9 @@
 #include <cassert>
 #include <map>
 
+#include <hlr/matrix/tiling.hh>
 #include <hlr/vector/tile_storage.hh>
 #include <hlr/utils/checks.hh>
-
-namespace std
-{
-
-// (partial) ordering of index sets
-inline
-bool
-operator < ( const HLIB::TIndexSet  is1,
-             const HLIB::TIndexSet  is2 )
-{
-    return is1.is_strictly_left_of( is2 );
-}
-
-}// namespace std
 
 namespace hlr
 { 
@@ -65,6 +52,8 @@ public:
     // value type
     using  value_t = T_value;
 
+    using  mutex_map_t = std::unordered_map< indexset, std::mutex, indexset_hash >;
+
 private:
     // local index set of vector
     indexset                 _is;
@@ -73,7 +62,8 @@ private:
     // mapping of (sub-) index set to tile
     tile_storage< value_t >  _tiles;
 
-    std::map< indexset, std::mutex >  _tile_mutices;
+    // mapping of indexsets to mutices
+    mutex_map_t              _tile_mutices;
     
     // tile size
     size_t                   _ntile;
@@ -89,6 +79,15 @@ public:
             , _ntile( 0 )
     {}
     
+    tiled_scalarvector ( const indexset &  ais,
+                         tile_is_map_t &   atile_is_map )
+            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            , _is( ais )
+            , _ntile( 0 )
+    {
+        init_tiles( atile_is_map );
+    }
+
     tiled_scalarvector ( const indexset  ais,
                          const size_t    antile )
             : TVector( ais.first(), hpro::value_type< value_t >::value )
@@ -143,6 +142,9 @@ public:
     // allocate storage for all tiles
     void  init_tiles ();
 
+    // allocate storage for all tiles
+    void  init_tiles ( tile_is_map_t &  tile_is_map );
+
     // copy data from given factors to local tiles (allocate if needed)
     void  copy_tiles ( const blas::Vector< value_t > &  atiles );
     
@@ -155,11 +157,11 @@ public:
     virtual void fill ( const real  a )
     {
         for ( auto [ is, v_is ] : _tiles )
-            blas::fill( a, v_is );
+            blas::fill( value_t(a), v_is );
     }
 
     // fill with random numbers
-    virtual void fill_rand ( const uint  seed )
+    virtual void fill_rand ( const uint  /* seed */ )
     {
         assert( false );
     }
@@ -172,8 +174,8 @@ public:
     }
 
     // this ≔ a · vector
-    virtual void assign ( const real             a,
-                          const hpro::TVector *  v )
+    virtual void assign ( const real             /* a */,
+                          const hpro::TVector *  /* v */ )
     {
         assert( false );
     }
@@ -205,8 +207,8 @@ public:
     }
     
     // this ≔ this + α·x
-    virtual void axpy ( const real             a,
-                        const hpro::TVector *  x )
+    virtual void axpy ( const real             /* a */,
+                        const hpro::TVector *  /* x */ )
     {
         assert( false );
     }
@@ -236,14 +238,14 @@ public:
     { assert( false ); }
 
     // return dot-product, <x,y> = x^H · y, where x = this
-    virtual complex dot  ( const TVector *  x ) const
+    virtual complex dot  ( const TVector *  ) const
     {
         assert( false );
         return complex(0);
     }
 
     // return dot-product, <x,y> = x^T · y, where x = this
-    virtual complex dotu ( const TVector * ) const
+    virtual complex dotu ( const TVector *  ) const
     {
         assert( false );
         return complex(0);
@@ -302,6 +304,23 @@ tiled_scalarvector< value_t >::init_tiles ()
         _tiles[ is_i ] = tile< value_t >( is_i.size() );
         _tile_mutices[ is_i ].lock();  // ensure mutex exists in map
         _tile_mutices[ is_i ].unlock();
+    }// for
+}
+
+//
+// allocate storage for all tiles as defined by given map
+//
+template < typename value_t >
+void
+tiled_scalarvector< value_t >::init_tiles ( tile_is_map_t &  tile_is_map )
+{
+    const auto &  tiles = tile_is_map[ _is ];
+
+    for ( const auto  is : tiles )
+    {
+        _tiles[ is ] = tile< value_t >( is.size() );
+        _tile_mutices[ is ].lock();  // ensure mutex exists in map
+        _tile_mutices[ is ].unlock();
     }// for
 }
 

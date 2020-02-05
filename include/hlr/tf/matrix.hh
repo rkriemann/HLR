@@ -45,7 +45,8 @@ build_helper ( ::tf::SubflowBuilder &       tf,
                const HLIB::TBlockCluster *  bct,
                const coeff_t &              coeff,
                const lrapx_t &              lrapx,
-               const HLIB::TTruncAcc &      acc )
+               const HLIB::TTruncAcc &      acc,
+               const size_t                 nseq )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
@@ -76,6 +77,10 @@ build_helper ( ::tf::SubflowBuilder &       tf,
             M = coeff.build( rowis, colis );
         }// else
     }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc );
+    }// if
     else
     {
         M = std::make_unique< HLIB::TBlockMatrix >( bct );
@@ -98,15 +103,18 @@ build_helper ( ::tf::SubflowBuilder &       tf,
                 if ( bct->son( i, j ) != nullptr )
                 {
                     tf.silent_emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,B] ( auto &  sf )
+                        [bct,i,j,&coeff,&lrapx,&acc,B,nseq] ( auto &  sf )
                         {
-                            auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc );
+                            auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
                         } );
                 }// if
             }// for
         }// for
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
     }// else
 
     // copy properties from the cluster
@@ -124,12 +132,13 @@ std::unique_ptr< HLIB::TMatrix >
 build ( const HLIB::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc )
+        const HLIB::TTruncAcc &      acc,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size )
 {
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.silent_emplace( [&,bct] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc ); } );
+    tf.silent_emplace( [&,bct,nseq] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
 
     ::tf::Executor  executor;
     

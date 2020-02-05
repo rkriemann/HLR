@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : dag-inv-seq.cc
 // Description : DAG based inversion using sequential execution
 // Author      : Ronald Kriemann

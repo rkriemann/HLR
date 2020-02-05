@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : gauss-hpx.cc
 // Description : DAG based Gaussian Elimination using HPX
 // Author      : Ronald Kriemann

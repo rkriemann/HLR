@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-tbb.cc
 // Description : TLR-LU using TBB
 // Author      : Ronald Kriemann

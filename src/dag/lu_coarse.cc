@@ -459,44 +459,10 @@ update_node::run_ ( const TTruncAcc &  acc )
 void
 apply_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( is_blocked( A ) && ! is_small( A ) )
+    if ( is_blocked( A ) && ! hpro::is_small( A ) )
         A->apply_updates( acc, nonrecursive );
     else
         A->apply_updates( acc, recursive );
-}
-
-//
-// construct DAG for applying updates
-//
-void
-build_apply_dag ( TMatrix *           A,
-                  node *              parent,
-                  apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes )
-{
-    if ( is_null( A ) )
-        return;
-    
-    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
-
-    apply_map[ A->id() ] = apply;
-
-    if ( parent != nullptr )
-        apply->after( parent );
-    
-    if ( is_blocked( A ) && is_small( A ) )
-    {
-        auto  BA = ptrcast( A, TBlockMatrix );
-
-        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
-            {
-                if ( BA->block( i, j ) != nullptr )
-                    build_apply_dag( BA->block( i, j ), apply, apply_map, apply_nodes );
-            }// for
-        }// for
-    }// if
 }
 
 }// namespace anonymous
@@ -509,14 +475,10 @@ build_apply_dag ( TMatrix *           A,
 
 graph
 gen_dag_lu_oop_coarse ( TMatrix &            A,
+                        const size_t         ncoarse,
                         const refine_func_t  refine,
-                        const exec_func_t    fine_run,
-                        const size_t         ncoarse )
+                        const exec_func_t    fine_run )
 {
-    // if coarse size if too small, generate standard LU DAG
-    if ( ncoarse <= HLIB::CFG::Arith::max_seq_size )
-        return gen_dag_lu_oop_auto( A, refine );
-            
     apply_map_t  apply_map;
     auto         dag = refine( new lu_node( & A, apply_map, fine_run ), ncoarse, use_single_end_node );
 

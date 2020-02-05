@@ -1,5 +1,5 @@
 //
-// Project     : HLib
+// Project     : HLR
 // File        : tlr-mpi.cc
 // Description : TLR arithmetic with MPI
 // Author      : Ronald Kriemann
@@ -11,4 +11,4 @@
 
 namespace ARITH = hlr::mpi::ibcast::tlr;
 
-#include "tlr-mpi-main.hh"
+#include "tlr-mpi.hh"
