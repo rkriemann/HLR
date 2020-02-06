@@ -62,6 +62,7 @@ std::ostream &  reverse      ( std::ostream &  os );
 
 std::ostream &  alert        ( std::ostream &  os );
 std::ostream &  bullet       ( std::ostream &  os );
+std::ostream &  dash         ( std::ostream &  os );
 
 //
 // modify given string

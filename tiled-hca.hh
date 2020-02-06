@@ -12,6 +12,7 @@
 #include <hpro/bem/TRefinableGrid.hh>
 #include <hpro/bem/TBFCoeffFn.hh>
 #include <hpro/matrix/TMatrixSum.hh>
+#include <hpro/matrix/TMatrixProduct.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -22,6 +23,7 @@
 #include "hlr/seq/arith_tiled_v2.hh"
 #include "hlr/bem/hca.hh"
 #include "hlr/bem/tiled_hca.hh"
+#include "hlr/arith/multiply.hh"
 
 using namespace hlr;
 using namespace hpro;
@@ -176,8 +178,47 @@ program_main ()
         runtime.clear();
         
         //
+        // mat-mul
+        //
+
+        std::cout << "    " << term::dash << "mat-mul" << std::endl;
+
+        {
+            auto  A   = M_hca.get();
+            auto  C   = impl::matrix::copy( *M_hca );
+            auto  REF = hpro::matrix_product( A, A );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                C->scale( real_t(0) );
+                
+                tic = timer::now();
+        
+                hlr::arith::multiply( value_t(1), *A, *A, *C, acc );
+                // impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C1, acc );
+
+                toc = timer::since( tic );
+                std::cout << "    mult in " << format_time( toc ) << std::endl;
+
+                runtime.push_back( toc.seconds() );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+            runtime.clear();
+
+            auto  diff = hpro::matrix_sum( 1.0, REF.get(), -1.0, C.get() );
+
+            std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        }            
+
+        //
         // mat-vec benchmark
         //
+
+        std::cout << "    " << term::dash << "mat-vec" << std::endl;
 
         blas::Vector< value_t >  x( M_hca->ncols() );
         blas::Vector< value_t >  y( M_hca->nrows() );
@@ -256,9 +297,23 @@ program_main ()
         }// if
 
         //
+        // mat-mul
+        //
+
+        std::cout << "    " << term::dash << "mat-mul" << std::endl;
+
+        // auto  A = M_thca.get();
+        // auto  B = impl::matrix::copy( *M_thca );
+        // auto  C = impl::matrix::copy( *M_thca );
+
+        // seq::arith::tiled2::multiply( value_t(1), *A, *B, value_t(1), *C, acc );
+        
+        //
         // mat-vec benchmark
         //
 
+        std::cout << "    " << term::dash << "mat-vec" << std::endl;
+        
         vector::tiled_scalarvector< value_t >  x( M_thca->col_is(), tile_map );
         vector::tiled_scalarvector< value_t >  y( M_thca->row_is(), tile_map );
 

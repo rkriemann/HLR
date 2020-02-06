@@ -256,6 +256,11 @@ std::ostream &  bullet       ( std::ostream &  os )
     return os << yellow << bold << "∙ " << reset;
 }
 
+std::ostream &  dash        ( std::ostream &  os )
+{
+    return os << yellow << bold << "━ " << reset;
+}
+
 }// namespace term
 
 }// namespace hlr

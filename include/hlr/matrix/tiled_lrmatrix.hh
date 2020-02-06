@@ -59,6 +59,10 @@ public:
 private:
     // local index set of matrix
     indexset                 _row_is, _col_is;
+
+    // mapping of local index set to tile indexsets
+    tile_is_map_t &          _row_tile_is_map;
+    tile_is_map_t &          _col_tile_is_map;
     
     // low-rank factors in tiled storage:
     // mapping of (sub-) index set to tile
@@ -81,9 +85,24 @@ public:
             , _col_is( 0, 0 )
             , _rank( 0 )
             , _ntile( 0 )
-    {
-    }
+    {}
     
+    tiled_lrmatrix ( const indexset              arow_is,
+                     const indexset              acol_is,
+                     tile_is_map_t &             arow_tile_is_map,
+                     tile_is_map_t &             acol_tile_is_map )
+            : TMatrix( hpro::value_type< value_t >::value )
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _row_tile_is_map( arow_tile_is_map )
+            , _col_tile_is_map( acol_tile_is_map )
+            , _rank( 0 )
+            , _ntile( 0 )
+    {
+        set_ofs( _row_is.first(), _col_is.first() );
+        init_tiles_map();
+    }
+
     tiled_lrmatrix ( const indexset              arow_is,
                      const indexset              acol_is,
                      tile_storage< value_t > &&  aU,
@@ -134,6 +153,9 @@ public:
     // access internal data
     //
 
+    tile_is_map_t                    row_tile_is_map () { return _row_tile_is_map; }
+    tile_is_map_t                    col_tile_is_map () { return _col_tile_is_map; }
+        
     tile< value_t > &                tile_U ( const indexset &  is )       { return _U.at( is ); }
     const tile< value_t > &          tile_U ( const indexset &  is ) const { return _U.at( is ); }
     
@@ -188,6 +210,7 @@ public:
 
     // allocate storage for all tiles
     void  init_tiles ();
+    void  init_tiles_map ();
 
     // copy data from given factors to local tiles (allocate if needed)
     void  copy_tiles ( const blas::Matrix< value_t > &  U,
@@ -278,6 +301,30 @@ tiled_lrmatrix< value_t >::init_tiles ()
 
         _V[ is_i ] = blas::Matrix< value_t >( is_i.size(), _rank );
         _V.tile_is().push_back( is_i );
+    }// for
+}
+
+template < typename value_t >
+void
+tiled_lrmatrix< value_t >::init_tiles_map ()
+{
+    const auto &  row_iss = _row_tile_is_map.at( _row_is );
+    const auto &  col_iss = _col_tile_is_map.at( _col_is );
+    
+    _U.tile_is().reserve( row_iss.size() );
+    
+    for ( auto  is : row_iss )
+    {
+        _U[ is ] = blas::Matrix< value_t >( is.size(), 0 );
+        _U.tile_is().push_back( is );
+    }// for
+
+    _V.tile_is().reserve( col_iss.size() );
+
+    for ( auto  is : col_iss )
+    {
+        _V[ is ] = blas::Matrix< value_t >( is.size(), 0 );
+        _V.tile_is().push_back( is );
     }// for
 }
 

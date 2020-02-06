@@ -566,6 +566,108 @@ truncate ( const indexset &                 row_is,
         return { std::move( Uk ), std::move( Vk ) };
     }// else
 }
+
+//
+// multiplication of general matrix with tile_storage
+// - assumption: storage of X is consistent with clustering of M
+//
+template < typename value_t >
+tile_storage< value_t >
+multiply ( const value_t                    alpha,
+           const hpro::matop_t              op_M,
+           const hpro::TMatrix &            M,
+           const tile_storage< value_t > &  X )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                {
+                    auto  Y_ij = multiply( alpha, op_M, B->block( i, j ), X );
+                }// if       
+            }// for
+        }// for
+    }// if
+    else if ( is_dense( M ) )
+    {
+        HLR_ASSERT( X.contains( M.col_is( op_M ) ) );
+
+        auto  D = cptrcast( &M, hpro::TDenseMatrix );
+        auto  Y = blas::prod( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), X.at( D->col_is( op_M ) ) );
+
+        return { M.row_is( op_M ), std::move( Y ) };
+    }// if
+    else if ( hlr::matrix::is_tiled_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, tiled_lrmatrix< value_t > );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type " + M.typestr() );
+
+    return {};
+}
+    
+//
+// multiplication C := α A B + C of general matrices A, B and C with
+// low-rank blocks stored in tiled storage
+//
+// template < typename value_t >
+// tile_storage< value_t >
+// multiply ( const value_t          alpha,
+//            const hpro::TMatrix &  A,
+//            const hpro::TMatrix &  B,
+//            const hpro::TMatrix &  C )
+// {
+//     using namespace hlr::matrix;
+    
+//     if ( is_blocked_all( A, B, C ) )
+//     {
+//         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+//         auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+//         auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+
+//         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+//         {
+//             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+//             {
+//                 HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
+                
+//                 for ( uint  l = 0; l < BA->nblock_cols(); ++l )
+//                 {
+//                     multiply( alpha, BA->block( i, l ), BB->block( l, j ), BC->block( i, j ) );
+//                 }// if       
+//             }// for
+//         }// for
+//     }// if
+//     else if ( is_blocked( C ) )
+//     {
+//         auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+
+//     }// if
+//     else if ( is_tiled_lowrank( C ) )
+//     {
+//         auto  R = cptrcast( &C, tiled_lrmatrix< value_t > );
+
+//     }// if
+//     else if ( is_dense( C ) )
+//     {
+//         HLR_ASSERT( X.contains( M.col_is( op_M ) ) );
+
+//         auto  D = cptrcast( &C, hpro::TDenseMatrix );
+//         auto  Y = blas::prod( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), X.at( D->col_is( op_M ) ) );
+
+//         return { M.row_is( op_M ), std::move( Y ) };
+//     }// if
+//     else
+//         HLR_ERROR( "unsupported matrix type " + M.typestr() );
+
+//     return {};
+// }
     
 namespace hodlr
 {

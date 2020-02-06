@@ -21,7 +21,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++2a'
+CXXFLAGS     = '-std=c++2a -fpermissive'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
@@ -234,14 +234,13 @@ if profile :
 
 if warn :
     WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
-    
+
 env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
-                   CPPDEFINES = Split( DEFINES ),
-                   )
+                   CPPDEFINES = Split( DEFINES ) )
 
 # include HLIBpro library
 env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )

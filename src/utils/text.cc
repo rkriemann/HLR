@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <iostream>
+
 #include <string>
 #include <sstream>
 
@@ -23,7 +25,7 @@ largest_power10_smaller_than ( const size_t  n )
 {
     size_t  p = 1;
 
-    while (( 10*p ) < n )
+    while (( 10*p ) <= n )
         p *= 10;
 
     return p;
@@ -44,7 +46,7 @@ subscript ( size_t  n )
 
     std::ostringstream  out;
     size_t              pot = largest_power10_smaller_than( n );
-
+    
     while ( pot > 0 )
     {
         const auto  n_i = n / pot;

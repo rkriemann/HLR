@@ -161,20 +161,20 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
 }
 
 template <>
-matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is,
+matrix_info< tile_storage< real > * >::matrix_info ( const indexset          ais,
                                                      tile_storage< real > *  adata )
         : name( id_t(adata) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
 template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
+matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           ais,
                                                                       std::shared_ptr< tile_storage< real > >  adata )
         : name( id_t(adata.get()) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
@@ -195,10 +195,10 @@ matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr<
 {}
 
 template <>
-matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is )
+matrix_info< tile_storage< real > * >::matrix_info ( const indexset          ais )
         : name( 255 )
         , id( -1 )
-        , is( is )
+        , is( ais )
 {}
 
 using dense_matrix        = matrix_info< matrix< real > >;

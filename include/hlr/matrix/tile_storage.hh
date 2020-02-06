@@ -64,6 +64,12 @@ public:
     // ctors
     tile_storage () {}
 
+    tile_storage ( const indexset &    is,
+                   tile< value_t > &&  t )
+    {
+        _tiles[ is ] = std::move( t );
+    }
+
     tile_storage ( tile_storage &&  ts )
             : _tiles( std::move( ts._tiles ) )
     {}
