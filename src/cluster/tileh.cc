@@ -107,13 +107,16 @@ cluster ( HLIB::TCoordinate *   coords,
           const size_t          ntile,
           const size_t          nlvl )
 {
-    TCardBSPPartStrat  part_strat;
+    TCardBSPPartStrat  part_strat( adaptive_split_axis );
     TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
+    ct_builder.adjust_bb( true );
+    
     auto  ct = ct_builder.build( coords );
 
     // flatten top levels to set up Tile-H
-    flatten( ct->root(), nlvl );
+    if ( nlvl > 0 )
+        flatten( ct->root(), nlvl );
     
     return ct;
 }

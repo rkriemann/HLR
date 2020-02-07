@@ -20,6 +20,7 @@ namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
 namespace blas = hpro::BLAS;
+namespace math = hpro::Math;
 
 using namespace hpro;
 
@@ -88,7 +89,7 @@ aca ( const operator_t &  M,
         // determine row pivot
         const auto  pivot_row = blas::max_idx( column );
 
-        if ( std::abs( column( pivot_row ) ) <= almost_zero )
+        if ( math::abs( column( pivot_row ) ) <= almost_zero )
             break;
 
         blas::scale( value_t(1) / column( pivot_row ), column );
@@ -123,13 +124,13 @@ aca ( const operator_t &  M,
         //                           + u_k·u_k v_k·v_k
         //
 
-        real_t  upd = norm_i*norm_i;
+        value_t  upd = norm_i*norm_i;
         
         for ( uint  l = 0; l < U.size(); ++l )
             upd += ( blas::dot( U[l],   column ) * blas::dot( V[l], row  ) +
                      blas::dot( column, U[l]   ) * blas::dot( row,  V[l] ) );
 
-        norm_M = std::sqrt( norm_M * norm_M + std::abs( upd ) );
+        norm_M = std::sqrt( norm_M * norm_M + math::abs( upd ) );
 
         //
         // chose pivot column for next step

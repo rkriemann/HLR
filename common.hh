@@ -85,6 +85,15 @@ format_norm ( const double  e )
     return hlr::term::italic( str( format( "%.4e" ) % e ) );
 }
 
+// return default formated string for FLOPs
+inline
+std::string
+format_flops ( const double  f,
+               const double  t )
+{
+    return str( format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
+}
+
 //
 // timing
 //

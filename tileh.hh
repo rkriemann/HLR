@@ -15,8 +15,58 @@
 #include "hlr/cluster/mblr.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/norm.hh"
+#include "hlr/bem/aca.hh"
 
 using namespace hlr;
+
+uint64_t
+get_flops ( const std::string &  method )
+{
+    #if HLIB_COUNT_FLOPS == 1
+
+    return blas::FLOPS;
+
+    #else
+
+    if ( ntile == 128 )
+    {
+        if ( method == "mm" )
+        {
+            if ( gridfile == "sphere-5" ) return 455151893464;   // 515345354964;
+            if ( gridfile == "sphere-6" ) return 2749530544148;  // 3622694502712;
+            if ( gridfile == "sphere-7" ) return 12122134505132; // 21122045509696;
+            if ( gridfile == "sphere-8" ) return 118075035109436;
+        }// if
+        else if ( method == "lu" )
+        {
+            if ( gridfile == "sphere-5" ) return 124087920212;  // 122140965488;
+            if ( gridfile == "sphere-6" ) return 881254402164;  // 832636379560;
+            if ( gridfile == "sphere-7" ) return 5442869949704; // 5113133279628;
+            if ( gridfile == "sphere-8" ) return 30466486574184;
+        }// if
+    }// if
+    else if ( ntile == 64 )
+    {
+        if ( method == "mm" )
+        {
+            if ( gridfile == "sphere-5" ) return 362295459228;  // 362301558484;
+            if ( gridfile == "sphere-6" ) return 2254979752712; // 2364851019180;
+            if ( gridfile == "sphere-7" ) return 9888495763740; // 10305554560228;
+            if ( gridfile == "sphere-8" ) return 119869484219652;
+        }// if
+        else if ( method == "lu" )
+        {
+            if ( gridfile == "sphere-5" ) return 111349327848; // 111663294708;
+            if ( gridfile == "sphere-6" ) return 912967909892; // 936010549040;
+            if ( gridfile == "sphere-7" ) return 6025437614656; // 6205509061236;
+            if ( gridfile == "sphere-8" ) return 33396933144996;
+        }// if
+    }// if
+
+    #endif
+
+    return 0;
+}
 
 //
 // main function
@@ -48,7 +98,8 @@ program_main ()
     auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
+    auto  lrapx  = std::make_unique< bem::aca_lrapx< hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+    // auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     auto  toc    = timer::since( tic );
     
@@ -62,6 +113,17 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    {
+        auto  D = hpro::to_dense( A.get() );
+        auto  fout = fopen( "A.bin", "wb" );
+
+        fwrite( hpro::blas_mat< value_t >( D.get() ).data(), sizeof(value_t), A->nrows()*A->ncols(), fout );
+
+        std::cout << hpro::blas_mat< value_t >( D.get() )( 256, 123 ) << std::endl;
+        
+        // hpro::DBG::write( A.get(), "A.mat", "A" );
+    }
+    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
@@ -72,10 +134,12 @@ program_main ()
               << ", " << acc.to_string()
               << " )" << term::reset << std::endl;
     
-    std::vector< double >  runtime;
-    auto                   mul_res = hpro::matrix_product( A.get(), A.get() );
-    
+    auto  mul_res = hpro::matrix_product( A.get(), A.get() );
+   
+    if ( false ) 
     {
+        std::vector< double >  runtime, flops;
+        
         std::cout << "  " << term::bullet << " DAG" << std::endl;
         
         auto  C0 = impl::matrix::copy( *A );
@@ -96,86 +160,106 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+            
             tic = timer::now();
             
             impl::dag::run( dag, acc );
             
             toc = timer::since( tic );
-            std::cout << "    mult in " << format_time( toc ) << std::endl;
+            std::cout << "    mult in  " << format_time( toc ) << std::endl;
             
+            flops.push_back( get_flops( "mm" ) );
             runtime.push_back( toc.seconds() );
         }// for
-        
+
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+            
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C0.get() );
 
-        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
 
     {
         std::cout << "  " << term::bullet << " HLR" << std::endl;
         
+        std::vector< double >  runtime, flops;
+        
         auto  C1 = impl::matrix::copy( *A );
 
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+
             tic = timer::now();
         
             impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C1, acc );
 
             toc = timer::since( tic );
-            std::cout << "    mult in " << format_time( toc ) << std::endl;
+            std::cout << "    mult in  " << format_time( toc ) << std::endl;
 
+            flops.push_back( get_flops( "mm" ) );
             runtime.push_back( toc.seconds() );
         }// for
         
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C1.get() );
 
-        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
 
-    if (( impl_name == "seq" ) || ( impl_name == "tbb" )) // otherwise sequential !!!
+    if ( false && (( impl_name == "seq" ) || ( impl_name == "tbb" ))) // otherwise sequential !!!
     {
         std::cout << "  " << term::bullet << " Hpro" << std::endl;
+        
+        std::vector< double >  runtime, flops;
         
         auto  C2 = impl::matrix::copy( *A );
 
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+
             tic = timer::now();
 
             hpro::multiply< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(), value_t(1), C2.get(), acc );
 
             toc = timer::since( tic );
-            std::cout << "    mult in " << format_time( toc ) << std::endl;
+            std::cout << "    mult in  " << format_time( toc ) << std::endl;
+
+            flops.push_back( get_flops( "mm" ) );
             runtime.push_back( toc.seconds() );
         }// for
+
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C2.get() );
 
-        std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
     
     // auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
 
-    // std::cout << "    error = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+    // std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -191,6 +275,8 @@ program_main ()
         
     {
         std::cout << "  " << term::bullet << " full DAG" << std::endl;
+        
+        std::vector< double >  runtime, flops;
         
         impl::matrix::copy_to( *A, *C );
         
@@ -214,6 +300,9 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+
             tic = timer::now();
             
             impl::dag::run( dag, acc );
@@ -221,26 +310,31 @@ program_main ()
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;
             
+            flops.push_back( get_flops( "lu" ) );
             runtime.push_back( toc.seconds() );
 
             if ( i < (nbench-1) )
                 impl::matrix::copy_to( *A, *C );
         }// for
 
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
-        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
-    
+   
+    if ( false ) 
     {
         std::cout << "  " << term::bullet << " Tile-H DAG" << std::endl;
+        
+        std::vector< double >  runtime, flops;
         
         impl::matrix::copy_to( *A, *C );
         
@@ -264,6 +358,9 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+
             tic = timer::now();
             
             impl::dag::run( dag, acc );
@@ -271,31 +368,39 @@ program_main ()
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;
             
+            flops.push_back( get_flops( "lu" ) );
             runtime.push_back( toc.seconds() );
 
             if ( i < (nbench-1) )
                 impl::matrix::copy_to( *A, *C );
         }// for
 
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
-        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
     
+    if ( false ) 
     {
         std::cout << "  " << term::bullet << " recursive+DAG" << std::endl;
+        
+        std::vector< double >  runtime, flops;
         
         impl::matrix::copy_to( *A, *C );
         
         for ( int i = 0; i < nbench; ++i )
         {
+            blas::FLOPS = 0;
+            blas::reset_statistics();
+
             tic = timer::now();
         
             impl::tileh::lu< HLIB::real >( C.get(), acc );
@@ -303,21 +408,23 @@ program_main ()
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;
             
+            flops.push_back( get_flops( "lu" ) );
             runtime.push_back( toc.seconds() );
 
             if ( i < (nbench-1) )
                 impl::matrix::copy_to( *A, *C );
         }// for
         
+        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
         if ( nbench > 1 )
             std::cout << "  runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        runtime.clear();
 
         hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
         
-        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
 }

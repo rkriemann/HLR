@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 # to enable print() syntax with python2
 from __future__ import print_function
@@ -20,8 +21,8 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++'
-CXXFLAGS     = '-std=c++2a'
+CXX          = 'g++-9.2'
+CXXFLAGS     = '-std=c++2a -DTBB_PREVIEW_GLOBAL_CONTROL=1'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
