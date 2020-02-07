@@ -21,14 +21,14 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++-9.2'
-CXXFLAGS     = '-std=c++2a -DTBB_PREVIEW_GLOBAL_CONTROL=1'
+CXX          = 'g++'
+CXXFLAGS     = '-std=c++2a'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
-DEFINES      = 'BOOST_SYSTEM_NO_DEPRECATED'
+DEFINES      = ''
 
 # directories for the various external libraries
 HPRO_DIR     = '/'
@@ -241,8 +241,7 @@ env = Environment( options    = opts, # TODO: <- check without
                    CXX        = CXX,
                    CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
-                   CPPDEFINES = Split( DEFINES ),
-                   )
+                   CPPDEFINES = Split( DEFINES ) )
 
 # include HLIBpro library
 env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )

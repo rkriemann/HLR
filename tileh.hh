@@ -21,53 +21,7 @@
 using namespace hlr;
 
 uint64_t
-get_flops ( const std::string &  method )
-{
-    #if HLIB_COUNT_FLOPS == 1
-
-    return blas::FLOPS;
-
-    #else
-
-    if ( ntile == 128 )
-    {
-        if ( method == "mm" )
-        {
-            if ( gridfile == "sphere-5" ) return 455151893464;   // 515345354964;
-            if ( gridfile == "sphere-6" ) return 2749530544148;  // 3622694502712;
-            if ( gridfile == "sphere-7" ) return 12122134505132; // 21122045509696;
-            if ( gridfile == "sphere-8" ) return 118075035109436;
-        }// if
-        else if ( method == "lu" )
-        {
-            if ( gridfile == "sphere-5" ) return 124087920212;  // 122140965488;
-            if ( gridfile == "sphere-6" ) return 881254402164;  // 832636379560;
-            if ( gridfile == "sphere-7" ) return 5442869949704; // 5113133279628;
-            if ( gridfile == "sphere-8" ) return 30466486574184;
-        }// if
-    }// if
-    else if ( ntile == 64 )
-    {
-        if ( method == "mm" )
-        {
-            if ( gridfile == "sphere-5" ) return 362295459228;  // 362301558484;
-            if ( gridfile == "sphere-6" ) return 2254979752712; // 2364851019180;
-            if ( gridfile == "sphere-7" ) return 9888495763740; // 10305554560228;
-            if ( gridfile == "sphere-8" ) return 119869484219652;
-        }// if
-        else if ( method == "lu" )
-        {
-            if ( gridfile == "sphere-5" ) return 111349327848; // 111663294708;
-            if ( gridfile == "sphere-6" ) return 912967909892; // 936010549040;
-            if ( gridfile == "sphere-7" ) return 6025437614656; // 6205509061236;
-            if ( gridfile == "sphere-8" ) return 33396933144996;
-        }// if
-    }// if
-
-    #endif
-
-    return 0;
-}
+get_flops ( const std::string &  method );
 
 //
 // main function
@@ -87,7 +41,8 @@ program_main ()
     auto  ct      = cluster::tileh::cluster( *coord, ntile, nlvl );
     auto  bct     = cluster::tileh::blockcluster( *ct, *ct );
 
-    hpro::flatten_leaf( bct->root() );
+    if ( nlvl == 0 )
+        hpro::flatten_leaf( bct->root() );
     
     std::cout << "    tiling = " << bct->root()->nrows() << " × " << bct->root()->ncols() << std::endl;
     
@@ -138,18 +93,18 @@ program_main ()
               << " )" << term::reset << std::endl;
     
     auto  mul_res = hpro::matrix_product( A.get(), A.get() );
-   
-    if ( false ) 
+
+    if ( false )
     {
-        std::vector< double >  runtime, flops;
-        
         std::cout << "  " << term::bullet << " DAG" << std::endl;
         
-        auto  C0 = impl::matrix::copy( *A );
+        std::vector< double >  runtime, flops;
+        
+        auto  C = impl::matrix::copy( *A );
 
         tic = timer::now();
         
-        auto  dag = std::move( dag::gen_dag_update( A.get(), A.get(), C0.get(), nseq, impl::dag::refine ) );
+        auto  dag = std::move( dag::gen_dag_update( A.get(), A.get(), C.get(), nseq, impl::dag::refine ) );
             
         toc = timer::since( tic );
             
@@ -163,8 +118,9 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            C->scale( 0 );
+            
+            blas::reset_flops();
             
             tic = timer::now();
             
@@ -184,26 +140,28 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C0.get() );
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
 
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
 
+    if ( true )
     {
         std::cout << "  " << term::bullet << " HLR" << std::endl;
-        
+
         std::vector< double >  runtime, flops;
         
-        auto  C1 = impl::matrix::copy( *A );
-
+        auto  C = impl::matrix::copy( *A );
+        
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            C->scale( 0 );
+            
+            blas::reset_flops();
 
             tic = timer::now();
         
-            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C1, acc );
+            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
 
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
@@ -219,7 +177,7 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C1.get() );
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
 
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
@@ -230,16 +188,17 @@ program_main ()
         
         std::vector< double >  runtime, flops;
         
-        auto  C2 = impl::matrix::copy( *A );
-
+        auto  C = impl::matrix::copy( *A );
+        
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            C->scale( 0 );
+            
+            blas::reset_flops();
 
             tic = timer::now();
 
-            hpro::multiply< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(), value_t(1), C2.get(), acc );
+            hpro::multiply< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(), value_t(1), C.get(), acc );
 
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
@@ -255,14 +214,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C2.get() );
+        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
 
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     }
-    
-    // auto  diff = hpro::matrix_sum( 1.0, C1.get(), -1.0, C2.get() );
-
-    // std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -274,14 +229,13 @@ program_main ()
               << ", " << acc.to_string()
               << " )" << term::reset << std::endl;
     
-    auto  C = impl::matrix::copy( *A );
-        
+    if ( true )
     {
         std::cout << "  " << term::bullet << " full DAG" << std::endl;
         
         std::vector< double >  runtime, flops;
         
-        impl::matrix::copy_to( *A, *C );
+        auto  C = impl::matrix::copy( *A );
         
         // no sparsification
         hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
@@ -303,8 +257,7 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            blas::reset_flops();
 
             tic = timer::now();
             
@@ -333,13 +286,13 @@ program_main ()
         std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
    
-    if ( false ) 
+    if ( false )
     {
         std::cout << "  " << term::bullet << " Tile-H DAG" << std::endl;
         
         std::vector< double >  runtime, flops;
         
-        impl::matrix::copy_to( *A, *C );
+        auto  C = impl::matrix::copy( *A );
         
         // no sparsification
         hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
@@ -361,8 +314,7 @@ program_main ()
         
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            blas::reset_flops();
 
             tic = timer::now();
             
@@ -391,18 +343,17 @@ program_main ()
         std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
     
-    if ( false ) 
+    if ( false )
     {
         std::cout << "  " << term::bullet << " recursive+DAG" << std::endl;
         
         std::vector< double >  runtime, flops;
         
-        impl::matrix::copy_to( *A, *C );
+        auto  C = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
-            blas::FLOPS = 0;
-            blas::reset_statistics();
+            blas::reset_flops();
 
             tic = timer::now();
         
@@ -430,4 +381,56 @@ program_main ()
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
+}
+
+//
+// return FLOPs for standard settings
+//
+uint64_t
+get_flops ( const std::string &  method )
+{
+    #if HLIB_COUNT_FLOPS == 1
+
+    return blas::get_flops();
+
+    #else
+
+    if ( ntile == 128 )
+    {
+        if ( method == "mm" )
+        {
+            if ( gridfile == "sphere-5" ) return 455151893464;   // 515345354964;
+            if ( gridfile == "sphere-6" ) return 2749530544148;  // 3622694502712;
+            if ( gridfile == "sphere-7" ) return 12122134505132; // 21122045509696;
+            if ( gridfile == "sphere-8" ) return 118075035109436;
+        }// if
+        else if ( method == "lu" )
+        {
+            if ( gridfile == "sphere-5" ) return 124087920212;  // 122140965488;
+            if ( gridfile == "sphere-6" ) return 881254402164;  // 832636379560;
+            if ( gridfile == "sphere-7" ) return 5442869949704; // 5113133279628;
+            if ( gridfile == "sphere-8" ) return 30466486574184;
+        }// if
+    }// if
+    else if ( ntile == 64 )
+    {
+        if ( method == "mm" )
+        {
+            if ( gridfile == "sphere-5" ) return 362295459228;  // 362301558484;
+            if ( gridfile == "sphere-6" ) return 2254979752712; // 2364851019180;
+            if ( gridfile == "sphere-7" ) return 9888495763740; // 10305554560228;
+            if ( gridfile == "sphere-8" ) return 119869484219652;
+        }// if
+        else if ( method == "lu" )
+        {
+            if ( gridfile == "sphere-5" ) return 111349327848; // 111663294708;
+            if ( gridfile == "sphere-6" ) return 912967909892; // 936010549040;
+            if ( gridfile == "sphere-7" ) return 6025437614656; // 6205509061236;
+            if ( gridfile == "sphere-8" ) return 33396933144996;
+        }// if
+    }// if
+
+    #endif
+
+    return 0;
 }

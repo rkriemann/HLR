@@ -112,7 +112,7 @@ cluster ( HLIB::TCoordinate &   coords,
 
     ct_builder.adjust_bb( true );
     
-    auto  ct = ct_builder.build( coords );
+    auto  ct = ct_builder.build( &coords );
 
     // flatten top levels to set up Tile-H
     if ( nlvl > 0 )
