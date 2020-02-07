@@ -103,7 +103,7 @@ flatten ( TCluster *  cl,
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< HLIB::TClusterTree >
-cluster ( HLIB::TCoordinate *   coords,
+cluster ( HLIB::TCoordinate &   coords,
           const size_t          ntile,
           const size_t          nlvl )
 {
@@ -125,13 +125,13 @@ cluster ( HLIB::TCoordinate *   coords,
 // build block cluster tree based on given row/column cluster trees
 //
 std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree *  rowct,
-               HLIB::TClusterTree *  colct )
+blockcluster ( HLIB::TClusterTree &  rowct,
+               HLIB::TClusterTree &  colct )
 {
     TWeakStdGeomAdmCond  adm_cond;
     TBCBuilder           bct_builder;
 
-    return bct_builder.build( rowct, colct, & adm_cond );
+    return bct_builder.build( & rowct, & colct, & adm_cond );
 }
 
 }}}// namespace hlr::cluster::tileh
