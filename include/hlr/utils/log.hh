@@ -69,7 +69,7 @@ log ( const int            lvl,
 #ifdef NDEBUG
 #  define HLR_LOG( lvl, msg ) 
 #else
-#  define HLR_LOG( lvl, msg ) \
+#  define HLR_LOG( lvl, msg )                                           \
     hlr::log( lvl,                                                      \
               std::string( "                                          " ) + msg )
 #endif

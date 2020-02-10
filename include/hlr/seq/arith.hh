@@ -13,15 +13,18 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 #include <hpro/algebra/mat_mul.hh>
+#include <hpro/algebra/mat_add.hh>
 #include <hpro/algebra/mat_fac.hh>
 #include <hpro/algebra/solve_tri.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
+#include "hlr/utils/tensor.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/norm.hh"
+#include "hlr/matrix/restrict.hh"
 
 namespace hlr { namespace seq {
 
@@ -155,6 +158,158 @@ multiply ( const value_t            alpha,
         hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
 }
 
+namespace detail
+{
+
+using  upd_list_t = std::list< std::pair< const TMatrix *, const TMatrix * > >;
+
+//
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t >
+void
+multiply_accu ( const value_t                 alpha,
+                const hpro::matop_t           op_A,
+                const hpro::matop_t           op_B,
+                hpro::TMatrix &               C,
+                upd_list_t &                  upd_C,
+                std::unique_ptr< TMatrix > &  upd_accu,
+                const hpro::TTruncAcc &       acc )
+{
+    //
+    // first handle computable updates to C, including non-blocked C
+    //
+
+    std::unique_ptr< TMatrix >  U( std::move( upd_accu ) );
+    
+    for ( auto  [ A, B ] : upd_C )
+    {
+        if ( ! is_blocked_all( *A, *B, C ) )
+        {
+            auto  T = std::unique_ptr< TMatrix >();
+            
+            if ( is_blocked_all( *A, *B ) )
+            {
+                T = std::make_unique< TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type< value_t >::value );
+
+                hpro::multiply( value_t(1), op_A, A, op_B, B, value_t(0), T.get(), acc );
+            }// if
+            else
+            {
+                // either A or B is low-rank or dense
+                T = multiply< value_t >( alpha, op_A, A, op_B, B );
+            }// else
+            
+            if ( is_null( U ) )
+            {
+                U = std::move( T );
+            }// if
+            else
+            {
+                if ( is_dense( T.get() ) )
+                {
+                    hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                    U = std::move( T );
+                }// if
+                else
+                    hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+            }// else
+        }// if
+    }// for
+
+    //
+    // now handle recursive updates
+    //
+    
+    if ( is_blocked( C ) )
+    {
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+
+        //
+        // first, split update U into subblock updates
+        // (to release U before recursion)
+        //
+
+        tensor2< std::unique_ptr< TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
+        
+        if ( ! is_null( U ) )
+        {
+            for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( BC->block( i, j ) ) )
+                        sub_U(i,j) = hlr::matrix::restrict( *U, BC->block( i, j )->block_is() );
+                }// for
+            }// for
+
+            U.reset( nullptr );
+        }// if
+
+        //
+        // now apply recursive multiplications, e.g.,
+        // collect all sub-products and recurse
+        //
+        
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            {
+                auto  C_ij = BC->block(i,j);
+
+                HLR_ASSERT( ! is_null( C_ij ) );
+
+                upd_list_t  upd_ij;
+                
+                for ( auto  [ A, B ] : upd_C )
+                {
+                    if ( is_blocked_all( A, B ) )
+                    {
+                        auto  BA = cptrcast( A, TBlockMatrix );
+                        auto  BB = cptrcast( B, TBlockMatrix );
+                        
+                        for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                        {
+                            auto  A_il = BA->block( i, l, op_A );
+                            auto  B_lj = BB->block( l, j, op_B );
+                            
+                            if ( is_null_any( A_il, B_lj ) )
+                                continue;
+                            
+                            upd_ij.push_back( { A_il, B_lj } );
+                        }// for
+                    }// if
+                }// for
+
+                multiply_accu< value_t >( alpha, op_A, op_B, *C_ij, upd_ij, sub_U( i, j ), acc );
+            }// for
+        }// for
+    }// if
+    else
+    {
+        // apply accumulated updates
+        hpro::add( alpha, U.get(), value_t(1), &C, acc );
+    }// else
+}
+
+}// namespace detail
+
+template < typename value_t >
+void
+multiply_accu ( const value_t            alpha,
+                const hpro::matop_t      op_A,
+                const hpro::TMatrix &    A,
+                const hpro::matop_t      op_B,
+                const hpro::TMatrix &    B,
+                hpro::TMatrix &          C,
+                const hpro::TTruncAcc &  acc )
+{
+    std::unique_ptr< TMatrix >  U;
+    detail::upd_list_t          upd{ { &A, &B } };
+    
+    detail::multiply_accu< value_t >( alpha, op_A, op_B, C, upd, U, acc );
+}
+
 //
 // compute C = C + α op( A ) op( B )
 //
@@ -166,7 +321,8 @@ multiply_apx ( const value_t            alpha,
                const hpro::matop_t      op_B,
                const hpro::TMatrix &    B,
                hpro::TMatrix &          C,
-               const hpro::TTruncAcc &  acc )
+               const hpro::TTruncAcc &  acc,
+               typename hpro::real_type< value_t >::type_t  tol )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -190,7 +346,7 @@ multiply_apx ( const value_t            alpha,
                     
                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                    multiply_apx< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, tol );
                 }// for
             }// for
         }// for
@@ -206,7 +362,7 @@ multiply_apx ( const value_t            alpha,
             const auto  norm_A = norm::norm_F( A );
             const auto  norm_B = norm::norm_F( B );
 
-            if (( norm_A < acc.rel_eps() ) || ( norm_B < acc.rel_eps() ))
+            if ( norm_A * norm_B < tol )
                 return;
         }// if
         

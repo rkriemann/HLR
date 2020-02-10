@@ -24,6 +24,7 @@ size_t  nseq       = 0;            // use sequential arithmetic below
 size_t  nlvl       = 0;            // number of level, e.g., for Tile-H or MBLR
 size_t  k          = 16;           // constant rank
 double  eps        = -1;           // constant precision
+double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
 string  distr      = "cyclic2d";   // block distribution
 uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
@@ -66,6 +67,7 @@ parse ( int argc, char ** argv )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
+        ( "tol",         value<double>(), ": tolerance for some algorithms" )
         ( "accu",                         ": use accumulator arithmetic" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
@@ -121,6 +123,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nlvl"       ) ) nlvl       = vm["nlvl"].as<int>();
     if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
+    if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();

@@ -23,7 +23,7 @@ largest_power10_smaller_than ( const size_t  n )
 {
     size_t  p = 1;
 
-    while (( 10*p ) < n )
+    while (( 10*p ) <= n )
         p *= 10;
 
     return p;
