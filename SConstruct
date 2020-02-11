@@ -118,7 +118,9 @@ opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    ''
 opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
 opts.Add(               'cxx',      'C++ compiler to use',           CXX )
+opts.Add(               'cxxflags', 'C++ compiler flags',            CXXFLAGS )
 opts.Add(               'cpuflags', 'path to cpuflags',              CPUFLAGS )
+opts.Add(               'defines',  'preprocessor defines',          DEFINES )
 
 opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
@@ -165,7 +167,9 @@ if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
 
 CXX          = opt_env['cxx']
+CXXFLAGS     = opt_env['cxxflags']
 CPUFLAGS     = opt_env['cpuflags']
+DEFINES      = opt_env['defines']
 
 HPRO_DIR     = opt_env['hpro']
 TBB_DIR      = opt_env['tbb']
