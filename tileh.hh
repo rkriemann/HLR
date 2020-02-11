@@ -53,6 +53,8 @@ program_main ()
         bc_vis.id( false ).print( bct->root(), "bct" );
     }// if
 
+    blas::reset_flops();
+    
     auto  acc    = gen_accuracy();
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
@@ -63,6 +65,7 @@ program_main ()
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
+    std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
 
     if ( verbose( 3 ) )
     {
@@ -92,7 +95,8 @@ program_main ()
               << ", " << acc.to_string()
               << " )" << term::reset << std::endl;
     
-    auto  mul_res = hpro::matrix_product( A.get(), A.get() );
+    auto  AxA      = hpro::matrix_product( A.get(), A.get() );
+    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
 
     if ( false )
     {
@@ -140,10 +144,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( true )
@@ -178,10 +182,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( true )
@@ -200,10 +204,7 @@ program_main ()
 
             tic = timer::now();
         
-            // seq::multiply_apx< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc, tol );
-            impl::multiply_accu< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
-            // hpro::multiply_accu< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(),
-            //                                 value_t(1), C.get(), acc );
+            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
 
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
@@ -219,10 +220,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( false && (( impl_name == "seq" ) || ( impl_name == "tbb" ))) // otherwise sequential !!!
@@ -257,10 +258,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
     
     if ( true && (( impl_name == "seq" ) || ( impl_name == "tbb" ))) // otherwise sequential !!!
@@ -296,10 +297,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, mul_res.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }// if
 
     //////////////////////////////////////////////////////////////////////
