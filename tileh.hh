@@ -321,12 +321,11 @@ program_main ()
         
         auto  C = impl::matrix::copy( *A );
         
-        // no sparsification
-        hlr::dag::sparsify_mode = hlr::dag::sparsify_none;
+        hlr::dag::sparsify_mode = hlr::dag::sparsify_node_succ;
+        hlr::dag::def_path_len  = 2;
         
         tic = timer::now();
         
-        // auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, nseq, impl::dag::refine ) );
         auto  dag = std::move( dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
             
         toc = timer::since( tic );

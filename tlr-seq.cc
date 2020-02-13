@@ -8,14 +8,23 @@
 
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/seq/dag.hh"
 
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
 #include "tlr.hh"
 
-int
-main ( int argc, char ** argv )
+template < typename problem_t >
+void
+framework_main ()
 {
-    return hlrmain( argc, argv );
+    // limit HLIBpro parallelism
+    ::tbb::global_control  tbb_control( ::tbb::global_control::max_allowed_parallelism, 1 );
+
+    hpro::CFG::set_nthreads( 1 );
+
+    program_main< problem_t >();
 }
+
+HLR_DEFAULT_MAIN
