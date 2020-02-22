@@ -120,6 +120,53 @@ dot ( const indexset &                 is,
     }// else
 }
 
+template < typename value_t >
+matrix< value_t >
+dot ( const cluster &                  cl,
+      const tile_storage< value_t > &  A,
+      const tile_storage< value_t > &  B )
+{
+    HLR_LOG( 4, hpro::to_string( "dot( %d )", cl.size() ) );
+    
+    if ( cl.is_leaf() )
+    {
+        assert( A.contains( cl ) && B.contains( cl ) );
+
+        return blas::prod( value_t(1), blas::adjoint( A.at( cl ) ), B.at( cl ) );
+    }// if
+    else
+    {
+        HLR_ASSERT( ( cl.nsons() == 2 ) && ! is_null_any( cl.son(0), cl.son(1) ) );
+        
+        auto  T0  = dot( *cl.son(0), A, B );
+        auto  T1  = dot( *cl.son(1), A, B );
+
+        blas::add( value_t(1), T0, T1 );
+
+        return T1;
+    }// else
+}
+
+//
+// compute Y := X + Y
+// - add to existing tiles in Y or insert new tiles into Y
+//
+template < typename value_t >
+void
+add ( const tile_storage< value_t > &  X,
+      tile_storage< value_t > &        Y )
+{
+    HLR_LOG( 4, "add" );
+
+    for ( auto &  [ is, X_is ] : X )
+    {
+        if ( Y.contains( is ) )
+            blas::add( value_t(1), X_is, Y.at( is ) );
+        else
+            Y[ is ] = std::move( blas::copy( X_is ) );
+    }// for
+}
+
 //
 // compute B := β·B + α·A·T
 //
@@ -195,12 +242,13 @@ tprod ( const indexset &           is,
 }
 
 //
-// compute B := A·T
+// compute B := α·A·T
 // - assumption: binary cluster tree
 //
 template < typename value_t >
 void
 tprod ( const cluster &                  cl,
+        const value_t                    alpha,
         const tile_storage< value_t > &  A,
         const matrix< value_t > &        T,
         tile_storage< value_t > &        B )
@@ -211,14 +259,14 @@ tprod ( const cluster &                  cl,
     {
         assert( A.contains( cl ) );
 
-        B[ cl ] = std::move( blas::prod( value_t(1), A.at( cl ), T ) );
+        B[ cl ] = std::move( blas::prod( alpha, A.at( cl ), T ) );
     }// if
     else
     {
         assert(( cl.nsons() == 2 ) && ! is_null_any( cl.son( 0 ), cl.son( 1 )) );
         
-        tprod( *cl.son( 0 ), A, T, B );
-        tprod( *cl.son( 1 ), A, T, B );
+        tprod( *cl.son( 0 ), alpha, A, T, B );
+        tprod( *cl.son( 1 ), alpha, A, T, B );
     }// else
 }
 
@@ -569,6 +617,9 @@ truncate ( const indexset &                 row_is,
 
 //
 // multiplication of general matrix with tile_storage
+//
+//        α M X
+//
 // - assumption: storage of X is consistent with clustering of M
 //
 template < typename value_t >
@@ -580,7 +631,8 @@ multiply ( const value_t                    alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto                     B = cptrcast( &M, hpro::TBlockMatrix );
+        tile_storage< value_t >  Y;
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -588,10 +640,14 @@ multiply ( const value_t                    alpha,
             {
                 if ( ! is_null( B->block( i, j ) ) )
                 {
-                    auto  Y_ij = multiply( alpha, op_M, B->block( i, j ), X );
+                    auto  Y_ij = multiply( alpha, op_M, *B->block( i, j ), X );
+
+                    add( Y_ij, Y );
                 }// if       
             }// for
         }// for
+
+        return Y;
     }// if
     else if ( is_dense( M ) )
     {
@@ -604,7 +660,37 @@ multiply ( const value_t                    alpha,
     }// if
     else if ( hlr::matrix::is_tiled_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, tiled_lrmatrix< value_t > );
+        auto    R = cptrcast( &M, tiled_lrmatrix< value_t > );
+        auto &  U = R->U();
+        auto &  V = R->V();
+        auto    Y = tile_storage< value_t >();
+
+        HLR_ASSERT( ! is_null_any( R->cluster(), R->cluster()->rowcl(), R->cluster()->colcl() ) );
+        
+        if ( op_M == apply_normal )
+        {
+            // T = V'·X
+            auto  T = dot( * R->cluster()->colcl(), V, X );
+
+            // Y = U·T
+            tprod( * R->cluster()->rowcl(), alpha, U, T, Y );
+
+            return Y;
+        }// if
+        else if ( op_M == apply_transposed )
+        {
+            HLR_ASSERT( false );
+        }// if
+        else if ( op_M == apply_adjoint )
+        {
+            // T = U'·X
+            auto  T = dot( * R->cluster()->rowcl(), U, X );
+
+            // Y = V·T
+            tprod( * R->cluster()->colcl(), alpha, V, T, Y );
+
+            return Y;
+        }// if
     }// if
     else
         HLR_ERROR( "unsupported matrix type " + M.typestr() );
@@ -616,58 +702,94 @@ multiply ( const value_t                    alpha,
 // multiplication C := α A B + C of general matrices A, B and C with
 // low-rank blocks stored in tiled storage
 //
-// template < typename value_t >
-// tile_storage< value_t >
-// multiply ( const value_t          alpha,
-//            const hpro::TMatrix &  A,
-//            const hpro::TMatrix &  B,
-//            const hpro::TMatrix &  C )
-// {
-//     using namespace hlr::matrix;
+template < typename value_t >
+tile_storage< value_t >
+multiply ( const value_t          alpha,
+           const hpro::TMatrix &  A,
+           const hpro::TMatrix &  B,
+           const hpro::TMatrix &  C )
+{
+    using namespace hlr::matrix;
     
-//     if ( is_blocked_all( A, B, C ) )
-//     {
-//         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-//         auto  BB = cptrcast( &B, hpro::TBlockMatrix );
-//         auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
 
-//         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-//         {
-//             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-//             {
-//                 HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            {
+                HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
                 
-//                 for ( uint  l = 0; l < BA->nblock_cols(); ++l )
-//                 {
-//                     multiply( alpha, BA->block( i, l ), BB->block( l, j ), BC->block( i, j ) );
-//                 }// if       
-//             }// for
-//         }// for
-//     }// if
-//     else if ( is_blocked( C ) )
-//     {
-//         auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+                for ( uint  l = 0; l < BA->nblock_cols(); ++l )
+                {
+                    multiply( alpha, BA->block( i, l ), BB->block( l, j ), BC->block( i, j ) );
+                }// if       
+            }// for
+        }// for
+    }// if
+    else if ( is_blocked( C ) )
+    {
+        auto  BC = ptrcast( &C, hpro::TBlockMatrix );
 
-//     }// if
-//     else if ( is_tiled_lowrank( C ) )
-//     {
-//         auto  R = cptrcast( &C, tiled_lrmatrix< value_t > );
+        // assumption: block matrices only on upper levels without dense blocks
+        if ( is_blocked( A ) )
+        {
+            HLR_ASSERT( is_tiled_lowrank( B ) );
+            
+            auto    BA = cptrcast( &A, hpro::TBlockMatrix );
+            auto    RB = cptrcast( &B, tiled_lrmatrix< value_t > );
+            auto    TU = multiply( alpha, hpro::apply_normal, *BA, RB->U() );
+            auto &  TV = RB->V(); // copy
+        }// if
+        else if ( is_blocked( B ) )
+        {
+            HLR_ASSERT( is_tiled_lowrank( A ) );
+            
+            auto    RA = cptrcast( &A, tiled_lrmatrix< value_t > );
+            auto    BB = cptrcast( &B, hpro::TBlockMatrix );
+            auto    TV = multiply( alpha, hpro::apply_adjoint, *BB, RA->V() );
+            auto &  TU = RA->U(); // copy
+        }// if
+        else
+        {
+            HLR_ASSERT( is_tiled_lowrank_all( A, B ) );
+            
+            auto    RA = cptrcast( &A, tiled_lrmatrix< value_t > );
+            auto    RB = cptrcast( &B, tiled_lrmatrix< value_t > );
+            auto    T  = dot( RA->cluster()->colcl(), RA->V(), RB->U() );
+            auto &  TV = RB->V(); // copy
+            auto    TU = tile_storage< value_t >();
 
-//     }// if
-//     else if ( is_dense( C ) )
-//     {
-//         HLR_ASSERT( X.contains( M.col_is( op_M ) ) );
+            tprod( * RA->cluster()->rowcl(), alpha, RA->U(), T, TU );
+        }// else
+    }// if
+    else if ( is_tiled_lowrank( C ) )
+    {
+        auto  R = cptrcast( &C, tiled_lrmatrix< value_t > );
 
-//         auto  D = cptrcast( &C, hpro::TDenseMatrix );
-//         auto  Y = blas::prod( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), X.at( D->col_is( op_M ) ) );
+        // assumption: block matrices only on upper levels without dense blocks
+        if ( is_blocked( A ) )
+        {
+        }// if
+        else if ( is_blocked( B ) )
+        {
+        }// if
+        else
+        {
+        }// else
+    }// if
+    else if ( is_dense( C ) )
+    {
+        // assumption: no block matrices (as not on deepest level)
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type " + C.typestr() );
 
-//         return { M.row_is( op_M ), std::move( Y ) };
-//     }// if
-//     else
-//         HLR_ERROR( "unsupported matrix type " + M.typestr() );
-
-//     return {};
-// }
+    return {};
+}
     
 namespace hodlr
 {

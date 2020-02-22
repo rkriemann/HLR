@@ -243,7 +243,10 @@ env = Environment( options    = opts, # TODO: <- check without
                    CPPDEFINES = Split( DEFINES ) )
 
 # include HLIBpro library
-env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
+try :
+    env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
+except :
+    pass
 
 # decative full compiler/linker output
 if not fullmsg :

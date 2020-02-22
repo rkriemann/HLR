@@ -584,9 +584,37 @@ is_tiled_lowrank ( const hpro::TMatrix &  M )
 
 inline
 bool
+is_tiled_lowrank_all  ( const hpro::TMatrix &  M )
+{
+    return is_tiled_lowrank( M );
+}
+
+template < typename... T >
+bool
+is_tiled_lowrank_all  ( const hpro::TMatrix &  M, T&&...  mats )
+{
+    return is_tiled_lowrank( M ) && is_tiled_lowrank_all( std::forward< T >( mats )... );
+}
+
+inline
+bool
 is_tiled_lowrank ( const hpro::TMatrix *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, tiled_lrmatrix );
+}
+
+inline
+bool
+is_tiled_lowrank_all  ( const hpro::TMatrix *  M )
+{
+    return is_tiled_lowrank( M );
+}
+
+template < typename... T >
+bool
+is_tiled_lowrank_all  ( const hpro::TMatrix *  M, T...  mats )
+{
+    return is_tiled_lowrank( M ) && is_tiled_lowrank_all( mats... );
 }
 
 }} // namespace hlr::matrix
