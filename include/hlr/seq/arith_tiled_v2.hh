@@ -483,8 +483,8 @@ tsqr ( const cluster &                  cl,
 
         tile_storage< value_t >  Q;
 
-        tprod( *cl.son(0), Q0, Q01_0, Q );
-        tprod( *cl.son(1), Q1, Q01_1, Q );
+        tprod( *cl.son(0), value_t(1), Q0, Q01_0, Q );
+        tprod( *cl.son(1), value_t(1), Q1, Q01_1, Q );
 
         return { std::move( Q ), std::move( R ) };
     }// else
@@ -523,8 +523,8 @@ truncate ( const cluster &                  row_cl,
 
     tile_storage< value_t >  Uk, Vk;
 
-    tprod( row_cl, Q0, Usk, Uk );
-    tprod( col_cl, Q1, Vsk, Vk );
+    tprod( row_cl, value_t(1), Q0, Usk, Uk );
+    tprod( col_cl, value_t(1), Q1, Vsk, Vk );
 
     return { std::move( Uk ), std::move( Vk ) };
 }

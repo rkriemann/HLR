@@ -302,6 +302,38 @@ program_main ()
 
         std::cout << "    " << term::dash << "mat-mul" << std::endl;
 
+        {
+            auto  B = impl::matrix::copy_tiled< double >( *M_thca, ntile );
+            auto  X = matrix::tile_storage< value_t >();
+
+            // look for leafs in <ct> and initialize data
+            std::list< hpro::TCluster * >  nodes{ ct->root() };
+
+            while ( ! nodes.empty() )
+            {
+                auto  node = nodes.front();
+
+                nodes.pop_front();
+                
+                if ( node->is_leaf() )
+                {
+                    auto  M = matrix::tile< value_t >( node->size(), 5 );
+
+                    blas::fill( value_t(1), M );
+                    
+                    X[ *node ] = std::move( M );
+                }// if
+                else
+                {
+                    for ( uint  i = 0; i < node->nsons(); ++i )
+                        nodes.push_front( node->son(i) );
+                }// else
+            }// while
+            
+            auto  Y = seq::tiled2::multiply( value_t(1), hpro::apply_normal, *B, X );
+        }
+    
+        
         // auto  A = M_thca.get();
         // auto  B = impl::matrix::copy( *M_thca );
         // auto  C = impl::matrix::copy( *M_thca );
