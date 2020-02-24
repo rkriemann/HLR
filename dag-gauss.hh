@@ -11,43 +11,38 @@
 #include "hlr/cluster/h.hh"
 #include "hlr/dag/gauss_elim.hh"
 
-namespace hlr { namespace dag {
-
-extern std::atomic< size_t >  collisions;
-
-} }// namespace hlr::dag
+using namespace hlr;
 
 //
 // main function
 //
 template < typename problem_t >
 void
-mymain ( int, char ** )
+program_main ()
 {
     using value_t = typename problem_t::value_t;
     
     auto  tic = timer::now();
     auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< TMatrix >();
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
 
     if ( matrixfile == "" )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::h::cluster( coord.get(), ntile );
-        auto  bct     = cluster::h::blockcluster( ct.get(), ct.get() );
+        auto  ct      = cluster::h::cluster( *coord, ntile );
+        auto  bct     = cluster::h::blockcluster( *ct, *ct );
     
         if ( verbose( 3 ) )
         {
-            TPSBlockClusterVis   bc_vis;
+            hpro::TPSBlockClusterVis   bc_vis;
         
             bc_vis.id( true ).print( bct->root(), "bct" );
-            print_vtk( coord.get(), "coord" );
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
@@ -57,7 +52,7 @@ mymain ( int, char ** )
                   << "    matrix = " << matrixfile
                   << std::endl;
 
-        A = read_matrix( matrixfile );
+        A = hpro::read_matrix( matrixfile );
 
         // for spreading memory usage
         if ( docopy )
@@ -72,7 +67,7 @@ mymain ( int, char ** )
     
     if ( verbose( 3 ) )
     {
-        TPSMatrixVis  mvis;
+        hpro::TPSMatrixVis  mvis;
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
@@ -92,7 +87,7 @@ mymain ( int, char ** )
     {
         tic = timer::now();
         
-        dag = std::move( hlr::dag::gen_dag_gauss_elim( C.get(), T.get(), nseq, impl::dag::refine ) );
+        dag = std::move( hlr::dag::gen_dag_gauss_elim( C.get(), T.get(), impl::dag::refine ) );
         
         toc = timer::since( tic );
         

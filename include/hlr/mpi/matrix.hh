@@ -20,6 +20,7 @@
 #include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/tools.hh"
+#include "hlr/utils/text.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/tbb/matrix.hh"
 #include "hlr/mpi/mpi.hh"

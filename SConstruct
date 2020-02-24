@@ -518,9 +518,9 @@ if 'mpi' in frameworks :
         Default( mpi.Program( 'tlr-mpi-ibcast.cc' ) )
         Default( mpi.Program( 'tlr-mpi-rdma.cc' ) )
     
-    if 'tileh' in programs :
-        Default( mpi.Program( 'tileh-mpi-bcast',  [ 'tileh-mpi-bcast.cc',  'src/tbb/dag.cc' ] ) )
-        Default( mpi.Program( 'tileh-mpi-ibcast', [ 'tileh-mpi-ibcast.cc', 'src/tbb/dag.cc' ] ) )
+    if 'tileh' in programs and 'tbb' in frameworks :
+        Default( mpi.Program( 'tileh-mpi-bcast',  [ 'tileh-mpi-bcast.cc',  'src/tbb/dag.o' ] ) )
+        Default( mpi.Program( 'tileh-mpi-ibcast', [ 'tileh-mpi-ibcast.cc', 'src/tbb/dag.o' ] ) )
 
 #
 # GASPI

@@ -365,7 +365,10 @@ lu ( TMatrix *          A,
                                                        {
                                                            TScopedLock  lock( *A_jl );
                                                            
-                                                           multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc );
+                                                           hlr::tf::multiply< value_t >( value_t(-1),
+                                                                                         hpro::apply_normal, *A_ji,
+                                                                                         hpro::apply_normal, *A_il,
+                                                                                         *A_jl, acc );
                                                        } );
                 has_u_task(i,j,l) = true;
                 

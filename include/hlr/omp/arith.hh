@@ -180,7 +180,7 @@ multiply_parfor ( const value_t            alpha,
             {
                 for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
                 {
-                    auto  C_ij = BC->block(i,j);
+                    auto  C_ij = BC->block( i, j );
                     auto  A_il = BA->block( i, l, op_A );
                     auto  B_lj = BB->block( l, j, op_B );
                 
@@ -359,7 +359,10 @@ lu ( hpro::TMatrix *          A,
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                multiply< value_t >( value_t(-1), BA->block( j, i ), BA->block( i, l ), BA->block( j, l ), acc );
+                hlr::omp::multiply< value_t >( value_t(-1),
+                                               hpro::apply_normal, *BA->block( j, i ),
+                                               hpro::apply_normal, *BA->block( i, l ),
+                                               *BA->block( j, l ), acc );
             }// for
         }// for
     }// for

@@ -26,6 +26,7 @@
 #include "hlr/mpi/arith.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/tbb/dag.hh"
+#include "hlr/tbb/arith.hh"
 
 namespace hlr
 {
@@ -381,7 +382,7 @@ lu ( TMatrix *          A,
             log( 4, HLIB::to_string( "lu( %d )", A_ii->id() ) );
 
             // HLIB::LU::factorise_rec( A_ii, acc );
-            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *A_ii, tbb::dag::refine ) );
+            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *A_ii, 128, tbb::dag::refine ) );
 
             tbb::dag::run( dag, acc );
         }// if
@@ -454,7 +455,7 @@ lu ( TMatrix *          A,
                     log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
 
                     // solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-                    auto  dag = std::move( gen_dag_solve_upper( H_ii, A_ji, tbb::dag::refine ) );
+                    auto  dag = std::move( gen_dag_solve_upper( H_ii, A_ji, 128, tbb::dag::refine ) );
 
                     tbb::dag::run( dag, acc );
                 }// if
@@ -473,7 +474,7 @@ lu ( TMatrix *          A,
                     log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
 
                     // solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-                    auto  dag = std::move( gen_dag_solve_lower( H_ii, A_il, tbb::dag::refine ) );
+                    auto  dag = std::move( gen_dag_solve_lower( H_ii, A_il, 128, tbb::dag::refine ) );
 
                     tbb::dag::run( dag, acc );
                 }// if
@@ -588,8 +589,8 @@ lu ( TMatrix *          A,
                 {
                     log( 4, HLIB::to_string( "update of %d with %d × %d", A_jl->id(), A_ji->id(), A_il->id() ) );
 
-                    // recursive method has same degree of parallelism as DAG method
-                    multiply( -1.0, A_ji, A_il, 1.0, A_jl, acc );
+                    // recursive method shows best parallel performance
+                    hlr::tbb::multiply( -1.0, apply_normal, *A_ji, apply_normal, *A_il, *A_jl, acc );
                 }// if
             }// for
         }// for

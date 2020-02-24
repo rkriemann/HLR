@@ -8,6 +8,7 @@
 
 #include "hlr/tf/matrix.hh"
 #include "hlr/tf/arith.hh"
+#include "hlr/tf/arith_accu.hh"
 #include "hlr/tf/dag.hh"
 
 namespace          impl      = hlr::tf;

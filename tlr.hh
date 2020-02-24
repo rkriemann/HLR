@@ -6,10 +6,17 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <fstream>
+
 #include "common.hh"
 #include "common-main.hh"
 
+#include <hpro/cluster/TClusterBasisBuilder.hh>
+#include <hpro/io/TClusterBasisVis.hh>
+#include <hpro/algebra/mat_conv.hh>
+
 #include "hlr/cluster/tlr.hh"
+#include "hlr/cluster/mblr.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/bem/aca.hh"
 
@@ -31,7 +38,7 @@ program_main ()
     auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::tlr::cluster( *coord, ntile );
+    auto  ct      = cluster::mblr::cluster( *coord, ntile, nlvl );
     auto  bct     = cluster::tlr::blockcluster( *ct, *ct );
     
     if ( hpro::verbose( 3 ) )
@@ -54,7 +61,7 @@ program_main ()
     {
         hpro::TPSMatrixVis  mvis;
         
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
+        mvis.svd( false ).print( A.get(), "A" );
     }// if
     
     //////////////////////////////////////////////////////////////////////
@@ -67,7 +74,7 @@ program_main ()
               << ", " << acc.to_string()
               << " )" << term::reset << std::endl;
     
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << " recursive" << std::endl;
         
@@ -106,7 +113,7 @@ program_main ()
         std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << " DAG" << std::endl;
         
@@ -159,6 +166,60 @@ program_main ()
         
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // H² conversion
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << term::bullet << term::bold << "H² ( " << impl_name
+              << ", " << acc.to_string()
+              << " )" << term::reset << std::endl;
+
+    {
+        std::cout << "  " << term::bullet << " cluster basis" << std::endl;
+        
+        hpro::THClusterBasisBuilder< value_t >  bbuilder;
+
+        tic = timer::now();
+
+        auto  [ rowcb, colcb ] = bbuilder.build( A.get(), acc );
+
+        toc = timer::since( tic );
+        
+        std::cout << "    time   = " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size() ) << " / " << format_mem( colcb->byte_size() ) << std::endl;
+
+        if ( verbose( 3 ) )
+        {
+            hpro::TPSClusterBasisVis< value_t >  cbvis;
+            std::ofstream                        rowout( "cb.eps" );
+
+            cbvis.visualise( rowcb.get(), rowout );
+        }// if
+
+        std::cout << "  " << term::bullet << " H → H²" << std::endl;
+        
+        tic = timer::now();
+
+        auto  A2 = hpro::to_h2( A.get(), rowcb.get(), colcb.get() );
+
+        toc = timer::since( tic );
+        
+        std::cout << "    time   = " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
+        std::cout << "    |A|    = " << format_norm( hpro::norm_F( A.get() ) ) << std::endl;
+        std::cout << "    |A²|   = " << format_norm( hpro::norm_F( A2.get() ) ) << std::endl;
+        // std::cout << "    |A-A'|₂= " << format_error( hpro::diff_norm_2( A.get(), A2.get() ) ) << std::endl;
+
+        if ( verbose( 3 ) )
+        {
+            hpro::TPSMatrixVis  mvis;
+        
+            mvis.svd( false ).print( A2.get(), "A2" );
+        }// if
     }
 }
 

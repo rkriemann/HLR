@@ -24,8 +24,8 @@ mymain ( int argc, char ** argv )
     auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::tlr::cluster( coord.get(), ntile );
-    auto  bct     = cluster::tlr::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::tlr::cluster( *coord, ntile );
+    auto  bct     = cluster::tlr::blockcluster( *ct, *ct );
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );

@@ -8,6 +8,7 @@
 
 #include "hlr/omp/matrix.hh"
 #include "hlr/omp/arith.hh"
+#include "hlr/omp/arith_accu.hh"
 #include "hlr/omp/dag.hh"
 
 namespace          impl      = hlr::omp;

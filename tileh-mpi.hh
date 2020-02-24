@@ -27,8 +27,8 @@ mymain ( int, char ** )
     auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::tileh::cluster( coord.get(), ntile, 4 ); // std::max< uint >( 3, std::log2( nprocs )+2 ) );
-    auto  bct     = cluster::tileh::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::tileh::cluster( *coord, ntile, nlvl ); // std::max< uint >( 3, std::log2( nprocs )+2 ) );
+    auto  bct     = cluster::tileh::blockcluster( *ct, *ct );
 
     // assign blocks to nodes
     if      ( distr == "cyclic2d"    ) cluster::distribution::cyclic_2d( nprocs, bct->root() );
@@ -76,7 +76,7 @@ mymain ( int, char ** )
 
         if ( nprocs == 1 )
         {
-            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, hlr::tbb::dag::refine ) );
+            auto  dag = std::move( dag::gen_dag_lu_oop_auto( *C, 128, hlr::tbb::dag::refine ) );
 
             hlr::tbb::dag::run( dag, acc );
         }// if

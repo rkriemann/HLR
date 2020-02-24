@@ -10,6 +10,7 @@
 
 #include "hlr/hpx/matrix.hh"
 #include "hlr/hpx/arith.hh"
+#include "hlr/hpx/arith_accu.hh"
 #include "hlr/hpx/dag.hh"
 
 namespace          impl      = hlr::hpx;

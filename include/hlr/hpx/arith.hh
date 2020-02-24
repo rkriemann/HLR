@@ -273,7 +273,13 @@ lu ( hpro::TMatrix *          A,
                         auto  A_il = BA->block( i, l );
                         auto  A_jl = BA->block( j, l );
                                        
-                        tb.run( [A_ji,A_il,A_jl,&acc] { multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc ); } );
+                        tb.run( [A_ji,A_il,A_jl,&acc]
+                                {
+                                    hlr::hpx::multiply< value_t >( value_t(-1),
+                                                                   hpro::apply_normal, *A_ji,
+                                                                   hpro::apply_normal, *A_il,
+                                                                   *A_jl, acc );
+                                } );
                     }// for
                 }// for
             } );

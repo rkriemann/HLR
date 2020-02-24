@@ -81,6 +81,7 @@ parse ( int argc, char ** argv )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
+        ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
         ;
 
     //
@@ -138,6 +139,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
+    if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
 
     if ( appl == "help" )
     {

@@ -16,6 +16,7 @@
 
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tools.hh"
+#include "hlr/utils/text.hh"
 
 namespace hlr
 {
