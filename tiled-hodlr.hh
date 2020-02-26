@@ -23,15 +23,15 @@ using namespace hlr;
 //
 template < typename problem_t >
 void
-mymain ( int, char ** )
+program_main ()
 {
     using value_t = typename problem_t::value_t;
     
     auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::hodlr::cluster( coord.get(), ntile );
-    auto  bct     = cluster::hodlr::blockcluster( ct.get(), ct.get() );
+    auto  ct      = cluster::hodlr::cluster( *coord, ntile );
+    auto  bct     = cluster::hodlr::blockcluster( *ct, *ct );
     
     if ( hpro::verbose( 3 ) )
     {

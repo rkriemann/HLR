@@ -200,7 +200,7 @@ public:
     {
         std::scoped_lock  lock( _mtx );
 
-        return _tiles.contains( is );
+        return _tiles.find( is ) != _tiles.end();
     }
 };
 

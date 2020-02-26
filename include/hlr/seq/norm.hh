@@ -137,9 +137,9 @@ norm_F ( const hpro::TMatrix &  A )
     else if ( is_dense( A ) )
     {
         if ( A.is_complex() )
-            return blas::normF( blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
+            return blas::normF( hpro::blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
         else
-            return blas::normF( blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
+            return blas::normF( hpro::blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
     }// if
     else
     {

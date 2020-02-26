@@ -61,7 +61,7 @@ setup_tiling ( const hpro::TCluster &  cl,
             {
                 setup_tiling( * son, tile_map );
 
-                if ( ! tile_map.contains( *son ) )
+                if ( tile_map.find( *son ) == tile_map.end() )
                     HLR_ERROR( "setup_tiling : son tiles missing" );
                 
                 if ( tile_map.at( *son ).size() == 0 )

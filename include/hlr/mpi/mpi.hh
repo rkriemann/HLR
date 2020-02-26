@@ -37,7 +37,7 @@ namespace mpi
 #define MPI_CHECK_RESULT( MPIFunc, Args )                               \
     {                                                                   \
         int _check_result = MPIFunc Args;                               \
-        assert(_check_result == MPI_SUCCESS);                           \
+        HLR_ASSERT(_check_result == MPI_SUCCESS);                       \
     }
 
 //
