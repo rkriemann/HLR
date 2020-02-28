@@ -55,7 +55,8 @@ PROGRAMS     = [ 'tlr',
                  'dag-gauss',
                  'dag-inv',
                  'dag-waz',
-                 'dag-hodlr' ]
+                 'dag-hodlr',
+                 'uniform' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq',

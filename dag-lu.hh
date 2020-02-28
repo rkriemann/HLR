@@ -51,7 +51,7 @@ program_main ()
             hpro::TPSBlockClusterVis  bc_vis;
         
             cl_vis.print( ct->root(), "ct" );
-            bc_vis.id( false ).adaptive_lw( true ).base_line_width( 8 ).print( bct->root(), "bct" );
+            bc_vis.id( false ).print( bct->root(), "bct" );
         }// if
     
         auto  coeff  = problem->coeff_func();
