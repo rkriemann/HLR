@@ -42,6 +42,8 @@ int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times
 string  ref        = "";           // reference matrix, algorithm, etc.
 auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
+string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
+string  adm        = "weak";       // admissibility (std,weak,hodlr)
 
 void
 parse ( int argc, char ** argv )
@@ -50,28 +52,41 @@ parse ( int argc, char ** argv )
     // define command line options
     //
 
-    options_description  opts( string( "usage: " ) + argv[0] + " [options]\n  where options include" );
+    options_description  opts( hlr::term::bold( "usage: " ) + argv[0] + " [options]\n\n" +
+                               "where " + hlr::term::italic( "options" ) + " include" );
+    options_description  gen_opts( hlr::term::bold( "General Options" ) );
+    options_description  app_opts( hlr::term::bold( "Application Options" ) );
+    options_description  ari_opts( hlr::term::bold( "Arithmetic Options" ) );
     variables_map        vm;
 
     // standard options
-    opts.add_options()
+    gen_opts.add_options()
         ( "help,h",                       ": print this help text" )
-        ( "ntile",       value<int>(),    ": set tile size" )
-        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
+        ( "threads,t",   value<int>(),    ": number of parallel threads" )
+        ( "verbosity,v", value<int>(),    ": verbosity level" )
+        ( "noredir",                      ": do not redirect output (MPI only)" )
+        ;
+
+    app_opts.add_options()
         ( "nprob,n",     value<int>(),    ": set problem size" )
-        ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
-        ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "matrix",      value<string>(), ": matrix file use" )
+        ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
+        ( "cluster",     value<string>(), ": clustering technique" )
+        ( "adm",         value<string>(), ": admissibility" )
+        ;
+
+    ari_opts.add_options()
+        ( "ntile",       value<int>(),    ": set tile size" )
+        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
+        ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
+        ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
         ( "tol",         value<double>(), ": tolerance for some algorithms" )
         ( "accu",                         ": use accumulator arithmetic" )
-        ( "threads,t",   value<int>(),    ": number of parallel threads" )
-        ( "verbosity,v", value<int>(),    ": verbosity level" )
-        ( "noredir",                      ": do not redirect output (MPI only)" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
         ( "lvl",                          ": do level-wise LU" )
@@ -81,9 +96,10 @@ parse ( int argc, char ** argv )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
-        ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
         ;
 
+    opts.add( gen_opts ).add( app_opts ).add( ari_opts );
+    
     //
     // parse command line options
     //
@@ -140,15 +156,18 @@ parse ( int argc, char ** argv )
     if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
+    if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
+    if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
 
     if ( appl == "help" )
     {
         std::cout << "Applications:" << std::endl
-                  << "  - logkernel  : 1D integral equation ∫_[0,1] log |x-y| dx;" << std::endl
-                  << "                 n defines number of DoFs" << std::endl
-                  << "  - materncov  : Matérn covariance over given number of spatial points;" << std::endl
-                  << "                 if grid is defined use grid points, otherwise n random points in 3D" << std::endl
-                  << "  - laplaceslp : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl;
+                  << "  - logkernel    : 1D integral equation ∫_[0,1] log |x-y| dx;" << std::endl
+                  << "                   n defines number of DoFs" << std::endl
+                  << "  - materncov    : Matérn covariance over given number of spatial points;" << std::endl
+                  << "                   if grid is defined use grid points, otherwise n random points in 3D" << std::endl
+                  << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
+                  << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -163,6 +182,27 @@ parse ( int argc, char ** argv )
                   << "Refinement level l is defined by appending \"-l\", e.g. sphere-3" << std::endl
                   << std::endl
                   << "If grid is not an internal grid, it is assumed to be a file name" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( cluster == "help" )
+    {
+        std::cout << "Clustering Techniques:" << std::endl
+                  << "  - tlr/blr : flat clustering, i.e., without hierarchy" << std::endl
+                  << "  - mblr    : MBLR clustering with <nlvl> level" << std::endl
+                  << "  - tileh   : Tile-H / LatticeH for first level and BSP for rest" << std::endl
+                  << "  - bsp/h   : binary space partitioning" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( adm == "help" )
+    {
+        std::cout << "Clustering Techniques:" << std::endl
+                  << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
+                  << "  - weak          : weak geometric admissibility" << std::endl
+                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl;
 
         std::exit( 0 );
     }// if

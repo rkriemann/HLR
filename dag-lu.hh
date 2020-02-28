@@ -42,8 +42,8 @@ program_main ()
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::mblr::cluster( *coord, ntile, nlvl );
-        auto  bct     = cluster::tlr::blockcluster( *ct, *ct );
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
     
         if ( hpro::verbose( 3 ) )
         {
