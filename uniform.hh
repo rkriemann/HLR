@@ -65,9 +65,9 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
     
-    std::cout << term::bullet << term::bold << "H² conversion" << std::endl;
+    std::cout << term::bullet << term::bold << "H² conversion" << term::reset << std::endl;
 
-    std::cout << "  " << term::bullet << "cluster bases" << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "build cluster bases" << term::reset << std::endl;
     
     hpro::THClusterBasisBuilder< value_t >  bbuilder;
 
@@ -87,7 +87,7 @@ program_main ()
         cbvis.print( rowcb.get(), "rowcb.eps" );
     }// if
 
-    std::cout << "  " << term::bullet << "convert matrix" << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
 
     tic = timer::now();
     

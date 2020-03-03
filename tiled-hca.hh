@@ -53,8 +53,8 @@ program_main ()
 
     std::cout << "    dims = " << coord->ncoord() << " × " << coord->ncoord() << std::endl;
     
-    auto  ct      = cluster::h::cluster( *coord, ntile );
-    auto  bct     = cluster::h::blockcluster( *ct, *ct );
+    auto  ct      = gen_ct( *coord );
+    auto  bct     = gen_bct( *ct, *ct );
     
     if ( verbose( 3 ) )
     {
