@@ -155,24 +155,34 @@ verbose ( const int  lvl )
 std::unique_ptr< hpro::TClusterTree >
 gen_ct ( hpro::TCoordinate &  coord )
 {
-    if (( hlr::cmdline::cluster == "tlr" ) || ( hlr::cmdline::cluster == "blr" ))
+    using  hlr::cmdline::cluster;
+    
+    if (( cluster == "tlr" ) || ( cluster == "blr" ))
     {
         return hlr::cluster::tlr::cluster( coord, hlr::cmdline::ntile );
     }// if
-    else if ( hlr::cmdline::cluster == "mblr" )
+    else if (( cluster == "mblr" ) ||
+             (( cluster.size() >= 6 ) && ( cluster.substr( 0, 5 ) == "mblr-" )))
     {
+        if ( cluster.size() >= 6 )
+            hlr::cmdline::nlvl = std::stoi( cluster.substr( 5, string::npos ) );
+            
         return hlr::cluster::mblr::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
-    else if ( hlr::cmdline::cluster == "tileh" )
+    else if (( cluster == "tileh" ) ||
+             (( cluster.size() >= 7 ) && ( cluster.substr( 0, 6 ) == "tileh-" )))
     {
+        if ( cluster.size() >= 7 )
+            hlr::cmdline::nlvl = std::stoi( cluster.substr( 6, string::npos ) );
+        
         return hlr::cluster::tileh::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
-    else if (( hlr::cmdline::cluster == "bsp" ) || ( hlr::cmdline::cluster == "h" ))
+    else if (( cluster == "bsp" ) || ( cluster == "h" ))
     {
         return hlr::cluster::h::cluster( coord, hlr::cmdline::ntile );
     }// if
     else
-        HLR_ERROR( "unsupported clustering : " + hlr::cmdline::cluster );
+        HLR_ERROR( "unsupported clustering : " + cluster );
 }
 
 std::unique_ptr< hpro::TBlockClusterTree >

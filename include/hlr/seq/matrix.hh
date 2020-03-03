@@ -91,6 +91,7 @@ build ( const hpro::TBlockCluster *  bct,
         B->adjust_value_type();
     }// else
 
+    M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 

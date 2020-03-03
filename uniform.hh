@@ -27,38 +27,24 @@ program_main ()
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< hpro::TMatrix >();
 
-    if ( matrixfile == "" )
-    {
-        auto  problem = gen_problem< problem_t >();
-        auto  coord   = problem->coordinates();
-        auto  ct      = gen_ct( *coord );
-        auto  bct     = gen_bct( *ct, *ct );
+    auto  problem = gen_problem< problem_t >();
+    auto  coord   = problem->coordinates();
+    auto  ct      = gen_ct( *coord );
+    auto  bct     = gen_bct( *ct, *ct );
     
-        if ( hpro::verbose( 3 ) )
-        {
-            hpro::TPSBlockClusterVis  bc_vis;
+    if ( hpro::verbose( 3 ) )
+    {
+        hpro::TPSBlockClusterVis  bc_vis;
         
-            bc_vis.id( false ).print( bct->root(), "bct" );
-        }// if
-    
-        auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
-
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        print_ps( ct->root(), "ct" );
+        bc_vis.id( false ).print( bct->root(), "bct" );
     }// if
-    else
-    {
-        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
-                  << "    matrix = " << matrixfile
-                  << std::endl;
-
-        A = hpro::read_matrix( matrixfile );
-
-        // for spreading memory usage
-        if ( docopy )
-            A = impl::matrix::realloc( A.release() );
-    }// else
+    
+    auto  coeff  = problem->coeff_func();
+    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
+    
+    A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
 
     auto  toc    = timer::since( tic );
     
@@ -81,13 +67,13 @@ program_main ()
     
     std::cout << term::bullet << term::bold << "H² conversion" << std::endl;
 
-    std::cout << "    " << term::bullet << "cluster bases" << std::endl;
+    std::cout << "  " << term::bullet << "cluster bases" << std::endl;
     
     hpro::THClusterBasisBuilder< value_t >  bbuilder;
 
     tic = timer::now();
     
-    auto  [ rowcb, colcb ] = bbuilder.build( A.get(), acc );
+    auto  [ rowcb, colcb ] = bbuilder.build( ct->root(), ct->root(), A.get(), acc );
 
     toc = timer::since( tic );
 
@@ -101,7 +87,7 @@ program_main ()
         cbvis.print( rowcb.get(), "rowcb.eps" );
     }// if
 
-    std::cout << "    " << term::bullet << "convert matrix" << std::endl;
+    std::cout << "  " << term::bullet << "convert matrix" << std::endl;
 
     tic = timer::now();
     
