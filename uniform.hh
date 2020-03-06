@@ -9,6 +9,8 @@
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/io/TClusterBasisVis.hh>
 
+#include <hlr/matrix/cluster_basis.hh>
+
 #include "common.hh"
 #include "common-main.hh"
 
@@ -58,6 +60,27 @@ program_main ()
         
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // conversion to H²
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    {
+        std::cout << term::bullet << term::bold << "H² conversion" << term::reset << std::endl;
+
+        std::cout << "  " << term::bullet << term::bold << "build cluster bases" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb ] = matrix::construct_from_H< value_t >( *ct->root(), *ct->root(), *A, acc );
+
+        toc = timer::since( tic );
+
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size() ) << " / " << format_mem( colcb->byte_size() ) << std::endl;
+    }
 
     //////////////////////////////////////////////////////////////////////
     //
