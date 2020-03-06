@@ -18,7 +18,6 @@ namespace hlr
 {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // solve X U = M

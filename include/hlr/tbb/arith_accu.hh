@@ -20,13 +20,13 @@
 #include <hpro/algebra/mat_conv.hh>
 
 #include "hlr/utils/tensor.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/matrix/restrict.hh"
 
 namespace hlr { namespace tbb { namespace accu {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 

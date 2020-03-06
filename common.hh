@@ -28,7 +28,7 @@ using boost::format;
 #include <hlr/cluster/h.hh>
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
+//namespace blas = HLIB::BLAS;
 
 #include "cmdline.hh"
 #include "gen_problem.hh"

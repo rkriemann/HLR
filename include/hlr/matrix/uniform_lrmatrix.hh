@@ -15,12 +15,15 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/utils/checks.hh>
+#include <hlr/utils/log.hh>
 
 namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
+//namespace blas = hpro::BLAS;
+
+using indexset = hpro::TIndexSet;
 
 using hpro::real;
 using hpro::complex;
@@ -54,11 +57,11 @@ private:
     
     // low-rank factors in uniform storage:
     // mapping of (sub-) index set to tile
-    const cluster_basis< value_t > &  _row_cb;
-    const cluster_basis< value_t > &  _col_cb;
+    const cluster_basis< value_t > *  _row_cb;
+    const cluster_basis< value_t > *  _col_cb;
 
     // local coefficient matrix
-    blas::matrix< value_t >           _S;
+    blas::Matrix< value_t >           _S;
     
 public:
     //
@@ -85,15 +88,14 @@ public:
                        const indexset                    acol_is,
                        const cluster_basis< value_t > &  arow_cb,
                        const cluster_basis< value_t > &  acol_cb,
-                       blas::matrix< value_t > &&        aS )
+                       hlr::blas::matrix< value_t > &&   aS )
             : TMatrix( hpro::value_type< value_t >::value )
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _row_cb( arow_cb )
-            , _col_cb( acol_cb )
-            , _S( aS )
+            , _row_cb( &arow_cb )
+            , _col_cb( &acol_cb )
+            , _S( std::move( aS ) )
     {
-        HLR_ASSERT( ! is_null_any( _row_cb, _col_cb ) );
         set_ofs( _row_is.first(), _col_is.first() );
     }
 
@@ -107,28 +109,28 @@ public:
 
     uint                              rank () const { return std::min( _S.nrows(), _S.ncols() ); }
 
-    cluster_basis< value_t > &        row_cb ()       { return _row_cb; }
-    const cluster_basis< value_t > &  row_cb () const { return _row_cb; }
+    cluster_basis< value_t > &        row_cb ()       { return *_row_cb; }
+    const cluster_basis< value_t > &  row_cb () const { return *_row_cb; }
 
-    cluster_basis< value_t > &        col_cb ()       { return _col_cb; }
-    const cluster_basis< value_t > &  col_cb () const { return _col_cb; }
+    cluster_basis< value_t > &        col_cb ()       { return *_col_cb; }
+    const cluster_basis< value_t > &  col_cb () const { return *_col_cb; }
 
     void
     set_cluster_bases ( const cluster_basis< value_t > &  arow_cb,
                         const cluster_basis< value_t > &  acol_cb )
     {
-        _row_cb = arowcb;
-        _col_cb = acolcb;
+        _row_cb = arow_cb;
+        _col_cb = acol_cb;
 
-        if (( _S.nrows() != _row_cb.rank() ) ||
-            ( _S.ncols() != _col_cb.rank() ))
-            _S = std::move( blas::Matrix< value_t >( _row_cb.rank(), _col_cb.rank() ) );
+        if (( _S.nrows() != _row_cb->rank() ) ||
+            ( _S.ncols() != _col_cb->rank() ))
+            _S = std::move( blas::Matrix< value_t >( _row_cb->rank(), _col_cb->rank() ) );
     }
 
     void
     set_coeff ( const blas::Matrix< value_t > &  aS )
     {
-        HLR_ASSERT(( aS.nrows() == _row_cb.rank() ) && ( aS.ncols() == _col_cb.rank() ));
+        HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
 
         blas::copy( aS, _S );
     }
@@ -136,7 +138,7 @@ public:
     void
     set_coeff ( blas::Matrix< value_t > &&  aS )
     {
-        HLR_ASSERT(( aS.nrows() == _row_cb.rank() ) && ( aS.ncols() == _col_cb.rank() ));
+        HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
 
         _S = std::move( aS );
     }
@@ -154,9 +156,6 @@ public:
     // use "op" versions from TMatrix
     using TMatrix::nrows;
     using TMatrix::ncols;
-    
-    // return rank of matrix
-    virtual uint    rank      () const { return std::min( _S.nrows(), _S.ncols() ); }
     
     // return true, if matrix is zero
     virtual bool    is_zero   () const { return ( rank() == 0 ); }
@@ -235,8 +234,6 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
                                        hpro::TVector *        vy,
                                        const hpro::matop_t    op ) const
 {
-    using  vector = blas::Vector< value_t >;
-        
     assert( vx->is_complex() == this->is_complex() );
     assert( vy->is_complex() == this->is_complex() );
     assert( vx->is() == this->col_is( op ) );
@@ -252,11 +249,9 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
     const auto  y = ptrcast(  vy, hpro::TScalarVector );
 
     // y := β·y
-    if ( beta != value_t(1) )
-        blas::scale( beta, hpro::blas_vec< value_t >( y ) );
+    if ( beta != real(1) )
+        blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
                      
-    vector  t( _rank );
-            
     if ( op == hpro::apply_normal )
     {
         //
@@ -264,16 +259,16 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         //
         
         // t := V^H x
-        auto  t = _row_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
+        auto  t = _col_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
 
         // s := S t
         auto  s = blas::mulvec( value_t(1), _S, t );
         
         // r := U s
-        auto  r = _col_cb->transform_backward( s );
+        auto  r = _row_cb->transform_backward( s );
 
         // y = y + r
-        blas::add( alpha, r, hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
     }// if
     else if ( op == hpro::apply_transposed )
     {
@@ -287,7 +282,7 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
 
         blas::conj( cx );
         
-        auto  t  = _col_cb->transform_forward( cx );
+        auto  t  = _row_cb->transform_forward( cx );
 
         blas::conj( t );
         
@@ -298,7 +293,7 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         auto  r = _col_cb->transform_backward( s );
 
         // y = y + r
-        blas::add( alpha, r, hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
     }// if
     else if ( op == hpro::apply_adjoint )
     {
@@ -308,16 +303,16 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         //
         
         // t := U^H x
-        auto  t = _col_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
+        auto  t = _row_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
 
         // s := S t
         auto  s = blas::mulvec( value_t(1), blas::adjoint(_S), t );
         
         // r := V s
-        auto  r = _row_cb->transform_backward( s );
+        auto  r = _col_cb->transform_backward( s );
 
         // y = y + r
-        blas::add( alpha, r, hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
     }// if
 }
 
@@ -338,12 +333,9 @@ template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
 uniform_lrmatrix< value_t >::copy () const
 {
-    auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is );
+    auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
 
     M->copy_struct_from( this );
-    M->_row_cb = _row_cb;
-    M->_col_cb = _col_cb;
-    M->_S      = std::move( _S.copy() );
     
     return M;
 }
@@ -411,7 +403,8 @@ uniform_lrmatrix< value_t >::byte_size () const
     size_t  size = hpro::TMatrix::byte_size();
 
     size += sizeof(_row_is) + sizeof(_col_is);
-    size += _row_cb->byte_size() + _col_cb->byte_size() + _S.byte_size();
+    size += sizeof(_row_cb) + sizeof(_col_cb);
+    size += sizeof(_S) + sizeof(value_t) * _S.nrows() * _S.ncols();
 
     return size;
 }

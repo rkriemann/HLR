@@ -5,6 +5,7 @@
 //
 
 #include "hlr/tbb/matrix.hh"
+#include "hlr/tbb/cluster_basis.hh"
 
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";

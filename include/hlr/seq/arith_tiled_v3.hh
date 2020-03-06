@@ -23,22 +23,12 @@ namespace hlr { namespace seq { namespace tiled3 {
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using HLIB::id_t;
 using HLIB::real;
 
-// dense matrix
-template < typename value_t >
-using  matrix   = HLIB::BLAS::Matrix< value_t >;
-
-// dense vector
-template < typename value_t >
-using  vector   = HLIB::BLAS::Vector< value_t >;
-
 // import matrix types
 using hlr::matrix::indexset;
-using hlr::matrix::range;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;

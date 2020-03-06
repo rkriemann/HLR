@@ -15,7 +15,6 @@ namespace hlr
 {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // compute C := C + α A·B

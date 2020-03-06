@@ -179,8 +179,8 @@ program_main ()
         // mat-vec benchmark
         //
 
-        blas::Vector< value_t >  x( M_hca->ncols() );
-        blas::Vector< value_t >  y( M_hca->nrows() );
+        blas::vector< value_t >  x( M_hca->ncols() );
+        blas::vector< value_t >  y( M_hca->nrows() );
 
         blas::fill( value_t(1), x );
             

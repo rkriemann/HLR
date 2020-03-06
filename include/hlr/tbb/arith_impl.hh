@@ -11,7 +11,6 @@
 namespace hlr { namespace tbb { namespace detail {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using indexset = hpro::TIndexSet;
 
@@ -32,8 +31,8 @@ constexpr size_t  CHUNK_SIZE = 64;
 template < typename value_t >
 void
 update ( const indexset &                 is,
-         const blas::Vector< value_t > &  t,
-         blas::Vector< value_t > &        y,
+         const blas::vector< value_t > &  t,
+         blas::vector< value_t > &        y,
          mutex_map_t &                    mtx_map )
 {
     const idx_t  ofs         = is.first();
@@ -45,8 +44,8 @@ update ( const indexset &                 is,
     while ( start_idx <= end_idx )
     {
         const indexset  chunk_is( start_idx, end_idx );
-        auto            t_i = blas::Vector< value_t >( t, chunk_is - ofs );
-        auto            y_i = blas::Vector< value_t >( y, chunk_is - ofs );
+        auto            t_i = blas::vector< value_t >( t, chunk_is - ofs );
+        auto            y_i = blas::vector< value_t >( y, chunk_is - ofs );
 
         {
             std::scoped_lock  lock( * mtx_map[ chunk ] );
@@ -68,8 +67,8 @@ void
 mul_vec_chunk ( const value_t                    alpha,
                 const hpro::matop_t              op_M,
                 const hpro::TMatrix &            M,
-                const blas::Vector< value_t > &  x,
-                blas::Vector< value_t > &        y,
+                const blas::vector< value_t > &  x,
+                blas::vector< value_t > &        y,
                 const size_t                     ofs_rows,
                 const size_t                     ofs_cols,
                 mutex_map_t &                    mtx_map )
@@ -107,7 +106,7 @@ mul_vec_chunk ( const value_t                    alpha,
         const auto  col_is = M.col_is( op_M );
         auto        x_is   = x( col_is - ofs_cols );
         auto        y_is   = y( row_is - ofs_rows );
-        auto        yt     = blas::Vector< value_t >( y_is.length() );
+        auto        yt     = blas::vector< value_t >( y_is.length() );
         
         if ( is_dense( M ) )
         {

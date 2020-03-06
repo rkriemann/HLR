@@ -17,6 +17,7 @@
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/tbb/matrix.hh"
@@ -24,20 +25,19 @@
 namespace hlr { namespace tbb { namespace tiled {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // split given range into <n> subsets
 //
 inline
-std::vector< blas::Range >
-split ( const blas::Range &  r,
+std::vector< blas::range >
+split ( const blas::range &  r,
         const size_t         n )
 {
     if ( n == 2 )
     {
-        const blas::Range  r0( r.first(), r.first() + r.size() / 2 - 1 );
-        const blas::Range  r1( r0.last() + 1, r.last() );
+        const blas::range  r0( r.first(), r.first() + r.size() / 2 - 1 );
+        const blas::range  r1( r0.last() + 1, r.last() );
 
         return { std::move(r0), std::move(r1) };
     }// if
@@ -51,9 +51,9 @@ split ( const blas::Range &  r,
 // compute T := A^H · B
 //
 template < typename value_t >
-blas::Matrix< value_t >
-dot ( const blas::Matrix< value_t > &  A,
-      const blas::Matrix< value_t > &  B,
+blas::matrix< value_t >
+dot ( const blas::matrix< value_t > &  A,
+      const blas::matrix< value_t > &  B,
       const size_t                     ntile )
 {
     assert( A.nrows() == B.nrows() );
@@ -62,13 +62,13 @@ dot ( const blas::Matrix< value_t > &  A,
     
     if ( A.nrows() > ntile )
     {
-        const auto                     R = split( blas::Range( 0, A.nrows()-1 ), 2 );
-        const blas::Matrix< value_t >  A0( A, R[0], blas::Range::all );
-        const blas::Matrix< value_t >  A1( A, R[1], blas::Range::all );
-        const blas::Matrix< value_t >  B0( B, R[0], blas::Range::all );
-        const blas::Matrix< value_t >  B1( B, R[1], blas::Range::all );
+        const auto                     R = split( blas::range( 0, A.nrows()-1 ), 2 );
+        const blas::matrix< value_t >  A0( A, R[0], blas::range::all );
+        const blas::matrix< value_t >  A1( A, R[1], blas::range::all );
+        const blas::matrix< value_t >  B0( B, R[0], blas::range::all );
+        const blas::matrix< value_t >  B1( B, R[1], blas::range::all );
 
-        blas::Matrix< value_t >  T0, T1;
+        blas::matrix< value_t >  T0, T1;
 
         ::tbb::parallel_invoke( [&,ntile] { T0 = std::move( dot( A0, B0, ntile ) ); },
                                 [&,ntile] { T1 = std::move( dot( A1, B1, ntile ) ); } );
@@ -89,10 +89,10 @@ dot ( const blas::Matrix< value_t > &  A,
 template < typename value_t >
 void
 tprod ( const value_t                    alpha,
-        const blas::Matrix< value_t > &  A,
-        const blas::Matrix< value_t > &  T,
+        const blas::matrix< value_t > &  A,
+        const blas::matrix< value_t > &  T,
         const value_t                    beta,
-        blas::Matrix< value_t > &        B,
+        blas::matrix< value_t > &        B,
         const size_t                     ntile )
 {
     assert( A.nrows() == B.nrows() );
@@ -103,11 +103,11 @@ tprod ( const value_t                    alpha,
     
     if ( A.ncols() > ntile )
     {
-        const auto                     R = split( blas::Range( 0, A.nrows()-1 ), 2 );
-        const blas::Matrix< value_t >  A0( A, R[0], blas::Range::all );
-        const blas::Matrix< value_t >  A1( A, R[1], blas::Range::all );
-        blas::Matrix< value_t >        B0( B, R[0], blas::Range::all );
-        blas::Matrix< value_t >        B1( B, R[1], blas::Range::all );
+        const auto                     R = split( blas::range( 0, A.nrows()-1 ), 2 );
+        const blas::matrix< value_t >  A0( A, R[0], blas::range::all );
+        const blas::matrix< value_t >  A1( A, R[1], blas::range::all );
+        blas::matrix< value_t >        B0( B, R[0], blas::range::all );
+        blas::matrix< value_t >        B1( B, R[1], blas::range::all );
 
         ::tbb::parallel_invoke( [&,ntile] { tprod( alpha, A0, T, beta, B0, ntile ); },
                                 [&,ntile] { tprod( alpha, A1, T, beta, B1, ntile ); } );
@@ -122,12 +122,12 @@ tprod ( const value_t                    alpha,
 // compute QR factorization of [αX·T,U]
 //
 template < typename value_t >
-std::pair< blas::Matrix< value_t >,
-           blas::Matrix< value_t > >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
 tsqr ( const value_t                 alpha,
-       const blas::Matrix< real > &  X,
-       const blas::Matrix< real > &  T,
-       const blas::Matrix< real > &  U,
+       const blas::matrix< real > &  X,
+       const blas::matrix< real > &  T,
+       const blas::matrix< real > &  U,
        const size_t                  ntile )
 {
     assert( X.nrows() == U.nrows() );
@@ -142,33 +142,33 @@ tsqr ( const value_t                 alpha,
         //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
         //
         
-        const auto                     rows = split( blas::Range( 0, X.nrows()-1 ), 2 );
-        const blas::Matrix< value_t >  X0( X, rows[0], blas::Range::all );
-        const blas::Matrix< value_t >  X1( X, rows[1], blas::Range::all );
-        const blas::Matrix< value_t >  U0( U, rows[0], blas::Range::all );
-        const blas::Matrix< value_t >  U1( U, rows[1], blas::Range::all );
+        const auto                     rows = split( blas::range( 0, X.nrows()-1 ), 2 );
+        const blas::matrix< value_t >  X0( X, rows[0], blas::range::all );
+        const blas::matrix< value_t >  X1( X, rows[1], blas::range::all );
+        const blas::matrix< value_t >  U0( U, rows[0], blas::range::all );
+        const blas::matrix< value_t >  U1( U, rows[1], blas::range::all );
 
-        blas::Matrix< value_t >  Q0, Q1;
-        blas::Matrix< value_t >  R0, R1;
+        blas::matrix< value_t >  Q0, Q1;
+        blas::matrix< value_t >  R0, R1;
         
         ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, T, U0, ntile ) ); },
                                 [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, T, U1, ntile ) ); } );
 
         // Q = | R0 |
         //     | R1 |
-        blas::Matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
-        blas::Matrix< value_t >  Q01_0( Q01, blas::Range(          0, R0.nrows()-1  ), blas::Range::all );
-        blas::Matrix< value_t >  Q01_1( Q01, blas::Range( R0.nrows(), Q01.nrows()-1 ), blas::Range::all );
-        blas::Matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        blas::matrix< value_t >  Q01_0( Q01, blas::range(          0, R0.nrows()-1  ), blas::range::all );
+        blas::matrix< value_t >  Q01_1( Q01, blas::range( R0.nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( R0, Q01_0 );
         blas::copy( R1, Q01_1 );
 
         blas::qr( Q01, R );
 
-        blas::Matrix< value_t >  Q( X.nrows(), Q01.ncols() );
-        blas::Matrix< value_t >  Q_0( Q, rows[0], blas::Range::all );
-        blas::Matrix< value_t >  Q_1( Q, rows[1], blas::Range::all );
+        blas::matrix< value_t >  Q( X.nrows(), Q01.ncols() );
+        blas::matrix< value_t >  Q_0( Q, rows[0], blas::range::all );
+        blas::matrix< value_t >  Q_1( Q, rows[1], blas::range::all );
 
         ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
                                 [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
@@ -178,14 +178,14 @@ tsqr ( const value_t                 alpha,
     else
     {
         auto                     W = blas::prod( alpha, X, T );
-        blas::Matrix< value_t >  WU( W.nrows(), W.ncols() + U.ncols () );
-        blas::Matrix< value_t >  WU_W( WU, blas::Range::all, blas::Range( 0, W.ncols()-1 ) );
-        blas::Matrix< value_t >  WU_U( WU, blas::Range::all, blas::Range( W.ncols(), WU.ncols()-1 ) );
+        blas::matrix< value_t >  WU( W.nrows(), W.ncols() + U.ncols () );
+        blas::matrix< value_t >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        blas::matrix< value_t >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         blas::copy( W, WU_W );
         blas::copy( U, WU_U );
 
-        blas::Matrix< value_t >  R;
+        blas::matrix< value_t >  R;
         
         blas::qr( WU, R );
 
@@ -197,11 +197,11 @@ tsqr ( const value_t                 alpha,
 // compute QR factorization of [αX,U]
 //
 template < typename value_t >
-std::pair< blas::Matrix< value_t >,
-           blas::Matrix< value_t > >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
 tsqr ( const value_t                 alpha,
-       const blas::Matrix< real > &  X,
-       const blas::Matrix< real > &  U,
+       const blas::matrix< real > &  X,
+       const blas::matrix< real > &  U,
        const size_t                  ntile )
 {
     assert( X.nrows() == U.nrows() );
@@ -215,33 +215,33 @@ tsqr ( const value_t                 alpha,
         //     | Q1 R1 |   |   Q1 | | R1 |   |   Q1 | 
         //
         
-        const auto                     rows = split( blas::Range( 0, X.nrows()-1 ), 2 );
-        const blas::Matrix< value_t >  X0( X, rows[0], blas::Range::all );
-        const blas::Matrix< value_t >  X1( X, rows[1], blas::Range::all );
-        const blas::Matrix< value_t >  U0( U, rows[0], blas::Range::all );
-        const blas::Matrix< value_t >  U1( U, rows[1], blas::Range::all );
+        const auto                     rows = split( blas::range( 0, X.nrows()-1 ), 2 );
+        const blas::matrix< value_t >  X0( X, rows[0], blas::range::all );
+        const blas::matrix< value_t >  X1( X, rows[1], blas::range::all );
+        const blas::matrix< value_t >  U0( U, rows[0], blas::range::all );
+        const blas::matrix< value_t >  U1( U, rows[1], blas::range::all );
 
-        blas::Matrix< value_t >  Q0, Q1;
-        blas::Matrix< value_t >  R0, R1;
+        blas::matrix< value_t >  Q0, Q1;
+        blas::matrix< value_t >  R0, R1;
         
         ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha, X0, U0, ntile ) ); },
                                 [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( alpha, X1, U1, ntile ) ); } );
 
         // Q = | R0 |
         //     | R1 |
-        blas::Matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
-        blas::Matrix< value_t >  Q01_0( Q01, blas::Range(          0, R0.nrows()-1  ), blas::Range::all );
-        blas::Matrix< value_t >  Q01_1( Q01, blas::Range( R0.nrows(), Q01.nrows()-1 ), blas::Range::all );
-        blas::Matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        blas::matrix< value_t >  Q01_0( Q01, blas::range(          0, R0.nrows()-1  ), blas::range::all );
+        blas::matrix< value_t >  Q01_1( Q01, blas::range( R0.nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( R0, Q01_0 );
         blas::copy( R1, Q01_1 );
 
         blas::qr( Q01, R );
 
-        blas::Matrix< value_t >  Q( X.nrows(), Q01.ncols() );
-        blas::Matrix< value_t >  Q_0( Q, rows[0], blas::Range::all );
-        blas::Matrix< value_t >  Q_1( Q, rows[1], blas::Range::all );
+        blas::matrix< value_t >  Q( X.nrows(), Q01.ncols() );
+        blas::matrix< value_t >  Q_0( Q, rows[0], blas::range::all );
+        blas::matrix< value_t >  Q_1( Q, rows[1], blas::range::all );
 
         ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Q01_0, value_t(0), Q_0, ntile ); },
                                 [&,ntile] { tprod( value_t(1), Q1, Q01_1, value_t(0), Q_1, ntile ); } );
@@ -250,14 +250,14 @@ tsqr ( const value_t                 alpha,
     }// if
     else
     {
-        blas::Matrix< value_t >  XU( X.nrows(), X.ncols() + U.ncols () );
-        blas::Matrix< value_t >  XU_X( XU, blas::Range::all, blas::Range( 0, X.ncols()-1 ) );
-        blas::Matrix< value_t >  XU_U( XU, blas::Range::all, blas::Range( X.ncols(), XU.ncols()-1 ) );
+        blas::matrix< value_t >  XU( X.nrows(), X.ncols() + U.ncols () );
+        blas::matrix< value_t >  XU_X( XU, blas::range::all, blas::range( 0, X.ncols()-1 ) );
+        blas::matrix< value_t >  XU_U( XU, blas::range::all, blas::range( X.ncols(), XU.ncols()-1 ) );
 
         blas::copy( X, XU_X );
         blas::copy( U, XU_U );
 
-        blas::Matrix< value_t >  R;
+        blas::matrix< value_t >  R;
         
         blas::qr( XU, R );
 
@@ -269,14 +269,14 @@ tsqr ( const value_t                 alpha,
 // truncate α X T Y^H + U V^H
 //
 template < typename value_t >
-std::pair< blas::Matrix< value_t >,
-           blas::Matrix< value_t > >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
 truncate ( const value_t                 alpha,
-           const blas::Matrix< real > &  X,
-           const blas::Matrix< real > &  T,
-           const blas::Matrix< real > &  Y,
-           const blas::Matrix< real > &  U,
-           const blas::Matrix< real > &  V,
+           const blas::matrix< real > &  X,
+           const blas::matrix< real > &  T,
+           const blas::matrix< real > &  Y,
+           const blas::matrix< real > &  U,
+           const blas::matrix< real > &  V,
            const hpro::TTruncAcc &       acc,
            const size_t                  ntile )
 {
@@ -301,28 +301,28 @@ truncate ( const value_t                 alpha,
     }// if
     else
     {
-        blas::Matrix< value_t >  Q0, Q1;
-        blas::Matrix< value_t >  R0, R1;
+        blas::matrix< value_t >  Q0, Q1;
+        blas::matrix< value_t >  R0, R1;
         
         ::tbb::parallel_invoke( [&,ntile] { std::tie( Q0, R0 ) = std::move( tsqr( alpha,      X, T, U, ntile ) ); },
                                 [&,ntile] { std::tie( Q1, R1 ) = std::move( tsqr( value_t(1), Y,    V, ntile ) ); } );
 
         auto                     R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
         auto                     Us = std::move( R );
-        blas::Matrix< value_t >  Vs;
-        blas::Vector< value_t >  Ss;
+        blas::matrix< value_t >  Vs;
+        blas::vector< value_t >  Ss;
         
         blas::svd( Us, Ss, Vs );
         
         auto  k  = acc.trunc_rank( Ss );
 
-        blas::Matrix< value_t >  Usk( Us, blas::Range::all, blas::Range( 0, k-1 ) );
-        blas::Matrix< value_t >  Vsk( Vs, blas::Range::all, blas::Range( 0, k-1 ) );
+        blas::matrix< value_t >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+        blas::matrix< value_t >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
         blas::prod_diag( Usk, Ss, k );
 
-        blas::Matrix< value_t >  Uk( U.nrows(), k );
-        blas::Matrix< value_t >  Vk( V.nrows(), k );
+        blas::matrix< value_t >  Uk( U.nrows(), k );
+        blas::matrix< value_t >  Vk( V.nrows(), k );
 
         ::tbb::parallel_invoke( [&,ntile] { tprod( value_t(1), Q0, Usk, value_t(0), Uk, ntile ); },
                                 [&,ntile] { tprod( value_t(1), Q1, Vsk, value_t(0), Vk, ntile ); } );
@@ -334,17 +334,17 @@ truncate ( const value_t                 alpha,
 namespace hodlr
 {
 
-template < typename value_t >       blas::Matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t >       blas::Matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t > const blas::Matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t > const blas::Matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t >       blas::Matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t >       blas::Matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
 
-template < typename value_t > const blas::Matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t > const blas::Matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -359,7 +359,7 @@ template < typename value_t > const blas::Matrix< value_t > &  mat_V ( const hpr
 template < typename value_t >
 void
 trsml ( const hpro::TMatrix *      L,
-        blas::Matrix< value_t > &  X,
+        blas::matrix< value_t > &  X,
         const size_t               ntile )
 {
     HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
@@ -371,8 +371,8 @@ trsml ( const hpro::TMatrix *      L,
         auto  L10 = cptrcast( BL->block( 1, 0 ), hpro::TRkMatrix );
         auto  L11 = BL->block( 1, 1 );
 
-        blas::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), blas::Range::all );
+        blas::matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), blas::range::all );
             
         hodlr::trsml( L00, X0, ntile );
 
@@ -395,9 +395,9 @@ trsml ( const hpro::TMatrix *      L,
 //
 template < typename value_t >
 void
-addlr ( const blas::Matrix< value_t > &  U,
-        const blas::Matrix< value_t > &  T,
-        const blas::Matrix< value_t > &  V,
+addlr ( const blas::matrix< value_t > &  U,
+        const blas::matrix< value_t > &  T,
+        const blas::matrix< value_t > &  V,
         hpro::TMatrix *                  A,
         const hpro::TTruncAcc &          acc,
         const size_t                     ntile )
@@ -412,10 +412,10 @@ addlr ( const blas::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         ::tbb::parallel_invoke(
             [&,ntile]
@@ -458,7 +458,7 @@ addlr ( const blas::Matrix< value_t > &  U,
 template < typename value_t >
 void
 trsmuh ( const hpro::TMatrix *      U,
-         blas::Matrix< value_t > &  X,
+         blas::matrix< value_t > &  X,
          const size_t               ntile )
 {
     HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
@@ -470,8 +470,8 @@ trsmuh ( const hpro::TMatrix *      U,
         auto  U01 = cptrcast( BU->block( 0, 1 ), hpro::TRkMatrix );
         auto  U11 = BU->block( 1, 1 );
 
-        blas::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), blas::range::all );
             
         trsmuh( U00, X0, ntile );
 
@@ -485,7 +485,7 @@ trsmuh ( const hpro::TMatrix *      U,
     {
         auto  DU = cptrcast( U, hpro::TDenseMatrix );
         
-        blas::Matrix< value_t >  Y( X, hpro::copy_value );
+        blas::matrix< value_t >  Y( X, hpro::copy_value );
 
         blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X );
     }// else

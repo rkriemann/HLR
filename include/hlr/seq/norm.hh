@@ -11,6 +11,7 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/blas/Algebra.hh>
 
+#include "hlr/arith/blas.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
@@ -19,7 +20,6 @@
 namespace hlr { namespace seq { namespace norm {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // return Frobenius norm of A, e.g. |A|_F

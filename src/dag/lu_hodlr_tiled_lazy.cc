@@ -28,24 +28,14 @@ namespace hlr { namespace dag {
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
 using hpro::id_t;
 using hpro::real;
 
-// dense matrix
-template < typename value_t >
-using  matrix   = blas::Matrix< value_t >;
-
-// dense vector
-template < typename value_t >
-using  vector   = blas::Vector< value_t >;
-
 // import matrix types
 using hlr::matrix::indexset;
-using hlr::matrix::range;
 using hlr::matrix::block_indexset;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
@@ -151,7 +141,7 @@ struct matrix_info
 };
 
 template <>
-matrix_info< matrix< real > >::~matrix_info ()
+matrix_info< blas::matrix< real > >::~matrix_info ()
 {}
 
 template <>
@@ -159,7 +149,7 @@ matrix_info< tile_storage< real > * >::~matrix_info ()
 {}
 
 template <>
-matrix_info< std::shared_ptr< matrix< real > > >::~matrix_info ()
+matrix_info< std::shared_ptr< blas::matrix< real > > >::~matrix_info ()
 {
 //    std::cout << "matrix : " << data.get() << ", #" << data.use_count() << std::endl;
 }
@@ -180,7 +170,7 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const inde
 {}
 
 template <>
-matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr< matrix< real > >  adata )
+matrix_info< std::shared_ptr< blas::matrix< real > > >::matrix_info ( std::shared_ptr< blas::matrix< real > >  adata )
         : name( id_t(adata.get()) )
         , id( -1  )
         , is( IS_ONE )
@@ -204,15 +194,15 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::mem_block () const
 
 template <>
 const mem_block_t
-matrix_info< std::shared_ptr< matrix< real > > >::mem_block () const
+matrix_info< std::shared_ptr< blas::matrix< real > > >::mem_block () const
 {
     return { id_t(data.get()), block_is() };
 }
 
 
-using dense_matrix        = matrix_info< matrix< real > >;
+using dense_matrix        = matrix_info< blas::matrix< real > >;
 using tiled_matrix        = matrix_info< tile_storage< real > * >;
-using shared_matrix       = matrix_info< std::shared_ptr< matrix< real > > >;
+using shared_matrix       = matrix_info< std::shared_ptr< blas::matrix< real > > >;
 using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< real > > >;
 
 //
@@ -822,7 +812,7 @@ struct tsqr_node : public node
                 const size_t         antile )
             : alpha( aalpha )
             , X( aX )
-            , T( shared_matrix( NAME_NONE, std::shared_ptr< matrix< real > >() ) ) // T = 0
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< real > >() ) ) // T = 0
             , U( aU )
             , Q( aQ )
             , R( aR )
@@ -881,7 +871,7 @@ struct tsqr1_node : public node
                  const size_t         antile )
             : alpha( aalpha )
             , X( aX )
-            , T( shared_matrix( NAME_NONE, std::shared_ptr< matrix< real > >() ) ) // T = 0
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< real > >() ) ) // T = 0
             , Q( aQ )
             , R( aR )
             , ntile( antile )
@@ -1145,7 +1135,7 @@ lu_node::refine_ ( const size_t  tile_size )
             solve_01->after( upd_01 );
         }// if
 
-        auto  T        = std::make_shared< matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
                                                    tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
                                                    shared_matrix( T ),
@@ -1211,7 +1201,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( is0, X ),
                                                      tiled_matrix( is0, M ),
                                                      update_map, ntile );
-        auto  T        = std::make_shared< matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_U, U01->id(), U01->row_is(), & U01->U() ),
                                                    tiled_matrix( is0, X ),
                                                    shared_matrix( T ),
@@ -1278,7 +1268,7 @@ trsml_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( is0, X ),
                                                      tiled_matrix( is0, M ),
                                                      update_map, ntile );
-        auto  T        = std::make_shared< matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< real > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, L10->id(), L10->col_is(), & L10->V() ),
                                                    tiled_matrix( is0, X ),
                                                    shared_matrix( T ),
@@ -1330,8 +1320,8 @@ dot_node::refine_ ( const size_t  tile_size )
         const auto  sis_A = split( A.is, 2 );
         const auto  sis_B = split( B.is, 2 );
 
-        auto  T0     = std::make_shared< matrix< real > >();
-        auto  T1     = std::make_shared< matrix< real > >();
+        auto  T0     = std::make_shared< blas::matrix< real > >();
+        auto  T1     = std::make_shared< blas::matrix< real > >();
         auto  tsmul0 = g.alloc_node< dot_node  >( tiled_matrix( sis_A[0], A ),
                                                   tiled_matrix( sis_B[0], B ),
                                                   shared_matrix( T0 ),
@@ -1524,7 +1514,7 @@ tadd_node::run_ ( const TTruncAcc & )
     assert(( T0.data->nrows() == T1.data->nrows() ) && ( T0.data->ncols() == T1.data->ncols() ));
     
     if (( T.data->nrows() != T0.data->nrows() ) || ( T.data->ncols() != T0.data->ncols() ))
-        *(T.data) = matrix< real >( T0.data->nrows(), T0.data->ncols() );
+        *(T.data) = blas::matrix< real >( T0.data->nrows(), T0.data->ncols() );
     
     blas::add( real(1), *(T0.data), *(T.data) );
     blas::add( real(1), *(T1.data), *(T.data) );
@@ -1547,9 +1537,9 @@ truncate_node::refine_ ( const size_t )
     assert( Y.is == V.is );
 
     auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
     auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr_node( alpha,   X, T, U, Q0, R0, ntile );
@@ -1558,8 +1548,8 @@ truncate_node::refine_ ( const size_t )
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
@@ -1590,9 +1580,9 @@ truncate2_node::refine_ ( const size_t )
     assert( V1.is == V.is );
 
     auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
     auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R2 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr_node( real(1), U1, U2, Q1, R1, ntile );
@@ -1601,8 +1591,8 @@ truncate2_node::refine_ ( const size_t )
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
     auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
 
     svd->after( qr_U, qr_V );
@@ -1632,9 +1622,9 @@ truncate3_node::refine_ ( const size_t )
     assert( V1.is == V.is );
 
     auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
     auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R2 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr_node( real(1), U1, T1, U2, Q1, R1, ntile ); // TODO: check if order is correct
@@ -1643,8 +1633,8 @@ truncate3_node::refine_ ( const size_t )
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
     auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
 
     svd->after( qr_U, qr_V );
@@ -1669,9 +1659,9 @@ truncate4_node::refine_ ( const size_t )
     local_graph  g;
 
     auto  Q0 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R0 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
     auto  Q1 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< matrix< real > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr1_node( real(1), U1, T1, Q0, R0, ntile );
@@ -1680,8 +1670,8 @@ truncate4_node::refine_ ( const size_t )
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
@@ -1710,9 +1700,9 @@ truncate5_node::refine_ ( const size_t )
     assert( Y.is == V.is );
 
     auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
     auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(             std::make_shared< matrix< real > >() );
+    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr_node( real(1), X, U, Q0, R0, ntile );
@@ -1721,8 +1711,8 @@ truncate5_node::refine_ ( const size_t )
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
@@ -1778,8 +1768,8 @@ tsqr_node< matrixX_t, matrixU_t >::refine_ ( const size_t  tile_size )
         const auto  sis_Q = split( Q.is, 2 );
         auto        Q0    = matrix_info( sis_Q[0], Q );
         auto        Q1    = matrix_info( sis_Q[1], Q );
-        auto        R0    = matrix_info( std::make_shared< matrix< real > >() );
-        auto        R1    = matrix_info( std::make_shared< matrix< real > >() );
+        auto        R0    = matrix_info( std::make_shared< blas::matrix< real > >() );
+        auto        R1    = matrix_info( std::make_shared< blas::matrix< real > >() );
 
         // std::cout << "R0 = " << R0.data.get() << std::endl;
         // std::cout << "R1 = " << R1.data.get() << std::endl;
@@ -1831,9 +1821,9 @@ tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
 
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
-        matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
-        matrix< real >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
-        matrix< real >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
+        blas::matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
+        blas::matrix< real >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
+        blas::matrix< real >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
 
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
@@ -1861,9 +1851,9 @@ tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
         auto            W    = blas::prod( alpha, X_is, *(T.data) );
-        matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
-        matrix< real >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
-        matrix< real >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
+        blas::matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
+        blas::matrix< real >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        blas::matrix< real >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
@@ -1894,8 +1884,8 @@ tsqr1_node< matrixX_t >::refine_ ( const size_t  tile_size )
         const auto  sis_Q = split( Q.is, 2 );
         auto        Q0    = matrix_info( sis_Q[0], Q );
         auto        Q1    = matrix_info( sis_Q[1], Q );
-        auto        R0    = matrix_info( std::make_shared< matrix< real > >() );
-        auto        R1    = matrix_info( std::make_shared< matrix< real > >() );
+        auto        R0    = matrix_info( std::make_shared< blas::matrix< real > >() );
+        auto        R1    = matrix_info( std::make_shared< blas::matrix< real > >() );
 
         // std::cout << "R0 = " << R0.data.get() << std::endl;
         // std::cout << "R1 = " << R1.data.get() << std::endl;
@@ -1968,9 +1958,9 @@ qr_node::run_ ( const TTruncAcc & )
 {
     // Q = | R0 |
     //     | R1 |
-    matrix< real >  Q(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
-    matrix< real >  Q_0( Q, range(                0, R0.data->nrows()-1 ), range::all );
-    matrix< real >  Q_1( Q, range( R0.data->nrows(), Q.nrows()-1        ), range::all );
+    blas::matrix< real >  Q(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
+    blas::matrix< real >  Q_0( Q, blas::range(                0, R0.data->nrows()-1 ), blas::range::all );
+    blas::matrix< real >  Q_1( Q, blas::range( R0.data->nrows(), Q.nrows()-1        ), blas::range::all );
         
     blas::copy( *(R0.data), Q_0 );
     blas::copy( *(R1.data), Q_1 );
@@ -1995,8 +1985,8 @@ void
 svd_node::run_ ( const TTruncAcc &  acc )
 {
     auto            Us = blas::prod( real(1), *(R0.data), blas::adjoint( *(R1.data) ) );
-    matrix< real >  Vs;
-    vector< real >  Ss;
+    blas::matrix< real >  Vs;
+    blas::vector< real >  Ss;
         
     blas::svd( Us, Ss, Vs );
         
@@ -2005,13 +1995,13 @@ svd_node::run_ ( const TTruncAcc &  acc )
     // for ( size_t  i = 0; i < k; ++i )
     //     std::cout << Ss(i) << std::endl;
     
-    matrix< real >  Usk( Us, range::all, range( 0, k-1 ) );
-    matrix< real >  Vsk( Vs, range::all, range( 0, k-1 ) );
+    blas::matrix< real >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+    blas::matrix< real >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
     blas::prod_diag( Usk, Ss, k );
 
-    *(Uk.data) = std::move( matrix< real >( Usk.nrows(), Usk.ncols() ) );
-    *(Vk.data) = std::move( matrix< real >( Vsk.nrows(), Vsk.ncols() ) );
+    *(Uk.data) = std::move( blas::matrix< real >( Usk.nrows(), Usk.ncols() ) );
+    *(Vk.data) = std::move( blas::matrix< real >( Vsk.nrows(), Vsk.ncols() ) );
 
     blas::copy( Usk, *(Uk.data) );
     blas::copy( Vsk, *(Vk.data) );

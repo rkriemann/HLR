@@ -15,6 +15,7 @@
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/matrix.hh"
@@ -24,22 +25,12 @@ namespace hlr { namespace seq { namespace tiled2 {
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // cluster
-using  cluster  = hpro::TCluster;
-
-// dense matrix
-template < typename value_t >
-using  matrix   = HLIB::BLAS::Matrix< value_t >;
-
-// dense vector
-template < typename value_t >
-using  vector   = HLIB::BLAS::Vector< value_t >;
+using  cluster = hpro::TCluster;
 
 // import matrix/vector types
 using hlr::matrix::indexset;
-using hlr::matrix::range;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
@@ -94,7 +85,7 @@ split ( const indexset &  is,
 // compute T := A^H · B where A, B ∈ K^{is × k}
 //
 template < typename value_t >
-matrix< value_t >
+blas::matrix< value_t >
 dot ( const indexset &                 is,
       const tile_storage< value_t > &  A,
       const tile_storage< value_t > &  B,
@@ -128,7 +119,7 @@ void
 tprod ( const indexset &                 is,
         const value_t                    alpha,
         const tile_storage< value_t > &  A,
-        const matrix< value_t > &        T,
+        const blas::matrix< value_t > &  T,
         const value_t                    beta,
         tile_storage< value_t > &        B,
         const size_t                     ntile )
@@ -169,11 +160,11 @@ tprod ( const indexset &                 is,
 
 template < typename value_t >
 void
-tprod ( const indexset &           is,
-        const value_t              alpha,
-        tile_storage< value_t > &  A,
-        const matrix< value_t > &  T,
-        const size_t               ntile )
+tprod ( const indexset &                 is,
+        const value_t                    alpha,
+        tile_storage< value_t > &        A,
+        const blas::matrix< value_t > &  T,
+        const size_t                     ntile )
 {
     HLR_LOG( 4, hpro::to_string( "tprod( %d )", is.size() ) );
     
@@ -188,7 +179,7 @@ tprod ( const indexset &           is,
     {
         assert( A.contains( is ) );
         
-        matrix< value_t >  Ac( A.at( is ), copy_value );
+        blas::matrix< value_t >  Ac( A.at( is ), copy_value );
         
         blas::prod( alpha, Ac, T, value_t(0), A.at( is ) );
     }// else
@@ -202,7 +193,7 @@ template < typename value_t >
 void
 tprod ( const cluster &                  cl,
         const tile_storage< value_t > &  A,
-        const matrix< value_t > &        T,
+        const blas::matrix< value_t > &  T,
         tile_storage< value_t > &        B )
 {
     HLR_LOG( 4, hpro::to_string( "tprod( %d )", cl.size() ) );
@@ -227,11 +218,11 @@ tprod ( const cluster &                  cl,
 //
 template < typename value_t >
 std::pair< tile_storage< value_t >,
-           matrix< value_t > >
+           blas::matrix< value_t > >
 tsqr ( const indexset &                 is,
        const value_t                    alpha,
        const tile_storage< value_t > &  X,
-       const matrix< value_t > &        T,
+       const blas::matrix< value_t > &  T,
        const tile_storage< value_t > &  U,
        const size_t                     ntile )
 {
@@ -251,10 +242,10 @@ tsqr ( const indexset &                 is,
 
         // Q = | R0 |
         //     | R1 |
-        matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
-        matrix< value_t >  Q01_0( Q01, range(          0, R0.nrows()-1  ), range::all );
-        matrix< value_t >  Q01_1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
-        matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        blas::matrix< value_t >  Q01_0( Q01, blas::range(          0, R0.nrows()-1  ), blas::range::all );
+        blas::matrix< value_t >  Q01_1( Q01, blas::range( R0.nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( R0, Q01_0 );
         blas::copy( R1, Q01_1 );
@@ -272,12 +263,12 @@ tsqr ( const indexset &                 is,
     {
         assert( X.contains( is ) && U.contains( is ) );
 
-        const auto         X_is = X.at( is );
-        const auto         U_is = U.at( is );
-        auto               W    = blas::prod( alpha, X_is, T );
-        matrix< value_t >  WU( W.nrows(), W.ncols() + U_is.ncols () );
-        matrix< value_t >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
-        matrix< value_t >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
+        const auto               X_is = X.at( is );
+        const auto               U_is = U.at( is );
+        auto                     W    = blas::prod( alpha, X_is, T );
+        blas::matrix< value_t >  WU( W.nrows(), W.ncols() + U_is.ncols () );
+        blas::matrix< value_t >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        blas::matrix< value_t >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         HLR_LOG( 5, "tsqr  :          X , " + isstr( is, ntile ) + " = " + normstr( blas::normF( X.at( is ) ) ) );
         HLR_LOG( 5, "tsqr  :          W , " + isstr( is, ntile ) + " = " + normstr( blas::normF( W ) ) );
@@ -286,7 +277,7 @@ tsqr ( const indexset &                 is,
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
 
-        matrix< value_t >  R;
+        blas::matrix< value_t >  R;
         
         blas::qr( WU, R );
 
@@ -306,7 +297,7 @@ tsqr ( const indexset &                 is,
 //
 template < typename value_t >
 std::pair< tile_storage< value_t >,
-           matrix< value_t > >
+           blas::matrix< value_t > >
 tsqr ( const indexset &                 is,
        const value_t                    alpha,
        const tile_storage< value_t > &  X,
@@ -329,10 +320,10 @@ tsqr ( const indexset &                 is,
 
         // Q = | R0 |
         //     | R1 |
-        matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
-        matrix< value_t >  Q01_0( Q01, range(          0, R0.nrows()-1  ), range::all );
-        matrix< value_t >  Q01_1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
-        matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        blas::matrix< value_t >  Q01_0( Q01, blas::range(          0, R0.nrows()-1  ), blas::range::all );
+        blas::matrix< value_t >  Q01_1( Q01, blas::range( R0.nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( R0, Q01_0 );
         blas::copy( R1, Q01_1 );
@@ -350,11 +341,11 @@ tsqr ( const indexset &                 is,
     {
         assert( X.contains( is ) && U.contains( is ) );
 
-        const auto         X_is = X.at( is );
-        const auto         U_is = U.at( is );
-        matrix< value_t >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
-        matrix< value_t >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
-        matrix< value_t >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
+        const auto               X_is = X.at( is );
+        const auto               U_is = U.at( is );
+        blas::matrix< value_t >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
+        blas::matrix< value_t >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
+        blas::matrix< value_t >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
 
         HLR_LOG( 5, "tsqr  :          X , " + isstr( is, ntile ) + " = " + normstr( blas::normF( X.at( is ) ) ) );
         HLR_LOG( 5, "tsqr  :          U , " + isstr( is, ntile ) + " = " + normstr( blas::normF( U.at( is ) ) ) );
@@ -362,7 +353,7 @@ tsqr ( const indexset &                 is,
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
 
-        matrix< value_t >  R;
+        blas::matrix< value_t >  R;
         
         blas::qr( XU, R );
 
@@ -383,7 +374,7 @@ tsqr ( const indexset &                 is,
 //
 template < typename value_t >
 std::pair< tile_storage< value_t >,
-           matrix< value_t > >
+           blas::matrix< value_t > >
 tsqr ( const cluster &                  cl,
        const tile_storage< value_t > &  X )
 {
@@ -394,7 +385,7 @@ tsqr ( const cluster &                  cl,
         assert( X.contains( cl ) );
 
         auto                     X_cl = blas::copy( X.at( cl ) );
-        matrix< value_t >        R;
+        blas::matrix< value_t >  R;
         tile_storage< value_t >  Q;
 
         if ( X_cl.nrows() < X_cl.ncols() )
@@ -423,10 +414,10 @@ tsqr ( const cluster &                  cl,
 
         // Q = | R0 |
         //     | R1 |
-        matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
-        matrix< value_t >  Q01_0( Q01, range( 0,          R0.nrows()-1  ), range::all );
-        matrix< value_t >  Q01_1( Q01, range( R0.nrows(), Q01.nrows()-1 ), range::all );
-        matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< value_t >  Q01(   R0.nrows() + R1.nrows(), R0.ncols() );
+        blas::matrix< value_t >  Q01_0( Q01, blas::range( 0,          R0.nrows()-1  ), blas::range::all );
+        blas::matrix< value_t >  Q01_1( Q01, blas::range( R0.nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< value_t >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( R0, Q01_0 );
         blas::copy( R1, Q01_1 );
@@ -459,17 +450,17 @@ truncate ( const cluster &                  row_cl,
     auto [ Q0, R0 ] = tsqr( row_cl, U );
     auto [ Q1, R1 ] = tsqr( col_cl, V );
 
-    auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
-    auto               Us = std::move( R );
-    matrix< value_t >  Vs;
-    vector< value_t >  Ss;
+    auto                     R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
+    auto                     Us = std::move( R );
+    blas::matrix< value_t >  Vs;
+    blas::vector< value_t >  Ss;
         
     blas::svd( Us, Ss, Vs );
 
     auto  k = acc.trunc_rank( Ss );
 
-    matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
-    matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
+    blas::matrix< value_t >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+    blas::matrix< value_t >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
     blas::prod_diag( Usk, Ss, k );
 
@@ -491,7 +482,7 @@ truncate ( const indexset &                 row_is,
            const indexset &                 col_is,
            const value_t                    alpha,
            const tile_storage< value_t > &  X,
-           const matrix< value_t > &        T,
+           const blas::matrix< value_t > &  T,
            const tile_storage< value_t > &  Y,
            const tile_storage< value_t > &  U,
            const tile_storage< value_t > &  V,
@@ -537,10 +528,10 @@ truncate ( const indexset &                 row_is,
         // DBG::write(  R0, "R0.mat", "R0" );
         // DBG::write(  R1, "R1.mat", "R1" );
         
-        auto               R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
-        auto               Us = std::move( R );
-        matrix< value_t >  Vs;
-        vector< value_t >  Ss;
+        auto                     R  = blas::prod( value_t(1), R0, blas::adjoint( R1 ) );
+        auto                     Us = std::move( R );
+        blas::matrix< value_t >  Vs;
+        blas::vector< value_t >  Ss;
         
         blas::svd( Us, Ss, Vs );
 
@@ -553,8 +544,8 @@ truncate ( const indexset &                 row_is,
         // for ( size_t  i = 0; i < k; ++i )
         //     std::cout << Ss(i) << std::endl;
         
-        matrix< value_t >  Usk( Us, range::all, range( 0, k-1 ) );
-        matrix< value_t >  Vsk( Vs, range::all, range( 0, k-1 ) );
+        blas::matrix< value_t >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+        blas::matrix< value_t >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
         blas::prod_diag( Usk, Ss, k );
 
@@ -582,7 +573,7 @@ namespace hodlr
 template < typename value_t >
 void
 addlr ( const tile_storage< value_t > &  U,
-        const matrix< value_t > &        T,
+        const blas::matrix< value_t > &  T,
         const tile_storage< value_t > &  V,
         TMatrix *                        A,
         const TTruncAcc &                acc,
@@ -672,8 +663,8 @@ trsmuh ( const TMatrix *            U,
         
         auto  DU = cptrcast( U, TDenseMatrix );
 
-        auto               X_is = X.at( U->row_is() );
-        matrix< value_t >  Y( X_is, copy_value );
+        auto                     X_is = X.at( U->row_is() );
+        blas::matrix< value_t >  Y( X_is, copy_value );
 
         blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
@@ -816,7 +807,7 @@ mul_vec ( const value_t                          alpha,
     else if ( hlr::matrix::is_tiled_lowrank( M ) )
     {
         auto                     R = cptrcast( &M, tiled_lrmatrix< value_t > );
-        blas::Vector< value_t >  t( R->rank() );
+        blas::vector< value_t >  t( R->rank() );
 
         if ( op_M == hpro::apply_normal )
         {

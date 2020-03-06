@@ -12,14 +12,12 @@
 #include <list>
 #include <utility>
 
-#include <hpro/blas/Vector.hh>
-#include <hpro/blas/Matrix.hh>
+#include <hlr/arith/blas.hh>
 
 namespace hlr
 {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using hpro::idx_t;
 
@@ -35,10 +33,10 @@ using hpro::idx_t;
 //
 template < typename value_t >
 void
-subtract ( const std::list< blas::Vector< value_t > > &  U,
+subtract ( const std::list< blas::vector< value_t > > &  U,
            const int                                     i,
-           const std::list< blas::Vector< value_t > > &  V,
-           blas::Vector< value_t > &                     col )
+           const std::list< blas::vector< value_t > > &  V,
+           blas::vector< value_t > &                     col )
 {
     auto  U_k = U.begin();
     auto  V_k = V.begin();
@@ -54,9 +52,9 @@ subtract ( const std::list< blas::Vector< value_t > > &  U,
 template < typename value_t >
 void
 subtract ( const int                                     i,
-           const std::list< blas::Vector< value_t > > &  U,
-           const std::list< blas::Vector< value_t > > &  V,
-           blas::Vector< value_t > &                     row )
+           const std::list< blas::vector< value_t > > &  U,
+           const std::list< blas::vector< value_t > > &  V,
+           blas::vector< value_t > &                     row )
 {
     auto  U_k = U.begin();
     auto  V_k = V.begin();
@@ -102,10 +100,10 @@ struct ACAPivot
     template < typename value_t >
     std::pair< int, int >
     next ( const operator_t &                            M,
-           const std::list< BLAS::Vector< value_t > > &  U,
-           const std::list< BLAS::Vector< value_t > > &  V,
-           BLAS::Vector< value_t > &                     row,
-           BLAS::Vector< value_t > &                     col )
+           const std::list< blas::vector< value_t > > &  U,
+           const std::list< blas::vector< value_t > > &  V,
+           blas::vector< value_t > &                     row,
+           blas::vector< value_t > &                     col )
     {
         using real_t = typename real_type< value_t >::type_t;
 
@@ -119,7 +117,7 @@ struct ACAPivot
         col                = get_column< value_t >( piv_j, M );
         subtract( U, piv_j, V, col );
         
-        const auto  piv_i = BLAS::max_idx( col );
+        const auto  piv_i = blas::max_idx( col );
         const auto  max_v = col( piv_i );
 
         // stop and signal no pivot found if remainder is "zero"
@@ -127,7 +125,7 @@ struct ACAPivot
             return { -1, -1 };
 
         // scale u by inverse of maximal element in u
-        BLAS::scale( value_t(1) / max_v, col );
+        blas::scale( value_t(1) / max_v, col );
         
         used_rows[ piv_i ] = true;
         row                = get_row< value_t >( piv_i, M );
@@ -139,7 +137,7 @@ struct ACAPivot
         
         // next_col++; // just use next column
 
-        const auto  max_j = BLAS::max_idx( row );
+        const auto  max_j = blas::max_idx( row );
 
         if ( ! used_cols[ max_j ] )
             next_col = max_j;
@@ -172,8 +170,8 @@ struct ACAPivot
 template < typename value_t,
            typename operator_t,
            typename pivotsearch_t >
-std::pair< BLAS::Matrix< value_t >,
-           BLAS::Matrix< value_t > >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
 approx_aca  ( const operator_t &                        M,
               const hpro::TTruncAcc &                   acc,
               std::list< std::pair< idx_t, idx_t > > *  pivots )
@@ -181,10 +179,10 @@ approx_aca  ( const operator_t &                        M,
     using  real_t = typename real_type< value_t >::type_t;
 
     if ( M.empty() )
-        return { BLAS::Matrix< value_t >(), BLAS::Matrix< value_t >() };
+        return { blas::matrix< value_t >(), blas::matrix< value_t >() };
     
-    std::list< BLAS::Vector< value_t > >  U, V;
-    BLAS::Vector< value_t >               row, col;
+    std::list< blas::vector< value_t > >  U, V;
+    blas::vector< value_t >               row, col;
     auto                                  sqnorm_M  = real_t(0);
     auto                                  norm_rest = real_t(0);
     uint                                  k         = 0;
@@ -209,7 +207,7 @@ approx_aca  ( const operator_t &                        M,
         // norm of ( M - U·V^H ) by last vector pair
         //
 
-        const auto  sqnorm_rest = re( BLAS::dot( col, col ) * BLAS::dot( row, row ) );
+        const auto  sqnorm_rest = re( blas::dot( col, col ) * blas::dot( row, row ) );
 
         sqnorm_M += sqnorm_rest;
 
@@ -218,8 +216,8 @@ approx_aca  ( const operator_t &                        M,
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
         {
-            sqnorm_M += re( BLAS::dot( col, *u_i ) * BLAS::dot( *v_i, row ) );
-            sqnorm_M += re( BLAS::dot( *u_i, col ) * BLAS::dot( row, *v_i ) );
+            sqnorm_M += re( blas::dot( col, *u_i ) * blas::dot( *v_i, row ) );
+            sqnorm_M += re( blas::dot( *u_i, col ) * blas::dot( row, *v_i ) );
         }// for
 
         // DBG::printf( "|M| = %.4e", Math::sqrt( sqnorm_M ) );
@@ -250,8 +248,8 @@ approx_aca  ( const operator_t &                        M,
     // copy vector pairs into low-rank matrix
     //
 
-    BLAS::Matrix< value_t >  MU( nrows, k );
-    BLAS::Matrix< value_t >  MV( ncols, k );
+    blas::matrix< value_t >  MU( nrows, k );
+    blas::matrix< value_t >  MV( ncols, k );
 
     auto  u_i = U.cbegin();
     auto  v_i = V.cbegin();
@@ -262,8 +260,8 @@ approx_aca  ( const operator_t &                        M,
         auto  mu_i = MU.column( k );
         auto  mv_i = MV.column( k );
         
-        BLAS::copy( *u_i, mu_i );
-        BLAS::copy( *v_i, mv_i );
+        blas::copy( *u_i, mu_i );
+        blas::copy( *v_i, mv_i );
     }// for
 
     return { std::move( MU ), std::move( MV ) };

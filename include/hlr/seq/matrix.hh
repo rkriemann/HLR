@@ -17,12 +17,14 @@
 #include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/utils/checks.hh"
+#include "hlr/arith/blas.hh"
+#include "hlr/matrix/cluster_basis.hh"
+#include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 
 namespace hlr { namespace seq { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
     
 //
 // build representation of dense matrix with
@@ -582,9 +584,9 @@ clear ( hpro::TMatrix &  M )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &             M,
-               const cluster_basis< value_t > &  rowcb,
-               const cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix &                          M,
+               const hlr::matrix::cluster_basis< value_t > &  rowcb,
+               const hlr::matrix::cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -622,15 +624,23 @@ copy_uniform ( const hpro::TMatrix &             M,
         //             = U · (U^H·A)·(V^H·B)^H · V^H
         //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
 
-        auto  R  = cptrcast( &M, TRkMatrix );
+        auto  R  = cptrcast( &M, hpro::TRkMatrix );
 
-        auto  UA = rowcb.transform_forward( blas_mat_A< value_t >( R ) );
-        auto  VB = colcb.transform_forward( blas_mat_B< value_t >( R ) );
+        auto  UA = rowcb.transform_forward( hpro::blas_mat_A< value_t >( R ) );
+        auto  VB = colcb.transform_forward( hpro::blas_mat_B< value_t >( R ) );
         auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
 
-        return std::make_unique< uniform_lrmatrix< value_t > >( M.row_is(), M->col_is(),
-                                                                rowcb, colcb,
-                                                                std::move( S ) );
+        // auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
+        // auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
+        // auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
+
+        // blas::add( value_t(-1), M2, M1 );
+        
+        // std::cout << blas::norm_F( M1 ) << std::endl;
+        
+        return std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                             rowcb, colcb,
+                                                                             std::move( S ) );
     }// if
     else
     {
