@@ -14,6 +14,7 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
+#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -21,13 +22,8 @@ namespace hlr
 { 
 
 namespace hpro = HLIB;
-//namespace blas = hpro::BLAS;
 
 using indexset = hpro::TIndexSet;
-
-using hpro::real;
-using hpro::complex;
-using hpro::idx_t;
 
 // local matrix type
 DECLARE_TYPE( uniform_lrmatrix );
@@ -107,13 +103,15 @@ public:
     // access internal data
     //
 
-    uint                              rank () const { return std::min( _S.nrows(), _S.ncols() ); }
+    uint                              rank     () const { return std::min( _S.nrows(), _S.ncols() ); }
+    uint                              row_rank () const { return _S.nrows(); }
+    uint                              col_rank () const { return _S.ncols(); }
 
-    cluster_basis< value_t > &        row_cb ()       { return *_row_cb; }
-    const cluster_basis< value_t > &  row_cb () const { return *_row_cb; }
+    cluster_basis< value_t > &        row_cb   ()       { return *_row_cb; }
+    const cluster_basis< value_t > &  row_cb   () const { return *_row_cb; }
 
-    cluster_basis< value_t > &        col_cb ()       { return *_col_cb; }
-    const cluster_basis< value_t > &  col_cb () const { return *_col_cb; }
+    cluster_basis< value_t > &        col_cb   ()       { return *_col_cb; }
+    const cluster_basis< value_t > &  col_cb   () const { return *_col_cb; }
 
     void
     set_cluster_bases ( const cluster_basis< value_t > &  arow_cb,

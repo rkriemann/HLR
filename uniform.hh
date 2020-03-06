@@ -11,7 +11,7 @@
 #include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/seq/norm.hh>
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/print.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -113,6 +113,9 @@ program_main ()
         auto  error = hlr::seq::norm::norm_2( *diff );
         
         std::cout << "    error  = " << format_error( error ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            matrix::print_eps( *A2, "A1" );
     }
 
     //////////////////////////////////////////////////////////////////////
