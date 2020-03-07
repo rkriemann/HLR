@@ -23,7 +23,6 @@
 namespace hlr { namespace omp {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -41,8 +40,8 @@ void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
           const TMatrix &                  M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
 {
     // assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );

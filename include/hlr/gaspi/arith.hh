@@ -37,7 +37,6 @@ namespace hlr { namespace gaspi { namespace tlr {
 ///////////////////////////////////////////////////////////////////////
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 const hpro::typeid_t  TYPE_DENSE = hpro::RTTI::type_to_id( "TDenseMatrix" );
 const hpro::typeid_t  TYPE_LR    = hpro::RTTI::type_to_id( "TRkMatrix" );

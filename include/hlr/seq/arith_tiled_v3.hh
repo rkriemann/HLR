@@ -131,7 +131,7 @@ struct matrix_info
 };
 
 template <>
-matrix_info< matrix< real > >::~matrix_info ()
+matrix_info< blas::matrix< real > >::~matrix_info ()
 {}
 
 template <>
@@ -139,7 +139,7 @@ matrix_info< tile_storage< real > * >::~matrix_info ()
 {}
 
 template <>
-matrix_info< std::shared_ptr< matrix< real > > >::~matrix_info ()
+matrix_info< std::shared_ptr< blas::matrix< real > > >::~matrix_info ()
 {
 //    std::cout << "matrix : " << data.get() << ", #" << data.use_count() << std::endl;
 }
@@ -151,25 +151,25 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
 }
 
 template <>
-matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is,
+matrix_info< tile_storage< real > * >::matrix_info ( const indexset          ais,
                                                      tile_storage< real > *  adata )
         : name( id_t(adata) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
 template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           is,
+matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           ais,
                                                                       std::shared_ptr< tile_storage< real > >  adata )
         : name( id_t(adata.get()) )
         , id( -1 )
-        , is( is )
+        , is( ais )
         , data( adata )
 {}
 
 template <>
-matrix_info< matrix< real > >::matrix_info ( matrix< real >  adata )
+matrix_info< blas::matrix< real > >::matrix_info ( blas::matrix< real >  adata )
         : name( id_t(adata.data()) )
         , id( -1  )
         , is( IS_ONE )
@@ -177,7 +177,7 @@ matrix_info< matrix< real > >::matrix_info ( matrix< real >  adata )
 {}
 
 template <>
-matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr< matrix< real > >  adata )
+matrix_info< std::shared_ptr< blas::matrix< real > > >::matrix_info ( std::shared_ptr< blas::matrix< real > >  adata )
         : name( id_t(adata.get()) )
         , id( -1  )
         , is( IS_ONE )
@@ -185,15 +185,15 @@ matrix_info< std::shared_ptr< matrix< real > > >::matrix_info ( std::shared_ptr<
 {}
 
 template <>
-matrix_info< tile_storage< real > * >::matrix_info ( const indexset          is )
+matrix_info< tile_storage< real > * >::matrix_info ( const indexset  ais )
         : name( 255 )
         , id( -1 )
-        , is( is )
+        , is( ais )
 {}
 
-using dense_matrix        = matrix_info< matrix< real > >;
+using dense_matrix        = matrix_info< blas::matrix< real > >;
 using tiled_matrix        = matrix_info< tile_storage< real > * >;
-using shared_matrix       = matrix_info< std::shared_ptr< matrix< real > > >;
+using shared_matrix       = matrix_info< std::shared_ptr< blas::matrix< real > > >;
 using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< real > > >;
 
 inline
@@ -277,7 +277,7 @@ dot ( tiled_matrix  A,
 
         // HLR_LOG( 5, "         dot :       " + isstr( A.is, ntile ) + " = " + normstr( blas::normF( T ) ) );
 
-        return shared_matrix( std::make_shared< matrix< real > >( std::move( T ) ) );
+        return shared_matrix( std::make_shared< blas::matrix< real > >( std::move( T ) ) );
     }// else
 }
 
@@ -349,7 +349,7 @@ tprod ( const real     alpha,
     {
         HLR_ASSERT( A.data->contains( A.is ) );
         
-        matrix< real >  Ac( A.data->at( A.is ), copy_value );
+        blas::matrix< real >  Ac( A.data->at( A.is ), copy_value );
         
         blas::prod( alpha, Ac, *(T.data), real(0), A.data->at( A.is ) );
     }// else
@@ -384,10 +384,10 @@ tsqr ( const real     alpha,
 
         // Q = | R0 |
         //     | R1 |
-        matrix< real >  Q01(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
-        matrix< real >  Q01_0( Q01, range( 0, R0.data->nrows()-1 ), range::all );
-        matrix< real >  Q01_1( Q01, range( R0.data->nrows(), Q01.nrows()-1 ), range::all );
-        matrix< real >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< real >  Q01(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
+        blas::matrix< real >  Q01_0( Q01, blas::range( 0, R0.data->nrows()-1 ), blas::range::all );
+        blas::matrix< real >  Q01_1( Q01, blas::range( R0.data->nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< real >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( *(R0.data), Q01_0 );
         blas::copy( *(R1.data), Q01_1 );
@@ -396,13 +396,13 @@ tsqr ( const real     alpha,
 
         tiled_matrix  Q( X.is, new tile_storage< real > );
 
-        shared_matrix  dQ01_0( std::make_shared< matrix< real > >( Q01_0, hpro::copy_value ) );
-        shared_matrix  dQ01_1( std::make_shared< matrix< real > >( Q01_1, hpro::copy_value ) );
+        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, hpro::copy_value ) );
+        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, hpro::copy_value ) );
         
         tprod( real(1), Q0, dQ01_0, real(0), tiled_matrix( sis[0], Q ), ntile );
         tprod( real(1), Q1, dQ01_1, real(0), tiled_matrix( sis[1], Q ), ntile );
 
-        return { std::move( Q ), std::make_shared< matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
     }// if
     else
     {
@@ -411,9 +411,9 @@ tsqr ( const real     alpha,
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
         auto            W    = blas::prod( alpha, X_is, *(T.data) );
-        matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
-        matrix< real >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
-        matrix< real >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
+        blas::matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
+        blas::matrix< real >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        blas::matrix< real >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         HLR_LOG( 5, "tsqr  :          X , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( X.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          W , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( W ) ) );
@@ -422,7 +422,7 @@ tsqr ( const real     alpha,
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
 
-        matrix< real >  R;
+        blas::matrix< real >  R;
         
         blas::qr( WU, R );
 
@@ -433,7 +433,7 @@ tsqr ( const real     alpha,
         HLR_LOG( 5, "tsqr  :          Q , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( Q.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          R , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
-        return { std::move( Q ), std::make_shared< matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
     }// else
 }
 
@@ -465,10 +465,10 @@ tsqr ( const real    alpha,
 
         // Q = | R0 |
         //     | R1 |
-        matrix< real >  Q01(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
-        matrix< real >  Q01_0( Q01, range( 0, R0.data->nrows()-1 ), range::all );
-        matrix< real >  Q01_1( Q01, range( R0.data->nrows(), Q01.nrows()-1 ), range::all );
-        matrix< real >  R(     Q01.ncols(), Q01.ncols() );
+        blas::matrix< real >  Q01(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
+        blas::matrix< real >  Q01_0( Q01, blas::range( 0, R0.data->nrows()-1 ), blas::range::all );
+        blas::matrix< real >  Q01_1( Q01, blas::range( R0.data->nrows(), Q01.nrows()-1 ), blas::range::all );
+        blas::matrix< real >  R(     Q01.ncols(), Q01.ncols() );
         
         blas::copy( *(R0.data), Q01_0 );
         blas::copy( *(R1.data), Q01_1 );
@@ -477,13 +477,13 @@ tsqr ( const real    alpha,
 
         tiled_matrix  Q( X.is, new tile_storage< real > );
         
-        shared_matrix  dQ01_0( std::make_shared< matrix< real > >( Q01_0, hpro::copy_value ) );
-        shared_matrix  dQ01_1( std::make_shared< matrix< real > >( Q01_1, hpro::copy_value ) );
+        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, hpro::copy_value ) );
+        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, hpro::copy_value ) );
         
         tprod( real(1), Q0, dQ01_0, real(0), tiled_matrix( sis[0], Q ), ntile );
         tprod( real(1), Q1, dQ01_1, real(0), tiled_matrix( sis[1], Q ), ntile );
 
-        return { std::move( Q ), std::make_shared< matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
     }// if
     else
     {
@@ -491,9 +491,9 @@ tsqr ( const real    alpha,
 
         const auto         X_is = X.data->at( X.is );
         const auto         U_is = U.data->at( U.is );
-        matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
-        matrix< real >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
-        matrix< real >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
+        blas::matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
+        blas::matrix< real >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
+        blas::matrix< real >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
 
         HLR_LOG( 5, "tsqr  :          X , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( X.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          U , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( U.data->at( X.is ) ) ) );
@@ -501,7 +501,7 @@ tsqr ( const real    alpha,
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
 
-        matrix< real >  R;
+        blas::matrix< real >  R;
         
         blas::qr( XU, R );
 
@@ -512,7 +512,7 @@ tsqr ( const real    alpha,
         HLR_LOG( 5, "tsqr  :          Q , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( Q.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          R , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
-        return { std::move( Q ), std::make_shared< matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
     }// else
 }
 
@@ -562,10 +562,10 @@ truncate ( const real         alpha,
         // DBG::write(  R0, "R0.mat", "R0" );
         // DBG::write(  R1, "R1.mat", "R1" );
         
-        auto            R  = blas::prod( real(1), *(R0.data), blas::adjoint( *(R1.data) ) );
-        auto            Us = std::move( R );
-        matrix< real >  Vs;
-        vector< real >  Ss;
+        auto                  R  = blas::prod( real(1), *(R0.data), blas::adjoint( *(R1.data) ) );
+        auto                  Us = std::move( R );
+        blas::matrix< real >  Vs;
+        blas::vector< real >  Ss;
         
         blas::svd( Us, Ss, Vs );
 
@@ -578,16 +578,16 @@ truncate ( const real         alpha,
         for ( size_t  i = 0; i < k; ++i )
             std::cout << Ss(i) << std::endl;
         
-        matrix< real >  Usk( Us, range::all, range( 0, k-1 ) );
-        matrix< real >  Vsk( Vs, range::all, range( 0, k-1 ) );
+        blas::matrix< real >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+        blas::matrix< real >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
         blas::prod_diag( Usk, Ss, k );
 
         tiled_matrix  Uk( U.is, new tile_storage< real > );
         tiled_matrix  Vk( V.is, new tile_storage< real > );
 
-        shared_matrix  dUsk( std::make_unique< matrix< real > >( Usk, hpro::copy_value ) );
-        shared_matrix  dVsk( std::make_unique< matrix< real > >( Vsk, hpro::copy_value ) );
+        shared_matrix  dUsk( std::make_unique< blas::matrix< real > >( Usk, hpro::copy_value ) );
+        shared_matrix  dVsk( std::make_unique< blas::matrix< real > >( Vsk, hpro::copy_value ) );
         
         tprod( real(1), Q0, dUsk, real(0), Uk, ntile );
         tprod( real(1), Q1, dVsk, real(0), Vk, ntile );
@@ -727,7 +727,7 @@ trsmuh ( TMatrix *     U,
         auto  DU = ptrcast( U, TDenseMatrix );
 
         auto            X_is = X.data->at( U->row_is() );
-        matrix< real >  Y( X_is, copy_value );
+        blas::matrix< real >  Y( X_is, copy_value );
 
         blas::prod( real(1), blas::adjoint( blas_mat< real >( DU ) ), Y, real(0), X_is );
 
