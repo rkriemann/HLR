@@ -125,6 +125,9 @@ public:
             _S = std::move( blas::Matrix< value_t >( _row_cb->rank(), _col_cb->rank() ) );
     }
 
+    blas::matrix< value_t > &        coeff ()       { return _S; }
+    const blas::matrix< value_t > &  coeff () const { return _S; }
+    
     void
     set_coeff ( const blas::Matrix< value_t > &  aS )
     {

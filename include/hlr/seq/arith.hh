@@ -21,6 +21,7 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/norm.hh"
 
@@ -105,6 +106,56 @@ mul_vec ( const value_t                    alpha,
             auto  t = blas::mulvec( value_t(1), blas::adjoint( blas_mat_A< value_t >( R ) ), x );
 
             blas::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
+        }// if
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        
+        if ( op_M == hpro::apply_normal )
+        {
+            //
+            // y = y + U·S·V^H x
+            //
+        
+            auto  t = R->col_cb().transform_forward( x );
+            auto  s = blas::mulvec( value_t(1), R->coeff(), t );
+            auto  r = R->row_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
+        }// if
+        else if ( op_M == hpro::apply_transposed )
+        {
+            //
+            // y = y + (U·S·V^H)^T x
+            //   = y + conj(V)·S^T·U^T x
+            //
+        
+            auto  cx = blas::copy( x );
+
+            blas::conj( cx );
+        
+            auto  t  = R->row_cb().transform_forward( cx );
+
+            blas::conj( t );
+        
+            auto  s = blas::mulvec( value_t(1), blas::transposed(R->coeff()), t );
+            auto  r = R->col_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
+        }// if
+        else if ( op_M == hpro::apply_adjoint )
+        {
+            //
+            // y = y + (U·S·V^H)^H x
+            //   = y + V·S^H·U^H x
+            //
+        
+            auto  t = R->row_cb().transform_forward( x );
+            auto  s = blas::mulvec( value_t(1), blas::adjoint(R->coeff()), t );
+            auto  r = R->col_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
         }// if
     }// if
     else

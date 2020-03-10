@@ -63,9 +63,42 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    {
+        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        
+        std::vector< double >    runtime;
+        blas::vector< value_t >  x( A->ncols() );
+        blas::vector< value_t >  y( A->nrows() );
+
+        blas::fill( value_t(1), x );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A, x, y );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                blas::fill( value_t(0), y );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
+    }
+    
     //////////////////////////////////////////////////////////////////////
     //
-    // conversion to H²
+    // conversion to uniform
     //
     //////////////////////////////////////////////////////////////////////
 
@@ -116,6 +149,41 @@ program_main ()
 
         if ( hpro::verbose( 3 ) )
             matrix::print_eps( *A2, "A1" );
+
+        //
+        // mat-vec benchmark
+        //
+
+        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        
+        std::vector< double >    runtime;
+        blas::vector< value_t >  x( A2->ncols() );
+        blas::vector< value_t >  y( A2->nrows() );
+
+        blas::fill( value_t(1), x );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A2, x, y );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                blas::fill( value_t(0), y );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -165,5 +233,40 @@ program_main ()
         
             mvis.svd( false ).print( A2.get(), "A2" );
         }// if
+
+        //
+        // mat-vec benchmark
+        //
+
+        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        
+        std::vector< double >    runtime;
+        auto                     x = A2->col_vector();
+        auto                     y = A2->row_vector();
+
+        x->fill( 1 );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                A->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                y->fill( 1 );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
     }
 }

@@ -5,6 +5,7 @@
 //
 
 #include "hlr/seq/matrix.hh"
+#include "hlr/seq/arith.hh"
 #include "hlr/seq/cluster_basis.hh"
 
 namespace          impl      = hlr::seq;
