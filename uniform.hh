@@ -128,19 +128,24 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
-        // auto  x  = A->row_vector();
-        // auto  y1 = A->row_vector();
-        // auto  y2 = A->row_vector();
+        {
+            auto  x  = A->row_vector();
+            auto  y1 = A->row_vector();
+            auto  y2 = A->row_vector();
 
-        // x->fill_rand( 1 );
-        // y1->fill( 0 );
-        // y2->fill( 0 );
+            x->fill_rand( 1 );
+            y1->fill( 0 );
+            y2->fill( 0 );
 
-        // A->mul_vec(  hpro::real(1), x.get(), (1), y1.get(), hpro::apply_normal );
-        // A2->mul_vec( hpro::real(1), x.get(), hpro::real(1), y2.get(), hpro::apply_normal );
+            A->mul_vec(  hpro::real(1), x.get(), (1), y1.get(), hpro::apply_normal );
+            A2->mul_vec( hpro::real(1), x.get(), hpro::real(1), y2.get(), hpro::apply_normal );
 
-        // hpro::DBG::write( y1.get(), "y1.mat", "y1" );
-        // hpro::DBG::write( y2.get(), "y2.mat", "y2" );
+            hpro::DBG::write( y1.get(), "y1.mat", "y1" );
+            hpro::DBG::write( y2.get(), "y2.mat", "y2" );
+
+            y1->axpy( -1, y2.get() );
+            std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
+        }
         
         auto  diff  = hpro::matrix_sum( value_t(1), A.get(), value_t(-1), A2.get() );
         auto  error = hlr::seq::norm::norm_2( *diff );
@@ -234,6 +239,25 @@ program_main ()
             mvis.svd( false ).print( A2.get(), "A2" );
         }// if
 
+        {
+            auto  x  = A->row_vector();
+            auto  y1 = A->row_vector();
+            auto  y2 = A->row_vector();
+
+            x->fill_rand( 1 );
+            y1->fill( 0 );
+            y2->fill( 0 );
+
+            A->mul_vec(  hpro::real(1), x.get(), (1), y1.get(), hpro::apply_normal );
+            A2->mul_vec( hpro::real(1), x.get(), hpro::real(1), y2.get(), hpro::apply_normal );
+
+            hpro::DBG::write( y1.get(), "y1.mat", "y1" );
+            hpro::DBG::write( y2.get(), "y2.mat", "y2" );
+
+            y1->axpy( -1, y2.get() );
+            std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
+        }
+        
         //
         // mat-vec benchmark
         //

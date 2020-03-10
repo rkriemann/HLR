@@ -139,6 +139,53 @@ mul_vec_chunk ( const value_t                    alpha,
                 blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), yt );
             }// if
         }// if
+        else if ( hlr::matrix::is_uniform_lowrank( M ) )
+        {
+            auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        
+            if ( op_M == hpro::apply_normal )
+            {
+                //
+                // y = y + U·S·V^H x
+                //
+        
+                auto  t = R->col_cb().transform_forward( x );
+                auto  s = blas::mulvec( alpha, R->coeff(), t );
+
+                yt = std::move( R->row_cb().transform_backward( s ) );
+            }// if
+            else if ( op_M == hpro::apply_transposed )
+            {
+                //
+                // y = y + (U·S·V^H)^T x
+                //   = y + conj(V)·S^T·U^T x
+                //
+        
+                auto  cx = blas::copy( x );
+
+                blas::conj( cx );
+        
+                auto  t  = R->row_cb().transform_forward( cx );
+
+                blas::conj( t );
+        
+                auto  s = blas::mulvec( alpha, blas::transposed(R->coeff()), t );
+
+                yt = std::move( R->col_cb().transform_backward( s ) );
+            }// if
+            else if ( op_M == hpro::apply_adjoint )
+            {
+                //
+                // y = y + (U·S·V^H)^H x
+                //   = y + V·S^H·U^H x
+                //
+        
+                auto  t = R->row_cb().transform_forward( x );
+                auto  s = blas::mulvec( alpha, blas::adjoint(R->coeff()), t );
+
+                yt = std::move( R->col_cb().transform_backward( s ) );
+            }// if
+        }// if
         else
             assert( false );
 
