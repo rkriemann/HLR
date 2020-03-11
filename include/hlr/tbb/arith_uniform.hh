@@ -1,9 +1,9 @@
-#ifndef __HLR_SEQ_ARITH_UNIFORM_HH
-#define __HLR_SEQ_ARITH_UNIFORM_HH
+#ifndef __HLR_TBB_ARITH_UNIFORM_HH
+#define __HLR_TBB_ARITH_UNIFORM_HH
 //
 // Project     : HLib
-// Module      : seq/arith_uniform.hh
-// Description : sequential arithmetic functions for uniform matrices
+// Module      : tbb/arith_uniform.hh
+// Description : arithmetic functions for uniform matrices with TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
@@ -14,7 +14,7 @@
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 
-namespace hlr { namespace seq { namespace uniform {
+namespace hlr { namespace tbb { namespace uniform {
 
 namespace hpro = HLIB;
 
@@ -30,9 +30,10 @@ namespace hpro = HLIB;
 namespace detail
 {
 
-using matrix::cluster_basis;
-using vector::scalar_vector;
-using vector::uniform_vector;
+using hlr::matrix::cluster_basis;
+using hlr::matrix::uniform_lrmatrix;
+using hlr::vector::scalar_vector;
+using hlr::vector::uniform_vector;
 
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
@@ -55,21 +56,27 @@ mul_vec ( const value_t                                       alpha,
         HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
                    ( B->nblock_cols( op_M ) == x.nblocks() ));
             
-        for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
-        {
-            auto  x_i = x.block( i );
-            
-            for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, B->nblock_rows( op_M ),
+                                              0, B->nblock_cols( op_M ) ),
+            [&,alpha,op_M,B] ( const auto &  r )
             {
-                auto  B_ij = B->block( i, j, op_M );
-                auto  y_j  = y.block( j );
-            
-                if ( ! is_null( B_ij ) )
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
-                    mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy );
-                }// if
-            }// for
-        }// for
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  B_ij = B->block( i, j, op_M );
+            
+                        if ( ! is_null( B_ij ) )
+                        {
+                            auto  x_i = x.block( i );
+                            auto  y_j = y.block( j );
+                            
+                            mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy );
+                        }// if
+                    }// for
+                }// for
+            } );
     }// if
     else if ( is_dense( M ) )
     {
@@ -79,9 +86,9 @@ mul_vec ( const value_t                                       alpha,
         
         blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
     }// if
-    else if ( matrix::is_uniform_lowrank( M ) )
+    else if ( hlr::matrix::is_uniform_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
         
         if ( op_M == hpro::apply_normal )
         {
@@ -120,8 +127,11 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
 
     if ( cb.nsons() > 0 )
     {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
+        ::tbb::parallel_for( uint(0), cb.nsons(),
+                             [&] ( const uint  i )
+                             {
+                                 u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
+                             } );
     }// if
 
     return u;
@@ -138,8 +148,11 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 
     if ( cb.nsons() > 0 )
     {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            u->set_block( i, make_uniform( *cb.son(i) ).release() );
+        ::tbb::parallel_for( uint(0), cb.nsons(),
+                             [&] ( const uint  i )
+                             {
+                                 u->set_block( i, make_uniform( *cb.son(i) ).release() );
+                             } );
     }// if
 
     return u;
@@ -163,8 +176,11 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 
     if ( u.nblocks() > 0 )
     {
-        for ( uint  i = 0; i < u.nblocks(); ++i )
-            add_uniform_to_scalar( *u.block(i), v );
+        ::tbb::parallel_for( uint(0), u.nblocks(),
+                             [&] ( const uint  i )
+                             {
+                                 add_uniform_to_scalar( *u.block(i), v );
+                             } );
     }// if
 }
     
@@ -172,13 +188,13 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                       alpha,
-          const matop_t                       op_M,
-          const TMatrix &                     M,
-          const hpro::TVector &               x,
-          hpro::TVector &                     y,
-          matrix::cluster_basis< value_t > &  rowcb,
-          matrix::cluster_basis< value_t > &  colcb )
+mul_vec ( const value_t                            alpha,
+          const matop_t                            op_M,
+          const TMatrix &                          M,
+          const hpro::TVector &                    x,
+          hpro::TVector &                          y,
+          hlr::matrix::cluster_basis< value_t > &  rowcb,
+          hlr::matrix::cluster_basis< value_t > &  colcb )
 {
     if ( alpha == value_t(0) )
         return;
@@ -200,6 +216,6 @@ mul_vec ( const value_t                       alpha,
     detail::add_uniform_to_scalar( *uy, *sy );
 }
 
-}}}// namespace hlr::seq::uniform
+}}}// namespace hlr::tbb::uniform
 
-#endif // __HLR_SEQ_ARITH_UNIFORM_HH
+#endif // __HLR_TBB_ARITH_UNIFORM_HH

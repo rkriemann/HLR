@@ -18,8 +18,8 @@ namespace hlr
 
 namespace hpro = HLIB;
 
-using clustertree = hpro::TCluster;
-using accuracy    = hpro::TTruncAcc;
+using cluster_tree = hpro::TCluster;
+using accuracy     = hpro::TTruncAcc;
 
 using hpro::real;
 using hpro::complex;
@@ -44,7 +44,7 @@ public:
     
 private:
     // associated cluster
-    const clustertree *                        _cluster;
+    const cluster_tree *                       _cluster;
 
     // cluster basis of sub clusters
     std::vector< cluster_basis< value_t > * >  _sons;
@@ -55,13 +55,13 @@ private:
 public:
     
     // construct cluster basis corresponding to cluster <cl>
-    cluster_basis ( const clustertree &  cl )
+    cluster_basis ( const cluster_tree &  cl )
             : _cluster( &cl )
     {}
 
     // construct cluster basis corresponding to cluster <cl>
     // with basis defined by <V>
-    cluster_basis ( const clustertree &                    cl,
+    cluster_basis ( const cluster_tree &                   cl,
                     const hlr::blas::matrix< value_t > &&  V )
             : _cluster( &cl )
             , _V( V )
@@ -95,11 +95,14 @@ public:
     // access basis
     //
 
+    // underlying cluster tree
+    const cluster_tree &                  cluster () const { return *_cluster; }
+    
     // return rank of cluster basis
-    uint                                  rank   () const  { return _V.ncols(); }
+    uint                                  rank    () const { return _V.ncols(); }
     
     // return local basis
-    const hlr::blas::matrix< value_t > &  basis  () const { return _V; }
+    const hlr::blas::matrix< value_t > &  basis   () const { return _V; }
     
     // set local basis
     void

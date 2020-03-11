@@ -30,10 +30,10 @@ using hlr::seq::matrix::detail::build_matrix_map;
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const clustertree &  ct,
-                  matrix_map_t &       mat_map,
-                  const accuracy &     acc,
-                  const bool           adjoint );
+construct_basis ( const cluster_tree &  ct,
+                  matrix_map_t &        mat_map,
+                  const accuracy &      acc,
+                  const bool            adjoint );
 
 }// namespace detail
 
@@ -45,8 +45,8 @@ construct_basis ( const clustertree &  ct,
 template < typename value_t >
 std::pair< std::unique_ptr< cluster_basis< value_t > >,
            std::unique_ptr< cluster_basis< value_t > > >
-construct_from_H ( const clustertree &    rowct,
-                   const clustertree &    colct,
+construct_from_H ( const cluster_tree &   rowct,
+                   const cluster_tree &   colct,
                    const hpro::TMatrix &  M,
                    const accuracy &       acc )
 {
@@ -85,10 +85,10 @@ using hlr::seq::matrix::detail::V;
 //
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const clustertree &  ct,
-                  matrix_map_t &       mat_map,
-                  const accuracy &     acc,
-                  const bool           adjoint )
+construct_basis ( const cluster_tree &  ct,
+                  matrix_map_t &        mat_map,
+                  const accuracy &      acc,
+                  const bool            adjoint )
 {
     auto  cb = std::make_unique< cluster_basis< value_t > >( ct );
 

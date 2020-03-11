@@ -194,7 +194,24 @@ program_main ()
 
         {
             std::cout << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
-        
+
+            {
+                auto  x  = A2->col_vector();
+                auto  y1 = A2->row_vector();
+                auto  y2 = A2->row_vector();
+
+                x->fill( 1 );
+            
+                impl::mul_vec( value_t(1),
+                               hpro::apply_adjoint, *A2,
+                               hpro::blas_vec< value_t >( cptrcast( x.get(), hpro::TScalarVector ) ),
+                               hpro::blas_vec< value_t >( ptrcast( y1.get(), hpro::TScalarVector ) ) );
+                impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A2, *x, *y2, *rowcb, *colcb );
+
+                hpro::DBG::write( y1.get(), "y1.mat", "y1" );
+                hpro::DBG::write( y2.get(), "y2.mat", "y2" );
+            }
+            
             auto  x = A2->col_vector();
             auto  y = A2->row_vector();
 
@@ -205,7 +222,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    seq::uniform::mul_vec( value_t(1), hpro::apply_normal, *A2, *x, *y, *rowcb, *colcb );
+                    impl::uniform::mul_vec( value_t(1), hpro::apply_normal, *A2, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );

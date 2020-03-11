@@ -36,17 +36,17 @@ using  indexset = hpro::TIndexSet;
 using  matrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
 
 void
-build_matrix_map ( const clustertree &    ct,
+build_matrix_map ( const cluster_tree &   ct,
                    const hpro::TMatrix &  M,
                    matrix_map_t &         mat_map,
                    const bool             adjoint );
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const clustertree &  ct,
-                  matrix_map_t &       mat_map,
-                  const accuracy &     acc,
-                  const bool           adjoint );
+construct_basis ( const cluster_tree &  ct,
+                  matrix_map_t &        mat_map,
+                  const accuracy &      acc,
+                  const bool            adjoint );
 
 }// namespace detail
 
@@ -58,8 +58,8 @@ construct_basis ( const clustertree &  ct,
 template < typename value_t >
 std::pair< std::unique_ptr< cluster_basis< value_t > >,
            std::unique_ptr< cluster_basis< value_t > > >
-construct_from_H ( const clustertree &    rowct,
-                   const clustertree &    colct,
+construct_from_H ( const cluster_tree &   rowct,
+                   const cluster_tree &   colct,
                    const hpro::TMatrix &  M,
                    const accuracy &       acc )
 {
@@ -111,7 +111,7 @@ V ( const hpro::TRkMatrix *  M,
 // construct map from index sets to matrix blocks for row clusters
 //
 void
-build_matrix_map ( const clustertree &    ct,
+build_matrix_map ( const cluster_tree &   ct,
                    const hpro::TMatrix &  M,
                    matrix_map_t &         mat_map,
                    const bool             adjoint )
@@ -177,10 +177,10 @@ build_matrix_map ( const clustertree &    ct,
 //
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const clustertree &  ct,
-                  matrix_map_t &       mat_map,
-                  const accuracy &     acc,
-                  const bool           adjoint )
+construct_basis ( const cluster_tree &  ct,
+                  matrix_map_t &        mat_map,
+                  const accuracy &      acc,
+                  const bool            adjoint )
 {
     auto  cb = std::make_unique< cluster_basis< value_t > >( ct );
 
