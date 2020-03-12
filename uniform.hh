@@ -208,8 +208,8 @@ program_main ()
                                hpro::blas_vec< value_t >( ptrcast( y1.get(), hpro::TScalarVector ) ) );
                 impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A2, *x, *y2, *rowcb, *colcb );
 
-                hpro::DBG::write( y1.get(), "y1.mat", "y1" );
-                hpro::DBG::write( y2.get(), "y2.mat", "y2" );
+                y1->axpy( -1.0, y2.get() );
+                std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
             }
             
             auto  x = A2->col_vector();

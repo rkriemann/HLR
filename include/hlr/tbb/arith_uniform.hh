@@ -13,6 +13,7 @@
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
+#include <hlr/utils/hash.hh>
 
 namespace hlr { namespace tbb { namespace uniform {
 
@@ -35,6 +36,8 @@ using hlr::matrix::uniform_lrmatrix;
 using hlr::vector::scalar_vector;
 using hlr::vector::uniform_vector;
 
+using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >, indexset_hash >;
+
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
 // For dense blocks of M, the actual result is directly updated.
@@ -47,7 +50,8 @@ mul_vec ( const value_t                                       alpha,
           const uniform_vector< cluster_basis< value_t > > &  x,
           uniform_vector< cluster_basis< value_t > > &        y,
           const scalar_vector &                               sx,
-          scalar_vector &                                     sy )
+          scalar_vector &                                     sy,
+          mutex_map_t &                                       mtx_map )
 {
     if ( is_blocked( M ) )
     {
@@ -72,7 +76,7 @@ mul_vec ( const value_t                                       alpha,
                             auto  x_i = x.block( i );
                             auto  y_j = y.block( j );
                             
-                            mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy );
+                            mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy, mtx_map );
                         }// if
                     }// for
                 }// for
@@ -80,9 +84,11 @@ mul_vec ( const value_t                                       alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D   = cptrcast( &M, TDenseMatrix );
-        auto  x_i = blas::vector< value_t >( blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D    = cptrcast( &M, TDenseMatrix );
+        auto  x_i  = blas::vector< value_t >( blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j  = blas::vector< value_t >( blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  mtx  = mtx_map[ M.row_is( op_M ) ].get();
+        auto  lock = std::scoped_lock( *mtx );
         
         blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
     }// if
@@ -92,14 +98,20 @@ mul_vec ( const value_t                                       alpha,
         
         if ( op_M == hpro::apply_normal )
         {
+            std::scoped_lock  lock( y.mutex() );
+
             blas::mulvec( value_t(1), R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
         }// if
         else if ( op_M == hpro::apply_transposed )
         {
+            std::scoped_lock  lock( y.mutex() );
+
             HLR_ASSERT( false );
         }// if
         else if ( op_M == hpro::apply_adjoint )
         {
+            std::scoped_lock  lock( y.mutex() );
+            
             blas::mulvec( value_t(1), blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
         }// if
     }// if
@@ -146,12 +158,15 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 {
     auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
 
+    std::cout << u->ofs() << std::endl;
+    
     if ( cb.nsons() > 0 )
     {
         ::tbb::parallel_for( uint(0), cb.nsons(),
                              [&] ( const uint  i )
                              {
                                  u->set_block( i, make_uniform( *cb.son(i) ).release() );
+                                 std::cout << "    " << u->block(i)->ofs() << std::endl;
                              } );
     }// if
 
@@ -171,7 +186,7 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
         auto  x   = u.basis().transform_backward( u.coeffs() );
         auto  v_u = blas::vector< value_t >( blas_vec< value_t >( v ), u.is() - v.ofs() );
             
-        blas::add( value_t(1), x, v_u );
+        // blas::add( value_t(1), x, v_u );
     }// if
 
     if ( u.nblocks() > 0 )
@@ -183,7 +198,26 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
                              } );
     }// if
 }
-    
+
+//
+// generate mapping of index set to mutices for leaf clusters
+//
+template < typename value_t >
+void
+build_mutex_map ( const cluster_basis< value_t > &  cb,
+                  mutex_map_t &                     mtx_map )
+{
+    if ( cb.nsons() == 0 )
+    {
+        mtx_map[ cb.cluster() ] = std::make_unique< std::mutex >();
+    }// if
+    else
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            build_mutex_map( *cb.son(i), mtx_map );
+    }// else
+}
+
 }// namespace detail
 
 template < typename value_t >
@@ -206,13 +240,16 @@ mul_vec ( const value_t                            alpha,
     // construct uniform representation of y
     //
 
+    detail::mutex_map_t  mtx_map;
+    
     auto  sx = cptrcast( & x, vector::scalar_vector );
     auto  sy = ptrcast(  & y, vector::scalar_vector );
 
     auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? rowcb : colcb, * sx );
     auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? colcb : rowcb );
 
-    detail::mul_vec( alpha, op_M, M, *ux, *uy, *sx, *sy );
+    detail::build_mutex_map( rowcb, mtx_map );
+    detail::mul_vec( alpha, op_M, M, *ux, *uy, *sx, *sy, mtx_map );
     detail::add_uniform_to_scalar( *uy, *sy );
 }
 

@@ -9,6 +9,7 @@
 //
 
 #include <type_traits>
+#include <mutex>
 
 #include <hpro/vector/TVector.hh>
 
@@ -54,6 +55,9 @@ private:
     
     // sub blocks
     std::vector< sub_block_t * >  _blocks;
+
+    // for mutual exclusion
+    std::mutex                    _mutex;
     
 public:
     //
@@ -102,7 +106,7 @@ public:
     }
     
     //
-    // access internal data
+    // access basis and coefficients
     //
 
     const cluster_basis_t &          basis  () const { return *_basis; }
@@ -137,7 +141,13 @@ public:
     }
     
     //
-    // vector data
+    // access mutex
+    //
+
+    std::mutex &  mutex () { return _mutex; }
+    
+    //
+    // general vector data
     //
     
     virtual size_t  size  () const { return _is.size(); }
