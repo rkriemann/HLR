@@ -329,7 +329,7 @@ norm_2 ( const matrix_t &  A,
             norm_y = lambda_new = y->norm2();
         }// else
 
-        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.4e (%.4e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
+        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.8e (%.8e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
         
         // test against given tolerance
         if ( std::abs( ( lambda_new - lambda ) / lambda ) < tol )

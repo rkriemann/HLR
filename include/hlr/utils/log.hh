@@ -32,8 +32,8 @@ error ( const msg_t &  msg )
 // throw exception with file info
 #define HLR_ERROR( msg )                                                \
     throw std::runtime_error( hlr::term::italic( __FILE__ + HLIB::to_string( ":%d", __LINE__ ) ) + \
-                              std::string( " in " ) + hlr::term::italic( __PRETTY_FUNCTION__ ) + \
                               std::string( " : " ) + hlr::term::red( msg ) )
+//                            std::string( " in " ) + hlr::term::italic( __PRETTY_FUNCTION__ ) + 
 
 // always-on-assert
 #define HLR_ASSERT( expr )                                              \

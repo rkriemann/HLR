@@ -978,7 +978,7 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  tile_size )
 
 template < typename matrixX_t, typename matrixY_t >
 void
-tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc &  acc )
+tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), beta, *(Y.data), ntile );
 }

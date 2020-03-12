@@ -49,8 +49,8 @@ mul_vec ( const value_t                                       alpha,
           const hpro::TMatrix &                               M,
           const uniform_vector< cluster_basis< value_t > > &  x,
           uniform_vector< cluster_basis< value_t > > &        y,
-          const scalar_vector &                               sx,
-          scalar_vector &                                     sy,
+          const scalar_vector< value_t > &                    sx,
+          scalar_vector< value_t > &                          sy,
           mutex_map_t &                                       mtx_map )
 {
     if ( is_blocked( M ) )
@@ -73,10 +73,10 @@ mul_vec ( const value_t                                       alpha,
             
                         if ( ! is_null( B_ij ) )
                         {
-                            auto  x_i = x.block( i );
-                            auto  y_j = y.block( j );
+                            auto  x_j = x.block( j );
+                            auto  y_i = y.block( i );
                             
-                            mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy, mtx_map );
+                            mul_vec( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy, mtx_map );
                         }// if
                     }// for
                 }// for
@@ -125,7 +125,7 @@ mul_vec ( const value_t                                       alpha,
 template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
-                    const scalar_vector &             v )
+                    const scalar_vector< value_t > &  v )
 {
     auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
 
@@ -158,15 +158,12 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 {
     auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
 
-    std::cout << u->ofs() << std::endl;
-    
     if ( cb.nsons() > 0 )
     {
         ::tbb::parallel_for( uint(0), cb.nsons(),
                              [&] ( const uint  i )
                              {
                                  u->set_block( i, make_uniform( *cb.son(i) ).release() );
-                                 std::cout << "    " << u->block(i)->ofs() << std::endl;
                              } );
     }// if
 
@@ -179,14 +176,14 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 template < typename value_t >
 void
 add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
-                        scalar_vector &                                     v )
+                        scalar_vector< value_t > &                          v )
 {
     if ( u.basis().rank() > 0 )
     {
         auto  x   = u.basis().transform_backward( u.coeffs() );
         auto  v_u = blas::vector< value_t >( blas_vec< value_t >( v ), u.is() - v.ofs() );
             
-        // blas::add( value_t(1), x, v_u );
+        blas::add( value_t(1), x, v_u );
     }// if
 
     if ( u.nblocks() > 0 )
@@ -222,35 +219,33 @@ build_mutex_map ( const cluster_basis< value_t > &  cb,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                            alpha,
-          const matop_t                            op_M,
-          const TMatrix &                          M,
-          const hpro::TVector &                    x,
-          hpro::TVector &                          y,
-          hlr::matrix::cluster_basis< value_t > &  rowcb,
-          hlr::matrix::cluster_basis< value_t > &  colcb )
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y,
+          hlr::matrix::cluster_basis< value_t > &   rowcb,
+          hlr::matrix::cluster_basis< value_t > &   colcb )
 {
     if ( alpha == value_t(0) )
         return;
 
     HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( vector::is_scalar( x ) && vector::is_scalar( y ) );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
     
     //
-    // construct uniform representation of y
+    // construct uniform representation of x and y
     //
 
     detail::mutex_map_t  mtx_map;
     
-    auto  sx = cptrcast( & x, vector::scalar_vector );
-    auto  sy = ptrcast(  & y, vector::scalar_vector );
-
-    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? rowcb : colcb, * sx );
-    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? colcb : rowcb );
+    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
 
     detail::build_mutex_map( rowcb, mtx_map );
-    detail::mul_vec( alpha, op_M, M, *ux, *uy, *sx, *sy, mtx_map );
-    detail::add_uniform_to_scalar( *uy, *sy );
+    detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
+    detail::add_uniform_to_scalar( *uy, y );
 }
 
 }}}// namespace hlr::tbb::uniform

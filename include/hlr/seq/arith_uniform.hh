@@ -45,28 +45,29 @@ mul_vec ( const value_t                                       alpha,
           const hpro::TMatrix &                               M,
           const uniform_vector< cluster_basis< value_t > > &  x,
           uniform_vector< cluster_basis< value_t > > &        y,
-          const scalar_vector &                               sx,
-          scalar_vector &                                     sy )
+          const scalar_vector< value_t > &                    sx,
+          scalar_vector< value_t > &                          sy )
 {
     if ( is_blocked( M ) )
     {
         auto  B = cptrcast( &M, TBlockMatrix );
 
-        HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
-                   ( B->nblock_cols( op_M ) == x.nblocks() ));
+        if ( ! (( B->nblock_rows( op_M ) == y.nblocks() ) &&
+                ( B->nblock_cols( op_M ) == x.nblocks() )) )
+            HLR_ERROR( "error" );
             
         for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
         {
-            auto  x_i = x.block( i );
+            auto  y_i = y.block( i );
             
             for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
             {
                 auto  B_ij = B->block( i, j, op_M );
-                auto  y_j  = y.block( j );
+                auto  x_j  = x.block( j );
             
                 if ( ! is_null( B_ij ) )
                 {
-                    mul_vec( alpha, op_M, *B_ij, *x_i, *y_j, sx, sy );
+                    mul_vec( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
                 }// if
             }// for
         }// for
@@ -106,7 +107,7 @@ mul_vec ( const value_t                                       alpha,
 template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
-                    const scalar_vector &             v )
+                    const scalar_vector< value_t > &  v )
 {
     auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
 
@@ -151,7 +152,7 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 template < typename value_t >
 void
 add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
-                        scalar_vector &                                     v )
+                        scalar_vector< value_t > &                          v )
 {
     if ( u.basis().rank() > 0 )
     {
@@ -172,32 +173,30 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                       alpha,
-          const matop_t                       op_M,
-          const TMatrix &                     M,
-          const hpro::TVector &               x,
-          hpro::TVector &                     y,
-          matrix::cluster_basis< value_t > &  rowcb,
-          matrix::cluster_basis< value_t > &  colcb )
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y,
+          matrix::cluster_basis< value_t > &        rowcb,
+          matrix::cluster_basis< value_t > &        colcb )
 {
     if ( alpha == value_t(0) )
         return;
 
     HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( vector::is_scalar( x ) && vector::is_scalar( y ) );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
     
     //
-    // construct uniform representation of y
+    // construct uniform representation of x and y
     //
 
-    auto  sx = cptrcast( & x, vector::scalar_vector );
-    auto  sy = ptrcast(  & y, vector::scalar_vector );
+    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
 
-    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? rowcb : colcb, * sx );
-    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? colcb : rowcb );
-
-    detail::mul_vec( alpha, op_M, M, *ux, *uy, *sx, *sy );
-    detail::add_uniform_to_scalar( *uy, *sy );
+    detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
+    detail::add_uniform_to_scalar( *uy, y );
 }
 
 }}}// namespace hlr::seq::uniform

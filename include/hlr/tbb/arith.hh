@@ -60,6 +60,21 @@ mul_vec ( const value_t                    alpha,
     detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
 }
 
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+
+    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
+}
+
 //
 // compute C = C + α op( A ) op( B )
 //

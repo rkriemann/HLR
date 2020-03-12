@@ -22,6 +22,7 @@
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
+#include "hlr/vector/scalar_vector.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/norm.hh"
 
@@ -160,6 +161,24 @@ mul_vec ( const value_t                    alpha,
     }// if
     else
         assert( false );
+}
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+
+    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
 }
 
 //

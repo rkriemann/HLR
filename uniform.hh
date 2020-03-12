@@ -65,6 +65,7 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -96,6 +97,15 @@ program_main ()
         
         runtime.clear();
     }
+
+    //
+    // set up reference vector for mat-vec error tests
+
+    auto  x_ref = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+    auto  y_ref = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+    x_ref->fill( 1 );
+    impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A, *x_ref, *y_ref );
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -103,6 +113,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
 
@@ -129,27 +140,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
-        {
-            auto  x  = A->row_vector();
-            auto  y1 = A->row_vector();
-            auto  y2 = A->row_vector();
-
-            x->fill_rand( 1 );
-            y1->fill( 0 );
-            y2->fill( 0 );
-
-            A->mul_vec(  hpro::real(1), x.get(), (1), y1.get(), hpro::apply_normal );
-            A2->mul_vec( hpro::real(1), x.get(), hpro::real(1), y2.get(), hpro::apply_normal );
-
-            hpro::DBG::write( y1.get(), "y1.mat", "y1" );
-            hpro::DBG::write( y2.get(), "y2.mat", "y2" );
-
-            y1->axpy( -1, y2.get() );
-            std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
-        }
-        
         auto  diff  = hpro::matrix_sum( value_t(1), A.get(), value_t(-1), A2.get() );
-        auto  error = hlr::seq::norm::norm_2( *diff );
+        auto  error = hlr::seq::norm::norm_2( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error ) << std::endl;
 
@@ -160,20 +152,30 @@ program_main ()
         // mat-vec benchmark
         //
 
+        if ( true )
         {
             std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
-            blas::vector< value_t >  x( A2->ncols() );
-            blas::vector< value_t >  y( A2->nrows() );
+            {
+                auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
 
-            blas::fill( value_t(1), x );
+                impl::mul_vec( value_t(1), hpro::apply_normal, *A2, *x_ref, *y );
+
+                y->axpy( -1.0, y_ref.get() );
+                std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
+            }
+            
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A2->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
+
+            x->fill( 1 );
             
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A2, x, y );
+                    impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A2, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -181,7 +183,7 @@ program_main ()
                 std::cout << "    mvm in   " << format_time( toc ) << std::endl;
 
                 if ( i < nbench-1 )
-                    blas::fill( value_t(0), y );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )
@@ -192,28 +194,21 @@ program_main ()
             runtime.clear();
         }
 
+        if ( true )
         {
             std::cout << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
 
             {
-                auto  x  = A2->col_vector();
-                auto  y1 = A2->row_vector();
-                auto  y2 = A2->row_vector();
+                auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
 
-                x->fill( 1 );
-            
-                impl::mul_vec( value_t(1),
-                               hpro::apply_adjoint, *A2,
-                               hpro::blas_vec< value_t >( cptrcast( x.get(), hpro::TScalarVector ) ),
-                               hpro::blas_vec< value_t >( ptrcast( y1.get(), hpro::TScalarVector ) ) );
-                impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A2, *x, *y2, *rowcb, *colcb );
+                impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A2, *x_ref, *y, *rowcb, *colcb );
 
-                y1->axpy( -1.0, y2.get() );
-                std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
+                y->axpy( -1.0, y_ref.get() );
+                std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
             }
             
-            auto  x = A2->col_vector();
-            auto  y = A2->row_vector();
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A2->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
 
             x->fill( 1 );
             
@@ -248,6 +243,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "H² matrix" << term::reset << std::endl;
 
@@ -290,33 +286,23 @@ program_main ()
             mvis.svd( false ).print( A2.get(), "A2" );
         }// if
 
-        {
-            auto  x  = A->row_vector();
-            auto  y1 = A->row_vector();
-            auto  y2 = A->row_vector();
-
-            x->fill_rand( 1 );
-            y1->fill( 0 );
-            y2->fill( 0 );
-
-            A->mul_vec(  hpro::real(1), x.get(), (1), y1.get(), hpro::apply_normal );
-            A2->mul_vec( hpro::real(1), x.get(), hpro::real(1), y2.get(), hpro::apply_normal );
-
-            hpro::DBG::write( y1.get(), "y1.mat", "y1" );
-            hpro::DBG::write( y2.get(), "y2.mat", "y2" );
-
-            y1->axpy( -1, y2.get() );
-            std::cout << "    error  = " << format_error( y1->norm2() ) << std::endl;
-        }
-        
         //
         // mat-vec benchmark
         //
 
         std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
-        auto  x = A2->col_vector();
-        auto  y = A2->row_vector();
+        {
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            A2->mul_vec( 1.0, x_ref.get(), 1.0, y.get(), hpro::apply_normal );
+
+            y->axpy( -1.0, y_ref.get() );
+            std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
+        }
+            
+        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A2->col_is() );
+        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
 
         x->fill( 1 );
             
@@ -325,7 +311,7 @@ program_main ()
             tic = timer::now();
     
             for ( int j = 0; j < 50; ++j )
-                A->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+                A2->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
