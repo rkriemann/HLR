@@ -13,10 +13,4 @@ namespace          impl      = hlr::omp;
 const std::string  impl_name = "omp";
 
 #include "hodlr.hh"
-
-int
-main ( int argc, char ** argv )
-{
-    return hlrmain( argc, argv );
-}
-
+#include "seq.hh"

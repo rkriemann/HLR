@@ -14,6 +14,7 @@
 
 #include <hpro/matrix/structure.hh>
 
+#include "hlr/arith/blas.hh"
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
@@ -28,7 +29,6 @@ namespace hlr { namespace dag {
 
 // map HLIB namespaces to HLR
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -45,7 +45,6 @@ using  vector   = blas::Vector< value_t >;
 
 // import matrix types
 using hlr::matrix::indexset;
-using hlr::matrix::range;
 using hlr::matrix::tile;
 using hlr::matrix::tile_storage;
 using hlr::matrix::tiled_lrmatrix;
@@ -979,7 +978,7 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  tile_size )
 
 template < typename matrixX_t, typename matrixY_t >
 void
-tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc &  acc )
+tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), beta, *(Y.data), ntile );
 }
@@ -1227,8 +1226,8 @@ tsqr_node::run_ ( const TTruncAcc & )
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
         matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
-        matrix< real >  XU_X( XU, range::all, range( 0, X_is.ncols()-1 ) );
-        matrix< real >  XU_U( XU, range::all, range( X_is.ncols(), XU.ncols()-1 ) );
+        matrix< real >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
+        matrix< real >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
 
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
@@ -1257,8 +1256,8 @@ tsqr_node::run_ ( const TTruncAcc & )
         const auto      U_is = U.data->at( U.is );
         auto            W    = blas::prod( alpha, X_is, *(T.data) );
         matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
-        matrix< real >  WU_W( WU, range::all, range( 0, W.ncols()-1 ) );
-        matrix< real >  WU_U( WU, range::all, range( W.ncols(), WU.ncols()-1 ) );
+        matrix< real >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        matrix< real >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
@@ -1284,8 +1283,8 @@ qr_node::run_ ( const TTruncAcc & )
     // Q = | R0 |
     //     | R1 |
     matrix< real >  Q(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
-    matrix< real >  Q_0( Q, range(                0, R0.data->nrows()-1 ), range::all );
-    matrix< real >  Q_1( Q, range( R0.data->nrows(), Q.nrows()-1        ), range::all );
+    matrix< real >  Q_0( Q, blas::range(                0, R0.data->nrows()-1 ), blas::range::all );
+    matrix< real >  Q_1( Q, blas::range( R0.data->nrows(), Q.nrows()-1        ), blas::range::all );
         
     blas::copy( *(R0.data), Q_0 );
     blas::copy( *(R1.data), Q_1 );
@@ -1320,8 +1319,8 @@ svd_node::run_ ( const TTruncAcc &  acc )
     // for ( size_t  i = 0; i < k; ++i )
     //     std::cout << Ss(i) << std::endl;
     
-    matrix< real >  Usk( Us, range::all, range( 0, k-1 ) );
-    matrix< real >  Vsk( Vs, range::all, range( 0, k-1 ) );
+    matrix< real >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+    matrix< real >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
     blas::prod_diag( Usk, Ss, k );
 

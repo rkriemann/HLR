@@ -15,12 +15,4 @@ namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
 #include "tiled-hodlr.hh"
-
-int
-main ( int argc, char ** argv )
-{
-    HLIB::CFG::set_nthreads( 1 );
-
-    return hlrmain( argc, argv );
-}
-
+#include "seq.hh"

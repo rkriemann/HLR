@@ -141,7 +141,7 @@ lu ( TMatrix *          A,
         // DBG::printf( "step %d", i );
         
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
-        auto  p_ii = A_ii->procs().master();
+        int   p_ii = A_ii->procs().master();
 
         if ( pid == p_ii )
         {
@@ -180,8 +180,8 @@ lu ( TMatrix *          A,
                 // for ( uint  j = i+1; j < nbr; ++j )
                 {
                     // L is unit diagonal !!! Only solve with U
-                    auto        A_ji = BA->block( j, i );
-                    const auto  p_ji = A_ji->procs().master();
+                    auto       A_ji = BA->block( j, i );
+                    const int  p_ji = A_ji->procs().master();
                     
                     if ( pid == p_ji )
                     {
@@ -203,7 +203,7 @@ lu ( TMatrix *          A,
         for ( uint  j = i+1; j < nbr; ++j )
         {
             const auto  A_ji = BA->block( j, i );
-            const auto  p_ji = A_ji->procs().master();
+            const int   p_ji = A_ji->procs().master();
             
             // broadcast A_ji to all processors in row j
             if ( contains( row_procs[j], pid ) )
@@ -226,7 +226,7 @@ lu ( TMatrix *          A,
         for ( uint  l = i+1; l < nbc; ++l )
         {
             const auto  A_il = BA->block( i, l );
-            const auto  p_il = A_il->procs().master();
+            const int   p_il = A_il->procs().master();
             
             // broadcast A_il to all processors in column l
             if ( contains( col_procs[l], pid ) )
@@ -269,8 +269,8 @@ lu ( TMatrix *          A,
                         // update local matrix block
                         //
                         
-                        auto        A_jl = BA->block( j, l );
-                        const auto  p_jl = A_jl->procs().master();
+                        auto       A_jl = BA->block( j, l );
+                        const int  p_jl = A_jl->procs().master();
                         
                         if ( pid == p_jl )
                             multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc );
@@ -373,7 +373,7 @@ lu ( TMatrix *          A,
         log( 4, HLIB::to_string( "step %d", i ) );
         
         auto  A_ii = BA->block( i, i );
-        auto  p_ii = A_ii->procs().master();
+        int   p_ii = A_ii->procs().master();
 
         assert( A_ii->procs().size() == 1 );
         
@@ -445,8 +445,8 @@ lu ( TMatrix *          A,
             for ( uint  j = i+1; j < nbr; ++j )
             {
                 // L is unit diagonal !!! Only solve with U
-                auto        A_ji = BA->block( j, i );
-                const auto  p_ji = A_ji->procs().master();
+                auto       A_ji = BA->block( j, i );
+                const int  p_ji = A_ji->procs().master();
 
                 assert( A_ji->procs().size() == 1 );
                 
@@ -464,8 +464,8 @@ lu ( TMatrix *          A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 // L is unit diagonal !!! Only solve with U
-                auto        A_il = BA->block( i, l );
-                const auto  p_il = A_il->procs().master();
+                auto       A_il = BA->block( i, l );
+                const int  p_il = A_il->procs().master();
                 
                 assert( A_il->procs().size() == 1 );
                 
@@ -493,7 +493,7 @@ lu ( TMatrix *          A,
         for ( uint  j = i+1; j < nbr; ++j )
         {
             const auto  A_ji = BA->block( j, i );
-            const auto  p_ji = A_ji->procs().master();
+            const int   p_ji = A_ji->procs().master();
             
             // broadcast A_ji to all processors in row j
             if ( contains( row_procs[j], pid ) )
@@ -530,7 +530,7 @@ lu ( TMatrix *          A,
         for ( uint  l = i+1; l < nbc; ++l )
         {
             const auto  A_il = BA->block( i, l );
-            const auto  p_il = A_il->procs().master();
+            const int   p_il = A_il->procs().master();
             
             // broadcast A_il to all processors in column l
             if ( contains( col_procs[l], pid ) )
@@ -582,8 +582,8 @@ lu ( TMatrix *          A,
                 // update local matrix block
                 //
                 
-                auto        A_jl = BA->block( j, l );
-                const auto  p_jl = A_jl->procs().master();
+                auto       A_jl = BA->block( j, l );
+                const int  p_jl = A_jl->procs().master();
                 
                 if ( pid == p_jl )
                 {

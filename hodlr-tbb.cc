@@ -13,10 +13,4 @@ namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
 #include "hodlr.hh"
-
-int
-main ( int argc, char ** argv )
-{
-    return hlrmain( argc, argv );
-}
-
+#include "tbb.hh"

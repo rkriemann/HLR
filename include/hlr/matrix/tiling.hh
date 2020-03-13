@@ -2,7 +2,7 @@
 #define __HLR_MATRIX_TILING_HH
 //
 // Project     : HLib
-// File        : arith.hh
+// Module      : matrix/tiling
 // Description : tiling related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
@@ -13,25 +13,15 @@
 #include <hpro/cluster/TCluster.hh>
 
 #include <hlr/utils/checks.hh>
+#include <hlr/utils/hash.hh>
 #include <hlr/utils/log.hh>
 
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
 using  indexset = hpro::TIndexSet;
-
-// hash function for index sets (for mapping below)
-struct indexset_hash
-{
-    size_t operator () ( const HLIB::TIndexSet &  is ) const
-    {
-        return ( std::hash< HLIB::idx_t >()( is.first() ) ^
-                 std::hash< HLIB::idx_t >()( is.last()  ) );
-    }
-};
 
 // mapping of clusters (indexsets) to tile indexsets
 using  tile_is_map_t = std::unordered_map< indexset, std::deque< indexset >, indexset_hash >;
@@ -61,7 +51,7 @@ setup_tiling ( const hpro::TCluster &  cl,
             {
                 setup_tiling( * son, tile_map );
 
-                if ( ! tile_map.contains( *son ) )
+                if ( tile_map.find( *son ) == tile_map.end() )
                     HLR_ERROR( "setup_tiling : son tiles missing" );
                 
                 if ( tile_map.at( *son ).size() == 0 )

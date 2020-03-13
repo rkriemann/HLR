@@ -19,7 +19,6 @@ namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 namespace math = hpro::Math;
 
 using hpro::real;

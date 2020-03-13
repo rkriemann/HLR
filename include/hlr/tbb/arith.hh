@@ -18,6 +18,7 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
@@ -30,7 +31,6 @@
 namespace hlr { namespace tbb {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -48,8 +48,8 @@ void
 mul_vec ( const value_t                    alpha,
           const hpro::matop_t              op_M,
           const hpro::TMatrix &            M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
 {
     auto        mtx_map = detail::mutex_map_t();
     const auto  is      = M.row_is( op_M );
@@ -58,6 +58,21 @@ mul_vec ( const value_t                    alpha,
         mtx_map[ i ] = std::make_unique< std::mutex >();
     
     detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
+}
+
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+
+    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
 }
 
 //
@@ -254,8 +269,8 @@ namespace hodlr
 //
 template < typename value_t >
 void
-addlr ( blas::Matrix< value_t > &  U,
-        blas::Matrix< value_t > &  V,
+addlr ( blas::matrix< value_t > &  U,
+        blas::matrix< value_t > &  V,
         hpro::TMatrix *            A,
         const hpro::TTruncAcc &    acc )
 {
@@ -269,10 +284,10 @@ addlr ( blas::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         ::tbb::parallel_invoke( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); },
                                 [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); },

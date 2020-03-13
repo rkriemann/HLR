@@ -25,7 +25,6 @@ namespace hlr
 {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
     
 namespace tbb
 {
@@ -117,6 +116,7 @@ build ( const hpro::TBlockCluster *  bct,
     }// else
 
     // copy properties from the cluster
+    M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
@@ -511,6 +511,84 @@ realloc ( hpro::TMatrix *  A )
         delete A;
 
         return C;
+    }// else
+}
+
+//
+// return copy of matrix with uniform low-rank matrices
+// - TODO: add cluster basis as template argument to allow
+//         different bases
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+copy_uniform ( const hpro::TMatrix &                          M,
+               const hlr::matrix::cluster_basis< value_t > &  rowcb,
+               const hlr::matrix::cluster_basis< value_t > &  colcb )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+
+        HLR_ASSERT( B->nblock_rows() == rowcb.nsons() );
+        HLR_ASSERT( B->nblock_cols() == colcb.nsons() );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = copy_uniform( * BM->block( i, j ), * rowcb.son(i), * colcb.son(j) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        //
+        // project into row/column cluster basis:
+        //
+        //   M = A·B^H = (V·V^H·A) (U·U^H·B)^H
+        //             = U · (U^H·A)·(V^H·B)^H · V^H
+        //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
+
+        auto  R  = cptrcast( &M, hpro::TRkMatrix );
+
+        auto  UA = rowcb.transform_forward( hpro::blas_mat_A< value_t >( R ) );
+        auto  VB = colcb.transform_forward( hpro::blas_mat_B< value_t >( R ) );
+        auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
+
+        // auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
+        // auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
+        // auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
+
+        // blas::add( value_t(-1), M2, M1 );
+        
+        // std::cout << blas::norm_F( M1 ) << std::endl;
+        
+        return std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                             rowcb, colcb,
+                                                                             std::move( S ) );
+    }// if
+    else
+    {
+        // assuming dense block (no low-rank)
+        return M.copy();
     }// else
 }
 

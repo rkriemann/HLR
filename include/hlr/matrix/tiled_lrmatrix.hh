@@ -22,7 +22,7 @@ namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
+//namespace blas = hpro::BLAS;
 
 using hpro::real;
 using hpro::complex;

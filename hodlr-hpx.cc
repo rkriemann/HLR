@@ -15,17 +15,4 @@ namespace          impl      = hlr::hpx;
 const std::string  impl_name = "hpx";
 
 #include "hodlr.hh"
-
-int
-hpx_main ( int argc, char ** argv )
-{
-    hlrmain( argc, argv );
-    
-    return ::hpx::finalize();
-}
-
-int
-main ( int argc, char ** argv )
-{
-    return ::hpx::init( argc, argv );
-}
+#include "hpx.hh"

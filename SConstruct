@@ -22,7 +22,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++2a'
+CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
@@ -55,7 +55,8 @@ PROGRAMS     = [ 'tlr',
                  'dag-gauss',
                  'dag-inv',
                  'dag-waz',
-                 'dag-hodlr' ]
+                 'dag-hodlr',
+                 'uniform' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq',
@@ -415,9 +416,11 @@ libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/helmholtz.cc',
                                      'src/dag/solve.cc',
                                      'src/matrix/level_matrix.cc',
                                      'src/matrix/luinv_eval.cc',
+                                     'src/matrix/print.cc',
                                      'src/seq/dag.cc',
                                      'src/seq/solve.cc',
                                      'src/utils/compare.cc',
+                                     'src/utils/eps_printer.cc',
                                      'src/utils/log.cc',
                                      'src/utils/mach.cc',
                                      'src/utils/term.cc',

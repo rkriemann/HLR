@@ -23,7 +23,7 @@ using namespace hlr;
 //
 template < typename problem_t >
 void
-mymain ( int argc, char ** argv )
+mymain ( int, char ** )
 {
     using value_t = typename problem_t::value_t;
     

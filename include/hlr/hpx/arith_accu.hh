@@ -25,7 +25,6 @@
 namespace hlr { namespace hpx { namespace accu {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 

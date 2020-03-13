@@ -8,15 +8,11 @@
 
 #include "hlr/tbb/matrix.hh"
 #include "hlr/tbb/arith.hh"
+#include "hlr/tbb/arith_tiled.hh"
+#include "hlr/tbb/arith_tiled_v2.hh"
 
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
 #include "tiled-hodlr.hh"
-
-int
-main ( int argc, char ** argv )
-{
-    return hlrmain( argc, argv );
-}
-
+#include "tbb.hh"

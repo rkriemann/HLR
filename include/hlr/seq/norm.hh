@@ -11,6 +11,7 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/blas/Algebra.hh>
 
+#include "hlr/arith/blas.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
@@ -19,7 +20,6 @@
 namespace hlr { namespace seq { namespace norm {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // return Frobenius norm of A, e.g. |A|_F
@@ -137,9 +137,9 @@ norm_F ( const hpro::TMatrix &  A )
     else if ( is_dense( A ) )
     {
         if ( A.is_complex() )
-            return blas::normF( blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
+            return blas::normF( hpro::blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
         else
-            return blas::normF( blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
+            return blas::normF( hpro::blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
     }// if
     else
     {
@@ -329,7 +329,7 @@ norm_2 ( const matrix_t &  A,
             norm_y = lambda_new = y->norm2();
         }// else
 
-        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.4e (%.4e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
+        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.8e (%.8e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
         
         // test against given tolerance
         if ( std::abs( ( lambda_new - lambda ) / lambda ) < tol )

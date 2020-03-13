@@ -14,21 +14,20 @@
 #include <hpro/cluster/TIndexSet.hh>
 #include <hpro/blas/Matrix.hh>
 
+#include <hlr/arith/blas.hh>
 #include <hlr/matrix/tiling.hh>
 
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
 using  indexset       = hpro::TIndexSet;
-using  range          = blas::Range;
 using  block_indexset = hpro::TBlockIndexSet;
 
 // tile type
 template < typename value_t >
-using  tile     = blas::Matrix< value_t >;
+using  tile     = blas::matrix< value_t >;
 
 // tile mapping type
 template < typename value_t >
@@ -200,7 +199,7 @@ public:
     {
         std::scoped_lock  lock( _mtx );
 
-        return _tiles.contains( is );
+        return _tiles.find( is ) != _tiles.end();
     }
 };
 
@@ -208,7 +207,7 @@ public:
 // convert tile_storage to blas::matrix
 //
 template < typename value_t >
-blas::Matrix< value_t >
+blas::matrix< value_t >
 to_dense ( const tile_storage< value_t > &  st )
 {
     //
@@ -231,11 +230,11 @@ to_dense ( const tile_storage< value_t > &  st )
             row_is = join( row_is, is );
     }// for
 
-    blas::Matrix< value_t >  D( row_is.size(), ncols );
+    blas::matrix< value_t >  D( row_is.size(), ncols );
 
     for ( auto & [ is, U ] : st )
     {
-        blas::Matrix< value_t >  D_i( D, is - row_is.first(), range::all );
+        blas::matrix< value_t >  D_i( D, is - row_is.first(), blas::range::all );
 
         blas::copy( U, D_i );
     }// for

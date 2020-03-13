@@ -14,27 +14,26 @@
 #include <hpro/cluster/TIndexSet.hh>
 #include <hpro/blas/Vector.hh>
 
+#include <hlr/utils/hash.hh>
+#include <hlr/arith/blas.hh>
 #include <hlr/matrix/tiling.hh>
 
 namespace hlr { namespace vector {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
 using  indexset = hpro::TIndexSet;
-using  range    = blas::Range;
 
-using hlr::matrix::indexset_hash;
 using hlr::matrix::tile_is_map_t;
 
 // tile type
 template < typename value_t >
-using  tile     = blas::Vector< value_t >;
+using  tile     = blas::vector< value_t >;
 
 // tile mapping type
 template < typename value_t >
-using  tilemap  = std::unordered_map< indexset, tile< value_t >, matrix::indexset_hash >;
+using  tilemap  = std::unordered_map< indexset, tile< value_t >, indexset_hash >;
 
 //
 // represents storage for consecutive tiles
@@ -192,7 +191,7 @@ public:
 // convert tile_storage to blas::vector
 //
 template < typename value_t >
-blas::Vector< value_t >
+blas::vector< value_t >
 to_dense ( const tile_storage< value_t > &  ts )
 {
     //
@@ -213,11 +212,11 @@ to_dense ( const tile_storage< value_t > &  ts )
             row_is = join( row_is, is );
     }// for
 
-    blas::Vector< value_t >  v( row_is.size() );
+    blas::vector< value_t >  v( row_is.size() );
 
     for ( auto & [ is, ts_i ] : ts )
     {
-        blas::Vector< value_t >  v_i( v, is - row_is.first() );
+        blas::vector< value_t >  v_i( v, is - row_is.first() );
 
         blas::copy( ts_i, v_i );
     }// for

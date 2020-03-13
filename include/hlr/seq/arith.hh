@@ -18,15 +18,17 @@
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/matrix/uniform_lrmatrix.hh"
+#include "hlr/vector/scalar_vector.hh"
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/norm.hh"
 
 namespace hlr { namespace seq {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -44,8 +46,8 @@ void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
           const TMatrix &                  M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
 {
     // assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
@@ -107,8 +109,76 @@ mul_vec ( const value_t                    alpha,
             blas::mulvec( alpha, blas_mat_B< value_t >( R ), t, value_t(1), y );
         }// if
     }// if
+    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        
+        if ( op_M == hpro::apply_normal )
+        {
+            //
+            // y = y + U·S·V^H x
+            //
+        
+            auto  t = R->col_cb().transform_forward( x );
+            auto  s = blas::mulvec( value_t(1), R->coeff(), t );
+            auto  r = R->row_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
+        }// if
+        else if ( op_M == hpro::apply_transposed )
+        {
+            //
+            // y = y + (U·S·V^H)^T x
+            //   = y + conj(V)·S^T·U^T x
+            //
+        
+            auto  cx = blas::copy( x );
+
+            blas::conj( cx );
+        
+            auto  t  = R->row_cb().transform_forward( cx );
+
+            blas::conj( t );
+        
+            auto  s = blas::mulvec( value_t(1), blas::transposed(R->coeff()), t );
+            auto  r = R->col_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
+        }// if
+        else if ( op_M == hpro::apply_adjoint )
+        {
+            //
+            // y = y + (U·S·V^H)^H x
+            //   = y + V·S^H·U^H x
+            //
+        
+            auto  t = R->row_cb().transform_forward( x );
+            auto  s = blas::mulvec( value_t(1), blas::adjoint(R->coeff()), t );
+            auto  r = R->col_cb().transform_backward( s );
+
+            blas::add( alpha, r, y );
+        }// if
+    }// if
     else
         assert( false );
+}
+
+//
+// compute y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const TMatrix &                           M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+
+    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
 }
 
 //
@@ -373,7 +443,7 @@ namespace hodlr
 template < typename value_t >
 void
 trsml ( const TMatrix *            L,
-        blas::Matrix< value_t > &  X )
+        blas::matrix< value_t > &  X )
 {
     HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
     
@@ -384,8 +454,8 @@ trsml ( const TMatrix *            L,
         auto  L10 = cptrcast( BL->block( 1, 0 ), TRkMatrix );
         auto  L11 = BL->block( 1, 1 );
 
-        blas::Matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), blas::Range::all );
+        blas::matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  X1( X, L11->row_is() - L->row_ofs(), blas::range::all );
             
         trsml( L00, X0 );
 
@@ -403,7 +473,7 @@ trsml ( const TMatrix *            L,
         
         // auto  DL = cptrcast( L, TDenseMatrix );
         
-        // blas::Matrix< value_t >  Y( X, copy_value );
+        // blas::matrix< value_t >  Y( X, copy_value );
 
         // blas::prod( value_t(1), blas_mat< value_t >( DL ), Y, value_t(0), X );
     }// else
@@ -416,7 +486,7 @@ trsml ( const TMatrix *            L,
 template < typename value_t >
 void
 trsmuh ( const TMatrix *            U,
-         blas::Matrix< value_t > &  X )
+         blas::matrix< value_t > &  X )
 {
     HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
     
@@ -427,8 +497,8 @@ trsmuh ( const TMatrix *            U,
         auto  U01 = cptrcast( BU->block( 0, 1 ), TRkMatrix );
         auto  U11 = BU->block( 1, 1 );
 
-        blas::Matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  X1( X, U11->col_is() - U->col_ofs(), blas::range::all );
             
         trsmuh( U00, X0 );
 
@@ -442,7 +512,7 @@ trsmuh ( const TMatrix *            U,
     {
         auto  DU = cptrcast( U, TDenseMatrix );
         
-        blas::Matrix< value_t >  Y( X, copy_value );
+        blas::matrix< value_t >  Y( X, copy_value );
 
         blas::prod( value_t(1), blas::adjoint( blas_mat< value_t >( DU ) ), Y, value_t(0), X );
     }// else
@@ -453,8 +523,8 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-addlr ( blas::Matrix< value_t > &  U,
-        blas::Matrix< value_t > &  V,
+addlr ( blas::matrix< value_t > &  U,
+        blas::matrix< value_t > &  V,
         TMatrix *                  A,
         const TTruncAcc &          acc )
 {
@@ -468,10 +538,10 @@ addlr ( blas::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         addlr( U0, V0, A00, acc );
         addlr( U1, V1, A11, acc );

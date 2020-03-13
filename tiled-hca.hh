@@ -53,8 +53,8 @@ program_main ()
 
     std::cout << "    dims = " << coord->ncoord() << " × " << coord->ncoord() << std::endl;
     
-    auto  ct      = cluster::h::cluster( *coord, ntile );
-    auto  bct     = cluster::h::blockcluster( *ct, *ct );
+    auto  ct      = gen_ct( *coord );
+    auto  bct     = gen_bct( *ct, *ct );
     
     if ( verbose( 3 ) )
     {
@@ -179,8 +179,8 @@ program_main ()
         // mat-vec benchmark
         //
 
-        blas::Vector< value_t >  x( M_hca->ncols() );
-        blas::Vector< value_t >  y( M_hca->nrows() );
+        blas::vector< value_t >  x( M_hca->ncols() );
+        blas::vector< value_t >  y( M_hca->nrows() );
 
         blas::fill( value_t(1), x );
             

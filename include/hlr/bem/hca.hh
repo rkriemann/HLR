@@ -15,7 +15,6 @@
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 
 using namespace hpro;
 
@@ -106,19 +105,19 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     // integrals at index positions/pivot elements
     //
 
-    blas::Matrix< value_t >
+    blas::matrix< value_t >
     compute_U  ( const TIndexSet &                rowis,
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
                  const tensor_grid< real_t > &    col_grid,
-                 const blas::Matrix< value_t > &  G ) const
+                 const blas::matrix< value_t > &  G ) const
     {
         std::vector< T3Point >  y_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
 
-        blas::Matrix< value_t >  U( rowis.size(), rank );
+        blas::matrix< value_t >  U( rowis.size(), rank );
 
         base_class::generator_fn().integrate_dx( rowis, y_pts, U );
 
@@ -126,7 +125,7 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
         return blas::prod( value_t(1), U, G );
     }
 
-    blas::Matrix< value_t >
+    blas::matrix< value_t >
     compute_V  ( const TIndexSet &              colis,
                  const size_t                   rank,
                  const pivot_arr_t &            pivots,
@@ -137,7 +136,7 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );
 
-        blas::Matrix< value_t >  V( colis.size(), rank );
+        blas::matrix< value_t >  V( colis.size(), rank );
 
         base_class::generator_fn().integrate_dy( colis, x_pts, V );
 

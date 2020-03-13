@@ -12,6 +12,9 @@
 #include "common-main.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/cluster/hodlr.hh"
+#include "hlr/cluster/tlr.hh"
+#include "hlr/cluster/mblr.hh"
+#include "hlr/cluster/tileh.hh"
 #include "hlr/matrix/level_matrix.hh"
 #include "hlr/matrix/luinv_eval.hh"
 #include "hlr/dag/lu.hh"
@@ -39,14 +42,16 @@ program_main ()
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
-        auto  ct      = cluster::h::cluster( *coord, ntile );
-        auto  bct     = cluster::h::blockcluster( *ct, *ct );
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
     
         if ( hpro::verbose( 3 ) )
         {
-            hpro::TPSBlockClusterVis   bc_vis;
+            hpro::TPSClusterVis       cl_vis;
+            hpro::TPSBlockClusterVis  bc_vis;
         
-            bc_vis.id( true ).print( bct->root(), "bct" );
+            cl_vis.print( ct->root(), "ct" );
+            bc_vis.id( false ).print( bct->root(), "bct" );
         }// if
     
         auto  coeff  = problem->coeff_func();

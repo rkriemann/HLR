@@ -11,7 +11,6 @@
 namespace hlr { namespace tbb { namespace detail {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using indexset = hpro::TIndexSet;
 
@@ -32,8 +31,8 @@ constexpr size_t  CHUNK_SIZE = 64;
 template < typename value_t >
 void
 update ( const indexset &                 is,
-         const blas::Vector< value_t > &  t,
-         blas::Vector< value_t > &        y,
+         const blas::vector< value_t > &  t,
+         blas::vector< value_t > &        y,
          mutex_map_t &                    mtx_map )
 {
     const idx_t  ofs         = is.first();
@@ -45,8 +44,8 @@ update ( const indexset &                 is,
     while ( start_idx <= end_idx )
     {
         const indexset  chunk_is( start_idx, end_idx );
-        auto            t_i = blas::Vector< value_t >( t, chunk_is - ofs );
-        auto            y_i = blas::Vector< value_t >( y, chunk_is - ofs );
+        auto            t_i = blas::vector< value_t >( t, chunk_is - ofs );
+        auto            y_i = blas::vector< value_t >( y, chunk_is - ofs );
 
         {
             std::scoped_lock  lock( * mtx_map[ chunk ] );
@@ -68,8 +67,8 @@ void
 mul_vec_chunk ( const value_t                    alpha,
                 const hpro::matop_t              op_M,
                 const hpro::TMatrix &            M,
-                const blas::Vector< value_t > &  x,
-                blas::Vector< value_t > &        y,
+                const blas::vector< value_t > &  x,
+                blas::vector< value_t > &        y,
                 const size_t                     ofs_rows,
                 const size_t                     ofs_cols,
                 mutex_map_t &                    mtx_map )
@@ -107,7 +106,7 @@ mul_vec_chunk ( const value_t                    alpha,
         const auto  col_is = M.col_is( op_M );
         auto        x_is   = x( col_is - ofs_cols );
         auto        y_is   = y( row_is - ofs_rows );
-        auto        yt     = blas::Vector< value_t >( y_is.length() );
+        auto        yt     = blas::vector< value_t >( y_is.length() );
         
         if ( is_dense( M ) )
         {
@@ -138,6 +137,53 @@ mul_vec_chunk ( const value_t                    alpha,
                 auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( R ) ), x_is );
 
                 blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), yt );
+            }// if
+        }// if
+        else if ( hlr::matrix::is_uniform_lowrank( M ) )
+        {
+            auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        
+            if ( op_M == hpro::apply_normal )
+            {
+                //
+                // y = y + U·S·V^H x
+                //
+        
+                auto  t = R->col_cb().transform_forward( x );
+                auto  s = blas::mulvec( alpha, R->coeff(), t );
+
+                yt = std::move( R->row_cb().transform_backward( s ) );
+            }// if
+            else if ( op_M == hpro::apply_transposed )
+            {
+                //
+                // y = y + (U·S·V^H)^T x
+                //   = y + conj(V)·S^T·U^T x
+                //
+        
+                auto  cx = blas::copy( x );
+
+                blas::conj( cx );
+        
+                auto  t  = R->row_cb().transform_forward( cx );
+
+                blas::conj( t );
+        
+                auto  s = blas::mulvec( alpha, blas::transposed(R->coeff()), t );
+
+                yt = std::move( R->col_cb().transform_backward( s ) );
+            }// if
+            else if ( op_M == hpro::apply_adjoint )
+            {
+                //
+                // y = y + (U·S·V^H)^H x
+                //   = y + V·S^H·U^H x
+                //
+        
+                auto  t = R->row_cb().transform_forward( x );
+                auto  s = blas::mulvec( alpha, blas::adjoint(R->coeff()), t );
+
+                yt = std::move( R->col_cb().transform_backward( s ) );
             }// if
         }// if
         else

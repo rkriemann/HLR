@@ -16,10 +16,11 @@
 
 #include <hpro/blas/Algebra.hh>
 
+#include <hlr/arith/blas.hh>
+
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 namespace math = hpro::Math;
 
 using namespace hpro;
@@ -34,8 +35,8 @@ using  pivot_arr_t = std::vector< std::pair< idx_t, idx_t > >;
 // perform standard ACA to compute low-rank U·V' approximating given M
 //
 template < typename operator_t >
-std::pair< blas::Matrix< typename operator_t::value_t >,
-           blas::Matrix< typename operator_t::value_t > >
+std::pair< blas::matrix< typename operator_t::value_t >,
+           blas::matrix< typename operator_t::value_t > >
 aca ( const operator_t &  M,
       const accuracy &    acc )
 {
@@ -66,7 +67,7 @@ aca ( const operator_t &  M,
     real_t      norm_M      = real_t(0);
 
     // ACA data
-    std::deque< blas::Vector< value_t > >  U, V;
+    std::deque< blas::vector< value_t > >  U, V;
     std::vector< bool >                    chosen( ncols_M, false );
     uint                                   next_col = 0;
 
@@ -151,8 +152,8 @@ aca ( const operator_t &  M,
     // copy to matrices and return
     //
     
-    blas::Matrix< value_t >  MU( nrows_M, U.size() );
-    blas::Matrix< value_t >  MV( ncols_M, V.size() );
+    blas::matrix< value_t >  MU( nrows_M, U.size() );
+    blas::matrix< value_t >  MV( ncols_M, V.size() );
 
     for ( uint  l = 0; l < U.size(); ++l )
     {
@@ -205,11 +206,11 @@ ncols ( const coefffn_operator< coeff_fn_t > &  op )
 }
 
 template < typename coeff_fn_t >
-blas::Vector< typename coeff_fn_t::value_t >
+blas::vector< typename coeff_fn_t::value_t >
 get_row ( const coefffn_operator< coeff_fn_t > &  op,
           const size_t                            i )
 {
-    blas::Vector< typename coeff_fn_t::value_t >  v( ncols( op ) );
+    blas::vector< typename coeff_fn_t::value_t >  v( ncols( op ) );
     const auto                                    ofs = i + op.bis.row_is().first();
 
     op.func.eval( is( ofs, ofs ), op.bis.col_is(), v.data() );
@@ -218,11 +219,11 @@ get_row ( const coefffn_operator< coeff_fn_t > &  op,
 }
 
 template < typename coeff_fn_t >
-blas::Vector< typename coeff_fn_t::value_t >
+blas::vector< typename coeff_fn_t::value_t >
 get_column ( const coefffn_operator< coeff_fn_t > &  op,
              const size_t                            i )
 {
-    blas::Vector< typename coeff_fn_t::value_t >  v( nrows( op ) );
+    blas::vector< typename coeff_fn_t::value_t >  v( nrows( op ) );
     const auto                                    ofs = i + op.bis.col_is().first();
 
     op.func.eval( op.bis.row_is(), is( ofs, ofs ), v.data() );
@@ -296,7 +297,7 @@ public:
 //
 template < typename value_t >
 pivot_arr_t
-aca_full_pivots  ( blas::Matrix< value_t > &                          M,
+aca_full_pivots  ( blas::matrix< value_t > &                          M,
                    const typename hpro::real_type< value_t >::type_t  eps )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
@@ -310,8 +311,8 @@ aca_full_pivots  ( blas::Matrix< value_t > &                          M,
     size_t                   k           = 0;
     const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
     real_t                   apr         = eps;
-    blas::Vector< value_t >  row( M.ncols() );
-    blas::Vector< value_t >  col( M.nrows() );
+    blas::vector< value_t >  row( M.ncols() );
+    blas::vector< value_t >  col( M.nrows() );
     pivot_arr_t              pivots;
                 
     pivots.reserve( max_rank );

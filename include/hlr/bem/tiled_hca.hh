@@ -20,7 +20,6 @@
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 
 using namespace hpro;
 
@@ -127,7 +126,7 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
                  const tensor_grid< real_t > &    col_grid,
-                 const blas::Matrix< value_t > &  G ) const
+                 const blas::matrix< value_t > &  G ) const
     {
         //
         // set up collocation points and evaluate
@@ -140,13 +139,13 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
 
-        HLR_ASSERT( _row_tile_map.contains( rowis ) );
+        HLR_ASSERT( _row_tile_map.find( rowis ) != _row_tile_map.end() );
 
         const auto &  tiles = _row_tile_map.at( rowis );
 
         for ( auto  is : tiles )
         {
-            blas::Matrix< value_t >  U_is( is.size(), rank );
+            blas::matrix< value_t >  U_is( is.size(), rank );
             
             base_class::generator_fn().integrate_dx( is, y_pts, U_is );
             
@@ -172,13 +171,13 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );
 
-        HLR_ASSERT( _col_tile_map.contains( colis ) );
+        HLR_ASSERT( _col_tile_map.find( colis ) != _col_tile_map.end() );
         
         const auto &  tiles = _col_tile_map.at( colis );
 
         for ( auto  is : tiles )
         {
-            blas::Matrix< value_t >  V_is( is.size(), rank );
+            blas::matrix< value_t >  V_is( is.size(), rank );
             
             base_class::generator_fn().integrate_dy( is, x_pts, V_is );
             blas::conj( V_is );

@@ -18,7 +18,6 @@
 namespace hlr { namespace arith {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // compute LU factorization of A within L

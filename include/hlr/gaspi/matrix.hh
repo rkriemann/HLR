@@ -27,7 +27,6 @@
 namespace hlr { namespace gaspi { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 //
 // build representation of dense matrix with
@@ -91,11 +90,11 @@ build ( const hpro::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        ::tbb::blocked_range2d< uint >  r( 0, B->nblock_rows(),
-                                           0, B->nblock_cols() );
+        ::tbb::blocked_range2d< uint >  brange( 0, B->nblock_rows(),
+                                                0, B->nblock_cols() );
         
         ::tbb::parallel_for(
-            r,
+            brange,
             [&,bct] ( const ::tbb::blocked_range2d< uint > &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )

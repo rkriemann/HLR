@@ -29,9 +29,9 @@ namespace gaspi
 //
 #define GASPI_CHECK_RESULT( Func, Args )                                \
     {                                                                   \
-        if ( HLIB::verbose( 6 ) )                                       \
-            hlr::log( 6, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); \
-        else if ( HLIB::verbose( 5 ) )                                  \
+    /* if ( HLIB::verbose( 6 ) )                                         \
+       hlr::log( 6, std::string( __ASSERT_FUNCTION ) + " : " + #Func ); */ \
+        if ( HLIB::verbose( 5 ) )                                       \
             hlr::log( 5, #Func );                                       \
                                                                         \
         auto  check_result = Func Args;                                 \

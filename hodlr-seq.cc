@@ -13,10 +13,4 @@ namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
 #include "hodlr.hh"
-
-int
-main ( int argc, char ** argv )
-{
-    return hlrmain( argc, argv );
-}
-
+#include "seq.hh"

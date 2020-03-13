@@ -17,7 +17,6 @@
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 
 using namespace hpro;
 

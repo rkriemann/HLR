@@ -14,6 +14,7 @@
 #include <hpro/algebra/TLowRankApx.hh>
 #include <hpro/blas/Algebra.hh>
 
+#include <hlr/arith/blas.hh>
 #include <hlr/bem/interpolation.hh>
 #include <hlr/bem/tensor_grid.hh>
 #include <hlr/bem/aca.hh>
@@ -21,7 +22,6 @@
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
 
 using namespace hpro;
 
@@ -109,7 +109,7 @@ public:
 
         const size_t             nrows = row_grid.nvertices();
         const size_t             ncols = col_grid.nvertices();
-        blas::Matrix< value_t >  D( nrows, ncols );
+        blas::matrix< value_t >  D( nrows, ncols );
 
         for ( uint  i = 0; i < nrows; ++i )
         {
@@ -129,13 +129,13 @@ public:
     //
     // compute generator matrix G
     //
-    blas::Matrix< value_t >
+    blas::matrix< value_t >
     compute_G ( const pivot_arr_t &            pivots,
                 const tensor_grid< real_t > &  row_grid,
                 const tensor_grid< real_t > &  col_grid ) const
     {
         const auto               k = pivots.size();
-        blas::Matrix< value_t >  G( k, k );
+        blas::matrix< value_t >  G( k, k );
     
         for ( idx_t  j = 0; j < idx_t(k); j++ )
         {

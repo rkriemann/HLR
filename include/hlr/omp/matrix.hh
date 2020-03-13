@@ -116,6 +116,7 @@ build_task ( const HLIB::TBlockCluster *  bct,
     }// else
 
     // copy properties from the cluster
+    M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 

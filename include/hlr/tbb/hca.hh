@@ -217,7 +217,7 @@ struct tiled_hca : public hlr::bem::tiled_hca< T_coeff, T_generator_fn >
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
 
-        HLR_ASSERT( base_class::_row_tile_map.contains( rowis ) );
+        HLR_ASSERT( base_class::_row_tile_map.find( rowis ) != base_class::_row_tile_map.end() );
 
         const auto &  tiles = base_class::_row_tile_map.at( rowis );
 
@@ -252,7 +252,7 @@ struct tiled_hca : public hlr::bem::tiled_hca< T_coeff, T_generator_fn >
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );
 
-        HLR_ASSERT( base_class::_col_tile_map.contains( colis ) );
+        HLR_ASSERT( base_class::_col_tile_map.find( colis ) != base_class::_col_tile_map.end() );
         
         const auto &  tiles = base_class::_col_tile_map.at( colis );
 

@@ -15,6 +15,7 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
@@ -27,7 +28,6 @@
 namespace hlr { namespace tf {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -45,8 +45,8 @@ void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
           const TMatrix &                  M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
 {
     // assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
@@ -255,8 +255,8 @@ gauss_elim ( ::tf::SubflowBuilder &  tf,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
         
-        if ( A->is_complex() ) hpro::BLAS::invert( DA->blas_cmat() );
-        else                   hpro::BLAS::invert( DA->blas_rmat() );
+        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
+        else                   blas::invert( DA->blas_rmat() );
     }// if
     else
         assert( false );
@@ -317,7 +317,7 @@ lu ( TMatrix *          A,
                                            {
                                                TScopedLock  lock( *A_ii );
                                                
-                                               BLAS::invert( blas_mat< value_t >( A_ii ) );
+                                               blas::invert( blas_mat< value_t >( A_ii ) );
                                            } );
             
         for ( uint  l = 0; l < i; ++l )
@@ -403,8 +403,8 @@ namespace hodlr
 //
 template < typename value_t >
 void
-addlr ( const BLAS::Matrix< value_t > &  U,
-        const BLAS::Matrix< value_t > &  V,
+addlr ( const blas::matrix< value_t > &  U,
+        const blas::matrix< value_t > &  V,
         TMatrix *                        A,
         const TTruncAcc &                acc )
 {
@@ -419,10 +419,10 @@ addlr ( const BLAS::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        BLAS::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), BLAS::Range::all );
-        BLAS::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), BLAS::Range::all );
+        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         ::tf::Taskflow  tf;
         
@@ -451,7 +451,7 @@ addlr ( const BLAS::Matrix< value_t > &  U,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
 
-        BLAS::prod( value_t(1), U, BLAS::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), blas_mat< value_t >( DA ) );
     }// else
 }
 
@@ -489,8 +489,8 @@ lu ( TMatrix *             A,
         task_00.precede( { task_01, task_10 } );
         
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  [ task_T,   T ] = tf.emplace( [A10,A01] () { return BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); } );
-        auto  [ task_UT, UT ] = tf.emplace( [A10,&T]  () { return BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T.get() ); } );
+        auto  [ task_T,   T ] = tf.emplace( [A10,A01] () { return blas::prod(  value_t(1), blas::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) ); } );
+        auto  [ task_UT, UT ] = tf.emplace( [A10,&T]  () { return blas::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T.get() ); } );
 
         task_01.precede( task_T );
         task_10.precede( task_T );
@@ -527,8 +527,8 @@ lu ( TMatrix *             A,
         }
         
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = BLAS::prod(  value_t(1), BLAS::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) );
-        auto  UT = BLAS::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
+        auto  T  = blas::prod(  value_t(1), blas::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) );
+        auto  UT = blas::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
         addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
         lu< value_t >( A11, acc );
@@ -539,7 +539,7 @@ lu ( TMatrix *             A,
     {
         auto  DA = ptrcast( A, TDenseMatrix );
         
-        BLAS::invert( DA->blas_rmat() );
+        blas::invert( DA->blas_rmat() );
     }// else
 }
 

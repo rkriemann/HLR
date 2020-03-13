@@ -25,7 +25,6 @@
 namespace hlr { namespace hpx {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
 
@@ -43,8 +42,8 @@ void
 mul_vec ( const value_t                    alpha,
           const matop_t                    op_M,
           const TMatrix &                  M,
-          const blas::Vector< value_t > &  x,
-          blas::Vector< value_t > &        y )
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
 {
     // assert( ! is_null( M ) );
     // assert( M->ncols( op_M ) == x.length() );
@@ -302,8 +301,8 @@ namespace hodlr
 //
 template < typename value_t >
 void
-addlr ( blas::Matrix< value_t > &  U,
-        blas::Matrix< value_t > &  V,
+addlr ( blas::matrix< value_t > &  U,
+        blas::matrix< value_t > &  V,
         hpro::TMatrix *            A,
         const hpro::TTruncAcc &    acc )
 {
@@ -317,10 +316,10 @@ addlr ( blas::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
         
-        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
+        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         auto  task_00 = ::hpx::async( [&,A00] () { addlr( U0, V0, A00, acc ); } );
         auto  task_11 = ::hpx::async( [&,A11] () { addlr( U1, V1, A11, acc ); } );
