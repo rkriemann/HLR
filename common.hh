@@ -55,6 +55,14 @@ format_mem ( const size_t  m )
     return hlr::term::black( hpro::Mem::to_string( m ) ) + mem_usage();
 }
 
+template < typename ... T_size >
+std::string
+format_mem ( const size_t    m,
+             const T_size... ms )
+{
+    return hlr::term::black( hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
+}
+
 // return default formated timing string
 std::string
 format_time ( const double  t )

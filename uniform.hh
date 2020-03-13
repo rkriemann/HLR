@@ -67,7 +67,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
         blas::vector< value_t >  x( A->ncols() );
         blas::vector< value_t >  y( A->nrows() );
@@ -126,7 +126,7 @@ program_main ()
         toc = timer::since( tic );
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( rowcb->byte_size() ) << " / " << format_mem( colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
 
         std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
@@ -154,7 +154,7 @@ program_main ()
 
         if ( true )
         {
-            std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -196,7 +196,7 @@ program_main ()
 
         if ( true )
         {
-            std::cout << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
 
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
@@ -258,7 +258,7 @@ program_main ()
         toc = timer::since( tic );
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( rowcb->byte_size() ) << " / " << format_mem( colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
         if ( verbose( 3 ) )
         {
@@ -290,7 +290,7 @@ program_main ()
         // mat-vec benchmark
         //
 
-        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
