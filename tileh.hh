@@ -74,17 +74,6 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    // {
-    //     auto  D = hpro::to_dense( A.get() );
-    //     auto  fout = fopen( "A.bin", "wb" );
-
-    //     fwrite( hpro::blas_mat< value_t >( D.get() ).data(), sizeof(value_t), A->nrows()*A->ncols(), fout );
-
-    //     std::cout << hpro::blas_mat< value_t >( D.get() )( 256, 123 ) << std::endl;
-        
-    //     // hpro::DBG::write( A.get(), "A.mat", "A" );
-    // }
-    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
@@ -100,7 +89,7 @@ program_main ()
 
     if ( false )
     {
-        std::cout << "  " << term::bullet << " DAG" << std::endl;
+        std::cout << "  " << term::bullet << term::bold << " DAG" << term::reset << std::endl;
         
         std::vector< double >  runtime, flops;
         
@@ -152,7 +141,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << " HLR" << std::endl;
+        std::cout << "  " << term::bullet << term::bold << " HLR" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
         
@@ -163,48 +152,9 @@ program_main ()
             C->scale( 0 );
             
             blas::reset_flops();
-
             tic = timer::now();
         
             impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
-
-            toc = timer::since( tic );
-            std::cout << "    mult in  " << format_time( toc ) << std::endl;
-
-            flops.push_back( get_flops( "mm" ) );
-            runtime.push_back( toc.seconds() );
-        }// for
-        
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
-
-        if ( nbench > 1 )
-            std::cout << "  runtime = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
-
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
-
-        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
-    }
-
-    if ( true )
-    {
-        std::cout << "  " << term::bullet << " HLR Accu" << std::endl;
-
-        std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
-        
-        for ( int i = 0; i < nbench; ++i )
-        {
-            C->scale( 0 );
-            
-            blas::reset_flops();
-
-            tic = timer::now();
-        
-            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
 
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
@@ -263,45 +213,6 @@ program_main ()
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
-    
-    if ( true && (( impl_name == "seq" ) || ( impl_name == "tbb" ))) // otherwise sequential !!!
-    {
-        std::cout << "  " << term::bullet << " Hpro Accu" << std::endl;
-
-        std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
-        
-        for ( int i = 0; i < nbench; ++i )
-        {
-            C->scale( 0 );
-            
-            blas::reset_flops();
-
-            tic = timer::now();
-        
-            hpro::multiply_accu< value_t >( value_t(1), hpro::apply_normal, A.get(), hpro::apply_normal, A.get(),
-                                            value_t(1), C.get(), acc );
-
-            toc = timer::since( tic );
-            std::cout << "    mult in  " << format_time( toc ) << std::endl;
-
-            flops.push_back( get_flops( "mm" ) );
-            runtime.push_back( toc.seconds() );
-        }// for
-        
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
-
-        if ( nbench > 1 )
-            std::cout << "  runtime = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
-
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
-
-        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
-    }// if
 
     //////////////////////////////////////////////////////////////////////
     //

@@ -14,6 +14,7 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <hpro/algebra/TLowRankApx.hh>
 #include <hpro/blas/Algebra.hh>
 
 #include <hlr/arith/blas.hh>
@@ -169,7 +170,7 @@ aca ( const operator_t &  M,
 
 //////////////////////////////////////////////////////////////////////
 //
-// wrapper for TCoeffFn for operator to be used by ACA
+// wrapper for TCoeffFn as operator to be used by ACA
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -238,7 +239,7 @@ get_column ( const coefffn_operator< coeff_fn_t > &  op,
 //////////////////////////////////////////////////////////////////////
 
 template < typename coeff_fn_t >
-class aca_lrapx : public TLowRankApx
+class aca_lrapx : public hpro::TLowRankApx
 {
 public:
     using  value_t = typename coeff_fn_t::value_t;
