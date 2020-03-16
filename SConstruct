@@ -56,7 +56,8 @@ PROGRAMS     = [ 'tlr',
                  'dag-inv',
                  'dag-waz',
                  'dag-hodlr',
-                 'uniform' ]
+                 'uniform',
+                 'accu' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
 FRAMEWORKS   = [ 'seq',
@@ -74,6 +75,21 @@ MALLOCS      = [ 'default',
                  'mimalloc',
                  'tbbmalloc',
                  'tcmalloc' ]
+
+# mapping of programs to subdirs
+SUBDIRS      = { 'tlr'         : 'tlr',
+                 'hodlr'       : 'hodlr',
+                 'tileh'       : 'tileh',
+                 'tiled-h'     : 'tiled',
+                 'tiled-hca'   : 'tiled',
+                 'tiled-hodlr' : 'tiled',
+                 'dag-lu'      : 'dag',
+                 'dag-gauss'   : 'dag',
+                 'dag-inv'     : 'dag',
+                 'dag-waz'     : 'dag',
+                 'dag-hodlr'   : 'dag',
+                 'uniform'     : '',
+                 'accu'        : '' }
 
 ######################################################################
 #
@@ -96,6 +112,15 @@ def readln ( prog ):
 
     return text
 
+#
+# compose actual path of program source
+#
+def path ( program, source ) :
+    if SUBDIRS[ program ] != '' :
+        return os.path.join( 'programs', SUBDIRS[ program ], source );
+    else :
+        return os.path.join( 'programs', source );
+    
 ######################################################################
 #
 # eval options
@@ -265,6 +290,7 @@ if not debug :
 
 # add internal paths and libraries
 env.Append(  CPPPATH = [ '#include' ] )
+env.Append(  CPPPATH = [ '#programs/common' ] )
 env.Prepend( LIBS    = [ "hlr" ] )
 env.Prepend( LIBPATH = [ "." ] )
 
@@ -437,10 +463,10 @@ if 'seq' in frameworks :
         
     for program in programs :
         name   = program + '-seq'
-        source = name + '.cc'
+        source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( seq.Program( name, [ source ] ) )
+            Default( seq.Program( path( program, name ), [ source ] ) )
 
 #
 # OpenMP
@@ -453,10 +479,10 @@ if 'omp' in frameworks :
 
     for program in programs :
         name   = program + '-omp'
-        source = name + '.cc'
+        source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( omp.Program( name, [ source, 'src/omp/dag.cc' ] ) )
+            Default( omp.Program( path( program, name ), [ source, 'src/omp/dag.cc' ] ) )
 
 #
 # TBB
@@ -469,10 +495,10 @@ if 'tbb' in frameworks :
 
     for program in programs :
         name   = program + '-tbb'
-        source = name + '.cc'
+        source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( tbb.Program( name, [ source, 'src/tbb/dag.cc' ] ) )
+            Default( tbb.Program( path( program, name ), [ source, 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -485,10 +511,10 @@ if 'tf' in frameworks :
     
     for program in programs :
         name   = program + '-tf'
-        source = name + '.cc'
+        source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( tf.Program( name, [ source, 'src/tf/dag.cc' ] ) )
+            Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
 
 #
 # HPX
@@ -502,10 +528,10 @@ if 'hpx' in frameworks :
     
     for program in programs :
         name   = program + '-hpx'
-        source = name + '.cc'
+        source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( hpx.Program( name, [ source, 'src/hpx/dag.cc' ] ) )
+            Default( hpx.Program( path( program, name ), [ source, 'src/hpx/dag.cc' ] ) )
 
 #
 # MPI
@@ -517,13 +543,13 @@ if 'mpi' in frameworks :
     mpi.ParseConfig( 'mpic++ --showme:link' )
     
     if 'tlr'   in programs :
-        Default( mpi.Program( 'tlr-mpi-bcast.cc' ) )
-        Default( mpi.Program( 'tlr-mpi-ibcast.cc' ) )
-        Default( mpi.Program( 'tlr-mpi-rdma.cc' ) )
+        Default( mpi.Program( path( 'tlr', 'tlr-mpi-bcast.cc'  ) ) )
+        Default( mpi.Program( path( 'tlr', 'tlr-mpi-ibcast.cc' ) ) )
+        Default( mpi.Program( path( 'tlr', 'tlr-mpi-rdma.cc'   ) ) )
     
     if 'tileh' in programs and 'tbb' in frameworks :
-        Default( mpi.Program( 'tileh-mpi-bcast',  [ 'tileh-mpi-bcast.cc',  'src/tbb/dag.o' ] ) )
-        Default( mpi.Program( 'tileh-mpi-ibcast', [ 'tileh-mpi-ibcast.cc', 'src/tbb/dag.o' ] ) )
+        Default( mpi.Program( path( 'tileh', 'tileh-mpi-bcast'  ), [ path( 'tileh', 'tileh-mpi-bcast.cc'  ), 'src/tbb/dag.o' ] ) )
+        Default( mpi.Program( path( 'tileh', 'tileh-mpi-ibcast' ), [ path( 'tileh', 'tileh-mpi-ibcast.cc' ), 'src/tbb/dag.o' ] ) )
 
 #
 # GASPI
@@ -535,4 +561,4 @@ if 'gpi2' in frameworks :
     gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
     gpi.Append( LIBS = [ "pthread" ] )
     
-    if 'tlr'   in programs : Default( gpi.Program( 'tlr-gaspi.cc' ) )
+    if 'tlr' in programs : Default( gpi.Program( path( 'tlr', 'tlr-gaspi.cc' ) ) )
