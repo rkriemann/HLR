@@ -133,7 +133,7 @@ multiply_task ( const value_t            alpha,
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  C_ij = BC->block(i,j);
                     auto  A_il = BA->block( i, l, op_A );
@@ -177,7 +177,7 @@ multiply_parfor ( const value_t            alpha,
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  C_ij = BC->block( i, j );
                     auto  A_il = BA->block( i, l, op_A );

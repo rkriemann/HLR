@@ -127,13 +127,6 @@ def path ( program, source ) :
 #
 ######################################################################
 
-# prepare program and framework options (for +opt, -opt)
-# opt_programs = [ [ prog, '-' + prog, '+' + prog ] for prog in PROGRAMS ]
-# opt_programs = [ prog for sublist in opt_programs for prog in sublist  ]
-
-# opt_frameworks = [ [ fwrk, '-' + fwrk, '+' + fwrk ] for fwrk in FRAMEWORKS ]
-# opt_frameworks = [ fwrk for sublist in opt_frameworks for fwrk in sublist  ]
-
 # set up command line parameters
 opts = Variables( opts_file )
 opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
@@ -374,7 +367,7 @@ env.Alias( 'help', help_cmd )
 
 def show_options ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
-                 True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
+                 True  : colors['bold'] + colors['green'] + '✔' + colors['reset'] }
     
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
@@ -414,43 +407,45 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-libhlr = env.StaticLibrary( 'hlr', [ 'src/apps/helmholtz.cc',
-                                     'src/apps/laplace.cc',
-                                     'src/apps/log_kernel.cc',
-                                     'src/apps/matern_cov.cc',
-                                     'src/cluster/distr.cc',
-                                     'src/cluster/h.cc',
-                                     'src/cluster/hodlr.cc',
-                                     'src/cluster/mblr.cc',
-                                     'src/cluster/tileh.cc',
-                                     'src/cluster/tlr.cc',
-                                     'src/dag/gauss_elim.cc',
-                                     'src/dag/graph.cc',
-                                     'src/dag/invert.cc',
-                                     'src/dag/local_graph.cc',
-                                     'src/dag/lu.cc',
-                                     'src/dag/lu_coarse.cc',
-                                     'src/dag/lu_hodlr_tiled.cc',
-                                     'src/dag/lu_hodlr_tiled_lazy.cc',
-                                     'src/dag/lu_lvl.cc',
-                                     'src/dag/lu_oop.cc',
-                                     'src/dag/lu_oop_accu.cc',
-                                     'src/dag/lu_oop_accu_sep.cc',
-                                     'src/dag/lu_oop_auto.cc',
-                                     'src/dag/lu_tileh.cc',
-                                     'src/dag/node.cc',
-                                     'src/dag/solve.cc',
-                                     'src/matrix/level_matrix.cc',
-                                     'src/matrix/luinv_eval.cc',
-                                     'src/matrix/print.cc',
-                                     'src/seq/dag.cc',
-                                     'src/seq/solve.cc',
-                                     'src/utils/compare.cc',
-                                     'src/utils/eps_printer.cc',
-                                     'src/utils/log.cc',
-                                     'src/utils/mach.cc',
-                                     'src/utils/term.cc',
-                                     'src/utils/text.cc' ] )
+sources = [ 'src/apps/helmholtz.cc',
+            'src/apps/laplace.cc',
+            'src/apps/log_kernel.cc',
+            'src/apps/matern_cov.cc',
+            'src/cluster/distr.cc',
+            'src/cluster/h.cc',
+            'src/cluster/hodlr.cc',
+            'src/cluster/mblr.cc',
+            'src/cluster/tileh.cc',
+            'src/cluster/tlr.cc',
+            'src/dag/gauss_elim.cc',
+            'src/dag/graph.cc',
+            'src/dag/invert.cc',
+            'src/dag/local_graph.cc',
+            'src/dag/lu.cc',
+            'src/dag/lu_coarse.cc',
+            'src/dag/lu_hodlr_tiled.cc',
+            'src/dag/lu_hodlr_tiled_lazy.cc',
+            'src/dag/lu_lvl.cc',
+            'src/dag/lu_oop.cc',
+            'src/dag/lu_oop_accu.cc',
+            'src/dag/lu_oop_accu_sep.cc',
+            'src/dag/lu_oop_auto.cc',
+            'src/dag/lu_tileh.cc',
+            'src/dag/node.cc',
+            'src/dag/solve.cc',
+            'src/matrix/level_matrix.cc',
+            'src/matrix/luinv_eval.cc',
+            'src/matrix/print.cc',
+            'src/seq/dag.cc',
+            'src/seq/solve.cc',
+            'src/utils/compare.cc',
+            'src/utils/eps_printer.cc',
+            'src/utils/log.cc',
+            'src/utils/mach.cc',
+            'src/utils/term.cc',
+            'src/utils/text.cc' ]
+
+libhlr = env.StaticLibrary( 'hlr', sources )
 
 Default( None )
 

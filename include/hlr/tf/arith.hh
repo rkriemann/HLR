@@ -141,7 +141,7 @@ multiply ( ::tf::SubflowBuilder &   tf,
             {
                 auto  C_ij = BC->block(i,j);
             
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  A_il = BA->block( i, l, op_A );
                     auto  B_lj = BB->block( l, j, op_B );
