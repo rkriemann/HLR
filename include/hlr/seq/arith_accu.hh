@@ -61,7 +61,7 @@ multiply ( const value_t                 alpha,
            const hpro::TTruncAcc &       acc )
 {
     //
-    // first handle updates to C with at least one leaf block
+    // first handle all updates to C which have at least one leaf block factor
     //
 
     std::unique_ptr< TMatrix >       U( std::move( upd_accu ) );
@@ -72,7 +72,8 @@ multiply ( const value_t                 alpha,
         if ( is_blocked_all( *A, *B ) )
         {
             //
-            // set up block matrix with low-rank sub-blocks
+            // for recursive part below, we set up a temporary block matrix
+            // with low-rank sub-blocks
             //
 
             if ( is_null( BC ) )
@@ -103,15 +104,15 @@ multiply ( const value_t                 alpha,
             {
                 U = std::move( T );
             }// if
+            else if ( is_dense( T.get() ) )
+            {
+                // prefer dense format to avoid unnecessary truncations
+                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                U = std::move( T );
+            }// if
             else
             {
-                if ( is_dense( T.get() ) )
-                {
-                    hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
-                    U = std::move( T );
-                }// if
-                else
-                    hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
             }// else
         }// else
     }// for
@@ -151,22 +152,23 @@ multiply ( const value_t                 alpha,
                 
                 for ( auto  [ A, B ] : upd_C )
                 {
-                    if ( is_blocked_all( A, B ) )
-                    {
-                        auto  BA = cptrcast( A, TBlockMatrix );
-                        auto  BB = cptrcast( B, TBlockMatrix );
+                    // filter out above handled updates
+                    if ( ! is_blocked_all( A, B ) )
+                        continue;
+                    
+                    auto  BA = cptrcast( A, TBlockMatrix );
+                    auto  BB = cptrcast( B, TBlockMatrix );
                         
-                        for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                        {
-                            auto  A_il = BA->block( i, l, op_A );
-                            auto  B_lj = BB->block( l, j, op_B );
-                            
-                            if ( is_null_any( A_il, B_lj ) )
-                                continue;
-                            
-                            upd_ij.push_back( { A_il, B_lj } );
-                        }// for
-                    }// if
+                    for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
+                    {
+                        auto  A_il = BA->block( i, l, op_A );
+                        auto  B_lj = BB->block( l, j, op_B );
+                        
+                        if ( is_null_any( A_il, B_lj ) )
+                            continue;
+                        
+                        upd_ij.push_back( { A_il, B_lj } );
+                    }// for
                 }// for
 
                 HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
@@ -179,6 +181,9 @@ multiply ( const value_t                 alpha,
         // finally convert subblocks to single low-rank matrix for new accumulated updates
         //
 
+        if ( ! is_null( U ) )
+            HLR_ERROR( "accumulator non-null" );
+        
         U = to_rank( BC.get(), acc );
     }// if
 
@@ -210,7 +215,7 @@ multiply ( const value_t                 alpha,
     }// if
     
     //
-    // first handle computable updates to C, including non-blocked C
+    // first handle all computable updates to C, including if C is non-blocked
     //
 
     std::unique_ptr< TMatrix >  U( std::move( upd_accu ) );
@@ -220,9 +225,18 @@ multiply ( const value_t                 alpha,
         if ( ! is_blocked_all( *A, *B, C ) )
         {
             auto  T = std::unique_ptr< TMatrix >();
+
+            //
+            // compute update
+            //
             
             if ( is_blocked_all( *A, *B ) )
             {
+                //
+                // assumption: dense matrices only on lowest level in matrix,
+                //             therefore result has to be of low-rank format
+                //
+                
                 T = std::make_unique< TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type< value_t >::value );
 
                 hpro::multiply( value_t(1), op_A, A, op_B, B, value_t(0), T.get(), acc );
@@ -232,20 +246,24 @@ multiply ( const value_t                 alpha,
                 // either A or B is low-rank or dense
                 T = multiply< value_t >( alpha, op_A, A, op_B, B );
             }// else
+
+            //
+            // apply update to accumulator
+            //
             
             if ( is_null( U ) )
             {
                 U = std::move( T );
             }// if
+            else if ( is_dense( T.get() ) )
+            {
+                // prefer dense format to avoid unnecessary truncations
+                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                U = std::move( T );
+            }// if
             else
             {
-                if ( is_dense( T.get() ) )
-                {
-                    hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
-                    U = std::move( T );
-                }// if
-                else
-                    hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
             }// else
         }// if
     }// for
@@ -260,7 +278,8 @@ multiply ( const value_t                 alpha,
 
         //
         // first, split update U into subblock updates
-        // (to release U before recursion)
+        // (to release U before recursion and by that avoid
+        //  memory consumption dependent on hierarchy depth)
         //
 
         tensor2< std::unique_ptr< TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
@@ -268,13 +287,9 @@ multiply ( const value_t                 alpha,
         if ( ! is_null( U ) )
         {
             for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-            {
                 for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-                {
                     if ( ! is_null( BC->block( i, j ) ) )
                         sub_U(i,j) = hlr::matrix::restrict( *U, BC->block( i, j )->block_is() );
-                }// for
-            }// for
 
             U.reset( nullptr );
         }// if
@@ -296,22 +311,23 @@ multiply ( const value_t                 alpha,
                 
                 for ( auto  [ A, B ] : upd_C )
                 {
-                    if ( is_blocked_all( A, B ) )
-                    {
-                        auto  BA = cptrcast( A, TBlockMatrix );
-                        auto  BB = cptrcast( B, TBlockMatrix );
+                    // filter out above handled updates
+                    if ( ! is_blocked_all( A, B ) )
+                        continue;
+                    
+                    auto  BA = cptrcast( A, TBlockMatrix );
+                    auto  BB = cptrcast( B, TBlockMatrix );
                         
-                        for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                        {
-                            auto  A_il = BA->block( i, l, op_A );
-                            auto  B_lj = BB->block( l, j, op_B );
+                    for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
+                    {
+                        auto  A_il = BA->block( i, l, op_A );
+                        auto  B_lj = BB->block( l, j, op_B );
                             
-                            if ( is_null_any( A_il, B_lj ) )
-                                continue;
-                            
-                            upd_ij.push_back( { A_il, B_lj } );
-                        }// for
-                    }// if
+                        if ( is_null_any( A_il, B_lj ) )
+                            continue;
+                        
+                        upd_ij.push_back( { A_il, B_lj } );
+                    }// for
                 }// for
 
                 multiply< value_t >( alpha, op_A, op_B, *C_ij, upd_ij, sub_U( i, j ), acc );

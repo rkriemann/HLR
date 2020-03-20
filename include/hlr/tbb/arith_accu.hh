@@ -119,15 +119,14 @@ multiply ( const value_t                 alpha,
             {
                 U = std::move( T );
             }// if
+            else if ( is_dense( T.get() ) )
+            {
+                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                U = std::move( T );
+            }// if
             else
             {
-                if ( is_dense( T.get() ) )
-                {
-                    hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
-                    U = std::move( T );
-                }// if
-                else
-                    hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
             }// else
         }// else
     }// for
@@ -179,22 +178,22 @@ multiply ( const value_t                 alpha,
                 
                         for ( auto  [ A, B ] : upd_C )
                         {
-                            if ( is_blocked_all( A, B ) )
-                            {
-                                auto  BA = cptrcast( A, TBlockMatrix );
-                                auto  BB = cptrcast( B, TBlockMatrix );
+                            if ( ! is_blocked_all( A, B ) )
+                                continue;
+                            
+                            auto  BA = cptrcast( A, TBlockMatrix );
+                            auto  BB = cptrcast( B, TBlockMatrix );
                         
-                                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                                {
-                                    auto  A_il = BA->block( i, l, op_A );
-                                    auto  B_lj = BB->block( l, j, op_B );
-                            
-                                    if ( is_null_any( A_il, B_lj ) )
-                                        continue;
-                            
-                                    upd_ij.push_back( { A_il, B_lj } );
-                                }// for
-                            }// if
+                            for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
+                            {
+                                auto  A_il = BA->block( i, l, op_A );
+                                auto  B_lj = BB->block( l, j, op_B );
+                                
+                                if ( is_null_any( A_il, B_lj ) )
+                                    continue;
+                                
+                                upd_ij.push_back( { A_il, B_lj } );
+                            }// for
                         }// for
 
                         HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
@@ -209,6 +208,9 @@ multiply ( const value_t                 alpha,
         // finally convert subblocks to single low-rank matrix for new accumulated updates
         //
 
+        if ( ! is_null( U ) )
+            HLR_ERROR( "accumulator non-null" );
+        
         U = to_rank( BC.get(), acc );
     }// if
 
@@ -267,15 +269,14 @@ multiply ( const value_t                 alpha,
             {
                 U = std::move( T );
             }// if
+            else if ( is_dense( T.get() ) )
+            {
+                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                U = std::move( T );
+            }// if
             else
             {
-                if ( is_dense( T.get() ) )
-                {
-                    hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
-                    U = std::move( T );
-                }// if
-                else
-                    hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
             }// else
         }// if
     }// for
@@ -339,22 +340,22 @@ multiply ( const value_t                 alpha,
                 
                         for ( auto  [ A, B ] : upd_C )
                         {
-                            if ( is_blocked_all( A, B ) )
-                            {
-                                auto  BA = cptrcast( A, TBlockMatrix );
-                                auto  BB = cptrcast( B, TBlockMatrix );
+                            if ( ! is_blocked_all( A, B ) )
+                                continue;
+                            
+                            auto  BA = cptrcast( A, TBlockMatrix );
+                            auto  BB = cptrcast( B, TBlockMatrix );
                                 
-                                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                                {
-                                    auto  A_il = BA->block( i, l, op_A );
-                                    auto  B_lj = BB->block( l, j, op_B );
+                            for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
+                            {
+                                auto  A_il = BA->block( i, l, op_A );
+                                auto  B_lj = BB->block( l, j, op_B );
                                     
-                                    if ( is_null_any( A_il, B_lj ) )
-                                        continue;
+                                if ( is_null_any( A_il, B_lj ) )
+                                    continue;
                                     
-                                    upd_ij.push_back( { A_il, B_lj } );
-                                }// for
-                            }// if
+                                upd_ij.push_back( { A_il, B_lj } );
+                            }// for
                         }// for
                         
                         multiply< value_t >( alpha, op_A, op_B, *C_ij, upd_ij, sub_U( i, j ), acc );

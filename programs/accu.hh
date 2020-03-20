@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <likwid.h>
+
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
 
@@ -28,6 +30,8 @@ template < typename problem_t >
 void
 program_main ()
 {
+    LIKWID_MARKER_INIT;
+
     using value_t = typename problem_t::value_t;
 
     auto  tic     = timer::now();
@@ -49,7 +53,13 @@ program_main ()
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< bem::aca_lrapx< hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+
+    LIKWID_MARKER_START( "build" );
+            
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+
+    LIKWID_MARKER_STOP( "build" );
+    
     auto  toc    = timer::since( tic );
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
@@ -89,8 +99,12 @@ program_main ()
 
             tic = timer::now();
         
+            LIKWID_MARKER_START( "hmm" );
+            
             impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
 
+            LIKWID_MARKER_STOP( "hmm" );
+            
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
 
@@ -127,8 +141,12 @@ program_main ()
 
             tic = timer::now();
         
+            LIKWID_MARKER_START( "hmmaccu" );
+            
             impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
 
+            LIKWID_MARKER_STOP( "hmmaccu" );
+            
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
 
@@ -148,6 +166,8 @@ program_main ()
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
+
+    LIKWID_MARKER_CLOSE;
 }
 
 //
