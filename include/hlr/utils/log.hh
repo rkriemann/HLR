@@ -1,7 +1,7 @@
 #ifndef __HLR_UTILS_LOG_HH
 #define __HLR_UTILS_LOG_HH
 //
-// Project     : HLib
+// Project     : HLR
 // File        : log.hh
 // Description : logging functions
 // Author      : Ronald Kriemann

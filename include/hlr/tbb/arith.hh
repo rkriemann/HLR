@@ -293,16 +293,16 @@ addlr ( blas::matrix< value_t > &  U,
                                 [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); },
                                 [&U0,&V1,A01,&acc] ()
                                 {
-                                    auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                                                                        { hpro::blas_mat_B< value_t >( A01 ), V1 },
-                                                                                        acc );
+                                    auto [ U01, V01 ] = hlr::approx::svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                                                                     { hpro::blas_mat_B< value_t >( A01 ), V1 },
+                                                                                     acc );
                                     A01->set_lrmat( U01, V01 );
                                 },
                                 [&U1,&V0,A10,&acc] ()
                                 {
-                                    auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                                                                        { hpro::blas_mat_B< value_t >( A10 ), V0 },
-                                                                                        acc );
+                                    auto [ U10, V10 ] = hlr::approx::svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                                                                     { hpro::blas_mat_B< value_t >( A10 ), V0 },
+                                                                                     acc );
                                     A10->set_lrmat( U10, V10 );
                                 } );
     }// if

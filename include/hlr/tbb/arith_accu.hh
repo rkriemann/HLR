@@ -22,13 +22,12 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
+#include "hlr/arith/add.hh"
 #include "hlr/matrix/restrict.hh"
 
 namespace hlr { namespace tbb { namespace accu {
 
 namespace hpro = HLIB;
-
-using namespace hpro;
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -44,37 +43,41 @@ using  upd_list_t = std::list< std::pair< const TMatrix *, const TMatrix * > >;
 //
 // forward decl.
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
-multiply ( const value_t                 alpha,
-           const hpro::matop_t           op_A,
-           const hpro::matop_t           op_B,
-           hpro::TMatrix &               C,
-           upd_list_t &                  upd_C,
-           std::unique_ptr< TMatrix > &  upd_accu,
-           const hpro::TTruncAcc &       acc );
+multiply ( const value_t                       alpha,
+           const hpro::matop_t                 op_A,
+           const hpro::matop_t                 op_B,
+           hpro::TMatrix &                     C,
+           upd_list_t &                        upd_C,
+           std::unique_ptr< hpro::TMatrix > &  upd_accu,
+           const hpro::TTruncAcc &             acc,
+           const approx_t &                    approx );
 
 //
 // special case : C is low-rank matrix
 // - construct sub-blocks of C for all blocked updates with corresponding accumulators
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
-multiply ( const value_t                 alpha,
-           const hpro::matop_t           op_A,
-           const hpro::matop_t           op_B,
-           hpro::TRkMatrix &             C,
-           upd_list_t &                  upd_C,
-           std::unique_ptr< TMatrix > &  upd_accu,
-           const hpro::TTruncAcc &       acc )
+multiply ( const value_t                       alpha,
+           const hpro::matop_t                 op_A,
+           const hpro::matop_t                 op_B,
+           hpro::TRkMatrix &                   C,
+           upd_list_t &                        upd_C,
+           std::unique_ptr< hpro::TMatrix > &  upd_accu,
+           const hpro::TTruncAcc &             acc,
+           const approx_t &                    approx )
 {
     //
     // first handle updates to C with at least one leaf block
     //
 
-    std::unique_ptr< TMatrix >       U( std::move( upd_accu ) );
-    std::unique_ptr< TBlockMatrix >  BC;
-    ::tbb::affinity_partitioner      ap; // to ensure (???) allocated data is used in equal threads
+    std::unique_ptr< hpro::TMatrix >       U( std::move( upd_accu ) );
+    std::unique_ptr< hpro::TBlockMatrix >  BC;
+    ::tbb::affinity_partitioner            ap; // to ensure (???) allocated data is used in equal threads
     
     for ( auto  [ A, B ] : upd_C )
     {
@@ -86,10 +89,10 @@ multiply ( const value_t                 alpha,
 
             if ( is_null( BC ) )
             {
-                auto  BA = cptrcast( A, TBlockMatrix );
-                auto  BB = cptrcast( B, TBlockMatrix );
+                auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                auto  BB = cptrcast( B, hpro::TBlockMatrix );
                 
-                BC = std::make_unique< TBlockMatrix >( C.row_is(), C.col_is() );
+                BC = std::make_unique< hpro::TBlockMatrix >( C.row_is(), C.col_is() );
 
                 BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
 
@@ -103,9 +106,9 @@ multiply ( const value_t                 alpha,
                             {
                                 HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                                 
-                                BC->set_block( i, j, new TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                    BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                    C.value_type() ) );
+                                BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                          BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                          C.value_type() ) );
                             }// for
                     },
                     ap );
@@ -121,12 +124,12 @@ multiply ( const value_t                 alpha,
             }// if
             else if ( is_dense( T.get() ) )
             {
-                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                hlr::add( value_t(1), *U, *T, acc, approx );
                 U = std::move( T );
             }// if
             else
             {
-                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hlr::add( value_t(1), *T, *U, acc, approx );
             }// else
         }// else
     }// for
@@ -142,7 +145,7 @@ multiply ( const value_t                 alpha,
         // (to release U before recursion)
         //
 
-        tensor2< std::unique_ptr< TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
+        tensor2< std::unique_ptr< hpro::TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
         
         if ( ! is_null( U ) )
         {
@@ -181,8 +184,8 @@ multiply ( const value_t                 alpha,
                             if ( ! is_blocked_all( A, B ) )
                                 continue;
                             
-                            auto  BA = cptrcast( A, TBlockMatrix );
-                            auto  BB = cptrcast( B, TBlockMatrix );
+                            auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                            auto  BB = cptrcast( B, hpro::TBlockMatrix );
                         
                             for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                             {
@@ -198,7 +201,7 @@ multiply ( const value_t                 alpha,
 
                         HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
                 
-                        multiply< value_t >( alpha, op_A, op_B, *BC->block( i, j ), upd_ij, sub_U( i, j ), acc );
+                        multiply< value_t >( alpha, op_A, op_B, *BC->block( i, j ), upd_ij, sub_U( i, j ), acc, approx );
                     }// for
                 }// for
             },
@@ -219,25 +222,27 @@ multiply ( const value_t                 alpha,
     //
 
     if ( ! is_null( U ) )
-        hpro::add( alpha, U.get(), value_t(1), &C, acc );
+        hlr::add( alpha, *U, C, acc, approx );
 }
 
 //
 // general version to compute C = C + α op( A ) op( B )
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
-multiply ( const value_t                 alpha,
-           const hpro::matop_t           op_A,
-           const hpro::matop_t           op_B,
-           hpro::TMatrix &               C,
-           upd_list_t &                  upd_C,
-           std::unique_ptr< TMatrix > &  upd_accu,
-           const hpro::TTruncAcc &       acc )
+multiply ( const value_t                       alpha,
+           const hpro::matop_t                 op_A,
+           const hpro::matop_t                 op_B,
+           hpro::TMatrix &                     C,
+           upd_list_t &                        upd_C,
+           std::unique_ptr< hpro::TMatrix > &  upd_accu,
+           const hpro::TTruncAcc &             acc,
+           const approx_t &                    approx )
 {
     if ( is_lowrank( C ) )
     {
-        multiply< value_t >( alpha, op_A, op_B, *ptrcast( &C, TRkMatrix ), upd_C, upd_accu, acc );
+        multiply< value_t >( alpha, op_A, op_B, *ptrcast( &C, hpro::TRkMatrix ), upd_C, upd_accu, acc, approx );
         return;
     }// if
     
@@ -245,17 +250,19 @@ multiply ( const value_t                 alpha,
     // first handle computable updates to C, including non-blocked C
     //
 
-    std::unique_ptr< TMatrix >  U( std::move( upd_accu ) );
+    std::unique_ptr< hpro::TMatrix >  U( std::move( upd_accu ) );
     
     for ( auto  [ A, B ] : upd_C )
     {
         if ( ! is_blocked_all( *A, *B, C ) )
         {
-            auto  T = std::unique_ptr< TMatrix >();
+            auto  T = std::unique_ptr< hpro::TMatrix >();
             
             if ( is_blocked_all( *A, *B ) )
             {
-                T = std::make_unique< TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type< value_t >::value );
+                HLR_ERROR( C.typestr() + " += blocked × blocked" );
+                
+                T = std::make_unique< hpro::TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type< value_t >::value );
 
                 hpro::multiply( value_t(1), op_A, A, op_B, B, value_t(0), T.get(), acc );
             }// if
@@ -271,12 +278,12 @@ multiply ( const value_t                 alpha,
             }// if
             else if ( is_dense( T.get() ) )
             {
-                hpro::add( value_t(1), U.get(), value_t(1), T.get(), acc );
+                hlr::add( value_t(1), *U, *T, acc, approx );
                 U = std::move( T );
             }// if
             else
             {
-                hpro::add( value_t(1), T.get(), value_t(1), U.get(), acc );
+                hlr::add( value_t(1), *T, *U, acc, approx );
             }// else
         }// if
     }// for
@@ -287,14 +294,14 @@ multiply ( const value_t                 alpha,
     
     if ( is_blocked( C ) )
     {
-        auto  BC = ptrcast(  &C, TBlockMatrix );
+        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
 
         //
         // first, split update U into subblock updates
         // (to release U before recursion)
         //
 
-        tensor2< std::unique_ptr< TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
+        tensor2< std::unique_ptr< hpro::TMatrix > >  sub_U( BC->nblock_rows(), BC->nblock_cols() );
         ::tbb::affinity_partitioner            ap;
         
         if ( ! is_null( U ) )
@@ -343,8 +350,8 @@ multiply ( const value_t                 alpha,
                             if ( ! is_blocked_all( A, B ) )
                                 continue;
                             
-                            auto  BA = cptrcast( A, TBlockMatrix );
-                            auto  BB = cptrcast( B, TBlockMatrix );
+                            auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                            auto  BB = cptrcast( B, hpro::TBlockMatrix );
                                 
                             for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                             {
@@ -358,7 +365,7 @@ multiply ( const value_t                 alpha,
                             }// for
                         }// for
                         
-                        multiply< value_t >( alpha, op_A, op_B, *C_ij, upd_ij, sub_U( i, j ), acc );
+                        multiply< value_t >( alpha, op_A, op_B, *C_ij, upd_ij, sub_U( i, j ), acc, approx );
                     }// for
                 }// for
             },
@@ -367,13 +374,14 @@ multiply ( const value_t                 alpha,
     else
     {
         // apply accumulated updates
-        hpro::add( alpha, U.get(), value_t(1), &C, acc );
+        hlr::add( alpha, *U, C, acc, approx );
     }// else
 }
 
 }// namespace detail
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -381,12 +389,13 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
-    std::unique_ptr< TMatrix >  U;
-    detail::upd_list_t          upd{ { &A, &B } };
+    std::unique_ptr< hpro::TMatrix >  U;
+    detail::upd_list_t                upd{ { &A, &B } };
     
-    detail::multiply< value_t >( alpha, op_A, op_B, C, upd, U, acc );
+    detail::multiply< value_t >( alpha, op_A, op_B, C, upd, U, acc, approx );
 }
 
 }}}// namespace hlr::tbb::accu

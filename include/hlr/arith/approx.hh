@@ -9,5 +9,6 @@
 //
 
 #include "approx_svd.hh"
+#include "approx_rrqr.hh"
 
 #endif // __HLR_APPROX_HH

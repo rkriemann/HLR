@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <likwid.h>
+#include <hlr/utils/likwid.hh>
 
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
@@ -88,8 +88,8 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << " standard" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -131,7 +131,9 @@ program_main ()
 
         std::vector< double >  runtime, flops;
         
-        auto  C = impl::matrix::copy( *A );
+        auto  SVD  = hlr::approx::SVD< value_t >();
+        auto  RRQR = hlr::approx::RRQR< value_t >();
+        auto  C    = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -143,7 +145,7 @@ program_main ()
         
             LIKWID_MARKER_START( "hmmaccu" );
             
-            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
+            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc, RRQR );
 
             LIKWID_MARKER_STOP( "hmmaccu" );
             

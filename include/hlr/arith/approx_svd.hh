@@ -13,8 +13,7 @@
 
 #include <hlr/arith/blas.hh>
 
-namespace hlr
-{
+namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
@@ -23,12 +22,12 @@ using hpro::idx_t;
 //
 // return low-rank approximation of M with accuracy <acc>
 //
-template < typename T >
-std::pair< blas::matrix< T >, blas::matrix< T > >
-approx_svd ( blas::matrix< T > &      M,
-             const hpro::TTruncAcc &  acc )
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( blas::matrix< value_t > &  M,
+      const hpro::TTruncAcc &    acc )
 {
-    using  value_t = T;
     using  real_t  = typename hpro::real_type< value_t >::type_t;
 
     //
@@ -71,13 +70,13 @@ approx_svd ( blas::matrix< T > &      M,
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
-template <typename T>
-std::pair< blas::matrix< T >, blas::matrix< T > >
-truncate_svd ( const blas::matrix< T > &  U,
-               const blas::matrix< T > &  V,
-               const hpro::TTruncAcc &    acc )
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( const blas::matrix< value_t > &  U,
+      const blas::matrix< value_t > &  V,
+      const hpro::TTruncAcc &          acc )
 {
-    using  value_t = T;
     using  real_t  = typename hpro::real_type< value_t >::type_t;
 
     assert( U.ncols() == V.ncols() );
@@ -92,7 +91,7 @@ truncate_svd ( const blas::matrix< T > &  U,
 
     const idx_t  acc_rank = idx_t( acc.rank() );
 
-    blas::matrix< T >  OU, OV;
+    blas::matrix< value_t >  OU, OV;
     
     if ( in_rank == 0 )
     {
@@ -138,7 +137,7 @@ truncate_svd ( const blas::matrix< T > &  U,
 
         lacc.set_max_rank( acc_rank );
 
-        std::tie( OU, OV ) = hlr::approx_svd( M, lacc );
+        std::tie( OU, OV ) = svd( M, lacc );
     }// if
     else
     {
@@ -219,15 +218,14 @@ truncate_svd ( const blas::matrix< T > &  U,
 //
 // compute low-rank approximation of a sum Σ_i U_i V_i^H using SVD
 //
-template< typename T >
-std::pair< blas::matrix< T >, blas::matrix< T > >
-approx_sum_svd ( const std::list< blas::matrix< T > > &  U,
-                 const std::list< blas::matrix< T > > &  V,
-                 const hpro::TTruncAcc &                 acc )
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( const std::list< blas::matrix< value_t > > &  U,
+      const std::list< blas::matrix< value_t > > &  V,
+      const hpro::TTruncAcc &                       acc )
 {
     assert( U.size() == V.size() );
-
-    using  value_t = T;
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -258,7 +256,7 @@ approx_sum_svd ( const std::list< blas::matrix< T > > &  U,
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
             blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), D );
 
-        auto [ U_tr, V_tr ] = hlr::approx_svd( D, acc );
+        auto [ U_tr, V_tr ] = svd( D, acc );
 
         return { std::move( U_tr ), std::move( V_tr ) };
     }// if
@@ -294,19 +292,20 @@ approx_sum_svd ( const std::list< blas::matrix< T > > &  U,
         // truncate and return result
         //
     
-        return hlr::truncate_svd( U_all, V_all, acc );
+        return svd( U_all, V_all, acc );
     }// else
 }
 
 //
 // compute low-rank approximation of a sum Σ_i U_i T_i V_i^H using SVD
 //
-template< typename value_t >
-std::pair< blas::matrix< value_t >, blas::matrix< value_t > >
-approx_sum_svd ( const std::list< blas::matrix< value_t > > &  U,
-                 const std::list< blas::matrix< value_t > > &  T,
-                 const std::list< blas::matrix< value_t > > &  V,
-                 const hpro::TTruncAcc &                       acc )
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( const std::list< blas::matrix< value_t > > &  U,
+      const std::list< blas::matrix< value_t > > &  T,
+      const std::list< blas::matrix< value_t > > &  V,
+      const hpro::TTruncAcc &                       acc )
 {
     assert( U.size() == T.size() );
     assert( T.size() == V.size() );
@@ -345,7 +344,7 @@ approx_sum_svd ( const std::list< blas::matrix< value_t > > &  U,
             blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), D );
         }// for
 
-        return hlr::approx_svd( D, acc );
+        return svd( D, acc );
     }// if
     else
     {
@@ -382,10 +381,56 @@ approx_sum_svd ( const std::list< blas::matrix< value_t > > &  U,
         // truncate and return result
         //
     
-        return hlr::truncate_svd( U_all, V_all, acc );
+        return svd( U_all, V_all, acc );
     }// else
 }
 
-}// namespace hlr
+//////////////////////////////////////////////////////////////////////
+//
+// provide above functions as functor
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+struct SVD
+{
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( blas::matrix< value_t > &  M,
+                  const hpro::TTruncAcc &    acc ) const
+    {
+        return std::move( hlr::approx::svd( M, acc ) );
+    }
+
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const blas::matrix< value_t > &  U,
+                  const blas::matrix< value_t > &  V,
+                  const hpro::TTruncAcc &          acc ) const 
+    {
+        return std::move( hlr::approx::svd( U, V, acc ) );
+    }
+    
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const std::list< blas::matrix< value_t > > &  U,
+                  const std::list< blas::matrix< value_t > > &  V,
+                  const hpro::TTruncAcc &                       acc ) const
+    {
+        return std::move( hlr::approx::svd( U, V, acc ) );
+    }
+
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const std::list< blas::matrix< value_t > > &  U,
+                  const std::list< blas::matrix< value_t > > &  T,
+                  const std::list< blas::matrix< value_t > > &  V,
+                  const hpro::TTruncAcc &                       acc ) const
+    {
+        return std::move( hlr::approx::svd( U, T, V, acc ) );
+    }
+};
+
+}}// namespace hlr::approx
 
 #endif // __HLR_ARITH_APPROX_SVD_HH
