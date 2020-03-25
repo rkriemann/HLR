@@ -50,11 +50,11 @@ mul_vec ( const value_t                                       alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, TBlockMatrix );
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
 
         if ( ! (( B->nblock_rows( op_M ) == y.nblocks() ) &&
                 ( B->nblock_cols( op_M ) == x.nblocks() )) )
-            HLR_ERROR( "error" );
+            HLR_ERROR( "matrix/vector block structure incompatible" );
             
         for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
         {
@@ -74,11 +74,11 @@ mul_vec ( const value_t                                       alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D   = cptrcast( &M, TDenseMatrix );
-        auto  x_i = blas::vector< value_t >( blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D   = cptrcast( &M, hpro::TDenseMatrix );
+        auto  x_i = blas::vector< value_t >( hpro::blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( hpro::blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
+        blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
     }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
@@ -113,7 +113,7 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
 
     if ( cb.rank() > 0 )
     {
-        auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.cluster() - v.ofs() );
+        auto  v_cb = blas::vector< value_t >( hpro::blas_vec< value_t >( v ), cb.cluster() - v.ofs() );
         auto  s    = cb.transform_forward( v_cb );
 
         u->set_coeffs( std::move( s ) );
@@ -157,7 +157,7 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
     if ( u.basis().rank() > 0 )
     {
         auto  x   = u.basis().transform_backward( u.coeffs() );
-        auto  v_u = blas::vector< value_t >( blas_vec< value_t >( v ), u.is() - v.ofs() );
+        auto  v_u = blas::vector< value_t >( hpro::blas_vec< value_t >( v ), u.is() - v.ofs() );
             
         blas::add( value_t(1), x, v_u );
     }// if
@@ -174,8 +174,8 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
-          const matop_t                             op_M,
-          const TMatrix &                           M,
+          const hpro::matop_t                       op_M,
+          const hpro::TMatrix &                     M,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y,
           matrix::cluster_basis< value_t > &        rowcb,

@@ -1,15 +1,14 @@
-#ifndef __HLR_ARITH_APPROX_RRQR_HH
-#define __HLR_ARITH_APPROX_RRQR_HH
+#ifndef __HLR_APPROX_RRQR_HH
+#define __HLR_APPROX_RRQR_HH
 //
 // Project     : HLib
-// File        : approx_rrqr.hh
-// Description : low-rank approximation functions using RRQR
+// Module      : approx/rrqr
+// Description : low-rank approximation functions using rank revealing QR
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include <list>
-#include <cassert>
 
 #include <hlr/arith/blas.hh>
 
@@ -294,8 +293,8 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
        const std::list< blas::matrix< value_t > > &  V,
        const hpro::TTruncAcc &                       acc )
 {
-    assert( U.size() == T.size() );
-    assert( T.size() == V.size() );
+    HLR_ASSERT( U.size() == T.size() );
+    HLR_ASSERT( T.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -378,9 +377,11 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
 //
 //////////////////////////////////////////////////////////////////////
 
-template < typename value_t >
+template < typename T_value >
 struct RRQR
 {
+    using  value_t = T_value;
+    
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
@@ -420,4 +421,4 @@ struct RRQR
 
 }}// namespace hlr::approx
 
-#endif // __HLR_ARITH_APPROX_RRQR_HH
+#endif // __HLR_APPROX_RRQR_HH

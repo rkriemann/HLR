@@ -21,6 +21,7 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/approx/svd.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
 #include "hlr/seq/matrix.hh"

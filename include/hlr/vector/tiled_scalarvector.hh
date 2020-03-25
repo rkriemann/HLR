@@ -156,7 +156,7 @@ public:
     virtual void fill ( const real  a )
     {
         for ( auto [ is, v_is ] : _tiles )
-            blas::fill( value_t(a), v_is );
+            blas::fill( v_is, value_t(a) );
     }
 
     // fill with random numbers

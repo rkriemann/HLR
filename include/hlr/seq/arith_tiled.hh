@@ -18,6 +18,7 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/approx/svd.hh"
 #include "hlr/seq/matrix.hh"
 
 namespace hlr { namespace seq { namespace tiled {
@@ -424,7 +425,7 @@ truncate ( const value_t                 alpha,
         blas::prod( alpha, W, blas::adjoint( Y ), value_t(1), M );
             
         // truncate to rank-k
-        return std::move( hlr::approx_svd( M, acc ) );
+        return std::move( hlr::approx::svd( M, acc ) );
     }// if
     else
     {
@@ -473,17 +474,17 @@ truncate ( const value_t                 alpha,
 namespace hodlr
 {
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( TRkMatrix *        A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_A< value_t >( A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const TRkMatrix *  A ) { assert( ! is_null( A ) ); return blas_mat_B< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( TRkMatrix &        A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( TRkMatrix &        A ) { return blas_mat_B< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const TRkMatrix &  A ) { return blas_mat_A< value_t >( & A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const TRkMatrix &  A ) { return blas_mat_B< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -573,7 +574,7 @@ trsmuh ( const hpro::TMatrix *      U,
     {
         auto  DU = cptrcast( U, hpro::TDenseMatrix );
         
-        blas::matrix< value_t >  Y( X, copy_value );
+        blas::matrix< value_t >  Y( X, hpro::copy_value );
 
         blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X );
 

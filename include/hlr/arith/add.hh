@@ -8,7 +8,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "hlr/arith/approx.hh"
 #include "hlr/utils/log.hh"
 
 namespace hlr

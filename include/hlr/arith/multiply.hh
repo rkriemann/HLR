@@ -8,7 +8,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include "hlr/arith/approx.hh"
 #include "hlr/utils/log.hh"
 
 namespace hlr
@@ -198,7 +197,7 @@ multiply ( const value_t            alpha,
     if      ( is_dense(   C ) ) multiply< value_t, approx_t >( alpha, A, B, ptrcast( C, hpro::TDenseMatrix ), acc, approx );
     else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, A, B, ptrcast( C, hpro::TRkMatrix ),    acc, approx );
     else
-        assert( false );
+        HLR_ERROR( "unsupported matrix type : " + C->typestr() );
 }
 
 template < typename value_t,
@@ -215,7 +214,7 @@ multiply ( const value_t            alpha,
     if      ( is_dense(   B ) ) multiply< value_t, approx_t, matrix1_t, hpro::TDenseMatrix >( alpha, A, cptrcast( B, hpro::TDenseMatrix ), C, acc, approx );
     else if ( is_lowrank( B ) ) multiply< value_t, approx_t, matrix1_t, hpro::TRkMatrix >(    alpha, A, cptrcast( B, hpro::TRkMatrix ),    C, acc, approx );
     else
-        hlr::error( "unsupported matrix type : " + B->typestr() );
+        HLR_ERROR( "unsupported matrix type : " + B->typestr() );
 }
 
 template < typename value_t,
@@ -231,7 +230,7 @@ multiply ( const value_t            alpha,
     if      ( is_dense(   A ) ) multiply< value_t, approx_t, hpro::TDenseMatrix >( alpha, cptrcast( A, hpro::TDenseMatrix ), B, C, acc, approx );
     else if ( is_lowrank( A ) ) multiply< value_t, approx_t, hpro::TRkMatrix >(    alpha, cptrcast( A, hpro::TRkMatrix ),    B, C, acc, approx );
     else
-        hlr::error( "unsupported matrix type : " + B->typestr() );
+        HLR_ERROR( "unsupported matrix type : " + A->typestr() );
 }
 
 }// namespace hlr

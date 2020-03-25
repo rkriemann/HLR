@@ -1,15 +1,14 @@
-#ifndef __HLR_ARITH_APPROX_SVD_HH
-#define __HLR_ARITH_APPROX_SVD_HH
+#ifndef __HLR_APPROX_SVD_HH
+#define __HLR_APPROX_SVD_HH
 //
 // Project     : HLib
-// File        : approx_svd.hh
+// Module      : approx/svd
 // Description : low-rank approximation functions using SVD
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
 #include <list>
-#include <cassert>
 
 #include <hlr/arith/blas.hh>
 
@@ -79,7 +78,7 @@ svd ( const blas::matrix< value_t > &  U,
 {
     using  real_t  = typename hpro::real_type< value_t >::type_t;
 
-    assert( U.ncols() == V.ncols() );
+    HLR_ASSERT( U.ncols() == V.ncols() );
 
     const idx_t  n       = idx_t( U.nrows() );
     const idx_t  m       = idx_t( V.nrows() );
@@ -225,7 +224,7 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  V,
       const hpro::TTruncAcc &                       acc )
 {
-    assert( U.size() == V.size() );
+    HLR_ASSERT( U.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -307,8 +306,8 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  V,
       const hpro::TTruncAcc &                       acc )
 {
-    assert( U.size() == T.size() );
-    assert( T.size() == V.size() );
+    HLR_ASSERT( U.size() == T.size() );
+    HLR_ASSERT( T.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -391,9 +390,11 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
 //
 //////////////////////////////////////////////////////////////////////
 
-template < typename value_t >
+template < typename T_value >
 struct SVD
 {
+    using  value_t = T_value;
+    
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
@@ -433,4 +434,4 @@ struct SVD
 
 }}// namespace hlr::approx
 
-#endif // __HLR_ARITH_APPROX_SVD_HH
+#endif // __HLR_APPROX_SVD_HH

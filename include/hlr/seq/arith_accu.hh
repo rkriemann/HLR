@@ -187,7 +187,7 @@ multiply ( const value_t                       alpha,
         if ( ! is_null( U ) )
             HLR_ERROR( "accumulator non-null" );
         
-        U = to_rank( BC.get(), acc );
+        U = matrix::convert_to_lowrank( *BC, acc, approx );
     }// if
 
     //

@@ -14,6 +14,9 @@
 #include "hlr/seq/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/randsvd.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -22,6 +25,60 @@ using namespace hlr;
 
 uint64_t
 get_flops ( const std::string &  method );
+
+//
+// accumulator based mat-mul
+//
+template < typename approx_t >
+void
+mm_accu ( const hpro::TMatrix &    A,
+          const hpro::TTruncAcc &  acc,
+          const approx_t &         approx )
+{
+    using  value_t = typename approx_t::value_t;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic      = timer::now();
+    auto  toc      = timer::since( tic );
+    
+    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  C        = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        C->scale( 0 );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hmmaccu" );
+            
+        impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, A, hpro::apply_normal, A, *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hmmaccu" );
+            
+        toc = timer::since( tic );
+        std::cout << "    mult in  " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "mm" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "  runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+
+    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+}
 
 //
 // main function
@@ -85,7 +142,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << " standard" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
 
@@ -127,47 +184,30 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << " accumulator" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "accumulator (SVD)" << term::reset << std::endl;
 
-        std::vector< double >  runtime, flops;
-        
-        auto  SVD  = hlr::approx::SVD< value_t >();
-        auto  RRQR = hlr::approx::RRQR< value_t >();
-        auto  C    = impl::matrix::copy( *A );
-        
-        for ( int i = 0; i < nbench; ++i )
-        {
-            C->scale( 0 );
-            
-            blas::reset_flops();
+        auto  apx = hlr::approx::SVD< value_t >();
 
-            tic = timer::now();
-        
-            LIKWID_MARKER_START( "hmmaccu" );
-            
-            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc, RRQR );
+        mm_accu( *A, acc, apx );
+    }// if
 
-            LIKWID_MARKER_STOP( "hmmaccu" );
-            
-            toc = timer::since( tic );
-            std::cout << "    mult in  " << format_time( toc ) << std::endl;
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "accumulator (RRQR)" << term::reset << std::endl;
 
-            flops.push_back( get_flops( "mm" ) );
-            runtime.push_back( toc.seconds() );
-        }// for
-        
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        auto  apx = hlr::approx::RRQR< value_t >();
 
-        if ( nbench > 1 )
-            std::cout << "  runtime = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+        mm_accu( *A, acc, apx );
+    }// if
 
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "accumulator (RandSVD)" << term::reset << std::endl;
 
-        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
-    }
+        auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_accu( *A, acc, apx );
+    }// if
 
     LIKWID_MARKER_CLOSE;
 }
