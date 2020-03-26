@@ -819,7 +819,7 @@ mul_vec ( const value_t                          alpha,
         }// if
         else if ( op_M == hpro::apply_transposed )
         {
-            assert( is_complex_type< value_t >::value == false );
+            assert( hpro::is_complex_type< value_t >::value == false );
             
             for ( auto  [ is, U_is ] : R->U() )
                 blas::mulvec( value_t(1), blas::transposed( U_is ), x.at( is ), value_t(1), t );

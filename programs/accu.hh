@@ -17,6 +17,7 @@
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
+#include <hlr/approx/aca.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -205,6 +206,15 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << "accumulator (RandSVD)" << term::reset << std::endl;
 
         auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_accu( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "accumulator (ACA)" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::ACA< value_t >();
 
         mm_accu( *A, acc, apx );
     }// if
