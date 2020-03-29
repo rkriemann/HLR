@@ -620,23 +620,26 @@ copy_uniform ( const hpro::TMatrix &                          M,
         //
         // project into row/column cluster basis:
         //
-        //   M = A·B^H = (V·V^H·A) (U·U^H·B)^H
+        //   M = A·B^H = (U·U^H·A) (V·V^H·B)^H
         //             = U · (U^H·A)·(V^H·B)^H · V^H
         //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
-
+        //
+        
         auto  R  = cptrcast( &M, hpro::TRkMatrix );
 
         auto  UA = rowcb.transform_forward( hpro::blas_mat_A< value_t >( R ) );
         auto  VB = colcb.transform_forward( hpro::blas_mat_B< value_t >( R ) );
         auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
 
-        // auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
-        // auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
-        // auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
-
-        // blas::add( value_t(-1), M2, M1 );
-        
-        // std::cout << blas::norm_F( M1 ) << std::endl;
+        // {
+        //     auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
+        //     auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
+        //     auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
+            
+        //     blas::add( value_t(-1), M2, M1 );
+            
+        //     std::cout << hpro::to_string( "%.6e", blas::norm_F( M1 ) ) << std::endl;
+        // }
         
         return std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
                                                                              rowcb, colcb,

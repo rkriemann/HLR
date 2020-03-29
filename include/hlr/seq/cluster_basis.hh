@@ -188,8 +188,6 @@ construct_basis ( const cluster_tree &  ct,
     // compute row basis for all blocks
     //
 
-    // std::cout << ct.to_string() << std::endl;
-    
     if ( ! mat_map[ ct ].empty() )
     {
         //
@@ -202,15 +200,18 @@ construct_basis ( const cluster_tree &  ct,
         
         for ( auto  M : mat_map[ ct ] )
         {
-            // std::cout << M->block_is().to_string() << std::endl;
-    
             if ( M->rank() > 0 )
             {
-                auto  P = blas::copy( V< value_t >( M, adjoint ) );
-                auto  C = blas::matrix< value_t >( M->rank(), M->rank() );
-                
-                blas::factorise_ortho( P, C );
+                auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
 
+                {
+                    auto  T = blas::prod( value_t(1), Q, C );
+
+                    blas::add( value_t(-1), V< value_t >( M, adjoint ), T );
+
+                    // std::cout << blas::norm_F( T ) << std::endl;
+                }
+                
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
             }// if
@@ -254,11 +255,19 @@ construct_basis ( const cluster_tree &  ct,
             // approximate basis up to given accuracy and update cluster basis
             //
 
-            blas::matrix< value_t >  R;
+            // hpro::DBG::write( Xt, "Xt.mat", "Xt" );
+            
+            auto  [ Q, R ] = blas::factorise_ortho( Xt, acc );
 
-            blas::factorise_ortho( Xt, R, acc );
+            // {
+            //     auto  T = blas::prod( value_t(1), Q, R );
 
-            cb->set_basis( std::move( Xt ) );
+            //     blas::add( value_t(-1), Xt, T );
+
+            //     std::cout << hpro::to_string( "%.6e", blas::norm_F( T ) / blas::norm_F( Xt ) ) << std::endl;
+            // }
+                
+            cb->set_basis( std::move( Q ) );
         }// if
     }// if
 

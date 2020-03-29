@@ -104,14 +104,24 @@ public:
     //
 
     uint                              rank     () const { return std::min( _S.nrows(), _S.ncols() ); }
+
     uint                              row_rank () const { return _S.nrows(); }
     uint                              col_rank () const { return _S.ncols(); }
+
+    uint                              row_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_rank() : col_rank(); }
+    uint                              col_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_rank() : row_rank(); }
 
     cluster_basis< value_t > &        row_cb   ()       { return *_row_cb; }
     const cluster_basis< value_t > &  row_cb   () const { return *_row_cb; }
 
     cluster_basis< value_t > &        col_cb   ()       { return *_col_cb; }
     const cluster_basis< value_t > &  col_cb   () const { return *_col_cb; }
+
+    cluster_basis< value_t > &        row_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_cb() : col_cb(); }
+    const cluster_basis< value_t > &  row_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? row_cb() : col_cb(); }
+
+    cluster_basis< value_t > &        col_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_cb() : row_cb(); }
+    const cluster_basis< value_t > &  col_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? col_cb() : row_cb(); }
 
     void
     set_cluster_bases ( const cluster_basis< value_t > &  arow_cb,
