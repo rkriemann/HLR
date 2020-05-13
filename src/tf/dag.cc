@@ -260,7 +260,7 @@ run ( graph &                  dag,
     
     // create TF tasks for all nodes
     for ( auto  node : dag.nodes() )
-        taskmap[ node ] = tf.silent_emplace( [node,&acc] () { node->run( acc ); } );
+        taskmap[ node ] = tf.emplace( [node,&acc] () { node->run( acc ); } );
     
     // set up dependencies
     for ( auto  node : dag.nodes() )

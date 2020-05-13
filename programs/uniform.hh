@@ -57,6 +57,9 @@ program_main ()
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+
+    // assign clusters since needed for cluster bases
+    seq::matrix::assign_cluster( *A, *bct->root() );
     
     if ( hpro::verbose( 3 ) )
     {

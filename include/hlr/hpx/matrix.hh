@@ -113,11 +113,22 @@ build ( const HLIB::TBlockCluster *  bct,
     }// else
 
     // copy properties from the cluster
-    M->set_cluster_force( bct );
+    // M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// assign block cluster to matrix
+//
+inline
+void
+assign_cluster ( hpro::TMatrix &              M,
+                 const hpro::TBlockCluster &  bc )
+{
+    hlr::seq::matrix::assign_cluster( M, bc );
 }
 
 //

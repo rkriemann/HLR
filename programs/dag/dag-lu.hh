@@ -6,8 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-// #include <likwid.h>
-
 #include "common.hh"
 #include "common-main.hh"
 #include "hlr/cluster/h.hh"
@@ -22,6 +20,7 @@
 #include "hlr/arith/lu.hh"
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/utils/likwid.hh"
 
 using namespace hlr;
 
@@ -103,7 +102,7 @@ program_main ()
     
     hlr::dag::graph  dag;
     
-    auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
+    auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( impl::matrix::copy( *A ) ) );
 
     if ( levelwise )
         C->set_hierarchy_data();

@@ -21,14 +21,14 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++'
+CXX          = 'g++-10'
 CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
-DEFINES      = ''
+DEFINES      = '__TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries
 HPRO_DIR     = '/'

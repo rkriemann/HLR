@@ -152,6 +152,17 @@ build ( const HLIB::TBlockCluster *  bct,
 }
 
 //
+// assign block cluster to matrix
+//
+inline
+void
+assign_cluster ( hpro::TMatrix &              M,
+                 const hpro::TBlockCluster &  bc )
+{
+    hlr::seq::matrix::assign_cluster( M, bc );
+}
+
+//
 // return copy of matrix
 // - copy operation is performed in parallel for sub blocks
 //

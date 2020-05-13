@@ -93,11 +93,44 @@ build ( const hpro::TBlockCluster *  bct,
         B->adjust_value_type();
     }// else
 
-    M->set_cluster_force( bct );
+    // M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// assign block cluster to matrix
+//
+inline
+void
+assign_cluster ( hpro::TMatrix &              M,
+                 const hpro::TBlockCluster &  bc )
+{
+    M.set_cluster_force( & bc );
+    
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+
+        HLR_ASSERT( ( B->nblock_rows() == bc.nrows() ) &&
+                    ( B->nblock_cols() == bc.ncols() ) );
+                    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( B->block( i, j ) == nullptr )
+                    continue;
+
+                if ( bc.son( i, j ) == nullptr )
+                    HLR_ERROR( "null cluster for non-null sub-block" );
+                
+                assign_cluster( * B->block( i, j ), * bc.son( i, j ) );
+            }// for
+        }// for
+    }// if
 }
 
 //

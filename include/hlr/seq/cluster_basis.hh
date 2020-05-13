@@ -175,6 +175,22 @@ build_matrix_map ( const cluster_tree &   ct,
 //
 // construct cluster basis for each cluster (block rows)
 //
+// For a cluster t let M = { M' : row_cluster( M ) = t } be the set of all
+// low-rank matrices in the block row defined by t.
+//
+// Construct total cluster basis X_t:
+//
+//    X_t = [ X_1, X_2, ... ]
+//        = [ U_1 · C_1^H, U_2 · C_2^H, ... ]
+//
+// with C_i from  Q_i C_i = qr( V_i )
+//
+// The cluster basis W_t is then defined as
+//
+//    W_t R_t = qr( X_t )
+//
+// Here, "qr" may be replaced by any orthonormal factorization.
+//
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
@@ -204,13 +220,13 @@ construct_basis ( const cluster_tree &  ct,
             {
                 auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
 
-                {
-                    auto  T = blas::prod( value_t(1), Q, C );
+                // {
+                //     auto  T = blas::prod( value_t(1), Q, C );
 
-                    blas::add( value_t(-1), V< value_t >( M, adjoint ), T );
+                //     blas::add( value_t(-1), V< value_t >( M, adjoint ), T );
 
-                    // std::cout << blas::norm_F( T ) << std::endl;
-                }
+                //     std::cout << blas::norm_F( T ) << std::endl;
+                // }
                 
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
