@@ -32,6 +32,7 @@ DEFINES      = '__TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries
 HPRO_DIR     = '/'
+MKL_DIR      = None  # preinitialized below
 TBB_DIR      = '/'
 TASKFLOW_DIR = '/'
 HPX_DIR      = '/'
@@ -68,6 +69,12 @@ FRAMEWORKS   = [ 'seq',
                  'mpi',
                  'gpi2' ]
 
+# supported lapack libraries
+LAPACKLIBS   = [ 'default',   # default system implementation, e.g., -llapack -lblas
+                 'none',      # do not use any LAPACK library
+                 'mkl',       # use Intel MKL
+                 'mklseq' ]   # use sequential Intel MKL
+                 
 # malloc libraries (also depends on directories above)
 MALLOCS      = [ 'default',
                  'system',
@@ -123,6 +130,18 @@ def path ( program, source ) :
     
 ######################################################################
 #
+# preinitialization with known defaults
+#
+######################################################################
+
+# MKL should define MKLROOT
+if MKL_DIR == None and 'MKLROOT' in os.environ :
+    MKL_DIR = os.environ['MKLROOT']
+else :
+    MKL_DIR = '/' # to prevent error below due to invalid path
+
+######################################################################
+#
 # eval options
 #
 ######################################################################
@@ -147,10 +166,13 @@ opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DI
 opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
 
+opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+
 opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
+opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
 opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
 
@@ -196,10 +218,13 @@ TASKFLOW_DIR = opt_env['tf']
 HPX_DIR      = opt_env['hpx']
 GPI2_DIR     = opt_env['gpi2']
 
+MKL_DIR      = opt_env['mkl']
+
 JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
 TCMALLOC_DIR = opt_env['tcmalloc']
 
+lapack       = opt_env['lapack']
 malloc       = opt_env['malloc']
 likwid       = opt_env['likwid']
 
@@ -279,13 +304,27 @@ if not fullmsg :
 
 # ensure NDEBUG is set in optimization mode
 if not debug :
-    env.Append(  CPPDEFINES = [ "NDEBUG" ] )
+    env.Append(  CPPDEFINES = [ 'NDEBUG' ] )
 
 # add internal paths and libraries
 env.Append(  CPPPATH = [ '#include' ] )
 env.Append(  CPPPATH = [ '#programs/common' ] )
-env.Prepend( LIBS    = [ "hlr" ] )
-env.Prepend( LIBPATH = [ "." ] )
+env.Prepend( LIBS    = [ 'hlr' ] )
+env.Prepend( LIBPATH = [ '.' ] )
+
+# add LAPACK library
+if lapack == 'default' :
+    env.Append( LIBS = [ 'lapack', 'blas' ] )
+elif lapack == 'mkl' :
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
+elif lapack == 'mklseq' :
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
 
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
@@ -503,6 +542,8 @@ if 'tf' in frameworks :
     tf = env.Clone()
     tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
     tf.Append( LIBS = [ "pthread" ] )
+    tf.ParseConfig( "PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma" )
+    tf.ParseConfig( "PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma" )
     
     for program in programs :
         name   = program + '-tf'
@@ -510,6 +551,8 @@ if 'tf' in frameworks :
 
         if os.path.exists( source ) and os.path.isfile( source ) :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
+            
+    Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
 
 #
 # HPX
