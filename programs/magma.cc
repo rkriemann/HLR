@@ -77,6 +77,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////
 
+    blas::magma::init();
+    
     // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
     auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
     auto  U   = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
@@ -86,26 +88,66 @@ program_main ()
     // using default blas
     //
 
-    auto                     U1 = blas::copy( U );
-    blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
-
-    blas::qr( U1, R1 );
-
-    hpro::DBG::write( U1, "U1.mat", "U1" );
-    hpro::DBG::write( R1, "R1.mat", "R1" );
+    {
+        auto                     U1 = blas::copy( U );
+        blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
+        
+        blas::qr( U1, R1 );
+        
+        hpro::DBG::write( U1, "U1.mat", "U1" );
+        hpro::DBG::write( R1, "R1.mat", "R1" );
+    }
     
     //
     // using MAGMA
     //
 
-    auto                     U2 = blas::copy( U );
-    blas::matrix< value_t >  R2( U.ncols(), U.ncols() );
+    {
+        auto                     U2 = blas::copy( U );
+        blas::matrix< value_t >  R2( U.ncols(), U.ncols() );
     
-    blas::magma::init();
-    blas::magma::qr( U2, R2 );
+        blas::magma::init();
+        blas::magma::qr( U2, R2 );
 
-    hpro::DBG::write( U1, "U1.mat", "U1" );
-    hpro::DBG::write( R1, "R1.mat", "R1" );
+        hpro::DBG::write( U2, "U2.mat", "U2" );
+        hpro::DBG::write( R2, "R2.mat", "R2" );
+    }
+
+    //////////////////////////////////////////////////////////////////
+    //
+    // compute QR with column pivoting
+    //
+    //////////////////////////////////////////////////////////////////
+
+    //
+    // using default blas
+    //
+
+    {
+        auto                     U1 = blas::copy( U );
+        blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
+        std::vector< int >       P1( U.ncols() );
+        
+        blas::qrp( U1, R1, P1 );
+        
+        hpro::DBG::write( U1, "U1p.mat", "U1p" );
+        hpro::DBG::write( R1, "R1p.mat", "R1p" );
+    }
+    
+    //
+    // using MAGMA
+    //
+
+    {
+        auto                     U2 = blas::copy( U );
+        blas::matrix< value_t >  R2( U.ncols(), U.ncols() );
+        std::vector< int >       P2( U.ncols() );
+    
+        blas::magma::qrp( U2, R2, P2 );
+        
+        hpro::DBG::write( U2, "U2p.mat", "U2p" );
+        hpro::DBG::write( R2, "R2p.mat", "R2p" );
+    }
 }
 
 template < typename problem_t >

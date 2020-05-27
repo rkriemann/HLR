@@ -72,7 +72,7 @@ rrqr ( const blas::matrix< T > &  U,
         auto  RU = blas::matrix< value_t >( in_rank, in_rank );
         auto  P  = std::vector< int >( in_rank, 0 );
 
-        blas::qrp( QU, RU, P );
+        blas::magma::qrp( QU, RU, P );
 
         auto  out_rank = hlr::approx::detail::trunc_rank( RU, acc );
         

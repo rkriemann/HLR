@@ -40,6 +40,7 @@ init ()
 {
     magma_int_t  ndevices = 0;
 
+    magma_init();
     magma_getdevices( devices, 1, & ndevices );
 
     if ( ndevices == 0 )
@@ -183,12 +184,94 @@ ungqr ( const magma_int_t                           nrows,
 
 #undef HLR_MAGMA_UNGQR
 
+//
+// wrapper for QR factorization with column pivoting
+//
+inline void
+magma_geqp3 ( const magma_int_t  nrows,
+              const magma_int_t  ncols,
+              magmaFloat_ptr     M,
+              magma_int_t        ldM,
+              magma_int_t *      jpvt,
+              float *            tau,
+              magmaFloat_ptr     dwork,
+              magma_int_t        lwork,
+              float *            /* rwork */,
+              magma_int_t *      info )
+{
+    magma_sgeqp3_gpu( nrows, ncols, M, ldM, jpvt, tau, dwork, lwork, info );
+}
+
+inline void
+magma_geqp3 ( const magma_int_t  nrows,
+              const magma_int_t  ncols,
+              magmaDouble_ptr    M,
+              magma_int_t        ldM,
+              magma_int_t *      jpvt,
+              double *           tau,
+              magmaDouble_ptr    dwork,
+              magma_int_t        lwork,
+              double *           /* rwork */,
+              magma_int_t *      info )
+{
+    magma_dgeqp3_gpu( nrows, ncols, M, ldM, jpvt, tau, dwork, lwork, info );
+}
+
+inline void
+magma_geqp3 ( const magma_int_t      nrows,
+              const magma_int_t      ncols,
+              magmaFloatComplex_ptr  M,
+              magma_int_t            ldM,
+              magma_int_t *          jpvt,
+              magmaFloatComplex *    tau,
+              magmaFloatComplex_ptr  dwork,
+              magma_int_t            lwork,
+              float *                rwork,
+              magma_int_t *          info )
+{
+    magma_cgeqp3_gpu( nrows, ncols, M, ldM, jpvt, tau, dwork, lwork, rwork, info );
+}
+
+inline void
+magma_geqp3 ( const magma_int_t       nrows,
+              const magma_int_t       ncols,
+              magmaDoubleComplex_ptr  M,
+              magma_int_t             ldM,
+              magma_int_t *           jpvt,
+              magmaDoubleComplex *    tau,
+              magmaDoubleComplex_ptr  dwork,
+              magma_int_t             lwork,
+              double *                rwork,
+              magma_int_t *           info )
+{
+    magma_zgeqp3_gpu( nrows, ncols, M, ldM, jpvt, tau, dwork, lwork, rwork, info );
+}
+
+template < typename  value_t >
+void
+geqp3 ( const magma_int_t                           nrows,
+        const magma_int_t                           ncols,
+        typename magma_type_ptr< value_t >::type_t  M,
+        magma_int_t                                 ldM,
+        magma_int_t *                               jpvt,
+        value_t *                                   tau,
+        typename magma_type_ptr< value_t >::type_t  work,
+        magma_int_t                                 lwork,
+        typename hpro::real_type< value_t >::type_t *  rwork )
+{
+    magma_int_t  info = 0;
+    
+    magma_geqp3( nrows, ncols, M, ldM, jpvt, typename magma_type_ptr< value_t >::type_t( tau ), work, lwork, rwork, & info );
+    
+    if ( info != 0 )
+        HLR_ERROR( "error in magma_get_geqp3_gpu" );
+}
+
 }// namespace detail
 
 //
-// compute QR factorisation of the n×m matrix \a A with
-// n×m matrix Q and mxm matrix R (n >= m); \a A will be
-// overwritten with Q upon exit
+// compute QR factorisation M = Q·R of the n×m matrix M
+// - M will be overwritten with Q upon exit
 //
 template < typename value_t >
 void
@@ -197,7 +280,7 @@ qr ( matrix< value_t > &  M,
 {
     const magma_int_t  nrows = magma_int_t( M.nrows() );
     const magma_int_t  ncols = magma_int_t( M.ncols() );
-    const magma_int_t  nb    = magma_get_dgeqrf_nb( nrows, ncols );
+    const magma_int_t  nb    = magma_get_dgeqrf_nb( nrows, ncols ); // CHECK for sgeqrf/cgeqrf/zgeqrf
 
     // adjust size of R
     if (( magma_int_t(R.nrows()) != ncols ) || ( magma_int_t(R.ncols()) != ncols ))
@@ -224,7 +307,7 @@ qr ( matrix< value_t > &  M,
     
     for ( magma_int_t  i = 0; i < ncols-1; i++ )
     {
-        vector< value_t >  col_i( R, range( i+1, nrows-1 ), i );
+        vector< value_t >  col_i( R, range( i+1, ncols-1 ), i );
 
         fill( value_t(0), col_i );
     }// for
@@ -235,6 +318,82 @@ qr ( matrix< value_t > &  M,
     
     detail::ungqr( nrows, ncols, M_dev, M.col_stride(), tau.data(), T_dev, nb );
     detail::from_device( M_dev, nrows, M, queue );
+}
+
+//
+// Compute QR factorisation with column pivoting of the matrix M.
+//
+template < typename value_t >
+void
+qrp ( matrix< value_t > &           M,
+      matrix< value_t > &           R,
+      std::vector< magma_int_t > &  P )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  hpro::blas_int_t;
+    
+    const magma_int_t  nrows = magma_int_t( M.nrows() );
+    const magma_int_t  ncols = magma_int_t( M.ncols() );
+    const magma_int_t  nb    = magma_get_dgeqp3_nb( nrows, ncols ); // CHECK for sgeqrf/cgeqrf/zgeqrf
+
+    if ( magma_int_t( P.size() ) != ncols )
+        P.resize( ncols );
+    
+    if (( magma_int_t( R.nrows() ) != ncols ) || ( magma_int_t( R.ncols() ) != ncols ))
+        R = std::move( matrix< value_t >( ncols, ncols ) );
+    
+    //
+    // allocate memory and copy data
+    //
+    
+    auto         M_dev     = detail::device_alloc< value_t >( nrows * ncols );
+    magma_int_t  lwork     = magma_roundup( ncols+1, 32 )*nb + magma_roundup( 2*ncols, 32 );
+    auto         work_dev  = detail::device_alloc< value_t >( lwork );
+
+    detail::to_device( M, M_dev, nrows, queue );
+
+    //
+    // compute Householder vectors and R
+    //
+
+    std::vector< value_t >  tau( std::min( nrows, ncols ) );
+    std::vector< real_t >   rwork( 2*ncols );
+    
+    detail::geqp3( nrows, ncols, M_dev, M.col_stride(), P.data(), tau.data(), work_dev, lwork, rwork.data() );
+
+    //
+    // copy M back and proceed on CPU
+    //
+
+    detail::from_device( M_dev, nrows, M, queue );
+
+    for ( magma_int_t  i = 0; i < ncols; i++ )
+    {
+        vector< value_t >  colM( M, range( 0, i ), i );
+        vector< value_t >  colR( R, range( 0, i ), i );
+
+        copy( colM, colR );
+    }// for
+    
+    //
+    // compute Q
+    //
+
+    blas_int_t              info = 0;
+    std::vector< value_t >  work( 1 );
+    
+    orgqr< value_t >( nrows, ncols, ncols, M.data(), blas_int_t( M.col_stride() ), tau.data(), work.data(), -1, info );
+
+    work.resize( hpro::re( work[0] ) );
+    
+    orgqr< value_t >( nrows, ncols, ncols, M.data(), blas_int_t( M.col_stride() ), tau.data(), work.data(), work.size(), info );
+
+    //
+    // correct indices in P (1-counted to 0-counted)
+    //
+
+    for ( magma_int_t  i = 0; i < nrows; i++ )
+        --P[i];
 }
 
 }}}// hlr::blas::magma
