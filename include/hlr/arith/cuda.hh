@@ -59,7 +59,7 @@ device_alloc ( const size_t  n )
 {
     void *  ptr = nullptr;
     
-    if ( cudaMalloc( (void**) & ptr, n * sizeof(value_t) ) != cudaSuccess )
+    if ( cudaMalloc( & ptr, n * sizeof(value_t) ) != cudaSuccess )
         HLR_ERROR( "device memory allocation failed" );
 
     return typename cuda_type_ptr< value_t >::type_t( ptr );
@@ -267,6 +267,13 @@ qr ( handle               handle,
         
     from_device( dev_M, nrows, R );
 
+    for ( size_t  i = 0; i < ncols; i++ )
+    {
+        vector< value_t >  R_i( R, range( i+1, ncols-1 ), i );
+
+        fill( value_t(0), R_i );
+    }// for
+    
     //
     // compute Q
     //
