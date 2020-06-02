@@ -45,7 +45,7 @@ TCMALLOC_DIR = '/'
 LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
 
-# set of programs to build: dag-*, tlr, hodlr, tileh (or "all")
+# set of programs to build: dag-*, tlr, hodlr, tileh (or 'all')
 PROGRAMS     = [ 'tlr',
                  'hodlr',
                  'tileh',
@@ -60,7 +60,7 @@ PROGRAMS     = [ 'tlr',
                  'uniform',
                  'accu' ]
 
-# set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or "all")
+# set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
                  'omp',
                  'tbb',
@@ -296,11 +296,11 @@ env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --l
 
 # decative full compiler/linker output
 if not fullmsg :
-    env.Replace( CCCOMSTR     = " %sCC%s     $SOURCES" % ( colors['green']  + colors['bold'], colors['reset'] )  )
-    env.Replace( CXXCOMSTR    = " %sC++%s    $SOURCES" % ( colors['green']  + colors['bold'], colors['reset'] ) )
-    env.Replace( LINKCOMSTR   = " %sLink%s   %s$TARGET%s"  % ( colors['cyan']   + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
-    env.Replace( ARCOMSTR     = " %sAR%s     %s$TARGET%s"  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
-    env.Replace( RANLIBCOMSTR = " %sIndex%s  %s$TARGET%s"  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
+    env.Replace( CCCOMSTR     = ' %sCC%s     $SOURCES' % ( colors['green']  + colors['bold'], colors['reset'] )  )
+    env.Replace( CXXCOMSTR    = ' %sC++%s    $SOURCES' % ( colors['green']  + colors['bold'], colors['reset'] ) )
+    env.Replace( LINKCOMSTR   = ' %sLink%s   %s$TARGET%s'  % ( colors['cyan']   + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
+    env.Replace( ARCOMSTR     = ' %sAR%s     %s$TARGET%s'  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
+    env.Replace( RANLIBCOMSTR = ' %sIndex%s  %s$TARGET%s'  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
 
 # ensure NDEBUG is set in optimization mode
 if not debug :
@@ -333,10 +333,10 @@ if JEMALLOC_DIR != None and malloc == 'jemalloc' :
 elif MIMALLOC_DIR != None and malloc == 'mimalloc' :
     env.MergeFlags( os.path.join( MIMALLOC_DIR, 'lib', 'libmimalloc.a' ) )
 elif malloc == 'tbbmalloc' :
-    env.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
+    env.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
     env.Append( LIBS    = 'tbbmalloc' )
 elif malloc == 'tcmalloc' :
-    env.Append( LIBPATH = os.path.join( TCMALLOC_DIR, "lib" ) )
+    env.Append( LIBPATH = os.path.join( TCMALLOC_DIR, 'lib' ) )
     env.Append( LIBS    = 'tcmalloc' )
 
 # include likwid performance monitoring library
@@ -348,7 +348,7 @@ if likwid and LIKWID_DIR != None :
 
 ######################################################################
 #
-# target "help"
+# target 'help'
 #
 ######################################################################
 
@@ -365,14 +365,14 @@ def show_help ( target, source, env ):
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), "0/1" )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), "0/1" )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), "0/1" )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), "0/1" )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), "0/1" )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), "0/1" )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
@@ -400,7 +400,7 @@ env.Alias( 'help', help_cmd )
 
 ######################################################################
 #
-# target "options"
+# target 'options'
 #
 ######################################################################
 
@@ -508,8 +508,8 @@ if 'seq' in frameworks :
 
 if 'omp' in frameworks :
     omp = env.Clone()
-    omp.Append( CXXFLAGS  = "-fopenmp" )
-    omp.Append( LINKFLAGS = "-fopenmp" )
+    omp.Append( CXXFLAGS  = '-fopenmp' )
+    omp.Append( LINKFLAGS = '-fopenmp' )
 
     for program in programs :
         name   = program + '-omp'
@@ -524,8 +524,8 @@ if 'omp' in frameworks :
 
 if 'tbb' in frameworks :
     tbb = env.Clone()
-    tbb.Append( CPPPATH = os.path.join( TBB_DIR, "include" ) )
-    tbb.Append( LIBPATH = os.path.join( TBB_DIR, "lib" ) )
+    tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
+    tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
 
     for program in programs :
         name   = program + '-tbb'
@@ -540,10 +540,11 @@ if 'tbb' in frameworks :
 
 if 'tf' in frameworks :
     tf = env.Clone()
-    tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, "include" ) )
-    tf.Append( LIBS = [ "pthread" ] )
-    tf.ParseConfig( "PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma" )
-    tf.ParseConfig( "PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma" )
+    tf.MergeFlags( '-isystem ' + os.path.join( TASKFLOW_DIR, 'include' ) )
+    tf.Append( LIBS = [ 'pthread' ] )
+    # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma' )
+    # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma' )
+    tf.Append( LIBS = [ 'cudart', 'cublas', 'cusolver' ] )
     
     for program in programs :
         name   = program + '-tf'
@@ -552,7 +553,8 @@ if 'tf' in frameworks :
         if os.path.exists( source ) and os.path.isfile( source ) :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
-    Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
+    # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
+    Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc' ] ) )
 
 #
 # HPX
@@ -560,9 +562,9 @@ if 'tf' in frameworks :
 
 if 'hpx' in frameworks :
     hpx = env.Clone()
-    hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
-    hpx.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application" % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
-    hpx.Append( LIBS = [ "hpx_iostreams" ] )
+    hpx.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags hpx_application' % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
+    hpx.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   hpx_application' % ( os.path.join( HPX_DIR, 'lib', 'pkgconfig' ) ) )
+    hpx.Append( LIBS = [ 'hpx_iostreams' ] )
     
     for program in programs :
         name   = program + '-hpx'
@@ -595,8 +597,8 @@ if 'mpi' in frameworks :
 
 if 'gpi2' in frameworks :
     gpi = env.Clone()
-    gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --cflags GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
-    gpi.ParseConfig( "PKG_CONFIG_PATH=%s pkg-config --libs   GPI2" % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
-    gpi.Append( LIBS = [ "pthread" ] )
+    gpi.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags GPI2' % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
+    gpi.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   GPI2' % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
+    gpi.Append( LIBS = [ 'pthread' ] )
     
     if 'tlr' in programs : Default( gpi.Program( path( 'tlr', 'tlr-gaspi.cc' ) ) )
