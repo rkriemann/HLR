@@ -25,6 +25,10 @@ template <>             struct cuda_type< hpro::Complex< double > >  { using  ty
 
 template < typename T > struct cuda_type_ptr                         { using  type_t = typename cuda_type< T >::type_t *; };
 
+template <typename T>   struct real_type                             { using  type_t = T; };
+template <>             struct real_type< cuFloatComplex >           { using  type_t = float; };
+template <>             struct real_type< cuDoubleComplex >          { using  type_t = double; };
+
 //
 // joined handle for cuBLAS and cuSolverDn
 //
@@ -106,6 +110,17 @@ from_device ( typename cuda_type_ptr< value_t >::type_t  M_dev,
 }
 
 template < typename value_t >
+void
+from_device ( typename cuda_type_ptr< value_t >::type_t  v_dev,
+              int                                        inc_dev,
+              vector< value_t > &                        v_host )
+{
+    // queue ???
+    if ( cublasGetVector( v_host.length(), sizeof(value_t), v_dev, inc_dev, v_host.data(), v_host.stride() ) != CUBLAS_STATUS_SUCCESS )
+        HLR_ERROR( "transfer to host failed" );
+}
+
+template < typename value_t >
 value_t
 from_device ( typename cuda_type_ptr< value_t >::type_t  dev_data )
 {
@@ -119,7 +134,7 @@ from_device ( typename cuda_type_ptr< value_t >::type_t  dev_data )
 
 //////////////////////////////////////////////////////////////////////
 //
-// QR
+// QR related functions
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -295,6 +310,140 @@ qr ( handle               handle,
     device_free( dev_info );
     device_free( dev_tau );
     device_free( dev_M );
+}
+
+//////////////////////////////////////////////////////////////////////
+//
+// SVD related functions
+//
+//////////////////////////////////////////////////////////////////////
+
+#define GESVDJ_BUFFERSIZE( type, func )              \
+    int                                              \
+    gesvdj_buffersize ( cusolverDnHandle_t  handle,  \
+                        cusolverEigMode_t   jobz,    \
+                        int                 econ,    \
+                        int                 m,       \
+                        int                 n,       \
+                        const type *        A,       \
+                        int                 lda,     \
+                        const typename real_type< type >::type_t *  S,  \
+                        const type *        U,       \
+                        int                 ldu,     \
+                        const type *        V,       \
+                        int                 ldv,     \
+                        gesvdjInfo_t        params ) \
+    {                                                \
+        int  lwork = 0;                              \
+                                                     \
+        if ( func( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, & lwork, params ) != CUSOLVER_STATUS_SUCCESS ) \
+            HLR_ERROR( "gesvdj_buffersize failed" ); \
+                                                     \
+        return lwork;                                \
+    }
+
+GESVDJ_BUFFERSIZE( float,           cusolverDnSgesvdj_bufferSize )
+GESVDJ_BUFFERSIZE( double,          cusolverDnDgesvdj_bufferSize )
+GESVDJ_BUFFERSIZE( cuFloatComplex,  cusolverDnCgesvdj_bufferSize )
+GESVDJ_BUFFERSIZE( cuDoubleComplex, cusolverDnZgesvdj_bufferSize )
+
+#undef GESVDJ_BUFFERSIZE
+
+#define GESVDJ( type, func )              \
+    void                                  \
+    gesvdj ( cusolverDnHandle_t  handle,  \
+             cusolverEigMode_t   jobz,    \
+             int                 econ,    \
+             int                 m,       \
+             int                 n,       \
+             type *              A,       \
+             int                 lda,     \
+             typename real_type< type >::type_t *  S, \
+             type *              U,       \
+             int                 ldu,     \
+             type *              V,       \
+             int                 ldv,     \
+             type *              work,    \
+             int                 lwork,   \
+             int *               info,    \
+             gesvdjInfo_t        params ) \
+    {                                     \
+        if ( func( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, work, lwork, info, params ) != CUSOLVER_STATUS_SUCCESS ) \
+            HLR_ERROR( "gesvj failed" );  \
+    }
+
+GESVDJ( float,           cusolverDnSgesvdj )
+GESVDJ( double,          cusolverDnDgesvdj )
+GESVDJ( cuFloatComplex,  cusolverDnCgesvdj )
+GESVDJ( cuDoubleComplex, cusolverDnZgesvdj )
+
+template < typename value_t >
+void
+svd ( handle               handle,
+      matrix< value_t > &  M,
+      vector< typename hpro::real_type< value_t >::type_t > &  S,
+      matrix< value_t > &  V )
+{
+    using cuda_t = typename cuda_type< value_t >::type_t;
+    using real_t = typename real_type< cuda_t >::type_t;
+    
+    //
+    // copy/allocate data to/on device
+    //
+
+    const int  nrows    = M.nrows();
+    const int  ncols    = M.ncols();
+    const int  minrc    = std::min( nrows, ncols );
+    auto       dev_M    = device_alloc< value_t >( nrows * ncols );
+    auto       dev_U    = device_alloc< value_t >( nrows * minrc );
+    auto       dev_S    = device_alloc< real_t >( minrc );
+    auto       dev_V    = device_alloc< value_t >( minrc * ncols );
+    auto       dev_info = device_alloc< int >( 1 );
+
+    to_device( M, dev_M, nrows );
+
+    // SVD parameters
+    const double       tol        = 1e-7; // from accuracy?
+    const int          max_sweeps = 15;
+    cusolverEigMode_t  jobz       = CUSOLVER_EIG_MODE_VECTOR;
+    const int          econ       = 1; // economy mode
+    gesvdjInfo_t       gesvdj_params;
+
+    if ( cusolverDnCreateGesvdjInfo( & gesvdj_params ) != CUSOLVER_STATUS_SUCCESS )
+        HLR_ERROR( "setting up gesvj parameter failed (alloc)" );
+
+    if ( cusolverDnXgesvdjSetTolerance( gesvdj_params, tol ) != CUSOLVER_STATUS_SUCCESS )
+        HLR_ERROR( "setting up gesvj parameter failed (tolerance)" );
+    
+    if ( cusolverDnXgesvdjSetMaxSweeps( gesvdj_params, max_sweeps ) != CUSOLVER_STATUS_SUCCESS )
+        HLR_ERROR( "setting up gesvj parameter failed (max_sweeps)" );
+    
+    // get work buffer size
+    const auto  lwork    = gesvdj_buffersize( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows,
+                                              dev_S, dev_U, nrows, dev_V, ncols, gesvdj_params );
+    
+    auto        dev_work = device_alloc< value_t >( lwork );
+
+    // compute SVD
+    int  info = 0;
+    
+    gesvdj( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows, dev_S, dev_U, nrows, dev_V, ncols,
+            dev_work, lwork, dev_info, gesvdj_params );
+
+    info = from_device< int >( dev_info );
+
+    if ( info != 0 )
+        HLR_ERROR( "error during gesvj" );
+
+    if ( int(S.length()) != minrc )
+        S = std::move( vector< real_t >( minrc ) );
+    
+    if (( int(V.nrows()) != minrc ) || ( int(V.ncols()) != ncols ))
+        V = std::move( matrix< real_t >( minrc, ncols ) );
+    
+    from_device( dev_U, nrows, M );
+    from_device( dev_S,     1, S );
+    from_device( dev_V, nrows, V );
 }
 
 }}}// hlr::blas::cuda

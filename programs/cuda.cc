@@ -33,6 +33,7 @@ void
 program_main ()
 {
     using value_t = typename problem_t::value_t;
+    using real_t  = typename hpro::real_type< value_t >::type_t;
 
     auto  tic = timer::now();
     auto  acc = gen_accuracy();
@@ -113,6 +114,52 @@ program_main ()
 
         hpro::DBG::write( U2, "U2.mat", "U2" );
         hpro::DBG::write( R2, "R2.mat", "R2" );
+    }
+
+    //////////////////////////////////////////////////////////////////
+    //
+    // compute SVD
+    //
+    //////////////////////////////////////////////////////////////////
+
+    blas::cuda::init();
+    
+    // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
+    U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+
+    auto  V = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
+    auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
+        
+    //
+    // using default blas
+    //
+
+    {
+        auto  M1 = blas::copy( M );
+        auto  S1 = blas::vector< real_t >( M1.nrows() );
+        auto  V1 = blas::matrix< value_t >( M1.ncols(), M1.nrows() );
+        
+        blas::svd( M1, S1, V1 );
+        
+        hpro::DBG::write( M1, "U1.mat", "U1" );
+        hpro::DBG::write( S1, "S1.mat", "S1" );
+        hpro::DBG::write( V1, "V1.mat", "V1" );
+    }
+    
+    //
+    // using CUDA
+    //
+
+    {
+        auto  M2 = blas::copy( M );
+        auto  S2 = blas::vector< real_t >( M2.nrows() );
+        auto  V2 = blas::matrix< value_t >( M2.ncols(), M2.nrows() );
+        
+        blas::cuda::svd( blas::cuda::default_handle, M2, S2, V2 );
+        
+        hpro::DBG::write( M2, "U2.mat", "U2" );
+        hpro::DBG::write( S2, "S2.mat", "S2" );
+        hpro::DBG::write( V2, "V2.mat", "V2" );
     }
 }
 
