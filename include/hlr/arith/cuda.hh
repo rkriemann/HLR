@@ -165,13 +165,13 @@ make_constant< cuDoubleComplex > ( const double  f )
 #define HLR_CUDA_COPY( type, func )                 \
     void                                            \
     copy ( handle        handle,                    \
-           const int     N,                         \
-           const type *  X,                         \
-           const int     incX,                      \
-           type *        Y,                         \
-           const int     incY)                      \
+           const int     n,                         \
+           const type *  x,                         \
+           const int     inc_x,                     \
+           type *        y,                         \
+           const int     inc_y )                    \
     {                                               \
-        func( handle.blas, N, X, incX, Y, incY );   \
+        func( handle.blas, n, x, inc_x, y, inc_y ); \
     }
 
 HLR_CUDA_COPY( float,           cublasScopy )
@@ -212,15 +212,15 @@ HLR_CUDA_SCALE( cuDoubleComplex, cublasZscal )
 template < typename value1_t,
            typename value2_t >
 void
-prod_diag ( handle            handle,
-            const int         nrows,
-            value1_t *        dev_M,
-            const value2_t *  dev_D,
-            const int         k )
+prod_diag ( handle                      handle,
+            const int                   nrows,
+            value1_t *                  dev_M,
+            const vector< value2_t > &  D,
+            const int                   k )
 {
     for ( idx_t  i = 0; i < k; ++i )
     {
-        auto  D_i = make_constant< value1_t >( dev_D[i] );
+        auto  D_i = make_constant< value1_t >( D(i) );
             
         scale( handle, nrows, D_i, dev_M + i * nrows, 1 );
     }// for
@@ -471,13 +471,13 @@ qr_dev ( handle     handle,
     if ( info != 0 )
         HLR_ERROR( "error during geqrf" );
 
-    // copy R and reset lower triangular part
-    copy( handle, ncols * ncols, dev_M, nrows, dev_R, ncols );
-
+    // copy upper triangular part to R
     auto  zero = make_constant< value_t >( 0 );
-    
-    for ( int  i = 0; i < ncols-1; i++ )
-        scale( handle, ncols - i -1, zero, dev_R + i*ncols+i+1, 1 );
+
+    scale( handle, ncols*ncols, zero, dev_R, 1 );
+
+    for ( int  i = 0; i < ncols; i++ )
+        copy( handle, i+1, dev_M + i*nrows, 1, dev_R + i*ncols, 1 );
     
     //
     // compute Q
@@ -760,6 +760,17 @@ svd ( handle                           handle,
         to_device< value_t >( U, dev_QU, nrows_U );
         
         qr_dev( handle, nrows_U, inrank, dev_QU, dev_RU );
+
+        // {
+        //     matrix< value_t >  QU( nrows_U, inrank );
+        //     matrix< value_t >  RU( inrank, inrank );
+
+        //     from_device( dev_QU, nrows_U, QU );
+        //     from_device( dev_RU, inrank,  RU );
+
+        //     hpro::DBG::write( QU, "QU.mat", "QU" );
+        //     hpro::DBG::write( RU, "RU.mat", "RU" );
+        // }
         
         auto  dev_QV = device_alloc< cuda_t >( nrows_V * inrank );
         auto  dev_RV = device_alloc< cuda_t >( inrank * inrank );
@@ -768,6 +779,17 @@ svd ( handle                           handle,
         
         qr_dev( handle, nrows_V, inrank, dev_QV, dev_RV );
 
+        // {
+        //     matrix< value_t >  QV( nrows_V, inrank );
+        //     matrix< value_t >  RV( inrank, inrank );
+
+        //     from_device( dev_QV, nrows_V, QV );
+        //     from_device( dev_RV, inrank,  RV );
+
+        //     hpro::DBG::write( QV, "QV.mat", "QV" );
+        //     hpro::DBG::write( RV, "RV.mat", "RV" );
+        // }
+        
         //
         // R = R_U · upper_triangular(QV)^H = R_V^H
         //
@@ -778,15 +800,37 @@ svd ( handle                           handle,
 
         prod( handle, CUBLAS_OP_N, CUBLAS_OP_C, inrank, inrank, inrank, one, dev_RU, inrank, dev_RV, inrank, zero, dev_R, inrank );
         
+        // {
+        //     matrix< value_t >  R( inrank, inrank );
+
+        //     from_device( dev_R, inrank,  R );
+
+        //     hpro::DBG::write( R, "R.mat", "R" );
+        // }
+        
         //
         // SVD(R) = U S V^H
         //
             
-        auto  dev_Ss = device_alloc< real_t >( inrank );
         auto  dev_Us = dev_R;  // reuse memory
+        auto  dev_Ss = device_alloc< real_t >( inrank );
         auto  dev_Vs = dev_RV; // reuse memory
             
         svd_dev< cuda_t >( handle, inrank, inrank, dev_Us, dev_Ss, dev_Vs );
+        
+        // {
+        //     matrix< value_t >  Us( inrank, inrank );
+        //     vector< real_t >   Ss( inrank );
+        //     matrix< value_t >  Vs( inrank, inrank );
+
+        //     from_device( dev_Us, inrank,  Us );
+        //     from_device< real_t >( dev_Ss, 1, Ss );
+        //     from_device( dev_Vs, inrank,  Vs );
+
+        //     hpro::DBG::write( Us, "Us.mat", "Us" );
+        //     hpro::DBG::write( Ss, "Ss.mat", "Ss" );
+        //     hpro::DBG::write( Vs, "Vs.mat", "Vs" );
+        // }
         
         // determine truncated rank based on singular values
         auto  Ss = blas::vector< real_t >( inrank );
@@ -806,7 +850,7 @@ svd ( handle                           handle,
             //
 
             // U := U·S
-            prod_diag( handle, inrank, dev_Us, dev_Ss, orank );
+            prod_diag( handle, inrank, dev_Us, Ss, orank );
 
             // OU := Q_U · U
             auto  dev_OU = device_alloc< cuda_t >( nrows_U * orank );

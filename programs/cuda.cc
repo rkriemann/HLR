@@ -183,6 +183,9 @@ program_main ()
         auto  U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
         auto  V = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
         
+        hpro::DBG::write( U, "U.mat", "U" );
+        hpro::DBG::write( V, "V.mat", "V" );
+        
         //
         // using default blas
         //
@@ -195,6 +198,12 @@ program_main ()
         
             hpro::DBG::write( U2, "U1.mat", "U1" );
             hpro::DBG::write( V2, "V1.mat", "V1" );
+
+            auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+            blas::prod( value_t(-1), U2, blas::adjoint(V2), value_t(1), M );
+
+            std::cout << "error = " << format_error( blas::norm_F( M ) ) << std::endl;
         }
     
         //
@@ -209,6 +218,12 @@ program_main ()
         
             hpro::DBG::write( U2, "U2.mat", "U2" );
             hpro::DBG::write( V2, "V2.mat", "V2" );
+
+            auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+            blas::prod( value_t(-1), U2, blas::adjoint(V2), value_t(1), M );
+
+            std::cout << "error = " << format_error( blas::norm_F( M ) ) << std::endl;
         }
     }
 }
