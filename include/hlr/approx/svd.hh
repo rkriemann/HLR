@@ -80,8 +80,8 @@ svd ( const blas::matrix< value_t > &  U,
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    const idx_t  n       = idx_t( U.nrows() );
-    const idx_t  m       = idx_t( V.nrows() );
+    const idx_t  nrows_U = idx_t( U.nrows() );
+    const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
     //
@@ -95,8 +95,8 @@ svd ( const blas::matrix< value_t > &  U,
     if ( in_rank == 0 )
     {
         // reset matrices
-        OU = std::move( blas::matrix< value_t >( n, 0 ) );
-        OV = std::move( blas::matrix< value_t >( m, 0 ) );
+        OU = std::move( blas::matrix< value_t >( nrows_U, 0 ) );
+        OV = std::move( blas::matrix< value_t >( nrows_V, 0 ) );
 
         return { std::move( OU ), std::move( OV ) };
     }// if
@@ -115,24 +115,14 @@ svd ( const blas::matrix< value_t > &  U,
     // via full SVD
     //
 
-    const idx_t  mrc   = std::min(n, m);
-    idx_t        orank = 0;
-        
-    if ( acc_rank >= mrc )
+    if ( acc_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
-        // build U = U·V^T
+        // build U = U·V^T and truncate to rank-k
         //
             
-        blas::matrix< value_t >  M( n, m );
-
-        blas::prod( value_t(1), U, adjoint(V), value_t(0), M );
-            
-        //
-        // truncate to rank-k
-        //
-
-        hpro::TTruncAcc  lacc( acc );
+        auto  M    = blas::prod( value_t(1), U, adjoint(V) );
+        auto  lacc = hpro::TTruncAcc( acc );
 
         lacc.set_max_rank( acc_rank );
 
@@ -144,13 +134,17 @@ svd ( const blas::matrix< value_t > &  U,
         // do QR-factorisation of U and V
         //
 
-        blas::matrix< value_t >  QU, QV, RU, RV;
+        #if 1
+
+        blas::matrix< value_t >  QU, RU;
 
         QU = std::move( blas::matrix< value_t >( U.nrows(), in_rank ) );
         RU = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
         
         blas::copy( U, QU );
         blas::qr( QU, RU );
+        
+        blas::matrix< value_t >  QV, RV;
         
         QV = std::move( blas::matrix< value_t >( V.nrows(), in_rank ) );
         RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
@@ -177,7 +171,7 @@ svd ( const blas::matrix< value_t > &  U,
         blas::svd( Us, Ss, Vs );
         
         // determine truncated rank based on singular values
-        orank = idx_t( acc.trunc_rank( Ss ) );
+        const auto  orank = idx_t( acc.trunc_rank( Ss ) );
 
         //
         // only build new vectors, if rank is decreased
@@ -209,6 +203,91 @@ svd ( const blas::matrix< value_t > &  U,
             OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
             OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
         }// else
+
+        #else
+
+        blas::matrix< value_t >  QU, RU;
+        std::vector< value_t >   TU;
+
+        QU = std::move( blas::matrix< value_t >( U.nrows(), in_rank ) );
+        RU = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
+        
+        blas::copy( U, QU );
+        blas::qr_impl( QU, RU, TU );
+        
+        blas::matrix< value_t >  QV, RV;
+        std::vector< value_t >   TV;
+        
+        QV = std::move( blas::matrix< value_t >( V.nrows(), in_rank ) );
+        RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
+        
+        blas::copy( V, QV );
+        blas::qr_impl( QV, RV, TV );
+
+        //
+        // R = R_U · upper_triangular(QV)^H = R_V^H
+        //
+        
+        blas::matrix< value_t >  R( in_rank, in_rank );
+
+        blas::prod( value_t(1), RU, adjoint(RV), value_t(0), R );
+        
+        //
+        // SVD(R) = U S V^H
+        //
+            
+        blas::vector< real_t >   Ss( in_rank );
+        blas::matrix< value_t >  Us( std::move( R ) );
+        blas::matrix< value_t >  Vs( std::move( RV ) );
+            
+        blas::svd( Us, Ss, Vs );
+        
+        // determine truncated rank based on singular values
+        const auto  orank = idx_t( acc.trunc_rank( Ss ) );
+
+        //
+        // only build new vectors, if rank is decreased
+        //
+        
+        if ( orank < in_rank )
+        {
+            //
+            // build new matrices U and V
+            //
+
+            const blas::Range  in_rank_is( 0, in_rank-1 );
+            const blas::Range  orank_is( 0, orank-1 );
+
+            // U := U·S
+            blas::matrix< value_t >  Urank( Us, in_rank_is, orank_is );
+            
+            blas::prod_diag( Urank, Ss, orank );
+
+            // U := Q_U · U
+            OU = std::move( blas::matrix< value_t >( nrows_U, orank ) );
+
+            auto  OU_sub = blas::matrix< value_t >( OU, in_rank_is, orank_is );
+
+            blas::copy( Urank, OU_sub );
+            blas::prod_Q( blas::from_left, hpro::apply_normal, QU, TU, OU );
+
+            // V := Q_V · conj(V)
+            blas::matrix< value_t >  Vrank( Vs, in_rank_is, orank_is );
+
+            OV = std::move( blas::matrix< value_t >( nrows_V, orank ) );
+
+            auto  OV_sub = blas::matrix< value_t >( OV, in_rank_is, orank_is );
+
+            blas::copy( Vrank, OV_sub );
+            blas::prod_Q( blas::from_left, hpro::apply_normal, QV, TV, OV );
+        }// if
+        else
+        {
+            OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
+            OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
+        }// else
+
+        #endif
     }// else
 
     return { std::move( OU ), std::move( OV ) };

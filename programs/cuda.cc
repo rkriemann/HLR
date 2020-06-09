@@ -18,6 +18,7 @@
 //#include "hlr/tf/approx.hh"
 #include "hlr/tf/dag.hh"
 
+#include <hlr/approx/svd.hh>
 #include "hlr/arith/cuda.hh"
 
 #include "common.hh"
@@ -74,46 +75,54 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
+    //
+    // for tests below
+    //
+    
+    // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
+    auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
+    
+    blas::cuda::init();
+    
     //////////////////////////////////////////////////////////////////
     //
     // compute QR
     //
     //////////////////////////////////////////////////////////////////
 
-    blas::cuda::init();
-    
-    // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
-    auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
-    auto  U   = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
-    // auto  V   = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
-        
-    //
-    // using default blas
-    //
-
+    if ( false )
     {
-        auto                     U1 = blas::copy( U );
-        blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
+        auto  U   = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        // auto  V   = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
         
-        blas::qr( U1, R1 );
+        //
+        // using default blas
+        //
+
+        {
+            auto                     U1 = blas::copy( U );
+            blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
         
-        hpro::DBG::write( U1, "U1.mat", "U1" );
-        hpro::DBG::write( R1, "R1.mat", "R1" );
-    }
+            blas::qr( U1, R1 );
+        
+            hpro::DBG::write( U1, "U1.mat", "U1" );
+            hpro::DBG::write( R1, "R1.mat", "R1" );
+        }
     
-    //
-    // using CUDA
-    //
+        //
+        // using CUDA
+        //
 
-    {
-        auto                     U2 = blas::copy( U );
-        blas::matrix< value_t >  R2( U.ncols(), U.ncols() );
+        {
+            auto                     U2 = blas::copy( U );
+            blas::matrix< value_t >  R2( U.ncols(), U.ncols() );
     
-        blas::cuda::init();
-        blas::cuda::qr( blas::cuda::default_handle, U2, R2 );
+            blas::cuda::init();
+            blas::cuda::qr( blas::cuda::default_handle, U2, R2 );
 
-        hpro::DBG::write( U2, "U2.mat", "U2" );
-        hpro::DBG::write( R2, "R2.mat", "R2" );
+            hpro::DBG::write( U2, "U2.mat", "U2" );
+            hpro::DBG::write( R2, "R2.mat", "R2" );
+        }
     }
 
     //////////////////////////////////////////////////////////////////
@@ -122,44 +131,85 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////
 
-    blas::cuda::init();
-    
-    // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
-    U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
-
-    auto  V = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
-    auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
-        
-    //
-    // using default blas
-    //
-
+    if ( false )
     {
-        auto  M1 = blas::copy( M );
-        auto  S1 = blas::vector< real_t >( M1.nrows() );
-        auto  V1 = blas::matrix< value_t >( M1.ncols(), M1.nrows() );
+        auto  U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        auto  V = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
+        auto  M = blas::prod( value_t(1), U, blas::adjoint( V ) );
         
-        blas::svd( M1, S1, V1 );
+        //
+        // using default blas
+        //
+
+        {
+            auto  M1 = blas::copy( M );
+            auto  S1 = blas::vector< real_t >( M1.nrows() );
+            auto  V1 = blas::matrix< value_t >( M1.ncols(), M1.nrows() );
         
-        hpro::DBG::write( M1, "U1.mat", "U1" );
-        hpro::DBG::write( S1, "S1.mat", "S1" );
-        hpro::DBG::write( V1, "V1.mat", "V1" );
+            blas::svd( M1, S1, V1 );
+        
+            hpro::DBG::write( M1, "U1.mat", "U1" );
+            hpro::DBG::write( S1, "S1.mat", "S1" );
+            hpro::DBG::write( V1, "V1.mat", "V1" );
+        }
+    
+        //
+        // using CUDA
+        //
+
+        {
+            auto  M2 = blas::copy( M );
+            auto  S2 = blas::vector< real_t >( M2.nrows() );
+            auto  V2 = blas::matrix< value_t >( M2.ncols(), M2.nrows() );
+
+            hpro::DBG::write( M, "M.mat", "M" );
+        
+            blas::cuda::svd( blas::cuda::default_handle, M2, S2, V2 );
+        
+            hpro::DBG::write( M2, "U2.mat", "U2" );
+            hpro::DBG::write( S2, "S2.mat", "S2" );
+            hpro::DBG::write( V2, "V2.mat", "V2" );
+        }
     }
-    
-    //
-    // using CUDA
-    //
 
+    //////////////////////////////////////////////////////////////////
+    //
+    // truncation
+    //
+    //////////////////////////////////////////////////////////////////
+
+    if ( true )
     {
-        auto  M2 = blas::copy( M );
-        auto  S2 = blas::vector< real_t >( M2.nrows() );
-        auto  V2 = blas::matrix< value_t >( M2.ncols(), M2.nrows() );
+        auto  U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        auto  V = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
         
-        blas::cuda::svd( blas::cuda::default_handle, M2, S2, V2 );
+        //
+        // using default blas
+        //
+
+        {
+            auto  U1 = blas::copy( U );
+            auto  V1 = blas::copy( V );
         
-        hpro::DBG::write( M2, "U2.mat", "U2" );
-        hpro::DBG::write( S2, "S2.mat", "S2" );
-        hpro::DBG::write( V2, "V2.mat", "V2" );
+            auto [ U2, V2 ] = approx::svd( U1, V1, hpro::fixed_rank( 2 ) );
+        
+            hpro::DBG::write( U2, "U1.mat", "U1" );
+            hpro::DBG::write( V2, "V1.mat", "V1" );
+        }
+    
+        //
+        // using CUDA
+        //
+
+        {
+            auto  U1 = blas::copy( U );
+            auto  V1 = blas::copy( V );
+        
+            auto [ U2, V2 ] = blas::cuda::svd( blas::cuda::default_handle, U1, V1, hpro::fixed_rank( 2 ) );
+        
+            hpro::DBG::write( U2, "U2.mat", "U2" );
+            hpro::DBG::write( V2, "V2.mat", "V2" );
+        }
     }
 }
 

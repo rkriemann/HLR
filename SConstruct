@@ -134,11 +134,11 @@ def path ( program, source ) :
 #
 ######################################################################
 
-# MKL should define MKLROOT
-if MKL_DIR == None and 'MKLROOT' in os.environ :
-    MKL_DIR = os.environ['MKLROOT']
-else :
-    MKL_DIR = '/' # to prevent error below due to invalid path
+# # MKL should define MKLROOT
+# if MKL_DIR == None and 'MKLROOT' in os.environ :
+#     MKL_DIR = os.environ['MKLROOT']
+# else :
+#     MKL_DIR = '/' # to prevent error below due to invalid path
 
 ######################################################################
 #
@@ -243,6 +243,19 @@ del opt_env['subframeworks']
 
 opts.Save( opts_file, opt_env )
 
+######################################################################
+#
+# apply known defaults in case no user provided value is set
+#
+######################################################################
+
+# MKL should define MKLROOT
+if MKL_DIR == None :
+    if 'MKLROOT' in os.environ :
+        MKL_DIR = os.environ['MKLROOT']
+    else :
+        MKL_DIR = '/' # to prevent error below due to invalid path
+    
 ######################################################################
 #
 # colorization
