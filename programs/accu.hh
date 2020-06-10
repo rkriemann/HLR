@@ -75,7 +75,7 @@ mm_accu ( const hpro::TMatrix &    A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
@@ -177,7 +177,7 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;

@@ -249,7 +249,7 @@ norm_F ( const double           alpha,
             {
                 for ( idx_t i = 0; i < n; ++i )
                 {
-                    const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                    const auto  a_ij = hpro::real(alpha) * MA(i,j) + hpro::real(beta) * MB(i,j);
                     
                     val += re( hpro::conj( a_ij ) * a_ij );
                 }// for
@@ -306,7 +306,7 @@ norm_2 ( const matrix_t &  A,
 
     const size_t  max_it  = ( amax_it == 0 ? std::min( A.range_dim(), A.domain_dim() ) / 10 : amax_it );
     const real    tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
-    const real    abs_tol = std::min( 1e1 * std::numeric_limits< real >::epsilon(), tol );
+    const real    abs_tol = std::min( real(1e1) * std::numeric_limits< real >::epsilon(), tol );
     const real    zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
     real          lambda  = 1.0;
     
