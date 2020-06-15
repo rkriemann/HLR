@@ -26,6 +26,12 @@
 
 using namespace hlr;
 
+void
+cuda_hostfn ( void *  data )
+{
+    std::cout << "cuda_hostfn" << std::endl;
+}
+
 //
 // main function
 //
@@ -178,6 +184,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////
 
+    std::cout << term::bullet << term::bold << "truncation" << term::reset << std::endl;
+    
     if ( true )
     {
         auto  U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
@@ -225,6 +233,70 @@ program_main ()
 
             std::cout << "error = " << format_error( blas::norm_F( M ) ) << std::endl;
         }
+    }
+
+    //////////////////////////////////////////////////////////////////
+    //
+    // asynchronous truncation
+    //
+    //////////////////////////////////////////////////////////////////
+
+    std::cout << term::bullet << term::bold << "async. truncation" << term::reset << std::endl;
+    
+    if ( true )
+    {
+        using  cuda_t = typename blas::cuda::cuda_type< value_t >::type_t;
+
+        blas::cuda::handle  handle;
+
+        HLR_CUDA_CHECK( cudaStreamCreate, ( & handle.stream ) );
+    
+        HLR_CUBLAS_CHECK( cublasCreate,    ( & handle.blas ) );
+        HLR_CUBLAS_CHECK( cublasSetStream, (   handle.blas, handle.stream ) );
+
+        HLR_CUSOLVER_CHECK( cusolverDnCreate,    ( & handle.solver ) );
+        HLR_CUSOLVER_CHECK( cusolverDnSetStream, (   handle.solver, handle.stream ) );
+        
+        
+        auto      U     = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        auto      V     = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
+        cuda_t *  dev_U = nullptr;
+        cuda_t *  dev_V = nullptr;
+
+        cudaMalloc( & dev_U, U.nrows() * U.ncols() * sizeof(cuda_t) );
+        cudaMalloc( & dev_V, U.nrows() * V.ncols() * sizeof(cuda_t) );
+
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_U, U.data(), sizeof(value_t) * U.nrows() * U.ncols(),
+                                           cudaMemcpyHostToDevice, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_V, V.data(), sizeof(value_t) * V.nrows() * V.ncols(),
+                                           cudaMemcpyHostToDevice, handle.stream ) );
+
+        auto  rank = svd_dev( handle, U.nrows(), V.nrows(), U.ncols(), dev_U, dev_V, acc );
+
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( U.data(), dev_U, sizeof(value_t) * U.nrows() * U.ncols(),
+                                           cudaMemcpyDeviceToHost, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( V.data(), dev_V, sizeof(value_t) * V.nrows() * V.ncols(),
+                                           cudaMemcpyDeviceToHost, handle.stream ) );
+
+        HLR_CUDA_CHECK( cudaLaunchHostFunc, ( handle.stream, cuda_hostfn, nullptr ) );
+        
+        HLR_CUDA_CHECK( cudaStreamSynchronize, ( handle.stream ) );
+        
+        // {
+        //     auto  U1 = blas::copy( U );
+        //     auto  V1 = blas::copy( V );
+        
+        //     auto [ U2, V2 ] = blas::cuda::svd( blas::cuda::default_handle, U1, V1, hpro::fixed_rank( 2 ) );
+        
+        //     hpro::DBG::write( U2, "U2.mat", "U2" );
+        //     hpro::DBG::write( V2, "V2.mat", "V2" );
+
+        //     auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+        //     blas::prod( value_t(-1), U2, blas::adjoint(V2), value_t(1), M );
+
+        //     std::cout << "error = " << format_error( blas::norm_F( M ) ) << std::endl;
+        // }
     }
 }
 

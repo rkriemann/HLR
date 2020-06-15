@@ -110,15 +110,13 @@ svd ( const blas::matrix< value_t > &  U,
     }// if
 
     //
-    // if k is bigger than the possible rank,
-    // we create a dense-matrix and do truncation
-    // via full SVD
+    // truncate given low-rank matrix
     //
-
-    if ( acc_rank >= std::min( nrows_U, nrows_V ) )
+    
+    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) / 2 )
     {
         //
-        // build U = U·V^T and truncate to rank-k
+        // since rank is too large, build U = U·V^T and do full-SVD
         //
             
         auto  M    = blas::prod( value_t(1), U, adjoint(V) );

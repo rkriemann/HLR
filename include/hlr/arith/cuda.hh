@@ -29,11 +29,31 @@ template <>             struct real_type< cuDoubleComplex >          { using  ty
 
 template < typename T > struct cuda_type_ptr                         { using  type_t = typename cuda_type< T >::type_t *; };
 
+// wrapper for cuda, cuBlas and cuSolver functions
+#define HLR_CUDA_CHECK( func, args )         \
+    {                                        \
+        auto  result = func args ;           \
+        HLR_ASSERT( result == cudaSuccess ); \
+    }
+
+#define HLR_CUBLAS_CHECK( func, args )                  \
+    {                                                   \
+        auto  result = func args ;                      \
+        HLR_ASSERT( result == CUBLAS_STATUS_SUCCESS );  \
+    }
+
+#define HLR_CUSOLVER_CHECK( func, args )                 \
+    {                                                    \
+        auto  result = func args ;                       \
+        HLR_ASSERT( result == CUSOLVER_STATUS_SUCCESS ); \
+    }
+
 //
 // joined handle for cuBLAS and cuSolverDn
 //
 struct handle
 {
+    cudaStream_t        stream;
     cublasHandle_t      blas;
     cusolverDnHandle_t  solver;
 };
@@ -47,11 +67,13 @@ handle  default_handle;
 void
 init ()
 {
-    if ( cublasCreate( & default_handle.blas ) != CUBLAS_STATUS_SUCCESS )
-        HLR_ERROR( "CUBLAS initialization failed" );
+    HLR_CUDA_CHECK( cudaStreamCreate, ( & default_handle.stream ) );
+    
+    HLR_CUBLAS_CHECK( cublasCreate,    ( & default_handle.blas ) );
+    HLR_CUBLAS_CHECK( cublasSetStream, (   default_handle.blas, default_handle.stream ) );
 
-    if ( cusolverDnCreate( & default_handle.solver ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "error during cusolverDnCreate" );
+    HLR_CUSOLVER_CHECK( cusolverDnCreate,    ( & default_handle.solver ) );
+    HLR_CUSOLVER_CHECK( cusolverDnSetStream, (   default_handle.solver, default_handle.stream ) );
 }
 
 //
@@ -63,8 +85,7 @@ device_alloc ( const size_t  n )
 {
     void *  ptr = nullptr;
     
-    if ( cudaMalloc( & ptr, n * sizeof(value_t) ) != cudaSuccess )
-        HLR_ERROR( "device memory allocation failed" );
+    HLR_CUDA_CHECK( cudaMalloc, ( & ptr, n * sizeof(value_t) ) );
 
     return typename cuda_type_ptr< value_t >::type_t( ptr );
 }
@@ -73,8 +94,7 @@ template < typename value_t >
 void
 device_free ( value_t *  ptr )
 {
-    if ( cudaFree( ptr ) != cudaSuccess )
-        HLR_ERROR( "device memory deallocation failed" );
+    HLR_CUDA_CHECK( cudaFree, ( ptr ) )
 }
 
 //
@@ -86,11 +106,24 @@ to_device ( const matrix< value_t > &                  M_host,
             typename cuda_type_ptr< value_t >::type_t  M_dev,
             int                                        lda_dev )
 {
-    // queue ???
-    if ( cublasSetMatrix( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                          M_host.data(), M_host.col_stride(),
-                          M_dev, lda_dev ) != CUBLAS_STATUS_SUCCESS )
-        HLR_ERROR( "transfer to device failed" );
+    HLR_CUBLAS_CHECK( cublasSetMatrix,
+                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
+                        M_host.data(), M_host.col_stride(),
+                        M_dev, lda_dev ) );
+}
+
+template < typename value_t >
+void
+to_device_async ( handle                                     handle,
+                  const matrix< value_t > &                  M_host,
+                  typename cuda_type_ptr< value_t >::type_t  M_dev,
+                  int                                        lda_dev )
+{
+    HLR_CUBLAS_CHECK( cublasSetMatrixAsync,
+                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
+                        M_host.data(), M_host.col_stride(),
+                        M_dev, lda_dev,
+                        handle.stream ) );
 }
 
 //
@@ -102,11 +135,24 @@ from_device ( typename cuda_type_ptr< value_t >::type_t  M_dev,
               int                                        lda_dev,
               matrix< value_t > &                        M_host )
 {
-    // queue ???
-    if ( cublasGetMatrix( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                          M_dev, lda_dev,
-                          M_host.data(), M_host.col_stride() ) != CUBLAS_STATUS_SUCCESS )
-        HLR_ERROR( "transfer to host failed" );
+    HLR_CUBLAS_CHECK( cublasGetMatrix,
+                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
+                        M_dev, lda_dev,
+                        M_host.data(), M_host.col_stride() ) );
+}
+
+template < typename value_t >
+void
+from_device_async ( handle                                     handle,
+                    typename cuda_type_ptr< value_t >::type_t  M_dev,
+                    int                                        lda_dev,
+                    matrix< value_t > &                        M_host )
+{
+    HLR_CUBLAS_CHECK( cublasGetMatrixAsync,
+                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
+                        M_dev, lda_dev,
+                        M_host.data(), M_host.col_stride(),
+                        handle.stream ) );
 }
 
 template < typename value_t >
@@ -115,9 +161,24 @@ from_device ( typename cuda_type_ptr< value_t >::type_t  v_dev,
               int                                        inc_dev,
               vector< value_t > &                        v_host )
 {
-    // queue ???
-    if ( cublasGetVector( v_host.length(), sizeof(value_t), v_dev, inc_dev, v_host.data(), v_host.stride() ) != CUBLAS_STATUS_SUCCESS )
-        HLR_ERROR( "transfer to host failed" );
+    HLR_CUBLAS_CHECK( cublasGetVector,
+                      ( v_host.length(), sizeof(value_t),
+                        v_dev, inc_dev,
+                        v_host.data(), v_host.stride() ) );
+}
+
+template < typename value_t >
+void
+from_device_async ( handle                                     handle,
+                    typename cuda_type_ptr< value_t >::type_t  v_dev,
+                    int                                        inc_dev,
+                    vector< value_t > &                        v_host )
+{
+    HLR_CUBLAS_CHECK( cublasGetVectorAsync,
+                      ( v_host.length(), sizeof(value_t),
+                        v_dev, inc_dev,
+                        v_host.data(), v_host.stride(),
+                        handle.stream ) );
 }
 
 template < typename value_t >
@@ -126,8 +187,19 @@ from_device ( typename cuda_type_ptr< value_t >::type_t  dev_data )
 {
     value_t  data;
 
-    if ( cudaMemcpy( & data, dev_data, sizeof(value_t), cudaMemcpyDeviceToHost ) != cudaSuccess )
-        HLR_ERROR( "transfer to host failed" );
+    HLR_CUDA_CHECK( cudaMemcpy, ( & data, dev_data, sizeof(value_t), cudaMemcpyDeviceToHost ) );
+
+    return data;
+}
+
+template < typename value_t >
+value_t
+from_device_async ( handle                                     handle,
+                    typename cuda_type_ptr< value_t >::type_t  dev_data )
+{
+    value_t  data;
+
+    HLR_CUDA_CHECK( cudaMemcpyAsync, ( & data, dev_data, sizeof(value_t), cudaMemcpyDeviceToHost, handle.stream ) );
 
     return data;
 }
@@ -276,8 +348,7 @@ HLR_CUDA_GEMM( cuDoubleComplex, cublasZgemm )
     {                                                                   \
         int  lwork = 0;                                                 \
                                                                         \
-        if ( func( handle, nrows, ncols, A, ldA, & lwork ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "error during cusolverDn*geqrf_bufferSize" );    \
+        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, A, ldA, & lwork ) ); \
                                                                         \
         return  lwork;                                                  \
     }
@@ -301,8 +372,7 @@ GEQRF_BUFFERSIZE( cuDoubleComplex, cusolverDnZgeqrf_bufferSize )
             int                 lwork,          \
             int *               info )          \
     {                                                                   \
-        if ( func( handle, nrows, ncols, A, ldA, tau, work, lwork, info ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "error during cusolverDn*geqrf" ); \
+        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, A, ldA, tau, work, lwork, info ) ); \
     }
 
 GEQRF( float,           cusolverDnSgeqrf )
@@ -324,8 +394,7 @@ GEQRF( cuDoubleComplex, cusolverDnZgeqrf )
     {                                               \
         int  lwork = 0;                                                 \
                                                                         \
-        if ( func( handle, nrows, ncols, k, A, ldA, tau, & lwork ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "error during cusolverDn*orgqr_bufferSize" );    \
+        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, k, A, ldA, tau, & lwork ) ); \
                                                                         \
         return  lwork;                                                  \
     }
@@ -350,8 +419,7 @@ ORGQR_BUFFERSIZE( cuDoubleComplex, cusolverDnZungqr_bufferSize )
             int                 lwork,          \
             int *               info )          \
     {                                                                   \
-        if ( func( handle, nrows, ncols, k, A, ldA, tau, work, lwork, info ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "error during cusolverDn*orgqr" ); \
+        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, k, A, ldA, tau, work, lwork, info ) ); \
     }
 
 ORGQR( float,           cusolverDnSorgqr )
@@ -398,8 +466,7 @@ qr ( handle               handle,
 
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during geqrf" );
+    HLR_ASSERT( info == 0 );
 
     // copy R and reset lower triangular part
     if (( R.nrows() != ncols ) || ( R.ncols() != ncols ))
@@ -422,8 +489,7 @@ qr ( handle               handle,
     
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during orgqr" );
+    HLR_ASSERT( info == 0 );
 
     from_device( dev_M, nrows, M );
 
@@ -468,8 +534,7 @@ qr_dev ( handle     handle,
 
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during geqrf" );
+    HLR_ASSERT( info == 0 );
 
     // copy upper triangular part to R
     auto  zero = make_constant< value_t >( 0 );
@@ -487,8 +552,7 @@ qr_dev ( handle     handle,
     
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during orgqr" );
+    HLR_ASSERT( info == 0 );
 
     //
     // release device memory
@@ -523,8 +587,7 @@ qr_dev ( handle     handle,
     {                                                \
         int  lwork = 0;                              \
                                                      \
-        if ( func( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, & lwork, params ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "gesvdj_buffersize failed" ); \
+        HLR_CUSOLVER_CHECK( func, ( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, & lwork, params ) ); \
                                                      \
         return lwork;                                \
     }
@@ -555,8 +618,7 @@ GESVDJ_BUFFERSIZE( cuDoubleComplex, cusolverDnZgesvdj_bufferSize )
              int *               info,    \
              gesvdjInfo_t        params ) \
     {                                     \
-        if ( func( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, work, lwork, info, params ) != CUSOLVER_STATUS_SUCCESS ) \
-            HLR_ERROR( "gesvj failed" );  \
+        HLR_CUSOLVER_CHECK( func, ( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, work, lwork, info, params ) ); \
     }
 
 GESVDJ( float,           cusolverDnSgesvdj )
@@ -599,14 +661,9 @@ svd ( handle               handle,
     const int          econ       = 1; // economy mode
     gesvdjInfo_t       gesvdj_params;
 
-    if ( cusolverDnCreateGesvdjInfo( & gesvdj_params ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (alloc)" );
-
-    if ( cusolverDnXgesvdjSetTolerance( gesvdj_params, tol ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (tolerance)" );
-    
-    if ( cusolverDnXgesvdjSetMaxSweeps( gesvdj_params, max_sweeps ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (max_sweeps)" );
+    HLR_CUSOLVER_CHECK( cusolverDnCreateGesvdjInfo,    ( & gesvdj_params ) );
+    HLR_CUSOLVER_CHECK( cusolverDnXgesvdjSetTolerance, ( gesvdj_params, tol ) );
+    HLR_CUSOLVER_CHECK( cusolverDnXgesvdjSetMaxSweeps, ( gesvdj_params, max_sweeps ) );
     
     // get work buffer size
     const auto  lwork    = gesvdj_buffersize( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows,
@@ -622,8 +679,7 @@ svd ( handle               handle,
 
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during gesvj" );
+    HLR_ASSERT( info == 0 );
 
     if ( int(S.length()) != minrc )
         S = std::move( vector< real_t >( minrc ) );
@@ -661,14 +717,9 @@ svd_dev ( handle                                         handle,
     const int          econ       = 1; // economy mode
     gesvdjInfo_t       gesvdj_params;
 
-    if ( cusolverDnCreateGesvdjInfo( & gesvdj_params ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (alloc)" );
-
-    if ( cusolverDnXgesvdjSetTolerance( gesvdj_params, tol ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (tolerance)" );
-    
-    if ( cusolverDnXgesvdjSetMaxSweeps( gesvdj_params, max_sweeps ) != CUSOLVER_STATUS_SUCCESS )
-        HLR_ERROR( "setting up gesvj parameter failed (max_sweeps)" );
+    HLR_CUSOLVER_CHECK( cusolverDnCreateGesvdjInfo,    ( & gesvdj_params ) );
+    HLR_CUSOLVER_CHECK( cusolverDnXgesvdjSetTolerance, ( gesvdj_params, tol ) );
+    HLR_CUSOLVER_CHECK( cusolverDnXgesvdjSetMaxSweeps, ( gesvdj_params, max_sweeps ) );
     
     // get work buffer size
     const auto  lwork    = gesvdj_buffersize( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows,
@@ -684,8 +735,7 @@ svd_dev ( handle                                         handle,
 
     info = from_device< int >( dev_info );
 
-    if ( info != 0 )
-        HLR_ERROR( "error during gesvj" );
+    HLR_ASSERT( info == 0 );
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -887,6 +937,137 @@ svd ( handle                           handle,
     }// else
 
     return { std::move( OU ), std::move( OV ) };
+}
+
+//
+// on-device version of the above SVD based low-rank truncation
+//
+// on exit : dev_U and dev_V will be (normally) reallocated and
+//           hold the truncated low-rank factors
+//
+template < typename value_t >
+int
+svd_dev ( handle                   handle,
+          const int                nrows_U,
+          const int                nrows_V,
+          const int                rank,
+          value_t * &              dev_U,
+          value_t * &              dev_V,
+          const hpro::TTruncAcc &  acc )
+{
+    using  cuda_t = value_t;
+    using  real_t = typename cuda::real_type< cuda_t >::type_t;
+
+    //
+    // don't increase rank
+    //
+
+    const int  in_rank   = rank;
+    const int  acc_rank = int( acc.rank() );
+
+    if ( in_rank == 0 )
+        return in_rank;
+
+    if ( in_rank <= acc_rank )
+        return in_rank;
+
+    //
+    // if k is bigger than the possible rank,
+    // we create a dense-matrix and do truncation
+    // via full SVD
+    //
+
+    int  out_rank = 0;
+        
+    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) / 2 )
+    {
+        HLR_ERROR( "TO DO" );
+        return in_rank;
+    }// if
+    else
+    {
+        //
+        // do QR-factorisation of U and V
+        //
+
+        auto  dev_QU = device_alloc< cuda_t >( nrows_U * in_rank );
+        auto  dev_RU = device_alloc< cuda_t >( in_rank * in_rank );
+
+        copy( handle, nrows_U * in_rank, dev_U, 1, dev_QU, 1 );
+        qr_dev( handle, nrows_U, in_rank, dev_QU, dev_RU );
+        
+        auto  dev_QV = device_alloc< cuda_t >( nrows_V * in_rank );
+        auto  dev_RV = device_alloc< cuda_t >( in_rank * in_rank );
+
+        copy( handle, nrows_V * in_rank, dev_V, 1, dev_QV, 1 );
+        qr_dev( handle, nrows_V, in_rank, dev_QV, dev_RV );
+
+        //
+        // R = R_U · upper_triangular(QV)^H = R_V^H
+        //
+        
+        auto  dev_R = device_alloc< cuda_t >( in_rank * in_rank );
+        auto  one   = make_constant< cuda_t >( 1 );
+        auto  zero  = make_constant< cuda_t >( 0 );
+
+        prod( handle, CUBLAS_OP_N, CUBLAS_OP_C, in_rank, in_rank, in_rank, one, dev_RU, in_rank, dev_RV, in_rank, zero, dev_R, in_rank );
+        
+        //
+        // SVD(R) = U S V^H
+        //
+            
+        auto  dev_Us = dev_R;  // reuse memory
+        auto  dev_Ss = device_alloc< real_t >( in_rank );
+        auto  dev_Vs = dev_RV; // reuse memory
+            
+        svd_dev< cuda_t >( handle, in_rank, in_rank, dev_Us, dev_Ss, dev_Vs );
+        
+        // determine truncated rank based on singular values
+        auto  Ss = blas::vector< real_t >( in_rank );
+
+        from_device< real_t >( dev_Ss, 1, Ss );
+        
+        out_rank = int( acc.trunc_rank( Ss ) );
+
+        //
+        // only build new vectors, if rank is decreased
+        //
+        
+        if ( out_rank < in_rank )
+        {
+            //
+            // free old and build new matrices U and V
+            //
+
+            device_free( dev_U );
+            device_free( dev_V );
+
+            // U := U·S
+            prod_diag( handle, in_rank, dev_Us, Ss, out_rank );
+
+            // OU := Q_U · U
+            dev_U = device_alloc< cuda_t >( nrows_U * out_rank );
+            prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, nrows_U, out_rank, in_rank, one, dev_QU, nrows_U, dev_Us, in_rank, zero, dev_U, nrows_U );
+            
+            // V := Q_V · conj(V)
+            dev_V = device_alloc< cuda_t >( nrows_V * out_rank );
+            prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, nrows_V, out_rank, in_rank, one, dev_QV, nrows_V, dev_Vs, in_rank, zero, dev_V, nrows_V );
+        }// if
+        else
+        {
+            // adjust for return value below
+            out_rank = in_rank;
+        }// else
+
+        device_free( dev_Ss );
+        device_free( dev_R  );
+        device_free( dev_QV );
+        device_free( dev_RV );
+        device_free( dev_QU );
+        device_free( dev_RU );
+
+        return  out_rank;
+    }// else
 }
 
 }}}// hlr::blas::cuda
