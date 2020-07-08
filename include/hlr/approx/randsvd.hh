@@ -61,14 +61,14 @@ column_basis ( const blas::matrix< value_t > &  M,
         
         for ( uint  j = 0; j < power_steps; ++j )
         {
-            blas::qr( Y, R );
+            blas::qr2( Y, R );
             blas::prod( value_t(1), blas::adjoint(M), Y, value_t(0), MtQ );
 
-            blas::qr( MtQ, R );
+            blas::qr2( MtQ, R );
             blas::prod( value_t(1), M, MtQ, value_t(0), Y );
         }// for
 
-        blas::qr( Y, R );
+        blas::qr2( Y, R );
 
         return Y;
     }// if
@@ -119,10 +119,10 @@ column_basis ( const blas::matrix< value_t > &  M,
             
             for ( uint  j = 0; j < power_steps; ++j )
             {
-                blas::qr( Q_i, R );
+                blas::qr2( Q_i, R );
                 blas::prod( value_t(1), blas::adjoint(A), Q_i, value_t(0), AtQ );
                 
-                blas::qr( AtQ, R );
+                blas::qr2( AtQ, R );
                 blas::prod( value_t(1), A, AtQ, value_t(0), Q_i );  // Q_i = Y_i
             }// for
             
@@ -221,17 +221,17 @@ column_basis ( const blas::matrix< value_t > &  IU,
         for ( uint  j = 0; j < power_steps; ++j )
         {
             // [Y,R] = qr(Y); MtQ = M^H·Y = V·U^H·Y
-            blas::qr( Y, R );
+            blas::qr2( Y, R );
             blas::prod( value_t(1), blas::adjoint(U), Y, value_t(0), UtQ );
             blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
 
             // [Q,R] = qr(V·U^H·Y); Y = U·V^H·Q
-            blas::qr( VUtQ, R );
+            blas::qr2( VUtQ, R );
             blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
             blas::prod( value_t(1), U, UtQ, value_t(0), Y );
         }// for
 
-        blas::qr( Y, R );
+        blas::qr2( Y, R );
 
         return Y;
     }// if
@@ -264,16 +264,16 @@ column_basis ( const blas::matrix< value_t > &  IU,
             
             for ( uint  j = 0; j < power_steps; ++j )
             {
-                blas::qr( Q_i, R );
+                blas::qr2( Q_i, R );
                 blas::prod( value_t(1), blas::adjoint(U), Q_i, value_t(0), UtQ );
                 blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
                 
-                blas::qr( VUtQ, R );
+                blas::qr2( VUtQ, R );
                 blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
                 blas::prod( value_t(1), U, UtQ, value_t(0), Q_i );  // Q_i = Y_i
             }// for
             
-            blas::qr( Q_i, R );
+            blas::qr2( Q_i, R );
             
             //
             // project Q_i away from previous Q_j
@@ -290,7 +290,7 @@ column_basis ( const blas::matrix< value_t > &  IU,
                     blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
                 }// for
                 
-                blas::qr( Q_i, R );
+                blas::qr2( Q_i, R );
             }// if
 
             //
@@ -357,7 +357,7 @@ randsvd ( blas::matrix< value_t > &  M,
     auto  S   = blas::vector< real_t >( k );
 
     // B^T = Q_B R_B  (Q_B overwrites B)
-    blas::qr( BT, R_B );
+    blas::qr2( BT, R_B );
 
     // R_B = U·S·V^H
     blas::svd( R_B, S, V );
@@ -444,7 +444,7 @@ randsvd ( const blas::matrix< value_t > &  U,
         auto  S      = blas::vector< real_t >( k_base );
 
         // (V·U^H·Q)^H = Q_B R
-        blas::qr( VUtQ, U_svd );
+        blas::qr2( VUtQ, U_svd );
         
         // R_V = U·S·V^H
         svd( U_svd, S, V_svd );

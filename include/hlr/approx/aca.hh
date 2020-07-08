@@ -79,7 +79,7 @@ struct aca_pivot
         auto  column = get_column( M, pivot_col );
         
         for ( uint  l = 0; l < U.size(); ++l )
-            blas::add( -hpro::conj( V[l]( pivot_col ) ), U[l], column );
+            blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
         
         const auto  pivot_row = blas::max_idx( column );
         const auto  max_val   = column( pivot_row );
@@ -96,7 +96,7 @@ struct aca_pivot
         auto  row = get_row( M, pivot_row );
         
         for ( uint  l = 0; l < U.size(); ++l )
-            blas::add( -hpro::conj( U[l]( pivot_row ) ), V[l], row );
+            blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
 
         //
         // for next column, look for maximal element in computed row

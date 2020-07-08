@@ -14,12 +14,12 @@
 #include <hlr/matrix/tiling.hh>
 #include <hlr/vector/tile_storage.hh>
 #include <hlr/utils/checks.hh>
+#include <hlr/utils/math.hh>
 
 namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace math = hpro::Math;
 
 using hpro::real;
 using hpro::complex;
@@ -195,7 +195,7 @@ public:
         for ( auto [ is, v_is ] : _tiles )
             f += blas::dot( v_is, v_is );
         
-        return hpro::re( math::sqrt( f ) );
+        return std::real( math::sqrt( f ) );
     }
 
     // return infimum norm

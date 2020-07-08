@@ -88,7 +88,40 @@ program_main ()
     // assuming HODLR adm., so use first off-diagonal block as low-rank matrix
     auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
     
-    blas::cuda::init();
+    //////////////////////////////////////////////////////////////////
+    //
+    // compute QR
+    //
+    //////////////////////////////////////////////////////////////////
+
+    {
+        auto  U = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        
+        //
+        // using default blas
+        //
+
+        {
+            auto                     U1 = blas::copy( U );
+            blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
+        
+            blas::qr2( U1, R1 );
+        
+            hpro::DBG::write( U1, "U1.mat", "U1" );
+            hpro::DBG::write( R1, "R1.mat", "R1" );
+        }
+
+        {
+            auto                     U1 = blas::copy( U );
+            blas::matrix< value_t >  R1( U.ncols(), U.ncols() );
+            std::vector< value_t >   tau( U.ncols() );
+        
+            blas::qr( U1, R1 );
+        
+            hpro::DBG::write( U1, "U2.mat", "U2" );
+            hpro::DBG::write( R1, "R2.mat", "R2" );
+        }
+    }
     
     //////////////////////////////////////////////////////////////////
     //
@@ -96,6 +129,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////
 
+    blas::cuda::init();
+    
     if ( false )
     {
         auto  U   = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
@@ -245,7 +280,11 @@ program_main ()
     
     if ( true )
     {
-        using  cuda_t = typename blas::cuda::cuda_type< value_t >::type_t;
+        using  cuda_t      = typename blas::cuda::cuda_type< value_t >::type_t;
+        using  cuda_real_t = typename blas::cuda::real_type< cuda_t >::type_t;
+
+        auto      U     = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
+        auto      V     = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
 
         blas::cuda::handle  handle;
 
@@ -257,31 +296,107 @@ program_main ()
         HLR_CUSOLVER_CHECK( cusolverDnCreate,    ( & handle.solver ) );
         HLR_CUSOLVER_CHECK( cusolverDnSetStream, (   handle.solver, handle.stream ) );
         
+        // cuda_t *  dev_U = nullptr;
+        // cuda_t *  dev_V = nullptr;
+
+        // cudaMalloc( & dev_U, U.nrows() * U.ncols() * sizeof(cuda_t) );
+        // cudaMalloc( & dev_V, U.nrows() * V.ncols() * sizeof(cuda_t) );
+
+        // HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_U, U.data(), sizeof(value_t) * U.nrows() * U.ncols(),
+        //                                    cudaMemcpyHostToDevice, handle.stream ) );
+        // HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_V, V.data(), sizeof(value_t) * V.nrows() * V.ncols(),
+        //                                    cudaMemcpyHostToDevice, handle.stream ) );
+
+        // int  rank = 0;
+
         
-        auto      U     = blas::copy( hpro::blas_mat_A< value_t >( *A01 ) );
-        auto      V     = blas::copy( hpro::blas_mat_B< value_t >( *A01 ) );
-        cuda_t *  dev_U = nullptr;
-        cuda_t *  dev_V = nullptr;
+        // blas::cuda::svd_dev2<<<1,1>>>( handle, U.nrows(), V.nrows(), U.ncols(), dev_U, dev_V, acc );
 
-        cudaMalloc( & dev_U, U.nrows() * U.ncols() * sizeof(cuda_t) );
-        cudaMalloc( & dev_V, U.nrows() * V.ncols() * sizeof(cuda_t) );
+        // std::cout << "svd_dev" << std::endl;
 
-        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_U, U.data(), sizeof(value_t) * U.nrows() * U.ncols(),
-                                           cudaMemcpyHostToDevice, handle.stream ) );
-        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_V, V.data(), sizeof(value_t) * V.nrows() * V.ncols(),
-                                           cudaMemcpyHostToDevice, handle.stream ) );
+        // HLR_CUDA_CHECK( cudaMemcpyAsync, ( U.data(), dev_U, sizeof(value_t) * U.nrows() * U.ncols(),
+        //                                    cudaMemcpyDeviceToHost, handle.stream ) );
+        // HLR_CUDA_CHECK( cudaMemcpyAsync, ( V.data(), dev_V, sizeof(value_t) * V.nrows() * V.ncols(),
+        //                                    cudaMemcpyDeviceToHost, handle.stream ) );
 
-        auto  rank = svd_dev( handle, U.nrows(), V.nrows(), U.ncols(), dev_U, dev_V, acc );
+        // HLR_CUDA_CHECK( cudaLaunchHostFunc, ( handle.stream, cuda_hostfn, nullptr ) );
+        // std::cout << "launch hostfn" << std::endl;
+        
+        // HLR_CUDA_CHECK( cudaStreamSynchronize, ( handle.stream ) );
+        // std::cout << "synchronise" << std::endl;
 
-        HLR_CUDA_CHECK( cudaMemcpyAsync, ( U.data(), dev_U, sizeof(value_t) * U.nrows() * U.ncols(),
-                                           cudaMemcpyDeviceToHost, handle.stream ) );
-        HLR_CUDA_CHECK( cudaMemcpyAsync, ( V.data(), dev_V, sizeof(value_t) * V.nrows() * V.ncols(),
-                                           cudaMemcpyDeviceToHost, handle.stream ) );
+        const int  n = U.nrows();
+        
+        auto  A2 = blas::random< value_t >( n, n );
+        auto  B2 = blas::random< value_t >( n, n );
+        auto  C2 = blas::random< value_t >( n, n );
 
+        // first, copy to pinned memory
+        value_t *  host_A2 = nullptr;
+        value_t *  host_B2 = nullptr;
+        value_t *  host_C2 = nullptr;
+
+        cudaMallocHost( & host_A2, n * n * sizeof(value_t) );
+        cudaMallocHost( & host_B2, n * n * sizeof(value_t) );
+        cudaMallocHost( & host_C2, n * n * sizeof(value_t) );
+
+        memcpy( host_A2, A2.data(), n * n * sizeof(value_t) ); 
+        memcpy( host_B2, B2.data(), n * n * sizeof(value_t) ); 
+        memcpy( host_C2, C2.data(), n * n * sizeof(value_t) ); 
+        
+        cuda_t *  dev_A2   = nullptr;
+        cuda_t *  dev_B2   = nullptr;
+        cuda_t *  dev_C2   = nullptr;
+        cuda_t *  dev_tau  = nullptr;
+        cuda_t *  dev_work = nullptr;
+        int *     dev_info = nullptr;
+        cuda_real_t *  dev_S = nullptr;
+
+        // auto  one   = blas::cuda::make_constant< cuda_t >( 1 );
+        // auto  zero  = blas::cuda::make_constant< cuda_t >( 0 );
+
+        gesvdjInfo_t  gesvdj_params;
+
+        cusolverDnCreateGesvdjInfo( & gesvdj_params );
+        cusolverDnXgesvdjSetTolerance( gesvdj_params, 1e-7 );
+        cusolverDnXgesvdjSetMaxSweeps( gesvdj_params, 15 );
+
+        cudaMalloc( & dev_A2, n * n * sizeof(cuda_t) );
+        cudaMalloc( & dev_B2, n * n * sizeof(cuda_t) );
+        cudaMalloc( & dev_C2, n * n * sizeof(cuda_t) );
+        cudaMalloc( & dev_tau, n * sizeof(cuda_t) );
+        cudaMalloc( & dev_S, n * sizeof(cuda_real_t) );
+
+        // auto  lwork = blas::cuda::qr_worksize< cuda_t >( handle, n, n, dev_A2, dev_tau );
+        auto  lwork = blas::cuda::svd_worksize< cuda_t >( handle, n, n, dev_A2, dev_B2, dev_S, dev_C2, gesvdj_params );
+            
+        cudaMalloc( & dev_work, lwork * sizeof(cuda_t) );
+        cudaMalloc( & dev_info, sizeof(int) );
+
+        tic = timer::now();
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_A2, host_A2, sizeof(value_t) * n * n, cudaMemcpyHostToDevice, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_B2, host_B2, sizeof(value_t) * n * n, cudaMemcpyHostToDevice, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( dev_C2, host_C2, sizeof(value_t) * n * n, cudaMemcpyHostToDevice, handle.stream ) );
+
+        for ( int  i = 0; i < 5; ++i )
+        {
+            // blas::cuda::prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, one, dev_A2, n, dev_B2, n, zero, dev_C2, n );
+            // blas::cuda::qr_dev( handle, n, n, dev_A2, dev_B2, dev_tau, lwork, dev_work, dev_info );
+            blas::cuda::svd_dev( handle, n, n, dev_A2, dev_B2, dev_S, dev_C2, gesvdj_params, lwork, dev_work, dev_info );
+        }// for
+
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( host_A2, dev_A2, sizeof(value_t) * n * n, cudaMemcpyDeviceToHost, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( host_B2, dev_B2, sizeof(value_t) * n * n, cudaMemcpyDeviceToHost, handle.stream ) );
+        HLR_CUDA_CHECK( cudaMemcpyAsync, ( host_C2, dev_C2, sizeof(value_t) * n * n, cudaMemcpyDeviceToHost, handle.stream ) );
+        
         HLR_CUDA_CHECK( cudaLaunchHostFunc, ( handle.stream, cuda_hostfn, nullptr ) );
+        toc = timer::since( tic );
+        std::cout << "time to setup stream = " << format_time( toc ) << std::endl;
         
         HLR_CUDA_CHECK( cudaStreamSynchronize, ( handle.stream ) );
-        
+        toc = timer::since( tic );
+        std::cout << "time to run          = " << format_time( toc ) << std::endl;
+
         // {
         //     auto  U1 = blas::copy( U );
         //     auto  V1 = blas::copy( V );

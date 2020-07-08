@@ -18,13 +18,13 @@ namespace hlr { namespace blas { namespace magma {
 //
 // mapping of default types to MAGMA types
 //
-template < typename T > struct magma_type                             { using  type_t = T; };
-template <>             struct magma_type< hpro::Complex< float > >   { using  type_t = magmaFloatComplex; };
-template <>             struct magma_type< hpro::Complex< double > >  { using  type_t = magmaDoubleComplex; };
+template < typename T > struct magma_type                            { using  type_t = T; };
+template <>             struct magma_type< std::complex< float > >   { using  type_t = magmaFloatComplex; };
+template <>             struct magma_type< std::complex< double > >  { using  type_t = magmaDoubleComplex; };
 
-template < typename T > struct magma_type_ptr                             { using  type_t = T *; };
-template <>             struct magma_type_ptr< hpro::Complex< float > >   { using  type_t = magmaFloatComplex_ptr; };
-template <>             struct magma_type_ptr< hpro::Complex< double > >  { using  type_t = magmaDoubleComplex_ptr; };
+template < typename T > struct magma_type_ptr                            { using  type_t = T *; };
+template <>             struct magma_type_ptr< std::complex< float > >   { using  type_t = magmaFloatComplex_ptr; };
+template <>             struct magma_type_ptr< std::complex< double > >  { using  type_t = magmaDoubleComplex_ptr; };
 
 //
 // devices and queues

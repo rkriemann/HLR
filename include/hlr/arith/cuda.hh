@@ -19,15 +19,15 @@ namespace hlr { namespace blas { namespace cuda {
 //
 // mapping of default types to cuBLAS types
 //
-template < typename T > struct cuda_type                             { using  type_t = T; };
-template <>             struct cuda_type< hpro::Complex< float > >   { using  type_t = cuFloatComplex; };
-template <>             struct cuda_type< hpro::Complex< double > >  { using  type_t = cuDoubleComplex; };
+template < typename T > struct cuda_type                            { using  type_t = T; };
+template <>             struct cuda_type< std::complex< float > >   { using  type_t = cuFloatComplex; };
+template <>             struct cuda_type< std::complex< double > >  { using  type_t = cuDoubleComplex; };
 
-template <typename T>   struct real_type                             { using  type_t = T; };
-template <>             struct real_type< cuFloatComplex >           { using  type_t = float; };
-template <>             struct real_type< cuDoubleComplex >          { using  type_t = double; };
+template <typename T>   struct real_type                            { using  type_t = T; };
+template <>             struct real_type< cuFloatComplex >          { using  type_t = float; };
+template <>             struct real_type< cuDoubleComplex >         { using  type_t = double; };
 
-template < typename T > struct cuda_type_ptr                         { using  type_t = typename cuda_type< T >::type_t *; };
+template < typename T > struct cuda_type_ptr                        { using  type_t = typename cuda_type< T >::type_t *; };
 
 // wrapper for cuda, cuBlas and cuSolver functions
 #define HLR_CUDA_CHECK( func, args )         \
@@ -64,6 +64,7 @@ handle  default_handle;
 //
 // initialize cuBLAS/cuSolver
 //
+inline
 void
 init ()
 {
@@ -235,6 +236,7 @@ make_constant< cuDoubleComplex > ( const double  f )
 //////////////////////////////////////////////////////////////////////
 
 #define HLR_CUDA_COPY( type, func )                 \
+    inline                                          \
     void                                            \
     copy ( handle        handle,                    \
            const int     n,                         \
@@ -254,6 +256,7 @@ HLR_CUDA_COPY( cuDoubleComplex, cublasZcopy )
 #undef HLR_CUDA_COPY
 
 #define HLR_CUDA_SCALE( type, func )               \
+    inline                                         \
     void                                           \
     scale ( handle      handle,                    \
             const int   n,                         \
@@ -301,7 +304,8 @@ prod_diag ( handle                      handle,
 //
 // general matrix multiplication C ≔ α·op(A)·op(B) + β·C
 //
-#define HLR_CUDA_GEMM( type, func ) \
+#define HLR_CUDA_GEMM( type, func )                                     \
+    inline                                                              \
     void                                                                \
     prod ( handle                   handle,                             \
            const cublasOperation_t  trans_A,                            \
@@ -339,6 +343,7 @@ HLR_CUDA_GEMM( cuDoubleComplex, cublasZgemm )
 // return work buffer size for geqrf/orgqr
 //
 #define GEQRF_BUFFERSIZE( type, func )                                  \
+    inline                                                              \
     int                                                                 \
     geqrf_buffersize ( cusolverDnHandle_t  handle,                      \
                        int                 nrows,                       \
@@ -361,6 +366,7 @@ GEQRF_BUFFERSIZE( cuDoubleComplex, cusolverDnZgeqrf_bufferSize )
 #undef GEQRF_BUFFERSIZE
 
 #define GEQRF( type, func )                     \
+    inline                                      \
     void                                        \
     geqrf ( cusolverDnHandle_t  handle,         \
             int                 nrows,          \
@@ -383,6 +389,7 @@ GEQRF( cuDoubleComplex, cusolverDnZgeqrf )
 #undef GEQRF
 
 #define ORGQR_BUFFERSIZE( type, func )              \
+    inline                                          \
     int                                             \
     orgqr_buffersize ( cusolverDnHandle_t  handle,  \
                        int                 nrows,   \
@@ -407,6 +414,7 @@ ORGQR_BUFFERSIZE( cuDoubleComplex, cusolverDnZungqr_bufferSize )
 #undef ORGQR_BUFFERSIZE
 
 #define ORGQR( type, func )                     \
+    inline                                      \
     void                                        \
     orgqr ( cusolverDnHandle_t  handle,         \
             int                 nrows,          \
@@ -563,6 +571,52 @@ qr_dev ( handle     handle,
     device_free( dev_tau );
 }
 
+template < typename value_t >
+int
+qr_worksize ( handle     handle,
+              const int  nrows,
+              const int  ncols,
+              value_t *  dev_M,
+              value_t *  dev_tau )
+{
+    return std::max( geqrf_buffersize( handle.solver, nrows, ncols, dev_M, nrows ),
+                     orgqr_buffersize( handle.solver, nrows, ncols, ncols, dev_M, nrows, dev_tau ) );
+}
+    
+template < typename value_t >
+void
+qr_dev ( handle     handle,
+         const int  nrows,
+         const int  ncols,
+         value_t *  dev_M,
+         value_t *  dev_R,
+         value_t *  dev_tau,
+         const int  lwork,
+         value_t *  dev_work,
+         int *      dev_info )
+{
+    //
+    // factorise 
+    //
+
+    geqrf( handle.solver, nrows, ncols, dev_M, nrows, dev_tau, dev_work, lwork, dev_info );
+
+    //
+    // copy upper triangular part to R
+    //
+    
+    cudaMemsetAsync( dev_R, 0, ncols*ncols*sizeof(value_t), handle.stream );
+
+    for ( int  i = 0; i < ncols; i++ )
+        copy( handle, i+1, dev_M + i*nrows, 1, dev_R + i*ncols, 1 );
+    
+    //
+    // compute Q
+    //
+    
+    orgqr( handle.solver, nrows, ncols, ncols, dev_M, nrows, dev_tau, dev_work, lwork, dev_info );
+}
+
 //////////////////////////////////////////////////////////////////////
 //
 // SVD related functions
@@ -570,6 +624,7 @@ qr_dev ( handle     handle,
 //////////////////////////////////////////////////////////////////////
 
 #define GESVDJ_BUFFERSIZE( type, func )              \
+    inline                                           \
     int                                              \
     gesvdj_buffersize ( cusolverDnHandle_t  handle,  \
                         cusolverEigMode_t   jobz,    \
@@ -600,6 +655,7 @@ GESVDJ_BUFFERSIZE( cuDoubleComplex, cusolverDnZgesvdj_bufferSize )
 #undef GESVDJ_BUFFERSIZE
 
 #define GESVDJ( type, func )              \
+    inline                                \
     void                                  \
     gesvdj ( cusolverDnHandle_t  handle,  \
              cusolverEigMode_t   jobz,    \
@@ -736,6 +792,51 @@ svd_dev ( handle                                         handle,
     info = from_device< int >( dev_info );
 
     HLR_ASSERT( info == 0 );
+}
+
+template < typename value_t >
+int
+svd_worksize ( handle                                         handle,
+               const int                                      nrows,
+               const int                                      ncols,
+               value_t *                                      dev_M,
+               value_t *                                      dev_U,
+               typename cuda::real_type< value_t >::type_t *  dev_S,
+               value_t *                                      dev_VH,
+               gesvdjInfo_t &                                 gesvdj_params )
+{
+    cusolverEigMode_t  jobz       = CUSOLVER_EIG_MODE_VECTOR;
+    const int          econ       = 1; // economy mode
+    
+    return gesvdj_buffersize( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows,
+                              dev_S, dev_U, nrows, dev_VH, ncols, gesvdj_params );
+}
+
+template < typename value_t >
+void
+svd_dev ( handle                                         handle,
+          const int                                      nrows,
+          const int                                      ncols,
+          value_t *                                      dev_M,
+          value_t *                                      dev_U,
+          typename cuda::real_type< value_t >::type_t *  dev_S,
+          value_t *                                      dev_VH,
+          gesvdjInfo_t &                                 gesvdj_params,
+          int                                            lwork,
+          value_t *                                      dev_work,
+          int *                                          dev_info )
+{
+    //
+    // allocate data on device
+    //
+
+    cusolverEigMode_t  jobz       = CUSOLVER_EIG_MODE_VECTOR;
+    const int          econ       = 1; // economy mode
+
+    copy( handle, nrows*ncols, dev_M, 1, dev_U, 1 );
+    
+    gesvdj( handle.solver, jobz, econ, nrows, ncols, dev_M, nrows, dev_S, dev_U, nrows, dev_VH, ncols,
+            dev_work, lwork, dev_info, gesvdj_params );
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1067,6 +1168,148 @@ svd_dev ( handle                   handle,
         device_free( dev_RU );
 
         return  out_rank;
+    }// else
+
+}
+
+//
+// on-device version of the above SVD based low-rank truncation
+//
+// on exit : dev_U and dev_V will be (normally) reallocated and
+//           hold the truncated low-rank factors
+//
+__global__
+template < typename value_t >
+void
+svd_dev2 ( handle                   handle,
+           const int                nrows_U,
+           const int                nrows_V,
+           const int                rank,
+           value_t * &              dev_U,
+           value_t * &              dev_V,
+           const hpro::TTruncAcc &  acc,
+           int &                    new_rank )
+{
+    using  cuda_t = value_t;
+    using  real_t = typename cuda::real_type< cuda_t >::type_t;
+
+    //
+    // don't increase rank
+    //
+
+    const int  in_rank   = rank;
+    const int  acc_rank = int( acc.rank() );
+
+    if ( in_rank == 0 )
+    {
+        new_rank = in_rank;
+        return;
+    }// if
+
+    if ( in_rank <= acc_rank )
+    {
+        new_rank = in_rank;
+        return;
+    }// if
+
+    //
+    // if k is bigger than the possible rank,
+    // we create a dense-matrix and do truncation
+    // via full SVD
+    //
+
+    int  out_rank = 0;
+        
+    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) / 2 )
+    {
+        HLR_ERROR( "TO DO" );
+
+        new_rank = in_rank;
+        return;
+    }// if
+    else
+    {
+        //
+        // do QR-factorisation of U and V
+        //
+
+        auto  dev_QU = device_alloc< cuda_t >( nrows_U * in_rank );
+        auto  dev_RU = device_alloc< cuda_t >( in_rank * in_rank );
+
+        copy( handle, nrows_U * in_rank, dev_U, 1, dev_QU, 1 );
+        qr_dev( handle, nrows_U, in_rank, dev_QU, dev_RU );
+        
+        auto  dev_QV = device_alloc< cuda_t >( nrows_V * in_rank );
+        auto  dev_RV = device_alloc< cuda_t >( in_rank * in_rank );
+
+        copy( handle, nrows_V * in_rank, dev_V, 1, dev_QV, 1 );
+        qr_dev( handle, nrows_V, in_rank, dev_QV, dev_RV );
+
+        //
+        // R = R_U · upper_triangular(QV)^H = R_V^H
+        //
+        
+        auto  dev_R = device_alloc< cuda_t >( in_rank * in_rank );
+        auto  one   = make_constant< cuda_t >( 1 );
+        auto  zero  = make_constant< cuda_t >( 0 );
+
+        prod( handle, CUBLAS_OP_N, CUBLAS_OP_C, in_rank, in_rank, in_rank, one, dev_RU, in_rank, dev_RV, in_rank, zero, dev_R, in_rank );
+        
+        //
+        // SVD(R) = U S V^H
+        //
+            
+        auto  dev_Us = dev_R;  // reuse memory
+        auto  dev_Ss = device_alloc< real_t >( in_rank );
+        auto  dev_Vs = dev_RV; // reuse memory
+            
+        svd_dev< cuda_t >( handle, in_rank, in_rank, dev_Us, dev_Ss, dev_Vs );
+        
+        // determine truncated rank based on singular values
+        auto  Ss = blas::vector< real_t >( in_rank );
+
+        from_device< real_t >( dev_Ss, 1, Ss );
+        
+        out_rank = int( acc.trunc_rank( Ss ) );
+
+        //
+        // only build new vectors, if rank is decreased
+        //
+        
+        if ( out_rank < in_rank )
+        {
+            //
+            // free old and build new matrices U and V
+            //
+
+            device_free( dev_U );
+            device_free( dev_V );
+
+            // U := U·S
+            prod_diag( handle, in_rank, dev_Us, Ss, out_rank );
+
+            // OU := Q_U · U
+            dev_U = device_alloc< cuda_t >( nrows_U * out_rank );
+            prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, nrows_U, out_rank, in_rank, one, dev_QU, nrows_U, dev_Us, in_rank, zero, dev_U, nrows_U );
+            
+            // V := Q_V · conj(V)
+            dev_V = device_alloc< cuda_t >( nrows_V * out_rank );
+            prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, nrows_V, out_rank, in_rank, one, dev_QV, nrows_V, dev_Vs, in_rank, zero, dev_V, nrows_V );
+
+            new_rank = out_rank;
+        }// if
+        else
+        {
+            // adjust for return value below
+            new_rank = in_rank;
+        }// else
+
+        device_free( dev_Ss );
+        device_free( dev_R  );
+        device_free( dev_QV );
+        device_free( dev_RV );
+        device_free( dev_QU );
+        device_free( dev_RU );
     }// else
 }
 

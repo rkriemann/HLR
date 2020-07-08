@@ -567,7 +567,7 @@ if 'tf' in frameworks :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
     # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
-    Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc' ] ) )
+    Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc'  ] ) )
 
 #
 # HPX

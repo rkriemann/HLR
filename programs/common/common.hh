@@ -211,9 +211,15 @@ gen_bct ( hpro::TClusterTree &  rowct,
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "hodlr" )
+    else if ( hlr::cmdline::adm == "hodlr" or hlr::cmdline::adm == "offdiag" )
     {
         hpro::TOffDiagAdmCond  adm_cond;
+        
+        return bct_builder.build( & rowct, & colct, & adm_cond );
+    }// if
+    else if ( hlr::cmdline::adm == "hilo" )
+    {
+        hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if

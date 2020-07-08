@@ -16,6 +16,7 @@
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/text.hh"
+#include "hlr/utils/math.hh"
 
 namespace hlr { namespace seq { namespace norm {
 
@@ -251,7 +252,7 @@ norm_F ( const double           alpha,
                 {
                     const auto  a_ij = hpro::real(alpha) * MA(i,j) + hpro::real(beta) * MB(i,j);
                     
-                    val += re( hpro::conj( a_ij ) * a_ij );
+                    val += std::real( math::conj( a_ij ) * a_ij );
                 }// for
             }// for
 
@@ -389,7 +390,7 @@ norm_2 ( const matrix_t &  A,
 
 //         const real  norm_x = x->norm2();
             
-//         if ( norm_x <= Math::square( Limits::epsilon< hpro::real >() ); )
+//         if ( norm_x <= math::square( Limits::epsilon< hpro::real >() ); )
 //             break;
         
 //         x->scale( real(1) / norm_x );

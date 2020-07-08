@@ -73,8 +73,8 @@ parse ( int argc, char ** argv )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "matrix",      value<string>(), ": matrix file use" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
-        ( "cluster",     value<string>(), ": clustering technique" )
-        ( "adm",         value<string>(), ": admissibility" )
+        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ;
 
     ari_opts.add_options()
@@ -202,7 +202,8 @@ parse ( int argc, char ** argv )
         std::cout << "Clustering Techniques:" << std::endl
                   << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
                   << "  - weak          : weak geometric admissibility" << std::endl
-                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl;
+                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
+                  << "  - hilo          : Hi/Low frequency addmissibility" << std::endl;
 
         std::exit( 0 );
     }// if
