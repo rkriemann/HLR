@@ -21,6 +21,10 @@ using boost::format;
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/cluster/TBCBuilder.hh>
 #include <hpro/cluster/TGeomAdmCond.hh>
+#include <hpro/cluster/TAlgPartStrat.hh>
+#include <hpro/cluster/TAlgCTBuilder.hh>
+#include <hpro/cluster/TAlgAdmCond.hh>
+#include <hpro/matrix/TMatBuilder.hh>
 
 #include <hlr/cluster/tlr.hh>
 #include <hlr/cluster/mblr.hh>

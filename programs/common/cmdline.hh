@@ -32,6 +32,7 @@ uint    verbosity  = 1;            // verbosity level
 bool    noredir    = false;        // prevent stdout redirection in distributed mode
 string  gridfile   = "sphere-4";   // gridfile for corresponding applications
 string  matrixfile = "";           // use matrix from file instead of application
+string  sparsefile = "";           // sparse matrix instead of application
 bool    onlydag    = false;        // only compute task graph, no DAG execution
 bool    docopy     = true;         // copy matrix before further comp. to distr. memory
 bool    levelwise  = false;        // use levelwise task graph construction
@@ -72,6 +73,7 @@ parse ( int argc, char ** argv )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "matrix",      value<string>(), ": matrix file use" )
+        ( "sparse",      value<string>(), ": sparse matrix file use" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
@@ -144,6 +146,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
+    if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
     if ( vm.count( "distr"      ) ) distr      = vm["distr"].as<string>();
     if ( vm.count( "noredir"    ) ) noredir    = true;
     if ( vm.count( "onlydag"    ) ) onlydag    = true;
