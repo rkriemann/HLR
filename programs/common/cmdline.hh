@@ -206,7 +206,8 @@ parse ( int argc, char ** argv )
                   << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
                   << "  - weak          : weak geometric admissibility" << std::endl
                   << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
-                  << "  - hilo          : Hi/Low frequency addmissibility" << std::endl;
+                  << "  - hilo          : Hi/Low frequency addmissibility" << std::endl
+                  << "  - none          : nothing admissible" << std::endl;
 
         std::exit( 0 );
     }// if

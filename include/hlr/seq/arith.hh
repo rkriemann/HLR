@@ -285,6 +285,112 @@ multiply_apx ( const value_t            alpha,
 }
 
 //
+// compute Hadamard product A = α A*B 
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply_hadamard ( const value_t            alpha,
+                    hpro::TMatrix &          A,
+                    const hpro::TMatrix &    B,
+                    const hpro::TTruncAcc &  acc,
+                    const approx_t &         approx )
+{
+    if ( is_blocked_all( A, B ) )
+    {
+        auto  BA = ptrcast( &A,  hpro::TBlockMatrix );
+        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+            {
+                auto  A_ij = BA->block( i, j );
+                auto  B_ij = BB->block( i, j );
+                
+                HLR_ASSERT( ! is_null_any( A_ij, B_ij ) );
+            
+                multiply_hadamard< value_t >( alpha, *A_ij, *B_ij, acc, approx );
+            }// for
+        }// for
+    }// if
+    else if ( is_dense_all( A, B ) )
+    {
+        auto        DA     = ptrcast( &A,  hpro::TDenseMatrix );
+        auto        DB     = cptrcast( &B, hpro::TDenseMatrix );
+        auto        blas_A = hpro::blas_mat< value_t >( DA );
+        auto        blas_B = hpro::blas_mat< value_t >( DB );
+        const auto  nrows  = DA->nrows();
+        const auto  ncols  = DA->ncols();
+
+        for ( size_t  i = 0; i < nrows*ncols; ++i )
+            blas_A.data()[i] *= alpha * blas_B.data()[i];
+    }// if
+    else if ( is_lowrank_all( A, B ) )
+    {
+        auto  RA = ptrcast( &A,  hpro::TRkMatrix );
+        auto  RB = cptrcast( &B, hpro::TRkMatrix );
+
+        //
+        // construct product with rank rank(A)·rank(B) and fill
+        // new low-rank vectors based on hadamard product
+        //
+        //  a_ij · b_ij = ( Σ_l u^l_i · v^l_j ) ( Σ_k w^k_i · x^k_j )
+        //              = Σ_l Σ_k ( u^l_i · w^k_i ) ( v^l_j · x^k_j )
+        //
+        //  i.e., C = Y·Z' with y^p_i = u^l_i · w^k_i and
+        //                      z^p_j = v^l_j · x^k_j
+        //
+        //  with p = l·rank(B)+k
+        //
+
+        auto  rank_A = RA->rank();
+        auto  rank_B = RB->rank();
+        auto  rank   = rank_A * rank_B;
+
+        auto  nrows = RA->nrows();
+        auto  ncols = RA->ncols();
+
+        auto  U = blas::mat_U< value_t >( RA );
+        auto  V = blas::mat_V< value_t >( RA );
+        auto  W = blas::mat_U< value_t >( RB );
+        auto  X = blas::mat_V< value_t >( RB );
+        auto  Y = blas::matrix< value_t >( nrows, rank );
+        auto  Z = blas::matrix< value_t >( ncols, rank );
+
+        uint  p = 0;
+        
+        for ( uint  l = 0; l < rank_A; ++l )
+        {
+            auto  u_l = U.column( l );
+            auto  v_l = V.column( l );
+                
+            for ( uint  k = 0; k < rank_B; ++k, ++p )
+            {
+                auto  w_k = W.column( k );
+                auto  x_k = X.column( k );
+                auto  y_p = Y.column( p );
+                auto  z_p = Z.column( p );
+
+                for ( size_t  i = 0; i < nrows; ++i )
+                    y_p(i) = alpha * u_l(i) * w_k(i);
+
+                for ( size_t  j = 0; j < ncols; ++j )
+                    z_p(j) = v_l(j) * x_k(j);
+            }// for
+        }// for
+
+        //
+        // truncate Y·Z and copy back to A
+        //
+
+        auto [ Y_acc, Z_acc ] = approx( Y, Z, acc );
+        
+        RA->set_lrmat( std::move( Y_acc ), std::move( Z_acc ) );
+    }// if
+}
+
+//
 // solve op(L) x = y with lower triangular L
 //
 void

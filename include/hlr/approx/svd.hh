@@ -122,7 +122,8 @@ svd ( const blas::matrix< value_t > &  U,
         auto  M    = blas::prod( value_t(1), U, adjoint(V) );
         auto  lacc = hpro::TTruncAcc( acc );
 
-        lacc.set_max_rank( acc_rank );
+        if ( acc_rank > 0 )
+            lacc.set_max_rank( acc_rank );
 
         std::tie( OU, OV ) = svd( M, lacc );
     }// if

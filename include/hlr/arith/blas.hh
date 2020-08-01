@@ -8,10 +8,14 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <cassert>
+
 #include <hpro/blas/Matrix.hh>
 #include <hpro/blas/Vector.hh>
 #include <hpro/blas/Algebra.hh>
+#include <hpro/matrix/TRkMatrix.hh>
 
+#include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 #include <hlr/utils/math.hh>
 #include <hlr/arith/blas_def.hh>
@@ -32,6 +36,23 @@ using range = HLIB::BLAS::Range;
 
 template < typename value_t > using vector = HLIB::BLAS::Vector< value_t >;
 template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
+
+//
+// access low-rank factors as U and V
+//
+
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
+
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
+
 
 //
 // general copy method

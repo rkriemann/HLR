@@ -227,6 +227,12 @@ gen_bct ( hpro::TClusterTree &  rowct,
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
+    else if ( hlr::cmdline::adm == "none" )
+    {
+        hpro::TStdGeomAdmCond  adm_cond( 0.0, hpro::use_min_diam );
+        
+        return bct_builder.build( & rowct, & colct, & adm_cond );
+    }// if
     else
         HLR_ERROR( "unsupported admissibility : " + hlr::cmdline::adm );
 }

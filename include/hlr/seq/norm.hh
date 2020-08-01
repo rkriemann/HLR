@@ -82,7 +82,7 @@ norm_F ( const hpro::TMatrix &  A )
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else if ( IS_TYPE( &A, tiled_lrmatrix ) )
@@ -132,7 +132,7 @@ norm_F ( const hpro::TMatrix &  A )
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else if ( is_dense( A ) )
@@ -148,6 +148,13 @@ norm_F ( const hpro::TMatrix &  A )
     }// else
 
     return 0;
+}
+
+inline
+double
+frobenius ( const hpro::TMatrix &  A )
+{
+    return norm_F( A );
 }
 
 //
@@ -226,11 +233,12 @@ norm_F ( const double           alpha,
             const auto  VA  = hpro::blas_mat_B< hpro::real >( RA );
             const auto  UB  = hpro::blas_mat_A< hpro::real >( RB );
             const auto  VB  = hpro::blas_mat_B< hpro::real >( RB );
+            const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
+                                alpha * beta  * lrdot( UA, VA, UB, VB ) +
+                                alpha * beta  * lrdot( UB, VB, UA, VA ) +
+                                beta  * beta  * lrdot( UB, VB, UB, VB ) );
 
-            return std::sqrt( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                              alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                              alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                              beta  * beta  * lrdot( UB, VB, UB, VB ) );
+            return std::sqrt( std::abs( sqn ) );
         }// else
     }// if
     else if ( is_dense_all( A, B ) )
@@ -256,7 +264,7 @@ norm_F ( const double           alpha,
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// if
         else
         {
@@ -276,7 +284,7 @@ norm_F ( const double           alpha,
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else
@@ -285,6 +293,16 @@ norm_F ( const double           alpha,
     }// else
 
     return 0;
+}
+
+inline
+double
+frobenius ( const double           alpha,
+            const hpro::TMatrix &  A,
+            const double           beta,
+            const hpro::TMatrix &  B )
+{
+    return norm_F( alpha, A, beta, B );
 }
 
 //
