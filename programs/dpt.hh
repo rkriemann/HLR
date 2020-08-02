@@ -269,6 +269,118 @@ construct_identity ( const hpro::TMatrix &  M )
 }
 
 //
+// construct zero matrix with same diagonal structure as <M>
+//
+inline
+std::unique_ptr< hpro::TMatrix >
+construct_zero ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = construct_zero( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D = M.copy();
+
+        D->scale( 0 );
+        
+        return D;
+    }// else
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is() );
+
+        R->set_complex( M.is_complex() );
+
+        return R;
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+}
+
+//
+// construct diagonal matrix with same diagonal structure as <M>
+// and diagonal defined by <diag>
+// - all low-rank matrices have zero rank
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+construct_diag ( const hpro::TMatrix &            M,
+                 const blas::vector< value_t > &  diag )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = construct_diag< value_t >( * BM->block( i, j ), diag );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D      = M.copy();
+        auto  blas_D = hpro::blas_mat< value_t >( ptrcast( D.get(), hpro::TDenseMatrix ) );
+
+        D->scale( 0 );
+
+        if ( M.row_is() == M.col_is() )
+        {
+            for ( idx_t  i = 0; i < std::min< idx_t >( D->nrows(), D->ncols() ); ++i )
+                blas_D( i, i ) = diag( M.row_ofs() + i );
+        }// if
+        
+        return D;
+    }// else
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is() );
+
+        R->set_complex( M.is_complex() );
+
+        return R;
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+}
+
+//
 // set diagonal to zero
 //
 template < typename value_t >
@@ -365,6 +477,37 @@ add_iota_diag ( hpro::TMatrix &  M,
 }
 
 //
+// return norm | M V · V E | / ( |M|·|V| )
+//
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+everror ( const hpro::TMatrix &            M,
+          const hpro::TMatrix &            V,
+          const blas::vector< value_t > &  E,
+          const hpro::TTruncAcc &          acc )
+{
+    using real_t = typename hpro::real_type< value_t >::type_t;
+
+    const auto  normM = real_t(1);
+    const auto  normV = real_t(1);
+    auto        T     = construct_zero( M );
+
+    impl::multiply( value_t(1),
+                    hpro::apply_normal, M,
+                    hpro::apply_normal, V,
+                    *T, acc );
+
+    auto  EM = construct_diag( M, E );
+    
+    impl::multiply( value_t(-1),
+                    hpro::apply_normal, V,
+                    hpro::apply_normal, *EM,
+                    *T, acc );
+
+    return seq::norm::frobenius( *T ) / ( normM * normV );
+}
+
+//
 // compute eigen values of given matrix M using DPT iteration
 //
 //   - stop iteration if |V_i - V_i-1| < tol or i > max_it
@@ -453,7 +596,7 @@ dpteigen ( hpro::TMatrix &      M,
 
         auto  toc3 = timer::since( tic3 );
 
-        std::cout << "      gemm in " << format_time( toc3 ) << std::endl;
+        std::cout << "      gemm     in " << format_time( toc3 ) << std::endl;
 
         // hpro::DBG::write( T.get(), "T1.mat", "T1" );
         
@@ -468,13 +611,14 @@ dpteigen ( hpro::TMatrix &      M,
 
         // // I - Θ ∗ (Δ·V - V·diag(Δ·V)) = I - Θ ∗ T
         tic3 = timer::now();
-        seq::multiply_hadamard( value_t(-1), *T, *Theta, acc, apx );
+        impl::multiply_hadamard( value_t(-1), *T, *Theta, acc, apx );
         toc3 = timer::since( tic3 );
         std::cout << "      hadamard in " << format_time( toc3 ) << std::endl;
         // hpro::DBG::write( T.get(), "T3.mat", "T3" );
         add_identity< value_t >( *T );
         // hpro::DBG::write( T.get(), "T4.mat", "T4" );
         // hpro::DBG::write( V.get(), "V.mat", "V" );
+
         //
         // compute error ||V-T||_F
         //
@@ -505,7 +649,8 @@ dpteigen ( hpro::TMatrix &      M,
             if ( nsteps > 0 )
                 std::cout << ", reduction = " << boost::format( "%.4e" ) % ( error / old_error );
             
-            std::cout << ", time = " << boost::format( "%.3es" ) % toc2 << std::endl;
+            std::cout << ", time = " << format_time( toc2 )
+                      << ", size(V) = " << format_mem( V->byte_size() ) << std::endl;
         }// if
         
         old_error = error;
@@ -584,64 +729,23 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
-    // Hadamard Product
+    // DPT eigenvalue iteration
     //
     //////////////////////////////////////////////////////////////////////
-    
-    // std::cout << term::bullet << term::bold << "Hadamard Product ( " << impl_name
-    //           << ", " << acc.to_string()
-    //           << " )" << term::reset << std::endl;
-
-    // {
-    //     auto  apx = hlr::approx::SVD< value_t >();
-    //     auto  B   = impl::matrix::copy( *A );
-    //     auto  C   = impl::matrix::copy( *A );
-
-    //     // hpro::DBG::write( A.get(), "A.mat", "A" );
-        
-    //     tic = timer::now();
-        
-    //     seq::multiply_hadamard( 1.0, *B, *C, acc, apx );
-        
-    //     toc = timer::since( tic );
-    //     std::cout << "    mult in  " << format_time( toc ) << std::endl;
-
-    //     // hpro::DBG::write( B.get(), "C.mat", "C" );
-
-    //     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
-    // }
-
-    //////////////////////////////////////////////////////////////////////
-    //
-    // Multiplication with Diagonal
-    //
-    //////////////////////////////////////////////////////////////////////
-
-    // {
-    //     auto  B    = impl::matrix::copy( *A );
-    //     auto  diag = vector::scalar_vector< value_t >( A->row_is() );
-
-    //     extract_diag< value_t >( *B, diag );
-        
-    //     // hpro::DBG::write( & diag, "adiag.mat", "adiag" );
-        
-    //     hpro::mul_diag_right( B.get(), diag );
-
-    //     // hpro::DBG::write( B.get(), "D.mat", "D" );
-    // }
 
     {
         std::cout << term::bullet << term::bold << "DPT eigen iteration ( " << impl_name
                   << ", " << acc.to_string()
                   << " )" << term::reset << std::endl;
         
-        hpro::DBG::write( *A, "A.mat", "A" );
+        // hpro::DBG::write( *A, "A.mat", "A" );
         
         auto  B       = impl::matrix::copy( *A );
 
         add_iota_diag< value_t >( *B, 1e-3 );
-        
-        hpro::DBG::write( *B, "M.mat", "M" );
+
+        if ( B->nrows() <= 2048 )
+            hpro::DBG::write( *B, "M.mat", "M" );
 
         tic = timer::now();
         
@@ -651,8 +755,15 @@ program_main ()
         
         std::cout << "    done in " << format_time( toc ) << std::endl;
         std::cout << "    mem   = " << format_mem( V->byte_size() ) << std::endl;
+
+        impl::matrix::copy_to( *A, *B );
+        add_iota_diag< value_t >( *B, 1e-3 );
+        std::cout << "    error = " << format_error( everror( *B, *V, E, acc ) ) << std::endl;
         
-        hpro::DBG::write( E, "E.mat", "E" );
-        hpro::DBG::write( *V, "V.mat", "V" );
+        if ( B->nrows() <= 2048 )
+        {
+            hpro::DBG::write( E, "E.mat", "E" );
+            hpro::DBG::write( *V, "V.mat", "V" );
+        }// if
     }
 }

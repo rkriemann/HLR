@@ -126,6 +126,48 @@ multiply ( const value_t            alpha,
 }
 
 //
+// compute Hadamard product A = α A*B 
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply_hadamard ( const value_t            alpha,
+                    hpro::TMatrix &          A,
+                    const hpro::TMatrix &    B,
+                    const hpro::TTruncAcc &  acc,
+                    const approx_t &         approx )
+{
+    if ( is_blocked_all( A, B ) )
+    {
+        auto  BA = ptrcast( &A,  hpro::TBlockMatrix );
+        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
+                                              0, BA->nblock_cols() ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  A_ij = BA->block( i, j );
+                        auto  B_ij = BB->block( i, j );
+                
+                        HLR_ASSERT( ! is_null_any( A_ij, B_ij ) );
+            
+                        multiply_hadamard< value_t >( alpha, *A_ij, *B_ij, acc, approx );
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+    {
+        hlr::seq::multiply_hadamard< value_t >( alpha, A, B, acc, approx );
+    }// if
+}
+
+//
 // Gaussian elimination of A, e.g. A = A^-1
 // - T is used as temporary space and has to have the same
 //   structure as A
