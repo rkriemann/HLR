@@ -9,15 +9,427 @@
 //
 
 #include "hlr/utils/log.hh"
+#include "hlr/arith/add.hh"
 
 namespace hlr
 {
 
 namespace hpro = HLIB;
 
+/////////////////////////////////////////////////////////////////////////////////
 //
-// compute C := C + α A·B
+// newer version with matrix operators (normal, transposed, adjoint)
 //
+/////////////////////////////////////////////////////////////////////////////////
+
+//
+// forward decl.
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx );
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TBlockMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TBlockMatrix &        C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+
+    for ( uint  i = 0; i < C.nblock_rows(); ++i )
+    {
+        for ( uint  j = 0; j < C.nblock_cols(); ++j )
+        {
+            HLR_ASSERT( ! is_null( C.block( i, j ) ) );
+                
+            for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
+            {
+                if ( ! is_null_any( A.block( i, l, op_A ), B.block( l, j, op_B ) ) )
+                    multiply< value_t >( alpha,
+                                         op_A, *A.block( i, l, op_A ),
+                                         op_B, *B.block( l, j, op_B ),
+                                         *C.block( i, j ), acc, approx );
+            }// if       
+        }// for
+    }// for
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TBlockMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TRkMatrix &           C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    //
+    // compute temporary block matrix BC and sub blocks
+    // BC_ij for each  i,j ∈ nblocks(A) × ncols(B)
+    // and combine all for update of C
+    //
+
+    auto  BC = std::make_unique< hpro::TBlockMatrix >( C.row_is(), C.col_is() );
+
+    BC->set_block_struct( A.nblock_rows( op_A ), B.nblock_cols( op_B ) );
+    
+    for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
+    {
+        for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+        {
+            for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
+            {
+                if ( ! is_null_any( A.block( i, l, op_A ), B.block( l, j, op_B ) ) )
+                {
+                    auto  A_il = A.block( i, l, op_A );
+                    auto  B_lj = B.block( l, j, op_B );
+
+                    if ( is_null( BC->block( i, j ) ) )
+                        BC->set_block( i, j, new hpro::TRkMatrix( A_il->row_is( op_A ), B_lj->col_is( op_B ),
+                                                                  hpro::value_type< value_t >::value ) );
+                    
+                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
+                }// if
+            }// if       
+        }// for
+    }// for
+
+    // ensure correct value type of BC
+    BC->adjust_value_type();
+
+    // apply update
+    hlr::add< value_t >( value_t(1), *BC, C, acc, approx );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TBlockMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TDenseMatrix &        C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    //
+    // perform block × block multiplication and compute local result
+    // which is used to update C
+    //
+
+    for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
+    {
+        for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+        {
+            std::unique_ptr< hpro::TDenseMatrix >  C_ij;
+            
+            for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
+            {
+                if ( ! is_null_any( A.block( i, l, op_A ), B.block( l, j, op_B ) ) )
+                {
+                    auto  A_il = A.block( i, l, op_A );
+                    auto  B_lj = B.block( l, j, op_B );
+
+                    if ( is_null( C_ij ) )
+                        C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type< value_t >::value );
+                    
+                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
+                }// if
+            }// if
+
+            if ( ! is_null( C_ij ) )
+                C.add_block( value_t(1), value_t(1), C_ij.get() );
+        }// for
+    }// for
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TRkMatrix &  A,
+           const hpro::matop_t      op_B,
+           const hpro::TRkMatrix &  B,
+           hpro::TRkMatrix &        C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), U(A) V(A)^H U(B) ] , [ V(C), V(B)^H ] )
+    auto  T  = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A, op_A ) ), blas::mat_U< value_t >( B, op_B ) );
+    auto  UT = blas::prod(      alpha, blas::mat_U< value_t >( A, op_A ), T );
+
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), UT },
+                            { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TRkMatrix &     A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TRkMatrix &           C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
+    auto  VB = blas::prod( alpha,
+                           blas::adjoint( blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) ),
+                           blas::mat_V< value_t >( A, op_A ) );
+
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), blas::mat_U< value_t >( A, op_A ) },
+                            { blas::mat_V< value_t >( C ), VB },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TRkMatrix &     B,
+           hpro::TRkMatrix &           C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
+    auto  AU = blas::prod( alpha,
+                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
+                           blas::mat_U< value_t >( B, op_B ) );
+
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), AU },
+                            { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TRkMatrix &           C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // [ U(C), V(C) ] = approx( C - A B )
+    auto  AB = blas::prod( alpha,
+                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
+                           blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+
+    blas::prod( value_t(1), blas::mat_U< value_t >( C ), blas::adjoint( blas::mat_V< value_t >( C ) ), value_t(1), AB );
+
+    auto [ U, V ] = approx( AB, acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TRkMatrix &  A,
+           const hpro::matop_t      op_B,
+           const hpro::TRkMatrix &  B,
+           hpro::TDenseMatrix &     C,
+           const hpro::TTruncAcc &,
+           const approx_t & )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // C = C + U(A) ( V(A)^H U(B) ) V(B)^H
+    auto  T  = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A, op_A ) ), blas::mat_U< value_t >( B, op_B ) );
+    auto  UT = blas::prod( value_t(1), blas::mat_U< value_t >( A, op_A ), T );
+
+    blas::prod( alpha, UT, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TRkMatrix &     B,
+           hpro::TDenseMatrix &        C,
+           const hpro::TTruncAcc &,
+           const approx_t & )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // C = C + ( A U(B) ) V(B)^H
+    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ), blas::mat_U< value_t >( B, op_B ) );
+
+    blas::prod( alpha, AU, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TRkMatrix &     A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TDenseMatrix &        C,
+           const hpro::TTruncAcc &,
+           const approx_t & )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // C = C + U(A) ( V(A)^H B )
+    auto  VB = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A, op_A ) ), blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+
+    blas::prod( alpha, blas::mat_U< value_t >( A, op_A ), VB, value_t(1), hpro::blas_mat< value_t >( C ) );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TDenseMatrix &        C,
+           const hpro::TTruncAcc &,
+           const approx_t & )
+{
+    HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) );
+    
+    // C = C + A B
+    blas::prod( alpha,
+                blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
+                blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ),
+                value_t(1), hpro::blas_mat< value_t >( C ) );
+}
+
+//
+// semi-automatic deduction of optimal "multiply" function
+//
+
+template < typename value_t,
+           typename approx_t,
+           typename matrixA_t,
+           typename matrixB_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const matrixA_t &        A,
+           const hpro::matop_t      op_B,
+           const matrixB_t &        B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    if      ( is_blocked( C ) )
+        multiply< value_t, approx_t >( alpha, op_A, A, op_B, B, * ptrcast( &C, hpro::TBlockMatrix ), acc, approx );
+    else if ( is_dense(   C ) )
+        multiply< value_t, approx_t >( alpha, op_A, A, op_B, B, * ptrcast( &C, hpro::TDenseMatrix ), acc, approx );
+    else if ( is_lowrank( C ) )
+        multiply< value_t, approx_t >( alpha, op_A, A, op_B, B, * ptrcast( &C, hpro::TRkMatrix ),    acc, approx );
+    else
+        HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+}
+
+template < typename value_t,
+           typename approx_t,
+           typename matrixA_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const matrixA_t &        A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    if      ( is_blocked( B ) )
+        multiply< value_t, approx_t, matrixA_t, hpro::TBlockMatrix >( alpha, op_A, A, op_B, * cptrcast( &B, hpro::TBlockMatrix ), C, acc, approx );
+    else if ( is_dense(   B ) )
+        multiply< value_t, approx_t, matrixA_t, hpro::TDenseMatrix >( alpha, op_A, A, op_B, * cptrcast( &B, hpro::TDenseMatrix ), C, acc, approx );
+    else if ( is_lowrank( B ) )
+        multiply< value_t, approx_t, matrixA_t, hpro::TRkMatrix >(    alpha, op_A, A, op_B, * cptrcast( &B, hpro::TRkMatrix ),    C, acc, approx );
+    else
+        HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    if      ( is_blocked( A ) )
+        multiply< value_t, approx_t, hpro::TBlockMatrix >( alpha, op_A, * cptrcast( &A, hpro::TBlockMatrix ), op_B, B, C, acc, approx );
+    else if ( is_dense(   A ) )
+        multiply< value_t, approx_t, hpro::TDenseMatrix >( alpha, op_A, * cptrcast( &A, hpro::TDenseMatrix ), op_B, B, C, acc, approx );
+    else if ( is_lowrank( A ) )
+        multiply< value_t, approx_t, hpro::TRkMatrix >(    alpha, op_A, * cptrcast( &A, hpro::TRkMatrix ),    op_B, B, C, acc, approx );
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+//
+// older, simplified version
+//
+/////////////////////////////////////////////////////////////////////////////////
+
 template < typename value_t,
            typename approx_t >
 void
@@ -31,11 +443,11 @@ multiply ( const value_t            alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) V(A)^H U(B) ] , [ V(C), V(B)^H ] )
-    auto  T  = blas::prod( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A ) ), hpro::blas_mat_A< value_t >( B ) );
-    auto  UT = blas::prod(      alpha, hpro::blas_mat_A< value_t >( A ), T );
+    auto  T  = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A ) ), blas::mat_U< value_t >( B ) );
+    auto  UT = blas::prod(      alpha, blas::mat_U< value_t >( A ), T );
 
-    auto [ U, V ] = approx( { hpro::blas_mat_A< value_t >( C ), UT },
-                            { hpro::blas_mat_B< value_t >( C ), hpro::blas_mat_B< value_t >( B ) },
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), UT },
+                            { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B ) },
                             acc );
         
     C->set_lrmat( U, V );
@@ -54,10 +466,10 @@ multiply ( const value_t               alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
-    auto  VB = blas::prod( alpha, blas::adjoint( hpro::blas_mat< value_t >( B ) ), hpro::blas_mat_B< value_t >( A ) );
+    auto  VB = blas::prod( alpha, blas::adjoint( hpro::blas_mat< value_t >( B ) ), blas::mat_V< value_t >( A ) );
 
-    auto [ U, V ] = approx( { hpro::blas_mat_A< value_t >( C ), hpro::blas_mat_A< value_t >( A ) },
-                            { hpro::blas_mat_B< value_t >( C ), VB },
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), blas::mat_U< value_t >( A ) },
+                            { blas::mat_V< value_t >( C ), VB },
                             acc );
         
     C->set_lrmat( U, V );
@@ -76,10 +488,10 @@ multiply ( const value_t               alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
-    auto  AU = blas::prod( alpha, hpro::blas_mat< value_t >( A ), hpro::blas_mat_A< value_t >( B ) );
+    auto  AU = blas::prod( alpha, hpro::blas_mat< value_t >( A ), blas::mat_U< value_t >( B ) );
 
-    auto [ U, V ] = approx( { hpro::blas_mat_A< value_t >( C ), AU },
-                            { hpro::blas_mat_B< value_t >( C ), hpro::blas_mat_B< value_t >( B ) },
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), AU },
+                            { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B ) },
                             acc );
         
     C->set_lrmat( U, V );
@@ -100,7 +512,7 @@ multiply ( const value_t               alpha,
     // [ U(C), V(C) ] = approx( C - A B )
     auto  AB = blas::prod( alpha, hpro::blas_mat< value_t >( A ), hpro::blas_mat< value_t >( B ) );
 
-    blas::prod( value_t(1), hpro::blas_mat_A< value_t >( C ), blas::adjoint( hpro::blas_mat_B< value_t >( C ) ), value_t(1), AB );
+    blas::prod( value_t(1), blas::mat_U< value_t >( C ), blas::adjoint( blas::mat_V< value_t >( C ) ), value_t(1), AB );
 
     auto [ U, V ] = approx( AB, acc );
         
@@ -120,10 +532,10 @@ multiply ( const value_t            alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + U(A) ( V(A)^H U(B) ) V(B)^H
-    auto  T  = blas::prod( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A ) ), hpro::blas_mat_A< value_t >( B ) );
-    auto  UT = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( A ), T );
+    auto  T  = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A ) ), blas::mat_U< value_t >( B ) );
+    auto  UT = blas::prod( value_t(1), blas::mat_U< value_t >( A ), T );
 
-    blas::prod( alpha, UT, blas::adjoint( hpro::blas_mat_B< value_t >( B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, UT, blas::adjoint( blas::mat_V< value_t >( B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
 template < typename value_t,
@@ -139,9 +551,9 @@ multiply ( const value_t               alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + ( A U(B) ) V(B)^H
-    auto  AU = blas::prod( value_t(1), hpro::blas_mat< value_t >( A ), hpro::blas_mat_A< value_t >( B ) );
+    auto  AU = blas::prod( value_t(1), hpro::blas_mat< value_t >( A ), blas::mat_U< value_t >( B ) );
 
-    blas::prod( alpha, AU, blas::adjoint( hpro::blas_mat_B< value_t >( B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, AU, blas::adjoint( blas::mat_V< value_t >( B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
 template < typename value_t,
@@ -157,9 +569,9 @@ multiply ( const value_t               alpha,
     HLR_LOG( 4, hpro::to_string( "multiply( %d, %d, %d )", A->id(), B->id(), C->id() ) );
     
     // C = C + U(A) ( V(A)^H B )
-    auto  VB = blas::prod( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A ) ), hpro::blas_mat< value_t >( B ) );
+    auto  VB = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A ) ), hpro::blas_mat< value_t >( B ) );
 
-    blas::prod( alpha, hpro::blas_mat_A< value_t >( A ), VB, value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, blas::mat_U< value_t >( A ), VB, value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
 template < typename value_t,

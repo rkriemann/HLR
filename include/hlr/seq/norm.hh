@@ -323,7 +323,7 @@ norm_2 ( const matrix_t &  A,
     x->fill_rand( 0 );
     x->scale( real(1) / x->norm2() );
 
-    const size_t  max_it  = ( amax_it == 0 ? std::min( A.range_dim(), A.domain_dim() ) / 10 : amax_it );
+    const size_t  max_it  = ( amax_it == 0 ? std::max( size_t(5), std::min( A.range_dim(), A.domain_dim() ) / 10 ) : amax_it );
     const real    tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
     const real    abs_tol = std::min( real(1e1) * std::numeric_limits< real >::epsilon(), tol );
     const real    zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
@@ -371,6 +371,16 @@ norm_2 ( const matrix_t &  A,
     }// for
 
     return lambda;
+}
+
+template < typename matrix_t >
+double
+spectral ( const matrix_t &  A,
+           const bool        squared = true,
+           const real        atol    = 0,
+           const size_t      amax_it = 0 )
+{
+    return norm_2( A, squared, atol, amax_it );
 }
 
 //

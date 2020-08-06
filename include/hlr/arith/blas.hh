@@ -40,18 +40,149 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 //
 // access low-rank factors as U and V
 //
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( hpro::TRkMatrix * A )
+{
+    assert( ! is_null( A ) );
+    return hpro::blas_mat_A< value_t >( A );
+}
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( hpro::TRkMatrix *    A,
+        const hpro::matop_t  op )
+{
+    assert( ! is_null( A ) );
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+    if ( op == hpro::apply_normal )
+        return hpro::blas_mat_A< value_t >( A );
+    else
+        return hpro::blas_mat_B< value_t >( A );
+}
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t >
+blas::matrix< value_t > &
+mat_V ( hpro::TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return hpro::blas_mat_B< value_t >( A );
+}
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t >
+blas::matrix< value_t > &
+mat_V ( hpro::TRkMatrix *    A,
+        const hpro::matop_t  op )
+{
+    assert( ! is_null( A ) );
+
+    if ( op == hpro::apply_normal )
+        return hpro::blas_mat_B< value_t >( A );
+    else
+        return hpro::blas_mat_A< value_t >( A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_U ( const hpro::TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return hpro::blas_mat_A< value_t >( A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_U ( const hpro::TRkMatrix *  A,
+        const hpro::matop_t      op )
+{
+    assert( ! is_null( A ) );
+
+    if ( op == hpro::apply_normal )
+        return hpro::blas_mat_A< value_t >( A );
+    else
+        return hpro::blas_mat_B< value_t >( A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const hpro::TRkMatrix *  A )
+{
+    assert( ! is_null( A ) );
+    return hpro::blas_mat_B< value_t >( A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const hpro::TRkMatrix *  A,
+        const hpro::matop_t      op )
+{
+    assert( ! is_null( A ) );
+
+    if ( op == hpro::apply_normal )
+        return hpro::blas_mat_B< value_t >( A );
+    else
+        return hpro::blas_mat_A< value_t >( A );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( hpro::TRkMatrix &    A )
+{
+    return mat_U< value_t >( & A );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( hpro::TRkMatrix &    A,
+        const hpro::matop_t  op )
+{
+    return mat_U< value_t >( & A, op );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_V ( hpro::TRkMatrix &    A )
+{
+    return mat_V< value_t >( & A );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_V ( hpro::TRkMatrix &    A,
+        const hpro::matop_t  op )
+{
+    return mat_V< value_t >( & A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_U ( const hpro::TRkMatrix &  A )
+{
+    return mat_U< value_t >( & A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_U ( const hpro::TRkMatrix &  A,
+        const hpro::matop_t      op )
+{
+    return mat_U< value_t >( & A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const hpro::TRkMatrix &  A )
+{
+    return mat_V< value_t >( & A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const hpro::TRkMatrix &  A,
+        const hpro::matop_t      op )
+{
+    return mat_V< value_t >( & A, op );
+}
 
 
 //
