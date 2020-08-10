@@ -47,6 +47,7 @@ refine ( node *                            root,
     std::list< node * >                 end;
     const bool                          do_lock = (( hlr::dag::sparsify_mode != hlr::dag::sparsify_none  ) &&
                                                    ( hlr::dag::sparsify_mode != hlr::dag::sparsify_local ));
+    ::tbb::affinity_partitioner         ap;
     
     while ( node_sets.size() > 0 )
     {
@@ -55,74 +56,86 @@ refine ( node *                            root,
         std::atomic< bool >                  any_changed = false;
 
         // first refine nodes
-        ::tbb::parallel_for< size_t >( 0, node_sets.size(),
-                                       [&,min_size] ( const size_t  i )
-                                       {
-                                           const auto &  nset        = node_sets[i];
-                                           bool          any_chg_loc = false;
-                                           
-                                           for ( auto  node : nset )
-                                           {
-                                               node->refine( min_size );
-
-                                               if ( node->is_refined() )
-                                                   any_chg_loc = true;
-                                           }// for
-
-                                           if ( any_chg_loc )
-                                               any_changed = true;
-                                       } );
-
+        ::tbb::parallel_for( ::tbb::blocked_range< size_t >( 0, node_sets.size() ),
+                             [&,min_size] ( const auto  r )
+                             {
+                                 for ( auto  i = r.begin(); i != r.end(); ++i )
+                                 {
+                                     const auto &  nset        = node_sets[i];
+                                     bool          any_chg_loc = false;
+                                     
+                                     for ( auto  node : nset )
+                                     {
+                                         node->refine( min_size );
+                                         
+                                         if ( node->is_refined() )
+                                             any_chg_loc = true;
+                                     }// for
+                                     
+                                     if ( any_chg_loc )
+                                         any_changed = true;
+                                 }// for
+                             },
+                             ap );
+        
         if ( any_changed )
         {
             // then refine dependencies and collect new nodes
-            ::tbb::parallel_for< size_t >( 0, node_sets.size(),
-                                           [&,do_lock] ( const size_t  i )
-                                           {
-                                               const auto &  nset = node_sets[i];
+            ::tbb::parallel_for( ::tbb::blocked_range< size_t >( 0, node_sets.size() ),
+                                 [&,do_lock] ( const auto  r )
+                                 {
+                                     for ( auto  i = r.begin(); i != r.end(); ++i )
+                                     {
+                                         const auto &  nset = node_sets[i];
                                      
-                                               for ( auto  node : nset )
-                                               {
-                                                   const bool  node_changed = node->refine_deps( do_lock );
+                                         for ( auto  node : nset )
+                                         {
+                                             const bool  node_changed = node->refine_deps( do_lock );
 
-                                                   if ( node->is_refined() )       // node was refined; collect all sub nodes
-                                                   {
-                                                       for ( auto  sub : node->sub_nodes() )
-                                                           subnodes[i].push_back( sub );
-                    
-                                                       delnodes[i].push_back( node );
-                                                   }// if
-                                                   else if ( node_changed )        // node was not refined but dependencies were
-                                                   {
-                                                       subnodes[i].push_back( node );
-                                                   }// if
-                                                   else                            // neither node nor dependencies changed: reached final state
-                                                   {
-                                                       // adjust dependency counter of successors (which were NOT refined!)
-                                                       for ( auto  succ : node->successors() )
-                                                           succ->inc_dep_cnt();
-
-                                                       {
-                                                           std::scoped_lock  lock( mtx );
-                    
-                                                           tasks.push_back( node );
-
-                                                           if ( node->successors().empty() )
-                                                               end.push_back( node );
-                                                       }
-                                                   }// else
-                                               }// for
-                                           } );
+                                             if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                             {
+                                                 for ( auto  sub : node->sub_nodes() )
+                                                     subnodes[i].push_back( sub );
+                                                           
+                                                 delnodes[i].push_back( node );
+                                             }// if
+                                             else if ( node_changed )        // node was not refined but dependencies were
+                                             {
+                                                 subnodes[i].push_back( node );
+                                             }// if
+                                             else                            // neither node nor dependencies changed: reached final state
+                                             {
+                                                 // adjust dependency counter of successors (which were NOT refined!)
+                                                 for ( auto  succ : node->successors() )
+                                                     succ->inc_dep_cnt();
+                                                           
+                                                 {
+                                                     std::scoped_lock  lock( mtx );
+                                                               
+                                                     tasks.push_back( node );
+                                                               
+                                                     if ( node->successors().empty() )
+                                                         end.push_back( node );
+                                                 }
+                                             }// else
+                                         }// for
+                                     }// for
+                                 },
+                                 ap );
 
             // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-            ::tbb::parallel_for< size_t >( 0, node_sets.size(),
-                                           [&] ( const size_t  i )
-                                           {
-                                               const auto &  nset = delnodes[i];
+            ::tbb::parallel_for( ::tbb::blocked_range< size_t >( 0, node_sets.size() ),
+                                 [&] ( const auto  r )
+                                 {
+                                     for ( auto  i = r.begin(); i != r.end(); ++i )
+                                     {
+                                         const auto &  nset = delnodes[i];
 
-                                               for ( auto  node : nset )
-                                                   delete node;
-                                           } );
+                                         for ( auto  node : nset )
+                                             delete node;
+                                     }// for
+                                 },
+                                 ap );
             
             //
             // split node sets if too large (increase parallelity)
