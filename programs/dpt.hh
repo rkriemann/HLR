@@ -734,6 +734,38 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     {
+        std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
+                  << ", " << acc.to_string()
+                  << " )" << term::reset << std::endl;
+
+        // auto  D = hpro::to_dense( A.get() );
+        // auto  M = hpro::blas_mat< value_t >( D );
+
+        // add_iota_diag< value_t >( *D, 1e-6 );
+
+        auto  R = blas::random< value_t >( A->nrows(), A->ncols() );
+        auto  M = blas::prod( value_t(1), R, blas::adjoint(R) );
+        
+        hpro::DBG::write( M, "M.mat", "M" );
+        
+        {
+            auto  [ E, V ] = blas::eigen_jac( M, 100, cmdline::eps );
+
+            hpro::DBG::write( E, "E1.mat", "E1" );
+            hpro::DBG::write( V, "V1.mat", "V1" );
+        }
+
+        hpro::DBG::write( M, "M2.mat", "M2" );
+        
+        auto  [ E, V ] = blas::eigen_dpt( M, 0, 1e-8, "fro", 2 );
+
+        hpro::DBG::write( E, "E.mat", "E" );
+        hpro::DBG::write( V, "V.mat", "V" );
+
+        return;
+    }
+    
+    {
         std::cout << term::bullet << term::bold << "DPT eigen iteration ( " << impl_name
                   << ", " << acc.to_string()
                   << " )" << term::reset << std::endl;

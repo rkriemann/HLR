@@ -30,21 +30,21 @@ multiply ( const value_t                    alpha,
            const blas::matrix< value_t > &  B,
            blas::matrix< value_t > &        C )
 {
-    for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
-    {
-        HLR_ASSERT( ! is_null( A.block( i, 0 ) ) );
+    // for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
+    // {
+    //     HLR_ASSERT( ! is_null( A.block( i, 0 ) ) );
         
-        auto  C_i = blas::matrix< value_t >( C, A.block( i, 0, op_A )->nrows( op_A ), C.ncols() );
+    //     auto  C_i = blas::matrix< value_t >( C, A.block( i, 0, op_A )->nrows( op_A ), C.ncols() );
         
-        for ( uint  j = 0; j < A.nblock_cols( op_A ); ++j )
-        {
-            auto  A_ij = A.block( i, j, op_A );
-            auto  is_j = A_ij->col_is( op_A );
-            auto  B_j  = blas::matrix< value_t >( B, is_j - A_ij->col_ofs( op_A ), blas::range::all );
+    //     for ( uint  j = 0; j < A.nblock_cols( op_A ); ++j )
+    //     {
+    //         auto  A_ij = A.block( i, j, op_A );
+    //         auto  is_j = A_ij->col_is( op_A );
+    //         auto  B_j  = blas::matrix< value_t >( B, is_j - A_ij->col_ofs( op_A ), blas::range::all );
             
-            multiply( alpha, op_A, * A_ij, B_j, C_i );
-        }// for
-    }// for
+    //         multiply( alpha, op_A, * A_ij, B_j, C_i );
+    //     }// for
+    // }// for
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -241,16 +241,16 @@ multiply ( const value_t               alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  VA = blas::mat_V< value_t >( A, op_A );
-    auto  VC = blas::matrix< value_t >( C.ncols(), A.rank() );
+    // auto  VA = blas::mat_V< value_t >( A, op_A );
+    // auto  VC = blas::matrix< value_t >( C.ncols(), A.rank() );
 
-    multiply< value_t >( alpha, hpro::adjoint( op_B ), B, VA, VC );
+    // multiply< value_t >( alpha, hpro::adjoint( op_B ), B, VA, VC );
 
-    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), blas::mat_U< value_t >( A, op_A ) },
-                            { blas::mat_V< value_t >( C ), VC },
-                            acc );
+    // auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), blas::mat_U< value_t >( A, op_A ) },
+    //                         { blas::mat_V< value_t >( C ), VC },
+    //                         acc );
         
-    C.set_lrmat( U, V );
+    // C.set_lrmat( U, V );
 }
 
 template < typename value_t,
