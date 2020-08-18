@@ -136,11 +136,11 @@ def path ( program, source ) :
 #
 ######################################################################
 
-# # MKL should define MKLROOT
-# if MKL_DIR == None and 'MKLROOT' in os.environ :
-#     MKL_DIR = os.environ['MKLROOT']
-# else :
-#     MKL_DIR = '/' # to prevent error below due to invalid path
+# MKL should define MKLROOT
+if MKL_DIR == None and 'MKLROOT' in os.environ :
+    MKL_DIR = os.environ['MKLROOT']
+else :
+    MKL_DIR = '/' # to prevent error below due to invalid path
 
 ######################################################################
 #

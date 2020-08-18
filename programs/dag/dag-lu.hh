@@ -173,13 +173,13 @@ program_main ()
     
     std::vector< double >  runtime;
     
-    // LIKWID_MARKER_INIT;
+    LIKWID_MARKER_INIT;
         
     for ( int  i = 0; i < nbench; ++i )
     {
         tic = timer::now();
         
-        // LIKWID_MARKER_START( "dag" );
+        LIKWID_MARKER_START( "dag" );
 
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C, nseq ) );
@@ -198,7 +198,7 @@ program_main ()
         else 
             dag = std::move( hlr::dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
         
-        // LIKWID_MARKER_STOP( "dag" );
+        LIKWID_MARKER_STOP( "dag" );
         
         toc = timer::since( tic );
         
@@ -215,7 +215,7 @@ program_main ()
             dag = std::move( hlr::dag::graph() );
     }// for
 
-    // LIKWID_MARKER_CLOSE;
+    LIKWID_MARKER_CLOSE;
         
     if ( hpro::verbose( 1 ) )
     {

@@ -246,6 +246,8 @@ program_main ()
         mm_std( *A, acc, apx );
     }// if
 
+    return;
+    
     if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "standard (RRQR)" << term::reset << std::endl;
