@@ -42,11 +42,11 @@ multiply ( const value_t                    alpha,
            const blas::matrix< value_t > &  B,
            blas::matrix< value_t > &        C )
 {
-    auto  DA = hpro::to_dense( & A );
-    auto  DB = blas::copy( B );
-    auto  DC = blas::copy( C );
+    // auto  DA = hpro::to_dense( & A );
+    // auto  DB = blas::copy( B );
+    // auto  DC = blas::copy( C );
 
-    blas::prod( alpha, blas::mat_view( op_A, hpro::blas_mat< value_t >( DA ) ), DB, value_t(1), DC );
+    // blas::prod( alpha, blas::mat_view( op_A, hpro::blas_mat< value_t >( DA ) ), DB, value_t(1), DC );
 
     for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
     {
@@ -63,10 +63,10 @@ multiply ( const value_t                    alpha,
         }// for
     }// for
 
-    auto  DD = blas::copy( C );
+    // auto  DD = blas::copy( C );
 
-    blas::add( value_t(-1), DD, DC );
-    std::cout << "        error = " << blas::norm_F( DC ) << " / " << A.typestr() << std::endl;
+    // blas::add( value_t(-1), DD, DC );
+    // std::cout << "        error = " << blas::norm_F( DC ) << " / " << A.typestr() << std::endl;
 }
 
 template < typename value_t >
@@ -136,11 +136,11 @@ multiply ( const value_t                    alpha,
            const blas::matrix< value_t > &  B,
            blas::matrix< value_t > &        C )
 {
-    auto  DA = hpro::to_dense( & A );
-    auto  DB = blas::copy( B );
-    auto  DC = blas::copy( C );
+    // auto  DA = hpro::to_dense( & A );
+    // auto  DB = blas::copy( B );
+    // auto  DC = blas::copy( C );
 
-    blas::prod( alpha, blas::mat_view( op_A, hpro::blas_mat< value_t >( DA ) ), DB, value_t(1), DC );
+    // blas::prod( alpha, blas::mat_view( op_A, hpro::blas_mat< value_t >( DA ) ), DB, value_t(1), DC );
     
     if      ( is_blocked( A ) ) multiply( alpha, op_A, * cptrcast( & A, hpro::TBlockMatrix ), B, C );
     else if ( is_lowrank( A ) ) multiply( alpha, op_A, * cptrcast( & A, hpro::TRkMatrix ), B, C );
@@ -148,10 +148,10 @@ multiply ( const value_t                    alpha,
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    auto  DD = blas::copy( C );
+    // auto  DD = blas::copy( C );
 
-    blas::add( value_t(-1), DD, DC );
-    std::cout << "        error = " << blas::norm_F( DC ) << " / " << A.typestr() << std::endl;
+    // blas::add( value_t(-1), DD, DC );
+    // std::cout << "        error = " << blas::norm_F( DC ) << " / " << A.typestr() << std::endl;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -681,11 +681,11 @@ multiply ( const value_t            alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  DA = hpro::to_dense( & A );
-    auto  DB = hpro::to_dense( & B );
-    auto  DC = hpro::to_dense( & C );
+    // auto  DA = hpro::to_dense( & A );
+    // auto  DB = hpro::to_dense( & B );
+    // auto  DC = hpro::to_dense( & C );
 
-    hpro::multiply( alpha, op_A, DA.get(), op_B, DB.get(), value_t(1), DC.get(), acc );
+    // hpro::multiply( alpha, op_A, DA.get(), op_B, DB.get(), value_t(1), DC.get(), acc );
 
     if      ( is_blocked( C ) )
         multiply< value_t, approx_t >( alpha, op_A, A, op_B, B, * ptrcast( &C, hpro::TBlockMatrix ), acc, approx );
@@ -696,13 +696,13 @@ multiply ( const value_t            alpha,
     else
         HLR_ERROR( "unsupported matrix type : " + C.typestr() );
 
-    auto  DD = hpro::to_dense( & C );
+    // auto  DD = hpro::to_dense( & C );
 
-    hpro::add( value_t(-1), DD.get(), value_t(1), DC.get(), acc );
+    // hpro::add( value_t(-1), DD.get(), value_t(1), DC.get(), acc );
 
-    HLR_MULT_PRINT;
+    // HLR_MULT_PRINT;
 
-    std::cout << "    error : " << seq::norm::frobenius( *DC ) << std::endl;
+    // std::cout << "    error : " << seq::norm::frobenius( *DC ) << std::endl;
 }
 
 template < typename value_t,

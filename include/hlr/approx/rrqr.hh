@@ -169,7 +169,7 @@ rrqr ( const blas::matrix< T > &  U,
         auto  QV = blas::copy( V );
         auto  RV = blas::matrix< value_t >( in_rank, in_rank );
 
-        qr( QV, RV );
+        blas::qr_wrapper( QV, RV );
 
         // compute column-pivoted QR of U·RV'
         auto  QU = blas::prod( value_t(1), U, adjoint(RV) );

@@ -62,23 +62,23 @@ mm_std ( const hpro::TMatrix &    A,
         LIKWID_MARKER_STOP( "hmmstd" );
             
         toc = timer::since( tic );
-        std::cout << "    mult in  " << format_time( toc ) << std::endl;
+        std::cout << "      mult in  " << format_time( toc ) << std::endl;
 
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
     }// for
         
-    std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+    std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
-        std::cout << "  runtime = "
+        std::cout << "    runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
-    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
 }
 
 //
@@ -116,23 +116,23 @@ mm_accu ( const hpro::TMatrix &    A,
         LIKWID_MARKER_STOP( "hmmaccu" );
             
         toc = timer::since( tic );
-        std::cout << "    mult in  " << format_time( toc ) << std::endl;
+        std::cout << "      mult in  " << format_time( toc ) << std::endl;
 
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
     }// for
         
-    std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+    std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
-        std::cout << "  runtime = "
+        std::cout << "    runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
-    std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
 }
 
 //
@@ -237,20 +237,20 @@ program_main ()
         std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
 
-    if ( true )
-    {
-        std::cout << "  " << term::bullet << term::bold << "standard (SVD)" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::SVD< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    return;
+    std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "standard (RRQR)" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::SVD< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "RRQR" << term::reset << std::endl;
 
         auto  apx = hlr::approx::RRQR< value_t >();
 
@@ -259,7 +259,27 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "accumulator (SVD)" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::ACA< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
+    
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
 
         auto  apx = hlr::approx::SVD< value_t >();
 
@@ -268,7 +288,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "accumulator (RRQR)" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "RRQR" << term::reset << std::endl;
 
         auto  apx = hlr::approx::RRQR< value_t >();
 
@@ -277,7 +297,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "accumulator (RandSVD)" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
 
         auto  apx = hlr::approx::RandSVD< value_t >();
 
@@ -286,7 +306,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "accumulator (ACA)" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
 
         auto  apx = hlr::approx::ACA< value_t >();
 

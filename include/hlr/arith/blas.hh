@@ -473,6 +473,17 @@ qr2  ( matrix< value_t > &  M,
 }
 
 //
+// to switch between different QR implementations
+//
+template < typename value_t >
+void
+qr_wrapper ( matrix< value_t > &  M,
+             matrix< value_t > &  R )
+{
+    blas::qr2( M, R );
+}
+
+//
 // compute QR factorisation A = Q·R with orthonormal Q
 // and upper triangular R. Upon exit, A will hold Q
 // implicitly together with tau.

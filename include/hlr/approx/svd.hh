@@ -141,7 +141,7 @@ svd ( const blas::matrix< value_t > &  U,
         RU = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
         
         blas::copy( U, QU );
-        blas::qr2( QU, RU );
+        blas::qr_wrapper( QU, RU );
         
         blas::matrix< value_t >  QV, RV;
         
@@ -149,7 +149,7 @@ svd ( const blas::matrix< value_t > &  U,
         RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
         
         blas::copy( V, QV );
-        blas::qr2( QV, RV );
+        blas::qr_wrapper( QV, RV );
 
         //
         // R = R_U · upper_triangular(QV)^H = R_V^H
