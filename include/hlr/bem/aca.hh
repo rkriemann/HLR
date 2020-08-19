@@ -150,7 +150,7 @@ aca_full_pivots  ( blas::matrix< value_t > &                          M,
         blas::copy( M_col, col );
         
         blas::conj( row );
-        blas::scale( value_t(1) / conj(pivot_val), row );
+        blas::scale( value_t(1) / math::conj(pivot_val), row );
         
         //
         // look at norm of residual

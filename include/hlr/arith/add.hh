@@ -142,6 +142,8 @@ add ( const value_t               alpha,
     // combine C with all low-rank blocks into single low-rank matrix and truncate
     //
 
+    std::scoped_lock  lock( C.mutex() );
+    
     if ( C.rank() > 0 )
         lr_blocks.push_back( &C );
         
@@ -218,6 +220,8 @@ add ( const value_t               alpha,
     // recurse for each block of A with corresponding virtual block of C
     //
 
+    std::scoped_lock  lock( C.mutex() );
+    
     for ( uint  i = 0; i < A.nblock_rows(); ++i )
     {
         for ( uint  j = 0; j < A.nblock_cols(); ++j )
@@ -287,6 +291,8 @@ add ( const value_t            alpha,
     if ( alpha == value_t(0) )
         return;
     
+    std::scoped_lock  lock( C.mutex() );
+    
     // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
     if ( alpha != value_t(1) )
     {
@@ -323,6 +329,8 @@ add ( const value_t               alpha,
     if ( alpha == value_t(0) )
         return;
     
+    std::scoped_lock  lock( C.mutex() );
+    
     auto  TA = blas::copy( hpro::blas_mat< value_t >( A ) );
 
     blas::prod( alpha,
@@ -347,6 +355,8 @@ add ( const value_t            alpha,
 {
     HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
+    std::scoped_lock  lock( C.mutex() );
+    
     blas::prod( alpha,
                 hpro::blas_mat_A< value_t >( A ),
                 blas::adjoint( hpro::blas_mat_B< value_t >( A ) ),
@@ -364,6 +374,8 @@ add ( const value_t               alpha,
       const approx_t & )
 {
     HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    std::scoped_lock  lock( C.mutex() );
     
     // C = C + α A
     blas::add( alpha, hpro::blas_mat< value_t >( A ), hpro::blas_mat< value_t >( C ) );

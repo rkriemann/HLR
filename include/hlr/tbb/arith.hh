@@ -126,6 +126,58 @@ multiply ( const value_t            alpha,
 }
 
 //
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BC->nblock_rows(),
+                                              0, BC->nblock_cols(),
+                                              0, BA->nblock_cols( op_A ) ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.pages().begin(); i != r.pages().end(); ++i )
+                {
+                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                    {
+                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                        {
+                            auto  C_ij = BC->block( i, j );
+                            auto  A_il = BA->block( i, l, op_A );
+                            auto  B_lj = BB->block( l, j, op_B );
+                
+                            if ( is_null_any( A_il, B_lj ) )
+                                continue;
+                    
+                            HLR_ASSERT( ! is_null( C_ij ) );
+            
+                            multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+        hlr::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx );
+}
+
+//
 // compute Hadamard product A = α A*B 
 //
 template < typename value_t,
