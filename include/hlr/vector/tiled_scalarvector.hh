@@ -315,7 +315,7 @@ tiled_scalarvector< value_t >::init_tiles ( tile_is_map_t &  tile_is_map )
 {
     const auto &  tiles = tile_is_map[ _is ];
 
-    for ( const auto  is : tiles )
+    for ( const auto &  is : tiles )
     {
         _tiles[ is ] = tile< value_t >( is.size() );
         _tile_mutices[ is ].lock();  // ensure mutex exists in map

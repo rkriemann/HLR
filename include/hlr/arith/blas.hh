@@ -25,6 +25,7 @@ namespace hlr { namespace blas {
 namespace hpro = HLIB;
 
 using hpro::blas_int_t;
+using hpro::matop_t;
 
 //
 // import functions from HLIBpro and adjust naming

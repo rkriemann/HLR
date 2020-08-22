@@ -101,24 +101,57 @@ struct aca_pivot
         //
         // for next column, look for maximal element in computed row
         //
-        
-        // next_col++; // just use next column
 
-        const auto  max_j = blas::max_idx( row );
-
-        if ( ! used_cols[ max_j ] )
-            next_col = max_j;
-        else
+        switch ( 2 )
         {
-            for ( size_t  j = 0; j < used_cols.size(); ++j )
+            case 0:
+                // just use next column
+                next_col++;
+                break;
+
+            case 1:
             {
-                if ( ! used_cols[j] )
+                // use maximal entry in row or next if used
+                const auto  max_j = blas::max_idx( row );
+
+                if ( ! used_cols[ max_j ] )
+                    next_col = max_j;
+                else
                 {
-                    next_col = int(j);
-                    break;
-                }// if
-            }// for
-        }// else
+                    for ( size_t  j = 0; j < used_cols.size(); ++j )
+                    {
+                        if ( ! used_cols[j] )
+                        {
+                            next_col = int(j);
+                            break;
+                        }// if
+                    }// for
+                }// else
+            }
+            break;
+            
+            case 2:
+            {
+                // use maximal unused entry in row
+                real_t  max_v = real_t(0);
+                int     max_j = -1;
+
+                for ( size_t  j = 0; j < row.length(); ++j )
+                {
+                    if ( ! used_cols[ j ] )
+                    {
+                        if ( std::abs( row(j) ) > max_v )
+                        {
+                            max_v = std::abs( row(j) );
+                            max_j = j;
+                        }// if
+                    }// if
+                }// for
+                
+                next_col = max_j;
+            }
+            break;
+        }// switch
             
         return { pivot_row, pivot_col, std::move( column ), std::move( row ) };
     }

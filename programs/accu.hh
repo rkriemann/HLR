@@ -18,6 +18,7 @@
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
 #include <hlr/approx/aca.hh>
+#include <hlr/approx/lanczos.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -68,7 +69,7 @@ mm_std ( const hpro::TMatrix &    A,
         runtime.push_back( toc.seconds() );
     }// for
         
-    std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
         std::cout << "    runtime = "
@@ -122,7 +123,7 @@ mm_accu ( const hpro::TMatrix &    A,
         runtime.push_back( toc.seconds() );
     }// for
         
-    std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
         std::cout << "    runtime = "
@@ -176,10 +177,18 @@ program_main ()
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
-    std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
+    // std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
+
+    // if ( true )
+    // {
+    //     auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
+    //     auto  M   = blas::prod( value_t(1), blas::mat_U< value_t >( A01 ), blas::adjoint( blas::mat_V< value_t >( A01 ) ) );
+    //     auto  apx = hlr::approx::Lanczos< value_t >();
+    //     auto  R   = apx( M, acc );
+    // }// if
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -194,6 +203,10 @@ program_main ()
     // exact representation
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+
+    //
+    // reference: Hpro
+    //
 
     if ( true )
     {
@@ -224,7 +237,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
         }// for
         
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        // std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
         if ( nbench > 1 )
             std::cout << "  runtime = "
@@ -239,6 +252,10 @@ program_main ()
 
     std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
+    //
+    // standard recursion with immediate updates
+    //
+
     if ( true )
     {
         std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
@@ -274,6 +291,19 @@ program_main ()
 
         mm_std( *A, acc, apx );
     }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "Lanczos" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::Lanczos< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    //
+    // using accumulators
+    //
 
     std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
@@ -309,6 +339,15 @@ program_main ()
         std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
 
         auto  apx = hlr::approx::ACA< value_t >();
+
+        mm_accu( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "Lanczos" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::Lanczos< value_t >();
 
         mm_accu( *A, acc, apx );
     }// if

@@ -34,7 +34,6 @@ using id_t = HLIB::id_t;
 // memory block identifiers
 const id_t  ID_A('A');
 const id_t  ID_C('C');
-const id_t  ID_T('T');
 
 //
 // computes C = A^-1
