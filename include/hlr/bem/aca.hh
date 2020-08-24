@@ -65,9 +65,11 @@ public:
     virtual hpro::TMatrix * build ( const hpro::TBlockIndexSet &  bis,
                                     const hpro::TTruncAcc &       acc ) const
     {
-        coefffn_operator  op( bis, _coeff_fn );
+        const auto  op           = coefffn_operator( bis, _coeff_fn );
+        auto        pivot_search = approx::aca_pivot( op );
+        
 
-        auto [ U, V ] = approx::aca< approx::aca_pivot< coefffn_operator< coeff_fn_t > > >( op, acc, nullptr );
+        auto [ U, V ] = approx::aca( op, pivot_search, acc, nullptr );
 
         // {
         //     auto  M = _coeff_fn.build( bis.row_is(), bis.col_is() );

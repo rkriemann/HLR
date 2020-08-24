@@ -50,8 +50,7 @@ struct aca_pivot
     //
     // initialise pivot search
     //
-    void
-    init ( const operator_t &  M )
+    aca_pivot ( const operator_t &  M )
     {
         next_col = 0;
 
@@ -171,6 +170,7 @@ template < typename pivotsearch_t >
 std::pair< blas::matrix< typename pivotsearch_t::operator_t::value_t >,
            blas::matrix< typename pivotsearch_t::operator_t::value_t > >
 aca  ( const typename pivotsearch_t::operator_t &  M,
+       pivotsearch_t &                             pivot_search,
        const hpro::TTruncAcc &                     acc,
        std::list< std::pair< idx_t, idx_t > > *    pivots )
 {
@@ -197,11 +197,8 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
     // approximation of |M|
     real_t      norm_M   = real_t(0);
 
-    // ACA data
+    // low-rank approximation
     std::deque< blas::vector< value_t > >  U, V;
-    pivotsearch_t                          pivot_search;
-
-    pivot_search.init( M );
     
     for ( uint  i = 0; i < max_rank; ++i )
     {
@@ -285,7 +282,9 @@ std::pair< blas::matrix< value_t >,
 aca ( blas::matrix< value_t > &  M,
       const hpro::TTruncAcc &    acc )
 {
-    return std::move( aca< aca_pivot< blas::matrix< value_t > > >( M, acc, nullptr ) );
+    auto  pivot_search = aca_pivot( M );
+    
+    return std::move( aca( M, pivot_search, acc, nullptr ) );
 }
 
 template < typename value_t >
@@ -295,9 +294,10 @@ aca ( const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
       const hpro::TTruncAcc &          acc )
 {
-    lowrank_operator  op( U, V );
+    auto  op           = operator_wrapper( U, V );
+    auto  pivot_search = aca_pivot( op );
     
-    return std::move( aca< aca_pivot< lowrank_operator< value_t > > >( op, acc, nullptr ) );
+    return std::move( aca( op, pivot_search, acc, nullptr ) );
 }
 
 template < typename value_t >
@@ -313,6 +313,11 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         return { std::move( blas::matrix< value_t >() ),
                  std::move( blas::matrix< value_t >() ) };
     
+    auto  op           = operator_wrapper( U, V );
+    auto  pivot_search = aca_pivot( op );
+        
+    return std::move( aca( op, pivot_search, acc, nullptr ) );
+        
     //
     // determine maximal rank
     //
