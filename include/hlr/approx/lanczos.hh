@@ -9,8 +9,6 @@
 //
 
 #include <list>
-#include <cassert>
-#include <random>
 
 #include <hlr/arith/blas.hh>
 
@@ -130,23 +128,6 @@ lanczos ( operator_t &             M,
     } while ( step <= std::min( nrowsM, ncolsM ) ); // fallback 
 
 
-    // {
-    //     auto  TU = blas::matrix< value_t >( nrowsM, step );
-    //     auto  TV = blas::matrix< value_t >( ncolsM, step );
-        
-    //     for ( uint  i = 0; i < step; ++i )
-    //     {
-    //         auto  TU_i = TU.column( i );
-    //         auto  TV_i = TV.column( i );
-            
-    //         blas::copy( U[i], TU_i );
-    //         blas::copy( V[i], TV_i );
-    //     }// for
-        
-    //     hpro::DBG::write( TU, "U2.mat", "U2" );
-    //     hpro::DBG::write( TV, "V2.mat", "V2" );
-    // }
-    
     //
     // U = U·diag(alpha) + diag(beta,-1), V remains unchanged
     //
@@ -174,9 +155,6 @@ lanczos ( operator_t &             M,
         blas::copy( U[i], RU_i );
         blas::copy( V[i], RV_i );
     }// for
-
-    // hpro::DBG::write( RU, "U3.mat", "U3" );
-    // hpro::DBG::write( RV, "V3.mat", "V3" );
     
     return { std::move( RU ), std::move( RV ) };
 }
@@ -192,8 +170,6 @@ std::pair< blas::matrix< value_t >,
 lanczos ( blas::matrix< value_t > &  M,
           const hpro::TTruncAcc &    acc )
 {
-    hpro::DBG::write( M, "M.mat", "M" );
-    
     return std::move( detail::lanczos( M, acc ) );
 }
 
@@ -209,9 +185,6 @@ lanczos ( const blas::matrix< value_t > &  U,
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    hpro::DBG::write( U, "U.mat", "U" );
-    hpro::DBG::write( V, "V.mat", "V" );
-    
     auto  op = operator_wrapper( U, V );
 
     return std::move( detail::lanczos( op, acc ) );
@@ -224,7 +197,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
           const hpro::TTruncAcc &                       acc )
 {
-    assert( U.size() == V.size() );
+    HLR_ASSERT( U.size() == V.size() );
 
     auto  op = operator_wrapper( U, V );
 
@@ -239,7 +212,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
           const hpro::TTruncAcc &                       acc )
 {
-    assert( U.size() == V.size() );
+    HLR_ASSERT( U.size() == V.size() );
 
     auto  op = operator_wrapper( U, T, V );
 

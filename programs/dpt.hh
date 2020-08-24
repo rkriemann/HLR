@@ -197,11 +197,13 @@ construct_theta ( const hpro::TMatrix &            M,
         blas::vector      v_row( v, M.row_is() );
         blas::vector      v_col( v, M.col_is() );
         theta_coeff_fn    theta_coeff( v_row, v_col );
-        coefffn_operator  op( hpro::bis( hpro::is( 0, M.nrows()-1 ),
-                                         hpro::is( 0, M.ncols()-1 ) ),
-                              theta_coeff );
+        auto              op = operator_wrapper( hpro::bis( hpro::is( 0, M.nrows()-1 ),
+                                                            hpro::is( 0, M.ncols()-1 ) ),
+                                                 theta_coeff );
+        auto              pivot_search = approx::aca_pivot( op );
+        
 
-        auto [ U, V ] = approx::aca< approx::aca_pivot< coefffn_operator< theta_coeff_fn< value_t > > > >( op, acc, nullptr );
+        auto [ U, V ] = approx::aca( op, pivot_search, acc, nullptr );
             
         return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
