@@ -19,6 +19,7 @@
 #include <hlr/approx/randsvd.hh>
 #include <hlr/approx/aca.hh>
 #include <hlr/approx/lanczos.hh>
+#include <hlr/approx/randlr.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -182,14 +183,6 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
-    // if ( true )
-    // {
-    //     auto  A01 = ptrcast( ptrcast( A.get(), hpro::TBlockMatrix )->block( 0, 1 ), hpro::TRkMatrix );
-    //     auto  M   = blas::prod( value_t(1), blas::mat_U< value_t >( A01 ), blas::adjoint( blas::mat_V< value_t >( A01 ) ) );
-    //     auto  apx = hlr::approx::Lanczos< value_t >();
-    //     auto  R   = apx( M, acc );
-    // }// if
-
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
@@ -285,6 +278,15 @@ program_main ()
 
     if ( true )
     {
+        std::cout << "    " << term::bullet << term::bold << "RandLR" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::RandLR< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
         std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
 
         auto  apx = hlr::approx::ACA< value_t >();
@@ -330,6 +332,15 @@ program_main ()
         std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
 
         auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_accu( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "RandLR" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::RandLR< value_t >();
 
         mm_accu( *A, acc, apx );
     }// if

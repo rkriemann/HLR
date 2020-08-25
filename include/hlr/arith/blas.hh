@@ -235,7 +235,7 @@ template < typename T_vector,
            typename T_fill_fn >
 void
 fill ( blas::VectorBase< T_vector > &   v,
-       T_fill_fn &  fill_fn )
+       T_fill_fn &                      fill_fn )
 {
     for ( size_t  i = 0; i < v.length(); ++i )
         v(i) = fill_fn();
@@ -253,8 +253,8 @@ fill ( blas::VectorBase< T_vector > &    v,
 template < typename T_matrix,
            typename T_fill_fn >
 void
-fill ( blas::MatrixBase< T_matrix > &   M,
-       T_fill_fn &  fill_fn )
+fill ( blas::MatrixBase< T_matrix > &  M,
+       T_fill_fn &                     fill_fn )
 {
     for ( size_t  i = 0; i < M.nrows(); ++i )
         for ( size_t  j = 0; j < M.ncols(); ++j )
