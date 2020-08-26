@@ -39,6 +39,9 @@ svd ( blas::matrix< value_t > &  M,
     auto         S       = blas::vector< real_t >( mrc );
     auto         V       = blas::matrix< value_t >( ncols_M, mrc );
 
+    // for update statistics
+    // std::cout << "full " << std::min( nrows_M, ncols_M ) << std::endl;
+    
     blas::svd( M, S, V );
         
     // determine truncated rank based on singular values
@@ -80,6 +83,9 @@ svd ( const blas::matrix< value_t > &  U,
     const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
+    // for update statistics
+    // std::cout << "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank << std::endl;
+    
     //
     // don't increase rank
     //
