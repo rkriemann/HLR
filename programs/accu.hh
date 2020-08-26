@@ -183,6 +183,26 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_std( *A, acc, apx );
+    }// if
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
+
+        auto  apx = hlr::approx::RandSVD< value_t >();
+
+        mm_accu( *A, acc, apx );
+    }// if
+
+    return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
