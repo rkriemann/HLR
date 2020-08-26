@@ -29,10 +29,10 @@ using hpro::idx_t;
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// implements standard pivot search for ACA
+// using column i and max_row(column i) for i'th pivot element 
 //
 template < typename T_operator >
-struct aca_pivot
+struct aca_pivot_next
 {
     using  operator_t    = T_operator;
     using  value_t       = typename operator_t::value_t;
@@ -50,7 +50,86 @@ struct aca_pivot
     //
     // initialise pivot search
     //
-    aca_pivot ( const operator_t &  M )
+    aca_pivot_next ( const operator_t &  M )
+    {
+        next_col = 0;
+
+        used_rows.resize( nrows( M ), false );
+        used_cols.resize( ncols( M ), false );
+    }
+    
+    //
+    // return position of next pivot of (M - U·V^H)
+    // - row/col hold the corresponding row/column data
+    //
+    std::tuple< int,
+                int,
+                blas::vector< value_t >,
+                blas::vector< value_t > >
+    next ( const operator_t &     M,
+           const vector_list_t &  U,
+           const vector_list_t &  V )
+    {
+        // get "j"'th column
+        const auto  pivot_col  = next_col;
+
+        used_cols[ pivot_col ] = true;
+
+        auto  column = get_column( M, pivot_col );
+        
+        for ( uint  l = 0; l < U.size(); ++l )
+            blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
+        
+        const auto  pivot_row = blas::max_idx( column );
+        const auto  max_val   = column( pivot_row );
+
+        // stop and signal no pivot found if remainder is "zero"
+        if ( hpro::Math::abs( max_val ) <= zero_val )
+            return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
+
+        // scale <col> by inverse of maximal element in u
+        blas::scale( value_t(1) / max_val, column );
+        
+        used_rows[ pivot_row ] = true;
+        
+        auto  row = get_row( M, pivot_row );
+        
+        for ( uint  l = 0; l < U.size(); ++l )
+            blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
+
+        //
+        // just use next column
+        //
+
+        next_col++;
+            
+        return { pivot_row, pivot_col, std::move( column ), std::move( row ) };
+    }
+};
+
+//
+// uses column with maximal entry in previous row for next pivot element
+//
+template < typename T_operator >
+struct aca_pivot_max
+{
+    using  operator_t    = T_operator;
+    using  value_t       = typename operator_t::value_t;
+    using  real_t        = typename hpro::real_type< value_t >::type_t;
+    using  vector_list_t = std::deque< blas::vector< value_t > >;
+
+    // value considered zero to avoid division by small values
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+        
+    
+    int                  next_col = 0;
+    std::vector< bool >  used_rows;
+    std::vector< bool >  used_cols;
+
+    //
+    // initialise pivot search
+    //
+    aca_pivot_max ( const operator_t &  M )
     {
         next_col = 0;
 
@@ -101,60 +180,32 @@ struct aca_pivot
         // for next column, look for maximal element in computed row
         //
 
-        switch ( 2 )
+        real_t  max_v = real_t(0);
+        int     max_j = -1;
+
+        for ( size_t  j = 0; j < row.length(); ++j )
         {
-            case 0:
-                // just use next column
-                next_col++;
-                break;
-
-            case 1:
+            if ( ! used_cols[ j ] )
             {
-                // use maximal entry in row or next if used
-                const auto  max_j = blas::max_idx( row );
-
-                if ( ! used_cols[ max_j ] )
-                    next_col = max_j;
-                else
+                if ( std::abs( row(j) ) > max_v )
                 {
-                    for ( size_t  j = 0; j < used_cols.size(); ++j )
-                    {
-                        if ( ! used_cols[j] )
-                        {
-                            next_col = int(j);
-                            break;
-                        }// if
-                    }// for
-                }// else
-            }
-            break;
-            
-            case 2:
-            {
-                // use maximal unused entry in row
-                real_t  max_v = real_t(0);
-                int     max_j = -1;
-
-                for ( size_t  j = 0; j < row.length(); ++j )
-                {
-                    if ( ! used_cols[ j ] )
-                    {
-                        if ( std::abs( row(j) ) > max_v )
-                        {
-                            max_v = std::abs( row(j) );
-                            max_j = j;
-                        }// if
-                    }// if
-                }// for
+                    max_v = std::abs( row(j) );
+                    max_j = j;
+                }// if
+            }// if
+        }// for
                 
-                next_col = max_j;
-            }
-            break;
-        }// switch
+        next_col = max_j;
             
         return { pivot_row, pivot_col, std::move( column ), std::move( row ) };
     }
 };
+
+//
+// default pivot search strategie
+//
+template < typename operator_t >
+using aca_pivot = aca_pivot_max< operator_t >;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -294,10 +345,47 @@ aca ( const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
       const hpro::TTruncAcc &          acc )
 {
-    auto  op           = operator_wrapper( U, V );
-    auto  pivot_search = aca_pivot( op );
+    HLR_ASSERT( U.ncols() == V.ncols() );
+
+    const idx_t  nrows   = idx_t( U.nrows() );
+    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  in_rank = idx_t( V.ncols() );
+
+    //
+    // don't increase rank
+    //
+
+    if ( in_rank == 0 )
+    {
+        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
+                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+    }// if
+
+    if ( in_rank <= idx_t(acc.rank()) )
+    {
+        return { std::move( blas::copy( U ) ),
+                 std::move( blas::copy( V ) ) };
+    }// if
+
+    //
+    // if k is bigger than the possible rank,
+    // we create a dense-matrix and do truncation
+    // via full SVD
+    //
+
+    if ( in_rank >= std::min( nrows, ncols ) )
+    {
+        auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+        return aca( M, acc );
+    }// if
+    else
+    {
+        auto  op           = operator_wrapper( U, V );
+        auto  pivot_search = aca_pivot( op );
     
-    return std::move( aca( op, pivot_search, acc, nullptr ) );
+        return aca( op, pivot_search, acc, nullptr );
+    }// else
 }
 
 template < typename value_t >
@@ -313,11 +401,6 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         return { std::move( blas::matrix< value_t >() ),
                  std::move( blas::matrix< value_t >() ) };
     
-    auto  op           = operator_wrapper( U, V );
-    auto  pivot_search = aca_pivot( op );
-        
-    return std::move( aca( op, pivot_search, acc, nullptr ) );
-        
     //
     // determine maximal rank
     //
@@ -335,51 +418,21 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
-            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), D );
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        auto [ U_tr, V_tr ] = aca( D, acc );
-
-        return { std::move( U_tr ), std::move( V_tr ) };
+        return aca( M, acc );
     }// if
     else
     {
-        //
-        // concatenate matrices
-        //
-
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        for ( auto &  U_i : U )
-        {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + U_i.ncols() - 1 ) );
-
-            blas::copy( U_i, U_all_i );
-            ofs += U_i.ncols();
-        }// for
-
-        ofs = 0;
-    
-        for ( auto &  V_i : V )
-        {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
-
-            blas::copy( V_i, V_all_i );
-            ofs += V_i.ncols();
-        }// for
-
-        //
-        // truncate and return result
-        //
-    
-        return aca( U_all, V_all, acc );
+        auto  op           = operator_wrapper( U, V );
+        auto  pivot_search = aca_pivot( op );
+        
+        return aca( op, pivot_search, acc, nullptr );
     }// else
 }
 
@@ -415,8 +468,7 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -425,47 +477,17 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         {
             const auto  UT_i = blas::prod( value_t(1), *U_i, *T_i );
             
-            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), D );
+            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return aca( D, acc );
+        return aca( M, acc );
     }// if
     else
     {
-        //
-        // concatenate matrices
-        //
-
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        auto  U_i = U.cbegin();
-        auto  T_i = T.cbegin();
+        auto  op           = operator_wrapper( U, T, V );
+        auto  pivot_search = aca_pivot( op );
         
-        for ( ; U_i != U.cend(); ++U_i, ++T_i )
-        {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + T_i->ncols() - 1 ) );
-
-            blas::prod( value_t(1), *U_i, *T_i, value_t(1), U_all_i );
-            ofs += T_i.ncols();
-        }// for
-
-        ofs = 0;
-    
-        for ( auto &  V_i : V )
-        {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
-
-            blas::copy( V_i, V_all_i );
-            ofs += V_i.ncols();
-        }// for
-
-        //
-        // truncate and return result
-        //
-    
-        return aca( U_all, V_all, acc );
+        return aca( op, pivot_search, acc, nullptr );
     }// else
 }
 
@@ -485,7 +507,7 @@ struct ACA
     operator () ( blas::matrix< value_t > &  M,
                   const hpro::TTruncAcc &    acc ) const
     {
-        return std::move( hlr::approx::aca( M, acc ) );
+        return hlr::approx::aca( M, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -494,7 +516,7 @@ struct ACA
                   const blas::matrix< value_t > &  V,
                   const hpro::TTruncAcc &          acc ) const 
     {
-        return std::move( hlr::approx::aca( U, V, acc ) );
+        return hlr::approx::aca( U, V, acc );
     }
     
     std::pair< blas::matrix< value_t >,
@@ -503,7 +525,7 @@ struct ACA
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::aca( U, V, acc ) );
+        return hlr::approx::aca( U, V, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -513,7 +535,7 @@ struct ACA
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::aca( U, T, V, acc ) );
+        return hlr::approx::aca( U, T, V, acc );
     }
 };
 

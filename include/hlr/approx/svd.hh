@@ -33,11 +33,11 @@ svd ( blas::matrix< value_t > &  M,
     // perform SVD of M
     //
 
-    const idx_t              n   = idx_t( M.nrows() );
-    const idx_t              m   = idx_t( M.ncols() );
-    const idx_t              mrc = std::min(n,m);
-    blas::vector< real_t >   S( mrc );
-    blas::matrix< value_t >  V( m, mrc );
+    const idx_t  nrows_M = idx_t( M.nrows() );
+    const idx_t  ncols_M = idx_t( M.ncols() );
+    const idx_t  mrc     = std::min( nrows_M, ncols_M );
+    auto         S       = blas::vector< real_t >( mrc );
+    auto         V       = blas::matrix< value_t >( ncols_M, mrc );
 
     blas::svd( M, S, V );
         
@@ -49,19 +49,15 @@ svd ( blas::matrix< value_t > &  M,
     // scale smaller one of A and B by S
     //
 
-    const blas::Range        row_is( 0, n-1 );
-    const blas::Range        col_is( 0, m-1 );
-    blas::matrix< value_t >  Uk( M, row_is, blas::Range( 0, k-1 ) );
-    blas::matrix< value_t >  Vk( V, col_is, blas::Range( 0, k-1 ) );
-    
-    blas::matrix< value_t >  A( n, k );
-    blas::matrix< value_t >  B( m, k );
+    const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+    const auto  Vk = blas::matrix< value_t >( V, blas::range::all, blas::range( 0, k-1 ) );
+    auto        A = blas::copy( Uk );
+    auto        B = blas::copy( Vk );
 
-    blas::copy( Uk, A );
-    blas::copy( Vk, B );
-
-    if ( n < m ) prod_diag( A, S, k );
-    else         prod_diag( B, S, k );
+    if ( nrows_M < ncols_M )
+        prod_diag( A, S, k );
+    else
+        prod_diag( B, S, k );
 
     return { std::move( A ), std::move( B ) };
 }
@@ -90,24 +86,12 @@ svd ( const blas::matrix< value_t > &  U,
 
     const idx_t  acc_rank = idx_t( acc.rank() );
 
-    blas::matrix< value_t >  OU, OV;
-    
     if ( in_rank == 0 )
-    {
-        // reset matrices
-        OU = std::move( blas::matrix< value_t >( nrows_U, 0 ) );
-        OV = std::move( blas::matrix< value_t >( nrows_V, 0 ) );
-
-        return { std::move( OU ), std::move( OV ) };
-    }// if
+        return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
 
     if ( in_rank <= acc_rank )
-    {
-        OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
-        OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
-
-        return { std::move( OU ), std::move( OV ) };
-    }// if
+        return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
 
     //
     // truncate given low-rank matrix
@@ -125,7 +109,7 @@ svd ( const blas::matrix< value_t > &  U,
         if ( acc_rank > 0 )
             lacc.set_max_rank( acc_rank );
 
-        std::tie( OU, OV ) = svd( M, lacc );
+        return svd( M, lacc );
     }// if
     else
     {
@@ -135,36 +119,28 @@ svd ( const blas::matrix< value_t > &  U,
 
         #if 1
 
-        blas::matrix< value_t >  QU, RU;
-
-        QU = std::move( blas::matrix< value_t >( U.nrows(), in_rank ) );
-        RU = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
+        auto  QU = blas::copy( U );
+        auto  RU = blas::matrix< value_t >( in_rank, in_rank );
         
-        blas::copy( U, QU );
         blas::qr_wrapper( QU, RU );
         
-        blas::matrix< value_t >  QV, RV;
+        auto  QV = blas::copy( V );
+        auto  RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
         
-        QV = std::move( blas::matrix< value_t >( V.nrows(), in_rank ) );
-        RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
-        
-        blas::copy( V, QV );
         blas::qr_wrapper( QV, RV );
 
         //
         // R = R_U · upper_triangular(QV)^H = R_V^H
         //
         
-        blas::matrix< value_t >  R( in_rank, in_rank );
-
-        blas::prod( value_t(1), RU, adjoint(RV), value_t(0), R );
+        auto  R = blas::prod( value_t(1), RU, adjoint(RV) );
         
         //
         // SVD(R) = U S V^H
         //
             
         blas::vector< real_t >   Ss( in_rank );
-        blas::matrix< value_t >  Us( std::move( R ) );
+        blas::matrix< value_t >  Us( std::move( R ) );  // reuse storage
         blas::matrix< value_t >  Vs( std::move( RV ) );
             
         blas::svd( Us, Ss, Vs );
@@ -182,61 +158,56 @@ svd ( const blas::matrix< value_t > &  U,
             // build new matrices U and V
             //
 
-            const blas::Range  in_rank_is( 0, in_rank-1 );
-            const blas::Range  orank_is( 0, orank-1 );
+            const blas::range  in_rank_is( 0, in_rank-1 );
+            const blas::range  orank_is( 0, orank-1 );
 
             // U := Q_U · U
             blas::matrix< value_t >  Urank( Us, in_rank_is, orank_is );
             
             // U := U·S
             blas::prod_diag( Urank, Ss, orank );
-            OU = blas::prod( value_t(1), QU, Urank );
+
+            auto  OU = blas::prod( value_t(1), QU, Urank );
             
             // V := Q_V · conj(V)
             blas::matrix< value_t >  Vrank( Vs, in_rank_is, orank_is );
 
-            OV = blas::prod( value_t(1), QV, Vrank );
+            auto  OV = blas::prod( value_t(1), QV, Vrank );
+
+            return { std::move( OU ), std::move( OV ) };
         }// if
         else
         {
-            OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
-            OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
+            // rank has not changed, so return original matrices
+            return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
         }// else
 
         #else
 
-        blas::matrix< value_t >  QU, RU;
-        std::vector< value_t >   TU;
-
-        QU = std::move( blas::matrix< value_t >( U.nrows(), in_rank ) );
-        RU = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
+        auto  QU = blas::copy( U );
+        auto  RU = blas::matrix< value_t >( in_rank, in_rank );
+        auto  TU = std::vector< value_t >();
         
-        blas::copy( U, QU );
         blas::qr_impl( QU, RU, TU );
         
-        blas::matrix< value_t >  QV, RV;
-        std::vector< value_t >   TV;
+        auto  QV = blas::copy( V );
+        auto  RV = blas::matrix< value_t >( in_rank, in_rank );
+        auto  TV = std::vector< value_t >();
         
-        QV = std::move( blas::matrix< value_t >( V.nrows(), in_rank ) );
-        RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
-        
-        blas::copy( V, QV );
         blas::qr_impl( QV, RV, TV );
 
         //
         // R = R_U · upper_triangular(QV)^H = R_V^H
         //
         
-        blas::matrix< value_t >  R( in_rank, in_rank );
-
-        blas::prod( value_t(1), RU, adjoint(RV), value_t(0), R );
+        auto  R = blas::prod( value_t(1), RU, adjoint(RV) );
         
         //
         // SVD(R) = U S V^H
         //
             
         blas::vector< real_t >   Ss( in_rank );
-        blas::matrix< value_t >  Us( std::move( R ) );
+        blas::matrix< value_t >  Us( std::move( R ) ); // reuse storage
         blas::matrix< value_t >  Vs( std::move( RV ) );
             
         blas::svd( Us, Ss, Vs );
@@ -254,42 +225,39 @@ svd ( const blas::matrix< value_t > &  U,
             // build new matrices U and V
             //
 
-            const blas::Range  in_rank_is( 0, in_rank-1 );
-            const blas::Range  orank_is( 0, orank-1 );
+            const blas::range  in_rank_is( 0, in_rank-1 );
+            const blas::range  orank_is( 0, orank-1 );
 
             // U := U·S
-            blas::matrix< value_t >  Urank( Us, in_rank_is, orank_is );
+            auto  Urank = blas::matrix< value_t >( Us, in_rank_is, orank_is );
             
             blas::prod_diag( Urank, Ss, orank );
 
             // U := Q_U · U
-            OU = std::move( blas::matrix< value_t >( nrows_U, orank ) );
-
+            auto  OU     = blas::matrix< value_t >( nrows_U, orank );
             auto  OU_sub = blas::matrix< value_t >( OU, in_rank_is, orank_is );
 
             blas::copy( Urank, OU_sub );
             blas::prod_Q( blas::from_left, hpro::apply_normal, QU, TU, OU );
 
             // V := Q_V · conj(V)
-            blas::matrix< value_t >  Vrank( Vs, in_rank_is, orank_is );
-
-            OV = std::move( blas::matrix< value_t >( nrows_V, orank ) );
-
+            auto  Vrank  = blas::matrix< value_t >( Vs, in_rank_is, orank_is );
+            auto  OV     = blas::matrix< value_t >( nrows_V, orank );
             auto  OV_sub = blas::matrix< value_t >( OV, in_rank_is, orank_is );
 
             blas::copy( Vrank, OV_sub );
             blas::prod_Q( blas::from_left, hpro::apply_normal, QV, TV, OV );
+
+            return { std::move( OU ), std::move( OV ) };
         }// if
         else
         {
-            OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
-            OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
+            // rank has not changed, so return original matrices
+            return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
         }// else
 
         #endif
     }// else
-
-    return { std::move( OU ), std::move( OV ) };
 }
 
 //
@@ -325,17 +293,14 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
-            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), D );
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        auto [ U_tr, V_tr ] = svd( D, acc );
-
-        return { std::move( U_tr ), std::move( V_tr ) };
+        return svd( M, acc );
     }// if
     else
     {
@@ -343,13 +308,13 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
+        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
+        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        idx_t  ofs   = 0;
 
         for ( auto &  U_i : U )
         {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + U_i.ncols() - 1 ) );
+            auto  U_all_i = blas::matrix< value_t >( U_all, blas::range::all, blas::range( ofs, ofs + U_i.ncols() - 1 ) );
 
             blas::copy( U_i, U_all_i );
             ofs += U_i.ncols();
@@ -359,7 +324,7 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
     
         for ( auto &  V_i : V )
         {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
+            auto  V_all_i = blas::matrix< value_t >( V_all, blas::range::all, blas::range( ofs, ofs + V_i.ncols() - 1 ) );
 
             blas::copy( V_i, V_all_i );
             ofs += V_i.ncols();
@@ -408,8 +373,7 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -418,10 +382,10 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         {
             const auto  UT_i = blas::prod( value_t(1), *U_i, *T_i );
             
-            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), D );
+            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return svd( D, acc );
+        return svd( M, acc );
     }// if
     else
     {
@@ -429,16 +393,15 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        auto  U_i = U.cbegin();
-        auto  T_i = T.cbegin();
+        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
+        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        idx_t  ofs   = 0;
+        auto   U_i   = U.cbegin();
+        auto   T_i   = T.cbegin();
         
         for ( ; U_i != U.cend(); ++U_i, ++T_i )
         {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + T_i->ncols() - 1 ) );
+            auto  U_all_i = blas::matrix< value_t >( U_all, blas::range::all, blas::range( ofs, ofs + T_i->ncols() - 1 ) );
 
             blas::prod( value_t(1), *U_i, *T_i, value_t(1), U_all_i );
             ofs += T_i.ncols();
@@ -448,7 +411,7 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
     
         for ( auto &  V_i : V )
         {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
+            auto  V_all_i = blas::matrix< value_t >( V_all, blas::range::all, blas::range( ofs, ofs + V_i.ncols() - 1 ) );
 
             blas::copy( V_i, V_all_i );
             ofs += V_i.ncols();

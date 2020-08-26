@@ -21,11 +21,8 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
-namespace detail
-{
-
 //
-// compute low-rank approximation of a given sum Σ_i M_i using RANDLR
+// compute low-rank approximation of a given sum Σ_i M_i using randomized LR
 // - only need matrix-vector evaluation of given operators
 //
 template < typename operator_t >
@@ -51,7 +48,7 @@ randlr  ( const operator_t &       M,
     // normal distributed random numbers
     auto          rd        = std::random_device{};
     auto          generator = std::mt19937{ rd() };
-    auto          distr     = std::normal_distribution<>{ 0, 1 };
+    auto          distr     = std::normal_distribution<>{ real_t(0), real_t(1) };
     auto          rand      = [&] () { return value_t( distr( generator ) ); };
     
     do
@@ -139,23 +136,6 @@ randlr  ( const operator_t &       M,
     return { std::move( MU ), std::move( MV ) };
 }
 
-}// namespace detail
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// functions for dense approximation and low-rank truncation
-//
-////////////////////////////////////////////////////////////////////////////////
-
-template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-randlr ( blas::matrix< value_t > &  M,
-         const hpro::TTruncAcc &    acc )
-{
-    return std::move( detail::randlr( M, acc ) );
-}
-
 template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
@@ -163,9 +143,46 @@ randlr ( const blas::matrix< value_t > &  U,
          const blas::matrix< value_t > &  V,
          const hpro::TTruncAcc &          acc )
 {
-    auto  op = operator_wrapper( U, V );
+    HLR_ASSERT( U.ncols() == V.ncols() );
 
-    return std::move( detail::randlr( op, acc ) );
+    const idx_t  nrows   = idx_t( U.nrows() );
+    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  in_rank = idx_t( V.ncols() );
+
+    //
+    // don't increase rank
+    //
+
+    if ( in_rank == 0 )
+    {
+        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
+                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+    }// if
+
+    if ( in_rank <= idx_t(acc.rank()) )
+    {
+        return { std::move( blas::copy( U ) ),
+                 std::move( blas::copy( V ) ) };
+    }// if
+
+    //
+    // if k is bigger than the possible rank,
+    // we create a dense-matrix and do truncation
+    // via full SVD
+    //
+
+    if ( in_rank >= std::min( nrows, ncols ) )
+    {
+        auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+        return std::move( randlr( M, acc ) );
+    }// if
+    else
+    {
+        auto  op = operator_wrapper( U, V );
+
+        return std::move( randlr( op, acc ) );
+    }// else
 }
 
 template < typename value_t >
@@ -181,10 +198,6 @@ randlr ( const std::list< blas::matrix< value_t > > &  U,
         return { std::move( blas::matrix< value_t >() ),
                  std::move( blas::matrix< value_t >() ) };
     
-    auto  op = operator_wrapper( U, V );
-        
-    return std::move( detail::randlr( op, acc ) );
-        
     //
     // determine maximal rank
     //
@@ -202,51 +215,20 @@ randlr ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
-            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), D );
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        auto [ U_tr, V_tr ] = randlr( D, acc );
-
-        return { std::move( U_tr ), std::move( V_tr ) };
+        return randlr( M, acc );
     }// if
     else
     {
-        //
-        // concatenate matrices
-        //
-
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        for ( auto &  U_i : U )
-        {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + U_i.ncols() - 1 ) );
-
-            blas::copy( U_i, U_all_i );
-            ofs += U_i.ncols();
-        }// for
-
-        ofs = 0;
-    
-        for ( auto &  V_i : V )
-        {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
-
-            blas::copy( V_i, V_all_i );
-            ofs += V_i.ncols();
-        }// for
-
-        //
-        // truncate and return result
-        //
-    
-        return randlr( U_all, V_all, acc );
+        auto  op = operator_wrapper( U, V );
+        
+        return randlr( op, acc );
     }// else
 }
 
@@ -282,8 +264,7 @@ randlr ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -292,47 +273,16 @@ randlr ( const std::list< blas::matrix< value_t > > &  U,
         {
             const auto  UT_i = blas::prod( value_t(1), *U_i, *T_i );
             
-            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), D );
+            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return detail::randlr( D, acc );
+        return randlr( M, acc );
     }// if
     else
     {
-        //
-        // concatenate matrices
-        //
-
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        auto  U_i = U.cbegin();
-        auto  T_i = T.cbegin();
+        auto  op = operator_wrapper( U, T, V );
         
-        for ( ; U_i != U.cend(); ++U_i, ++T_i )
-        {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + T_i->ncols() - 1 ) );
-
-            blas::prod( value_t(1), *U_i, *T_i, value_t(1), U_all_i );
-            ofs += T_i.ncols();
-        }// for
-
-        ofs = 0;
-    
-        for ( auto &  V_i : V )
-        {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
-
-            blas::copy( V_i, V_all_i );
-            ofs += V_i.ncols();
-        }// for
-
-        //
-        // truncate and return result
-        //
-    
-        return detail::randlr( U_all, V_all, acc );
+        return randlr( op, acc );
     }// else
 }
 
@@ -352,7 +302,7 @@ struct RandLR
     operator () ( blas::matrix< value_t > &  M,
                   const hpro::TTruncAcc &    acc ) const
     {
-        return std::move( hlr::approx::randlr( M, acc ) );
+        return hlr::approx::randlr( M, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -361,7 +311,7 @@ struct RandLR
                   const blas::matrix< value_t > &  V,
                   const hpro::TTruncAcc &          acc ) const 
     {
-        return std::move( hlr::approx::randlr( U, V, acc ) );
+        return hlr::approx::randlr( U, V, acc );
     }
     
     std::pair< blas::matrix< value_t >,
@@ -370,7 +320,7 @@ struct RandLR
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::randlr( U, V, acc ) );
+        return hlr::approx::randlr( U, V, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -380,7 +330,7 @@ struct RandLR
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::randlr( U, T, V, acc ) );
+        return hlr::approx::randlr( U, T, V, acc );
     }
 };
 

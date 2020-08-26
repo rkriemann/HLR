@@ -18,11 +18,8 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
-namespace detail
-{
-
 //
-// version of Lanczos bidiagonalization with generic operator
+// version of Lanczos bidiagonalization for generic operator
 //
 template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
@@ -159,20 +156,6 @@ lanczos ( operator_t &             M,
     return { std::move( RU ), std::move( RV ) };
 }
 
-}// namespace detail
-
-//
-// return low-rank approximation of M with accuracy <acc>
-//
-template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-lanczos ( blas::matrix< value_t > &  M,
-          const hpro::TTruncAcc &    acc )
-{
-    return std::move( detail::lanczos( M, acc ) );
-}
-
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
@@ -185,9 +168,44 @@ lanczos ( const blas::matrix< value_t > &  U,
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    auto  op = operator_wrapper( U, V );
+    const idx_t  nrows   = idx_t( U.nrows() );
+    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  in_rank = idx_t( V.ncols() );
 
-    return std::move( detail::lanczos( op, acc ) );
+    //
+    // don't increase rank
+    //
+
+    if ( in_rank == 0 )
+    {
+        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
+                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+    }// if
+
+    if ( in_rank <= idx_t(acc.rank()) )
+    {
+        return { std::move( blas::copy( U ) ),
+                 std::move( blas::copy( V ) ) };
+    }// if
+
+    //
+    // if k is bigger than the possible rank,
+    // we create a dense-matrix and do truncation
+    // via full SVD
+    //
+
+    if ( in_rank >= std::min( nrows, ncols ) )
+    {
+        auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+        return std::move( lanczos( M, acc ) );
+    }// if
+    else
+    {
+        auto  op = operator_wrapper( U, V );
+
+        return std::move( lanczos( op, acc ) );
+    }// else
 }
 
 template < typename value_t >
@@ -197,11 +215,44 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
           const hpro::TTruncAcc &                       acc )
 {
-    HLR_ASSERT( U.size() == V.size() );
+    assert( U.size() == V.size() );
 
-    auto  op = operator_wrapper( U, V );
+    if ( U.empty() )
+        return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::matrix< value_t >() ) };
+    
+    //
+    // determine maximal rank
+    //
 
-    return std::move( detail::lanczos( op, acc ) );
+    const size_t  nrows   = U.front().nrows();
+    const size_t  ncols   = V.front().nrows();
+    uint          in_rank = 0;
+
+    for ( auto &  U_i : U )
+        in_rank += U_i.ncols();
+
+    if ( in_rank >= std::min( nrows, ncols ) )
+    {
+        //
+        // perform dense approximation
+        //
+
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  u_i = U.cbegin();
+        auto  v_i = V.cbegin();
+        
+        for ( ; u_i != U.cend(); ++u_i, ++v_i )
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
+
+        return lanczos( M, acc );
+    }// if
+    else
+    {
+        auto  op = operator_wrapper( U, V );
+
+        return lanczos( op, acc );
+    }// else
 }
 
 template < typename value_t >
@@ -212,11 +263,50 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
           const hpro::TTruncAcc &                       acc )
 {
-    HLR_ASSERT( U.size() == V.size() );
+    HLR_ASSERT( U.size() == T.size() );
+    HLR_ASSERT( T.size() == V.size() );
 
-    auto  op = operator_wrapper( U, T, V );
+    if ( U.empty() )
+        return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::matrix< value_t >() ) };
+    
+    //
+    // determine maximal rank
+    //
 
-    return std::move( detail::lanczos( op, acc ) );
+    const size_t  nrows   = U.front().nrows();
+    const size_t  ncols   = V.front().nrows();
+    uint          in_rank = 0;
+
+    for ( auto &  T_i : T )
+        in_rank += T_i.ncols();
+
+    if ( in_rank >= std::min( nrows, ncols ) )
+    {
+        //
+        // perform dense approximation
+        //
+
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  U_i = U.cbegin();
+        auto  T_i = T.cbegin();
+        auto  V_i = V.cbegin();
+        
+        for ( ; U_i != U.cend(); ++U_i, ++T_i, ++V_i )
+        {
+            const auto  UT_i = blas::prod( value_t(1), *U_i, *T_i );
+            
+            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
+        }// for
+
+        return lanczos( M, acc );
+    }// if
+    else
+    {
+        auto  op = operator_wrapper( U, T, V );
+        
+        return lanczos( op, acc );
+    }// else
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -239,7 +329,7 @@ struct Lanczos
     operator () ( blas::matrix< value_t > &  M,
                   const hpro::TTruncAcc &    acc ) const
     {
-        return std::move( hlr::approx::lanczos( M, acc ) );
+        return hlr::approx::lanczos( M, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -248,7 +338,7 @@ struct Lanczos
                   const blas::matrix< value_t > &  V,
                   const hpro::TTruncAcc &          acc ) const 
     {
-        return std::move( hlr::approx::lanczos( U, V, acc ) );
+        return hlr::approx::lanczos( U, V, acc );
     }
     
     std::pair< blas::matrix< value_t >,
@@ -257,7 +347,7 @@ struct Lanczos
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::lanczos( U, V, acc ) );
+        return hlr::approx::lanczos( U, V, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -267,7 +357,7 @@ struct Lanczos
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::lanczos( U, T, V, acc ) );
+        return hlr::approx::lanczos( U, T, V, acc );
     }
 };
 

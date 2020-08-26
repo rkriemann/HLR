@@ -73,7 +73,7 @@ mm_std ( const hpro::TMatrix &    A,
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
-        std::cout << "    runtime = "
+        std::cout << "      runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
@@ -183,26 +183,6 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandSVD< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandSVD< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    return;
-    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication

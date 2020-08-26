@@ -69,21 +69,19 @@ rrqr ( blas::matrix< value_t > &  M,
 
     if ( ncols > nrows )
     {
-        blas::matrix< value_t >  MH( ncols, nrows );
+        auto  MH = blas::matrix< value_t >( ncols, nrows );
 
         blas::copy( blas::adjoint( M ), MH );
 
-        auto [ U, V ] = rrqr( MH, acc );
-
-        return { std::move( V ), std::move( U ) };
+        return rrqr( MH, acc );
     }// if
     
     //
     // perform column pivoted QR of M
     //
 
-    blas::matrix< value_t >  R( ncols, ncols );
-    std::vector< int >       P( ncols, 0 );
+    auto  R = blas::matrix< value_t >( ncols, ncols );
+    auto  P = std::vector< int >( ncols, 0 );
 
     blas::qrp( M, R, P );
 
@@ -100,8 +98,8 @@ rrqr ( blas::matrix< value_t > &  M,
     blas::copy( Qk, U );
 
     // copy first k columns of R^T to V, i.e., first k rows of R
-    blas::matrix< value_t >  Rk( R, blas::range( 0, k-1 ), blas::range::all );
-    blas::matrix< value_t >  TV( ncols, k );
+    auto  Rk = blas::matrix< value_t >( R, blas::range( 0, k-1 ), blas::range::all );
+    auto  TV = blas::matrix< value_t >( ncols, k );
     
     blas::copy( blas::adjoint( Rk ), TV );
     
@@ -161,7 +159,7 @@ rrqr ( const blas::matrix< T > &  U,
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
-        return std::move( rrqr( M, acc ) );
+        return rrqr( M, acc );
     }// if
     else
     {
@@ -235,17 +233,14 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
-            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), D );
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        auto [ U_tr, V_tr ] = rrqr( D, acc );
-
-        return { std::move( U_tr ), std::move( V_tr ) };
+        return rrqr( M, acc );
     }// if
     else
     {
@@ -253,13 +248,13 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
+        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
+        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        idx_t  ofs   = 0;
 
         for ( auto &  U_i : U )
         {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + U_i.ncols() - 1 ) );
+            auto  U_all_i = blas::matrix< value_t >( U_all, blas::range::all, blas::range( ofs, ofs + U_i.ncols() - 1 ) );
 
             blas::copy( U_i, U_all_i );
             ofs += U_i.ncols();
@@ -269,7 +264,7 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     
         for ( auto &  V_i : V )
         {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
+            auto  V_all_i = blas::matrix< value_t >( V_all, blas::range::all, blas::range( ofs, ofs + V_i.ncols() - 1 ) );
 
             blas::copy( V_i, V_all_i );
             ofs += V_i.ncols();
@@ -317,8 +312,7 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // perform dense approximation
         //
 
-        blas::matrix< value_t >  D( nrows, ncols );
-
+        auto  M   = blas::matrix< value_t >( nrows, ncols );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -327,10 +321,10 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         {
             const auto  UT_i = blas::prod( value_t(1), *U_i, *T_i );
             
-            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), D );
+            blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return rrqr( D, acc );
+        return rrqr( M, acc );
     }// if
     else
     {
@@ -338,16 +332,15 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        blas::matrix< value_t >  U_all( nrows, in_rank );
-        blas::matrix< value_t >  V_all( ncols, in_rank );
-        idx_t                    ofs = 0;
-
-        auto  U_i = U.cbegin();
-        auto  T_i = T.cbegin();
+        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
+        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        idx_t  ofs   = 0;
+        auto   U_i   = U.cbegin();
+        auto   T_i   = T.cbegin();
         
         for ( ; U_i != U.cend(); ++U_i, ++T_i )
         {
-            blas::matrix< value_t > U_all_i( U_all, blas::Range::all, blas::Range( ofs, ofs + T_i->ncols() - 1 ) );
+            auto  U_all_i = blas::matrix< value_t >( U_all, blas::range::all, blas::range( ofs, ofs + T_i->ncols() - 1 ) );
 
             blas::prod( value_t(1), *U_i, *T_i, value_t(1), U_all_i );
             ofs += T_i.ncols();
@@ -357,7 +350,7 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     
         for ( auto &  V_i : V )
         {
-            blas::matrix< value_t > V_all_i( V_all, blas::Range::all, blas::Range( ofs, ofs + V_i.ncols() - 1 ) );
+            auto  V_all_i = blas::matrix< value_t >( V_all, blas::range::all, blas::range( ofs, ofs + V_i.ncols() - 1 ) );
 
             blas::copy( V_i, V_all_i );
             ofs += V_i.ncols();
@@ -387,7 +380,7 @@ struct RRQR
     operator () ( blas::matrix< value_t > &  M,
                   const hpro::TTruncAcc &    acc ) const
     {
-        return std::move( hlr::approx::rrqr( M, acc ) );
+        return hlr::approx::rrqr( M, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -396,7 +389,7 @@ struct RRQR
                   const blas::matrix< value_t > &  V,
                   const hpro::TTruncAcc &          acc ) const 
     {
-        return std::move( hlr::approx::rrqr( U, V, acc ) );
+        return hlr::approx::rrqr( U, V, acc );
     }
     
     std::pair< blas::matrix< value_t >,
@@ -405,7 +398,7 @@ struct RRQR
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::rrqr( U, V, acc ) );
+        return hlr::approx::rrqr( U, V, acc );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -415,7 +408,7 @@ struct RRQR
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return std::move( hlr::approx::rrqr( U, T, V, acc ) );
+        return hlr::approx::rrqr( U, T, V, acc );
     }
 };
 
