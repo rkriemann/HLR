@@ -5,7 +5,7 @@
 // File        : tiled_lrmatrix.hh
 // Description : low-rank matrix with tiled storage
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
 #include <cassert>
@@ -20,9 +20,6 @@
 
 namespace hlr
 { 
-
-namespace hpro = HLIB;
-//namespace blas = hpro::BLAS;
 
 using hpro::real;
 using hpro::complex;
@@ -205,10 +202,10 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec ( const real             alpha,
+    virtual void mul_vec ( const value_t          alpha,
                            const hpro::TVector *  x,
-                           const real             beta,
-                           hpro::TVector       *  y,
+                           const value_t          beta,
+                           hpro::TVector *        y,
                            const hpro::matop_t    op = hpro::apply_normal ) const;
     
     // truncate matrix to accuracy \a acc

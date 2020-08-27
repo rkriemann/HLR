@@ -183,46 +183,46 @@ mul_vec ( const value_t                             alpha,
 //
 // compute C = C + α op( A ) op( B )
 //
-template < typename value_t >
-void
-multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
-           const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
-{
-    if ( is_blocked_all( A, B, C ) )
-    {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
-        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+// template < typename value_t >
+// void
+// multiply ( const value_t            alpha,
+//            const hpro::matop_t      op_A,
+//            const hpro::TMatrix &    A,
+//            const hpro::matop_t      op_B,
+//            const hpro::TMatrix &    B,
+//            hpro::TMatrix &          C,
+//            const hpro::TTruncAcc &  acc )
+// {
+//     if ( is_blocked_all( A, B, C ) )
+//     {
+//         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+//         auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+//         auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
         
-        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-            {
-                auto  C_ij = BC->block(i,j);
+//         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+//         {
+//             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+//             {
+//                 auto  C_ij = BC->block(i,j);
             
-                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                {
-                    auto  A_il = BA->block( i, l, op_A );
-                    auto  B_lj = BB->block( l, j, op_B );
+//                 for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
+//                 {
+//                     auto  A_il = BA->block( i, l, op_A );
+//                     auto  B_lj = BB->block( l, j, op_B );
                 
-                    if ( is_null_any( A_il, B_lj ) )
-                        continue;
+//                     if ( is_null_any( A_il, B_lj ) )
+//                         continue;
                     
-                    HLR_ASSERT( ! is_null( C_ij ) );
+//                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
-                }// for
-            }// for
-        }// for
-    }// if
-    else
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
-}
+//                     multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+//                 }// for
+//             }// for
+//         }// for
+//     }// if
+//     else
+//         hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+// }
 
 template < typename value_t,
            typename approx_t >
@@ -452,6 +452,63 @@ trsvu ( const hpro::matop_t      op_U,
         const hpro::TMatrix &    U,
         hpro::TScalarVector &    x,
         const hpro::diag_type_t  diag_mode );
+
+//
+// LU factorization
+//
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
+{
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+        {
+            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            
+            lu( * BA->block( i, i ), approx );
+
+            for ( uint  j = i+1; j < BA->block_rows(); ++j )
+            {
+                HLR_ASSERT( ! is_null( BA->block( j, i ) ) );
+                solve_upper_tri( blas::from_right, BA->block( i, i ), BA->block( j, i ), acc, approx );
+            }// for
+
+            for ( uint  j = i+1; j < BA->block_cols(); ++j )
+            {
+                HLR_ASSERT( ! is_null( BA->block( i, j ) ) );
+                solve_lower_tri( blas::from_left,  BA->block( i, i ), BA->block( i, j ), acc, approx );
+            }// for
+
+            for ( uint  j = i+1; j < BA->block_rows(); ++j )
+            {
+                for ( uint  l = l+1; l < BA->block_rows(); ++l )
+                {
+                    // other blocks tested above
+                    HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                    
+                    multiply( value_t(-1),
+                              hpro::apply_normal, BA->block( j, i ),
+                              hpro::apply_normal, BA->block( i, l ),
+                              value_t(1), BA->block( j, l ),
+                              acc, approx );
+                }// for
+            }// for
+        }// for
+    }// if
+    else if ( is_dense( A ) )
+    {
+        // TODO
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A->typestr() );
+}
+     
 
 //
 // Gaussian elimination of A, e.g. A = A^-1

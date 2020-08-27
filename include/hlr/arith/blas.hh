@@ -20,9 +20,13 @@
 #include <hlr/utils/math.hh>
 #include <hlr/arith/blas_def.hh>
 
-namespace hlr { namespace blas {
+namespace hlr
+{
 
 namespace hpro = HLIB;
+
+namespace blas
+{
 
 using hpro::blas_int_t;
 using hpro::matop_t;
