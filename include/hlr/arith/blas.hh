@@ -25,11 +25,19 @@ namespace hlr
 
 namespace hpro = HLIB;
 
+// import into general namespace
+using hpro::eval_side_t;
+using hpro::from_left;
+using hpro::from_right;
+
+using hpro::matop_t;
+using hpro::apply_normal;
+using hpro::apply_conjugate;
+using hpro::apply_transposed;
+using hpro::apply_adjoint;
+
 namespace blas
 {
-
-using hpro::blas_int_t;
-using hpro::matop_t;
 
 //
 // import functions from HLIBpro and adjust naming
@@ -37,6 +45,7 @@ using hpro::matop_t;
 
 using namespace HLIB::BLAS;
 
+using hpro::blas_int_t;
 using range = HLIB::BLAS::Range;
 
 template < typename value_t > using vector = HLIB::BLAS::Vector< value_t >;
@@ -1009,6 +1018,136 @@ eigen_jac ( matrix< value_t > &                                M,
         E(i) = M(i,i);
 
     return { std::move( E ), std::move( V ) };
+}
+
+template < typename value_t >
+void
+make_diag_dom ( matrix< value_t > &                                M,
+                const size_t                                       amax_sweeps = 0,
+                const typename hpro::real_type< value_t >::type_t  atolerance  = 0 )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+    
+    const auto         nrows      = M.nrows();
+    const auto         ncols      = M.ncols();
+    const size_t       max_sweeps = ( amax_sweeps > 0 ? amax_sweeps : 15 );
+    const real_t       tolerance  = ( atolerance > 0 ? atolerance : real_t(10) * std::numeric_limits< real_t >::epsilon() );
+    bool               converged  = false;
+    uint               sweep      = 0;
+
+    while ( ! converged && ( sweep < max_sweeps ))
+    {
+        real_t  max_err = 0.0;
+        
+        sweep++;
+        converged = true;
+
+        //
+        // look for m_ij with |m_ij| = max_k≠l |m_kl|
+        //
+
+        size_t  i     = 0;
+        size_t  j     = 1;
+        real_t  m_max = std::abs( M(i,j) );
+        
+        for ( size_t  k = 0; k < nrows-1; k++ )
+        {
+            for ( size_t l = k + 1; l < ncols; l++ )
+            {
+                if ( std::abs( M(k,l) ) > m_max )
+                {
+                    m_max = std::abs( M(k,l) );
+                    i     = k;
+                    j     = l;
+                }// if
+            }// for
+        }// for
+        
+        //
+        // compute Jacobi rotation diagonalizing ⎧ M_ii  M_ij ⎫
+        //                                       ⎩ M_ji  M_jj ⎭
+        //
+
+        const auto  c = M(i,j);
+
+        if ( std::abs( c ) == value_t(0) )
+            break;
+        
+        const auto  a   = M(i,i);
+        const auto  b   = M(j,j);
+        const auto  err = std::abs( c ) / std::real( std::sqrt( a*b ) );
+        
+        if (  err > tolerance )
+            converged = false;
+        
+        max_err = std::max( err, max_err );
+        
+        //
+        // compute Jacobi rotation which diagonalises │a c│
+        //                                            │c b│
+        //
+        
+        const auto  xi = (b - a) / ( value_t(2) * c );
+        const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( 1.0 + xi*xi ) ) );
+        const auto  cs = value_t(1) / std::sqrt( 1.0 + t*t );
+        const auto  sn = cs * t;
+        
+        M(i,i) = a - c * t;
+        M(j,j) = b + c * t;
+        M(i,j) = M(j,i) = 0;
+        
+        //
+        // update columns i and j of A (apply rotation)
+        //
+        
+        for ( size_t  k = 0; k < nrows; k++ )
+        {
+            if (( k == i ) || ( k == j ))
+                continue;
+            
+            const auto  m_ik = M(i,k);
+            const auto  m_jk = M(j,k);
+            
+            M(k,i) = M(i,k) = cs * m_ik - sn * m_jk;
+            M(k,j) = M(j,k) = sn * m_ik + cs * m_jk;
+        }// for
+
+        //
+        // determine diagonal dominance ( Σ_j≠i a_ij ) / a_ii
+        //
+
+        real_t  diag_dom = real_t(0);
+        real_t  avg_dom  = real_t(0);
+        
+        for ( size_t  k = 0; k < nrows-1; k++ )
+        {
+            real_t  row_sum = real_t(0);
+            
+            for ( size_t l = 0; l < ncols; l++ )
+            {
+                if ( k != l )
+                    row_sum += std::abs( M(k,l) );
+            }// for
+
+            const auto  dom = row_sum / std::abs( M(k,k) );
+            
+            diag_dom = std::max( diag_dom, dom );
+            avg_dom += dom;
+        }// for
+
+        avg_dom /= nrows;
+        
+        std::cout << "sweeps " << sweep << " : "
+                  << "error = " << max_err << ", "
+                  << "diag_dom = " << diag_dom << ", "
+                  << "avg_dom = " << avg_dom 
+                  << std::endl;
+
+        if (( diag_dom <= 2.0 ) && ( avg_dom <= 0.5 ))
+            break;
+    }// while
+
+    std::cout << "#sweeps = " << sweep << std::endl;
 }
 
 //

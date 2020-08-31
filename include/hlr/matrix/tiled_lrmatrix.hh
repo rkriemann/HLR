@@ -202,9 +202,9 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec ( const value_t          alpha,
+    virtual void mul_vec ( const real             alpha,
                            const hpro::TVector *  x,
-                           const value_t          beta,
+                           const real             beta,
                            hpro::TVector *        y,
                            const hpro::matop_t    op = hpro::apply_normal ) const;
     

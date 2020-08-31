@@ -20,7 +20,9 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
+#include "hlr/arith/mulvec.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/arith/invert.hh"
 #include "hlr/approx/svd.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
@@ -43,123 +45,12 @@ namespace hpro = HLIB;
 template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
+          const matop_t                    op_M,
           const hpro::TMatrix &            M,
           const blas::vector< value_t > &  x,
           blas::vector< value_t > &        y )
 {
-    // assert( ! is_null( M ) );
-    // assert( M->ncols( op_M ) == x.length() );
-    // assert( M->nrows( op_M ) == y.length() );
-
-    if ( alpha == value_t(0) )
-        return;
-
-    if ( is_blocked( M ) )
-    {
-        auto        B       = cptrcast( &M, hpro::TBlockMatrix );
-        const auto  row_ofs = B->row_is( op_M ).first();
-        const auto  col_ofs = B->col_is( op_M ).first();
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto  B_ij = B->block( i, j );
-                
-                if ( ! is_null( B_ij ) )
-                {
-                    auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
-                    auto  y_i = y( B_ij->row_is( op_M ) - row_ofs );
-
-                    mul_vec( alpha, op_M, *B_ij, x_j, y_i );
-                }// if
-            }// for
-        }// for
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D = cptrcast( &M, hpro::TDenseMatrix );
-        
-        blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x, value_t(1), y );
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, hpro::TRkMatrix );
-
-        if ( op_M == hpro::apply_normal )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_A< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_transposed )
-        {
-            assert( hpro::is_complex_type< value_t >::value == false );
-            
-            auto  t = blas::mulvec( value_t(1), blas::transposed( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-        else if ( op_M == hpro::apply_adjoint )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( R ) ), x );
-
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), y );
-        }// if
-    }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        
-        if ( op_M == hpro::apply_normal )
-        {
-            //
-            // y = y + U·S·V^H x
-            //
-        
-            auto  t = R->col_cb().transform_forward( x );
-            auto  s = blas::mulvec( value_t(1), R->coeff(), t );
-            auto  r = R->row_cb().transform_backward( s );
-
-            blas::add( alpha, r, y );
-        }// if
-        else if ( op_M == hpro::apply_transposed )
-        {
-            //
-            // y = y + (U·S·V^H)^T x
-            //   = y + conj(V)·S^T·U^T x
-            //
-        
-            auto  cx = blas::copy( x );
-
-            blas::conj( cx );
-        
-            auto  t  = R->row_cb().transform_forward( cx );
-
-            blas::conj( t );
-        
-            auto  s = blas::mulvec( value_t(1), blas::transposed(R->coeff()), t );
-            auto  r = R->col_cb().transform_backward( s );
-
-            blas::add( alpha, r, y );
-        }// if
-        else if ( op_M == hpro::apply_adjoint )
-        {
-            //
-            // y = y + (U·S·V^H)^H x
-            //   = y + V·S^H·U^H x
-            //
-        
-            auto  t = R->row_cb().transform_forward( x );
-            auto  s = blas::mulvec( value_t(1), blas::adjoint(R->coeff()), t );
-            auto  r = R->col_cb().transform_backward( s );
-
-            blas::add( alpha, r, y );
-        }// if
-    }// if
-    else
-        assert( false );
+    hlr::mul_vec< value_t >( alpha, op_M, M, x, y );
 }
 
 //
@@ -168,7 +59,7 @@ mul_vec ( const value_t                    alpha,
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
-          const hpro::matop_t                       op_M,
+          const matop_t                             op_M,
           const hpro::TMatrix &                     M,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y )
@@ -186,9 +77,9 @@ mul_vec ( const value_t                             alpha,
 // template < typename value_t >
 // void
 // multiply ( const value_t            alpha,
-//            const hpro::matop_t      op_A,
+//            const matop_t            op_A,
 //            const hpro::TMatrix &    A,
-//            const hpro::matop_t      op_B,
+//            const matop_t            op_B,
 //            const hpro::TMatrix &    B,
 //            hpro::TMatrix &          C,
 //            const hpro::TTruncAcc &  acc )
@@ -228,9 +119,9 @@ template < typename value_t,
            typename approx_t >
 void
 multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
+           const matop_t            op_A,
            const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
+           const matop_t            op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
            const hpro::TTruncAcc &  acc,
@@ -275,9 +166,9 @@ multiply ( const value_t            alpha,
 template < typename value_t >
 void
 multiply_apx ( const value_t            alpha,
-               const hpro::matop_t      op_A,
+               const matop_t            op_A,
                const hpro::TMatrix &    A,
-               const hpro::matop_t      op_B,
+               const matop_t            op_B,
                const hpro::TMatrix &    B,
                hpro::TMatrix &          C,
                const hpro::TTruncAcc &  acc,
@@ -436,24 +327,6 @@ multiply_hadamard ( const value_t            alpha,
 }
 
 //
-// solve op(L) x = y with lower triangular L
-//
-void
-trsvl ( const hpro::matop_t      op_L,
-        const hpro::TMatrix &    L,
-        hpro::TScalarVector &    x,
-        const hpro::diag_type_t  diag_mode );
-
-//
-// solve op(U) x = y with upper triangular U
-//
-void
-trsvu ( const hpro::matop_t      op_U,
-        const hpro::TMatrix &    U,
-        hpro::TScalarVector &    x,
-        const hpro::diag_type_t  diag_mode );
-
-//
 // LU factorization
 //
 template < typename value_t,
@@ -471,18 +344,18 @@ lu ( hpro::TMatrix &          A,
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            lu( * BA->block( i, i ), approx );
+            lu< value_t >( * BA->block( i, i ), approx );
 
             for ( uint  j = i+1; j < BA->block_rows(); ++j )
             {
                 HLR_ASSERT( ! is_null( BA->block( j, i ) ) );
-                solve_upper_tri( blas::from_right, BA->block( i, i ), BA->block( j, i ), acc, approx );
+                solve_upper_tri< value_t >( from_right, BA->block( i, i ), BA->block( j, i ), acc, approx );
             }// for
 
             for ( uint  j = i+1; j < BA->block_cols(); ++j )
             {
                 HLR_ASSERT( ! is_null( BA->block( i, j ) ) );
-                solve_lower_tri( blas::from_left,  BA->block( i, i ), BA->block( i, j ), acc, approx );
+                solve_lower_tri< value_t >( from_left,  BA->block( i, i ), BA->block( i, j ), acc, approx );
             }// for
 
             for ( uint  j = i+1; j < BA->block_rows(); ++j )
@@ -506,7 +379,7 @@ lu ( hpro::TMatrix &          A,
         // TODO
     }// if
     else
-        HLR_ERROR( "unsupported matrix type : " + A->typestr() );
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
      
 
@@ -864,7 +737,7 @@ lu ( hpro::TMatrix *          A,
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                hlr::seq::multiply( -1.0,
+                hlr::seq::multiply( value_t(-1),
                                     hpro::apply_normal, * BA->block( j, i ),
                                     hpro::apply_normal, * BA->block( i, l ),
                                     * BA->block( j, l ), acc );

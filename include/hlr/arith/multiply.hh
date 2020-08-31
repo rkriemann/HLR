@@ -2,19 +2,18 @@
 #define __HLR_ARITH_MULTIPLY_HH
 //
 // Project     : HLib
-// File        : multiply.hh
+// Module      : multiply
 // Description : matrix multiplication functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
 #include "hlr/utils/log.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/add.hh"
 
 namespace hlr
 {
-
-namespace hpro = HLIB;
 
 /////////////////////////////////////////////////////////////////////////////////
 //

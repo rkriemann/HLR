@@ -230,7 +230,7 @@ program_main ()
         
             LIKWID_MARKER_START( "hmm" );
             
-            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
+            hpro::multiply( value_t(1), apply_normal, A.get(), apply_normal, A.get(), value_t(1), C.get(), acc );
 
             LIKWID_MARKER_STOP( "hmm" );
             

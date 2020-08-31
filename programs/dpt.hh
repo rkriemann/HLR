@@ -493,18 +493,19 @@ everror ( const hpro::TMatrix &            M,
     const auto  normM = real_t(1);
     const auto  normV = real_t(1);
     auto        T     = construct_zero( M );
+    auto        apx   = approx::SVD< value_t >();
 
     impl::multiply( value_t(1),
                     hpro::apply_normal, M,
                     hpro::apply_normal, V,
-                    *T, acc );
+                    *T, acc, apx );
 
     auto  EM = construct_diag( M, E );
     
     impl::multiply( value_t(-1),
                     hpro::apply_normal, V,
                     hpro::apply_normal, *EM,
-                    *T, acc );
+                    *T, acc, apx );
 
     return seq::norm::frobenius( *T ) / ( normM * normV );
 }
@@ -701,6 +702,34 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    {
+        std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
+                  << " )" << term::reset << std::endl;
+
+        auto  R = blas::random< value_t >( cmdline::n, cmdline::n );
+        auto  M = blas::prod( value_t(1), R, blas::adjoint(R) );
+        
+        hpro::DBG::write( M, "M.mat", "M" );
+        
+        // {
+        //     auto  [ E, V ] = blas::eigen_jac( M, 100, cmdline::eps );
+
+        //     hpro::DBG::write( E, "E1.mat", "E1" );
+        //     hpro::DBG::write( V, "V1.mat", "V1" );
+        // }
+
+        blas::make_diag_dom( M, 10000, cmdline::eps );
+        
+        hpro::DBG::write( M, "M2.mat", "M2" );
+        
+        auto  [ E, V ] = blas::eigen_dpt( M, 0, 1e-8, "fro", 2 );
+
+        hpro::DBG::write( E, "E.mat", "E" );
+        hpro::DBG::write( V, "V.mat", "V" );
+
+        return;
+    }
+    
     auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -735,38 +764,6 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    {
-        std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
-                  << ", " << acc.to_string()
-                  << " )" << term::reset << std::endl;
-
-        // auto  D = hpro::to_dense( A.get() );
-        // auto  M = hpro::blas_mat< value_t >( D );
-
-        // add_iota_diag< value_t >( *D, 1e-6 );
-
-        auto  R = blas::random< value_t >( A->nrows(), A->ncols() );
-        auto  M = blas::prod( value_t(1), R, blas::adjoint(R) );
-        
-        hpro::DBG::write( M, "M.mat", "M" );
-        
-        {
-            auto  [ E, V ] = blas::eigen_jac( M, 100, cmdline::eps );
-
-            hpro::DBG::write( E, "E1.mat", "E1" );
-            hpro::DBG::write( V, "V1.mat", "V1" );
-        }
-
-        hpro::DBG::write( M, "M2.mat", "M2" );
-        
-        auto  [ E, V ] = blas::eigen_dpt( M, 0, 1e-8, "fro", 2 );
-
-        hpro::DBG::write( E, "E.mat", "E" );
-        hpro::DBG::write( V, "V.mat", "V" );
-
-        return;
-    }
-    
     {
         std::cout << term::bullet << term::bold << "DPT eigen iteration ( " << impl_name
                   << ", " << acc.to_string()

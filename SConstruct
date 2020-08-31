@@ -32,7 +32,7 @@ DEFINES      = '__TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries
 HPRO_DIR     = '/'
-MKL_DIR      = None  # preinitialized below
+MKL_DIR      = '/'
 TBB_DIR      = '/'
 TASKFLOW_DIR = '/'
 HPX_DIR      = '/'
@@ -136,11 +136,11 @@ def path ( program, source ) :
 #
 ######################################################################
 
-# MKL should define MKLROOT
-if MKL_DIR == None and 'MKLROOT' in os.environ :
-    MKL_DIR = os.environ['MKLROOT']
-else :
-    MKL_DIR = '/' # to prevent error below due to invalid path
+# # MKL should define MKLROOT
+# if MKL_DIR == None and 'MKLROOT' in os.environ :
+#     MKL_DIR = os.environ['MKLROOT']
+# else :
+#     MKL_DIR = '/' # to prevent error below due to invalid path
 
 ######################################################################
 #
@@ -186,7 +186,7 @@ opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',   
 opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
 
 # read options from options file
-opt_env    = Environment( options = opts )
+opt_env = Environment( options = opts )
 
 # apply modifiers
 for opt in Split( opt_env['addprograms'] ) :
@@ -252,7 +252,7 @@ opts.Save( opts_file, opt_env )
 ######################################################################
 
 # MKL should define MKLROOT
-if MKL_DIR == None :
+if MKL_DIR == None or MKL_DIR == '/' :
     if 'MKLROOT' in os.environ :
         MKL_DIR = os.environ['MKLROOT']
     else :

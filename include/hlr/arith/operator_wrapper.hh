@@ -44,8 +44,8 @@ get_column ( const blas::matrix< value_t > &  M,
 
 template < typename value_t >
 void
-prod ( const value_t  alpha,
-       const blas::matop_t &            op_M,
+prod ( const value_t                    alpha,
+       const matop_t                    op_M,
        const blas::matrix< value_t > &  M,
        const blas::vector< value_t > &  x,
        blas::vector< value_t > &        y )
@@ -55,8 +55,8 @@ prod ( const value_t  alpha,
 
 template < typename value_t >
 void
-prod ( const value_t  alpha,
-       const blas::matop_t &            op_M,
+prod ( const value_t                    alpha,
+       const matop_t                    op_M,
        const blas::matrix< value_t > &  M,
        const blas::matrix< value_t > &  X,
        blas::matrix< value_t > &        Y )
@@ -139,7 +139,7 @@ get_column ( const matrixsum_operator< value_t > &  op,
 template < typename value_t >
 void
 prod ( const value_t                          alpha,
-       const blas::matop_t &                  op_M,
+       const matop_t                          op_M,
        const matrixsum_operator< value_t > &  op,
        const blas::vector< value_t > &        x,
        blas::vector< value_t > &              y )
@@ -151,7 +151,7 @@ prod ( const value_t                          alpha,
 template < typename value_t >
 void
 prod ( const value_t                          alpha,
-       const blas::matop_t &                  op_M,
+       const matop_t                          op_M,
        const matrixsum_operator< value_t > &  op,
        const blas::matrix< value_t > &        X,
        blas::matrix< value_t > &              Y )
@@ -241,7 +241,7 @@ get_column ( const lowrank_operator< value_t > &  op,
 template < typename value_t >
 void
 prod ( const value_t                        alpha,
-       const blas::matop_t &                op_M,
+       const matop_t                        op_M,
        const lowrank_operator< value_t > &  op,
        const blas::vector< value_t > &      x,
        blas::vector< value_t > &            y )
@@ -280,7 +280,7 @@ prod ( const value_t                        alpha,
 template < typename value_t >
 void
 prod ( const value_t                        alpha,
-       const blas::matop_t &                op_M,
+       const matop_t                        op_M,
        const lowrank_operator< value_t > &  op,
        const blas::matrix< value_t > &      X,
        blas::matrix< value_t > &            Y )
@@ -421,7 +421,7 @@ get_column ( const lowranksum_operator< value_t > &  op,
 template < typename value_t >
 void
 prod ( const value_t                           alpha,
-       const blas::matop_t &                   op_M,
+       const matop_t                           op_M,
        const lowranksum_operator< value_t > &  op,
        const blas::vector< value_t > &         x,
        blas::vector< value_t > &               y )
@@ -475,7 +475,7 @@ prod ( const value_t                           alpha,
 template < typename value_t >
 void
 prod ( const value_t                           alpha,
-       const blas::matop_t &                   op_M,
+       const matop_t                           op_M,
        const lowranksum_operator< value_t > &  op,
        const blas::matrix< value_t > &         X,
        blas::matrix< value_t > &               Y )
@@ -599,7 +599,7 @@ get_column ( const lowranksumT_operator< value_t > &  op,
 template < typename value_t >
 void
 prod ( const value_t                            alpha,
-       const blas::matop_t &                    op_M,
+       const matop_t                            op_M,
        const lowranksumT_operator< value_t > &  op,
        const blas::vector< value_t > &          x,
        const blas::vector< value_t > &          y )
@@ -610,7 +610,7 @@ prod ( const value_t                            alpha,
 template < typename value_t >
 void
 prod ( const value_t                            alpha,
-       const blas::matop_t &                    op_M,
+       const matop_t                            op_M,
        const lowranksumT_operator< value_t > &  op,
        const blas::matrix< value_t > &          X,
        const blas::matrix< value_t > &          Y )
