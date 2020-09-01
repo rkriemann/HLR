@@ -30,7 +30,7 @@ invert ( hpro::TDenseMatrix &  M )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TDenseMatrix >
-invert ( const hpro::TDenseMatrix &  M )
+inverse ( const hpro::TDenseMatrix &  M )
 {
     auto  I = std::unique_ptr< hpro::TDenseMatrix >( ptrcast( M.copy().release(), hpro::TDenseMatrix ) );
 

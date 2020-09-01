@@ -344,32 +344,31 @@ lu ( hpro::TMatrix &          A,
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            lu< value_t >( * BA->block( i, i ), approx );
+            lu< value_t >( * BA->block( i, i ), acc, approx );
 
-            for ( uint  j = i+1; j < BA->block_rows(); ++j )
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
-                HLR_ASSERT( ! is_null( BA->block( j, i ) ) );
-                solve_upper_tri< value_t >( from_right, BA->block( i, i ), BA->block( j, i ), acc, approx );
+                if ( ! is_null( BA->block( j, i ) ) )
+                    solve_upper_tri< value_t >( from_right, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
             }// for
 
-            for ( uint  j = i+1; j < BA->block_cols(); ++j )
+            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
             {
-                HLR_ASSERT( ! is_null( BA->block( i, j ) ) );
-                solve_lower_tri< value_t >( from_left,  BA->block( i, i ), BA->block( i, j ), acc, approx );
+                if ( ! is_null( BA->block( i, j ) ) )
+                    solve_lower_tri< value_t >( from_left, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
             }// for
 
-            for ( uint  j = i+1; j < BA->block_rows(); ++j )
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
-                for ( uint  l = l+1; l < BA->block_rows(); ++l )
+                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
                 {
-                    // other blocks tested above
-                    HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                    {
+                        HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
                     
-                    multiply( value_t(-1),
-                              hpro::apply_normal, BA->block( j, i ),
-                              hpro::apply_normal, BA->block( i, l ),
-                              value_t(1), BA->block( j, l ),
-                              acc, approx );
+                        multiply( value_t(-1), apply_normal, *BA->block( j, i ), apply_normal, *BA->block( i, l ),
+                                  *BA->block( j, l ), acc, approx );
+                    }// if
                 }// for
             }// for
         }// for
@@ -377,6 +376,9 @@ lu ( hpro::TMatrix &          A,
     else if ( is_dense( A ) )
     {
         // TODO
+        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+
+        invert< value_t >( *D );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );

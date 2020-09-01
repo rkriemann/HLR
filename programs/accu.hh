@@ -185,11 +185,16 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "LU (SVD)" << term::reset << std::endl;
 
+        auto  C   = impl::matrix::copy( *A );
         auto  apx = hlr::approx::SVD< value_t >();
 
-        mm_accu( *A, acc, apx );
+        seq::lu< value_t >( *C, acc, apx );
+
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+        std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
     }// if
 
     return;
