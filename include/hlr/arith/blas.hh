@@ -25,10 +25,17 @@ namespace hlr
 
 namespace hpro = HLIB;
 
+//
 // import into general namespace
+//
+
 using hpro::eval_side_t;
 using hpro::from_left;
 using hpro::from_right;
+
+using hpro::diag_type_t;
+using hpro::unit_diag;
+using hpro::general_diag;
 
 using hpro::matop_t;
 using hpro::apply_normal;
@@ -56,6 +63,13 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 // template wrappers for low-rank factors as U and V
 //
 //////////////////////////////////////////////////////////////////////
+
+template < typename value_t >       blas::matrix< value_t > & mat ( hpro::TDenseMatrix *       A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > & mat ( const hpro::TDenseMatrix * A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > & mat ( hpro::TDenseMatrix &       A ) { return hpro::blas_mat< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > & mat ( const hpro::TDenseMatrix & A ) { return hpro::blas_mat< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > & mat ( std::unique_ptr< hpro::TDenseMatrix > & A ) { assert( ! is_null( A.get() ) ); return hpro::blas_mat< value_t >( *A ); }
+
 
 template < typename value_t >
 blas::matrix< value_t > &
@@ -867,6 +881,12 @@ factorise_ortho ( const matrix< value_t > &  M,
 //
 //////////////////////////////////////////////////////////////////////
 
+struct eigen_stat
+{
+    uint  nsweeps   = 0;
+    bool  converged = false;
+};
+
 //
 // compute eigen values and eigen vectors of M using two-sided Jacobi iteration.
 // - algorithm from "Lapack Working Notes 15"
@@ -876,7 +896,8 @@ std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
 eigen_jac ( matrix< value_t > &                                M,
             const size_t                                       amax_sweeps = 0,
-            const typename hpro::real_type< value_t >::type_t  atolerance  = 0 )
+            const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
+            eigen_stat *                                       stat        = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
     
@@ -975,38 +996,44 @@ eigen_jac ( matrix< value_t > &                                M,
         // determine diagonal dominance ( Σ_j≠i a_ij ) / a_ii
         //
 
-        real_t  diag_dom = real_t(0);
-        real_t  avg_dom  = real_t(0);
+        // real_t  diag_dom = real_t(0);
+        // real_t  avg_dom  = real_t(0);
         
-        for ( size_t  i = 0; i < nrows-1; i++ )
-        {
-            real_t  row_sum = real_t(0);
+        // for ( size_t  i = 0; i < nrows-1; i++ )
+        // {
+        //     real_t  row_sum = real_t(0);
             
-            for ( size_t j = 0; j < ncols; j++ )
-            {
-                if ( i != j )
-                    row_sum += std::abs( M(i,j) );
-            }// for
+        //     for ( size_t j = 0; j < ncols; j++ )
+        //     {
+        //         if ( i != j )
+        //             row_sum += std::abs( M(i,j) );
+        //     }// for
 
-            const auto  dom = row_sum / std::abs( M(i,i) );
+        //     const auto  dom = row_sum / std::abs( M(i,i) );
             
-            diag_dom = std::max( diag_dom, dom );
-            avg_dom += dom;
-        }// for
+        //     diag_dom = std::max( diag_dom, dom );
+        //     avg_dom += dom;
+        // }// for
 
-        avg_dom /= nrows;
+        // avg_dom /= nrows;
         
-        std::cout << "sweeps " << sweep << " : "
-                  << "error = " << max_err << ", "
-                  << "diag_dom = " << diag_dom << ", "
-                  << "avg_dom = " << avg_dom 
-                  << std::endl;
+        // std::cout << "sweeps " << sweep << " : "
+        //           << "error = " << max_err << ", "
+        //           << "diag_dom = " << diag_dom << ", "
+        //           << "avg_dom = " << avg_dom 
+        //           << std::endl;
 
-        if (( diag_dom <= 2.0 ) && ( avg_dom <= 0.05 ))
-            break;
+        // if (( diag_dom <= 2.0 ) && ( avg_dom <= 0.05 ))
+        //     break;
     }// while
 
-    std::cout << "#sweeps = " << sweep << std::endl;
+    // std::cout << "#sweeps = " << sweep << std::endl;
+
+    if ( ! is_null( stat ) )
+    {
+        stat->nsweeps   = sweep;
+        stat->converged = converged;
+    }// if
     
     //
     // extract eigenvalues as diagonal elements of M
@@ -1161,7 +1188,8 @@ eigen_dpt ( matrix< value_t > &                                M,
             const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
             const std::string &                                error_type  = "frobenius",
-            const int                                          verbosity   = 0 )
+            const int                                          verbosity   = 0,
+            eigen_stat *                                       stat        = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 
@@ -1206,6 +1234,12 @@ eigen_dpt ( matrix< value_t > &                                M,
     
     real_t  old_error = real_t(0);
     uint    sweep     = 0;
+
+    if ( ! is_null( stat ) )
+    {
+        stat->nsweeps   = 0;
+        stat->converged = false;
+    }// if
     
     do
     {
@@ -1282,13 +1316,24 @@ eigen_dpt ( matrix< value_t > &                                M,
             
             std::cout << std::endl;
         }// if
+
+        if (( sweep > 0 ) && ( error / old_error > 10.0 ))
+            return { vector< value_t >(), matrix< value_t >() };
         
         old_error = error;
         
         ++sweep;
+
+        if ( ! is_null( stat ) )
+            stat->nsweeps = sweep;
         
         if ( error < tolerance )
+        {
+            if ( ! is_null( stat ) )
+                stat->converged = true;
+            
             break;
+        }// if
 
         if ( ! std::isnormal( error ) )
             break;

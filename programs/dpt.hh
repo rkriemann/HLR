@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <tbb/parallel_for.h>
+
 #include <hpro/algebra/mat_mul_diag.hh>
 #include <hpro/algebra/mat_add.hh>
 
@@ -702,6 +704,60 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    {
+        std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
+                  << " )" << term::reset << std::endl;
+
+        blas::eigen_stat  stat;
+        
+        for ( size_t  n = 2560; n <= 4096; n += 512 )
+        {
+            std::mutex  mtx;
+            uint        nsweeps_min = 0;
+            uint        nsweeps_jac = 0;
+
+            ::tbb::parallel_for( uint(0), uint(10),
+                                 [&,n] ( const uint  i )
+                                 {
+                                     auto  R  = blas::random< value_t >( n, n );
+                                     auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
+                                     auto  Mc = blas::copy( M );
+
+                                     for ( uint nsweeps = 0; nsweeps < n; ++nsweeps )
+                                     {
+                                         {
+                                             auto  [ E, V ] = blas::eigen_jac( M, 1, 1e-14 );
+                                         }
+                                         
+                                         auto  T = blas::copy( M );
+                                         
+                                         auto  [ E, V ] = blas::eigen_dpt( T, 0, 1e-8, "fro", 0, & stat );
+                                         
+                                         if ( stat.converged )
+                                         {
+                                             // converged
+                                             std::scoped_lock  lock( mtx );
+                                             
+                                             nsweeps_min = std::max( nsweeps_min, nsweeps+1 );
+                                             break;
+                                         }// if
+                                     }// for
+
+                                     auto  [ E, V ] = blas::eigen_jac( Mc, 100, 1e-14, & stat );
+
+                                     {
+                                         std::scoped_lock  lock( mtx );
+                                         
+                                         nsweeps_jac = std::max( nsweeps_jac, stat.nsweeps );
+                                     }
+                                 } );
+
+            std::cout << "n = " << n << "   " << nsweeps_min << "    " << nsweeps_jac << std::endl;
+        }// for
+
+        return;
+    }
+    
     {
         std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
                   << " )" << term::reset << std::endl;

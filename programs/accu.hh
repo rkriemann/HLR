@@ -187,14 +187,38 @@ program_main ()
     {
         std::cout << "    " << term::bullet << term::bold << "LU (SVD)" << term::reset << std::endl;
 
-        auto  C   = impl::matrix::copy( *A );
-        auto  apx = hlr::approx::SVD< value_t >();
+        {
+            auto  C  = impl::matrix::copy( *A );
 
-        seq::lu< value_t >( *C, acc, apx );
+            tic = timer::now();
+            
+            hpro::LU::factorise_rec( C.get(), acc );
 
-        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
-        
-        std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+            toc = timer::since( tic );
+            
+            std::cout << "    done in " << format_time( toc ) << std::endl;
+            
+            hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+            
+            std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        }
+
+        {
+            auto  C   = impl::matrix::copy( *A );
+            auto  apx = hlr::approx::RRQR< value_t >();
+            
+            tic = timer::now();
+            
+            seq::lu< value_t >( *C, acc, apx );
+            
+            toc = timer::since( tic );
+            
+            std::cout << "    done in " << format_time( toc ) << std::endl;
+            
+            hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+            
+            std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        }
     }// if
 
     return;
