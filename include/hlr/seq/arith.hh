@@ -375,7 +375,6 @@ lu ( hpro::TMatrix &          A,
     }// if
     else if ( is_dense( A ) )
     {
-        // TODO
         auto  D = ptrcast( &A, hpro::TDenseMatrix );
 
         invert< value_t >( *D );

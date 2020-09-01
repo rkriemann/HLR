@@ -36,9 +36,13 @@ template < typename approx_t >
 void
 mm_std ( const hpro::TMatrix &    A,
          const hpro::TTruncAcc &  acc,
-         const approx_t &         approx )
+         const std::string &      apx_name )
 {
     using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
     
     std::vector< double >  runtime, flops;
 
@@ -90,9 +94,13 @@ template < typename approx_t >
 void
 mm_accu ( const hpro::TMatrix &    A,
           const hpro::TTruncAcc &  acc,
-          const approx_t &         approx )
+          const std::string &      apx_name )
 {
     using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
     
     std::vector< double >  runtime, flops;
 
@@ -205,11 +213,11 @@ program_main ()
 
         {
             auto  C   = impl::matrix::copy( *A );
-            auto  apx = hlr::approx::RRQR< value_t >();
+            auto  apx = hlr::approx::SVD< value_t >();
             
             tic = timer::now();
             
-            seq::lu< value_t >( *C, acc, apx );
+            impl::lu< value_t >( *C, acc, apx );
             
             toc = timer::since( tic );
             
@@ -289,59 +297,12 @@ program_main ()
     // standard recursion with immediate updates
     //
 
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::SVD< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RRQR" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RRQR< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandSVD< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandLR" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandLR< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::ACA< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "Lanczos" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::Lanczos< value_t >();
-
-        mm_std( *A, acc, apx );
-    }// if
+    if ( true ) mm_std< hlr::approx::SVD< value_t > >( *A, acc, "SVD" );
+    if ( true ) mm_std< hlr::approx::RRQR< value_t > >( *A, acc, "RRQR" );
+    if ( true ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( true ) mm_std< hlr::approx::RandLR< value_t > >( *A, acc, "RandLR" );
+    if ( true ) mm_std< hlr::approx::ACA< value_t > >( *A, acc, "ACA" );
+    if ( true ) mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
 
     //
     // using accumulators
@@ -349,59 +310,12 @@ program_main ()
 
     std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "SVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::SVD< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RRQR" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RRQR< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandSVD" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandSVD< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "RandLR" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::RandLR< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "ACA" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::ACA< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
-
-    if ( true )
-    {
-        std::cout << "    " << term::bullet << term::bold << "Lanczos" << term::reset << std::endl;
-
-        auto  apx = hlr::approx::Lanczos< value_t >();
-
-        mm_accu( *A, acc, apx );
-    }// if
+    if ( true ) mm_accu< hlr::approx::SVD< value_t > >( *A, acc, "SVD" );
+    if ( true ) mm_accu< hlr::approx::RRQR< value_t > >( *A, acc, "RRQR" );
+    if ( true ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( true ) mm_accu< hlr::approx::RandLR< value_t > >( *A, acc, "RandLR" );
+    if ( true ) mm_accu< hlr::approx::ACA< value_t > >( *A, acc, "ACA" );
+    if ( true ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
 
     LIKWID_MARKER_CLOSE;
 }

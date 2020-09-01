@@ -717,7 +717,7 @@ program_main ()
             uint        nsweeps_jac = 0;
 
             ::tbb::parallel_for( uint(0), uint(10),
-                                 [&,n] ( const uint  i )
+                                 [&,n] ( const uint )
                                  {
                                      auto  R  = blas::random< value_t >( n, n );
                                      auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
