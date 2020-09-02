@@ -18,6 +18,9 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
+// to print out update statistics (used in external script)
+#define HLR_RRQR_RANK_STAT( msg ) std::cout << msg << std::endl
+
 namespace detail
 {
 
@@ -76,6 +79,9 @@ rrqr ( blas::matrix< value_t > &  M,
         return rrqr( MH, acc );
     }// if
     
+    // for update statistics
+    HLR_RRQR_RANK_STAT( "full " << std::min( nrows, ncols ) );
+    
     //
     // perform column pivoted QR of M
     //
@@ -131,18 +137,21 @@ rrqr ( const blas::matrix< T > &  U,
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    const idx_t  nrows   = idx_t( U.nrows() );
-    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  nrows_U = idx_t( U.nrows() );
+    const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
+    // for update statistics
+    HLR_RRQR_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
     //
     // don't increase rank
     //
 
     if ( in_rank == 0 )
     {
-        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
-                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+        return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
     }// if
 
     if ( in_rank <= idx_t(acc.rank()) )
@@ -155,7 +164,7 @@ rrqr ( const blas::matrix< T > &  U,
     // if input rank is larger than maximal rank, use dense approximation
     //
 
-    if ( in_rank > std::min( nrows, ncols ) )
+    if ( in_rank > std::min( nrows_U, nrows_V ) )
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
@@ -180,12 +189,12 @@ rrqr ( const blas::matrix< T > &  U,
         
         // U = QU(:,1:k)
         auto  Qk = blas::matrix< value_t >( QU, blas::range::all, blas::range( 0, out_rank-1 ) );
-        auto  OU = blas::matrix< value_t >( nrows, out_rank );
+        auto  OU = blas::matrix< value_t >( nrows_U, out_rank );
         
         blas::copy( Qk, OU );
 
         // V = QV · P  (V' = P' · QV')
-        auto  QV_P = blas::matrix< value_t >( ncols, in_rank );
+        auto  QV_P = blas::matrix< value_t >( nrows_V, in_rank );
         
         for ( int  i = 0; i < in_rank; ++i )
         {
@@ -220,20 +229,20 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  U_i : U )
         in_rank += U_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
@@ -248,8 +257,8 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
-        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        auto   U_all = blas::matrix< value_t >( nrows_U, in_rank );
+        auto   V_all = blas::matrix< value_t >( nrows_V, in_rank );
         idx_t  ofs   = 0;
 
         for ( auto &  U_i : U )
@@ -299,20 +308,20 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  T_i : T )
         in_rank += T_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -332,8 +341,8 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
-        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        auto   U_all = blas::matrix< value_t >( nrows_U, in_rank );
+        auto   V_all = blas::matrix< value_t >( nrows_V, in_rank );
         idx_t  ofs   = 0;
         auto   U_i   = U.cbegin();
         auto   T_i   = T.cbegin();

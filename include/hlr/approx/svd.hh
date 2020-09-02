@@ -18,6 +18,9 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
+// to print out update statistics (used in external script)
+#define HLR_SVD_RANK_STAT( msg ) std::cout << msg << std::endl
+
 //
 // return low-rank approximation of M with accuracy <acc>
 //
@@ -40,7 +43,7 @@ svd ( blas::matrix< value_t > &  M,
     auto         V       = blas::matrix< value_t >( ncols_M, mrc );
 
     // for update statistics
-    // std::cout << "full " << std::min( nrows_M, ncols_M ) << std::endl;
+    HLR_SVD_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
     
     blas::svd( M, S, V );
         
@@ -84,7 +87,7 @@ svd ( const blas::matrix< value_t > &  U,
     const idx_t  in_rank = idx_t( V.ncols() );
 
     // for update statistics
-    // std::cout << "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank << std::endl;
+    HLR_SVD_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
     
     //
     // don't increase rank

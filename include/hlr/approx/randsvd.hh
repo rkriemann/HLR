@@ -20,6 +20,9 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
+// to print out update statistics (used in external script)
+#define HLR_RANDSVD_RANK_STAT( msg ) std::cout << msg << std::endl
+
 namespace detail
 {
 
@@ -377,6 +380,9 @@ randsvd ( const operator_t &       M,
     const auto  nrows_M = nrows( M );
     const auto  ncols_M = ncols( M );
 
+    // for update statistics
+    HLR_RANDSVD_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
+    
     // compute column basis
     auto  Q   = detail::column_basis( M, acc, power_steps, oversampling );
     auto  k   = Q.ncols();
@@ -430,9 +436,12 @@ randsvd ( const blas::matrix< value_t > &  U,
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    const idx_t  nrows   = idx_t( U.nrows() );
-    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  nrows_U = idx_t( U.nrows() );
+    const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
+
+    // for update statistics
+    HLR_RANDSVD_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
     //
     // don't increase rank
@@ -440,8 +449,8 @@ randsvd ( const blas::matrix< value_t > &  U,
 
     if ( in_rank == 0 )
     {
-        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
-                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+        return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
     }// if
 
     if ( in_rank <= idx_t(acc.rank()) )
@@ -456,7 +465,7 @@ randsvd ( const blas::matrix< value_t > &  U,
     // via full SVD
     //
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
@@ -495,7 +504,7 @@ randsvd ( const blas::matrix< value_t > &  U,
         auto  OU = blas::prod( value_t(1), Q,    Vk );
         auto  OV = blas::prod( value_t(1), VUtQ, Uk );
 
-        if ( nrows < ncols ) blas::prod_diag( OU, S, out_rank );
+        if ( nrows_U < nrows_V ) blas::prod_diag( OU, S, out_rank );
         else                 blas::prod_diag( OV, S, out_rank );
 
         return { std::move( OU ), std::move( OV ) };
@@ -524,20 +533,20 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  U_i : U )
         in_rank += U_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
@@ -552,8 +561,8 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
-        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        auto   U_all = blas::matrix< value_t >( nrows_U, in_rank );
+        auto   V_all = blas::matrix< value_t >( nrows_V, in_rank );
         idx_t  ofs   = 0;
 
         for ( auto &  U_i : U )
@@ -606,20 +615,20 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  T_i : T )
         in_rank += T_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -639,8 +648,8 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
         // concatenate matrices
         //
 
-        auto   U_all = blas::matrix< value_t >( nrows, in_rank );
-        auto   V_all = blas::matrix< value_t >( ncols, in_rank );
+        auto   U_all = blas::matrix< value_t >( nrows_U, in_rank );
+        auto   V_all = blas::matrix< value_t >( nrows_V, in_rank );
         idx_t  ofs   = 0;
         auto   U_i   = U.cbegin();
         auto   T_i   = T.cbegin();
