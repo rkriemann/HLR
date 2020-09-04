@@ -80,7 +80,7 @@ eigen_jac ( matrix< value_t > &                                M,
                     converged = false;
 
                 if ( ! std::isnormal( err ) )
-                    std::cout << std::endl;
+                    std::cout << '.' << std::flush;
                 
                 max_err = std::max( err, max_err );
                 

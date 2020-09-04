@@ -250,16 +250,16 @@ copy ( const T_matrix &  A )
     return M;
 }
 
-template < typename value1_t,
-           typename value2_t >
-matrix< value2_t >
-copy ( const matrix< value1_t > &  A )
+template < typename value_dest_t,
+           typename value_src_t >
+matrix< value_dest_t >
+copy ( const matrix< value_src_t > &  A )
 {
-    matrix< value2_t >  M( A.nrows(), A.ncols() );
-    const size_t        n = M.nrows() * M.ncols();
+    matrix< value_dest_t >  M( A.nrows(), A.ncols() );
+    const size_t            n = M.nrows() * M.ncols();
 
     for ( size_t  i = 0; i < n; ++i )
-        M.data()[i] = value2_t( A.data()[i] );
+        M.data()[i] = value_dest_t( A.data()[i] );
 
     return M;
 }
