@@ -19,7 +19,7 @@ namespace hpro = HLIB;
 using hpro::idx_t;
 
 // to print out update statistics (used in external script)
-#define HLR_RRQR_RANK_STAT( msg ) std::cout << msg << std::endl
+#define HLR_RRQR_RANK_STAT( msg ) // std::cout << msg << std::endl
 
 namespace detail
 {

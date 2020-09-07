@@ -19,7 +19,7 @@ namespace hpro = HLIB;
 using hpro::idx_t;
 
 // to print out update statistics (used in external script)
-#define HLR_SVD_RANK_STAT( msg ) std::cout << msg << std::endl
+#define HLR_SVD_RANK_STAT( msg ) // std::cout << msg << std::endl
 
 //
 // return low-rank approximation of M with accuracy <acc>
@@ -122,11 +122,12 @@ svd ( const blas::matrix< value_t > &  U,
     }// if
     else
     {
-        //
-        // do QR-factorisation of U and V
-        //
-
         #if 1
+
+        //////////////////////////////////////////////////////////////
+        //
+        // QR-factorisation of U and V with explicit Q
+        //
 
         auto  QU = blas::copy( U );
         auto  RU = blas::matrix< value_t >( in_rank, in_rank );
@@ -193,6 +194,11 @@ svd ( const blas::matrix< value_t > &  U,
 
         #else
 
+        //////////////////////////////////////////////////////////////
+        //
+        // QR-factorisation of U and V with implicit Q
+        //
+        
         auto  QU = blas::copy( U );
         auto  RU = blas::matrix< value_t >( in_rank, in_rank );
         auto  TU = std::vector< value_t >();

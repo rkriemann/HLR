@@ -18,6 +18,39 @@ using hpro::blas_int_t;
 
 extern "C"
 {
+float
+slange_ ( const char *        norm,
+          const blas_int_t *  nrows,
+          const blas_int_t *  ncols,
+          const float *       M,
+          const blas_int_t *  ldM,
+          float *             work );
+double
+dlange_ ( const char *        norm,
+          const blas_int_t *  nrows,
+          const blas_int_t *  ncols,
+          const double *      M,
+          const blas_int_t *  ldM,
+          double *            work );
+double
+clange_ ( const char *                   norm,
+          const blas_int_t *             nrows,
+          const blas_int_t *             ncols,
+          const std::complex< float > *  M,
+          const blas_int_t *             ldM,
+          float *                        work );
+double
+zlange_ ( const char *                    norm,
+          const blas_int_t *              nrows,
+          const blas_int_t *              ncols,
+          const std::complex< double > *  M,
+          const blas_int_t *              ldM,
+          double *                        work );
+}
+
+
+extern "C"
+{
 void slarfg_ ( const blas_int_t *      n,
                const float *           alpha,
                const float *           x,
@@ -239,6 +272,144 @@ HLR_BLAS_GEQR2( std::complex< float >,  cgeqr2_ )
 HLR_BLAS_GEQR2( std::complex< double >, zgeqr2_ )
 
 #undef HLR_BLAS_GEQR2
+
+
+extern "C"
+{
+void sgeqrt_ ( const blas_int_t *        nrows,
+               const blas_int_t *        ncols,
+               const blas_int_t *        nb,
+               float *                   A,
+               const blas_int_t *        ldA,
+               float *                   T,
+               const blas_int_t *        ldT,
+               float *                   work,
+               const blas_int_t *        info );
+void dgeqrt_ ( const blas_int_t *        nrows,
+               const blas_int_t *        ncols,
+               const blas_int_t *        nb,
+               double *                  A,
+               const blas_int_t *        ldA,
+               double *                  T,
+               const blas_int_t *        ldT,
+               double *                  work,
+               const blas_int_t *        info );
+void cgeqrt_ ( const blas_int_t *        nrows,
+               const blas_int_t *        ncols,
+               const blas_int_t *        nb,
+               std::complex< float > *   A,
+               const blas_int_t *        ldA,
+               std::complex< float > *   T,
+               const blas_int_t *        ldT,
+               std::complex< float > *   work,
+               const blas_int_t *        info );
+void zgeqrt_ ( const blas_int_t *        nrows,
+               const blas_int_t *        ncols,
+               const blas_int_t *        nb,
+               std::complex< double > *  A,
+               const blas_int_t *        ldA,
+               std::complex< double > *  T,
+               const blas_int_t *        ldT,
+               std::complex< double > *  work,
+               const blas_int_t *        info );
+}
+
+#define HLR_BLAS_GEQRT( type, func )                    \
+    inline                                              \
+    void geqrt ( const blas_int_t  nrows,               \
+                 const blas_int_t  ncols,               \
+                 const blas_int_t  nb,                  \
+                 type *            A,                   \
+                 const blas_int_t  ldA,                 \
+                 type *            T,                   \
+                 const blas_int_t  ldT,                 \
+                 type *            work,                \
+                 blas_int_t &      info )               \
+    {                                                   \
+        func( & nrows, & ncols, & nb, A, & ldA, T, & ldT, work, & info ); \
+    }
+
+HLR_BLAS_GEQRT( float,                  sgeqrt_ )
+HLR_BLAS_GEQRT( double,                 dgeqrt_ )
+HLR_BLAS_GEQRT( std::complex< float >,  cgeqrt_ )
+HLR_BLAS_GEQRT( std::complex< double >, zgeqrt_ )
+
+#undef HLR_BLAS_GEQRT
+
+
+extern "C"
+{
+void slatsqr_ ( const blas_int_t *        nrows,
+                const blas_int_t *        ncols,
+                const blas_int_t *        nbrow,
+                const blas_int_t *        nbcol,
+                float *                   A,
+                const blas_int_t *        ldA,
+                float *                   T,
+                const blas_int_t *        ldT,
+                float *                   work,
+                const blas_int_t *        lwork,
+                const blas_int_t *        info );
+void dlatsqr_ ( const blas_int_t *        nrows,
+                const blas_int_t *        ncols,
+                const blas_int_t *        nbrow,
+                const blas_int_t *        nbcol,
+                double *                  A,
+                const blas_int_t *        ldA,
+                double *                  T,
+                const blas_int_t *        ldT,
+                double *                  work,
+                const blas_int_t *        lwork,
+                const blas_int_t *        info );
+void clatsqr_ ( const blas_int_t *        nrows,
+                const blas_int_t *        ncols,
+                const blas_int_t *        nbrow,
+                const blas_int_t *        nbcol,
+                std::complex< float > *   A,
+                const blas_int_t *        ldA,
+                std::complex< float > *   T,
+                const blas_int_t *        ldT,
+                std::complex< float > *   work,
+                const blas_int_t *        lwork,
+                const blas_int_t *        info );
+void zlatsqr_ ( const blas_int_t *        nrows,
+                const blas_int_t *        ncols,
+                const blas_int_t *        nbrow,
+                const blas_int_t *        nbcol,
+                std::complex< double > *  A,
+                const blas_int_t *        ldA,
+                std::complex< double > *  T,
+                const blas_int_t *        ldT,
+                std::complex< double > *  work,
+                const blas_int_t *        lwork,
+                const blas_int_t *        info );
+}
+
+#define HLR_BLAS_LATSQR( type, func )                   \
+    inline                                              \
+    void latsqr ( const blas_int_t  nrows,              \
+                  const blas_int_t  ncols,              \
+                  const blas_int_t  nbrow,              \
+                  const blas_int_t  nbcol,              \
+                  type *            A,                  \
+                  const blas_int_t  ldA,                \
+                  type *            T,                  \
+                  const blas_int_t  ldT,                \
+                  type *            work,               \
+                  const blas_int_t  lwork,              \
+                  blas_int_t &      info )              \
+    {                                                   \
+        func( & nrows, & ncols, & nbrow, & nbcol,       \
+              A, & ldA, T, & ldT, work, & lwork, & info );  \
+    }
+
+HLR_BLAS_LATSQR( float,                  slatsqr_ )
+HLR_BLAS_LATSQR( double,                 dlatsqr_ )
+HLR_BLAS_LATSQR( std::complex< float >,  clatsqr_ )
+HLR_BLAS_LATSQR( std::complex< double >, zlatsqr_ )
+
+#undef HLR_BLAS_LATSQR
+
 
 extern "C"
 {
@@ -472,6 +643,176 @@ HLR_BLAS_UNG2R( std::complex< float >,  cung2r_ )
 HLR_BLAS_UNG2R( std::complex< double >, zung2r_ )
 
 #undef HLR_BLAS_UNG2R
+
+
+extern "C"
+{
+void sorgtsqr_ ( const blas_int_t *        nrows,
+                 const blas_int_t *        ncols,
+                 const blas_int_t *        nbrow,
+                 const blas_int_t *        nbcol,
+                 float *                   A,
+                 const blas_int_t *        ldA,
+                 const float *             T,
+                 const blas_int_t *        ldT,
+                 float *                   work,
+                 const blas_int_t *        lwork,
+                 const blas_int_t *        info );
+void dorgtsqr_ ( const blas_int_t *        nrows,
+                 const blas_int_t *        ncols,
+                 const blas_int_t *        nbrow,
+                 const blas_int_t *        nbcol,
+                 double *                  A,
+                 const blas_int_t *        ldA,
+                 const double *            T,
+                 const blas_int_t *        ldT,
+                 double *                  work,
+                 const blas_int_t *        lwork,
+                 const blas_int_t *        info );
+void cungtsqr_ ( const blas_int_t *        nrows,
+                 const blas_int_t *        ncols,
+                 const blas_int_t *        nbrow,
+                 const blas_int_t *        nbcol,
+                 std::complex< float > *   A,
+                 const blas_int_t *        ldA,
+                 const std::complex< float > * T,
+                 const blas_int_t *        ldT,
+                 std::complex< float > *   work,
+                 const blas_int_t *        lwork,
+                 const blas_int_t *        info );
+void zungtsqr_ ( const blas_int_t *        nrows,
+                 const blas_int_t *        ncols,
+                 const blas_int_t *        nbrow,
+                 const blas_int_t *        nbcol,
+                 std::complex< double > *  A,
+                 const blas_int_t *        ldA,
+                 const std::complex< double > * T,
+                 const blas_int_t *        ldT,
+                 std::complex< double > *  work,
+                 const blas_int_t *        lwork,
+                 const blas_int_t *        info );
+}
+
+#define HLR_BLAS_UNGTSQR( type, func )                  \
+    inline                                              \
+    void ungtsqr ( const blas_int_t  nrows,             \
+                   const blas_int_t  ncols,             \
+                   const blas_int_t  nbrow,             \
+                   const blas_int_t  nbcol,             \
+                   type *            A,                 \
+                   const blas_int_t  ldA,               \
+                   const type *      T,                 \
+                   const blas_int_t  ldT,               \
+                   type *            work,              \
+                   const blas_int_t  lwork,             \
+                   blas_int_t &      info )             \
+    {                                                   \
+        func( & nrows, & ncols, & nbrow, & nbcol,       \
+              A, & ldA, T, & ldT, work, & lwork, & info );  \
+    }
+
+HLR_BLAS_UNGTSQR( float,                  sorgtsqr_ )
+HLR_BLAS_UNGTSQR( double,                 dorgtsqr_ )
+HLR_BLAS_UNGTSQR( std::complex< float >,  cungtsqr_ )
+HLR_BLAS_UNGTSQR( std::complex< double >, zungtsqr_ )
+
+#undef HLR_BLAS_UNGTSQR
+
+
+
+extern "C"
+{
+void slarfb_ ( const char *                    side,
+               const char *                    trans,
+               const char *                    direct,
+               const char *                    storeV,
+               const blas_int_t *              nrows,
+               const blas_int_t *              ncols,
+               const blas_int_t *              norder,
+               const float *                   V,
+               const blas_int_t *              ldV,
+               const float *                   T,
+               const blas_int_t *              ldT,
+               float *                         C,
+               const blas_int_t *              ldC,
+               float *                         work,
+               const blas_int_t *              ldwork );
+void dlarfb_ ( const char *                    side,
+               const char *                    trans,
+               const char *                    direct,
+               const char *                    storeV,
+               const blas_int_t *              nrows,
+               const blas_int_t *              ncols,
+               const blas_int_t *              norder,
+               const double *                  V,
+               const blas_int_t *              ldV,
+               const double *                  T,
+               const blas_int_t *              ldT,
+               double *                        C,
+               const blas_int_t *              ldC,
+               double *                        work,
+               const blas_int_t *              ldwork );
+void clarfb_ ( const char *                    side,
+               const char *                    trans,
+               const char *                    direct,
+               const char *                    storeV,
+               const blas_int_t *              nrows,
+               const blas_int_t *              ncols,
+               const blas_int_t *              norder,
+               const std::complex< float > *   V,
+               const blas_int_t *              ldV,
+               const std::complex< float > *   T,
+               const blas_int_t *              ldT,
+               std::complex< float > *         C,
+               const blas_int_t *              ldC,
+               std::complex< float > *         work,
+               const blas_int_t *              ldwork );
+void zlarfb_ ( const char *                    side,
+               const char *                    trans,
+               const char *                    direct,
+               const char *                    storeV,
+               const blas_int_t *              nrows,
+               const blas_int_t *              ncols,
+               const blas_int_t *              norder,
+               const std::complex< double > *  V,
+               const blas_int_t *              ldV,
+               const std::complex< double > *  T,
+               const blas_int_t *              ldT,
+               std::complex< double > *        C,
+               const blas_int_t *              ldC,
+               std::complex< double > *        work,
+               const blas_int_t *              ldwork );
+}
+
+#define HLR_BLAS_LARFB( type, func )                    \
+    inline                                              \
+    void larfb ( const char        side,                \
+                 const char        trans,               \
+                 const char        direct,              \
+                 const char        storeV,              \
+                 const blas_int_t  nrows,               \
+                 const blas_int_t  ncols,               \
+                 const blas_int_t  norder,              \
+                 const type *      V,                   \
+                 const blas_int_t  ldV,                 \
+                 const type *      T,                   \
+                 const blas_int_t  ldT,                 \
+                 type *            C,                   \
+                 const blas_int_t  ldC,                 \
+                 type *            work,                \
+                 const blas_int_t  lwork )              \
+    {                                                   \
+        func( & side, & trans, & direct, & storeV,      \
+              & nrows, & ncols, & norder, V, & ldV,     \
+              T, & ldT, C, & ldC, work, & lwork );      \
+    }
+
+HLR_BLAS_LARFB( float,                  slarfb_ )
+HLR_BLAS_LARFB( double,                 dlarfb_ )
+HLR_BLAS_LARFB( std::complex< float >,  clarfb_ )
+HLR_BLAS_LARFB( std::complex< double >, zlarfb_ )
+
+#undef HLR_BLAS_LARFB
 
 }}// hlr::blas
 

@@ -318,38 +318,6 @@ fill ( blas::MatrixBase< T_matrix > &    M,
 //
 //////////////////////////////////////////////////////////////////////
 
-extern "C"
-{
-float
-slange_ ( const char *        norm,
-          const blas_int_t *  nrows,
-          const blas_int_t *  ncols,
-          const float *       M,
-          const blas_int_t *  ldM,
-          float *             work );
-double
-dlange_ ( const char *        norm,
-          const blas_int_t *  nrows,
-          const blas_int_t *  ncols,
-          const double *      M,
-          const blas_int_t *  ldM,
-          double *            work );
-double
-clange_ ( const char *                   norm,
-          const blas_int_t *             nrows,
-          const blas_int_t *             ncols,
-          const std::complex< float > *  M,
-          const blas_int_t *             ldM,
-          float *                        work );
-double
-zlange_ ( const char *                    norm,
-          const blas_int_t *              nrows,
-          const blas_int_t *              ncols,
-          const std::complex< double > *  M,
-          const blas_int_t *              ldM,
-          double *                        work );
-}
-
 #define  HLR_BLAS_NORM1( type, func )                                   \
     inline                                                              \
     typename hpro::real_type< type >::type_t                            \
@@ -515,6 +483,81 @@ qr2  ( matrix< value_t > &  M,
 }
 
 //
+// compute QR factorisation M = Q·R with orthonormal Q
+// and upper triangular R. Upon exit, M will hold Q.
+//
+// ASSUMPTION: nrows(M) ≥ ncols(M)
+//
+template < typename value_t >
+void
+qrt  ( matrix< value_t > &  M,
+       matrix< value_t > &  R )
+{
+    const blas_int_t        nrows = M.nrows();
+    const blas_int_t        ncols = M.ncols();
+    const blas_int_t        minrc = std::min( nrows, ncols );
+    const blas_int_t        nb    = minrc;
+    std::vector< value_t >  T( nb * minrc );
+    std::vector< value_t >  work( nb * ncols );
+
+    HLR_ASSERT( ncols <= nrows );
+
+    blas_int_t  info = 0;
+
+    // compute QR with H = I - V·T·V'
+    geqrt( nrows, ncols, nb, M.data(), nrows, T.data(), nb, work.data(), info );
+
+    // copy R
+    for ( blas_int_t  i = 0; i < ncols; ++i )
+        for ( blas_int_t  j = 0; j <= i; ++j )
+            R(j,i) = M(j,i);
+
+    // compute Q
+    matrix< value_t >  Q( nrows, minrc );
+
+    for ( blas_int_t  i = 0; i < minrc; ++i )
+        Q(i,i) = value_t(1);
+        
+    larfb( 'L', 'N', 'F', 'C', nrows, ncols, minrc, M.data(), nrows, T.data(), nb, Q.data(), nrows, work.data(), ncols );
+
+    copy( Q, M );
+}
+
+//
+// compute QR factorisation M = Q·R with orthonormal Q
+// and upper triangular R. Upon exit, M will hold Q.
+//
+// ASSUMPTION: nrows(M) > 2·ncols(M)
+//
+template < typename value_t >
+void
+qrts  ( matrix< value_t > &  M,
+        matrix< value_t > &  R )
+{
+    const blas_int_t        nrows = M.nrows();
+    const blas_int_t        ncols = M.ncols();
+    const blas_int_t        nbrow = 2*ncols;
+    const blas_int_t        nbcol = ncols;
+    std::vector< value_t >  T( ncols * nrows * ( ( nrows - ncols ) / ncols + 1 ) );
+    std::vector< value_t >  work( ( nrows + nbcol ) * ncols );
+
+    HLR_ASSERT( 2*ncols < nrows );
+
+    blas_int_t  info = 0;
+
+    // compute QR with H = I - V·T·V'
+    latsqr( nrows, ncols, nbrow, nbcol, M.data(), nrows, T.data(), nbcol, work.data(), work.size(), info );
+
+    // copy R
+    for ( blas_int_t  i = 0; i < ncols; ++i )
+        for ( blas_int_t  j = 0; j <= i; ++j )
+            R(j,i) = M(j,i);
+
+    // compute Q
+    ungtsqr( nrows, ncols, nbrow, nbcol, M.data(), nrows, T.data(), nbcol, work.data(), work.size(), info );
+}
+
+//
 // to switch between different QR implementations
 //
 template < typename value_t >
@@ -522,6 +565,9 @@ void
 qr_wrapper ( matrix< value_t > &  M,
              matrix< value_t > &  R )
 {
+    // if ( M.nrows() > 2*M.ncols() )
+    //     blas::qrts( M, R );
+    // else
     blas::qr2( M, R );
 }
 
@@ -774,7 +820,7 @@ tsqr  ( matrix< value_t > &  M,
         copy( R0, Q20 );
         copy( R1, Q21 );
 
-        qr2( Q2, R );
+        qr_wrapper( Q2, R );
 
         //
         // Q = | Q0    | Q    (overwrite M)
@@ -789,7 +835,7 @@ tsqr  ( matrix< value_t > &  M,
     }// if
     else
     {
-        qr2( M, R );
+        qr_wrapper( M, R );
     }// else
 }
 
