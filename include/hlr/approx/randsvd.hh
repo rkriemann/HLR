@@ -20,9 +20,6 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
-// to print out update statistics (used in external script)
-#define HLR_RANDSVD_RANK_STAT( msg ) // std::cout << msg << std::endl
-
 namespace detail
 {
 
@@ -381,7 +378,7 @@ randsvd ( const operator_t &       M,
     const auto  ncols_M = ncols( M );
 
     // for update statistics
-    HLR_RANDSVD_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
+    HLR_APPROX_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
     
     // compute column basis
     auto  Q   = detail::column_basis( M, acc, power_steps, oversampling );
@@ -440,9 +437,6 @@ randsvd ( const blas::matrix< value_t > &  U,
     const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
-    // for update statistics
-    HLR_RANDSVD_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
-
     //
     // don't increase rank
     //
@@ -473,6 +467,9 @@ randsvd ( const blas::matrix< value_t > &  U,
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+
         //
         // compute column basis
         //

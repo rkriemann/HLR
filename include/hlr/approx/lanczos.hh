@@ -18,6 +18,9 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
+namespace detail
+{
+
 //
 // version of Lanczos bidiagonalization for generic operator
 //
@@ -156,6 +159,20 @@ lanczos ( operator_t &             M,
     return { std::move( RU ), std::move( RV ) };
 }
 
+}// namespace detail
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+lanczos ( blas::matrix< value_t > &  M,
+          const hpro::TTruncAcc &    acc )
+{
+    // for update statistics
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+    
+    return detail::lanczos( M, acc );
+}
+
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
@@ -168,8 +185,8 @@ lanczos ( const blas::matrix< value_t > &  U,
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
-    const idx_t  nrows   = idx_t( U.nrows() );
-    const idx_t  ncols   = idx_t( V.nrows() );
+    const idx_t  nrows_U = idx_t( U.nrows() );
+    const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
     //
@@ -178,8 +195,8 @@ lanczos ( const blas::matrix< value_t > &  U,
 
     if ( in_rank == 0 )
     {
-        return { std::move( blas::matrix< value_t >( nrows, 0 ) ),
-                 std::move( blas::matrix< value_t >( ncols, 0 ) ) };
+        return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
     }// if
 
     if ( in_rank <= idx_t(acc.rank()) )
@@ -194,17 +211,20 @@ lanczos ( const blas::matrix< value_t > &  U,
     // via full SVD
     //
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
-        return std::move( lanczos( M, acc ) );
+        return detail::lanczos( M, acc );
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
         auto  op = operator_wrapper( U, V );
 
-        return std::move( lanczos( op, acc ) );
+        return detail::lanczos( op, acc );
     }// else
 }
 
@@ -225,33 +245,36 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  U_i : U )
         in_rank += U_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  u_i = U.cbegin();
         auto  v_i = V.cbegin();
         
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
             blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        return lanczos( M, acc );
+        return detail::lanczos( M, acc );
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
         auto  op = operator_wrapper( U, V );
 
-        return lanczos( op, acc );
+        return detail::lanczos( op, acc );
     }// else
 }
 
@@ -274,20 +297,20 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
     // determine maximal rank
     //
 
-    const size_t  nrows   = U.front().nrows();
-    const size_t  ncols   = V.front().nrows();
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
     uint          in_rank = 0;
 
     for ( auto &  T_i : T )
         in_rank += T_i.ncols();
 
-    if ( in_rank >= std::min( nrows, ncols ) )
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
         // perform dense approximation
         //
 
-        auto  M   = blas::matrix< value_t >( nrows, ncols );
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
         auto  U_i = U.cbegin();
         auto  T_i = T.cbegin();
         auto  V_i = V.cbegin();
@@ -299,13 +322,16 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
             blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return lanczos( M, acc );
+        return detail::lanczos( M, acc );
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
         auto  op = operator_wrapper( U, T, V );
         
-        return lanczos( op, acc );
+        return detail::lanczos( op, acc );
     }// else
 }
 

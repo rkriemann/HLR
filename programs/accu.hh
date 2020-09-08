@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <fstream>
+
 #include <hlr/utils/likwid.hh>
 
 #include <hpro/matrix/TMatrixSum.hh>
@@ -201,6 +203,61 @@ mm_accu ( const hpro::TMatrix &    A,
 }
 
 //
+// standard LU
+//
+template < typename approx_t >
+void
+lu_accu ( const hpro::TMatrix &    A,
+          const hpro::TTruncAcc &  acc,
+          const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  C   = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        impl::matrix::copy_to( A, *C );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hluaccu" );
+            
+        impl::accu::lu< value_t >( *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hluaccu" );
+            
+        toc = timer::since( tic );
+        std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "lu" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
 // main function
 //
 template < typename problem_t >
@@ -246,13 +303,69 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
+    lu_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    lu_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+
+    return;
+    
     // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "svd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
     //     mm_std< hlr::approx::SVD< value_t > >( *A, acc, "" );
-    //     mm_accu< hlr::approx::SVD< value_t > >( *A, acc, "" );
-    //     lu_std< hlr::approx::SVD< value_t > >( *A, acc, "" );
-    //     return;
+    //     std::cout.rdbuf( orig_cout );
     // }
-        
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "pairsvd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "rrqr.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RRQR< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "randsvd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "randlr.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RandLR< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "aca.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::ACA< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "lanczos.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
@@ -320,6 +433,7 @@ program_main ()
     //
 
     if ( true ) mm_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( true ) mm_std< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
     if ( true ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
     if ( true ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
     if ( true ) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
@@ -333,6 +447,7 @@ program_main ()
     std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
     if ( true ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( true ) mm_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
     if ( true ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
     if ( true ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
     if ( true ) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );

@@ -22,9 +22,6 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
-// to print out update statistics (used in external script)
-#define HLR_ACA_RANK_STAT( msg ) // std::cout << msg << std::endl
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // pivot search strategies
@@ -339,7 +336,7 @@ aca ( blas::matrix< value_t > &  M,
     auto  pivot_search = aca_pivot( M );
 
     // for update statistics
-    HLR_ACA_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
     
     return std::move( aca( M, pivot_search, acc, nullptr ) );
 }
@@ -356,9 +353,6 @@ aca ( const blas::matrix< value_t > &  U,
     const idx_t  nrows_U = idx_t( U.nrows() );
     const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
-
-    // for update statistics
-    HLR_ACA_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
     //
     // don't increase rank
@@ -390,6 +384,9 @@ aca ( const blas::matrix< value_t > &  U,
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+
         auto  op           = operator_wrapper( U, V );
         auto  pivot_search = aca_pivot( op );
     
@@ -421,9 +418,6 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
     for ( auto &  U_i : U )
         in_rank += U_i.ncols();
 
-    // for update statistics
-    HLR_ACA_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
-
     if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
@@ -441,6 +435,9 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+
         auto  op           = operator_wrapper( U, V );
         auto  pivot_search = aca_pivot( op );
         
@@ -474,9 +471,6 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
     for ( auto &  T_i : T )
         in_rank += T_i.ncols();
 
-    // for update statistics
-    HLR_ACA_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
-
     if ( in_rank >= std::min( nrows_U, nrows_V ) )
     {
         //
@@ -499,6 +493,9 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+
         auto  op           = operator_wrapper( U, T, V );
         auto  pivot_search = aca_pivot( op );
         

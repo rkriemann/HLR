@@ -18,9 +18,6 @@ namespace hpro = HLIB;
 
 using hpro::idx_t;
 
-// to print out update statistics (used in external script)
-#define HLR_RRQR_RANK_STAT( msg ) // std::cout << msg << std::endl
-
 namespace detail
 {
 
@@ -80,7 +77,7 @@ rrqr ( blas::matrix< value_t > &  M,
     }// if
     
     // for update statistics
-    HLR_RRQR_RANK_STAT( "full " << std::min( nrows, ncols ) );
+    HLR_APPROX_RANK_STAT( "full " << std::min( nrows, ncols ) );
     
     //
     // perform column pivoted QR of M
@@ -141,9 +138,6 @@ rrqr ( const blas::matrix< T > &  U,
     const idx_t  nrows_V = idx_t( V.nrows() );
     const idx_t  in_rank = idx_t( V.ncols() );
 
-    // for update statistics
-    HLR_RRQR_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
-    
     //
     // don't increase rank
     //
@@ -172,6 +166,9 @@ rrqr ( const blas::matrix< T > &  U,
     }// if
     else
     {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
         // [ QV, RV ] = qr( V )
         auto  QV = blas::copy( V );
         auto  RV = blas::matrix< value_t >( in_rank, in_rank );

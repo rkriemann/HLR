@@ -43,6 +43,9 @@ using hpro::apply_conjugate;
 using hpro::apply_transposed;
 using hpro::apply_adjoint;
 
+// to print out update statistics in approximation functions (used in external script)
+#define HLR_APPROX_RANK_STAT( msg ) // std::cout << msg << std::endl
+
 namespace blas
 {
 
