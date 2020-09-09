@@ -40,70 +40,6 @@ namespace detail
 using  upd_list_t = std::list< std::pair< const hpro::TMatrix *, const hpro::TMatrix * > >;
 
 //
-// evaluate all computable updates and apply to accumulator matrix
-// - given accumulator matrix may be replaced and newly created is returned
-//
-template < typename value_t,
-           typename approx_t >
-std::unique_ptr< hpro::TMatrix >
-eval_nonrec ( const value_t                       alpha,
-              const hpro::matop_t                 op_A,
-              const hpro::matop_t                 op_B,
-              hpro::TMatrix &                     M,
-              upd_list_t &                        upd_rec,
-              std::unique_ptr< hpro::TMatrix > &  upd_mat,
-              const hpro::TTruncAcc &             acc,
-              const approx_t &                    approx )
-{
-    std::unique_ptr< hpro::TMatrix >  U( std::move( upd_mat ) );
-    
-    for ( auto  [ A, B ] : upd_rec )
-    {
-        if ( ! is_blocked_all( *A, *B, M ) )
-        {
-            auto  T = std::unique_ptr< hpro::TMatrix >();
-
-            //
-            // compute update
-            //
-            
-            if ( is_blocked_all( *A, *B ) )
-            {
-                // ASSUMPTION: dense matrices only on lowest level in matrix,
-                //             therefore C has to be of low-rank format
-                HLR_ERROR( M.typestr() + " += blocked × blocked" );
-            }// if
-            else
-            {
-                // either A or B is low-rank or dense
-                T = multiply< value_t >( alpha, op_A, A, op_B, B );
-            }// else
-
-            //
-            // apply update to accumulator
-            //
-            
-            if ( is_null( U ) )
-            {
-                U = std::move( T );
-            }// if
-            else if ( is_dense( T.get() ) )
-            {
-                // prefer dense format to avoid unnecessary truncations
-                hlr::add( value_t(1), *U, *T, acc, approx );
-                U = std::move( T );
-            }// if
-            else
-            {
-                hlr::add( value_t(1), *T, *U, acc, approx );
-            }// else
-        }// if
-    }// for
-
-    return U;
-}
-
-//
 // restrict given recursive updates to sub block (i,j)
 // (of corresponding block matrix updates belong to)
 //
@@ -138,6 +74,162 @@ restrict_rec ( const matop_t     op_A,
     }// for
                                         
     return upd;
+}
+
+//
+// evaluate all computable updates and apply to accumulator matrix
+// - given accumulator matrix may be replaced and newly created is returned
+// - may proceed recursively if M is a leaf, e.g., low-rank block
+//
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< hpro::TMatrix >
+eval_nonrec ( const value_t                       alpha,
+              const hpro::matop_t                 op_A,
+              const hpro::matop_t                 op_B,
+              hpro::TMatrix &                     M,
+              upd_list_t &                        upd_rec,
+              std::unique_ptr< hpro::TMatrix > &  upd_mat,
+              const hpro::TTruncAcc &             acc,
+              const approx_t &                    approx )
+{
+    std::unique_ptr< hpro::TMatrix >       U( std::move( upd_mat ) );
+    std::unique_ptr< hpro::TBlockMatrix >  BC; // for recursive handling
+    
+    for ( auto  [ A, B ] : upd_rec )
+    {
+        //
+        // only handle computable updates, i.e., one of the participants is a leaf
+        //
+        
+        if ( ! is_blocked_all( *A, *B, M ) )
+        {
+            if ( is_blocked_all( A, B ) )
+            {
+                if ( ! is_null( BC ) )
+                    continue;
+                
+                //
+                // if M is a leaf and A _and_ B are blocked, a temporary matrix
+                // is created for further recursive update handling
+                //
+
+                // TODO: non low-rank M
+                HLR_ASSERT( is_lowrank( M ) );
+                
+                auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                auto  BB = cptrcast( B, hpro::TBlockMatrix );
+                
+                BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
+
+                BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
+
+                for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                    {
+                        HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
+                        
+                        BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                  BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                  M.value_type() ) );
+                    }// for
+                }// for
+            }// if
+            else
+            {
+                //
+                // actually compute product and update accumulator matrix
+                //
+                
+                auto  T = std::unique_ptr< hpro::TMatrix >();
+
+                //
+                // compute update
+                //
+            
+                if ( is_blocked_all( *A, *B ) )
+                {
+                    // ASSUMPTION: dense matrices only on lowest level in matrix,
+                    //             therefore C has to be of low-rank format
+                    HLR_ERROR( M.typestr() + " += blocked × blocked" );
+                }// if
+                else
+                {
+                    // either A or B is low-rank or dense
+                    T = multiply< value_t >( alpha, op_A, A, op_B, B );
+                }// else
+
+                //
+                // apply update to accumulator
+                //
+            
+                if ( is_null( U ) )
+                {
+                    U = std::move( T );
+                }// if
+                else if ( is_dense( T.get() ) )
+                {
+                    // prefer dense format to avoid unnecessary truncations
+                    hlr::add( value_t(1), *U, *T, acc, approx );
+                    U = std::move( T );
+                }// if
+                else
+                {
+                    hlr::add( value_t(1), *T, *U, acc, approx );
+                }// else
+            }// else
+        }// if
+    }// for
+
+    //
+    // now handle recursive updates
+    //
+    
+    if ( ! is_null( BC ) )
+    {
+        //
+        // first, split update U into subblock updates
+        // (to release U before recursion)
+        //
+
+        tensor2< std::unique_ptr< hpro::TMatrix > >  sub_mat( BC->nblock_rows(), BC->nblock_cols() );
+        tensor2< upd_list_t >                        sub_rec( BC->nblock_rows(), BC->nblock_cols() );
+        
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            {
+                HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
+                
+                if ( ! is_null( U ) )
+                    sub_mat(i,j) = hlr::matrix::restrict( *U, BC->block( i, j )->block_is() );
+                sub_rec(i,j) = detail::restrict_rec( op_A, op_B, upd_rec, i, j );
+            }// for
+        }// for
+
+        U.reset( nullptr );
+        
+        //
+        // apply recursive updates
+        //
+        
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                eval_nonrec< value_t >( alpha, op_A, op_B, *BC->block(i,j), sub_rec(i,j), sub_mat(i,j), acc, approx );
+
+        //
+        // finally convert subblocks to single low-rank matrix for new accumulated updates
+        //
+
+        U = matrix::convert_to_lowrank( *BC, acc, approx );
+    }// if
+
+    //
+    // all updates are applied now
+    //
+    
+    return U;
 }
 
 }// namespace detail
