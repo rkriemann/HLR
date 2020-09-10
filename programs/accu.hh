@@ -127,6 +127,8 @@ lu_std ( const hpro::TMatrix &    A,
         toc = timer::since( tic );
         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
+        hpro::DBG::write( C.get(), "C1.mat", "C1" );
+
         flops.push_back( get_flops( "lu" ) );
         runtime.push_back( toc.seconds() );
     }// for
@@ -240,6 +242,8 @@ lu_accu ( const hpro::TMatrix &    A,
         toc = timer::since( tic );
         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
+        hpro::DBG::write( C.get(), "C2.mat", "C2" );
+        
         flops.push_back( get_flops( "lu" ) );
         runtime.push_back( toc.seconds() );
     }// for

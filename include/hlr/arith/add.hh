@@ -106,7 +106,7 @@ add ( const value_t               alpha,
                 else if ( is_dense( A_ij ) )
                 {
                     auto  D_ij     = cptrcast( A_ij, hpro::TDenseMatrix );
-                    auto  M        = blas::copy( hpro::blas_mat< value_t >( D_ij ) );
+                    auto  M        = blas::copy( blas::mat< value_t >( D_ij ) );
                     auto  [ U, V ] = approx( M, acc );
 
                     if ( U.ncols() > 0 )
@@ -231,7 +231,7 @@ add ( const value_t               alpha,
             if ( is_null( A_ij ) )
                 continue;
 
-            auto  D_ij = blas::matrix< value_t >( hpro::blas_mat< value_t >( C ),
+            auto  D_ij = blas::matrix< value_t >( blas::mat< value_t >( C ),
                                                   A_ij->row_is() - C.row_ofs(), 
                                                   A_ij->col_is() - C.col_ofs() );
             auto  C_ij = hpro::TDenseMatrix( A_ij->row_is(), A_ij->col_is(), D_ij );
@@ -267,7 +267,7 @@ add ( const value_t               alpha,
 
             HLR_ASSERT( ! is_null( C_ij ) );
 
-            auto  D_ij = blas::matrix< value_t >( hpro::blas_mat< value_t >( A ),
+            auto  D_ij = blas::matrix< value_t >( blas::mat< value_t >( A ),
                                                   C_ij->row_is() - C.row_ofs(), 
                                                   C_ij->col_is() - C.col_ofs() );
             auto  A_ij = hpro::TDenseMatrix( C_ij->row_is(), C_ij->col_is(), D_ij );
@@ -296,19 +296,19 @@ add ( const value_t            alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
     if ( alpha != value_t(1) )
     {
-        auto  UA = blas::copy( hpro::blas_mat_A< value_t >( A ) );
+        auto  UA = blas::copy( blas::mat_U< value_t >( A ) );
 
         blas::scale( alpha, UA );
 
-        auto [ U, V ] = approx( {                               UA, hpro::blas_mat_A< value_t >( C ) },
-                                { hpro::blas_mat_B< value_t >( A ), hpro::blas_mat_B< value_t >( C ) },
+        auto [ U, V ] = approx( {                               UA, blas::mat_U< value_t >( C ) },
+                                { blas::mat_V< value_t >( A ), blas::mat_V< value_t >( C ) },
                                 acc );
         C.set_lrmat( std::move( U ), std::move( V ) );
     }// if
     else
     {
-        auto [ U, V ] = approx( { hpro::blas_mat_A< value_t >( A ), hpro::blas_mat_A< value_t >( C ) },
-                                { hpro::blas_mat_B< value_t >( A ), hpro::blas_mat_B< value_t >( C ) },
+        auto [ U, V ] = approx( { blas::mat_U< value_t >( A ), blas::mat_U< value_t >( C ) },
+                                { blas::mat_V< value_t >( A ), blas::mat_V< value_t >( C ) },
                                 acc );
         
         C.set_lrmat( std::move( U ), std::move( V ) );
@@ -331,13 +331,12 @@ add ( const value_t               alpha,
     
     std::scoped_lock  lock( C.mutex() );
     
-    auto  TA = blas::copy( hpro::blas_mat< value_t >( A ) );
+    auto  TA = blas::copy( blas::mat< value_t >( A ) );
 
-    blas::prod( alpha,
-                hpro::blas_mat_A< value_t >( C ),
-                blas::adjoint( hpro::blas_mat_B< value_t >( C ) ),
-                value_t( 1 ),
-                TA );
+    blas::prod( value_t(1),
+                blas::mat_U< value_t >( C ),
+                blas::adjoint( blas::mat_V< value_t >( C ) ),
+                alpha, TA );
 
     auto [ U, V ] = approx( TA, acc );
         
@@ -357,11 +356,8 @@ add ( const value_t            alpha,
     
     std::scoped_lock  lock( C.mutex() );
     
-    blas::prod( alpha,
-                hpro::blas_mat_A< value_t >( A ),
-                blas::adjoint( hpro::blas_mat_B< value_t >( A ) ),
-                value_t( 1 ),
-                hpro::blas_mat< value_t >( C ) );
+    blas::prod(      alpha, blas::mat_U< value_t >( A ), blas::adjoint( blas::mat_V< value_t >( A ) ),
+                value_t(1), blas::mat< value_t >( C ) );
 }
 
 template < typename value_t,
@@ -378,7 +374,7 @@ add ( const value_t               alpha,
     std::scoped_lock  lock( C.mutex() );
     
     // C = C + α A
-    blas::add( alpha, hpro::blas_mat< value_t >( A ), hpro::blas_mat< value_t >( C ) );
+    blas::add( alpha, blas::mat< value_t >( A ), blas::mat< value_t >( C ) );
 }
 
 //
