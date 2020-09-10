@@ -1,5 +1,5 @@
-#ifndef __HLR_MATRIX_ACCUMULATOR_HH
-#define __HLR_MATRIX_ACCUMULATOR_HH
+#ifndef __HLR_TBB_ACCUMULATOR_HH
+#define __HLR_TBB_ACCUMULATOR_HH
 //
 // Project     : HLR
 // File        : accumulator.hh
@@ -8,41 +8,20 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <cassert>
-
 #include <hpro/matrix/TBlockMatrix.hh>
 
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/add.hh>
+#include "hlr/matrix/accumulator_base.hh"
 #include "hlr/matrix/restrict.hh"
 #include <hlr/utils/checks.hh>
 #include "hlr/utils/tensor.hh"
-#include "hlr/seq/matrix.hh"
+#include "hlr/tbb/matrix.hh"
 
-namespace hlr { namespace matrix {
+namespace hlr { namespace tbb { namespace matrix {
 
-struct accumulator
+struct accumulator : public hlr::matrix::accumulator_base
 {
-    //
-    // represents an update, i.e., matrix product
-    //
-    struct update
-    {
-        const matop_t          op_A;
-        const hpro::TMatrix *  A;
-        const matop_t          op_B;
-        const hpro::TMatrix *  B;
-    };
-    
-    // represents set of updates
-    using  update_list = std::list< update >;
-
-    // accumulated computed updates
-    std::unique_ptr< hpro::TMatrix >   matrix;
-
-    // accumulated pending (recursive) updates
-    update_list                        pending;
-
     //
     // ctors
     //
@@ -52,28 +31,9 @@ struct accumulator
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
                   update_list &&                       apending )
-            : matrix( std::move( amatrix ) )
-            , pending( std::move( apending ) )
+            : hlr::matrix::accumulator_base( std::move( amatrix ), std::move( apending ) )
     {}
     
-    //
-    // remove update matrix
-    //
-    void
-    clear_matrix ()
-    {
-        matrix.reset( nullptr );
-    }
-
-    //
-    // release matrix
-    //
-    hpro::TMatrix *
-    release_matrix ()
-    {
-        return matrix.release();
-    }
-
     //
     // apply accumulated updates and free accumulator matrix
     //
@@ -252,17 +212,7 @@ struct accumulator
             // (to release matrix before recursion)
             //
 
-            tensor2< accumulator >  sub_accu( BC->nblock_rows(), BC->nblock_cols() );
-        
-            for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-            {
-                for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-                {
-                    HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
-
-                    sub_accu(i,j) = restrict( i, j, *BC );
-                }// for
-            }// for
+            auto  sub_accu = restrict( *BC );
 
             matrix.reset( nullptr );
         
@@ -270,27 +220,31 @@ struct accumulator
             // apply recursive updates
             //
         
-            for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-            {
-                for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            ::tbb::parallel_for(
+                ::tbb::blocked_range2d< uint >( 0, BC->nblock_rows(),
+                                                0, BC->nblock_cols() ),
+                [&,alpha] ( const auto & r )
                 {
-                    sub_accu(i,j).eval< value_t >( alpha, *BC->block(i,j), acc, approx );
+                    for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                        for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                        {
+                            sub_accu(i,j).eval( alpha, *BC->block(i,j), acc, approx );
 
-                    // replace block in BC by accumulator matrix for agglomeration below
-                    BC->delete_block( i, j );
-                    BC->set_block( i, j, sub_accu(i,j).release_matrix() );
-                }// for
-            }// for
+                            // replace block in BC by accumulator matrix for agglomeration below
+                            BC->delete_block( i, j );
+                            BC->set_block( i, j, sub_accu(i,j).release_matrix() );
+                        }// for
+                } );
 
             //
             // finally convert subblocks to single low-rank matrix for new accumulated updates
             //
 
-            matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
+            matrix = tbb::matrix::convert_to_lowrank( *BC, acc, approx );
         }// if
     }
 };
 
-}} // namespace hlr::matrix
+}}} // namespace hlr::tbb::matrix
 
-#endif // __HLR_MATRIX_ACCUMULATOR_HH
+#endif // __HLR_TBB_ACCUMULATOR_HH

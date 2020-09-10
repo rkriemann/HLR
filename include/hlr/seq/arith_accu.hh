@@ -16,19 +16,19 @@
 #include <hpro/algebra/mat_add.hh>
 #include <hpro/algebra/mat_conv.hh>
 
-#include "hlr/matrix/accumulator.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/tensor.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/add.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/seq/accumulator.hh"
 
 namespace hlr { namespace seq { namespace accu {
 
 namespace hpro = HLIB;
 
-using hlr::matrix::accumulator;
+using hlr::seq::matrix::accumulator;
 
 ////////////////////////////////////////////////////////////////////////////////
 //

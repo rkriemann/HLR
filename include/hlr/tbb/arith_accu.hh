@@ -23,13 +23,13 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/add.hh"
-#include "hlr/matrix/accumulator.hh"
+#include "hlr/tbb/accumulator.hh"
 
 namespace hlr { namespace tbb { namespace accu {
 
 namespace hpro = HLIB;
 
-using hlr::matrix::accumulator;
+using hlr::tbb::matrix::accumulator;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,7 +40,7 @@ using hlr::matrix::accumulator;
 namespace detail
 {
 
-using  upd_list_t = std::list< std::pair< const TMatrix *, const TMatrix * > >;
+using  upd_list_t = std::list< std::pair< const hpro::TMatrix *, const hpro::TMatrix * > >;
 
 //
 // forward decl.
