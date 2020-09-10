@@ -307,7 +307,7 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
-    lu_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
     lu_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
 
     return;
