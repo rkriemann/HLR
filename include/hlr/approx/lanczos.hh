@@ -127,7 +127,19 @@ lanczos ( operator_t &             M,
         
     } while ( step <= std::min( nrowsM, ncolsM ) ); // fallback 
 
+    blas::vector< real_t >  D( step );
+    blas::vector< real_t >  E( step-1 );
 
+    for ( uint  i = 0; i < step-1; ++i )
+    {
+        D(i) = alpha[i];
+        E[i] = beta[i];
+    }// for
+
+    D(step-1) = alpah[step-1];
+    
+    auto  [ Usvd, Ssvd, Vsvd ] = blas::bdsvd( D, E );
+        
     //
     // U = U·diag(alpha) + diag(beta,-1), V remains unchanged
     //

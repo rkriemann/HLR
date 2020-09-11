@@ -938,6 +938,34 @@ factorise_ortho ( const matrix< value_t > &  M,
     }// else
 }
 
+//
+// construct SVD of bidiagonal matrix with diagonal D and off-diagonal E
+//
+template < typename value_t >
+std::tuple< matrix< value_t >,
+            vector< value_t >,
+            matrix< value_t > >
+bdsvd ( const vector< value_t > &  D,
+        const vector< value_t > &  E )
+{
+    const blas_int_t           n   = D.length();
+    blas_int_t                 nsv = 0; // number of singular values found
+    matrix< value_t >          Z( 2*n, n+1 );
+    std::vector< value_t >     work( 14 * n );
+    std::vector< blas_int_t >  iwork( 12 * n );
+    blas_int_t                 info = 0;
+    auto                       S = vector< value_t >( n );
+
+    bdsvd( 'L', 'V', 'A', D.length(), D.data(), E.data(),
+           value_t(0), value_t(0), blas_int_t(0), blas_int_t(0),
+           nsv, S.data(), Z.data(), 2*n, work.data(), iwork.data(), info );
+
+    auto  U = blas::matrix< value_t >( n, nsv );
+    auto  V = blas::matrix< value_t >( nsv, n );
+
+    return { std::move( U ), std::move( S ), std::move( V ) };
+}
+
 }}// namespace hlr::blas
 
 #endif // __HLR_ARITH_BLAS_HH

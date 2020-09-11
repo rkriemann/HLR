@@ -814,6 +814,138 @@ HLR_BLAS_LARFB( std::complex< double >, zlarfb_ )
 
 #undef HLR_BLAS_LARFB
 
+
+extern "C"
+{
+void sbdsvdx_ ( const char *        uplo,
+                const char *        jobz,
+                const char *        range,
+                const blas_int_t *  n,
+                const float *       D,
+                const float *       E,
+                const float *       vl,
+                const float *       vu,
+                const blas_int_t *  il,
+                const blas_int_t *  iu,
+                const blas_int_t *  ns,
+                float *             S,
+                float *             Z,
+                const blas_int_t *  ldZ,
+                float *             work,
+                blas_int_t *        iwork,
+                const blas_int_t *  info );
+void dbdsvdx_ ( const char *        uplo,
+                const char *        jobz,
+                const char *        range,
+                const blas_int_t *  n,
+                const double *      D,
+                const double *      E,
+                const double *      vl,
+                const double *      vu,
+                const blas_int_t *  il,
+                const blas_int_t *  iu,
+                const blas_int_t *  ns,
+                double *            S,
+                double *            Z,
+                const blas_int_t *  ldZ,
+                double *            work,
+                blas_int_t *        iwork,
+                const blas_int_t *  info );
+}
+
+#define HLR_BLAS_BDSVD( type, func )                    \
+    inline                                              \
+    void bdsvd ( const char          uplo,              \
+                 const char          jobz,              \
+                 const char          range,             \
+                 const blas_int_t    n,                 \
+                 const type *        D,                 \
+                 const type *        E,                 \
+                 const type          vl,                \
+                 const type          vu,                \
+                 const blas_int_t    il,                \
+                 const blas_int_t    iu,                \
+                 const blas_int_t &  ns,                \
+                 type *              S,                 \
+                 type *              Z,                 \
+                 const blas_int_t    ldZ,               \
+                 type *              work,              \
+                 blas_int_t *        iwork,             \
+                 blas_int_t &        info )             \
+    {                                                   \
+        func( & uplo, & jobz, & range, & n, D, E,       \
+              & vl, & vu, & il, & iu, & ns, S, Z,       \
+              & ldZ, work, iwork, & info );             \
+    }
+
+HLR_BLAS_BDSVD( float,  sbdsvdx_ )
+HLR_BLAS_BDSVD( double, dbdsvdx_ )
+
+#undef HLR_BLAS_BDSVD
+
+
+extern "C"
+{
+void sbdsqr_ ( const char *        uplo,
+               const blas_int_t *  n,
+               const blas_int_t *  ncvt,
+               const blas_int_t *  nru,
+               const blas_int_t *  ncc,
+               float *             D,
+               float *             E,
+               float *             VT,
+               const blas_int_t *  ldVT,
+               float *             U,
+               const blas_int_t *  ldU,
+               float *             C,
+               const blas_int_t *  ldC,
+               float *             work,
+               const blas_int_t *  info );
+void dbdsqr_ ( const char *        uplo,
+               const blas_int_t *  n,
+               const blas_int_t *  ncvt,
+               const blas_int_t *  nru,
+               const blas_int_t *  ncc,
+               double *            D,
+               double *            E,
+               double *            VT,
+               const blas_int_t *  ldVT,
+               double *            U,
+               const blas_int_t *  ldU,
+               double *            C,
+               const blas_int_t *  ldC,
+               double *            work,
+               const blas_int_t *  info );
+}
+
+#define HLR_BLAS_BDSQR( type, func )                    \
+    inline                                              \
+    void bdsqr ( const char          uplo,              \
+                 const blas_int_t    n,                 \
+                 const blas_int_t    ncvt,              \
+                 const blas_int_t    nru,               \
+                 const blas_int_t    ncc,               \
+                 type *              D,                 \
+                 type *              E,                 \
+                 type *              VT,                \
+                 const blas_int_t    ldVT,              \
+                 type *              U,                 \
+                 const blas_int_t    ldU,               \
+                 type *              C,                 \
+                 const blas_int_t    ldC,               \
+                 type *              work,              \
+                 blas_int_t &        info )             \
+    {                                                   \
+        func( & uplo, & n, & ncvt, & nru, & ncc, D, E,  \
+              VT, & ldVT, U, & ldU, C, & ldC, work,     \
+              & info );                                 \
+    }
+
+HLR_BLAS_BDSQR( float,  sbdsqr_ )
+HLR_BLAS_BDSQR( double, dbdsqr_ )
+
+#undef HLR_BLAS_BDSQR
+
 }}// hlr::blas
 
 #endif // __HLR_ARITH_BLAS_DEF_HH

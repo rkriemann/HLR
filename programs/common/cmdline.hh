@@ -45,6 +45,7 @@ string  ref        = "";           // reference matrix, algorithm, etc.
 auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
+string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 
 void
 parse ( int argc, char ** argv )
@@ -63,41 +64,42 @@ parse ( int argc, char ** argv )
     // standard options
     gen_opts.add_options()
         ( "help,h",                       ": print this help text" )
+        ( "noredir",                      ": do not redirect output (MPI only)" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
         ( "verbosity,v", value<int>(),    ": verbosity level" )
-        ( "noredir",                      ": do not redirect output (MPI only)" )
         ;
 
     app_opts.add_options()
-        ( "nprob,n",     value<int>(),    ": set problem size" )
-        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
-        ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
-        ( "matrix",      value<string>(), ": matrix file use" )
-        ( "sparse",      value<string>(), ": sparse matrix file use" )
-        ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
-        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
+        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
+        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
+        ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
+        ( "matrix",      value<string>(), ": matrix file use" )
+        ( "nprob,n",     value<int>(),    ": set problem size" )
+        ( "sparse",      value<string>(), ": sparse matrix file use" )
         ;
 
     ari_opts.add_options()
-        ( "ntile",       value<int>(),    ": set tile size" )
-        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
-        ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
-        ( "nodag",                        ": do not use DAG in arithmetic" )
-        ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
-        ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
-        ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
-        ( "tol",         value<double>(), ": tolerance for some algorithms" )
         ( "accu",                         ": use accumulator arithmetic" )
-        ( "onlydag",                      ": only compute DAG but do not execute it" )
-        ( "nocopy",                       ": do not copy matrix before arithmetic" )
-        ( "lvl",                          ": do level-wise LU" )
-        ( "oop",                          ": do out-of-place LU" )
-        ( "fused",                        ": compute fused DAG for LU and accumulators" )
-        ( "nosparsify",                   ": do not sparsify DAG" )
-        ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
+        ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
+        ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
+        ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
+        ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
+        ( "fused",                        ": compute fused DAG for LU and accumulators" )
+        ( "lvl",                          ": do level-wise LU" )
+        ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
+        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
+        ( "ntile",       value<int>(),    ": set tile size" )
+        ( "nocopy",                       ": do not copy matrix before arithmetic" )
+        ( "nodag",                        ": do not use DAG in arithmetic" )
+        ( "nosparsify",                   ": do not sparsify DAG" )
+        ( "onlydag",                      ": only compute DAG but do not execute it" )
+        ( "oop",                          ": do out-of-place LU" )
+        ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
+        ( "tol",         value<double>(), ": tolerance for some algorithms" )
         ;
 
     opts.add( gen_opts ).add( app_opts ).add( ari_opts );
@@ -134,6 +136,7 @@ parse ( int argc, char ** argv )
 
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
+    if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
@@ -171,6 +174,21 @@ parse ( int argc, char ** argv )
                   << "                   if grid is defined use grid points, otherwise n random points in 3D" << std::endl
                   << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
                   << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( approx == "help" )
+    {
+        std::cout << "Low-rank approximation methods:" << std::endl
+                  << "  - svd     : low-rank singular value decomposition (best approximation)" << std::endl
+                  << "  - rrqr    : rank-revealing QR" << std::endl
+                  << "  - randsvd : randomized SVD" << std::endl
+                  << "  - randlr  : randomized low-rank" << std::endl
+                  << "  - aca     : adaptive cross approximation" << std::endl
+                  << "  - lanczos : Lanczos bidiagonalization" << std::endl
+                  << "  - all     : use all for comparison" << std::endl
+                  << "  - default : use default approximation (SVD)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -214,6 +232,9 @@ parse ( int argc, char ** argv )
     
     assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
     assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
+    assert( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
+            ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||
+            ( approx == "all"    ) || ( approx == "default" ) );
 }
 
 }}// namespace hlr::cmdline
