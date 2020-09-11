@@ -127,19 +127,57 @@ lanczos ( operator_t &             M,
         
     } while ( step <= std::min( nrowsM, ncolsM ) ); // fallback 
 
+    #if 1
+    
+    //
+    // compute SVD of ( diag(α) + diag(β,-1) )
+    //
+    
     blas::vector< real_t >  D( step );
     blas::vector< real_t >  E( step-1 );
 
     for ( uint  i = 0; i < step-1; ++i )
     {
         D(i) = alpha[i];
-        E[i] = beta[i];
+        E(i) = beta[i];
     }// for
 
-    D(step-1) = alpah[step-1];
-    
+    D(step-1) = alpha[step-1];
+
     auto  [ Usvd, Ssvd, Vsvd ] = blas::bdsvd( D, E );
-        
+    auto  k                    = acc.trunc_rank( Ssvd );
+
+    blas::prod_diag( Usvd, Ssvd, k );
+
+    auto  Uk  = blas::matrix< real_t >( Usvd, blas::range::all, blas::range( 0, k-1 ) );
+    auto  Ukv = blas::copy< value_t, real_t >( Uk );
+    auto  Vk  = blas::matrix< real_t >( Vsvd, blas::range::all, blas::range( 0, k-1 ) );
+    auto  Vkv = blas::copy< value_t, real_t >( Vk );
+    
+    //
+    // form final low-rank matrices: U·U_k , V·V_k
+    //
+
+    auto  RU = blas::matrix< value_t >( nrowsM, k );
+    auto  RV = blas::matrix< value_t >( ncolsM, k );
+
+    auto  TU = blas::matrix< value_t >( nrowsM, step );
+    auto  TV = blas::matrix< value_t >( ncolsM, step );
+
+    for ( uint  i = 0; i < step; ++i )
+    {
+        auto  TU_i = TU.column( i );
+        auto  TV_i = TV.column( i );
+
+        blas::copy( U[i], TU_i );
+        blas::copy( V[i], TV_i );
+    }// for
+
+    blas::prod( value_t(1), TU, Ukv, value_t(0), RU );
+    blas::prod( value_t(1), TV, Vkv, value_t(0), RV );
+    
+    #else
+    
     //
     // U = U·diag(alpha) + diag(beta,-1), V remains unchanged
     //
@@ -167,6 +205,8 @@ lanczos ( operator_t &             M,
         blas::copy( U[i], RU_i );
         blas::copy( V[i], RV_i );
     }// for
+
+    #endif
     
     return { std::move( RU ), std::move( RV ) };
 }

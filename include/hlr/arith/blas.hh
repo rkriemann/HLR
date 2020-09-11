@@ -954,15 +954,23 @@ bdsvd ( const vector< value_t > &  D,
     std::vector< value_t >     work( 14 * n );
     std::vector< blas_int_t >  iwork( 12 * n );
     blas_int_t                 info = 0;
-    auto                       S = vector< value_t >( n );
+    auto                       S2 = vector< value_t >( 2*n ); // bdsvd actually needs 2*n space here
 
     bdsvd( 'L', 'V', 'A', D.length(), D.data(), E.data(),
            value_t(0), value_t(0), blas_int_t(0), blas_int_t(0),
-           nsv, S.data(), Z.data(), 2*n, work.data(), iwork.data(), info );
+           nsv, S2.data(), Z.data(), 2*n, work.data(), iwork.data(), info );
 
-    auto  U = blas::matrix< value_t >( n, nsv );
-    auto  V = blas::matrix< value_t >( nsv, n );
+    auto  U  = matrix< value_t >( n, nsv );
+    auto  S  = vector< value_t >( n );
+    auto  V  = matrix< value_t >( n, nsv );
+    auto  SS = vector< value_t >( S2, range( 0, n-1 ) );
+    auto  ZU = matrix< value_t >( Z, range( 0,   n-1 ), range( 0, nsv-1 ) );
+    auto  ZV = matrix< value_t >( Z, range( n, 2*n-1 ), range( 0, nsv-1 ) );
 
+    copy( ZU, U );
+    copy( SS, S );
+    copy( ZV, V );
+    
     return { std::move( U ), std::move( S ), std::move( V ) };
 }
 

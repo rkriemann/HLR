@@ -387,7 +387,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "      " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
 
@@ -451,7 +451,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "      " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
         auto                   old_config = hpro::CFG::Arith::use_accu;
@@ -524,7 +524,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
 
@@ -580,7 +580,7 @@ program_main ()
     
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
         auto                   old_config = hpro::CFG::Arith::use_accu;
