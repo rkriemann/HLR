@@ -59,7 +59,8 @@ PROGRAMS     = [ 'tlr',
                  'dag-hodlr',
                  'uniform',
                  'accu',
-                 'dpt' ]
+                 'dpt',
+                 'polykern' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -98,7 +99,8 @@ SUBDIRS      = { 'tlr'         : 'tlr',
                  'dag-hodlr'   : 'dag',
                  'uniform'     : '',
                  'accu'        : '',
-                 'dpt'         : '' }
+                 'dpt'         : '',
+                 'polykern'    : '' }
 
 ######################################################################
 #

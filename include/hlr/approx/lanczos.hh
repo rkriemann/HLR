@@ -28,7 +28,8 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 lanczos ( operator_t &             M,
-          const hpro::TTruncAcc &  acc )
+          const hpro::TTruncAcc &  acc,
+          const bool               with_svd = false )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = typename hpro::real_type< value_t >::type_t;
@@ -127,88 +128,89 @@ lanczos ( operator_t &             M,
         
     } while ( step <= std::min( nrowsM, ncolsM ) ); // fallback 
 
-    #if 1
-    
     //
     // compute SVD of ( diag(α) + diag(β,-1) )
     //
-    
-    blas::vector< real_t >  D( step );
-    blas::vector< real_t >  E( step-1 );
 
-    for ( uint  i = 0; i < step-1; ++i )
+    if ( with_svd )
     {
-        D(i) = alpha[i];
-        E(i) = beta[i];
-    }// for
+        blas::vector< real_t >  D( step );
+        blas::vector< real_t >  E( step-1 );
 
-    D(step-1) = alpha[step-1];
+        for ( uint  i = 0; i < step-1; ++i )
+        {
+            D(i) = alpha[i];
+            E(i) = beta[i];
+        }// for
+        
+        D(step-1) = alpha[step-1];
+        
+        auto  [ Usvd, Ssvd, Vsvd ] = blas::bdsvd( D, E );
+        auto  k                    = acc.trunc_rank( Ssvd );
+        
+        blas::prod_diag( Usvd, Ssvd, k );
+        
+        auto  Uk  = blas::matrix< real_t >( Usvd, blas::range::all, blas::range( 0, k-1 ) );
+        auto  Ukv = blas::copy< value_t, real_t >( Uk );
+        auto  Vk  = blas::matrix< real_t >( Vsvd, blas::range::all, blas::range( 0, k-1 ) );
+        auto  Vkv = blas::copy< value_t, real_t >( Vk );
+        
+        //
+        // form final low-rank matrices: U·U_k , V·V_k
+        //
+        
+        auto  RU = blas::matrix< value_t >( nrowsM, k );
+        auto  RV = blas::matrix< value_t >( ncolsM, k );
+        
+        auto  TU = blas::matrix< value_t >( nrowsM, step );
+        auto  TV = blas::matrix< value_t >( ncolsM, step );
+        
+        for ( uint  i = 0; i < step; ++i )
+        {
+            auto  TU_i = TU.column( i );
+            auto  TV_i = TV.column( i );
+            
+            blas::copy( U[i], TU_i );
+            blas::copy( V[i], TV_i );
+        }// for
+        
+        blas::prod( value_t(1), TU, Ukv, value_t(0), RU );
+        blas::prod( value_t(1), TV, Vkv, value_t(0), RV );
 
-    auto  [ Usvd, Ssvd, Vsvd ] = blas::bdsvd( D, E );
-    auto  k                    = acc.trunc_rank( Ssvd );
-
-    blas::prod_diag( Usvd, Ssvd, k );
-
-    auto  Uk  = blas::matrix< real_t >( Usvd, blas::range::all, blas::range( 0, k-1 ) );
-    auto  Ukv = blas::copy< value_t, real_t >( Uk );
-    auto  Vk  = blas::matrix< real_t >( Vsvd, blas::range::all, blas::range( 0, k-1 ) );
-    auto  Vkv = blas::copy< value_t, real_t >( Vk );
-    
-    //
-    // form final low-rank matrices: U·U_k , V·V_k
-    //
-
-    auto  RU = blas::matrix< value_t >( nrowsM, k );
-    auto  RV = blas::matrix< value_t >( ncolsM, k );
-
-    auto  TU = blas::matrix< value_t >( nrowsM, step );
-    auto  TV = blas::matrix< value_t >( ncolsM, step );
-
-    for ( uint  i = 0; i < step; ++i )
+        return { std::move( RU ), std::move( RV ) };
+    }// if
+    else
     {
-        auto  TU_i = TU.column( i );
-        auto  TV_i = TV.column( i );
+        //
+        // U = U · ( diag(alpha) + diag(beta,-1) ), V remains unchanged
+        //
 
-        blas::copy( U[i], TU_i );
-        blas::copy( V[i], TV_i );
-    }// for
-
-    blas::prod( value_t(1), TU, Ukv, value_t(0), RU );
-    blas::prod( value_t(1), TV, Vkv, value_t(0), RV );
+        for ( uint  i = 0; i < step-1; ++i )
+        {
+            blas::scale( value_t(alpha[i]), U[i] );
+            blas::add( value_t(beta[i]), U[i+1], U[i] );
+        }// for
     
-    #else
-    
-    //
-    // U = U·diag(alpha) + diag(beta,-1), V remains unchanged
-    //
+        blas::scale( value_t(alpha[step-1]), U[step-1] );
 
-    for ( uint  i = 0; i < step-1; ++i )
-    {
-        blas::scale( value_t(alpha[i]), U[i] );
-        blas::add( value_t(beta[i]), U[i+1], U[i] );
-    }// for
-    
-    blas::scale( value_t(alpha[step-1]), U[step-1] );
+        //
+        // form final low-rank matrices
+        //
 
-    //
-    // form final low-rank matrices
-    //
+        auto  RU = blas::matrix< value_t >( nrowsM, step );
+        auto  RV = blas::matrix< value_t >( ncolsM, step );
 
-    auto  RU = blas::matrix< value_t >( nrowsM, step );
-    auto  RV = blas::matrix< value_t >( ncolsM, step );
+        for ( uint  i = 0; i < step; ++i )
+        {
+            auto  RU_i = RU.column( i );
+            auto  RV_i = RV.column( i );
 
-    for ( uint  i = 0; i < step; ++i )
-    {
-        auto  RU_i = RU.column( i );
-        auto  RV_i = RV.column( i );
+            blas::copy( U[i], RU_i );
+            blas::copy( V[i], RV_i );
+        }// for
 
-        blas::copy( U[i], RU_i );
-        blas::copy( V[i], RV_i );
-    }// for
-
-    #endif
-    
-    return { std::move( RU ), std::move( RV ) };
+        return { std::move( RU ), std::move( RV ) };
+    }// else
 }
 
 }// namespace detail
@@ -217,12 +219,13 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( blas::matrix< value_t > &  M,
-          const hpro::TTruncAcc &    acc )
+          const hpro::TTruncAcc &    acc,
+          const bool                 with_svd = false )
 {
     // for update statistics
     HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
     
-    return detail::lanczos( M, acc );
+    return detail::lanczos( M, acc, with_svd );
 }
 
 //
@@ -233,7 +236,8 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const blas::matrix< value_t > &  U,
           const blas::matrix< value_t > &  V,
-          const hpro::TTruncAcc &          acc )
+          const hpro::TTruncAcc &          acc,
+          const bool                       with_svd = false )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -267,7 +271,7 @@ lanczos ( const blas::matrix< value_t > &  U,
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
-        return detail::lanczos( M, acc );
+        return detail::lanczos( M, acc, with_svd );
     }// if
     else
     {
@@ -276,7 +280,7 @@ lanczos ( const blas::matrix< value_t > &  U,
     
         auto  op = operator_wrapper( U, V );
 
-        return detail::lanczos( op, acc );
+        return detail::lanczos( op, acc, with_svd );
     }// else
 }
 
@@ -285,7 +289,8 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc )
+          const hpro::TTruncAcc &                       acc,
+          const bool                                    with_svd = false )
 {
     assert( U.size() == V.size() );
 
@@ -317,7 +322,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
             blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        return detail::lanczos( M, acc );
+        return detail::lanczos( M, acc, with_svd );
     }// if
     else
     {
@@ -326,7 +331,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
     
         auto  op = operator_wrapper( U, V );
 
-        return detail::lanczos( op, acc );
+        return detail::lanczos( op, acc, with_svd );
     }// else
 }
 
@@ -336,7 +341,8 @@ std::pair< blas::matrix< value_t >,
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  T,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc )
+          const hpro::TTruncAcc &                       acc,
+          const bool                                    with_svd = false )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -374,7 +380,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
             blas::prod( value_t(1), UT_i, blas::adjoint( *V_i ), value_t(1), M );
         }// for
 
-        return detail::lanczos( M, acc );
+        return detail::lanczos( M, acc, with_svd );
     }// if
     else
     {
@@ -383,7 +389,7 @@ lanczos ( const std::list< blas::matrix< value_t > > &  U,
     
         auto  op = operator_wrapper( U, T, V );
         
-        return detail::lanczos( op, acc );
+        return detail::lanczos( op, acc, with_svd );
     }// else
 }
 
@@ -398,6 +404,8 @@ struct Lanczos
 {
     using  value_t = T_value;
 
+    const bool  with_svd = false;
+    
     //
     // operators
     //
@@ -407,7 +415,7 @@ struct Lanczos
     operator () ( blas::matrix< value_t > &  M,
                   const hpro::TTruncAcc &    acc ) const
     {
-        return hlr::approx::lanczos( M, acc );
+        return hlr::approx::lanczos( M, acc, with_svd );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -416,7 +424,7 @@ struct Lanczos
                   const blas::matrix< value_t > &  V,
                   const hpro::TTruncAcc &          acc ) const 
     {
-        return hlr::approx::lanczos( U, V, acc );
+        return hlr::approx::lanczos( U, V, acc, with_svd );
     }
     
     std::pair< blas::matrix< value_t >,
@@ -425,7 +433,7 @@ struct Lanczos
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return hlr::approx::lanczos( U, V, acc );
+        return hlr::approx::lanczos( U, V, acc, with_svd );
     }
 
     std::pair< blas::matrix< value_t >,
@@ -435,7 +443,7 @@ struct Lanczos
                   const std::list< blas::matrix< value_t > > &  V,
                   const hpro::TTruncAcc &                       acc ) const
     {
-        return hlr::approx::lanczos( U, T, V, acc );
+        return hlr::approx::lanczos( U, T, V, acc, with_svd );
     }
 };
 
