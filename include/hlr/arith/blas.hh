@@ -974,6 +974,44 @@ bdsvd ( const vector< value_t > &  D,
     return { std::move( U ), std::move( S ), std::move( V ) };
 }
 
+//
+// compute singular vectors of U·V'
+//
+template < typename value_t >
+vector< value_t >
+sv ( const matrix< value_t > &  U,
+     const matrix< value_t > &  V )
+{
+    const auto   nrows_U = U.nrows();
+    const auto   nrows_V = V.nrows();
+    const auto   rank    = U.ncols();
+    const auto   minrc   = std::min( nrows_U, nrows_V );
+    auto         S       = vector< value_t >( minrc );
+
+    if ( rank >= minrc )
+    {
+        auto  M = prod( value_t(1), U, adjoint(V) );
+
+        HLIB::BLAS::sv( M, S );
+    }// if
+    else
+    {
+        auto  QU = copy( U );
+        auto  QV = copy( V );
+        auto  RU = matrix< value_t >( rank, rank );
+        auto  RV = matrix< value_t >( rank, rank );
+
+        qr( QU, RU );
+        qr( QV, RV );
+        
+        auto  R = prod( value_t(1), RU, adjoint(RV) );
+            
+        HLIB::BLAS::sv( R, S );
+    }// else
+
+    return S;
+}
+    
 }}// namespace hlr::blas
 
 #endif // __HLR_ARITH_BLAS_HH

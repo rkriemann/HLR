@@ -946,6 +946,98 @@ HLR_BLAS_BDSQR( double, dbdsqr_ )
 
 #undef HLR_BLAS_BDSQR
 
+
+extern "C"
+{
+void
+ssyev_   ( const char *         jobz,
+           const char *         uplo,
+           const blas_int_t *   n,
+           float *              A,
+           const blas_int_t *   lda,
+           float *              w,
+           float *              work,
+           const blas_int_t *   lwork,
+           blas_int_t *         info );
+void
+dsyev_   ( const char *         jobz,
+           const char *         uplo,
+           const blas_int_t *   n,
+           double *             A,
+           const blas_int_t *   lda,
+           double *             w,
+           double *             work,
+           const blas_int_t *   lwork,
+           blas_int_t *         info );
+void
+cheev_   ( const char *             jobz,
+           const char *             uplo,
+           const blas_int_t *       n,
+           std::complex< float> *   A,
+           const blas_int_t *       lda,
+           float *                  w,
+           std::complex< float> *   work,
+           const blas_int_t *       lwork,
+           float *                  rwork,
+           blas_int_t *             info );
+void
+zheev_   ( const char *             jobz,
+           const char *             uplo,
+           const blas_int_t *       n,
+           std::complex< double> *  A,
+           const blas_int_t *       lda,
+           double *                 w,
+           std::complex< double> *  work,
+           const blas_int_t *       lwork,
+           double *                 rwork,
+           blas_int_t *             info );
+}
+
+#define HLR_BLAS_HEEV( type, func )                     \
+    inline                                              \
+    void heev ( const char          jobz,               \
+                const char          uplo,               \
+                const blas_int_t    n,                  \
+                type *              A,                  \
+                const blas_int_t    ldA,                \
+                hpro::real_type< type >::type_t *  w,   \
+                type *              work,               \
+                const blas_int_t    lwork,              \
+                hpro::real_type< type >::type_t *,      \
+                blas_int_t &        info )              \
+    {                                                   \
+        func( & jobz, & uplo, & n, A, & ldA, w, work,   \
+              & lwork, & info  );                       \
+    }
+
+HLR_BLAS_HEEV( float,                  ssyev_ )
+HLR_BLAS_HEEV( double,                 dsyev_ )
+
+#undef HLR_BLAS_HEEV
+
+#define HLR_BLAS_HEEV( type, func )                     \
+    inline                                              \
+    void heev ( const char          jobz,               \
+                const char          uplo,               \
+                const blas_int_t    n,                  \
+                type *              A,                  \
+                const blas_int_t    ldA,                \
+                hpro::real_type< type >::type_t *  w,   \
+                type *              work,               \
+                const blas_int_t    lwork,              \
+                hpro::real_type< type >::type_t *  rwork,   \
+                blas_int_t &        info )              \
+    {                                                   \
+        func( & jobz, & uplo, & n, A, & ldA, w, work,   \
+              & lwork, rwork, & info  );                \
+    }
+
+
+HLR_BLAS_HEEV( std::complex< float >,  cheev_ )
+HLR_BLAS_HEEV( std::complex< double >, zheev_ )
+
+#undef HLR_BLAS_HEEV
+
 }}// hlr::blas
 
 #endif // __HLR_ARITH_BLAS_DEF_HH

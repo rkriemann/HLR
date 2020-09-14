@@ -25,7 +25,34 @@ struct eigen_stat
 };
 
 //
-// compute eigen values and eigen vectors of M using two-sided Jacobi iteration.
+// compute eigenvalues and eigenvectors of hermitian matrix M
+//
+template < typename value_t >
+std::pair< blas::vector< typename hpro::real_type< value_t >::type_t >,
+           blas::matrix< value_t > >
+eigen_herm ( const matrix< value_t > &  M )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+
+    const blas_int_t        n = M.nrows();
+    auto                    V = copy( M );
+    blas::vector< real_t >  E( n );
+    std::vector< real_t >   rwork( hpro::is_complex_type< value_t >::value ? 3*n-2 : 0 );
+    value_t                 work_query = value_t(0);
+    blas_int_t              lwork      = -1;
+    blas_int_t              info       = 0;
+
+    heev( 'V', 'L', n, V.data(), V.col_stride(), E.data(), & work_query, lwork, rwork.data(), info );
+
+    std::vector< value_t >  work( blas_int_t( std::real( work_query ) ) );
+
+    heev( 'V', 'L', n, V.data(), V.col_stride(), E.data(), work.data(), work.size(), rwork.data(), info );
+
+    return { std::move( E ), std::move( V ) };
+}
+
+//
+// compute eigenvalues and eigenvectors of M using two-sided Jacobi iteration.
 // - algorithm from "Lapack Working Notes 15"
 //
 template < typename value_t >
@@ -315,7 +342,7 @@ make_diag_dom ( matrix< value_t > &                                M,
 }
 
 //
-// compute eigen values and eigen vectors of M using DPT iteration.
+// compute eigenvalues and eigenvectors of M using DPT iteration.
 // - algorithm from "Lapack Working Notes 15"
 //
 template < typename value_t >

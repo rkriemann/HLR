@@ -11,6 +11,7 @@
 #include <list>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/operator_wrapper.hh>
 
 namespace hlr { namespace approx {
 
