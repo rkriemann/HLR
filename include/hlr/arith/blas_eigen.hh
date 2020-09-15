@@ -349,6 +349,7 @@ template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
 eigen_dpt ( matrix< value_t > &                                M,
+            matrix< value_t > &                                V,
             const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
             const std::string &                                error_type  = "frobenius",
@@ -367,14 +368,12 @@ eigen_dpt ( matrix< value_t > &                                M,
     vector< value_t >  diag_T( nrows );
     vector< value_t >  diag_M( nrows );
     matrix< value_t >  Delta( M );  // reuse M
-    matrix< value_t >  V( nrows, nrows );
     matrix< value_t >  T( nrows, nrows );
 
     for ( size_t  i = 0; i < nrows; ++i )
     {
         diag_M(i)     = M( i, i );
         Delta( i, i ) = value_t(0);     // diag(Δ) = 0
-        V(i,i)        = value_t(1);     // V = I before iteration
     }// for
 
     //
@@ -520,6 +519,25 @@ eigen_dpt ( matrix< value_t > &                                M,
     }// for
     
     return { std::move( E ), std::move( V ) };
+}
+
+template < typename value_t >
+std::pair< blas::vector< value_t >,
+           blas::matrix< value_t > >
+eigen_dpt ( matrix< value_t > &                                M,
+            const size_t                                       amax_sweeps = 0,
+            const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
+            const std::string &                                error_type  = "frobenius",
+            const int                                          verbosity   = 0,
+            eigen_stat *                                       stat        = nullptr )
+{
+    const auto         nrows = M.nrows();
+    matrix< value_t >  V( nrows, nrows );
+
+    for ( size_t  i = 0; i < nrows; ++i )
+        V(i,i) = value_t(1);     // V = I before iteration
+
+    return eigen_dpt( M, V, amax_sweeps, atolerance, error_type, verbosity, stat );
 }
 
 //

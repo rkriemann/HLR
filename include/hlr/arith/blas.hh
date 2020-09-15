@@ -295,26 +295,29 @@ fill ( blas::VectorBase< T_vector > &    v,
 }
        
 template < typename T_matrix,
-           typename T_fill_fn >
-void
-fill ( blas::MatrixBase< T_matrix > &  M,
-       T_fill_fn &                     fill_fn )
-{
-    for ( size_t  i = 0; i < M.nrows(); ++i )
-        for ( size_t  j = 0; j < M.ncols(); ++j )
-            M(i,j) = fill_fn();
-}
-       
-template < typename T_matrix >
+           typename T_value >
 void
 fill ( blas::MatrixBase< T_matrix > &    M,
-       const typename T_matrix::value_t  f )
+       const T_value                     f )
+{
+    using value_M_t = typename T_matrix::value_t;
+    
+    for ( size_t  i = 0; i < M.nrows(); ++i )
+        for ( size_t  j = 0; j < M.ncols(); ++j )
+            M(i,j) = value_M_t(f);
+}
+
+template < typename T_matrix,
+           typename T_func >
+void
+fill_fn ( blas::MatrixBase< T_matrix > &  M,
+          T_func &&                       func )
 {
     for ( size_t  i = 0; i < M.nrows(); ++i )
         for ( size_t  j = 0; j < M.ncols(); ++j )
-            M(i,j) = f;
+            M(i,j) = func();
 }
-
+       
 //////////////////////////////////////////////////////////////////////
 //
 // norm computations

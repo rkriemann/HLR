@@ -50,7 +50,7 @@ column_basis ( const operator_t &       M,
         const auto  k = acc.rank();
         auto        T = blas::matrix< value_t >( ncols_M, k + oversampling );
 
-        blas::fill( T, rand_norm );
+        blas::fill_fn( T, rand_norm );
         
         auto        Q = blas::matrix< value_t >( nrows_M, k + oversampling );
 
@@ -103,7 +103,7 @@ column_basis ( const operator_t &       M,
             // draw random matrix and compute approximation of remainder M - Σ_j Q_j·Q_j'·M
             //
             
-            blas::fill( T_i, rand_norm );
+            blas::fill_fn( T_i, rand_norm );
             
             auto  Q_i = blas::matrix< value_t >( nrows_M, bsize );
 
@@ -230,7 +230,7 @@ column_basis ( const blas::matrix< value_t > &  U,
         const idx_t  k   = idx_t(acc.rank());
         auto         T   = blas::matrix< value_t >( nrows, k + oversampling );
 
-        blas::fill( T, fill_rand );
+        blas::fill_fn( T, fill_rand );
         
         auto         VtT = blas::prod( value_t(1), blas::adjoint(V), T );
         auto         Q   = blas::prod( value_t(1), U, VtT );
@@ -283,7 +283,7 @@ column_basis ( const blas::matrix< value_t > &  U,
 
         for ( uint  i = 0; i < nblocks; ++i )
         {
-            blas::fill( T_i, fill_rand );
+            blas::fill_fn( T_i, fill_rand );
             blas::prod( value_t(1), blas::adjoint(V), T_i, value_t(0), VtT );
             
             auto  Q_i = blas::prod( value_t(1), Uc, VtT );
