@@ -345,19 +345,21 @@ program_main ()
             auto M2       = blas::copy( M );
             auto tic      = timer::now();
             
-            auto [ E1, V1 ] = eigen_jac_bw( M2, 0.000001 );
+            auto [ E1, V1 ] = eigen_jac_bw( M2, 1e-5 );
             
-            std::cout << "done in " << format_time( timer::since( tic ) ) << std::endl;
+            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
             
-            auto [ E2, V2 ] = blas::eigen_dpt( M2, V1, 0, 1e-14, "frobenius", 3 );
+            auto  [ E, V2 ] = blas::eigen_dpt( M2, 0, 1e-14, "frobenius", 3 );
+            
+            std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
+
+            auto  V = blas::prod( double(1), V2, V1 );
             
             auto toc      = timer::since( tic );
 
             std::cout << "done in " << format_time( toc ) << std::endl;
-            hpro::DBG::write( V1, "V0.mat", "V0" );
-            hpro::DBG::write( E1, "E0.mat", "E0" );
-            hpro::DBG::write( V2, "V1.mat", "V1" );
-            hpro::DBG::write( E2, "E1.mat", "E1" );
+            hpro::DBG::write( V, "V1.mat", "V1" );
+            hpro::DBG::write( E, "E1.mat", "E1" );
         }
 
         {
