@@ -22,6 +22,7 @@ template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
 eigen_jac_bw ( blas::matrix< value_t > &                          M,
+               const size_t                                       block_size  = 128,
                const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
                const size_t                                       amax_sweeps = 0 )
 {
@@ -29,12 +30,11 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
 
     const auto         nrows      = M.nrows();
     const auto         ncols      = M.ncols();
-    const auto         bsize      = 128;
-    const auto         nbrows     = nrows / bsize;
-    const auto         nbcols     = ncols / bsize;
+    const auto         nbrows     = nrows / block_size;
+    const auto         nbcols     = ncols / block_size;
 
-    HLR_ASSERT( ( nrows / bsize ) * bsize == nrows );
-    HLR_ASSERT( ( ncols / bsize ) * bsize == ncols );
+    HLR_ASSERT( ( nrows / block_size ) * block_size == nrows );
+    HLR_ASSERT( ( ncols / block_size ) * block_size == ncols );
     
     const auto         minrc      = std::min( nrows, ncols );
     const size_t       max_sweeps = ( amax_sweeps > 0 ? amax_sweeps : 15*minrc*minrc );
@@ -58,8 +58,8 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
     {
         for ( size_t j = 0; j < nbcols; j++ )
         {
-            const auto  r_i  = blas::range( i*bsize, (i+1)*bsize-1 );
-            const auto  r_j  = blas::range( j*bsize, (j+1)*bsize-1 );
+            const auto  r_i  = blas::range( i*block_size, (i+1)*block_size-1 );
+            const auto  r_j  = blas::range( j*block_size, (j+1)*block_size-1 );
             auto        M_ij = blas::matrix< value_t >( M, r_i, r_j );
 
             norms(i,j) = blas::norm_F( M_ij );
@@ -69,46 +69,22 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
     //
     // block wise Jacobi
     //
+
+    auto    M0 = blas::copy( M );
+    real_t  norm_off = real_t(0);
     
     while ( ! converged && ( sweep < max_sweeps ))
     {
         sweep++;
 
-        //
-        // look for off-diagonal, maximal norm block
-        //
-
-        uint    max_i    = 0;
-        uint    max_j    = 1;
-        real_t  max_norm = norms( max_i, max_j );
+        auto  tic = timer::now();
         
-        for ( size_t  i = 0; i < nbrows-1; i++ )
-        {
-            for ( size_t j = i + 1; j < nbcols; j++ )
-            {
-                if ( i == j )
-                    continue;
-                
-                if ( norms(i,j) > max_norm )
-                {
-                    max_i    = i;
-                    max_j    = j;
-                    max_norm = norms(i,j);
-                }// if
-            }// for
-        }// for
-
-        if ( ( norms( max_i, max_j ) / std::sqrt( norms( max_i, max_i ) * norms( max_j, max_j ) ) ) < tolerance )
-            break;
-
-        std::cout << "sweep " << sweep-1 << " : " << format_error( norms( max_i, max_j ) / std::sqrt( norms( max_i, max_i ) * norms( max_j, max_j ) ) ) << std::endl;
-
         //
-        // sort norms and determine index pairs with decreasing norm for
-        // parallel handling
+        // sort norm of blocks
         //
 
         std::list< std::tuple< real_t, uint, uint > >  norm_idxs;
+        real_t                                         norm_sum = real_t(0);
 
         for ( uint  i = 0; i < nbrows-1; i++ )
         {
@@ -117,15 +93,51 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
                 if ( i == j )
                     continue;
 
+                // {
+                //     const auto  r_i  = blas::range( i*block_size, (i+1)*block_size-1 );
+                //     const auto  r_j  = blas::range( j*block_size, (j+1)*block_size-1 );
+                //     auto        M_ij = blas::matrix< value_t >( M, r_i, r_j );
+                    
+                //     auto  norms_ij = blas::norm_F( M_ij );
+
+                //     std::cout << i << "/" << j << " : " << math::abs( norms_ij - norms(i,j) ) << std::endl;
+                // }
+                
+                norm_sum += 2 * math::square( norms(i,j) );
                 norm_idxs.push_back( { norms(i,j), i, j } ); 
             }// for
         }// for
 
+        norm_sum = math::sqrt( norm_sum );
+        
         norm_idxs.sort( [] ( const auto &  n1, const auto &  n2 )
                         {
-                            return std::get<0>( n1 ) > std::get<0>( n2 ); // reverse order!
+                            return std::get<0>( n1 ) > std::get<0>( n2 ); // reverse order for big to small!
                         } );
 
+        //
+        // check norm of off-diagonal part and stop if threshold was reached
+        //
+        
+        const auto  max_norm = std::get<0>( norm_idxs.front() );
+        const auto  max_i    = std::get<1>( norm_idxs.front() );
+        const auto  max_j    = std::get<2>( norm_idxs.front() );
+
+        std::cout << "sweep " << sweep-1 << std::endl
+                  << "    off   : " << format_norm( norm_sum ) << std::endl
+                  << "    red.  : " << ( sweep > 1 ? norm_sum / norm_off : real_t(0) ) << std::endl
+                  << "    error : " << format_error( max_norm / std::sqrt( norms( max_i, max_i ) * norms( max_j, max_j ) ) ) << std::endl;
+
+        norm_off = norm_sum;
+        
+        if ( norm_off < tolerance )
+            break;
+
+        //
+        // set up block index pairs by successively choosing maximal norm
+        // and removing all pairs having same indices
+        //
+        
         std::deque< std::pair< uint, uint > >  idx_pairs;
 
         if ( true )
@@ -170,26 +182,26 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
         // ⎩ V_ji  V_jj ⎭  ⎩ M_ji  M_jj ⎭ ⎩ V_ji  V_jj ⎭   ⎩   0   D_jj ⎭
         //
 
-        const auto                              npairs = idx_pairs.size();
-        std::vector< blas::matrix< value_t > >  Vs( npairs );
+      
+        const auto  npairs = idx_pairs.size();
         
         // for ( size_t  idx = 0; idx < npairs; ++idx )
         ::tbb::parallel_for< size_t >(
             0, npairs,
-            [&,bsize] ( const auto  idx )
+            [&,block_size] ( const auto  idx )
             {
                 const auto  [ i, j ] = idx_pairs[ idx ];
-                const auto  r_i  = blas::range( i*bsize, (i+1)*bsize-1 );
-                const auto  r_j  = blas::range( j*bsize, (j+1)*bsize-1 );
+                const auto  r_i  = blas::range( i*block_size, (i+1)*block_size-1 );
+                const auto  r_j  = blas::range( j*block_size, (j+1)*block_size-1 );
                 auto        M_ii = blas::matrix< value_t >( M, r_i, r_i );
                 auto        M_ij = blas::matrix< value_t >( M, r_i, r_j );
                 auto        M_ji = blas::matrix< value_t >( M, r_j, r_i );
                 auto        M_jj = blas::matrix< value_t >( M, r_j, r_j );
 
                 // copy to local matrix for faster computation
-                auto  A    = blas::matrix< value_t >( 2*bsize, 2*bsize );
-                auto  r_0  = blas::range( 0, bsize-1 );
-                auto  r_1  = blas::range( bsize, 2*bsize-1 );
+                auto  A    = blas::matrix< value_t >( 2*block_size, 2*block_size );
+                auto  r_0  = blas::range( 0, block_size-1 );
+                auto  r_1  = blas::range( block_size, 2*block_size-1 );
                 auto  A_ii = blas::matrix< value_t >( A, r_0, r_0 );
                 auto  A_ij = blas::matrix< value_t >( A, r_0, r_1 );
                 auto  A_ji = blas::matrix< value_t >( A, r_1, r_0 );
@@ -202,39 +214,30 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
 
                 auto  [ EA, VA ] = blas::eigen_herm( A );
 
-                Vs[ idx ] = std::move( VA );
-            } );
-
-        //
-        // apply local V's back to global matrix M (and global V)
-        //
-        
-        // for ( size_t  idx = 0; idx < npairs; ++idx )
-        ::tbb::parallel_for< size_t >(
-            0, npairs,
-            [&,bsize] ( const auto  idx )
-            {
-                const auto  [ i, j ] = idx_pairs[ idx ];
-                const auto  VA       = Vs[ idx ];
-                const auto  r_i      = blas::range( i*bsize, (i+1)*bsize-1 );
-                const auto  r_j      = blas::range( j*bsize, (j+1)*bsize-1 );
-                const auto  r_0      = blas::range( 0, bsize-1 );
-                const auto  r_1      = blas::range( bsize, 2*bsize-1 );
-                const auto  VA_ii    = blas::matrix< value_t >( VA, r_0, r_0 );
-                const auto  VA_ij    = blas::matrix< value_t >( VA, r_0, r_1 );
-                const auto  VA_ji    = blas::matrix< value_t >( VA, r_1, r_0 );
-                const auto  VA_jj    = blas::matrix< value_t >( VA, r_1, r_1 );
+                // std::cout << i << " , " << j << std::endl;
+                // hpro::DBG::write( VA, "VA.mat", "VA" );
+                
+                //
+                // and apply to M and V
+                //
+                
+                const auto  VA_ii = blas::matrix< value_t >( VA, r_0, r_0 );
+                const auto  VA_ij = blas::matrix< value_t >( VA, r_0, r_1 );
+                const auto  VA_ji = blas::matrix< value_t >( VA, r_1, r_0 );
+                const auto  VA_jj = blas::matrix< value_t >( VA, r_1, r_1 );
                 
                 // for ( size_t  l = 0; l < nbcols; ++l )
                 ::tbb::parallel_for< size_t >(
                     0, nbcols,
-                    [&,i,j,bsize] ( const size_t  l )
+                    [&,i,j,block_size] ( const size_t  l )
                     {
-                        auto  r_l  = blas::range( l*bsize, (l+1)*bsize-1 );
+                        auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
                         auto  M_il = blas::matrix< value_t >( M, r_i, r_l );
                         auto  M_jl = blas::matrix< value_t >( M, r_j, r_l );
                         auto  C_il = blas::copy( M_il );
                         auto  C_jl = blas::copy( M_jl );
+                        // auto  C_il = M_il;
+                        // auto  C_jl = M_jl;
                         
                         auto  T_il = blas::prod( value_t(1), blas::adjoint(VA_ii), C_il );
                         auto  T_jl = blas::prod( value_t(1), blas::adjoint(VA_ij), C_il );
@@ -242,39 +245,29 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
                         blas::prod( value_t(1), blas::adjoint(VA_ji), C_jl, value_t(1), T_il );
                         blas::prod( value_t(1), blas::adjoint(VA_jj), C_jl, value_t(1), T_jl );
                         
+                        norms(i,l) = blas::norm_F( T_il );
+                        norms(j,l) = blas::norm_F( T_jl );
+                        
                         blas::copy( T_il, M_il );
                         blas::copy( T_jl, M_jl );
                     } );
-            } );
-
-        // for ( size_t  idx = 0; idx < npairs; ++idx )
-        ::tbb::parallel_for< size_t >(
-            0, npairs,
-            [&,bsize] ( const auto  idx )
-            {
-                const auto  [ i, j ] = idx_pairs[ idx ];
-                const auto  VA       = Vs[ idx ];
-                const auto  r_i      = blas::range( i*bsize, (i+1)*bsize-1 );
-                const auto  r_j      = blas::range( j*bsize, (j+1)*bsize-1 );
-                const auto  r_0      = blas::range( 0, bsize-1 );
-                const auto  r_1      = blas::range( bsize, 2*bsize-1 );
-                const auto  VA_ii    = blas::matrix< value_t >( VA, r_0, r_0 );
-                const auto  VA_ij    = blas::matrix< value_t >( VA, r_0, r_1 );
-                const auto  VA_ji    = blas::matrix< value_t >( VA, r_1, r_0 );
-                const auto  VA_jj    = blas::matrix< value_t >( VA, r_1, r_1 );
+                
+                // hpro::DBG::write( M, "M.mat", "M" );
                 
                 // for ( size_t  l = 0; l < nbrows; ++l )
                 ::tbb::parallel_for< size_t >(
                     0, nbrows,
-                    [&,i,j,bsize] ( const size_t  l )
+                    [&,i,j,block_size] ( const size_t  l )
                     {
-                        auto  r_l  = blas::range( l*bsize, (l+1)*bsize-1 );
+                        auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
 
                         // apply to M
                         auto  M_li = blas::matrix< value_t >( M, r_l, r_i );
-                        auto  C_li = blas::copy( M_li );
                         auto  M_lj = blas::matrix< value_t >( M, r_l, r_j );
+                        auto  C_li = blas::copy( M_li );
                         auto  C_lj = blas::copy( M_lj );
+                        // auto  C_li = M_li;
+                        // auto  C_lj = M_lj;
                         
                         auto  T_li = blas::prod( value_t(1), C_li, VA_ii );
                         auto  T_lj = blas::prod( value_t(1), C_li, VA_ij );
@@ -282,8 +275,8 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
                         blas::prod( value_t(1), C_lj, VA_ji, value_t(1), T_li );
                         blas::prod( value_t(1), C_lj, VA_jj, value_t(1), T_lj );
                         
-                        norms(l,i) = blas::norm_F( C_li );
-                        norms(l,j) = blas::norm_F( C_lj );
+                        norms(l,i) = blas::norm_F( T_li );
+                        norms(l,j) = blas::norm_F( T_lj );
                         
                         blas::copy( T_li, M_li );
                         blas::copy( T_lj, M_lj );
@@ -291,17 +284,37 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
                         // apply to V
                         auto  V_li = blas::matrix< value_t >( V, r_l, r_i );
                         auto  V_lj = blas::matrix< value_t >( V, r_l, r_j );
+                        auto  D_li = blas::copy( V_li );
+                        auto  D_lj = blas::copy( V_lj );
+                        // auto  D_li = V_li;
+                        // auto  D_lj = V_lj;
                         
-                        auto  S_li = blas::prod( value_t(1), V_li, VA_ii );
-                        auto  S_lj = blas::prod( value_t(1), V_li, VA_ij );
+                        auto  S_li = blas::prod( value_t(1), D_li, VA_ii );
+                        auto  S_lj = blas::prod( value_t(1), D_li, VA_ij );
                         
-                        blas::prod( value_t(1), V_lj, VA_ji, value_t(1), S_li );
-                        blas::prod( value_t(1), V_lj, VA_jj, value_t(1), S_lj );
+                        blas::prod( value_t(1), D_lj, VA_ji, value_t(1), S_li );
+                        blas::prod( value_t(1), D_lj, VA_jj, value_t(1), S_lj );
                         
                         blas::copy( S_li, V_li );
                         blas::copy( S_lj, V_lj );
                     } );
+
+                // hpro::DBG::write( M, "M.mat", "M" );
             } );
+
+        auto  toc = timer::since( tic );
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+
+        // auto  T1 = blas::prod( value_t(1), blas::adjoint(V), M0 );
+        // auto  T2 = blas::prod( value_t(1), T1, V );
+
+        // blas::add( value_t(-1), M, T2 );
+
+        // std::cout << blas::norm_F( T2 ) << std::endl;
+        
+        // hpro::DBG::write( M, "M.mat", "M" );
+        // hpro::DBG::write( V, "V.mat", "V" );
     }// while
 
     std::cout << sweep << std::endl;
@@ -317,7 +330,7 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
     
     return { std::move( E ), std::move( V ) };
 }
-    
+
 //
 // main function
 //
@@ -339,13 +352,34 @@ program_main ()
         
         auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
 
-        hpro::DBG::write( M, "M.mat", "M" );
+        if ( n <= 1024 )
+            hpro::DBG::write( M, "M.mat", "M" );
 
         {
             auto M2       = blas::copy( M );
             auto tic      = timer::now();
             
-            auto [ E1, V1 ] = eigen_jac_bw( M2, 1e-5 );
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 10 );
+            
+            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+        }
+        
+        {
+            auto M2       = blas::copy< float >( M );
+            auto tic      = timer::now();
+            
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 10 );
+            
+            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+        }
+
+        return;
+        
+        {
+            auto M2       = blas::copy( M );
+            auto tic      = timer::now();
+            
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5 );
             
             std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
             
@@ -358,7 +392,36 @@ program_main ()
             auto toc      = timer::since( tic );
 
             std::cout << "done in " << format_time( toc ) << std::endl;
-            hpro::DBG::write( V, "V1.mat", "V1" );
+
+            if ( n <= 1024 )
+                hpro::DBG::write( V, "V1.mat", "V1" );
+            hpro::DBG::write( E, "E1.mat", "E1" );
+        }
+
+        {
+            auto M2       = blas::copy< float >( M );
+            auto tic      = timer::now();
+            
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5 );
+            
+            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+
+            auto  V1d = blas::copy< double >( V1 );
+            auto  VM  = blas::prod( double(1), blas::adjoint(V1d), M );
+            auto  VMV = blas::prod( double(1), VM, V1d );
+            
+            auto  [ E, V2 ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", 3 );
+            
+            std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
+
+            auto  V = blas::prod( double(1), V2, V1d );
+            
+            auto toc      = timer::since( tic );
+
+            std::cout << "V   in " << format_time( toc ) << std::endl;
+
+            if ( n <= 1024 )
+                hpro::DBG::write( V, "V1.mat", "V1" );
             hpro::DBG::write( E, "E1.mat", "E1" );
         }
 
@@ -369,7 +432,8 @@ program_main ()
             auto toc      = timer::since( tic );
 
             std::cout << "done in " << format_time( toc ) << std::endl;
-            hpro::DBG::write( V, "V2.mat", "V2" );
+            if ( n <= 1024 )
+                hpro::DBG::write( V, "V2.mat", "V2" );
             hpro::DBG::write( E, "E2.mat", "E2" );
         }
 
