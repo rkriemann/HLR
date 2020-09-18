@@ -8,6 +8,8 @@
 
 #include <random>
 
+#include <mkl_service.h>
+
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 
@@ -399,75 +401,89 @@ program_main ()
 
         // M = std::move( // io::read_matlab< value_t >( "M.mat" ) );
         
-        {
-            auto M2       = blas::copy( M );
-            auto tic      = timer::now();
+        // {
+        //     auto M2       = blas::copy( M );
+        //     auto tic      = timer::now();
             
-            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
+        //     auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
             
-            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
-        }
+        //     std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+        // }
         
-        {
-            auto M2       = blas::copy< float >( M );
-            auto tic      = timer::now();
+        // {
+        //     auto M2       = blas::copy< float >( M );
+        //     auto tic      = timer::now();
             
-            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
+        //     auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
             
-            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
-        }
+        //     std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+        // }
 
-        return;
+        // return;
         
         {
             auto M2       = blas::copy( M );
             auto tic      = timer::now();
+
+            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+                
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity );
+
+            mkl_set_num_threads_local( mkl_nthreads );
+
+            auto  toc = timer::since( tic );
             
-            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 1000, cmdline::verbosity );
-            
-            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+            std::cout << "Jacobi in " << format_time( toc ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
+
+            tic = timer::now();
             
             auto  [ E, V2 ] = blas::eigen_dpt( M2, 0, 1e-14, "frobenius", cmdline::verbosity );
-            
-            std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
 
+            toc = timer::since( tic );
+            
+            std::cout << "DPT in " << format_time( toc ) << std::endl;
+
+            tic = timer::now();
+            
             auto  V = blas::prod( double(1), V2, V1 );
             
-            auto toc      = timer::since( tic );
+            toc = timer::since( tic );
 
-            std::cout << "done in " << format_time( toc ) << std::endl;
-
-            if ( n <= 1024 )
-                io::write_matlab( V, "V1" );
-            io::write_matlab( E, "E1" );
-        }
-
-        {
-            auto M2       = blas::copy< float >( M );
-            auto tic      = timer::now();
-            
-            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 1000, cmdline::verbosity );
-            
-            std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
-
-            auto  V1d = blas::copy< double >( V1 );
-            auto  VM  = blas::prod( double(1), blas::adjoint(V1d), M );
-            auto  VMV = blas::prod( double(1), VM, V1d );
-            
-            auto  [ E, V2 ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", cmdline::verbosity );
-            
-            std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
-
-            auto  V = blas::prod( double(1), V2, V1d );
-            
-            auto toc      = timer::since( tic );
-
-            std::cout << "V   in " << format_time( toc ) << std::endl;
+            std::cout << "V in   " << format_time( toc ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
 
             if ( n <= 1024 )
                 io::write_matlab( V, "V1" );
             io::write_matlab( E, "E1" );
         }
+
+        // {
+        //     auto M2       = blas::copy< float >( M );
+        //     auto tic      = timer::now();
+            
+        //     auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-5, 1000, cmdline::verbosity );
+            
+        //     std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
+
+        //     auto  V1d = blas::copy< double >( V1 );
+        //     auto  VM  = blas::prod( double(1), blas::adjoint(V1d), M );
+        //     auto  VMV = blas::prod( double(1), VM, V1d );
+            
+        //     auto  [ E, V2 ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", cmdline::verbosity );
+            
+        //     std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
+
+        //     auto  V = blas::prod( double(1), V2, V1d );
+            
+        //     auto toc      = timer::since( tic );
+
+        //     std::cout << "V   in " << format_time( toc ) << std::endl;
+
+        //     if ( n <= 1024 )
+        //         io::write_matlab( V, "V1" );
+        //     io::write_matlab( E, "E1" );
+        // }
 
         {
             auto M2       = blas::copy( M );
@@ -475,7 +491,9 @@ program_main ()
             auto [ E, V ] = blas::eigen_herm( M2 );
             auto toc      = timer::since( tic );
 
-            std::cout << "done in " << format_time( toc ) << std::endl;
+            std::cout << "syev in " << format_time( toc ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            
             if ( n <= 1024 )
                 io::write_matlab( V, "V2" );
             io::write_matlab( E, "E2" );

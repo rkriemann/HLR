@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <hlr/arith/blas_eigen.hh>
+#include <hlr/arith/blas.hh>
 
 namespace hlr { namespace blas {
 
@@ -642,6 +642,61 @@ svd_jac ( matrix< value_t > &                                      M,
             fill( value_t(0), v_i );
         }// else
     }// for
+}
+
+//
+// return norm | M V · V E | / ( |M|·|V| )
+//
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+everror ( const blas::matrix< value_t > &  M,
+          const blas::vector< value_t > &  E,
+          const blas::matrix< value_t > &  V )
+{
+    const auto  normM = norm_1( M );
+    const auto  normV = norm_1( V );
+
+    #if 1
+    
+    //
+    // matrix wise computation
+    //
+
+    auto  T = blas::prod( value_t(1), M, V );
+
+    for ( size_t  i = 0; i < V.ncols(); ++i )
+    {
+        auto  V_i = V.column( i );
+        auto  T_i = T.column( i );
+        
+        add( -E(i), V_i, T_i );
+    }// for
+
+    return norm_F( T ) / ( normM * normV );
+    
+    #else
+    
+    //
+    // vector wise computation
+    //
+    
+    auto                    square = [] ( auto  x ) { return x*x; };
+    auto                    error  = typename real_type< value_t >::type_t(0);
+    std::vector< value_t >  T( n );
+
+    for ( int  i = 0; i < n; ++i )
+    {
+        // sum up M·V(i,:) - e_i·V(i,:)
+        copy( n, V.data() + i*n, 1, T.data(), 1 );
+        scale( n, E[i], T.data(), 1 );
+        gemv( 'N', n, n, value_t(-1), M.data(), n, V.data() + i*n, 1, value_t(1), T.data(), 1 );
+
+        error += square( nrm2( n, T.data(), 1 ) );
+    }// for
+    
+    return std::sqrt( error ) / ( normM * normV );
+
+    #endif
 }
 
 }}// namespace hlr::blas

@@ -21,14 +21,14 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++-10'
+CXX          = 'g++-10.2'
 CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
 WARNFLAGS    = '-Wall'
 LINKFLAGS    = ''
-DEFINES      = '__TBB_show_deprecation_message_task_H'
+DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries
 HPRO_DIR     = '/'
@@ -74,7 +74,9 @@ FRAMEWORKS   = [ 'seq',
 # supported lapack libraries
 LAPACKLIBS   = [ 'default',   # default system implementation, e.g., -llapack -lblas
                  'none',      # do not use any LAPACK library
-                 'mkl',       # use Intel MKL
+                 'mkl',       # use parallel Intel MKL (should be OpenMP version)
+                 'mklomp',    # use OpenMP based Intel MKL
+                 'mkltbb',    # use TBB based Intel MKL
                  'mklseq' ]   # use sequential Intel MKL
                  
 # malloc libraries (also depends on directories above)
@@ -332,11 +334,16 @@ env.Prepend( LIBPATH = [ '.' ] )
 # add LAPACK library
 if lapack == 'default' :
     env.Append( LIBS = [ 'lapack', 'blas' ] )
-elif lapack == 'mkl' :
+elif lapack == 'mkl' or lapack == 'mklomp' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
+elif lapack == 'mkltbb' :
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
+    env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
 elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
