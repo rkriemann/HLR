@@ -29,7 +29,8 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
                const size_t                                       block_size  = 128,
                const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
                const size_t                                       amax_sweeps = 0,
-               const uint                                         verbosity   = 0 )
+               const uint                                         verbosity   = 0,
+               blas::eigen_stat *                                 stat        = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 
@@ -333,6 +334,12 @@ eigen_jac_bw ( blas::matrix< value_t > &                          M,
     if ( verbosity > 0 )
         std::cout << std::endl;
     
+    if ( ! is_null( stat ) )
+    {
+        stat->nsweeps   = sweep;
+        stat->converged = converged;
+    }// if
+    
     //
     // extract eigenvalues as diagonal elements of M
     //
@@ -354,6 +361,7 @@ program_main ()
 {
     using value_t = double;
 
+    if ( false )
     {
         const auto                                 seed = 1593694284; // time( nullptr );
         std::default_random_engine                 generator( seed );
@@ -501,55 +509,99 @@ program_main ()
 
         return;
     }
+
+    using  real_t = typename hpro::real_type< value_t >::type_t;
     
     std::cout << term::bullet << term::bold << "dense DPT eigen iteration ( " << impl_name
               << " )" << term::reset << std::endl;
 
     blas::eigen_stat  stat;
         
-    for ( size_t  n = 128; n <= 512; n += 128 )
+    for ( size_t  n = 256; n <= 16384; )
     {
-        std::mutex  mtx;
-        uint        nsweeps_min = 0;
-        uint        nsweeps_jac = 0;
+        real_t  tol_min     = real_t(1);
+        uint    nsweeps_dpt = 0;
+        double  time_dpt    = 0;
+        double  time_jac    = 0;
+        double  time_eig    = 0;
 
-        ::tbb::parallel_for( uint(0), uint(10),
-                             [&,n] ( const uint )
-                             // for ( uint  i = 0; i < 10; ++i )
-                             {
-                                 auto  R  = blas::random< value_t >( n, n );
-                                 auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
-                                 auto  Mc = blas::copy( M );
+        for ( uint  i = 0; i < 10; ++i )
+        {
+            auto  R  = blas::random< value_t >( n, n );
+            auto  M  = blas::copy( R );
 
-                                 for ( uint nsweeps = 1; nsweeps < n; ++nsweeps )
-                                 {
-                                     auto  Ms         = blas::copy< float >( M );
-                                     auto  [ Ej, Vj ] = blas::eigen_jac( Ms, nsweeps, 1e-7 );
-                                         
-                                     auto  Wj         = blas::copy< double >( Vj );
-                                     auto  VM         = blas::prod( value_t(1), blas::adjoint( Wj ), M );
-                                     auto  VMV        = blas::prod( value_t(1), VM, Wj );
-                                     auto  [ Ed, Vd ] = blas::eigen_dpt( VMV, 0, 1e-8, "fro", 0, & stat );
-                                         
-                                     if ( stat.converged )
-                                     {
-                                         // converged
-                                         std::scoped_lock  lock( mtx );
-                                             
-                                         nsweeps_min = std::max( nsweeps_min, nsweeps+1 );
-                                         break;
-                                     }// if
-                                 }// for
+            blas::add( value_t(1), blas::adjoint(R), M );
+            blas::scale( value_t(0.5), M );
+            
+            // auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
 
-                                 auto  [ E, V ] = blas::eigen_jac( Mc, 100, 1e-14, & stat );
+            const auto  eps = real_t(100) * std::numeric_limits< real_t >::epsilon();
+            auto        Mc  = blas::copy( M );
+            
+            for ( real_t  tol = real_t(1); tol >= eps; tol /= real_t(2) )
+            {
+                auto  Ms           = blas::copy( M );
 
-                                 {
-                                     std::scoped_lock  lock( mtx );
-                                         
-                                     nsweeps_jac = std::max( nsweeps_jac, stat.nsweeps );
-                                 }
-                             } );
+                auto  tic_dpt      = timer::now();
+                auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+                auto  [ Ej, Vj ]   = eigen_jac_bw( Ms, cmdline::ntile, tol, 1000, 0 );
+                
+                mkl_set_num_threads_local( mkl_nthreads );
+                // auto  Wj         = blas::copy< double >( Vj );
+                // auto  VM         = blas::prod( value_t(1), blas::adjoint( Wj ), M );
+                // auto  VMV        = blas::prod( value_t(1), VM, Wj );
+                // auto  [ Ed, Vd ] = blas::eigen_dpt( VMV, 0, 1e-14, "fro", 0, & stat );
+                auto  [ Ed, Vd ] = blas::eigen_dpt( Ms, 0, 1e-14, "fro", 0, & stat );
 
-        std::cout << "n = " << n << "   " << nsweeps_min << "    " << nsweeps_jac << std::endl;
+                auto  toc_dpt = timer::since( tic_dpt );
+                
+                if ( stat.converged )
+                {
+                    // converged
+                    tol_min     = std::min( tol_min, tol );
+                    nsweeps_dpt = std::max( nsweeps_dpt, stat.nsweeps );
+
+                    if ( i == 0 )
+                        time_dpt = toc_dpt.seconds();
+                    else
+                        time_dpt = std::max( time_dpt, toc_dpt.seconds() );
+                    
+                    break;
+                }// if
+            }// for
+
+            {
+                // also test pure Jacobi
+                auto  Ms       = blas::copy( Mc );
+                auto  tic_jac  = timer::now();
+                auto  [ E, V ] = eigen_jac_bw( Ms, cmdline::ntile, 1e-14, 1000, 0, & stat );
+                auto  toc_jac  = timer::since( tic_jac );
+            
+                // nsweeps_jac = std::max( nsweeps_jac, stat.nsweeps );
+                time_jac = toc_jac.seconds();
+            }
+
+            {
+                // and syev
+                auto  Ms       = blas::copy( Mc );
+                auto  tic_eig  = timer::now();
+                auto  [ E, V ] = blas::eigen_herm( Ms );
+                auto  toc_eig  = timer::since( tic_eig );
+                
+                // nsweeps_jac = std::max( nsweeps_jac, stat.nsweeps );
+                time_eig = toc_eig.seconds();
+            }
+        }// for
+    
+        std::cout << "n = " << n
+                  << "   " << format_norm( tol_min )
+                  << "   " << format_time( time_dpt )
+                  << "   " << format_time( time_jac )
+                  << "   " << format_time( time_eig )
+                  << std::endl;
+
+        if      ( n < 1024 ) n += 128;
+        else if ( n < 4096 ) n += 512;
+        else                 n += 1024;
     }// for
 }
