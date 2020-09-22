@@ -10,11 +10,10 @@
 #include <vector>
 #include <unordered_map>
 
-#include <hpx/async.hpp>
-#include <hpx/dataflow.hpp>
-#include <hpx/lcos/when_all.hpp>
-#include <hpx/util/unwrap.hpp>
+#include <hpx/future.hpp>
+#include <hpx/include/async.hpp>
 #include <hpx/include/parallel_for_each.hpp>
+#include <hpx/modules/pack_traversal.hpp>
 
 #include <boost/range/irange.hpp>
 

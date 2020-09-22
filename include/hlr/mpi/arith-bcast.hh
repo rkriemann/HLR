@@ -84,10 +84,12 @@ broadcast ( mpi::communicator &  comm,
 //
 // compute LU factorization of <A>
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
     assert( is_blocked( A ) );
     
@@ -255,7 +257,7 @@ lu ( TMatrix *          A,
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( i+1, nbr,
                                             i+1, nbc ),
-            [BA,i,pid,&row_i,&col_i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
+            [&,BA,i,pid] ( const ::tbb::blocked_range2d< uint > & r )
             {
                 for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                 {
@@ -273,7 +275,10 @@ lu ( TMatrix *          A,
                         const int  p_jl = A_jl->procs().master();
                         
                         if ( pid == p_jl )
-                            multiply< value_t >( value_t(-1), A_ji, A_il, A_jl, acc );
+                            hlr::multiply< value_t >( value_t(-1),
+                                                      apply_normal, *A_ji,
+                                                      apply_normal, *A_il,
+                                                      *A_jl, acc, approx );
                     }// for
                 }// for
             } );

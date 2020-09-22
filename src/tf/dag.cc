@@ -57,75 +57,75 @@ refine ( node *                            root,
         std::atomic< bool >                  any_changed = false;
 
         // first refine nodes
-        tf.parallel_for( node_sets.begin(), node_sets.end(),
-                         [&,min_size] ( const auto &  nset )
+        tf.for_each( node_sets.begin(), node_sets.end(),
+                     [&,min_size] ( const auto &  nset )
+                     {
+                         bool  any_chg_loc = false;
+                         
+                         for ( auto  node : nset )
                          {
-                             bool  any_chg_loc = false;
-                                           
-                             for ( auto  node : nset )
-                             {
-                                 node->refine( min_size );
-                                 
-                                 if ( node->is_refined() )
-                                     any_chg_loc = true;
-                             }// for
+                             node->refine( min_size );
                              
-                             if ( any_chg_loc )
-                                 any_changed = true;
-                         } );
+                             if ( node->is_refined() )
+                                 any_chg_loc = true;
+                         }// for
+                         
+                         if ( any_chg_loc )
+                             any_changed = true;
+                     } );
         executor.run( tf ).wait();
         tf.clear();
 
         if ( any_changed )
         {
             // then refine dependencies and collect new nodes
-            tf.parallel_for( size_t(0), node_sets.size(), size_t(1),
-                             [&,do_lock] ( const auto  i )
-                             {
-                                 const auto &  nset = node_sets[i];
-                                 
-                                 for ( auto  node : nset )
-                                 {
-                                     const bool  node_changed = node->refine_deps( do_lock );
-                                     
-                                     if ( node->is_refined() )       // node was refined; collect all sub nodes
-                                     {
-                                         for ( auto  sub : node->sub_nodes() )
-                                             subnodes[i].push_back( sub );
-                                         
-                                         delnodes[i].push_back( node );
-                                     }// if
-                                     else if ( node_changed )        // node was not refined but dependencies were
-                                     {
-                                         subnodes[i].push_back( node );
-                                     }// if
-                                     else                            // neither node nor dependencies changed: reached final state
-                                     {
-                                         // adjust dependency counter of successors (which were NOT refined!)
-                                         for ( auto  succ : node->successors() )
-                                             succ->inc_dep_cnt();
-                                         
-                                         {
-                                             std::scoped_lock  lock( mtx );
-                                             
-                                             tasks.push_back( node );
-                                             
-                                             if ( node->successors().empty() )
-                                                 end.push_back( node );
-                                         }
-                                     }// else
-                                 }// for
-                             } );
+            tf.for_each_index( size_t(0), node_sets.size(), size_t(1),
+                               [&,do_lock] ( const auto  i )
+                               {
+                                   const auto &  nset = node_sets[i];
+                                   
+                                   for ( auto  node : nset )
+                                   {
+                                       const bool  node_changed = node->refine_deps( do_lock );
+                                       
+                                       if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                       {
+                                           for ( auto  sub : node->sub_nodes() )
+                                               subnodes[i].push_back( sub );
+                                           
+                                           delnodes[i].push_back( node );
+                                       }// if
+                                       else if ( node_changed )        // node was not refined but dependencies were
+                                       {
+                                           subnodes[i].push_back( node );
+                                       }// if
+                                       else                            // neither node nor dependencies changed: reached final state
+                                       {
+                                           // adjust dependency counter of successors (which were NOT refined!)
+                                           for ( auto  succ : node->successors() )
+                                               succ->inc_dep_cnt();
+                                           
+                                           {
+                                               std::scoped_lock  lock( mtx );
+                                               
+                                               tasks.push_back( node );
+                                               
+                                               if ( node->successors().empty() )
+                                                   end.push_back( node );
+                                           }
+                                       }// else
+                                   }// for
+                               } );
             executor.run( tf ).wait();
             tf.clear();
             
             // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-            tf.parallel_for( delnodes.begin(), delnodes.end(),
-                             [&] ( const auto &  nset )
-                             {
-                                 for ( auto  node : nset )
-                                     delete node;
-                             } );
+            tf.for_each( delnodes.begin(), delnodes.end(),
+                         [&] ( const auto &  nset )
+                         {
+                             for ( auto  node : nset )
+                                 delete node;
+                         } );
             executor.run( tf ).wait();
             tf.clear();
             

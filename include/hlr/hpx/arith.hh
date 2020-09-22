@@ -9,6 +9,7 @@
 //
 
 #include <hpx/parallel/task_block.hpp>
+#include <hpx/include/async.hpp>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>

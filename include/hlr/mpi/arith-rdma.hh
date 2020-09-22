@@ -147,10 +147,12 @@ finish_rdma( std::vector< mpi::window > &  wins )
     }// for
 }
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
     // assert( RANK != 0 );
     assert( is_blocked( A ) );
@@ -409,7 +411,10 @@ lu ( TMatrix *          A,
                             //
                     
                             // DBG::printf( "updating %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() );
-                            multiply< value_t >( value_t(-1), row_i[j], col_i[l], A_jl, acc );
+                            hlr::multiply< value_t >( value_t(-1),
+                                                      apply_normal, *row_i[j],
+                                                      apply_normal, *col_i[l],
+                                                      *A_jl, acc, approx );
                         }// if
                     }// for
                 }// for

@@ -7,6 +7,7 @@
 #include "common.hh"
 #include "hlr/utils/RedirectOutput.hh"
 #include "hlr/utils/compare.hh"
+#include "hlr/approx/svd.hh"
 
 #define GPI_CHECK_RESULT( Func, Args )                                  \
     {                                                                   \
@@ -68,12 +69,13 @@ mymain ( int, char ** )
 
     {
         std::cout << term::bullet << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
-        
-        auto  C = A->copy();
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = A->copy();
         
         tic = timer::now();
         
-        gaspi::tlr::lu< hpro::real >( C.get(), acc );
+        gaspi::tlr::lu< hpro::real >( C.get(), acc, apx );
         
         toc = timer::since( tic );
         

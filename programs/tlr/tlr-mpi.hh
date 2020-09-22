@@ -5,6 +5,7 @@
 #include "common.hh"
 #include "hlr/utils/RedirectOutput.hh"
 #include "hlr/utils/compare.hh"
+#include "hlr/approx/svd.hh"
 
 using namespace hlr;
 
@@ -59,12 +60,13 @@ mymain ( int argc, char ** argv )
     
     {
         std::cout << term::bullet << term::bold << "LU ( TLR MPI )" << term::reset << std::endl;
-        
-        auto  C = A->copy();
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = A->copy();
         
         tic = timer::now();
         
-        ARITH::lu< hpro::real >( C.get(), fixed_rank( k ) );
+        ARITH::lu< hpro::real >( C.get(), fixed_rank( k ), apx );
         
         toc = timer::since( tic );
         
