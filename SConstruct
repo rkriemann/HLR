@@ -21,7 +21,7 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++-10.2'
+CXX          = 'g++-10'
 CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
@@ -568,7 +568,7 @@ if 'tf' in frameworks :
     tf.Append( LIBS = [ 'pthread' ] )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma' )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma' )
-    tf.Append( LIBS = [ 'cudart', 'cublas', 'cusolver' ] )
+    # tf.Append( LIBS = [ 'cudart', 'cublas', 'cusolver' ] )
     
     for program in programs :
         name   = program + '-tf'
@@ -578,7 +578,7 @@ if 'tf' in frameworks :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
     # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
-    Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc'  ] ) )
+    # Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc'  ] ) )
 
 #
 # HPX

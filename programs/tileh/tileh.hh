@@ -17,6 +17,7 @@
 #include "hlr/dag/lu.hh"
 #include "hlr/seq/norm.hh"
 #include "hlr/bem/aca.hh"
+#include "hlr/approx/svd.hh"
 
 using namespace hlr;
 
@@ -144,8 +145,9 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << " HLR" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -154,7 +156,7 @@ program_main ()
             blas::reset_flops();
             tic = timer::now();
         
-            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
+            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc, apx );
 
             toc = timer::since( tic );
             std::cout << "    mult in  " << format_time( toc ) << std::endl;
@@ -342,8 +344,9 @@ program_main ()
         std::cout << "  " << term::bullet << " recursive+DAG" << std::endl;
         
         std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -351,7 +354,7 @@ program_main ()
 
             tic = timer::now();
         
-            impl::tileh::lu< HLIB::real >( C.get(), acc );
+            impl::tileh::lu< value_t >( C.get(), acc, apx );
         
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;

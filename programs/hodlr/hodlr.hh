@@ -53,8 +53,9 @@ program_main ()
     
     {
         std::cout << term::bullet << term::bold << "LU ( HODLR " << impl_name << " )" << term::reset << std::endl;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = impl::matrix::copy( *A );
 
         std::vector< double >  runtime;
     
@@ -62,7 +63,7 @@ program_main ()
         {
             tic = timer::now();
             
-            impl::hodlr::lu< HLIB::real >( C.get(), hpro::fixed_rank( k ) );
+            impl::hodlr::lu< value_t >( C.get(), hpro::fixed_rank( k ), apx );
             
             toc = timer::since( tic );
 

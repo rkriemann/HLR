@@ -346,6 +346,7 @@ solve_lower_tri ( const eval_side_t        side,
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+inline
 void
 trsvl ( const hpro::matop_t      op_L,
         const hpro::TMatrix &    L,
@@ -783,6 +784,7 @@ solve_upper_tri ( const eval_side_t        side,
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+inline
 void
 trsvu ( const hpro::matop_t      op_U,
         const hpro::TMatrix &    U,

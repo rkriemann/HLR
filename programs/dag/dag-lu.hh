@@ -319,8 +319,8 @@ program_main ()
             {
                 tic = timer::now();
         
-                hlr::seq::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
-                hlr::seq::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
+                hlr::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
+                hlr::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
         
                 toc = timer::since( tic );
 

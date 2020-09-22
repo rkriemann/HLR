@@ -516,10 +516,12 @@ namespace tlr
 //
 // LU factorization for TLR block format
 // 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     assert( is_blocked( A ) );
     
@@ -543,7 +545,7 @@ lu ( hpro::TMatrix *          A,
 
         ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, nbr,
                                                              i+1, nbc ),
-                             [BA,i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
+                             [&,BA,i] ( const ::tbb::blocked_range2d< uint > & r )
                              {
                                  for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                                  {
@@ -552,7 +554,7 @@ lu ( hpro::TMatrix *          A,
                                          hlr::tbb::multiply< value_t >( value_t(-1),
                                                                         hpro::apply_normal, *BA->block( j, i ),
                                                                         hpro::apply_normal, *BA->block( i, l ),
-                                                                        *BA->block( j, l ), acc );
+                                                                        *BA->block( j, l ), acc, approx );
                                      }// for
                                  }// for
                              } );
@@ -573,12 +575,14 @@ namespace hodlr
 //
 // add U·V' to matrix A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 addlr ( blas::matrix< value_t > &  U,
         blas::matrix< value_t > &  V,
         hpro::TMatrix *            A,
-        const hpro::TTruncAcc &    acc )
+        const hpro::TTruncAcc &    acc,
+        const approx_t &           approx )
 {
     HLR_LOG( 5, hpro::to_string( "addlr( %d )", A->id() ) );
     
@@ -595,20 +599,20 @@ addlr ( blas::matrix< value_t > &  U,
         blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
         blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
-        ::tbb::parallel_invoke( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); },
-                                [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); },
-                                [&U0,&V1,A01,&acc] ()
+        ::tbb::parallel_invoke( [&] () { addlr( U0, V0, A00, acc, approx ); },
+                                [&] () { addlr( U1, V1, A11, acc, approx ); },
+                                [&] ()
                                 {
-                                    auto [ U01, V01 ] = hlr::approx::svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                                                                     { hpro::blas_mat_B< value_t >( A01 ), V1 },
-                                                                                     acc );
+                                    auto [ U01, V01 ] = approx( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                                                { hpro::blas_mat_B< value_t >( A01 ), V1 },
+                                                                acc );
                                     A01->set_lrmat( U01, V01 );
                                 },
-                                [&U1,&V0,A10,&acc] ()
+                                [&] ()
                                 {
-                                    auto [ U10, V10 ] = hlr::approx::svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                                                                     { hpro::blas_mat_B< value_t >( A10 ), V0 },
-                                                                                     acc );
+                                    auto [ U10, V10 ] = approx( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                                                { hpro::blas_mat_B< value_t >( A10 ), V0 },
+                                                                acc );
                                     A10->set_lrmat( U10, V10 );
                                 } );
     }// if
@@ -623,10 +627,12 @@ addlr ( blas::matrix< value_t > &  U,
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -638,7 +644,7 @@ lu ( hpro::TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        lu< value_t >( A00, acc );
+        lu< value_t >( A00, acc, approx );
 
         ::tbb::parallel_invoke( [A00,A01] () { seq::hodlr::trsml(  A00, hpro::blas_mat_A< value_t >( A01 ) ); },
                                 [A00,A10] () { seq::hodlr::trsmuh( A00, hpro::blas_mat_B< value_t >( A10 ) ); } );
@@ -647,9 +653,9 @@ lu ( hpro::TMatrix *          A,
         auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
         auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc );
+        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc, approx );
         
-        lu< value_t >( A11, acc );
+        lu< value_t >( A11, acc, approx );
     }// if
     else
     {
@@ -673,10 +679,12 @@ namespace tileh
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
 
@@ -735,16 +743,16 @@ lu ( hpro::TMatrix *          A,
 
         ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, nbr,
                                                              i+1, nbc ),
-                             [BA,i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
+                             [&,BA,i] ( const ::tbb::blocked_range2d< uint > & r )
                              {
                                  for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                                  {
                                      for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
                                      {
-                                         hlr::tbb::multiply( -1.0,
+                                         hlr::tbb::multiply( value_t(-1),
                                                              apply_normal, * BA->block( j, i ),
                                                              apply_normal, * BA->block( i, l ),
-                                                             * BA->block( j, l ), acc );
+                                                             * BA->block( j, l ), acc, approx );
                                      }// for
                                  }// for
                              } );
