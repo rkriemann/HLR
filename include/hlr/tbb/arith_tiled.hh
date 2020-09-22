@@ -20,6 +20,7 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/approx/svd.hh"
 #include "hlr/tbb/matrix.hh"
 
 namespace hlr { namespace tbb { namespace tiled {
@@ -297,7 +298,7 @@ truncate ( const value_t                 alpha,
         blas::prod( alpha, W, blas::adjoint( Y ), value_t(1), M );
             
         // truncate to rank-k
-        return std::move( hlr::approx_svd( M, acc ) );
+        return std::move( hlr::approx::svd( M, acc ) );
     }// if
     else
     {

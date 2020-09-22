@@ -102,7 +102,7 @@ build_helper ( ::tf::SubflowBuilder &       tf,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    tf.silent_emplace(
+                    tf.emplace(
                         [bct,i,j,&coeff,&lrapx,&acc,B,nseq] ( auto &  sf )
                         {
                             auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc, nseq );
@@ -118,7 +118,7 @@ build_helper ( ::tf::SubflowBuilder &       tf,
     }// else
 
     // copy properties from the cluster
-    M->set_cluster_force( bct );
+    // M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
     
@@ -139,13 +139,24 @@ build ( const HLIB::TBlockCluster *  bct,
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.silent_emplace( [&,bct,nseq] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
+    tf.emplace( [&,bct,nseq] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
 
     ::tf::Executor  executor;
     
     executor.run( tf ).wait();
 
     return res;
+}
+
+//
+// assign block cluster to matrix
+//
+inline
+void
+assign_cluster ( hpro::TMatrix &              M,
+                 const hpro::TBlockCluster &  bc )
+{
+    hlr::seq::matrix::assign_cluster( M, bc );
 }
 
 //
@@ -173,7 +184,7 @@ copy_helper ( ::tf::SubflowBuilder &  tf,
             {
                 if ( BM->block( i, j ) != nullptr )
                 {
-                    tf.silent_emplace(
+                    tf.emplace(
                         [B,BM,i,j] ( auto &  sf )
                         {
                             auto  B_ij = copy_helper( sf, * BM->block( i, j ) );
@@ -202,7 +213,7 @@ copy ( const HLIB::TMatrix &  M )
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.silent_emplace( [&M,&res] ( auto &  sf ) { res = detail::copy_helper( sf, M ); } );
+    tf.emplace( [&M,&res] ( auto &  sf ) { res = detail::copy_helper( sf, M ); } );
 
     ::tf::Executor  executor;
     
@@ -240,7 +251,7 @@ copy_to_helper ( ::tf::SubflowBuilder &  tf,
             {
                 if ( BA->block( i, j ) != nullptr )
                 {
-                    tf.silent_emplace(
+                    tf.emplace(
                         [BA,BB,i,j] ( auto &  sf )
                         {
                             assert( ! is_null( BB->block( i, j ) ) );
@@ -265,7 +276,7 @@ copy_to ( const HLIB::TMatrix &  A,
 {
     ::tf::Taskflow  tf;
     
-    tf.silent_emplace( [&A,&B] ( auto &  sf ) { detail::copy_to_helper( sf, A, B ); } );
+    tf.emplace( [&A,&B] ( auto &  sf ) { detail::copy_to_helper( sf, A, B ); } );
 
     ::tf::Executor  executor;
     
@@ -302,7 +313,7 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
                 {
                     for ( uint  j = 0; j < B->nblock_cols(); ++j )
                     {
-                        sf.silent_emplace(
+                        sf.emplace(
                             [B,BC,i,j] ( auto &  ssf )
                             {
                                 auto  C_ij = realloc_helper( ssf, B->block( i, j ) );
@@ -338,7 +349,7 @@ realloc ( HLIB::TMatrix *  A )
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.silent_emplace( [A,&res] ( auto &  sf ) { res = detail::realloc_helper( sf, A ); } );
+    tf.emplace( [A,&res] ( auto &  sf ) { res = detail::realloc_helper( sf, A ); } );
 
     ::tf::Executor  executor;
     

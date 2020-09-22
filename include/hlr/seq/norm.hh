@@ -16,6 +16,7 @@
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/text.hh"
+#include "hlr/utils/math.hh"
 
 namespace hlr { namespace seq { namespace norm {
 
@@ -81,7 +82,7 @@ norm_F ( const hpro::TMatrix &  A )
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else if ( IS_TYPE( &A, tiled_lrmatrix ) )
@@ -131,7 +132,7 @@ norm_F ( const hpro::TMatrix &  A )
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else if ( is_dense( A ) )
@@ -147,6 +148,13 @@ norm_F ( const hpro::TMatrix &  A )
     }// else
 
     return 0;
+}
+
+inline
+double
+frobenius ( const hpro::TMatrix &  A )
+{
+    return norm_F( A );
 }
 
 //
@@ -225,11 +233,12 @@ norm_F ( const double           alpha,
             const auto  VA  = hpro::blas_mat_B< hpro::real >( RA );
             const auto  UB  = hpro::blas_mat_A< hpro::real >( RB );
             const auto  VB  = hpro::blas_mat_B< hpro::real >( RB );
+            const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
+                                alpha * beta  * lrdot( UA, VA, UB, VB ) +
+                                alpha * beta  * lrdot( UB, VB, UA, VA ) +
+                                beta  * beta  * lrdot( UB, VB, UB, VB ) );
 
-            return std::sqrt( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                              alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                              alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                              beta  * beta  * lrdot( UB, VB, UB, VB ) );
+            return std::sqrt( std::abs( sqn ) );
         }// else
     }// if
     else if ( is_dense_all( A, B ) )
@@ -249,13 +258,13 @@ norm_F ( const double           alpha,
             {
                 for ( idx_t i = 0; i < n; ++i )
                 {
-                    const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                    const auto  a_ij = hpro::real(alpha) * MA(i,j) + hpro::real(beta) * MB(i,j);
                     
-                    val += re( hpro::conj( a_ij ) * a_ij );
+                    val += std::real( math::conj( a_ij ) * a_ij );
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// if
         else
         {
@@ -275,7 +284,7 @@ norm_F ( const double           alpha,
                 }// for
             }// for
 
-            return std::sqrt( val );
+            return std::sqrt( std::abs( val ) );
         }// else
     }// if
     else
@@ -284,6 +293,16 @@ norm_F ( const double           alpha,
     }// else
 
     return 0;
+}
+
+inline
+double
+frobenius ( const double           alpha,
+            const hpro::TMatrix &  A,
+            const double           beta,
+            const hpro::TMatrix &  B )
+{
+    return norm_F( alpha, A, beta, B );
 }
 
 //
@@ -304,9 +323,9 @@ norm_2 ( const matrix_t &  A,
     x->fill_rand( 0 );
     x->scale( real(1) / x->norm2() );
 
-    const size_t  max_it  = ( amax_it == 0 ? std::min( A.range_dim(), A.domain_dim() ) / 10 : amax_it );
+    const size_t  max_it  = ( amax_it == 0 ? std::max( size_t(5), std::min( A.range_dim(), A.domain_dim() ) / 10 ) : amax_it );
     const real    tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
-    const real    abs_tol = std::min( 1e1 * std::numeric_limits< real >::epsilon(), tol );
+    const real    abs_tol = std::min( real(1e1) * std::numeric_limits< real >::epsilon(), tol );
     const real    zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
     real          lambda  = 1.0;
     
@@ -354,6 +373,16 @@ norm_2 ( const matrix_t &  A,
     return lambda;
 }
 
+template < typename matrix_t >
+double
+spectral ( const matrix_t &  A,
+           const bool        squared = true,
+           const real        atol    = 0,
+           const size_t      amax_it = 0 )
+{
+    return norm_2( A, squared, atol, amax_it );
+}
+
 //
 // compute inversion error of A vs A^-1 in spectral norm, e.g. |A-A^-1|_2
 //
@@ -389,7 +418,7 @@ norm_2 ( const matrix_t &  A,
 
 //         const real  norm_x = x->norm2();
             
-//         if ( norm_x <= Math::square( Limits::epsilon< hpro::real >() ); )
+//         if ( norm_x <= math::square( Limits::epsilon< hpro::real >() ); )
 //             break;
         
 //         x->scale( real(1) / norm_x );

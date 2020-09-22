@@ -126,6 +126,312 @@ multiply ( const value_t            alpha,
 }
 
 //
+// compute C = C + α op( A ) op( B )
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    if ( is_blocked_all( A, B, C ) )
+    {
+        auto  BA = cptrcast( &A, TBlockMatrix );
+        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BC = ptrcast(  &C, TBlockMatrix );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BC->nblock_rows(),
+                                              0, BC->nblock_cols(),
+                                              0, BA->nblock_cols( op_A ) ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.pages().begin(); i != r.pages().end(); ++i )
+                {
+                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                    {
+                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                        {
+                            auto  C_ij = BC->block( i, j );
+                            auto  A_il = BA->block( i, l, op_A );
+                            auto  B_lj = BB->block( l, j, op_B );
+                
+                            if ( is_null_any( A_il, B_lj ) )
+                                continue;
+                    
+                            HLR_ASSERT( ! is_null( C_ij ) );
+            
+                            multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+        hlr::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx );
+}
+
+//
+// compute Hadamard product A = α A*B 
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply_hadamard ( const value_t            alpha,
+                    hpro::TMatrix &          A,
+                    const hpro::TMatrix &    B,
+                    const hpro::TTruncAcc &  acc,
+                    const approx_t &         approx )
+{
+    if ( is_blocked_all( A, B ) )
+    {
+        auto  BA = ptrcast( &A,  hpro::TBlockMatrix );
+        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
+                                              0, BA->nblock_cols() ),
+            [=,&acc] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  A_ij = BA->block( i, j );
+                        auto  B_ij = BB->block( i, j );
+                
+                        HLR_ASSERT( ! is_null_any( A_ij, B_ij ) );
+            
+                        multiply_hadamard< value_t >( alpha, *A_ij, *B_ij, acc, approx );
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+    {
+        hlr::seq::multiply_hadamard< value_t >( alpha, A, B, acc, approx );
+    }// if
+}
+
+//
+// solve L·X = M (from_left) or X·L = M (from_right)
+// - on exit, M contains X
+//
+template < typename value_t,
+           typename approx_t >
+void
+solve_lower_tri ( const eval_side_t        side,
+                  const diag_type_t        diag,
+                  const hpro::TMatrix &    L,
+                  hpro::TMatrix &          M,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
+{
+    if ( is_blocked_all( L, M ) )
+    {
+        auto  BL = cptrcast( &L, hpro::TBlockMatrix );
+        auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
+        
+        if ( side == from_left )
+        {
+            for ( uint i = 0; i < BL->nblock_cols(); ++i )
+            {
+                const auto  L_ii = BL->block( i, i );
+
+                HLR_ASSERT( ! is_null( L_ii ) );
+            
+                ::tbb::parallel_for< uint >( 0, BM->nblock_cols(),
+                                             [&,i,BL,BM] ( const uint  j )
+                                             {
+                                                 auto  M_ij = BM->block( i, j );
+                
+                                                 if ( ! is_null( M_ij ) )
+                                                     solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx );
+                                             } );
+
+                ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, BM->nblock_rows(),
+                                                                       0, BM->nblock_cols() ),
+                                     [&,i,BL,BM] ( const auto  r )
+                                     {
+                                         for ( auto  k = r.rows().begin(); k != r.rows().end(); ++k )
+                                         {
+                                             for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                                             {
+                                                 if ( ! is_null_any( BL->block(k,i), BM->block(i,j) ) )
+                                                 {
+                                                     HLR_ASSERT( ! is_null( BM->block(k,j) ) );
+                                                     
+                                                     multiply< value_t >( value_t(-1),
+                                                                          apply_normal, *BL->block(k,i),
+                                                                          apply_normal, *BM->block(i,j),
+                                                                          *BM->block(k,j), acc, approx );
+                                                 }// if
+                                             }// for
+                                         }// for
+                                     } );
+            }// for
+        }// if
+        else
+        {
+            HLR_ASSERT( false );
+        }// else
+    }// if
+    else
+        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+}
+
+//
+// solve U·X = M (side = from_left) or X·U = M (side = from_right)
+// with upper triangular matrix U
+// - on exit, M contains X
+//
+template < typename value_t,
+           typename approx_t >
+void
+solve_upper_tri ( const eval_side_t        side,
+                  const diag_type_t        diag,
+                  const hpro::TMatrix &    U,
+                  hpro::TMatrix &          M,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
+{
+    if ( is_blocked_all( U, M ) )
+    {
+        auto  BU = cptrcast( &U, hpro::TBlockMatrix );
+        auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
+        
+        if ( side == from_left )
+        {
+            HLR_ASSERT( false );
+        }// if
+        else
+        {
+            for ( uint j = 0; j < BM->nblock_cols(); ++j )
+            {
+                const auto  U_jj = BU->block( j, j );
+
+                HLR_ASSERT( ! is_null( U_jj ) );
+            
+                ::tbb::parallel_for< uint >( 0, BM->nblock_rows(),
+                                             [&,j,BU,BM] ( const uint  i )
+                                             {
+                                                 auto  M_ij = BM->block( i, j );
+                
+                                                 if ( ! is_null( M_ij ) )
+                                                     solve_upper_tri< value_t >( side, diag, *U_jj, *M_ij, acc, approx );
+                                             } );
+            
+                ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( j+1, BM->nblock_cols(),
+                                                                       0, BM->nblock_rows() ),
+                                     [&,j,BU,BM] ( const auto  r )
+                                     {
+                                         for ( auto  k = r.rows().begin(); k != r.rows().end(); ++k )
+                                         {
+                                             for ( auto  i = r.cols().begin(); i != r.cols().end(); ++i )
+                                             {
+                                                 if ( ! is_null_any( BM->block(i,j), BU->block(j,k) ) )
+                                                 {
+                                                     HLR_ASSERT( ! is_null( BM->block(i,k) ) );
+                                                     
+                                                     multiply< value_t >( value_t(-1),
+                                                                          apply_normal, *BM->block(i,j),
+                                                                          apply_normal, *BU->block(j,k),
+                                                                          *BM->block(i,k), acc, approx );
+                                                 }// if
+                                             }// for
+                                         }// for
+                                     } );
+            }// for
+        }// else
+    }// if
+    else
+    {
+        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+    }// else
+}
+
+//
+// LU factorization
+//
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
+{
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+        {
+            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            
+            lu< value_t >( * BA->block( i, i ), acc, approx );
+
+            ::tbb::parallel_invoke(
+                [&,i,BA] ()
+                {
+                    ::tbb::parallel_for< uint >( i+1, BA->nblock_rows(),
+                                                 [&,i,BA] ( const uint  j )
+                                                 {
+                                                     if ( ! is_null( BA->block( j, i ) ) )
+                                                         solve_upper_tri< value_t >( from_right, general_diag,
+                                                                                     *BA->block( i, i ), *BA->block( j, i ),
+                                                                                     acc, approx );
+                                                 } );
+                },
+
+                [&,i,BA] ()
+                {
+                    ::tbb::parallel_for< uint >( i+1, BA->nblock_cols(),
+                                                 [&,i,BA] ( const uint  j )
+                                                 {
+                                                     if ( ! is_null( BA->block( i, j ) ) )
+                                                         solve_lower_tri< value_t >( from_left, unit_diag,
+                                                                                     *BA->block( i, i ), *BA->block( i, j ),
+                                                                                     acc, approx );
+                                                 } );
+                } );
+
+            ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, BA->nblock_rows(),
+                                                                 i+1, BA->nblock_cols() ),
+                                 [&,i,BA] ( const auto  r )
+                                 {
+                                     for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                                     {
+                                         for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                                         {
+                                             if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                                             {
+                                                 HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                                                 
+                                                 multiply( value_t(-1), apply_normal, *BA->block( j, i ), apply_normal, *BA->block( i, l ),
+                                                           *BA->block( j, l ), acc, approx );
+                                             }// if
+                                         }// for
+                                     }// for
+                                 } );
+        }// for
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+
+        invert< value_t >( *D );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+}
+
+//
 // Gaussian elimination of A, e.g. A = A^-1
 // - T is used as temporary space and has to have the same
 //   structure as A
@@ -210,10 +516,12 @@ namespace tlr
 //
 // LU factorization for TLR block format
 // 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     assert( is_blocked( A ) );
     
@@ -237,7 +545,7 @@ lu ( hpro::TMatrix *          A,
 
         ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, nbr,
                                                              i+1, nbc ),
-                             [BA,i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
+                             [&,BA,i] ( const ::tbb::blocked_range2d< uint > & r )
                              {
                                  for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                                  {
@@ -246,7 +554,7 @@ lu ( hpro::TMatrix *          A,
                                          hlr::tbb::multiply< value_t >( value_t(-1),
                                                                         hpro::apply_normal, *BA->block( j, i ),
                                                                         hpro::apply_normal, *BA->block( i, l ),
-                                                                        *BA->block( j, l ), acc );
+                                                                        *BA->block( j, l ), acc, approx );
                                      }// for
                                  }// for
                              } );
@@ -267,12 +575,14 @@ namespace hodlr
 //
 // add U·V' to matrix A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 addlr ( blas::matrix< value_t > &  U,
         blas::matrix< value_t > &  V,
         hpro::TMatrix *            A,
-        const hpro::TTruncAcc &    acc )
+        const hpro::TTruncAcc &    acc,
+        const approx_t &           approx )
 {
     HLR_LOG( 5, hpro::to_string( "addlr( %d )", A->id() ) );
     
@@ -289,20 +599,20 @@ addlr ( blas::matrix< value_t > &  U,
         blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
         blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
-        ::tbb::parallel_invoke( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); },
-                                [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); },
-                                [&U0,&V1,A01,&acc] ()
+        ::tbb::parallel_invoke( [&] () { addlr( U0, V0, A00, acc, approx ); },
+                                [&] () { addlr( U1, V1, A11, acc, approx ); },
+                                [&] ()
                                 {
-                                    auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                                                                        { hpro::blas_mat_B< value_t >( A01 ), V1 },
-                                                                                        acc );
+                                    auto [ U01, V01 ] = approx( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                                                { hpro::blas_mat_B< value_t >( A01 ), V1 },
+                                                                acc );
                                     A01->set_lrmat( U01, V01 );
                                 },
-                                [&U1,&V0,A10,&acc] ()
+                                [&] ()
                                 {
-                                    auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                                                                        { hpro::blas_mat_B< value_t >( A10 ), V0 },
-                                                                                        acc );
+                                    auto [ U10, V10 ] = approx( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                                                { hpro::blas_mat_B< value_t >( A10 ), V0 },
+                                                                acc );
                                     A10->set_lrmat( U10, V10 );
                                 } );
     }// if
@@ -317,10 +627,12 @@ addlr ( blas::matrix< value_t > &  U,
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -332,7 +644,7 @@ lu ( hpro::TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        lu< value_t >( A00, acc );
+        lu< value_t >( A00, acc, approx );
 
         ::tbb::parallel_invoke( [A00,A01] () { seq::hodlr::trsml(  A00, hpro::blas_mat_A< value_t >( A01 ) ); },
                                 [A00,A10] () { seq::hodlr::trsmuh( A00, hpro::blas_mat_B< value_t >( A10 ) ); } );
@@ -341,9 +653,9 @@ lu ( hpro::TMatrix *          A,
         auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
         auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc );
+        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc, approx );
         
-        lu< value_t >( A11, acc );
+        lu< value_t >( A11, acc, approx );
     }// if
     else
     {
@@ -367,10 +679,12 @@ namespace tileh
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
 
@@ -429,16 +743,16 @@ lu ( hpro::TMatrix *          A,
 
         ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, nbr,
                                                              i+1, nbc ),
-                             [BA,i,&acc] ( const ::tbb::blocked_range2d< uint > & r )
+                             [&,BA,i] ( const ::tbb::blocked_range2d< uint > & r )
                              {
                                  for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
                                  {
                                      for ( uint  l = r.cols().begin(); l != r.cols().end(); ++l )
                                      {
-                                         hlr::tbb::multiply( -1.0,
+                                         hlr::tbb::multiply( value_t(-1),
                                                              apply_normal, * BA->block( j, i ),
                                                              apply_normal, * BA->block( i, l ),
-                                                             * BA->block( j, l ), acc );
+                                                             * BA->block( j, l ), acc, approx );
                                      }// for
                                  }// for
                              } );

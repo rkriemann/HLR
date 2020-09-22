@@ -1,7 +1,7 @@
 #ifndef __HLR_UTILS_LOG_HH
 #define __HLR_UTILS_LOG_HH
 //
-// Project     : HLib
+// Project     : HLR
 // File        : log.hh
 // Description : logging functions
 // Author      : Ronald Kriemann
@@ -70,8 +70,9 @@ log ( const int            lvl,
 #  define HLR_LOG( lvl, msg ) 
 #else
 #  define HLR_LOG( lvl, msg )                                           \
-    hlr::log( lvl,                                                      \
-              std::string( "                                          " ) + msg )
+    if ( HLIB::verbose( lvl ) ) {                                       \
+        hlr::log( lvl,                                                  \
+                  std::string( "                                          " ) + msg ); }
 #endif
               // hlr::term::green( __FILE__  ) + HLIB::to_string( ":%d", __LINE__ ) +
               // std::string( " in " ) + hlr::term::yellow( __func__ ) + 

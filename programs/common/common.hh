@@ -21,6 +21,10 @@ using boost::format;
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/cluster/TBCBuilder.hh>
 #include <hpro/cluster/TGeomAdmCond.hh>
+#include <hpro/cluster/TAlgPartStrat.hh>
+#include <hpro/cluster/TAlgCTBuilder.hh>
+#include <hpro/cluster/TAlgAdmCond.hh>
+#include <hpro/matrix/TMatBuilder.hh>
 
 #include <hlr/cluster/tlr.hh>
 #include <hlr/cluster/mblr.hh>
@@ -211,9 +215,21 @@ gen_bct ( hpro::TClusterTree &  rowct,
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "hodlr" )
+    else if ( hlr::cmdline::adm == "hodlr" or hlr::cmdline::adm == "offdiag" )
     {
         hpro::TOffDiagAdmCond  adm_cond;
+        
+        return bct_builder.build( & rowct, & colct, & adm_cond );
+    }// if
+    else if ( hlr::cmdline::adm == "hilo" )
+    {
+        hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
+        
+        return bct_builder.build( & rowct, & colct, & adm_cond );
+    }// if
+    else if ( hlr::cmdline::adm == "none" )
+    {
+        hpro::TStdGeomAdmCond  adm_cond( 0.0, hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if

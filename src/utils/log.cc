@@ -24,10 +24,9 @@ log ( const int            lvl,
 
         // print string without end-of-line characters
         for ( auto  c : msg )
-        {
             if ( c != '\n' )
                 std::cout << c;
-        }
+
         std::cout << std::endl;
     }// if
 }

@@ -9,6 +9,7 @@
 //
 
 #include <hpx/parallel/task_block.hpp>
+#include <hpx/include/async.hpp>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -112,7 +113,8 @@ mul_vec ( const value_t                    alpha,
 //
 // compute C = C + α op( A ) op( B )
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -120,7 +122,8 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -137,7 +140,7 @@ multiply ( const value_t            alpha,
                     {
                         auto  C_ij = BC->block(i,j);
                         
-                        for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                        for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                         {
                             auto  A_il = BA->block( i, l, op_A );
                             auto  B_lj = BB->block( l, j, op_B );
@@ -147,14 +150,14 @@ multiply ( const value_t            alpha,
                             
                             HLR_ASSERT( ! is_null( C_ij ) );
 
-                            tb.run( [=,&acc] { multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc ); } );
+                            tb.run( [=,&acc,&approx] { multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx ); } );
                         }// for
                     }// for
                 }// for
             } );
     }// if
     else
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+        hlr::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx );
 }
 
 //
@@ -236,10 +239,12 @@ namespace tlr
 //
 // LU factorization for TLR block format
 // 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     assert( is_blocked( A ) );
     
@@ -261,7 +266,7 @@ lu ( hpro::TMatrix *          A,
             } );
 
         ::hpx::parallel::v2::define_task_block(
-            [BA,i,nbr,nbc,&acc] ( auto &  tb )
+            [BA,i,nbr,nbc,&acc,&approx] ( auto &  tb )
             {
                 for ( uint  j = i+1; j < nbr; ++j )
                 {
@@ -272,12 +277,12 @@ lu ( hpro::TMatrix *          A,
                         auto  A_il = BA->block( i, l );
                         auto  A_jl = BA->block( j, l );
                                        
-                        tb.run( [A_ji,A_il,A_jl,&acc]
+                        tb.run( [A_ji,A_il,A_jl,&acc,&approx]
                                 {
                                     hlr::hpx::multiply< value_t >( value_t(-1),
                                                                    hpro::apply_normal, *A_ji,
                                                                    hpro::apply_normal, *A_il,
-                                                                   *A_jl, acc );
+                                                                   *A_jl, acc, approx );
                                 } );
                     }// for
                 }// for
@@ -299,12 +304,14 @@ namespace hodlr
 //
 // add U·V' to matrix A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 addlr ( blas::matrix< value_t > &  U,
         blas::matrix< value_t > &  V,
         hpro::TMatrix *            A,
-        const hpro::TTruncAcc &    acc )
+        const hpro::TTruncAcc &    acc,
+        const approx_t &           approx )
 {
     HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
@@ -316,25 +323,25 @@ addlr ( blas::matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
         
-        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
-        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
-        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
-        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
+        auto  U0  = blas::matrix< value_t >( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        auto  U1  = blas::matrix< value_t >( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        auto  V0  = blas::matrix< value_t >( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        auto  V1  = blas::matrix< value_t >( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
-        auto  task_00 = ::hpx::async( [&,A00] () { addlr( U0, V0, A00, acc ); } );
-        auto  task_11 = ::hpx::async( [&,A11] () { addlr( U1, V1, A11, acc ); } );
+        auto  task_00 = ::hpx::async( [&,A00] () { addlr( U0, V0, A00, acc, approx ); } );
+        auto  task_11 = ::hpx::async( [&,A11] () { addlr( U1, V1, A11, acc, approx ); } );
         auto  task_01 = ::hpx::async( [&,A01] ()
                         {
-                            auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                                                                { hpro::blas_mat_B< value_t >( A01 ), V1 },
-                                                                                acc );
+                            auto [ U01, V01 ] = approx( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                                        { hpro::blas_mat_B< value_t >( A01 ), V1 },
+                                                        acc );
                             A01->set_lrmat( U01, V01 );
                         } );
         auto  task_10 = ::hpx::async( [&,A10] ()
                         {
-                            auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                                                                { hpro::blas_mat_B< value_t >( A10 ), V0 },
-                                                                                acc );
+                            auto [ U10, V10 ] = approx( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                                        { hpro::blas_mat_B< value_t >( A10 ), V0 },
+                                                        acc );
                             A10->set_lrmat( U10, V10 );
                         } );
         auto  all = ::hpx::when_all( task_00, task_01, task_10, task_11 );
@@ -350,10 +357,12 @@ addlr ( blas::matrix< value_t > &  U,
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -365,7 +374,7 @@ lu ( hpro::TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        lu< value_t >( A00, acc );
+        lu< value_t >( A00, acc, approx );
 
         auto  solve_01 = ::hpx::async( [A00,A01] () { seq::hodlr::trsml(  A00, hpro::blas_mat_A< value_t >( A01 ) ); } );
         auto  solve_10 = ::hpx::async( [A00,A10] () { seq::hodlr::trsmuh( A00, hpro::blas_mat_B< value_t >( A10 ) ); } );
@@ -377,9 +386,9 @@ lu ( hpro::TMatrix *          A,
         auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
         auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc );
+        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc, approx );
         
-        lu< value_t >( A11, acc );
+        lu< value_t >( A11, acc, approx );
     }// if
     else
     {
@@ -401,10 +410,12 @@ namespace tileh
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -448,10 +459,10 @@ lu ( TMatrix *          A,
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                hlr::hpx::multiply( -1.0,
+                hlr::hpx::multiply( value_t(-1),
                                     apply_normal, * BA->block( j, i ),
                                     apply_normal, * BA->block( i, l ),
-                                    * BA->block( j, l ), acc );
+                                    * BA->block( j, l ), acc, approx );
             }// for
         }// for
     }// for

@@ -182,7 +182,7 @@ program_main ()
         blas::vector< value_t >  x( M_hca->ncols() );
         blas::vector< value_t >  y( M_hca->nrows() );
 
-        blas::fill( value_t(1), x );
+        blas::fill( x, value_t(1) );
             
         for ( int i = 0; i < nbench; ++i )
         {
@@ -197,7 +197,7 @@ program_main ()
             std::cout << "    mvm in   " << format_time( toc ) << std::endl;
 
             if ( i < nbench-1 )
-                blas::fill( value_t(0), y );
+                blas::fill( y, value_t(0) );
         }// for
         
         if ( nbench > 1 )

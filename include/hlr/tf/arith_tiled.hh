@@ -17,6 +17,7 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
+#include "hlr/approx/svd.hh"
 #include "hlr/tf/matrix.hh"
 
 namespace hlr { namespace tf { namespace tiled {
@@ -379,7 +380,7 @@ truncate ( const value_t                 alpha,
         BLAS::prod( alpha, W, BLAS::adjoint( Y ), value_t(1), M );
             
         // truncate to rank-k
-        return std::move( hlr::approx_svd( M, acc ) );
+        return std::move( hlr::approx::svd( M, acc ) );
     }// if
     else
     {
@@ -550,7 +551,7 @@ lu ( TMatrix *          A,
 {
     ::tf::Taskflow  tf;
 
-    tf.silent_emplace( [A,&acc,ntile] ( auto &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
+    tf.emplace( [A,&acc,ntile] ( auto &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
 
     ::tf::Executor  executor;
     

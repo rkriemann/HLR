@@ -124,6 +124,19 @@ print_eps ( const hpro::TMatrix &  M,
                        M.row_ofs() + M.nrows() );
                        
     }// else
+
+    // draw ID
+    prn.save();
+
+    const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 8.0 );
+    const auto  text    = hpro::to_string( "%d", M.id() );
+    
+    prn.set_font( "Helvetica", fn_size );
+    prn.set_rgb( 32, 74, 135 ); // SkyBlue3
+    prn.draw_text( double(M.col_ofs()) + double(M.cols()) / 2.0 - fn_size * text.length() / 4.0,
+                   double(M.row_ofs()) + double(M.rows()) / 2.0 + fn_size / 3.0,
+                   text );
+    prn.restore();
 }
 
 }// namespace anonymous

@@ -6,8 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-// #include <likwid.h>
-
 #include "common.hh"
 #include "common-main.hh"
 #include "hlr/cluster/h.hh"
@@ -22,6 +20,7 @@
 #include "hlr/arith/lu.hh"
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/utils/likwid.hh"
 
 using namespace hlr;
 
@@ -38,7 +37,7 @@ program_main ()
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< hpro::TMatrix >();
 
-    if ( matrixfile == "" )
+    if ( matrixfile == "" && sparsefile == "" )
     {
         auto  problem = gen_problem< problem_t >();
         auto  coord   = problem->coordinates();
@@ -60,7 +59,7 @@ program_main ()
 
         A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
-    else
+    else if ( matrixfile != "" )
     {
         std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
                   << "    matrix = " << matrixfile
@@ -71,6 +70,27 @@ program_main ()
         // for spreading memory usage
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
+    }// if
+    else if ( sparsefile != "" )
+    {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    sparse matrix = " << sparsefile
+                  << std::endl;
+
+        auto  M = hpro::read_matrix( sparsefile );
+        auto  S = ptrcast( M.get(), hpro::TSparseMatrix );
+
+        // convert to H
+        hpro::TMETISAlgPartStrat  part_strat;
+        hpro::TAlgCTBuilder       ct_builder( & part_strat, ntile );
+        hpro::TAlgNDCTBuilder     nd_ct_builder( & ct_builder, ntile );
+        auto                      cl = nd_ct_builder.build( S );
+        hpro::TWeakAlgAdmCond     adm_cond( S, cl->perm_i2e() );
+        hpro::TBCBuilder          bct_builder;
+        auto                      bcl = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+        hpro::TSparseMatBuilder   h_builder( S, cl->perm_i2e(), cl->perm_e2i() );
+
+        A = h_builder.build( bcl.get(), acc );
     }// else
 
     auto  toc    = timer::since( tic );
@@ -103,7 +123,7 @@ program_main ()
     
     hlr::dag::graph  dag;
     
-    auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( A->copy() ) );
+    auto  C = ( onlydag ? std::shared_ptr( std::move( A ) ) : std::shared_ptr( impl::matrix::copy( *A ) ) );
 
     if ( levelwise )
         C->set_hierarchy_data();
@@ -153,13 +173,13 @@ program_main ()
     
     std::vector< double >  runtime;
     
-    // LIKWID_MARKER_INIT;
+    LIKWID_MARKER_INIT;
         
     for ( int  i = 0; i < nbench; ++i )
     {
         tic = timer::now();
         
-        // LIKWID_MARKER_START( "dag" );
+        LIKWID_MARKER_START( "dag" );
 
         if ( levelwise )
             dag = std::move( hlr::dag::gen_dag_lu_lvl( *C, nseq ) );
@@ -178,7 +198,7 @@ program_main ()
         else 
             dag = std::move( hlr::dag::gen_dag_lu_ip( *C, nseq, impl::dag::refine ) );
         
-        // LIKWID_MARKER_STOP( "dag" );
+        LIKWID_MARKER_STOP( "dag" );
         
         toc = timer::since( tic );
         
@@ -195,7 +215,7 @@ program_main ()
             dag = std::move( hlr::dag::graph() );
     }// for
 
-    // LIKWID_MARKER_CLOSE;
+    LIKWID_MARKER_CLOSE;
         
     if ( hpro::verbose( 1 ) )
     {
@@ -299,8 +319,8 @@ program_main ()
             {
                 tic = timer::now();
         
-                hlr::seq::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
-                hlr::seq::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
+                hlr::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
+                hlr::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
         
                 toc = timer::since( tic );
 

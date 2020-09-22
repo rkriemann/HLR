@@ -373,10 +373,12 @@ build_col_groups ( const hpro::TBlockMatrix *                   A,
     }// for
 }
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     // assert( RANK != 0 );
     assert( is_blocked( A ) );
@@ -668,7 +670,10 @@ lu ( hpro::TMatrix *          A,
                     //
                     
                     // DBG::printf( "updating %d with %d × %d", A_jl->id(), row_i[j]->id(), col_i[l]->id() );
-                    multiply< value_t >( value_t(-1), row_i[j], col_i[l], A_jl, acc );
+                    hlr::multiply< value_t >( value_t(-1),
+                                              apply_normal, *row_i[j],
+                                              apply_normal, *col_i[l],
+                                              *A_jl, acc, approx );
                 }// if
             }// for
         }// for

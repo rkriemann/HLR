@@ -118,7 +118,8 @@ mul_vec ( const value_t                    alpha,
 namespace detail
 {
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( ::tf::SubflowBuilder &   tf,
            const value_t            alpha,
@@ -127,7 +128,8 @@ multiply ( ::tf::SubflowBuilder &   tf,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -141,7 +143,7 @@ multiply ( ::tf::SubflowBuilder &   tf,
             {
                 auto  C_ij = BC->block(i,j);
             
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  A_il = BA->block( i, l, op_A );
                     auto  B_lj = BB->block( l, j, op_B );
@@ -151,10 +153,10 @@ multiply ( ::tf::SubflowBuilder &   tf,
                     
                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    tf.silent_emplace(
-                        [=,&acc] ( auto &  sf )
+                    tf.emplace(
+                        [=,&acc,&approx] ( auto &  sf )
                         {
-                            multiply< value_t >( sf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                            multiply< value_t >( sf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                         } );
                     
                     // multiply< value_t >( tf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
@@ -164,17 +166,18 @@ multiply ( ::tf::SubflowBuilder &   tf,
     }// if
     else
     {
-        // tf.silent_emplace(
+        // tf.emplace(
         //     [=,&A,&B,&C,&acc] ()
         //     {
-                hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+        hlr::multiply( alpha, op_A, A, op_B, B, C, acc, approx );
             // } );
     }// else
 }
 
 }// namespace detail
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -182,11 +185,12 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     ::tf::Taskflow  tf;
     
-    tf.silent_emplace( [=,&A,&B,&C,&acc] ( auto &  sf ) { detail::multiply( sf, alpha, op_A, A, op_B, B, C, acc ); } );
+    tf.emplace( [=,&A,&B,&C,&acc,&approx] ( auto &  sf ) { detail::multiply( sf, alpha, op_A, A, op_B, B, C, acc, approx ); } );
 
     ::tf::Executor  executor;
     
@@ -273,7 +277,7 @@ gauss_elim ( hpro::TMatrix *    A,
 {
     ::tf::Taskflow  tf;
 
-    tf.silent_emplace( [A,T,&acc] ( auto &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
+    tf.emplace( [A,T,&acc] ( auto &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
 
     ::tf::Executor  executor;
     
@@ -292,10 +296,12 @@ namespace tlr
 //
 // LU factorization for TLR block format
 // 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
     assert( is_blocked( A ) );
     
@@ -313,12 +319,12 @@ lu ( TMatrix *          A,
     {
         auto  A_ii = ptrcast( BA->block( i, i ), TDenseMatrix );
 
-        fs_tasks(i,i) = tf.silent_emplace( [A_ii] ()
-                                           {
-                                               TScopedLock  lock( *A_ii );
-                                               
-                                               blas::invert( blas_mat< value_t >( A_ii ) );
-                                           } );
+        fs_tasks(i,i) = tf.emplace( [A_ii] ()
+                                    {
+                                        TScopedLock  lock( *A_ii );
+                                        
+                                        blas::invert( blas_mat< value_t >( A_ii ) );
+                                    } );
             
         for ( uint  l = 0; l < i; ++l )
             if ( has_u_task(l,i,i) )
@@ -327,24 +333,24 @@ lu ( TMatrix *          A,
         for ( uint  j = i+1; j < nbc; ++j )
         {
             // L is identity; task only for ensuring correct execution order
-            fs_tasks(i,j) = tf.silent_emplace( [A_ii,BA,i,j] ()
-                                               {
-                                                   auto         A_ij = BA->block(i,j);
-                                                   TScopedLock  lock( *A_ij );
-                                               } );
+            fs_tasks(i,j) = tf.emplace( [A_ii,BA,i,j] ()
+                                        {
+                                            auto         A_ij = BA->block(i,j);
+                                            TScopedLock  lock( *A_ij );
+                                        } );
             fs_tasks(i,i).precede( fs_tasks(i,j) );
 
             for ( uint  l = 0; l < i; ++l )
                 if ( has_u_task(l,i,j) )
                     u_tasks(l,i,j).precede( fs_tasks(i,j) );
             
-            fs_tasks(j,i) = tf.silent_emplace( [A_ii,BA,i,j] ()
-                                               {
-                                                   auto         A_ji = BA->block(j,i);
-                                                   TScopedLock  lock( *A_ji );
-                                                   
-                                                   trsmuh< value_t >( A_ii, A_ji );
-                                               } );
+            fs_tasks(j,i) = tf.emplace( [A_ii,BA,i,j] ()
+                                        {
+                                            auto         A_ji = BA->block(j,i);
+                                            TScopedLock  lock( *A_ji );
+                                            
+                                            trsmuh< value_t >( A_ii, A_ji );
+                                        } );
             fs_tasks(i,i).precede( fs_tasks(j,i) );
 
             for ( uint  l = 0; l < i; ++l )
@@ -361,15 +367,15 @@ lu ( TMatrix *          A,
                 auto  A_il = BA->block( i, l );
                 auto  A_jl = BA->block( j, l );
 
-                u_tasks(i,j,l)    = tf.silent_emplace( [A_ji,A_il,A_jl,&acc] ()
-                                                       {
-                                                           TScopedLock  lock( *A_jl );
-                                                           
-                                                           hlr::tf::multiply< value_t >( value_t(-1),
-                                                                                         hpro::apply_normal, *A_ji,
-                                                                                         hpro::apply_normal, *A_il,
-                                                                                         *A_jl, acc );
-                                                       } );
+                u_tasks(i,j,l)    = tf.emplace( [A_ji,A_il,A_jl,&acc,&approx] ()
+                                                {
+                                                    TScopedLock  lock( *A_jl );
+                                                    
+                                                    hlr::tf::multiply< value_t >( value_t(-1),
+                                                                                  hpro::apply_normal, *A_ji,
+                                                                                  hpro::apply_normal, *A_il,
+                                                                                  *A_jl, acc, approx );
+                                                } );
                 has_u_task(i,j,l) = true;
                 
                 // ensures non-simultanous writes
@@ -401,13 +407,18 @@ namespace hodlr
 //
 // add U·V' to matrix A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 addlr ( const blas::matrix< value_t > &  U,
         const blas::matrix< value_t > &  V,
         TMatrix *                        A,
-        const TTruncAcc &                acc )
+        const TTruncAcc &                acc,
+        const approx_t &                 approx )
 {
+    static_assert( std::is_same< value_t, typename approx_t::value_t >::value,
+                   "matrices and approximation object need to have same value type" );
+    
     if ( hpro::verbose( 4 ) )
         DBG::printf( "addlr( %d )", A->id() );
     
@@ -419,29 +430,29 @@ addlr ( const blas::matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
-        blas::matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::range::all );
-        blas::matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::range::all );
-        blas::matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::range::all );
+        auto  U0  = blas::matrix< value_t >( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        auto  U1  = blas::matrix< value_t >( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        auto  V0  = blas::matrix< value_t >( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        auto  V1  = blas::matrix< value_t >( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         ::tf::Taskflow  tf;
         
-        auto  add_00 = tf.silent_emplace( [&U0,&V0,A00,&acc] () { addlr( U0, V0, A00, acc ); } );
-        auto  add_11 = tf.silent_emplace( [&U1,&V1,A11,&acc] () { addlr( U1, V1, A11, acc ); } );
-        auto  add_01 = tf.silent_emplace( [&U0,&V1,A01,&acc] ()
-                                          {
-                                              auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A01 ), U0 },
-                                                                                                  { blas_mat_B< value_t >( A01 ), V1 },
-                                                                                                  acc );
-                                              A01->set_lrmat( U01, V01 );
-                                          } );
-        auto  add_10 = tf.silent_emplace( [&U1,&V0,A10,&acc] ()
-                                          {
-                                              auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { blas_mat_A< value_t >( A10 ), U1 },
-                                                                                                  { blas_mat_B< value_t >( A10 ), V0 },
-                                                                                                  acc );
-                                              A10->set_lrmat( U10, V10 );
-                                          } );
+        auto  add_00 = tf.emplace( [&] () { addlr( U0, V0, A00, acc, approx ); } );
+        auto  add_11 = tf.emplace( [&] () { addlr( U1, V1, A11, acc, approx ); } );
+        auto  add_01 = tf.emplace( [&] ()
+                                   {
+                                       auto [ U01, V01 ] = approx( { blas_mat_A< value_t >( A01 ), U0 },
+                                                                   { blas_mat_B< value_t >( A01 ), V1 },
+                                                                   acc );
+                                       A01->set_lrmat( U01, V01 );
+                                   } );
+        auto  add_10 = tf.emplace( [&] ()
+                                   {
+                                       auto [ U10, V10 ] = approx( { blas_mat_A< value_t >( A10 ), U1 },
+                                                                   { blas_mat_B< value_t >( A10 ), V0 },
+                                                                   acc );
+                                       A10->set_lrmat( U10, V10 );
+                                   } );
 
         ::tf::Executor  executor;
     
@@ -458,11 +469,16 @@ addlr ( const blas::matrix< value_t > &  U,
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
-lu ( TMatrix *             A,
-     const TTruncAcc &     acc )
+lu ( TMatrix *          A,
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
+    static_assert( std::is_same< value_t, typename approx_t::value_t >::value,
+                   "matrices and approximation object need to have same value type" );
+    
     if ( hpro::verbose( 4 ) )
         DBG::printf( "lu( %d )", A->id() );
 
@@ -482,9 +498,9 @@ lu ( TMatrix *             A,
         
         ::tf::Taskflow  tf;
         
-        auto  task_00 = tf.silent_emplace( [A00,&acc] () { lu< value_t >( A00, acc ); } );
-        auto  task_01 = tf.silent_emplace( [A00,A01]  () { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
-        auto  task_10 = tf.silent_emplace( [A00,A10]  () { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+        auto  task_00 = tf.emplace( [A00,&acc] () { lu< value_t >( A00, acc ); } );
+        auto  task_01 = tf.emplace( [A00,A01]  () { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
+        auto  task_10 = tf.emplace( [A00,A10]  () { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
 
         task_00.precede( { task_01, task_10 } );
         
@@ -496,12 +512,12 @@ lu ( TMatrix *             A,
         task_10.precede( task_T );
         task_T.precede( task_UT );
         
-        auto  task_add11      = tf.silent_emplace( [A01,A11,&UT,&acc] ()
-                                                   { addlr< value_t >( UT.get(), blas_mat_B< value_t >( A01 ), A11, acc ); } );
+        auto  task_add11      = tf.emplace( [A01,A11,&UT,&acc] ()
+                                            { addlr< value_t >( UT.get(), blas_mat_B< value_t >( A01 ), A11, acc ); } );
 
         task_UT.precede( task_add11 );
         
-        auto  task_11         = tf.silent_emplace( [A11,&acc] () { lu< value_t >( A11, acc ); } );
+        auto  task_11         = tf.emplace( [A11,&acc] () { lu< value_t >( A11, acc ); } );
 
         task_add11.precede( task_11 );
 
@@ -513,13 +529,13 @@ lu ( TMatrix *             A,
         // only tasks for the two parallel calls
         //
         
-        lu< value_t >( A00, acc );
+        lu< value_t >( A00, acc, approx );
 
         {
             ::tf::Taskflow  tf;
         
-            auto  task_01 = tf.silent_emplace( [A00,A01]  () { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
-            auto  task_10 = tf.silent_emplace( [A00,A10]  () { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
+            auto  task_01 = tf.emplace( [A00,A01]  () { seq::hodlr::trsml(  A00, blas_mat_A< value_t >( A01 ) ); } );
+            auto  task_10 = tf.emplace( [A00,A10]  () { seq::hodlr::trsmuh( A00, blas_mat_B< value_t >( A10 ) ); } );
 
             ::tf::Executor  executor;
     
@@ -530,8 +546,8 @@ lu ( TMatrix *             A,
         auto  T  = blas::prod(  value_t(1), blas::adjoint( blas_mat_B< value_t >( A10 ) ), blas_mat_A< value_t >( A01 ) );
         auto  UT = blas::prod( value_t(-1), blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc );
-        lu< value_t >( A11, acc );
+        addlr< value_t >( UT, blas_mat_B< value_t >( A01 ), A11, acc, approx );
+        lu< value_t >( A11, acc, approx );
 
         #endif
     }// if
@@ -557,11 +573,16 @@ namespace tileh
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( TMatrix *          A,
-     const TTruncAcc &  acc )
+     const TTruncAcc &  acc,
+     const approx_t &   approx )
 {
+    static_assert( std::is_same< value_t, typename approx_t::value_t >::value,
+                   "matrices and approximation object need to have same value type" );
+    
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
     assert( is_blocked( A ) );
@@ -625,13 +646,13 @@ lu ( TMatrix *          A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 auto  update = tf.emplace(
-                    [=,&acc] ( auto &  sf ) 
+                    [=,&acc,&approx] ( auto &  sf ) 
                     {
                         hlr::tf::detail::multiply( sf,
-                                                   -1.0,
+                                                   value_t(-1),
                                                    apply_normal, * BA->block( j, i ),
                                                    apply_normal, * BA->block( i, l ),
-                                                   * BA->block( j, l ), acc );
+                                                   * BA->block( j, l ), acc, approx );
                     } );
 
                 finished( j, i ).precede( update );

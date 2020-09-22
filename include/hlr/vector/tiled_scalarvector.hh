@@ -14,12 +14,12 @@
 #include <hlr/matrix/tiling.hh>
 #include <hlr/vector/tile_storage.hh>
 #include <hlr/utils/checks.hh>
+#include <hlr/utils/math.hh>
 
 namespace hlr
 { 
 
 namespace hpro = HLIB;
-namespace math = hpro::Math;
 
 using hpro::real;
 using hpro::complex;
@@ -156,7 +156,7 @@ public:
     virtual void fill ( const real  a )
     {
         for ( auto [ is, v_is ] : _tiles )
-            blas::fill( value_t(a), v_is );
+            blas::fill( v_is, value_t(a) );
     }
 
     // fill with random numbers
@@ -195,7 +195,7 @@ public:
         for ( auto [ is, v_is ] : _tiles )
             f += blas::dot( v_is, v_is );
         
-        return hpro::re( math::sqrt( f ) );
+        return std::real( math::sqrt( f ) );
     }
 
     // return infimum norm
@@ -315,7 +315,7 @@ tiled_scalarvector< value_t >::init_tiles ( tile_is_map_t &  tile_is_map )
 {
     const auto &  tiles = tile_is_map[ _is ];
 
-    for ( const auto  is : tiles )
+    for ( const auto &  is : tiles )
     {
         _tiles[ is ] = tile< value_t >( is.size() );
         _tile_mutices[ is ].lock();  // ensure mutex exists in map

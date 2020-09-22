@@ -19,6 +19,7 @@
 #include "hlr/cluster/mblr.hh"
 #include "hlr/dag/lu.hh"
 #include "hlr/bem/aca.hh"
+#include "hlr/approx/svd.hh"
 
 using namespace hlr;
 
@@ -79,8 +80,9 @@ program_main ()
         std::cout << "  " << term::bullet << " recursive" << std::endl;
         
         std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  apx = approx::SVD< value_t >();
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -88,7 +90,7 @@ program_main ()
 
             tic = timer::now();
         
-            impl::tlr::lu< HLIB::real >( C.get(), acc );
+            impl::tlr::lu< value_t >( C.get(), acc, apx );
         
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;

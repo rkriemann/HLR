@@ -6,12 +6,22 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <fstream>
+
+#include <hlr/utils/likwid.hh>
+
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
 
 #include "hlr/seq/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/randsvd.hh>
+#include <hlr/approx/aca.hh>
+#include <hlr/approx/lanczos.hh>
+#include <hlr/approx/randlr.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -22,12 +32,244 @@ uint64_t
 get_flops ( const std::string &  method );
 
 //
+// standard mat-mul
+//
+template < typename approx_t >
+void
+mm_std ( const hpro::TMatrix &    A,
+         const hpro::TTruncAcc &  acc,
+         const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic      = timer::now();
+    auto  toc      = timer::since( tic );
+    
+    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  C        = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        C->scale( 0 );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hmmstd" );
+            
+        impl::multiply< value_t >( value_t(1), hpro::apply_normal, A, hpro::apply_normal, A, *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hmmstd" );
+            
+        toc = timer::since( tic );
+        std::cout << "      mult in  " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "mm" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+}
+
+//
+// standard LU
+//
+template < typename approx_t >
+void
+lu_std ( const hpro::TMatrix &    A,
+         const hpro::TTruncAcc &  acc,
+         const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  C   = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        impl::matrix::copy_to( A, *C );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hlustd" );
+            
+        impl::lu< value_t >( *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hlustd" );
+            
+        toc = timer::since( tic );
+        std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+        hpro::DBG::write( C.get(), "C1.mat", "C1" );
+
+        flops.push_back( get_flops( "lu" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
+// accumulator based mat-mul
+//
+template < typename approx_t >
+void
+mm_accu ( const hpro::TMatrix &    A,
+          const hpro::TTruncAcc &  acc,
+          const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic      = timer::now();
+    auto  toc      = timer::since( tic );
+    
+    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  C        = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        C->scale( 0 );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hmmaccu" );
+            
+        impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, A, hpro::apply_normal, A, *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hmmaccu" );
+            
+        toc = timer::since( tic );
+        std::cout << "      mult in  " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "mm" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "    runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+}
+
+//
+// standard LU
+//
+template < typename approx_t >
+void
+lu_accu ( const hpro::TMatrix &    A,
+          const hpro::TTruncAcc &  acc,
+          const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  C   = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        impl::matrix::copy_to( A, *C );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hluaccu" );
+            
+        impl::accu::lu< value_t >( *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hluaccu" );
+            
+        toc = timer::since( tic );
+        std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+        hpro::DBG::write( C.get(), "C2.mat", "C2" );
+        
+        flops.push_back( get_flops( "lu" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
 // main function
 //
 template < typename problem_t >
 void
 program_main ()
 {
+    LIKWID_MARKER_INIT;
+
     using value_t = typename problem_t::value_t;
 
     auto  tic     = timer::now();
@@ -49,16 +291,80 @@ program_main ()
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = std::make_unique< bem::aca_lrapx< hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+
+    LIKWID_MARKER_START( "build" );
+            
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+
+    LIKWID_MARKER_STOP( "build" );
+    
     auto  toc    = timer::since( tic );
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
-    std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
+    // std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A" );
 
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "svd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::SVD< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "pairsvd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "rrqr.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RRQR< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "randsvd.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "randlr.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::RandLR< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "aca.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::ACA< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // {
+    //     auto  orig_cout = std::cout.rdbuf();
+    //     auto  fout      = std::make_unique< std::ofstream >( "lanczos.log" );
+    //     std::cout.rdbuf( fout->rdbuf() );
+    //     mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "" );
+    //     std::cout.rdbuf( orig_cout );
+    // }
+
+    // return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
@@ -73,13 +379,19 @@ program_main ()
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
 
+    std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
+    
+    //
+    // reference: Hpro
+    //
+
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << " standard" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
-        
-        auto  C = impl::matrix::copy( *A );
+
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -89,35 +401,64 @@ program_main ()
 
             tic = timer::now();
         
-            impl::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
+            LIKWID_MARKER_START( "hmm" );
+            
+            hpro::multiply( value_t(1), apply_normal, A.get(), apply_normal, A.get(), value_t(1), C.get(), acc );
 
+            LIKWID_MARKER_STOP( "hmm" );
+            
             toc = timer::since( tic );
-            std::cout << "    mult in  " << format_time( toc ) << std::endl;
+            std::cout << "      mult in  " << format_time( toc ) << std::endl;
 
             flops.push_back( get_flops( "mm" ) );
             runtime.push_back( toc.seconds() );
         }// for
         
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        // std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
         if ( nbench > 1 )
-            std::cout << "  runtime = "
+            std::cout << "    runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
-        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
+
+    //
+    // standard recursion with immediate updates
+    //
+
+    if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
+    if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+    if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+    if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_std< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+    if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+
+    //
+    // using accumulators
+    //
+
+    std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
+    
+    //
+    // reference: Hpro
+    //
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << " accumulator" << term::reset << std::endl;
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
         std::vector< double >  runtime, flops;
+        auto                   old_config = hpro::CFG::Arith::use_accu;
+
+        hpro::CFG::Arith::use_accu = true;
         
-        auto  C = impl::matrix::copy( *A );
+        auto  C   = impl::matrix::copy( *A );
         
         for ( int i = 0; i < nbench; ++i )
         {
@@ -127,27 +468,170 @@ program_main ()
 
             tic = timer::now();
         
-            impl::accu::multiply< value_t >( value_t(1), hpro::apply_normal, *A, hpro::apply_normal, *A, *C, acc );
+            LIKWID_MARKER_START( "hmm" );
+            
+            hpro::multiply_accu( value_t(1), apply_normal, A.get(), apply_normal, A.get(), value_t(1), C.get(), acc );
 
+            LIKWID_MARKER_STOP( "hmm" );
+            
             toc = timer::since( tic );
-            std::cout << "    mult in  " << format_time( toc ) << std::endl;
+            std::cout << "      mult in  " << format_time( toc ) << std::endl;
 
             flops.push_back( get_flops( "mm" ) );
             runtime.push_back( toc.seconds() );
         }// for
         
-        std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        hpro::CFG::Arith::use_accu = old_config;
+
+        // std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
         if ( nbench > 1 )
-            std::cout << "  runtime = "
+            std::cout << "    runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
+        auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
-        std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
     }
+
+    if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
+    if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+    if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+    if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+    if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+
+    LIKWID_MARKER_CLOSE;
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // LU factorization
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << term::bullet << term::bold << "LU factorization ( " << impl_name
+              << ", " << acc.to_string()
+              << " )" << term::reset << std::endl;
+
+    std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
+    
+    //
+    // standard recursion with immediate updates
+    //
+
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+
+        std::vector< double >  runtime, flops;
+
+        auto  C = impl::matrix::copy( *A );
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            impl::matrix::copy_to( *A, *C );
+            
+            blas::reset_flops();
+
+            tic = timer::now();
+        
+            LIKWID_MARKER_START( "hlustd" );
+            
+            hpro::LU::factorise_rec( C.get(), acc );
+
+            LIKWID_MARKER_STOP( "hlustd" );
+            
+            toc = timer::since( tic );
+            std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+            flops.push_back( get_flops( "lu" ) );
+            runtime.push_back( toc.seconds() );
+        }// for
+        
+        // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+        if ( nbench > 1 )
+            std::cout << "      runtime = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+        std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "      error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    }// if
+    
+    if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) lu_std< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
+    if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+    if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+    if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_std< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+    if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+
+    //
+    // using accumulators
+    //
+
+    std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
+    
+    if ( true )
+    {
+        std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+
+        std::vector< double >  runtime, flops;
+        auto                   old_config = hpro::CFG::Arith::use_accu;
+
+        hpro::CFG::Arith::use_accu = true;
+        
+        auto  C = impl::matrix::copy( *A );
+        
+        for ( int i = 0; i < nbench; ++i )
+        {
+            impl::matrix::copy_to( *A, *C );
+            
+            blas::reset_flops();
+
+            tic = timer::now();
+        
+            LIKWID_MARKER_START( "hluaccu" );
+            
+            hpro::LU::factorise_rec( C.get(), acc );
+
+            LIKWID_MARKER_STOP( "hluaccu" );
+            
+            toc = timer::since( tic );
+            std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+            flops.push_back( get_flops( "lu" ) );
+            runtime.push_back( toc.seconds() );
+        }// for
+
+        hpro::CFG::Arith::use_accu = old_config;
+        
+        // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+        if ( nbench > 1 )
+            std::cout << "      runtime = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+        std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        std::cout << "      error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    }// if
+    
+    if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) lu_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
+    if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+    if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+    if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+    if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+    if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
 }
 
 //

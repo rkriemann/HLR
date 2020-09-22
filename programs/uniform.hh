@@ -13,6 +13,7 @@
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
+#include <hlr/bem/aca.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -29,10 +30,8 @@ program_main ()
     using value_t = typename problem_t::value_t;
 
     auto  runtime = std::vector< double >();
-    auto  tic = timer::now();
-    auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< hpro::TMatrix >();
-
+    auto  tic     = timer::now();
+    auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = gen_ct( *coord );
@@ -47,16 +46,17 @@ program_main ()
     }// if
     
     auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
-    
-    A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
-
+    auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx  = bem::aca_lrapx( pcoeff );
+    auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     auto  toc    = timer::since( tic );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+
+    // assign clusters since needed for cluster bases
+    seq::matrix::assign_cluster( *A, *bct->root() );
     
     if ( hpro::verbose( 3 ) )
     {
@@ -72,7 +72,7 @@ program_main ()
         blas::vector< value_t >  x( A->ncols() );
         blas::vector< value_t >  y( A->nrows() );
 
-        blas::fill( value_t(1), x );
+        blas::fill( x, value_t(1) );
             
         for ( int i = 0; i < nbench; ++i )
         {
@@ -87,7 +87,7 @@ program_main ()
             std::cout << "    mvm in   " << format_time( toc ) << std::endl;
 
             if ( i < nbench-1 )
-                blas::fill( value_t(0), y );
+                blas::fill( y, value_t(0) );
         }// for
         
         if ( nbench > 1 )

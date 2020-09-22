@@ -192,7 +192,7 @@ update_node::run_ ( const TTruncAcc &  acc )
 //
 graph
 dag_lu_tileh ( TMatrix *      A,
-               const size_t   min_size,
+               const size_t   /* min_size */,
                refine_func_t  refine,
                exec_func_t    exec )
 {

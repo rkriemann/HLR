@@ -108,14 +108,9 @@ construct_basis ( const cluster_tree &  ct,
         
         for ( auto  M : mat_map[ ct ] )
         {
-            // std::cout << M->block_is().to_string() << std::endl;
-    
             if ( M->rank() > 0 )
             {
-                auto  P = blas::copy( V< value_t >( M, adjoint ) );
-                auto  C = blas::Matrix< value_t >( M->rank(), M->rank() );
-                
-                blas::factorise_ortho( P, C );
+                auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
 
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
@@ -160,11 +155,9 @@ construct_basis ( const cluster_tree &  ct,
             // approximate basis up to given accuracy and update cluster basis
             //
 
-            blas::Matrix< value_t >  R;
+            auto  [ Q, R ] = blas::factorise_ortho( Xt, acc );
 
-            blas::factorise_ortho( Xt, R, acc );
-
-            cb->set_basis( std::move( Xt ) );
+            cb->set_basis( std::move( Q ) );
         }// if
     }// if
 

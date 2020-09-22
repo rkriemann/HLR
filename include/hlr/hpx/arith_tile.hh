@@ -15,6 +15,7 @@
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
+#include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/hpx/matrix.hh"
@@ -25,18 +26,6 @@ namespace hpro = HLIB;
 
 namespace hodlr
 {
-
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
-
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
-
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
-
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -192,9 +181,9 @@ trsml ( const hpro::TMatrix *      L,
             
         hodlr::trsml( L00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_V< value_t >( L10 ), X0, ntile );
+        auto  T = hodlr::tsmul( blas::mat_V< value_t >( L10 ), X0, ntile );
 
-        hodlr::tsadd( value_t(-1), mat_U< value_t >( L10 ), T, X1, ntile );
+        hodlr::tsadd( value_t(-1), blas::mat_U< value_t >( L10 ), T, X1, ntile );
 
         hodlr::trsml( L11, X1, ntile );
     }// if
@@ -440,11 +429,11 @@ addlr ( const blas::matrix< value_t > &  U,
 
         addlr( U0, T, V0, A00, acc, ntile );
         
-        auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, mat_U< value_t >( A01 ), mat_V< value_t >( A01 ), acc, ntile );
+        auto  [ U01, V01 ] = truncate( value_t(-1), U0, T, V1, blas::mat_U< value_t >( A01 ), blas::mat_V< value_t >( A01 ), acc, ntile );
 
         A01->set_lrmat( U01, V01 );
 
-        auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, mat_U< value_t >( A10 ), mat_V< value_t >( A10 ), acc, ntile );
+        auto  [ U10, V10 ] = truncate( value_t(-1), U1, T, V0, blas::mat_U< value_t >( A10 ), blas::mat_V< value_t >( A10 ), acc, ntile );
 
         A10->set_lrmat( U10, V10 );
         
@@ -483,9 +472,9 @@ trsmuh ( const TMatrix *            U,
             
         hodlr::trsmuh( U00, X0, ntile );
 
-        auto  T = hodlr::tsmul( mat_U< value_t >( U01 ), X0, ntile );
+        auto  T = hodlr::tsmul( blas::mat_U< value_t >( U01 ), X0, ntile );
         
-        hodlr::tsadd( value_t(-1), mat_V< value_t >( U01 ), T, X1, ntile );
+        hodlr::tsadd( value_t(-1), blas::mat_V< value_t >( U01 ), T, X1, ntile );
 
         hodlr::trsmuh( U11, X1, ntile );
     }// if
@@ -520,13 +509,13 @@ lu ( hpro::TMatrix *          A,
 
         auto  lu_00   = ::hpx::async( [A00,&acc,ntile] { hodlr::lu< value_t >( A00, acc, ntile ); } );
         
-        auto  trsm_01 = ::hpx::async( [A00,A01,ntile] { trsml(  A00, mat_U< value_t >( A01 ), ntile ); } );
-        auto  trsm_10 = ::hpx::async( [A00,A01,ntile] { trsmuh( A00, mat_V< value_t >( A10 ), ntile ); } );
+        auto  trsm_01 = ::hpx::async( [A00,A01,ntile] { trsml(  A00, blas::mat_U< value_t >( A01 ), ntile ); } );
+        auto  trsm_10 = ::hpx::async( [A00,A01,ntile] { trsmuh( A00, blas::mat_V< value_t >( A10 ), ntile ); } );
 
         // T = ( V(A_10)^H · U(A_01) )
-        auto  comp_T  = ::hpx::async( [A10,A01,ntile] { return hodlr::tsmul( mat_V< value_t >( A10 ), mat_U< value_t >( A01 ), ntile ); } );
+        auto  comp_T  = ::hpx::async( [A10,A01,ntile] { return hodlr::tsmul( blas::mat_V< value_t >( A10 ), blas::mat_U< value_t >( A01 ), ntile ); } );
 
-        auto  upd_11  = ::hpx::async( [A10,A01,&acc,ntile] { hodlr::addlr< value_t >( mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile ); } );
+        auto  upd_11  = ::hpx::async( [A10,A01,&acc,ntile] { hodlr::addlr< value_t >( blas::mat_U< value_t >( A10 ), T, blas::mat_V< value_t >( A01 ), A11, acc, ntile ); } );
         
         auto  lu_11   = ::hpx::async( [A11,&acc,ntile] { hodlr::lu< value_t >( A11, acc, ntile ); } );
     }// if

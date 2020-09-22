@@ -93,11 +93,44 @@ build ( const hpro::TBlockCluster *  bct,
         B->adjust_value_type();
     }// else
 
-    M->set_cluster_force( bct );
+    // M->set_cluster_force( bct );
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// assign block cluster to matrix
+//
+inline
+void
+assign_cluster ( hpro::TMatrix &              M,
+                 const hpro::TBlockCluster &  bc )
+{
+    M.set_cluster_force( & bc );
+    
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+
+        HLR_ASSERT( ( B->nblock_rows() == bc.nrows() ) &&
+                    ( B->nblock_cols() == bc.ncols() ) );
+                    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( B->block( i, j ) == nullptr )
+                    continue;
+
+                if ( bc.son( i, j ) == nullptr )
+                    HLR_ERROR( "null cluster for non-null sub-block" );
+                
+                assign_cluster( * B->block( i, j ), * bc.son( i, j ) );
+            }// for
+        }// for
+    }// if
 }
 
 //
@@ -569,9 +602,9 @@ clear ( hpro::TMatrix &  M )
         auto  D = ptrcast( & M, hpro::TDenseMatrix );
 
         if ( D->is_complex() )
-            blas::fill( hpro::complex(0), hpro::blas_mat< hpro::complex >( D ) );
+            blas::fill( hpro::blas_mat< hpro::complex >( D ), hpro::complex(0) );
         else
-            blas::fill( hpro::real(0), hpro::blas_mat< hpro::real >( D ) );
+            blas::fill( hpro::blas_mat< hpro::real >( D ), hpro::real(0) );
     }// if
     else
         assert( false );
@@ -620,23 +653,26 @@ copy_uniform ( const hpro::TMatrix &                          M,
         //
         // project into row/column cluster basis:
         //
-        //   M = A·B^H = (V·V^H·A) (U·U^H·B)^H
+        //   M = A·B^H = (U·U^H·A) (V·V^H·B)^H
         //             = U · (U^H·A)·(V^H·B)^H · V^H
         //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
-
+        //
+        
         auto  R  = cptrcast( &M, hpro::TRkMatrix );
 
         auto  UA = rowcb.transform_forward( hpro::blas_mat_A< value_t >( R ) );
         auto  VB = colcb.transform_forward( hpro::blas_mat_B< value_t >( R ) );
         auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
 
-        // auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
-        // auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
-        // auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
-
-        // blas::add( value_t(-1), M2, M1 );
-        
-        // std::cout << blas::norm_F( M1 ) << std::endl;
+        // {
+        //     auto  M1 = blas::prod( value_t(1), hpro::blas_mat_A< value_t >( R ), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ) );
+        //     auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
+        //     auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
+            
+        //     blas::add( value_t(-1), M2, M1 );
+            
+        //     std::cout << hpro::to_string( "%.6e", blas::norm_F( M1 ) ) << std::endl;
+        // }
         
         return std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
                                                                              rowcb, colcb,
@@ -647,6 +683,76 @@ copy_uniform ( const hpro::TMatrix &                          M,
         // assuming dense block (no low-rank)
         return M.copy();
     }// else
+}
+
+//
+// convert given matrix into lowrank format
+//
+template < typename approx_t >
+std::unique_ptr< hpro::TRkMatrix >
+convert_to_lowrank ( const hpro::TMatrix &    M,
+                     const hpro::TTruncAcc &  acc,
+                     const approx_t &         approx )
+{
+    using  value_t = typename approx_t::value_t;
+    
+    if ( is_blocked( M ) )
+    {
+        //
+        // convert each sub block into low-rank format and 
+        // enlarge to size of M (pad with zeroes)
+        //
+
+        auto  B  = cptrcast( &M, hpro::TBlockMatrix );
+        auto  Us = std::list< blas::matrix< value_t > >();
+        auto  Vs = std::list< blas::matrix< value_t > >();
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+                
+                if ( is_null( B_ij ) )
+                    continue;
+
+                auto  R_ij = convert_to_lowrank( *B_ij, acc, approx );
+                auto  U    = blas::matrix< value_t >( M.nrows(), R_ij->rank() );
+                auto  V    = blas::matrix< value_t >( M.ncols(), R_ij->rank() );
+                auto  U_i  = blas::matrix< value_t >( U, R_ij->row_is() - M.row_ofs(), blas::range::all );
+                auto  V_j  = blas::matrix< value_t >( V, R_ij->col_is() - M.col_ofs(), blas::range::all );
+
+                blas::copy( hpro::blas_mat_A< value_t >( R_ij ), U_i );
+                blas::copy( hpro::blas_mat_B< value_t >( R_ij ), V_j );
+
+                Us.push_back( std::move( U ) );
+                Vs.push_back( std::move( V ) );
+            }// for
+        }// for
+
+        auto  [ U, V ] = approx( Us, Vs, acc );
+
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D        = cptrcast( &M, hpro::TDenseMatrix );
+        auto  T        = std::move( blas::copy( hpro::blas_mat< value_t >( D ) ) );
+        auto  [ U, V ] = approx( T, acc );
+
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R        = cptrcast( &M, hpro::TRkMatrix );
+        auto  [ U, V ] = approx( hpro::blas_mat_A< value_t >( R ),
+                                 hpro::blas_mat_B< value_t >( R ),
+                                 acc );
+        
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
 }}}// namespace hlr::seq::matrix

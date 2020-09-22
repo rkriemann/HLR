@@ -113,7 +113,8 @@ namespace detail
 //
 // compute C = C + α op( A ) op( B )
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply_task ( const value_t            alpha,
                 const hpro::matop_t      op_A,
@@ -121,7 +122,8 @@ multiply_task ( const value_t            alpha,
                 const hpro::matop_t      op_B,
                 const hpro::TMatrix &    B,
                 hpro::TMatrix &          C,
-                const hpro::TTruncAcc &  acc )
+                const hpro::TTruncAcc &  acc,
+                const approx_t &         approx )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -133,7 +135,7 @@ multiply_task ( const value_t            alpha,
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  C_ij = BC->block(i,j);
                     auto  A_il = BA->block( i, l, op_A );
@@ -146,17 +148,18 @@ multiply_task ( const value_t            alpha,
             
                     #pragma omp task
                     {
-                        multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                        multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                     }// omp task
                 }// for
             }// for
         }// for
     }// if
     else
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+        hlr::multiply( alpha, op_A, A, op_B, B, C, acc, approx );
 }
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply_parfor ( const value_t            alpha,
                   const hpro::matop_t      op_A,
@@ -164,7 +167,8 @@ multiply_parfor ( const value_t            alpha,
                   const hpro::matop_t      op_B,
                   const hpro::TMatrix &    B,
                   hpro::TMatrix &          C,
-                  const hpro::TTruncAcc &  acc )
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -177,7 +181,7 @@ multiply_parfor ( const value_t            alpha,
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
+                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
                 {
                     auto  C_ij = BC->block( i, j );
                     auto  A_il = BA->block( i, l, op_A );
@@ -188,18 +192,19 @@ multiply_parfor ( const value_t            alpha,
                     
                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    multiply_parfor< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
+                    multiply_parfor< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                 }// for
             }// for
         }// for
     }// if
     else
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
+        hlr::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx );
 }
 
 }// namespace detail
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -207,7 +212,8 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     #pragma omp parallel
     {
@@ -215,11 +221,11 @@ multiply ( const value_t            alpha,
         // {
         //     #pragma omp task
         //     {
-        //         detail::multiply_task( alpha, op_A, A, op_B, B, C, acc );
+        //         detail::multiply_task( alpha, op_A, A, op_B, B, C, acc, approx );
         //     }// omp task
         // }// omp single
         
-        detail::multiply_parfor( alpha, op_A, A, op_B, B, C, acc );
+        detail::multiply_parfor( alpha, op_A, A, op_B, B, C, acc, approx );
     }// omp parallel
 }
 
@@ -326,10 +332,12 @@ namespace tlr
 //
 // LU factorization for TLR block format
 // 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -361,7 +369,7 @@ lu ( hpro::TMatrix *          A,
                 hlr::omp::multiply< value_t >( value_t(-1),
                                                hpro::apply_normal, *BA->block( j, i ),
                                                hpro::apply_normal, *BA->block( i, l ),
-                                               *BA->block( j, l ), acc );
+                                               *BA->block( j, l ), acc, approx );
             }// for
         }// for
     }// for
@@ -381,12 +389,14 @@ namespace hodlr
 //
 // add U·V' to matrix A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 addlr ( blas::Matrix< value_t > &  U,
         blas::Matrix< value_t > &  V,
         hpro::TMatrix *            A,
-        const hpro::TTruncAcc &    acc )
+        const hpro::TTruncAcc &    acc,
+        const approx_t &           approx )
 {
     HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
     
@@ -398,33 +408,33 @@ addlr ( blas::Matrix< value_t > &  U,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        blas::Matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  U1( U, A11->row_is() - A->row_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V0( V, A00->col_is() - A->col_ofs(), blas::Range::all );
-        blas::Matrix< value_t >  V1( V, A11->col_is() - A->col_ofs(), blas::Range::all );
+        auto  U0  = blas::matrix< value_t >( U, A00->row_is() - A->row_ofs(), blas::range::all );
+        auto  U1  = blas::matrix< value_t >( U, A11->row_is() - A->row_ofs(), blas::range::all );
+        auto  V0  = blas::matrix< value_t >( V, A00->col_is() - A->col_ofs(), blas::range::all );
+        auto  V1  = blas::matrix< value_t >( V, A11->col_is() - A->col_ofs(), blas::range::all );
 
         #pragma omp parallel sections
         {
             #pragma omp section
-            { addlr( U0, V0, A00, acc ); }
+            { addlr( U0, V0, A00, acc, approx ); }
 
             #pragma omp section
-            { addlr( U1, V1, A11, acc ); }
+            { addlr( U1, V1, A11, acc, approx ); }
 
             #pragma omp section
             {
-                auto [ U01, V01 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                                                    { hpro::blas_mat_B< value_t >( A01 ), V1 },
-                                                                    acc );
+                auto [ U01, V01 ] = approx( { hpro::blas_mat_A< value_t >( A01 ), U0 },
+                                            { hpro::blas_mat_B< value_t >( A01 ), V1 },
+                                            acc );
                 
                 A01->set_lrmat( U01, V01 );
             }
             
             #pragma omp section
             {
-                auto [ U10, V10 ] = hlr::approx_sum_svd< value_t >( { hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                                                    { hpro::blas_mat_B< value_t >( A10 ), V0 },
-                                                                    acc );
+                auto [ U10, V10 ] = approx( { hpro::blas_mat_A< value_t >( A10 ), U1 },
+                                            { hpro::blas_mat_B< value_t >( A10 ), V0 },
+                                            acc );
                 A10->set_lrmat( U10, V10 );
             }
         }
@@ -440,10 +450,12 @@ addlr ( blas::Matrix< value_t > &  U,
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
     
@@ -455,7 +467,7 @@ lu ( hpro::TMatrix *          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        lu< value_t >( A00, acc );
+        lu< value_t >( A00, acc, approx );
 
         #pragma omp parallel sections
         {
@@ -470,9 +482,9 @@ lu ( hpro::TMatrix *          A,
         auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
         auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc );
+        addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc, approx );
         
-        lu< value_t >( A11, acc );
+        lu< value_t >( A11, acc, approx );
     }// if
     else
     {
@@ -496,10 +508,12 @@ namespace tileh
 //
 // compute LU factorization of A
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     assert( is_blocked( A ) );
 
@@ -566,10 +580,10 @@ lu ( hpro::TMatrix *          A,
             {
                 for ( uint  l = i+1; l < nbc; ++l )
                 {
-                    hlr::omp::detail::multiply_parfor( -1.0,
+                    hlr::omp::detail::multiply_parfor( value_t(-1),
                                                        apply_normal, * BA->block( j, i ),
                                                        apply_normal, * BA->block( i, l ),
-                                                       * BA->block( j, l ), acc );
+                                                       * BA->block( j, l ), acc, approx );
                 }// for
             }// for
         }// for
