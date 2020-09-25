@@ -65,7 +65,11 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( true )
+    //
+    // H-matrix matrix vector multiplication
+    //
+    
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -152,7 +156,7 @@ program_main ()
         // mat-vec benchmark
         //
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -194,7 +198,7 @@ program_main ()
             runtime.clear();
         }
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
 
@@ -235,6 +239,19 @@ program_main ()
         
             runtime.clear();
         }
+
+        //
+        // add low-rank matrix
+        //
+
+        const uint  k = 4;
+        auto        U = blas::matrix< value_t >( A2->nrows(), k );
+        auto        V = blas::matrix< value_t >( A2->ncols(), k );
+
+        blas::fill_rand( U );
+        blas::fill_rand( V );
+
+        impl::uniform::tlr::addlr( *A2, U, V, acc );
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -243,7 +260,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "H² matrix" << term::reset << std::endl;
 
