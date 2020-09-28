@@ -250,8 +250,18 @@ program_main ()
 
         blas::fill_rand( U );
         blas::fill_rand( V );
+        blas::scale( value_t(1e-3), U );
 
+        auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
+        
+        io::matlab::write( *D1, "A1" );
+        io::matlab::write( U, "U" );
+        io::matlab::write( V, "V" );
         impl::uniform::tlr::addlr( *A2, U, V, acc );
+
+        auto  D2 = seq::matrix::convert_to_dense< value_t >( *A2 );
+        
+        io::matlab::write( *D2, "A2" );
     }
 
     //////////////////////////////////////////////////////////////////////

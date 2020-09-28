@@ -251,6 +251,24 @@ zeros ( const size_t  nrows,
 }
 
 //
+// extend given matrix M by nrows × ncols, e.g., resulting matrix
+// has dimensions nrows(M) + nrows × ncols(M) + ncols
+//
+template < typename value_t >
+matrix< value_t >
+extend ( const matrix< value_t > &  M,
+         const size_t               nrows,
+         const size_t               ncols )
+{
+    auto  T  = matrix< value_t >( M.nrows() + nrows, M.ncols() + ncols );
+    auto  TM = matrix( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
+
+    copy( M, TM );
+
+    return T;
+}
+
+//
 // join given matrices M_i row-wise, e.g., return [ M_0, M_1, ..., M_n-1 ]
 //
 template < typename value_t >
@@ -352,8 +370,6 @@ diag ( const std::list< matrix< value_t > > &  matrices )
 
     for ( auto  M_i : matrices )
     {
-        HLR_ASSERT( M_i.nrows() == M_i.ncols() );
-        
         nrows += M_i.nrows();
         ncols += M_i.ncols();
     }// for
@@ -362,18 +378,21 @@ diag ( const std::list< matrix< value_t > > &  matrices )
     // put all matrices together
     //
 
-    auto    M   = matrix< value_t >( nrows, ncols );
-    size_t  pos = 0;
+    auto    M     = matrix< value_t >( nrows, ncols );
+    size_t  pos_r = 0;
+    size_t  pos_c = 0;
     
     for ( auto  M_i : matrices )
     {
         const auto  nrows_i = M_i.nrows();
+        const auto  ncols_i = M_i.ncols();
         auto        dest_i  = matrix( M,
-                                      range( pos, pos + nrows_i - 1 ),
-                                      range( pos, pos + nrows_i - 1 ) );
+                                      range( pos_r, pos_r + nrows_i - 1 ),
+                                      range( pos_c, pos_c + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
-        pos += nrows_i;
+        pos_r += nrows_i;
+        pos_c += ncols_i;
     }// for
 
     return M;

@@ -153,6 +153,20 @@ public:
 
         _S = std::move( aS );
     }
+
+    // set coefficient matrix without checking dimensions
+    // (because cluster bases need to be adjusted later)
+    void
+    set_coeff_unsafe ( const blas::Matrix< value_t > &  aS )
+    {
+        blas::copy( aS, _S );
+    }
+    
+    void
+    set_coeff_unsafe ( blas::Matrix< value_t > &&  aS )
+    {
+        _S = std::move( aS );
+    }
     
     //
     // matrix data
