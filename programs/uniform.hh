@@ -244,7 +244,7 @@ program_main ()
         // add low-rank matrix
         //
 
-        if ( false )
+        if ( true )
         {
             const uint  k = 4;
             auto        U = blas::matrix< value_t >( A2->nrows(), k );
@@ -259,7 +259,8 @@ program_main ()
             io::matlab::write( *D1, "A1" );
             io::matlab::write( U, "U" );
             io::matlab::write( V, "V" );
-            impl::uniform::tlr::addlr( *A2, U, V, acc );
+            // impl::uniform::tlr::addlr( *A2, U, V, acc );
+            impl::uniform::tlr::lu< value_t >( *A2, acc );
             
             auto  D2 = seq::matrix::convert_to_dense< value_t >( *A2 );
             
