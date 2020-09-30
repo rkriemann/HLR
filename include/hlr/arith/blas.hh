@@ -255,6 +255,20 @@ copy ( const T_matrix &  A )
 
 template < typename value_dest_t,
            typename value_src_t >
+vector< value_dest_t >
+copy ( const vector< value_src_t > &  v )
+{
+    const size_t            n = v.length();
+    vector< value_dest_t >  w( n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        w(i) = value_dest_t( v(i) );
+
+    return w;
+}
+
+template < typename value_dest_t,
+           typename value_src_t >
 matrix< value_dest_t >
 copy ( const matrix< value_src_t > &  A )
 {
@@ -405,6 +419,9 @@ qr2  ( matrix< value_t > &  M,
 
     HLR_ASSERT( ncols <= nrows );
 
+    if (( blas_int_t(R.nrows()) != ncols ) || ( blas_int_t(R.ncols()) != ncols ))
+        R = std::move( matrix< value_t >( ncols, ncols ) );
+    
     #if 1
     
     blas_int_t  info = 0;
@@ -568,13 +585,29 @@ qrts  ( matrix< value_t > &  M,
 //
 template < typename value_t >
 void
-qr_wrapper ( matrix< value_t > &  M,
-             matrix< value_t > &  R )
+qr ( matrix< value_t > &  M,
+     matrix< value_t > &  R )
 {
     // if ( M.nrows() > 2*M.ncols() )
     //     blas::qrts( M, R );
     // else
     blas::qr2( M, R );
+}
+
+//
+// return Q, R and leaves M unchanged
+//
+template < typename value_t >
+std::pair< matrix< value_t >,
+           matrix< value_t > >
+qr ( matrix< value_t > &  M )
+{
+    auto  Q = copy( M );
+    auto  R = matrix< value_t >();
+    
+    blas::qr( Q, R );
+
+    return { std::move( Q ), std::move( R ) };
 }
 
 //

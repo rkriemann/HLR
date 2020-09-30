@@ -361,47 +361,48 @@ program_main ()
 {
     using value_t = double;
 
-    if ( false )
+    if ( true )
     {
         const auto                                 seed = 1593694284; // time( nullptr );
         std::default_random_engine                 generator( seed );
         std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
         auto                                       random      = [&] () { return uniform_distr( generator ); };
 
-        #if 1
+        auto  M = blas::matrix< value_t >();
         
-        auto  R  = blas::matrix< value_t >( n, n );
+        if ( true )
+        {
+            auto  R  = blas::matrix< value_t >( n, n );
 
-        blas::fill_fn( R, random );
+            blas::fill_fn( R, random );
         
-        // auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
-        auto  M  = blas::copy( R );
-
-        blas::add( value_t(1), blas::adjoint(R), M );
-        blas::scale( value_t(0.5), M );
-
-        #else
-
-        auto  alpha = value_t(1e10);
-        auto  D     = blas::matrix< value_t >( n, n );
-        auto  Q     = blas::matrix< value_t >( n, n );
-        auto  R     = blas::matrix< value_t >( n, n );
-
-        // D with condition alpha
-        for ( uint  i = 0; i < n; ++i )
-            D(i,i) = std::pow( alpha, -(value_t(i)/value_t(n-1)) ); 
-
-        // random, orthogonal Q
-        blas::fill_fn( Q, random );
-        blas::qr( Q, R );
-
-        // M = Q·D·Q'
-        blas::prod( value_t(1), Q,                D, value_t(0), R );
-        blas::prod( value_t(1), R, blas::adjoint(Q), value_t(0), D );
-
-        auto  M = std::move( D );
-        
-        #endif
+            // auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
+            M = std::move( blas::copy( R ) );
+            
+            blas::add( value_t(1), blas::adjoint(R), M );
+            blas::scale( value_t(0.5), M );
+        }// if
+        else
+        {
+            auto  alpha = value_t(1e10);
+            auto  D     = blas::matrix< value_t >( n, n );
+            auto  Q     = blas::matrix< value_t >( n, n );
+            auto  R     = blas::matrix< value_t >( n, n );
+            
+            // D with condition alpha
+            for ( uint  i = 0; i < n; ++i )
+                D(i,i) = std::pow( alpha, -(value_t(i)/value_t(n-1)) ); 
+            
+            // random, orthogonal Q
+            blas::fill_fn( Q, random );
+            blas::qr( Q, R );
+            
+            // M = Q·D·Q'
+            blas::prod( value_t(1), Q,                D, value_t(0), R );
+            blas::prod( value_t(1), R, blas::adjoint(Q), value_t(0), D );
+            
+            M = std::move( D );
+        }// else
         
 
         if ( n <= 2048 )
@@ -428,6 +429,143 @@ program_main ()
         // }
 
         // return;
+
+        //
+        // double Jacobi
+        //
+
+        {
+            auto  tic = timer::now();
+            auto  toc = timer::since( tic );
+
+            blas::eigen_stat  stat;
+            
+            auto  M2  = blas::copy( M );
+            
+            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+            
+            tic = timer::now();
+            
+            auto [ E, V ] = eigen_jac_bw( M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
+
+            toc = timer::since( tic );
+            
+            std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+
+            mkl_set_num_threads_local( mkl_nthreads );
+        }
+        
+        //
+        // single Jac + double Jac
+        //
+        
+        {
+            auto  tic = timer::now();
+            auto  toc = timer::since( tic );
+
+            blas::eigen_stat  stat;
+            
+            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+
+            tic = timer::now();
+            
+            auto  M2        = blas::copy< float >( M );
+            auto [ Es, Vs ] = eigen_jac_bw( M2, cmdline::ntile, 1e-4, 1000, cmdline::verbosity, & stat );
+
+            toc = timer::since( tic );
+
+            std::cout << "single Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            
+            
+            auto  Ed        = blas::copy< double >( Es );
+            auto  Vd        = blas::copy< double >( Vs );
+
+            std::cout << "    error = " << format_error( blas::everror( M, Ed, Vd ) ) << std::endl;
+
+            tic = timer::now();
+            
+            auto  VM        = blas::prod( value_t(1), blas::adjoint( Vd ), M );
+            auto  VMV       = blas::prod( value_t(1), VM, Vd );
+
+            // auto  [ E, V ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", cmdline::verbosity );
+            auto  [ E, V ]  = eigen_jac_bw( VMV, cmdline::ntile, 1e-14, 1000, cmdline::verbosity );
+            
+            toc = timer::since( tic );
+
+            std::cout << "double Jacobi in " << format_time( toc ) << std::endl;
+
+            auto  V2 = blas::prod( double(1), V, Vd );
+            
+            std::cout << "    error = " << format_error( blas::everror( M, E, V2 ) ) << std::endl;
+
+            mkl_set_num_threads_local( mkl_nthreads );
+            
+            return;
+        }
+
+        //
+        // Precond + Jac + DPT
+        //
+        
+        {
+            auto  M2  = blas::matrix< value_t >();
+            auto  tic = timer::now();
+
+            blas::eigen_stat  stat;
+
+            if ( true )
+            {
+                auto  [ Q, R ] = blas::qr( M );
+                auto  H        = blas::prod( value_t(1), R, Q );
+                auto  Delta    = blas::prod( value_t(1), M, Q );
+
+                blas::prod( value_t(-1), Q, H, value_t(1), Delta );
+                blas::prod( value_t(1), blas::adjoint(Q), Delta, value_t(1), H );
+
+                M2 = std::move( H );
+            }// if
+            else
+                M2 = std::move( blas::copy( M ) );
+
+            auto  toc      = timer::since( tic );
+
+            std::cout << "precond in " << format_time( toc ) << std::endl;
+
+            io::write_matlab( M2, "M2" );
+            
+            tic = timer::now();
+            
+            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+                
+            auto [ E1, V1 ] = eigen_jac_bw( M2, cmdline::ntile, 1e-3, 1000, cmdline::verbosity, & stat );
+
+            mkl_set_num_threads_local( mkl_nthreads );
+
+            toc = timer::since( tic );
+            
+            std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
+
+            tic = timer::now();
+            
+            auto  [ E, V2 ] = blas::eigen_dpt( M2, 0, 1e-14, "frobenius", cmdline::verbosity );
+
+            toc = timer::since( tic );
+
+            std::cout << "DPT in " << format_time( toc ) << std::endl;
+
+            tic = timer::now();
+            
+            auto  V = blas::prod( double(1), V2, V1 );
+            
+            toc = timer::since( tic );
+
+            std::cout << "V in   " << format_time( toc ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+        }
+
+        return;
         
         {
             auto M2       = blas::copy( M );
