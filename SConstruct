@@ -370,6 +370,10 @@ if likwid and LIKWID_DIR != None :
     env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
     env.Append( LIBS       = 'likwid' )
 
+# add GMP
+env.ParseConfig( 'pkg-config --cflags gmpxx' )
+env.ParseConfig( 'pkg-config --libs   gmpxx' )
+
 ######################################################################
 #
 # target 'help'

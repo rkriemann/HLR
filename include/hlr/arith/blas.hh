@@ -560,6 +560,40 @@ HLR_BLAS_NORMM( std::complex< float >,  clange_ )
 HLR_BLAS_NORMM( std::complex< double >, zlange_ )
 #undef HLR_BLAS_NORMM
 
+#define  HLR_BLAS_NORMF( type, func )                                   \
+    inline                                                              \
+    typename hpro::real_type< type >::type_t                            \
+    norm_F ( const matrix< type > &  M )                                \
+    {                                                                   \
+        typename hpro::real_type< type >::type_t  work = 0;             \
+        const blas_int_t                          nrows = M.nrows();    \
+        const blas_int_t                          ncols = M.ncols();    \
+        const blas_int_t                          ldM   = M.col_stride(); \
+                                                                        \
+        return func( "F", & nrows, & ncols, M.data(), & ldM, & work );  \
+    }
+
+HLR_BLAS_NORMF( float,                  slange_ )
+HLR_BLAS_NORMF( double,                 dlange_ )
+HLR_BLAS_NORMF( std::complex< float >,  clange_ )
+HLR_BLAS_NORMF( std::complex< double >, zlange_ )
+#undef HLR_BLAS_NORMF
+
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+sqnorm_2 ( const vector< value_t > &  v )
+{
+    return math::square( norm2( v ) );
+}
+
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+sqnorm_F ( const matrix< value_t > &  M )
+{
+    return math::square( norm_F( M ) );
+}
+
+
 //////////////////////////////////////////////////////////////////////
 //
 // functions related to QR factorization

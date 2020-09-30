@@ -119,7 +119,7 @@ struct aca_pivot_max
     using  vector_list_t = std::deque< blas::vector< value_t > >;
 
     // value considered zero to avoid division by small values
-    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+    // static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
         
     
     int                  next_col = 0;
@@ -149,6 +149,8 @@ struct aca_pivot_max
            const vector_list_t &  U,
            const vector_list_t &  V )
     {
+        const value_t  zero_val(0);
+        
         // get "j"'th column
         const auto  pivot_col  = next_col;
 
@@ -163,7 +165,7 @@ struct aca_pivot_max
         const auto  max_val   = column( pivot_row );
 
         // stop and signal no pivot found if remainder is "zero"
-        if ( hpro::Math::abs( max_val ) <= zero_val )
+        if ( math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         // scale <col> by inverse of maximal element in u
@@ -187,9 +189,9 @@ struct aca_pivot_max
         {
             if ( ! used_cols[ j ] )
             {
-                if ( std::abs( row(j) ) > max_v )
+                if ( math::abs( row(j) ) > max_v )
                 {
-                    max_v = std::abs( row(j) );
+                    max_v = math::abs( row(j) );
                     max_j = j;
                 }// if
             }// if
@@ -241,12 +243,13 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
     
     // precision defined by accuracy or by machine precision
     // (to be corrected by operator norm)
-    real_t      eps      = ( acc.is_fixed_prec()
-                             ? acc.rel_eps()
-                             : real_t(10 * std::numeric_limits< real_t >::epsilon() ));
+    // real_t      sqeps    = math::square( real_t(1,1000000) );
+    real_t      sqeps    = ( acc.is_fixed_prec()
+                             ? real_t( math::square( acc.rel_eps() ) )
+                             : real_t( math::square( 10 * std::numeric_limits< real_t >::epsilon() ) ) );
     
-    // approximation of |M|
-    real_t      norm_M   = real_t(0);
+    // approximation of |M|²
+    real_t      sqnorm_M = real_t(0);
 
     // low-rank approximation
     std::deque< blas::vector< value_t > >  U, V;
@@ -264,9 +267,9 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
         // with |M| ≅ |U·V'|
         //
         
-        const auto  norm_i = blas::norm2( column ) * blas::norm2( row );
+        const auto  sqnorm_i = blas::sqnorm_2( column ) * blas::sqnorm_2( row );
 
-        if ( norm_i < eps * norm_M )
+        if ( sqnorm_i < sqeps * sqnorm_M )
         {
             U.push_back( std::move( column ) );
             V.push_back( std::move( row ) );
@@ -283,13 +286,13 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
         //                           + u_k·u_k v_k·v_k
         //
 
-        value_t  upd = norm_i*norm_i;
+        value_t  upd = sqnorm_i;
         
         for ( uint  l = 0; l < U.size(); ++l )
             upd += ( blas::dot( U[l],   column ) * blas::dot( V[l], row  ) +
                      blas::dot( column, U[l]   ) * blas::dot( row,  V[l] ) );
 
-        norm_M = std::sqrt( norm_M * norm_M + math::abs( upd ) );
+        sqnorm_M = sqnorm_M + math::abs( upd );
         
         //
         // and store new vectors/pivots

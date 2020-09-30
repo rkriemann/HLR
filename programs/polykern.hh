@@ -6,10 +6,15 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <boost/rational.hpp>
+#include <gmpxx.h>
+
 #include <vector>
 #include <random>
 #include <limits>
 
+#include <hlr/arith/blas.hh>
+//#include <hlr/arith/blas_rational.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
@@ -21,11 +26,36 @@
 
 using namespace hlr;
 
+using value_t   = double;
+// using value_t   = boost::rational< int64_t >;
+// using value_t   = mpq_class; // boost::rational< int64_t >;
+
+template < typename T >
 double
-ipow ( const double  t,
+to_double ( const T  f )
+{
+    return f;
+}
+
+template < typename integer_t >
+double
+to_double ( const boost::rational< integer_t >  f )
+{
+    return boost::rational_cast< double >( f );
+}
+
+template <>
+double
+to_double ( const mpq_class  f )
+{
+    return f.get_d();
+}
+
+value_t
+ipow ( const value_t  t,
        const uint    n )
 {
-    double  r = t;
+    value_t  r = t;
     
     for ( uint  i = 1; i < n; ++ i )
         r *= t;
@@ -34,10 +64,10 @@ ipow ( const double  t,
 }
 
 template < int N >
- double
- ipow ( const double  t )
+ value_t
+ ipow ( const value_t  t )
 {
-    double  r = t;
+    value_t  r = t;
     
     for ( int  i = 1; i < N; ++ i )
         r *= t;
@@ -45,35 +75,35 @@ template < int N >
     return  r;
 }
 
-template <> double ipow<0> ( const double    ) { return 1; }
-template <> double ipow<1> ( const double  t ) { return t; }
-template <> double ipow<2> ( const double  t ) { return t*t; }
-template <> double ipow<3> ( const double  t ) { return t*t*t; }
-template <> double ipow<4> ( const double  t ) { return t*t*t*t; }
-template <> double ipow<5> ( const double  t ) { return t*t*t*t*t; }
-template <> double ipow<6> ( const double  t ) { return t*t*t*t*t*t; }
+template <> value_t ipow<0> ( const value_t    ) { return 1; }
+template <> value_t ipow<1> ( const value_t  t ) { return t; }
+template <> value_t ipow<2> ( const value_t  t ) { return t*t; }
+template <> value_t ipow<3> ( const value_t  t ) { return t*t*t; }
+template <> value_t ipow<4> ( const value_t  t ) { return t*t*t*t; }
+template <> value_t ipow<5> ( const value_t  t ) { return t*t*t*t*t; }
+template <> value_t ipow<6> ( const value_t  t ) { return t*t*t*t*t*t; }
 
 //
 // test polynomials
 //
-double
-f1 ( const double  t )
+value_t
+f1 ( const value_t  t )
 {
-    return ( (2.0/3.0) * ipow<5>(t) +
-             (1.0/2.0) * ipow<4>(t) +
-             (5.0/2.0) * ipow<3>(t) +
-             (9.0/1.0) * ipow<2>(t) +
-             (1.0/2.0) * ipow<1>(t) +
-             (2.0/3.0) );
+    return ( (value_t(2)/value_t(3)) * ipow<5>(t) +
+             (value_t(1)/value_t(2)) * ipow<4>(t) +
+             (value_t(5)/value_t(2)) * ipow<3>(t) +
+             (value_t(9)/value_t(1)) * ipow<2>(t) +
+             (value_t(1)/value_t(2)) * ipow<1>(t) +
+             (value_t(2)/value_t(3)) );
 }
 
-double
-f2 ( const double  t )
+value_t
+f2 ( const value_t  t )
 {
-    return ( (10.0/7.0)*ipow<3>(t) +
-             ( 7.0/3.0)*ipow<2>(t) +
-             (10.0/3.0)*ipow<1>(t) +
-             ( 4.0/9.0) );
+    return ( (value_t(10)/value_t(7))*ipow<3>(t) +
+             (value_t( 7)/value_t(3))*ipow<2>(t) +
+             (value_t(10)/value_t(3))*ipow<1>(t) +
+             (value_t( 4)/value_t(9)) );
 }
 
 //
@@ -81,30 +111,31 @@ f2 ( const double  t )
 //
 template < typename approx_t >
 void
-lrapx ( const blas::matrix< double > &  M,
-        const std::string &             apx_name )
+lrapx ( const blas::matrix< value_t > &  M,
+        const std::string &              apx_name )
 {
     std::cout << term::bullet << term::bold << apx_name << term::reset << std::endl;
         
-    auto  tol = double(10) * std::numeric_limits< double >::epsilon();
-    auto  acc = hpro::fixed_prec( tol );
+    // auto  tol = value_t(10) * std::numeric_limits< value_t >::epsilon();
+    auto  acc = hpro::fixed_prec( 1e-6 );
     
+    auto  normM    = blas::sqnorm_F( M );
     auto  M2       = blas::copy( M );
-    auto  M3       = blas::copy( M );
-    auto  normM    = blas::norm_F( M );
     auto  apx      = approx_t();
     auto  [ U, V ] = apx( M2, acc );
-    auto  S        = blas::sv( U, V );
+    //auto  S        = blas::sv( U, V );
+
+    blas::copy( M, M2 ); // was destroyed
     
-    blas::prod( double(-1), U, blas::adjoint(V), double(1), M3 );
+    blas::prod( value_t(-1), U, blas::adjoint(V), value_t(1), M2 );
 
     std::cout << "    rank  = " << U.ncols() << std::endl
-              << "    error = " << format_error( blas::norm_F( M3 ) / normM ) << std::endl
-              << "    σ_i   = ";
+              << "    error = " << format_error( math::sqrt( to_double( value_t( blas::sqnorm_F( M2 ) / normM ) ) ) ) << std::endl;
+    // << "    σ_i   = ";
     
-    for ( uint  i = 0; i < S.length(); ++i )
-        std::cout << S(i) << ", ";
-    std::cout << std::endl;
+    // for ( uint  i = 0; i < S.length(); ++i )
+    //     std::cout << S(i) << ", ";
+    // std::cout << std::endl;
 }
 
 //
@@ -145,18 +176,29 @@ program_main ()
     
     const size_t            nindices = indices.size();
     const size_t            nsamples = 50; // number of random sample points
-    blas::matrix< double >  M( nsamples, nindices );
+    blas::matrix< value_t >  M( nsamples, nindices );
 
     const auto                                 seed = 1593694284; // time( nullptr );
     std::default_random_engine                 generator( seed );
-    std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
-    auto                                       random      = [&] () { return uniform_distr( generator ); };
-    
+    #if 0
+    std::uniform_int_distribution< int64_t >   uniform_distr( 1, 1000000 );
+    auto                                       random      = [&] ()
+                                                             {
+                                                                 return value_t( uniform_distr( generator ), 1000000 );
+                                                             };
+    #else
+    std::uniform_real_distribution< value_t >   uniform_distr( -1.0, 1.0 );
+    auto                                        random      = [&] () { return uniform_distr( generator ); };
+    #endif
+
     for ( uint  i = 0; i < nsamples; ++i )
     {
-        const double  t  = random();
-        const auto    v1 = f1( t );
-        const auto    v2 = f2( t );
+        // const auto  v = value_t( uniform_distr( generator ),
+        //                          uniform_distr( generator ) );
+        // const auto     t = v / abs( v );
+        const value_t  t  = random();
+        const auto     v1 = f1( t );
+        const auto     v2 = f2( t );
 
         for ( uint  j = 0; j < nindices; ++j )
         {
@@ -167,7 +209,7 @@ program_main ()
         }// for
     }// for
 
-    hpro::DBG::write( M, "M.mat", "M" );
+    // hpro::DBG::write( M, "M.mat", "M" );
     
     //
     // approximate M
@@ -175,9 +217,9 @@ program_main ()
 
     std::cout << "full rank = " << std::min( M.nrows(), M.ncols() ) << std::endl;
 
-    lrapx< approx::SVD< double > >(     M, "SVD" );
-    lrapx< approx::RRQR< double > >(    M, "RRQR" );
-    lrapx< approx::RandSVD< double > >( M, "RandSVD" );
-    lrapx< approx::ACA< double > >(     M, "ACA" );
-    lrapx< approx::Lanczos< double > >( M, "Lanczos" );
+    // lrapx< approx::SVD< value_t > >(     M, "SVD" );
+    // lrapx< approx::RRQR< value_t > >(    M, "RRQR" );
+    // lrapx< approx::RandSVD< value_t > >( M, "RandSVD" );
+    lrapx< approx::ACA< value_t > >(     M, "ACA" );
+    // lrapx< approx::Lanczos< value_t > >( M, "Lanczos" );
 }
