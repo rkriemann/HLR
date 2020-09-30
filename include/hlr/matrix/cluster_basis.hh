@@ -67,6 +67,12 @@ public:
             , _V( V )
     {}
 
+    cluster_basis ( const cluster_tree &                   cl,
+                    hlr::blas::matrix< value_t > &&        V )
+            : _cluster( &cl )
+            , _V( std::move( V ) )
+    {}
+
     // dtor: delete sons
     ~cluster_basis ()
     {
@@ -161,6 +167,20 @@ public:
     // misc.
     //
 
+    // return copy of cluster basis
+    std::unique_ptr< cluster_basis >
+    copy () const
+    {
+        auto  cb = std::make_unique< cluster_basis >( *_cluster, std::move( blas::copy( _V ) ) );
+
+        cb->set_nsons( nsons() );
+
+        for ( uint  i = 0; i < nsons(); ++i )
+            cb->set_son( i, son(i)->copy().release() );
+
+        return cb;
+    }
+    
     // return memory consumption
     size_t
     byte_size () const

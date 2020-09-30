@@ -17,15 +17,30 @@
 
 namespace hlr { namespace io {
 
+namespace matlab
+{
+
 //
 // write blas matrix/vector in Matlab format with given name
 // - if filename is empty, the matrix/vector name is used
 //
 template < typename value_t >
 void
-write_matlab ( const blas::matrix< value_t > &  M,
-               const std::string &              matname,
-               const std::string &              filename = "" )
+write ( const blas::matrix< value_t > &  M,
+        const std::string &              matname,
+        const std::string &              filename = "" )
+{
+    if ( filename == "" )
+        hpro::DBG::write( M, matname + ".mat", matname );
+    else
+        hpro::DBG::write( M, filename, matname );
+}
+
+inline
+void
+write ( const hpro::TMatrix &  M,
+        const std::string &    matname,
+        const std::string &    filename = "" )
 {
     if ( filename == "" )
         hpro::DBG::write( M, matname + ".mat", matname );
@@ -35,9 +50,9 @@ write_matlab ( const blas::matrix< value_t > &  M,
 
 template < typename value_t >
 void
-write_matlab ( const blas::vector< value_t > &  v,
-               const std::string &              vecname,
-               const std::string &              filename = "" )
+write ( const blas::vector< value_t > &  v,
+        const std::string &              vecname,
+        const std::string &              filename = "" )
 {
     if ( filename == "" )
         hpro::DBG::write( v, vecname + ".mat", vecname );
@@ -51,8 +66,8 @@ write_matlab ( const blas::vector< value_t > &  v,
 //
 template < typename value_t >
 blas::matrix< value_t >
-read_matlab ( const std::string &  filename,
-              const std::string &  matname = "" )
+read ( const std::string &  filename,
+       const std::string &  matname = "" )
 {
     hpro::TMatlabMatrixIO  mio;
     auto                   D = mio.read( filename, matname );
@@ -61,6 +76,8 @@ read_matlab ( const std::string &  filename,
     
     return std::move( blas::mat< value_t >( ptrcast( D.get(), hpro::TDenseMatrix ) ) );
 }
+
+}// namespace matlab
 
 }}// namespace hlr::io
 

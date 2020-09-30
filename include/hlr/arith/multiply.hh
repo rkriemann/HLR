@@ -8,12 +8,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-// #include <hpro/algebra/mat_conv.hh> // DEBUG
-// #include <hpro/algebra/mat_mul.hh> // DEBUG
-
 #include "hlr/utils/log.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/add.hh"
+#include "hlr/approx/svd.hh"
 
 namespace hlr
 {
@@ -917,6 +915,21 @@ multiply ( const value_t            alpha,
     // blas::add( value_t(-1), blas::mat< value_t >( DC1 ), blas::mat< value_t >( DC2 ) );
     // if ( blas::norm_F( blas::mat< value_t >( DC2 ) ) > 1e-14 )
     //     std::cout << hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) << ", error = " << blas::norm_F( blas::mat< value_t >( DC2 ) ) << std::endl;
+}
+
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    auto  apx = approx::SVD< value_t >();
+
+    multiply( alpha, op_A, A, op_B, B, C, acc, apx );
 }
 
 }// namespace hlr

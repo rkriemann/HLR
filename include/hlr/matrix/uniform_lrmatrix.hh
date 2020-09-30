@@ -12,6 +12,7 @@
 #include <map>
 
 #include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/matrix/cluster_basis.hh>
@@ -111,28 +112,27 @@ public:
     uint                              row_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_rank() : col_rank(); }
     uint                              col_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_rank() : row_rank(); }
 
-    cluster_basis< value_t > &        row_cb   ()       { return *_row_cb; }
+    // cluster_basis< value_t > &        row_cb   ()       { return *_row_cb; }
     const cluster_basis< value_t > &  row_cb   () const { return *_row_cb; }
 
-    cluster_basis< value_t > &        col_cb   ()       { return *_col_cb; }
+    // cluster_basis< value_t > &        col_cb   ()       { return *_col_cb; }
     const cluster_basis< value_t > &  col_cb   () const { return *_col_cb; }
 
-    cluster_basis< value_t > &        row_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_cb() : col_cb(); }
+    // cluster_basis< value_t > &        row_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_cb() : col_cb(); }
     const cluster_basis< value_t > &  row_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? row_cb() : col_cb(); }
 
-    cluster_basis< value_t > &        col_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_cb() : row_cb(); }
+    // cluster_basis< value_t > &        col_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_cb() : row_cb(); }
     const cluster_basis< value_t > &  col_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? col_cb() : row_cb(); }
 
     void
     set_cluster_bases ( const cluster_basis< value_t > &  arow_cb,
                         const cluster_basis< value_t > &  acol_cb )
     {
-        _row_cb = arow_cb;
-        _col_cb = acol_cb;
-
-        if (( _S.nrows() != _row_cb->rank() ) ||
-            ( _S.ncols() != _col_cb->rank() ))
-            _S = std::move( blas::Matrix< value_t >( _row_cb->rank(), _col_cb->rank() ) );
+        HLR_ASSERT(( _S.nrows() == arow_cb.rank() ) &&
+                   ( _S.ncols() == acol_cb.rank() ));
+            
+        _row_cb = & arow_cb;
+        _col_cb = & acol_cb;
     }
 
     blas::matrix< value_t > &        coeff ()       { return _S; }
@@ -151,6 +151,20 @@ public:
     {
         HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
 
+        _S = std::move( aS );
+    }
+
+    // set coefficient matrix without checking dimensions
+    // (because cluster bases need to be adjusted later)
+    void
+    set_coeff_unsafe ( const blas::Matrix< value_t > &  aS )
+    {
+        blas::copy( aS, _S );
+    }
+    
+    void
+    set_coeff_unsafe ( blas::Matrix< value_t > &&  aS )
+    {
         _S = std::move( aS );
     }
     
@@ -437,6 +451,43 @@ is_uniform_lowrank ( const hpro::TMatrix *  M )
     return ! is_null( M ) && IS_TYPE( M, uniform_lrmatrix );
 }
 
+//
+// replace current cluster basis by given cluster basis
+// ASSUMPTION: basis is identical
+//
+template < typename value_t >
+void
+replace_cluster_basis ( hpro::TMatrix &             M,
+                        cluster_basis< value_t > &  rowcb,
+                        cluster_basis< value_t > &  colcb )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( & M, hpro::TBlockMatrix );
+
+        HLR_ASSERT( B->nblock_rows() == rowcb.nsons() );
+        HLR_ASSERT( B->nblock_cols() == colcb.nsons() );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            auto  rowcb_i = rowcb.son( i );
+            
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
+
+                replace_cluster_basis( *B->block( i, j ), *rowcb_i, *colcb_j );
+            }// for
+        }// for
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  R = ptrcast( & M, uniform_lrmatrix< value_t > );
+
+        R->set_cluster_bases( rowcb, colcb );
+    }// if
+}
+    
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_UNIFORM_LRMATRIX_HH

@@ -65,7 +65,11 @@ program_main ()
         mvis.svd( false ).id( true ).print( A.get(), "A" );
     }// if
 
-    if ( true )
+    //
+    // H-matrix matrix vector multiplication
+    //
+    
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -152,7 +156,7 @@ program_main ()
         // mat-vec benchmark
         //
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -194,7 +198,7 @@ program_main ()
             runtime.clear();
         }
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
 
@@ -235,6 +239,51 @@ program_main ()
         
             runtime.clear();
         }
+
+        //
+        // add low-rank matrix
+        //
+
+        if ( true )
+        {
+            const uint  k = 4;
+            auto        U = blas::matrix< value_t >( A2->nrows(), k );
+            auto        V = blas::matrix< value_t >( A2->ncols(), k );
+            
+            blas::fill_rand( U );
+            blas::fill_rand( V );
+            blas::scale( value_t(1e-3), U );
+            
+            auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
+            
+            io::matlab::write( *D1, "A1" );
+            io::matlab::write( U, "U" );
+            io::matlab::write( V, "V" );
+            // impl::uniform::tlr::addlr( *A2, U, V, acc );
+            impl::uniform::tlr::lu< value_t >( *A2, acc );
+            
+            auto  D2 = seq::matrix::convert_to_dense< value_t >( *A2 );
+            
+            io::matlab::write( *D2, "A2" );
+        }
+
+        {
+            auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
+            
+            io::matlab::write( *D1, "A1" );
+
+            auto  A3     = impl::matrix::copy( *A2 );
+            auto  rowcb2 = rowcb->copy();
+            auto  colcb2 = rowcb->copy();
+
+            matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            
+            impl::uniform::tlr::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *A3, acc );
+            
+            auto  D2 = seq::matrix::convert_to_dense< value_t >( *A3 );
+            
+            io::matlab::write( *D2, "A2" );
+        }
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -243,7 +292,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "H² matrix" << term::reset << std::endl;
 
