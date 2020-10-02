@@ -229,11 +229,12 @@ mat_V ( const hpro::TRkMatrix &  A,
 //
 template < typename value_t >
 matrix< value_t >
-identity ( const size_t  n )
+eye ( const size_t  nrows,
+      const size_t  ncols )
 {
-    auto  I = matrix< value_t >( n, n );
+    auto  I = matrix< value_t >( nrows, ncols );
 
-    for ( size_t  i = 0; i < n; ++i )
+    for ( size_t  i = 0; i < std::min( nrows, ncols ); ++i )
         I(i,i) = value_t(1);
 
     return I;
@@ -583,7 +584,8 @@ qr2  ( matrix< value_t > &  M,
     std::vector< value_t >  tau( ncols );
     std::vector< value_t >  work( ncols );
 
-    HLR_ASSERT( ncols <= nrows );
+    if ( ncols > nrows )
+        HLR_ERROR( "#ncols > #rows" );
 
     #if 1
     
@@ -769,9 +771,9 @@ qrts  ( matrix< value_t > &  M,
 //
 template < typename value_t >
 void
-qr_wrapper ( matrix< value_t > &  M,
-             matrix< value_t > &  R,
-             const bool           comp_Q = true )
+qr ( matrix< value_t > &  M,
+     matrix< value_t > &  R,
+     const bool           comp_Q = true )
 {
     // if ( M.nrows() > 2*M.ncols() )
     //     blas::qrts( M, R );

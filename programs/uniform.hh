@@ -246,27 +246,10 @@ program_main ()
 
         if ( true )
         {
-            const uint  k = 4;
-            auto        U = blas::matrix< value_t >( A2->nrows(), k );
-            auto        V = blas::matrix< value_t >( A2->ncols(), k );
-            
-            blas::fill_rand( U );
-            blas::fill_rand( V );
-            blas::scale( value_t(1e-3), U );
-            
-            auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
-            
-            io::matlab::write( *D1, "A1" );
-            io::matlab::write( U, "U" );
-            io::matlab::write( V, "V" );
-            // impl::uniform::tlr::addlr( *A2, U, V, acc );
             impl::uniform::tlr::lu< value_t >( *A2, acc );
-            
-            auto  D2 = seq::matrix::convert_to_dense< value_t >( *A2 );
-            
-            io::matlab::write( *D2, "A2" );
         }
 
+        if ( false )
         {
             auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
             
@@ -286,6 +269,8 @@ program_main ()
         }
     }
 
+    return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // conversion to H²

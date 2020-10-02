@@ -62,7 +62,7 @@ column_basis ( const operator_t &       M,
             
         auto  R = blas::matrix< value_t >( k + oversampling, k + oversampling );
 
-        blas::qr_wrapper( Q, R );
+        blas::qr( Q, R );
 
         if ( power_steps > 0 )
         {
@@ -72,11 +72,11 @@ column_basis ( const operator_t &       M,
             {
                 blas::scale( value_t(0), MtQ );
                 prod( value_t(1), hpro::apply_adjoint, M, Q, MtQ );
-                blas::qr_wrapper( MtQ, R );
+                blas::qr( MtQ, R );
                 
                 blas::scale( value_t(0), Q );
                 prod( value_t(1), hpro::apply_normal, M, MtQ, Q );
-                blas::qr_wrapper( Q, R );
+                blas::qr( Q, R );
             }// for
         }// if
 
@@ -140,7 +140,7 @@ column_basis ( const operator_t &       M,
             // power iteration
             //
             
-            blas::qr_wrapper( Q_i, R );
+            blas::qr( Q_i, R );
             
             if ( power_steps > 0 )
             {
@@ -148,11 +148,11 @@ column_basis ( const operator_t &       M,
                 {
                     blas::scale( value_t(0), MtQ );
                     prod( value_t(1), hpro::apply_adjoint, M, Q_i, MtQ );
-                    blas::qr_wrapper( MtQ, R );
+                    blas::qr( MtQ, R );
                     
                     blas::scale( value_t(0), Q_i );
                     prod( value_t(1), hpro::apply_normal, M, MtQ, Q_i );
-                    blas::qr_wrapper( Q_i, R );
+                    blas::qr( Q_i, R );
                 }// for
             }// if
             
@@ -172,7 +172,7 @@ column_basis ( const operator_t &       M,
                     blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
                 }// for
                 
-                blas::qr_wrapper( Q_i, R );
+                blas::qr( Q_i, R );
             }// if
             
             //
@@ -236,7 +236,7 @@ column_basis ( const blas::matrix< value_t > &  U,
         auto         Q   = blas::prod( value_t(1), U, VtT );
         auto         R   = blas::matrix< value_t >( k + oversampling, k + oversampling );
 
-        blas::qr_wrapper( Q, R );
+        blas::qr( Q, R );
 
         //
         // power iteration
@@ -252,12 +252,12 @@ column_basis ( const blas::matrix< value_t > &  U,
                 // [Q,R] = qr(Q); MtQ = M^H·Q = V·U^H·Q
                 blas::prod( value_t(1), blas::adjoint(U), Q, value_t(0), UtQ );
                 blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
-                blas::qr_wrapper( VUtQ, R );
+                blas::qr( VUtQ, R );
                 
                 // [Q,R] = qr(V·U^H·Q); Q = U·V^H·Q
                 blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
                 blas::prod( value_t(1), U, UtQ, value_t(0), Q );
-                blas::qr_wrapper( Q, R );
+                blas::qr( Q, R );
             }// for
         }// if
 
@@ -292,7 +292,7 @@ column_basis ( const blas::matrix< value_t > &  U,
             // power iteration
             //
             
-            blas::qr_wrapper( Q_i, R );
+            blas::qr( Q_i, R );
             
             if ( power_steps > 0 )
             {
@@ -300,11 +300,11 @@ column_basis ( const blas::matrix< value_t > &  U,
                 {
                     blas::prod( value_t(1), blas::adjoint(Uc), Q_i, value_t(0), UtQ );
                     blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
-                    blas::qr_wrapper( VUtQ, R );
+                    blas::qr( VUtQ, R );
                     
                     blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
                     blas::prod( value_t(1), Uc, UtQ, value_t(0), Q_i );
-                    blas::qr_wrapper( Q_i, R );
+                    blas::qr( Q_i, R );
                 }// for
             }// if
             
@@ -322,7 +322,7 @@ column_basis ( const blas::matrix< value_t > &  U,
                     blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
                 }// for
                 
-                blas::qr_wrapper( Q_i, R );
+                blas::qr( Q_i, R );
             }// if
 
             //
@@ -395,7 +395,7 @@ randsvd ( const operator_t &       M,
     auto  S   = blas::vector< real_t >( k );
 
     // B^T = Q_B R_B  (Q_B overwrites B)
-    blas::qr_wrapper( BT, R_B );
+    blas::qr( BT, R_B );
 
     // R_B = U·S·V^H
     blas::svd( R_B, S, V );
@@ -487,7 +487,7 @@ randsvd ( const blas::matrix< value_t > &  U,
         auto  S      = blas::vector< real_t >( k_base );
 
         // (V·U^H·Q)^H = Q_B R
-        blas::qr_wrapper( VUtQ, U_svd );
+        blas::qr( VUtQ, U_svd );
         
         // R_V = U·S·V^H
         svd( U_svd, S, V_svd );
