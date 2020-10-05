@@ -246,7 +246,15 @@ program_main ()
 
         if ( true )
         {
+            auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            
             impl::uniform::tlr::lu< value_t >( *A2, acc );
+
+            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+
+            hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+
+            std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
         }
 
         if ( false )

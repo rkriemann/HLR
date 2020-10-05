@@ -25,7 +25,9 @@
 namespace hlr { namespace seq { namespace matrix {
 
 namespace hpro = HLIB;
-    
+
+using namespace hlr::matrix;
+
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -210,11 +212,11 @@ copy_tiled ( const hpro::TMatrix &  M,
         //
 
         auto  RM = cptrcast( & M, hpro::TRkMatrix );
-        auto  R  = std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
-                                                                               RM->col_is(),
-                                                                               ntile,
-                                                                               blas::mat_U< value_t >( RM ),
-                                                                               blas::mat_V< value_t >( RM ) );
+        auto  R  = std::make_unique< tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                  RM->col_is(),
+                                                                  ntile,
+                                                                  blas::mat_U< value_t >( RM ),
+                                                                  blas::mat_V< value_t >( RM ) );
 
         R->set_id( RM->id() );
 
@@ -266,10 +268,10 @@ copy_nontiled ( const hpro::TMatrix &  M )
 
         assert( M.is_real() );
         
-        auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
+        auto  RM = cptrcast( & M, tiled_lrmatrix< real > );
         auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
-        auto  U  = hlr::matrix::to_dense( RM->U() );
-        auto  V  = hlr::matrix::to_dense( RM->V() );
+        auto  U  = to_dense( RM->U() );
+        auto  V  = to_dense( RM->V() );
 
         R->set_lrmat( U, V );
         R->set_id( RM->id() );
@@ -618,8 +620,8 @@ clear ( hpro::TMatrix &  M )
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
 copy_uniform ( const hpro::TMatrix &                          M,
-               const hlr::matrix::cluster_basis< value_t > &  rowcb,
-               const hlr::matrix::cluster_basis< value_t > &  colcb )
+               const cluster_basis< value_t > &  rowcb,
+               const cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -663,24 +665,63 @@ copy_uniform ( const hpro::TMatrix &                          M,
         auto  UA = rowcb.transform_forward( blas::mat_U< value_t >( R ) );
         auto  VB = colcb.transform_forward( blas::mat_V< value_t >( R ) );
         auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
-
-        // {
-        //     auto  M1 = blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
-        //     auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
-        //     auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
-            
-        //     blas::add( value_t(-1), M2, M1 );
-            
-        //     std::cout << hpro::to_string( "%.6e", blas::norm_F( M1 ) ) << std::endl;
-        // }
-
-        auto  UR = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                                 rowcb, colcb,
-                                                                                 std::move( S ) );
+        auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                    rowcb, colcb,
+                                                                    std::move( S ) );
 
         UR->set_id( R->id() );
 
         return UR;
+    }// if
+    else
+    {
+        // assuming dense block (no low-rank)
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of matrix with uniform low-rank matrices converted
+// to standard lowrank matrices
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+copy_nonuniform ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_nonuniform< value_t >( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  R  = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  U  = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
+        auto  V  = blas::copy( R->col_cb().basis() );
+        auto  SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+
+        SR->set_id( R->id() );
+
+        return SR;
     }// if
     else
     {
@@ -819,9 +860,9 @@ convert_to_dense ( const hpro::TMatrix &  M )
         
         return D;
     }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    else if ( is_uniform_lowrank( M ) )
     {
-        auto  R   = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  D   = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
         auto  DD  = blas::mat< value_t >( *D );
         auto  UxS = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
