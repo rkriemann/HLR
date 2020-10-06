@@ -37,6 +37,7 @@ TBB_DIR      = '/'
 TASKFLOW_DIR = '/'
 HPX_DIR      = '/'
 GPI2_DIR     = '/'
+CUDA_DIR     = '/'
 
 JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
@@ -173,6 +174,7 @@ opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,   
 opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
 
 opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda',     'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
 opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
@@ -225,6 +227,7 @@ HPX_DIR      = opt_env['hpx']
 GPI2_DIR     = opt_env['gpi2']
 
 MKL_DIR      = opt_env['mkl']
+CUDA_DIR     = opt_env['cuda']
 
 JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
@@ -261,6 +264,13 @@ if MKL_DIR == None or MKL_DIR == '/' :
         MKL_DIR = os.environ['MKLROOT']
     else :
         MKL_DIR = '/' # to prevent error below due to invalid path
+    
+# CUDA should define CUDA_HOME
+if CUDA_DIR == None or CUDA_DIR == '/' :
+    if 'CUDA_HOME' in os.environ :
+        CUDA_DIR = os.environ['CUDA_HOME']
+    else :
+        CUDA_DIR = '/' # to prevent error below due to invalid path
     
 ######################################################################
 #
@@ -518,6 +528,9 @@ Default( None )
 
 if 'seq' in frameworks :
     seq = env.Clone()
+    seq.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+    seq.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64'   ) )
+    seq.Append( LIBS    = [ 'cudart', 'cublas', 'cusolver' ] )
         
     for program in programs :
         name   = program + '-seq'

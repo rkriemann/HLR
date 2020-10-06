@@ -12,51 +12,12 @@
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 
+#include <boost/format.hpp>
+
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/cuda_def.hh>
 
 namespace hlr { namespace blas { namespace cuda {
-
-//
-// mapping of default types to cuBLAS types
-//
-template < typename T > struct cuda_type                            { using  type_t = T; };
-template <>             struct cuda_type< std::complex< float > >   { using  type_t = cuFloatComplex; };
-template <>             struct cuda_type< std::complex< double > >  { using  type_t = cuDoubleComplex; };
-
-template <typename T>   struct real_type                            { using  type_t = T; };
-template <>             struct real_type< cuFloatComplex >          { using  type_t = float; };
-template <>             struct real_type< cuDoubleComplex >         { using  type_t = double; };
-
-template < typename T > struct cuda_type_ptr                        { using  type_t = typename cuda_type< T >::type_t *; };
-
-// wrapper for cuda, cuBlas and cuSolver functions
-#define HLR_CUDA_CHECK( func, args )         \
-    {                                        \
-        auto  result = func args ;           \
-        HLR_ASSERT( result == cudaSuccess ); \
-    }
-
-#define HLR_CUBLAS_CHECK( func, args )                  \
-    {                                                   \
-        auto  result = func args ;                      \
-        HLR_ASSERT( result == CUBLAS_STATUS_SUCCESS );  \
-    }
-
-#define HLR_CUSOLVER_CHECK( func, args )                 \
-    {                                                    \
-        auto  result = func args ;                       \
-        HLR_ASSERT( result == CUSOLVER_STATUS_SUCCESS ); \
-    }
-
-//
-// joined handle for cuBLAS and cuSolverDn
-//
-struct handle
-{
-    cudaStream_t        stream;
-    cublasHandle_t      blas;
-    cusolverDnHandle_t  solver;
-};
 
 // default handle
 handle  default_handle;
@@ -77,365 +38,11 @@ init ()
     HLR_CUSOLVER_CHECK( cusolverDnSetStream, (   default_handle.solver, default_handle.stream ) );
 }
 
-//
-// device memory allocation with CUDA
-//
-template < typename value_t >
-typename cuda_type_ptr< value_t >::type_t
-device_alloc ( const size_t  n )
-{
-    void *  ptr = nullptr;
-    
-    HLR_CUDA_CHECK( cudaMalloc, ( & ptr, n * sizeof(value_t) ) );
-
-    return typename cuda_type_ptr< value_t >::type_t( ptr );
-}
-
-template < typename value_t >
-void
-device_free ( value_t *  ptr )
-{
-    HLR_CUDA_CHECK( cudaFree, ( ptr ) )
-}
-
-//
-// host to device copy
-//
-template < typename value_t >
-void
-to_device ( const matrix< value_t > &                  M_host,
-            typename cuda_type_ptr< value_t >::type_t  M_dev,
-            int                                        lda_dev )
-{
-    HLR_CUBLAS_CHECK( cublasSetMatrix,
-                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                        M_host.data(), M_host.col_stride(),
-                        M_dev, lda_dev ) );
-}
-
-template < typename value_t >
-void
-to_device_async ( handle                                     handle,
-                  const matrix< value_t > &                  M_host,
-                  typename cuda_type_ptr< value_t >::type_t  M_dev,
-                  int                                        lda_dev )
-{
-    HLR_CUBLAS_CHECK( cublasSetMatrixAsync,
-                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                        M_host.data(), M_host.col_stride(),
-                        M_dev, lda_dev,
-                        handle.stream ) );
-}
-
-//
-// device to host copy
-//
-template < typename value_t >
-void
-from_device ( typename cuda_type_ptr< value_t >::type_t  M_dev,
-              int                                        lda_dev,
-              matrix< value_t > &                        M_host )
-{
-    HLR_CUBLAS_CHECK( cublasGetMatrix,
-                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                        M_dev, lda_dev,
-                        M_host.data(), M_host.col_stride() ) );
-}
-
-template < typename value_t >
-void
-from_device_async ( handle                                     handle,
-                    typename cuda_type_ptr< value_t >::type_t  M_dev,
-                    int                                        lda_dev,
-                    matrix< value_t > &                        M_host )
-{
-    HLR_CUBLAS_CHECK( cublasGetMatrixAsync,
-                      ( M_host.nrows(), M_host.ncols(), sizeof(value_t),
-                        M_dev, lda_dev,
-                        M_host.data(), M_host.col_stride(),
-                        handle.stream ) );
-}
-
-template < typename value_t >
-void
-from_device ( typename cuda_type_ptr< value_t >::type_t  v_dev,
-              int                                        inc_dev,
-              vector< value_t > &                        v_host )
-{
-    HLR_CUBLAS_CHECK( cublasGetVector,
-                      ( v_host.length(), sizeof(value_t),
-                        v_dev, inc_dev,
-                        v_host.data(), v_host.stride() ) );
-}
-
-template < typename value_t >
-void
-from_device_async ( handle                                     handle,
-                    typename cuda_type_ptr< value_t >::type_t  v_dev,
-                    int                                        inc_dev,
-                    vector< value_t > &                        v_host )
-{
-    HLR_CUBLAS_CHECK( cublasGetVectorAsync,
-                      ( v_host.length(), sizeof(value_t),
-                        v_dev, inc_dev,
-                        v_host.data(), v_host.stride(),
-                        handle.stream ) );
-}
-
-template < typename value_t >
-value_t
-from_device ( typename cuda_type_ptr< value_t >::type_t  dev_data )
-{
-    value_t  data;
-
-    HLR_CUDA_CHECK( cudaMemcpy, ( & data, dev_data, sizeof(value_t), cudaMemcpyDeviceToHost ) );
-
-    return data;
-}
-
-template < typename value_t >
-value_t
-from_device_async ( handle                                     handle,
-                    typename cuda_type_ptr< value_t >::type_t  dev_data )
-{
-    value_t  data;
-
-    HLR_CUDA_CHECK( cudaMemcpyAsync, ( & data, dev_data, sizeof(value_t), cudaMemcpyDeviceToHost, handle.stream ) );
-
-    return data;
-}
-
-//
-// wrapper to create cuBlas compatible constants
-//
-template < typename value_t >
-value_t
-make_constant ( const typename cuda::real_type< value_t >::type_t  f )
-{
-    return f;
-}
-
-template <>
-cuFloatComplex
-make_constant< cuFloatComplex > ( const float  f )
-{
-    return make_cuFloatComplex( f, 0 );
-}
-
-template <>
-cuDoubleComplex
-make_constant< cuDoubleComplex > ( const double  f )
-{
-    return make_cuDoubleComplex( f, 0 );
-}
-
-//////////////////////////////////////////////////////////////////////
-//
-// vector routines
-//
-//////////////////////////////////////////////////////////////////////
-
-#define HLR_CUDA_COPY( type, func )                 \
-    inline                                          \
-    void                                            \
-    copy ( handle        handle,                    \
-           const int     n,                         \
-           const type *  x,                         \
-           const int     inc_x,                     \
-           type *        y,                         \
-           const int     inc_y )                    \
-    {                                               \
-        func( handle.blas, n, x, inc_x, y, inc_y ); \
-    }
-
-HLR_CUDA_COPY( float,           cublasScopy )
-HLR_CUDA_COPY( double,          cublasDcopy )
-HLR_CUDA_COPY( cuFloatComplex,  cublasCcopy )
-HLR_CUDA_COPY( cuDoubleComplex, cublasZcopy )
-
-#undef HLR_CUDA_COPY
-
-#define HLR_CUDA_SCALE( type, func )               \
-    inline                                         \
-    void                                           \
-    scale ( handle      handle,                    \
-            const int   n,                         \
-            const type  alpha,                     \
-            type *      x,                         \
-            const int   inc_x )                    \
-    {                                              \
-        func( handle.blas, n, & alpha, x, inc_x ); \
-    }
-
-HLR_CUDA_SCALE( float,           cublasSscal )
-HLR_CUDA_SCALE( double,          cublasDscal )
-HLR_CUDA_SCALE( cuFloatComplex,  cublasCscal )
-HLR_CUDA_SCALE( cuDoubleComplex, cublasZscal )
-
-#undef HLR_CUDA_SCALE
-
-//////////////////////////////////////////////////////////////////////
-//
-// multiplication routines
-//
-//////////////////////////////////////////////////////////////////////
-
-//
-// multiply k columns of M with diagonal matrix D,
-// e.g. compute M ≔ M·D
-//
-template < typename value1_t,
-           typename value2_t >
-void
-prod_diag ( handle                      handle,
-            const int                   nrows,
-            value1_t *                  dev_M,
-            const vector< value2_t > &  D,
-            const int                   k )
-{
-    for ( idx_t  i = 0; i < k; ++i )
-    {
-        auto  D_i = make_constant< value1_t >( D(i) );
-            
-        scale( handle, nrows, D_i, dev_M + i * nrows, 1 );
-    }// for
-}
-
-//
-// general matrix multiplication C ≔ α·op(A)·op(B) + β·C
-//
-#define HLR_CUDA_GEMM( type, func )                                     \
-    inline                                                              \
-    void                                                                \
-    prod ( handle                   handle,                             \
-           const cublasOperation_t  trans_A,                            \
-           const cublasOperation_t  trans_B,                            \
-           const int                nrows_C,                            \
-           const int                ncols_C,                            \
-           const int                nrows_A,                            \
-           const type               alpha,                              \
-           const type *             A,                                  \
-           const int                ld_A,                               \
-           const type *             B,                                  \
-           const int                ld_B,                               \
-           const type               beta,                               \
-           type *                   C,                                  \
-           const int                ld_C )                              \
-    {                                                                   \
-        func( handle.blas, trans_A, trans_B, nrows_C, ncols_C, nrows_A, \
-              & alpha, A, ld_A, B, ld_B, & beta, C, ld_C );             \
-    }
-
-HLR_CUDA_GEMM( float,           cublasSgemm )
-HLR_CUDA_GEMM( double,          cublasDgemm )
-HLR_CUDA_GEMM( cuFloatComplex,  cublasCgemm )
-HLR_CUDA_GEMM( cuDoubleComplex, cublasZgemm )
-
-#undef HLR_CUDA_GEMM
-
 //////////////////////////////////////////////////////////////////////
 //
 // QR related functions
 //
 //////////////////////////////////////////////////////////////////////
-
-//
-// return work buffer size for geqrf/orgqr
-//
-#define GEQRF_BUFFERSIZE( type, func )                                  \
-    inline                                                              \
-    int                                                                 \
-    geqrf_buffersize ( cusolverDnHandle_t  handle,                      \
-                       int                 nrows,                       \
-                       int                 ncols,                       \
-                       type *              A,                           \
-                       int                 ldA )                        \
-    {                                                                   \
-        int  lwork = 0;                                                 \
-                                                                        \
-        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, A, ldA, & lwork ) ); \
-                                                                        \
-        return  lwork;                                                  \
-    }
-
-GEQRF_BUFFERSIZE( float,           cusolverDnSgeqrf_bufferSize )
-GEQRF_BUFFERSIZE( double,          cusolverDnDgeqrf_bufferSize )
-GEQRF_BUFFERSIZE( cuFloatComplex,  cusolverDnCgeqrf_bufferSize )
-GEQRF_BUFFERSIZE( cuDoubleComplex, cusolverDnZgeqrf_bufferSize )
-
-#undef GEQRF_BUFFERSIZE
-
-#define GEQRF( type, func )                     \
-    inline                                      \
-    void                                        \
-    geqrf ( cusolverDnHandle_t  handle,         \
-            int                 nrows,          \
-            int                 ncols,          \
-            type *              A,              \
-            int                 ldA,            \
-            type *              tau,            \
-            type *              work,           \
-            int                 lwork,          \
-            int *               info )          \
-    {                                                                   \
-        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, A, ldA, tau, work, lwork, info ) ); \
-    }
-
-GEQRF( float,           cusolverDnSgeqrf )
-GEQRF( double,          cusolverDnDgeqrf )
-GEQRF( cuFloatComplex,  cusolverDnCgeqrf )
-GEQRF( cuDoubleComplex, cusolverDnZgeqrf )
-
-#undef GEQRF
-
-#define ORGQR_BUFFERSIZE( type, func )              \
-    inline                                          \
-    int                                             \
-    orgqr_buffersize ( cusolverDnHandle_t  handle,  \
-                       int                 nrows,   \
-                       int                 ncols,   \
-                       int                 k,       \
-                       const type *        A,       \
-                       int                 ldA,     \
-                       const type *        tau )    \
-    {                                               \
-        int  lwork = 0;                                                 \
-                                                                        \
-        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, k, A, ldA, tau, & lwork ) ); \
-                                                                        \
-        return  lwork;                                                  \
-    }
-
-ORGQR_BUFFERSIZE( float,           cusolverDnSorgqr_bufferSize )
-ORGQR_BUFFERSIZE( double,          cusolverDnDorgqr_bufferSize )
-ORGQR_BUFFERSIZE( cuFloatComplex,  cusolverDnCungqr_bufferSize )
-ORGQR_BUFFERSIZE( cuDoubleComplex, cusolverDnZungqr_bufferSize )
-
-#undef ORGQR_BUFFERSIZE
-
-#define ORGQR( type, func )                     \
-    inline                                      \
-    void                                        \
-    orgqr ( cusolverDnHandle_t  handle,         \
-            int                 nrows,          \
-            int                 ncols,          \
-            int                 k,              \
-            type *              A,              \
-            int                 ldA,            \
-            type *              tau,            \
-            type *              work,           \
-            int                 lwork,          \
-            int *               info )          \
-    {                                                                   \
-        HLR_CUSOLVER_CHECK( func, ( handle, nrows, ncols, k, A, ldA, tau, work, lwork, info ) ); \
-    }
-
-ORGQR( float,           cusolverDnSorgqr )
-ORGQR( double,          cusolverDnDorgqr )
-ORGQR( cuFloatComplex,  cusolverDnCungqr )
-ORGQR( cuDoubleComplex, cusolverDnZungqr )
-
-#undef ORGQR
 
 //
 // compute [Q,R] = qr(M) with Q overwriting M
@@ -622,65 +229,6 @@ qr_dev ( handle     handle,
 // SVD related functions
 //
 //////////////////////////////////////////////////////////////////////
-
-#define GESVDJ_BUFFERSIZE( type, func )              \
-    inline                                           \
-    int                                              \
-    gesvdj_buffersize ( cusolverDnHandle_t  handle,  \
-                        cusolverEigMode_t   jobz,    \
-                        int                 econ,    \
-                        int                 m,       \
-                        int                 n,       \
-                        const type *        A,       \
-                        int                 lda,     \
-                        const typename cuda::real_type< type >::type_t *  S, \
-                        const type *        U,       \
-                        int                 ldu,     \
-                        const type *        V,       \
-                        int                 ldv,     \
-                        gesvdjInfo_t        params ) \
-    {                                                \
-        int  lwork = 0;                              \
-                                                     \
-        HLR_CUSOLVER_CHECK( func, ( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, & lwork, params ) ); \
-                                                     \
-        return lwork;                                \
-    }
-
-GESVDJ_BUFFERSIZE( float,           cusolverDnSgesvdj_bufferSize )
-GESVDJ_BUFFERSIZE( double,          cusolverDnDgesvdj_bufferSize )
-GESVDJ_BUFFERSIZE( cuFloatComplex,  cusolverDnCgesvdj_bufferSize )
-GESVDJ_BUFFERSIZE( cuDoubleComplex, cusolverDnZgesvdj_bufferSize )
-
-#undef GESVDJ_BUFFERSIZE
-
-#define GESVDJ( type, func )              \
-    inline                                \
-    void                                  \
-    gesvdj ( cusolverDnHandle_t  handle,  \
-             cusolverEigMode_t   jobz,    \
-             int                 econ,    \
-             int                 m,       \
-             int                 n,       \
-             type *              A,       \
-             int                 lda,     \
-             typename cuda::real_type< type >::type_t *  S, \
-             type *              U,       \
-             int                 ldu,     \
-             type *              V,       \
-             int                 ldv,     \
-             type *              work,    \
-             int                 lwork,   \
-             int *               info,    \
-             gesvdjInfo_t        params ) \
-    {                                     \
-        HLR_CUSOLVER_CHECK( func, ( handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, work, lwork, info, params ) ); \
-    }
-
-GESVDJ( float,           cusolverDnSgesvdj )
-GESVDJ( double,          cusolverDnDgesvdj )
-GESVDJ( cuFloatComplex,  cusolverDnCgesvdj )
-GESVDJ( cuDoubleComplex, cusolverDnZgesvdj )
 
 //
 // compute SVD M = U·S·V^H
@@ -1311,6 +859,244 @@ svd_dev2 ( handle                   handle,
         device_free( dev_QU );
         device_free( dev_RU );
     }// else
+}
+
+//
+// eigenvalues for hermitean matrices using Jacobi iteration
+//
+template < typename value_t >
+std::pair< blas::vector< typename hpro::real_type< value_t >::type_t >,
+           blas::matrix< value_t > >
+eigen_jac ( handle                                             handle,
+            blas::matrix< value_t > &                          M,
+            const typename hpro::real_type< value_t >::type_t  tol,
+            const size_t                                       max_sweeps )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+    
+    // square matrix assumed
+    HLR_ASSERT( M.nrows() == M.ncols() );
+
+    const auto  n = M.nrows();
+
+    //
+    // set up parameters for Jacobi
+    //
+
+    syevjInfo_t  syevj_params;
+    
+    cusolverDnCreateSyevjInfo( & syevj_params );
+    cusolverDnXsyevjSetTolerance( syevj_params, 0.1 );
+    if ( cusolverDnXsyevjSetMaxSweeps( syevj_params, 1 ) != CUSOLVER_STATUS_SUCCESS )
+        throw std::runtime_error( "error during cusolverDnXsyevjSetMaxSweeps" );
+    
+    //
+    // copy/allocate data to/on device
+    //
+    
+    auto  dev_M    = device_alloc< value_t >( n*n );
+    auto  dev_W    = device_alloc< real_t >( n );
+    auto  dev_info = device_alloc< int >( 1 );
+
+    to_device( M, dev_M, n );
+
+    // get work buffer size
+    const auto  lwork    = syevj_buffersize( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, dev_M, n, dev_W, syevj_params );
+    auto        dev_work = device_alloc< value_t >( lwork );
+
+    //
+    // compute eigenvalues
+    //
+
+    syevj( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, dev_M, n, dev_W, dev_work, lwork, dev_info, syevj_params );
+
+    HLR_CUDA_CHECK( cudaDeviceSynchronize, () );
+
+    int     sweeps   = 0;
+    double  residual = 0;
+    
+    cusolverDnXsyevjGetSweeps(   handle.solver, syevj_params, & sweeps );
+    cusolverDnXsyevjGetResidual( handle.solver, syevj_params, & residual );
+
+    std::cout << "sweeps = " << sweeps << ", residual = " << residual << std::endl;
+    
+    blas::vector< real_t >   E( n );
+    blas::vector< value_t >  V( n, n );
+
+    from_device( dev_W, 1, E );
+    from_device( dev_M, n, V );
+
+    auto  info = from_device< int >( dev_info );
+
+    if ( info != 0 )
+        HLR_ERROR( "syevj failed (info != 0)" );
+    
+    device_free( dev_work );
+    device_free( dev_M );
+    device_free( dev_W );
+    device_free( dev_info );
+    
+    return  { std::move( E ), std::move( V ) };
+}
+
+//
+// compute eigen values of given matrix M using DPT iteration
+//
+//   - stop iteration if |A_i - A_i-1| < tol or i > max_it
+//   - if tol == -1, then machine precision w.r.t. value_t is chosen
+//   - if max_it == 0, then max_it = 100 is set
+//
+template < typename value_t >
+std::pair< blas::vector< value_t >,
+           blas::matrix< value_t > >
+dpteigen ( handle                                             handle,
+           blas::matrix< value_t > &                          M,
+           const typename hpro::real_type< value_t >::type_t  tol        = -1,
+           const size_t                                       max_it     = 0,
+           const std::string &                                error_type = "frobenius",
+           const int                                          verbosity          = 1 )
+{
+    using  cuda_t = typename cuda_type< value_t >::type_t;
+    using  real_t = typename cuda::real_type< cuda_t >::type_t;
+    
+    // square matrix assumed
+    HLR_ASSERT( M.nrows() == M.ncols() );
+
+    const auto  n = M.nrows();
+
+    //
+    // set up auxiliary data structures
+    //
+    // Θ_ij = 1 / ( M_ii - M_jj )
+    // Δ    = M - diag(M)
+    //
+
+    blas::vector< value_t >  diag( n );
+    blas::vector< value_t >  one( n ); // needed for Identity vector in cuda
+
+    blas::fill( value_t(1), one );
+    
+    //
+    // initialize CUDA/cuBLAS
+    //
+
+    value_t *  dev_V     = device_alloc< cuda_t >( n * n );
+    value_t *  dev_Delta = device_alloc< cuda_t >( n * n );;
+    value_t *  dev_T     = device_alloc< cuda_t >( n * n );;
+    value_t *  dev_diagM = device_alloc< cuda_t >( n );;
+
+    // Δ = M
+    to_device< value_t >( M, dev_Delta, n );
+    
+    // diag = diag(M)
+    copy( handle, n, dev_Delta, n+1, dev_diagM, 1 );
+
+    // Δ = M - diag(M)
+    scale( handle, n, value_t(0), dev_Delta, n+1 );
+
+    // V = I
+    to_device( one, dev_V, n+1 );
+
+    //
+    // iteration
+    //
+
+    const real_t   precision = ( tol < 0
+                                 ? value_t(10) * std::numeric_limits< real_t >::epsilon()
+                                 : tol );
+    const size_t   max_steps = ( max_it == 0 ? 100 : max_it );
+    size_t         nsteps = 0;
+    real_t         old_error = 0;
+
+    do
+    {
+        //
+        // iteration step: I - ( Θ ∗ Δ·V - V·diag(Δ·V) )
+        //
+        
+        // Δ·V
+        gemm( handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, value_t(1), dev_Delta, n, dev_V, n, value_t(0), dev_T, n );
+        
+        // Δ·V - V·diag(Δ·V) = T - V·diag(T) 
+        // computed as T(i,:) = T(i,:) - T(i,i) · A(i,:)
+        from_device< value_t >( dev_T, n+1, diag );
+            
+        for ( size_t  i = 0; i < n; ++i )
+            axpy( handle, n, -diag[i], dev_V + i*n, 1, dev_T + i*n, 1 );
+
+        // I - Θ ∗ Δ·V - V·diag(Δ·V) = I - Θ ∗ T
+        hmul_theta( n, n, value_t(1), dev_diagM, dev_T, dev_T );
+
+        //
+        // compute error: ||V-T||_F
+        //
+
+        real_t  error = 0;
+        
+        if (( error_type == "frobenius" ) || ( error_type == "fro" ))
+        {
+            axpy( handle, n*n, value_t(-1), dev_T, 1, dev_V, 1 );
+            error = norm2( handle, n*n, dev_V, 1 );
+        }// if
+        else if (( error_type == "maximum" ) || ( error_type == "max" ))
+        {
+            throw std::runtime_error( "max error not supported" );
+        }// if
+        else if (( error_type == "residual" ) || ( error_type == "res" ))
+        {
+            throw std::runtime_error( "res error not supported" );
+        }// if
+        else
+            throw std::runtime_error( "unknown error type" );
+
+        //
+        // test stop criterion
+        //
+        
+        copy( handle, n*n, dev_T, 1, dev_V, 1 );
+
+        if ( verbosity >= 1 )
+        {
+            std::cout << "    step " << boost::format( "%03d" ) % nsteps
+                      << " : error = " << boost::format( "%.4e" ) % error;
+
+            if ( nsteps > 0 )
+                std::cout << ", reduction = " << boost::format( "%.4e" ) % ( error / old_error );
+            
+            std::cout << std::endl;
+        }// if
+        
+        old_error = error;
+
+        ++nsteps;
+
+        if ( error < precision )
+            break;
+
+        if ( ! std::isnormal( error ) )
+            break;
+
+    } while ( nsteps < max_steps );
+
+    //
+    // eigenvalues  : diag( M + Δ·V )
+    // eigenvectors : V
+    //
+
+    blas::vector< value_t >  E( n );
+    blas::matrix< value_t >  V( n, n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        E[i] = M[ i*n + i ] + dot( handle, n, dev_Delta + i, n, dev_V + i*n, 1 );
+
+    from_device( dev_V, n, V );
+
+    device_free( dev_diagM );
+    device_free( dev_T );
+    device_free( dev_Delta );
+    device_free( dev_V );
+    
+    return { std::move( E ), std::move( V ) };
 }
 
 }}}// hlr::blas::cuda

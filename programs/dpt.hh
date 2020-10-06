@@ -14,6 +14,7 @@
 #include <tbb/blocked_range2d.h>
 
 #include <hlr/arith/blas_eigen.hh>
+#include <hlr/arith/cuda.hh>
 #include <hlr/utils/tensor.hh>
 #include <hlr/utils/io.hh>
 
@@ -430,6 +431,32 @@ program_main ()
 
         // return;
 
+        //
+        // GPU
+        //
+
+        blas::cuda::init();
+        
+        {
+            auto  tic = timer::now();
+            auto  toc = timer::since( tic );
+
+            blas::eigen_stat  stat;
+            
+            auto  M2  = blas::copy( M );
+            
+            tic = timer::now();
+            
+            auto [ E, V ] = blas::cuda::eigen_jac( blas::cuda::default_handle, M2, 1e-14, 1000 );
+
+            toc = timer::since( tic );
+            
+            std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+        }
+
+        return;
+        
         //
         // double Jacobi
         //
