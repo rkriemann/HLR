@@ -6,8 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <random>
-
 #include <mkl_service.h>
 
 #include <tbb/parallel_for.h>
@@ -364,48 +362,16 @@ program_main ()
 
     if ( true )
     {
-        const auto                                 seed = 1593694284; // time( nullptr );
-        std::default_random_engine                 generator( seed );
-        std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
-        auto                                       random      = [&] () { return uniform_distr( generator ); };
-
-        auto  M = blas::matrix< value_t >();
+        const auto  seed = 1593694284; // time( nullptr );
+        auto        M    = blas::matrix< value_t >();
         
-        if ( true )
-        {
-            auto  R  = blas::matrix< value_t >( n, n );
-
-            blas::fill_fn( R, random );
-        
-            // auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
-            M = std::move( blas::copy( R ) );
-            
-            blas::add( value_t(1), blas::adjoint(R), M );
-            blas::scale( value_t(0.5), M );
-        }// if
+        if ( false )
+            M = std::move( blas::random_herm< value_t >( n, seed ) );
+        else if ( false )
+            M = std::move( blas::random_cond< value_t >( n, 1e10, seed ) );
         else
-        {
-            auto  alpha = value_t(1e10);
-            auto  D     = blas::matrix< value_t >( n, n );
-            auto  Q     = blas::matrix< value_t >( n, n );
-            auto  R     = blas::matrix< value_t >( n, n );
+            M = std::move( blas::random_probability< value_t >( n, 0.01, seed ) );
             
-            // D with condition alpha
-            for ( uint  i = 0; i < n; ++i )
-                D(i,i) = std::pow( alpha, -(value_t(i)/value_t(n-1)) ); 
-            
-            // random, orthogonal Q
-            blas::fill_fn( Q, random );
-            blas::qr( Q, R );
-            
-            // M = Q·D·Q'
-            blas::prod( value_t(1), Q,                D, value_t(0), R );
-            blas::prod( value_t(1), R, blas::adjoint(Q), value_t(0), D );
-            
-            M = std::move( D );
-        }// else
-        
-
         if ( n <= 2048 )
             io::matlab::write( M, "M" );
 
@@ -447,11 +413,47 @@ program_main ()
             
             tic = timer::now();
             
-            auto [ E, V ] = blas::cuda::eigen_jac( blas::cuda::default_handle, M2, 1e-14, 1000 );
+            auto [ E, V ] = blas::cuda::eigen_jac( blas::cuda::default_handle, M2, 1e-14, 1000, & stat );
 
             toc = timer::since( tic );
             
             std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+        }
+
+        {
+            auto  tic = timer::now();
+            auto  toc = timer::since( tic );
+
+            blas::eigen_stat  stat;
+            
+            auto  M2  = blas::copy( M );
+            
+            tic = timer::now();
+            
+            auto [ E, V ] = blas::cuda::eigen_herm( blas::cuda::default_handle, M2, & stat );
+
+            toc = timer::since( tic );
+            
+            std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+        }
+
+        {
+            auto  tic = timer::now();
+            auto  toc = timer::since( tic );
+
+            blas::eigen_stat  stat;
+            
+            auto  M2  = blas::copy( M );
+            
+            tic = timer::now();
+            
+            auto [ E, V ] = blas::cuda::eigen_dpt( blas::cuda::default_handle, M2, 1e-14, 1000, "frobenius", cmdline::verbosity, & stat );
+
+            toc = timer::since( tic );
+            
+            std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
             std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
         }
 

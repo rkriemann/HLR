@@ -9,6 +9,7 @@
 //
 
 #include <cassert>
+#include <random>
 
 #include <hpro/blas/Matrix.hh>
 #include <hpro/blas/Vector.hh>
@@ -220,6 +221,119 @@ mat_V ( const hpro::TRkMatrix &  A,
 
 //////////////////////////////////////////////////////////////////////
 //
+// general copy method
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename T_vector >
+typename hpro::enable_if_res< is_vector< T_vector >::value,
+                              vector< typename T_vector::value_t > >::result
+copy ( const T_vector &  v )
+{
+    using  value_t = typename T_vector::value_t;
+
+    vector< value_t >  w( v.length() );
+
+    hpro::BLAS::copy( v, w );
+
+    return w;
+}
+
+template < typename T_matrix >
+typename hpro::enable_if_res< is_matrix< T_matrix >::value,
+                              matrix< typename T_matrix::value_t > >::result
+copy ( const T_matrix &  A )
+{
+    using  value_t = typename T_matrix::value_t;
+
+    matrix< value_t >  M( A.nrows(), A.ncols() );
+
+    hpro::BLAS::copy( A, M );
+
+    return M;
+}
+
+template < typename value_dest_t,
+           typename value_src_t >
+vector< value_dest_t >
+copy ( const vector< value_src_t > &  v )
+{
+    const size_t            n = v.length();
+    vector< value_dest_t >  w( n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        w(i) = value_dest_t( v(i) );
+
+    return w;
+}
+
+template < typename value_dest_t,
+           typename value_src_t >
+matrix< value_dest_t >
+copy ( const matrix< value_src_t > &  A )
+{
+    matrix< value_dest_t >  M( A.nrows(), A.ncols() );
+    const size_t            n = M.nrows() * M.ncols();
+
+    for ( size_t  i = 0; i < n; ++i )
+        M.data()[i] = value_dest_t( A.data()[i] );
+
+    return M;
+}
+
+using hpro::BLAS::copy;
+
+//////////////////////////////////////////////////////////////////////
+//
+// various fill methods
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename T_vector,
+           typename T_fill_fn >
+void
+fill ( blas::VectorBase< T_vector > &   v,
+       T_fill_fn &                      fill_fn )
+{
+    for ( size_t  i = 0; i < v.length(); ++i )
+        v(i) = fill_fn();
+}
+       
+template < typename T_vector >
+void
+fill ( blas::VectorBase< T_vector > &    v,
+       const typename T_vector::value_t  f )
+{
+    for ( size_t  i = 0; i < v.length(); ++i )
+        v(i) = f;
+}
+       
+template < typename T_matrix,
+           typename T_value >
+void
+fill ( blas::MatrixBase< T_matrix > &    M,
+       const T_value                     f )
+{
+    using value_M_t = typename T_matrix::value_t;
+    
+    for ( size_t  i = 0; i < M.nrows(); ++i )
+        for ( size_t  j = 0; j < M.ncols(); ++j )
+            M(i,j) = value_M_t(f);
+}
+
+template < typename T_matrix,
+           typename T_func >
+void
+fill_fn ( blas::MatrixBase< T_matrix > &  M,
+          T_func &&                       func )
+{
+    for ( size_t  i = 0; i < M.nrows(); ++i )
+        for ( size_t  j = 0; j < M.ncols(); ++j )
+            M(i,j) = func();
+}
+       
+//////////////////////////////////////////////////////////////////////
+//
 // general helpers
 //
 //////////////////////////////////////////////////////////////////////
@@ -248,6 +362,95 @@ zeros ( const size_t  nrows,
         const size_t  ncols )
 {
     return matrix< value_t >( nrows, ncols );
+}
+
+//
+// return random matrix
+//
+template < typename value_t >
+matrix< value_t >
+random ( const size_t  nrows,
+         const size_t  ncols,
+         const size_t  seed = 0 )
+{
+    auto  generator     = std::default_random_engine( seed );
+    auto  uniform_distr = std::uniform_real_distribution< double >( -1.0, 1.0 );
+    auto  random        = [&] () { return uniform_distr( generator ); };
+    auto  M             = blas::matrix< value_t >( nrows, ncols );
+
+    blas::fill_fn( M, random );
+
+    return  M;
+}
+
+//
+// return hermitian random matrix
+//
+template < typename value_t >
+matrix< value_t >
+random_herm ( const size_t  n,
+              const size_t  seed = 0 )
+{
+    auto  R = random< value_t >( n, n, seed );
+        
+    // auto  M  = blas::prod( value_t(1), R, blas::adjoint(R) );
+    auto  M = std::move( blas::copy( R ) );
+            
+    blas::add( value_t(1), blas::adjoint(R), M );
+    blas::scale( value_t(0.5), M );
+
+    return  M;
+}
+
+//
+// return random matrix with defined condition number
+//
+template < typename value_t >
+matrix< value_t >
+random_cond ( const size_t                                       n,
+              const typename hpro::real_type< value_t >::type_t  alpha,
+              const size_t                                       seed = 0 )
+{
+    auto  D = matrix< value_t >( n, n );
+            
+    // D with condition alpha
+    for ( uint  i = 0; i < n; ++i )
+        D(i,i) = std::pow( alpha, -(value_t(i)/value_t(n-1)) ); 
+            
+    // random, orthogonal Q
+    auto  Q = random< value_t >( n, n, seed );
+    auto  R = matrix< value_t >( n, n );
+
+    qr( Q, R );
+            
+    // M = Q·D·Q'
+    prod( value_t(1), Q,                D, value_t(0), R );
+    prod( value_t(1), R, blas::adjoint(Q), value_t(0), D );
+            
+    return  D;
+}
+
+//
+// Generate dense n × n matrix M with
+//
+//           ⎧ i+1              iff  i = j
+//    m_ij = ⎨
+//           ⎩ λ rand([-1,1])   otherwise
+//
+template < typename value_t >
+matrix< value_t >
+random_probability ( const size_t   n,
+                     const value_t  lambda,
+                     const size_t   seed = 0 )
+{
+    auto  M = random< value_t >( n, n, seed );
+
+    scale( lambda, M );
+    
+    for ( size_t  j = 0; j < n; ++j )
+        M( j, j ) = j+1;
+
+    return  M;
 }
 
 //
@@ -398,119 +601,6 @@ diag ( const std::list< matrix< value_t > > &  matrices )
     return M;
 }
 
-//////////////////////////////////////////////////////////////////////
-//
-// general copy method
-//
-//////////////////////////////////////////////////////////////////////
-
-template < typename T_vector >
-typename hpro::enable_if_res< is_vector< T_vector >::value,
-                              vector< typename T_vector::value_t > >::result
-copy ( const T_vector &  v )
-{
-    using  value_t = typename T_vector::value_t;
-
-    vector< value_t >  w( v.length() );
-
-    hpro::BLAS::copy( v, w );
-
-    return w;
-}
-
-template < typename T_matrix >
-typename hpro::enable_if_res< is_matrix< T_matrix >::value,
-                              matrix< typename T_matrix::value_t > >::result
-copy ( const T_matrix &  A )
-{
-    using  value_t = typename T_matrix::value_t;
-
-    matrix< value_t >  M( A.nrows(), A.ncols() );
-
-    hpro::BLAS::copy( A, M );
-
-    return M;
-}
-
-template < typename value_dest_t,
-           typename value_src_t >
-vector< value_dest_t >
-copy ( const vector< value_src_t > &  v )
-{
-    const size_t            n = v.length();
-    vector< value_dest_t >  w( n );
-
-    for ( size_t  i = 0; i < n; ++i )
-        w(i) = value_dest_t( v(i) );
-
-    return w;
-}
-
-template < typename value_dest_t,
-           typename value_src_t >
-matrix< value_dest_t >
-copy ( const matrix< value_src_t > &  A )
-{
-    matrix< value_dest_t >  M( A.nrows(), A.ncols() );
-    const size_t            n = M.nrows() * M.ncols();
-
-    for ( size_t  i = 0; i < n; ++i )
-        M.data()[i] = value_dest_t( A.data()[i] );
-
-    return M;
-}
-
-using hpro::BLAS::copy;
-
-//////////////////////////////////////////////////////////////////////
-//
-// various fill methods
-//
-//////////////////////////////////////////////////////////////////////
-
-template < typename T_vector,
-           typename T_fill_fn >
-void
-fill ( blas::VectorBase< T_vector > &   v,
-       T_fill_fn &                      fill_fn )
-{
-    for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = fill_fn();
-}
-       
-template < typename T_vector >
-void
-fill ( blas::VectorBase< T_vector > &    v,
-       const typename T_vector::value_t  f )
-{
-    for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = f;
-}
-       
-template < typename T_matrix,
-           typename T_value >
-void
-fill ( blas::MatrixBase< T_matrix > &    M,
-       const T_value                     f )
-{
-    using value_M_t = typename T_matrix::value_t;
-    
-    for ( size_t  i = 0; i < M.nrows(); ++i )
-        for ( size_t  j = 0; j < M.ncols(); ++j )
-            M(i,j) = value_M_t(f);
-}
-
-template < typename T_matrix,
-           typename T_func >
-void
-fill_fn ( blas::MatrixBase< T_matrix > &  M,
-          T_func &&                       func )
-{
-    for ( size_t  i = 0; i < M.nrows(); ++i )
-        for ( size_t  j = 0; j < M.ncols(); ++j )
-            M(i,j) = func();
-}
-       
 //////////////////////////////////////////////////////////////////////
 //
 // norm computations

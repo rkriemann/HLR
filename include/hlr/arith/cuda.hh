@@ -15,6 +15,7 @@
 #include <boost/format.hpp>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/blas_eigen.hh>
 #include <hlr/arith/cuda_def.hh>
 
 namespace hlr { namespace blas { namespace cuda {
@@ -814,7 +815,7 @@ svd_dev2 ( handle                   handle,
         svd_dev< cuda_t >( handle, in_rank, in_rank, dev_Us, dev_Ss, dev_Vs );
         
         // determine truncated rank based on singular values
-        auto  Ss = blas::vector< real_t >( in_rank );
+        auto  Ss = vector< real_t >( in_rank );
 
         from_device< real_t >( dev_Ss, 1, Ss );
         
@@ -865,30 +866,33 @@ svd_dev2 ( handle                   handle,
 // eigenvalues for hermitean matrices using Jacobi iteration
 //
 template < typename value_t >
-std::pair< blas::vector< typename hpro::real_type< value_t >::type_t >,
-           blas::matrix< value_t > >
+std::pair< vector< typename hpro::real_type< value_t >::type_t >,
+           matrix< value_t > >
 eigen_jac ( handle                                             handle,
-            blas::matrix< value_t > &                          M,
+            matrix< value_t > &                                M,
             const typename hpro::real_type< value_t >::type_t  tol,
-            const size_t                                       max_sweeps )
+            const size_t                                       max_sweeps,
+            eigen_stat *                                       stat = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
     
     // square matrix assumed
     HLR_ASSERT( M.nrows() == M.ncols() );
 
-    const auto  n = M.nrows();
-
+    if ( ! is_null( stat ) )
+        stat->reset();
+    
     //
     // set up parameters for Jacobi
     //
 
+    const auto   n = M.nrows();
     syevjInfo_t  syevj_params;
     
     cusolverDnCreateSyevjInfo( & syevj_params );
-    cusolverDnXsyevjSetTolerance( syevj_params, 0.1 );
-    if ( cusolverDnXsyevjSetMaxSweeps( syevj_params, 1 ) != CUSOLVER_STATUS_SUCCESS )
-        throw std::runtime_error( "error during cusolverDnXsyevjSetMaxSweeps" );
+    cusolverDnXsyevjSetTolerance( syevj_params, tol );
+    
+    HLR_CUSOLVER_CHECK( cusolverDnXsyevjSetMaxSweeps, ( syevj_params, max_sweeps ) );
     
     //
     // copy/allocate data to/on device
@@ -918,18 +922,25 @@ eigen_jac ( handle                                             handle,
     cusolverDnXsyevjGetSweeps(   handle.solver, syevj_params, & sweeps );
     cusolverDnXsyevjGetResidual( handle.solver, syevj_params, & residual );
 
-    std::cout << "sweeps = " << sweeps << ", residual = " << residual << std::endl;
+    if ( ! is_null( stat ) )
+    {
+        stat->nsweeps = sweeps;
+        stat->error   = residual;
+    }// if
     
-    blas::vector< real_t >   E( n );
-    blas::vector< value_t >  V( n, n );
+    vector< real_t >   E( n );
+    matrix< value_t >  V( n, n );
 
     from_device( dev_W, 1, E );
     from_device( dev_M, n, V );
 
     auto  info = from_device< int >( dev_info );
 
+    if ( ! is_null( stat ) && ( info == 0 ))
+        stat->converged = true;
+    
     if ( info != 0 )
-        HLR_ERROR( "syevj failed (info != 0)" );
+        HLR_ERROR( hpro::to_string( "syevj failed (info == %d)", info ) );
     
     device_free( dev_work );
     device_free( dev_M );
@@ -940,6 +951,82 @@ eigen_jac ( handle                                             handle,
 }
 
 //
+// eigenvalues for hermitean matrices
+//
+template < typename value_t >
+std::pair< vector< typename hpro::real_type< value_t >::type_t >,
+           matrix< value_t > >
+eigen_herm ( handle               handle,
+             matrix< value_t > &  M,
+             eigen_stat *         stat = nullptr )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+    
+    // square matrix assumed
+    HLR_ASSERT( M.nrows() == M.ncols() );
+
+    if ( ! is_null( stat ) )
+        stat->reset();
+    
+    //
+    // copy/allocate data to/on device
+    //
+    
+    const auto  n        = M.nrows();
+    auto        dev_M    = device_alloc< value_t >( n*n );
+    auto        dev_W    = device_alloc< real_t >( n );
+    auto        dev_info = device_alloc< int >( 1 );
+
+    to_device( M, dev_M, n );
+
+    // get work buffer size
+    const auto  lwork    = syevd_buffersize( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, dev_M, n, dev_W );
+    auto        dev_work = device_alloc< value_t >( lwork );
+
+    //
+    // compute eigenvalues
+    //
+
+    syevd( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, dev_M, n, dev_W, dev_work, lwork, dev_info );
+
+    HLR_CUDA_CHECK( cudaDeviceSynchronize, () );
+
+    vector< real_t >   E( n );
+    matrix< value_t >  V( n, n );
+
+    from_device( dev_W, 1, E );
+    from_device( dev_M, n, V );
+
+    auto  info = from_device< int >( dev_info );
+
+    if ( ! is_null( stat ) && ( info == 0 ))
+        stat->converged = true;
+    
+    if ( info != 0 )
+        HLR_ERROR( hpro::to_string( "syevj failed (info == %d)", info ) );
+    
+    device_free( dev_work );
+    device_free( dev_M );
+    device_free( dev_W );
+    device_free( dev_info );
+    
+    return  { std::move( E ), std::move( V ) };
+}
+
+//
+// compute Q = I + α·Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
+// - implemented directly in CUDA
+//
+template < typename value_t >
+void
+hmul_theta ( const int                                    nrows,
+             const int                                    ncols,
+             const typename real_type< value_t >::type_t  alpha,
+             const value_t *                              diag_M,
+             const value_t *                              M,
+             value_t *                                    Q );
+
+//
 // compute eigen values of given matrix M using DPT iteration
 //
 //   - stop iteration if |A_i - A_i-1| < tol or i > max_it
@@ -947,14 +1034,15 @@ eigen_jac ( handle                                             handle,
 //   - if max_it == 0, then max_it = 100 is set
 //
 template < typename value_t >
-std::pair< blas::vector< value_t >,
-           blas::matrix< value_t > >
-dpteigen ( handle                                             handle,
-           blas::matrix< value_t > &                          M,
-           const typename hpro::real_type< value_t >::type_t  tol        = -1,
-           const size_t                                       max_it     = 0,
-           const std::string &                                error_type = "frobenius",
-           const int                                          verbosity          = 1 )
+std::pair< vector< value_t >,
+           matrix< value_t > >
+eigen_dpt ( handle                                             handle,
+            matrix< value_t > &                                M,
+            const typename hpro::real_type< value_t >::type_t  tol        = -1,
+            const size_t                                       max_it     = 0,
+            const std::string &                                error_type = "frobenius",
+            const int                                          verbosity  = 0,
+            eigen_stat *                                       stat       = nullptr )
 {
     using  cuda_t = typename cuda_type< value_t >::type_t;
     using  real_t = typename cuda::real_type< cuda_t >::type_t;
@@ -971,10 +1059,10 @@ dpteigen ( handle                                             handle,
     // Δ    = M - diag(M)
     //
 
-    blas::vector< value_t >  diag( n );
-    blas::vector< value_t >  one( n ); // needed for Identity vector in cuda
+    vector< value_t >  diag( n );
+    vector< value_t >  one( n ); // needed for Identity vector in cuda
 
-    blas::fill( value_t(1), one );
+    fill( value_t(1), one );
     
     //
     // initialize CUDA/cuBLAS
@@ -1015,14 +1103,14 @@ dpteigen ( handle                                             handle,
         //
         
         // Δ·V
-        gemm( handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, value_t(1), dev_Delta, n, dev_V, n, value_t(0), dev_T, n );
+        prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, value_t(1), dev_Delta, n, dev_V, n, value_t(0), dev_T, n );
         
         // Δ·V - V·diag(Δ·V) = T - V·diag(T) 
         // computed as T(i,:) = T(i,:) - T(i,i) · A(i,:)
         from_device< value_t >( dev_T, n+1, diag );
             
         for ( size_t  i = 0; i < n; ++i )
-            axpy( handle, n, -diag[i], dev_V + i*n, 1, dev_T + i*n, 1 );
+            axpy( handle, n, -diag(i), dev_V + i*n, 1, dev_T + i*n, 1 );
 
         // I - Θ ∗ Δ·V - V·diag(Δ·V) = I - Θ ∗ T
         hmul_theta( n, n, value_t(1), dev_diagM, dev_T, dev_T );
@@ -1036,7 +1124,7 @@ dpteigen ( handle                                             handle,
         if (( error_type == "frobenius" ) || ( error_type == "fro" ))
         {
             axpy( handle, n*n, value_t(-1), dev_T, 1, dev_V, 1 );
-            error = norm2( handle, n*n, dev_V, 1 );
+            error = norm_2( handle, n*n, dev_V, 1 );
         }// if
         else if (( error_type == "maximum" ) || ( error_type == "max" ))
         {
@@ -1083,11 +1171,11 @@ dpteigen ( handle                                             handle,
     // eigenvectors : V
     //
 
-    blas::vector< value_t >  E( n );
-    blas::matrix< value_t >  V( n, n );
+    vector< value_t >  E( n );
+    matrix< value_t >  V( n, n );
 
     for ( size_t  i = 0; i < n; ++i )
-        E[i] = M[ i*n + i ] + dot( handle, n, dev_Delta + i, n, dev_V + i*n, 1 );
+        E(i) = M(i,i) + dot( handle, n, dev_Delta + i, n, dev_V + i*n, 1 );
 
     from_device( dev_V, n, V );
 

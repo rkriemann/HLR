@@ -520,6 +520,28 @@ sources = [ 'src/apps/helmholtz.cc',
 
 libhlr = env.StaticLibrary( 'hlr', sources )
 
+#
+# CUDA sources
+#
+cuda_sources = [ 'src/cuda/hmul_theta.cc' ]
+
+cuda_env = env.Clone()
+cuda_env.Replace( CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
+cuda_env.Replace( CXX = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
+cuda_env.Replace( CXXFLAGS = '' )
+#,
+#                        CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu',
+#                        CXX = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
+
+cuda_obj = []
+
+for src in cuda_sources :
+    cuda_obj.append( cuda_env.Object( src ) )
+
+#
+# defaults depend on programs/frameworks
+#
+
 Default( None )
 
 #
@@ -537,7 +559,7 @@ if 'seq' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( seq.Program( path( program, name ), [ source ] ) )
+            Default( seq.Program( path( program, name ), [ source ] + cuda_obj ) )
 
 #
 # OpenMP

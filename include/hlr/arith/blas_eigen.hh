@@ -20,8 +20,16 @@ namespace hlr { namespace blas {
 
 struct eigen_stat
 {
-    uint  nsweeps   = 0;
-    bool  converged = false;
+    uint    nsweeps   = 0;
+    bool    converged = false;
+    double  error     = -1;
+
+    void reset ()
+    {
+        nsweeps   = 0;
+        converged = false;
+        error     = -1;
+    }
 };
 
 //
@@ -74,6 +82,9 @@ eigen_jac ( matrix< value_t > &                                M,
     uint               sweep      = 0;
     matrix< value_t >  V( minrc, ncols );
 
+    if ( ! is_null( stat ) )
+        stat->reset();
+    
     // initialise V with identity
     for ( size_t  i = 0; i < minrc; i++ )
         V(i,i) = 1.0;
@@ -359,6 +370,9 @@ eigen_dpt ( matrix< value_t > &                                M,
 
     // assumption
     HLR_ASSERT( M.nrows() == M.ncols() );
+    
+    if ( ! is_null( stat ) )
+        stat->reset();
     
     const auto    nrows      = M.nrows();
     const real_t  tolerance  = ( atolerance  > 0 ? atolerance : real_t(10) * std::numeric_limits< real_t >::epsilon() );

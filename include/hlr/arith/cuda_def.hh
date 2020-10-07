@@ -312,6 +312,28 @@ HLR_CUDA_AXPY( cuDoubleComplex, cublasZaxpy )
 HLR_CUDA_DOT( float,  cublasSdot )
 HLR_CUDA_DOT( double, cublasDdot )
 
+#undef HLR_CUDA_DOT
+
+#define HLR_CUDA_NORM2( type, func )                 \
+    typename real_type< type >::type_t               \
+    norm_2 ( handle         handle,                  \
+             int            n,                       \
+             const type *   x,                       \
+             int            incx )                   \
+    {                                                \
+        typename real_type< type >::type_t  res;     \
+                                                     \
+        func( handle.blas, n, x, incx, & res ) ;     \
+        return res;                                  \
+    }
+
+HLR_CUDA_NORM2( float,           cublasSnrm2 )
+HLR_CUDA_NORM2( double,          cublasDnrm2 )
+HLR_CUDA_NORM2( cuFloatComplex,  cublasScnrm2 )
+HLR_CUDA_NORM2( cuDoubleComplex, cublasDznrm2 )
+
+#undef HLR_CUDA_NORM2
+
 //////////////////////////////////////////////////////////////////////
 //
 // multiplication routines
@@ -477,10 +499,13 @@ HLR_CUDA_ORGQR( cuDoubleComplex, cusolverDnZungqr )
 
 //////////////////////////////////////////////////////////////////////
 //
-// SVD related functions
+// eigenvalue related functions
 //
 //////////////////////////////////////////////////////////////////////
 
+//
+// gesvdj
+//
 #define HLR_CUDA_GESVDJ_BUFFERSIZE( type, func )     \
     inline                                           \
     int                                              \
@@ -542,6 +567,9 @@ HLR_CUDA_GESVDJ( cuDoubleComplex, cusolverDnZgesvdj )
 
 #undef HLR_CUDA_GESVDJ
 
+//
+// syevj
+//
 #define HLR_CUDA_SYEVJ_BUFFERSIZE( type, func )                         \
     int                                                                 \
     syevj_buffersize ( handle              handle,                      \
@@ -586,6 +614,56 @@ HLR_CUDA_SYEVJ( float,  cusolverDnSsyevj )
 HLR_CUDA_SYEVJ( double, cusolverDnDsyevj )
 
 #undef HLR_CUDA_SYEVJ
+
+//
+// syevd
+//
+#define HLR_CUDA_SYEVD_BUFFERSIZE( type, func )                         \
+    int                                                                 \
+    syevd_buffersize ( handle              handle,                      \
+                       cusolverEigMode_t   jobz,                        \
+                       cublasFillMode_t    uplo,                        \
+                       int                 n,                           \
+                       const type *        A,                           \
+                       int                 ldA,                         \
+                       typename real_type< type >::type_t *  W )        \
+    {                                                                   \
+        int  lwork = 0;                                                 \
+                                                                        \
+        HLR_CUSOLVER_CHECK( func, ( handle.solver, jobz, uplo, n, A, ldA, W, & lwork ) ); \
+                                                                        \
+        return  lwork;                                                  \
+    }
+
+HLR_CUDA_SYEVD_BUFFERSIZE( float,           cusolverDnSsyevd_bufferSize )
+HLR_CUDA_SYEVD_BUFFERSIZE( double,          cusolverDnDsyevd_bufferSize )
+HLR_CUDA_SYEVD_BUFFERSIZE( cuFloatComplex,  cusolverDnCheevd_bufferSize )
+HLR_CUDA_SYEVD_BUFFERSIZE( cuDoubleComplex, cusolverDnZheevd_bufferSize )
+
+#undef HLR_CUDA_SYEVD_BUFFERSIZE
+
+#define HLR_CUDA_SYEVD( type, func )                                    \
+    void                                                                \
+    syevd ( handle              handle,                                 \
+            cusolverEigMode_t   jobz,                                   \
+            cublasFillMode_t    uplo,                                   \
+            int                 n,                                      \
+            type *              A,                                      \
+            int                 ldA,                                    \
+            typename real_type< type >::type_t *  W,                    \
+            type *              work,                                   \
+            int                 lwork,                                  \
+            int *               info )                                  \
+    {                                                                   \
+        HLR_CUSOLVER_CHECK( func, ( handle.solver, jobz, uplo, n, A, ldA, W, work, lwork, info ) ); \
+}
+
+HLR_CUDA_SYEVD( float,           cusolverDnSsyevd )
+HLR_CUDA_SYEVD( double,          cusolverDnDsyevd )
+HLR_CUDA_SYEVD( cuFloatComplex,  cusolverDnCheevd )
+HLR_CUDA_SYEVD( cuDoubleComplex, cusolverDnZheevd )
+
+#undef HLR_CUDA_SYEVD
 
 }}}// namespace hlr::blas::cuda
 
