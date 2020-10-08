@@ -1017,14 +1017,19 @@ eigen_herm ( handle               handle,
 // compute Q = I + α·Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
 // - implemented directly in CUDA
 //
-template < typename value_t >
-void
-hmul_theta ( const int                                    nrows,
-             const int                                    ncols,
-             const typename real_type< value_t >::type_t  alpha,
-             const value_t *                              diag_M,
-             const value_t *                              M,
-             value_t *                                    Q );
+#define HMUL_THETA( type )                                          \
+    void                                                            \
+    hmul_theta ( const int      nrows,                              \
+                 const int      ncols,                              \
+                 const typename real_type< type >::type_t  alpha,   \
+                 const type *   diag_M,                             \
+                 const type *   M,                                  \
+                 type *         Q );
+
+HMUL_THETA( float )
+HMUL_THETA( double )
+HMUL_THETA( cuFloatComplex )
+HMUL_THETA( cuDoubleComplex )
 
 //
 // compute eigen values of given matrix M using DPT iteration

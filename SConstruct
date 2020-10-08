@@ -480,6 +480,24 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
+#
+# CUDA sources
+#
+cuda_sources = [ 'src/cuda/hmul_theta.cc' ]
+
+cuda_env = env.Clone()
+cuda_env.Replace( CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
+cuda_env.Replace( CXX = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
+cuda_env.Replace( CXXFLAGS = Split( '-O2' ) )
+
+cuda_obj = []
+
+for src in cuda_sources :
+    cuda_obj.append( cuda_env.Object( src ) )
+
+#
+# standard source files
+#
 sources = [ 'src/apps/helmholtz.cc',
             'src/apps/laplace.cc',
             'src/apps/log_kernel.cc',
@@ -518,25 +536,7 @@ sources = [ 'src/apps/helmholtz.cc',
             'src/utils/term.cc',
             'src/utils/text.cc' ]
 
-libhlr = env.StaticLibrary( 'hlr', sources )
-
-#
-# CUDA sources
-#
-cuda_sources = [ 'src/cuda/hmul_theta.cc' ]
-
-cuda_env = env.Clone()
-cuda_env.Replace( CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
-cuda_env.Replace( CXX = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
-cuda_env.Replace( CXXFLAGS = '' )
-#,
-#                        CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu',
-#                        CXX = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )
-
-cuda_obj = []
-
-for src in cuda_sources :
-    cuda_obj.append( cuda_env.Object( src ) )
+libhlr = env.StaticLibrary( 'hlr', sources + cuda_obj )
 
 #
 # defaults depend on programs/frameworks
@@ -559,7 +559,7 @@ if 'seq' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( seq.Program( path( program, name ), [ source ] + cuda_obj ) )
+            Default( seq.Program( path( program, name ), [ source ] ) )
 
 #
 # OpenMP
