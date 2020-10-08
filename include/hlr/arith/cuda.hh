@@ -1055,8 +1055,9 @@ eigen_dpt ( handle                                             handle,
     // square matrix assumed
     HLR_ASSERT( M.nrows() == M.ncols() );
 
-    const auto  n = M.nrows();
-
+    if ( ! is_null( stat ) )
+        stat->reset();
+    
     //
     // set up auxiliary data structures
     //
@@ -1064,6 +1065,7 @@ eigen_dpt ( handle                                             handle,
     // Δ    = M - diag(M)
     //
 
+    const auto         n = M.nrows();
     vector< value_t >  diag( n );
     vector< value_t >  one( n ); // needed for Identity vector in cuda
 
@@ -1159,12 +1161,23 @@ eigen_dpt ( handle                                             handle,
             std::cout << std::endl;
         }// if
         
+        if ( ! is_null( stat ) )
+        {
+            stat->nsweeps = nsteps;
+            stat->error   = error;
+        }// if
+        
         old_error = error;
 
         ++nsteps;
 
         if ( error < precision )
+        {
+            if ( ! is_null( stat ) )
+                stat->converged = true;
+            
             break;
+        }// if
 
         if ( ! std::isnormal( error ) )
             break;

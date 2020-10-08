@@ -364,13 +364,15 @@ program_main ()
     {
         const auto  seed = 1593694284; // time( nullptr );
         auto        M    = blas::matrix< value_t >();
-        
-        if ( false )
+
+        if ( cmdline::appl == "random" )
             M = std::move( blas::random_herm< value_t >( n, seed ) );
-        else if ( false )
+        else if ( cmdline::appl == "randcond" )
             M = std::move( blas::random_cond< value_t >( n, 1e10, seed ) );
-        else
+        else if ( cmdline::appl == "randprob" )
             M = std::move( blas::random_probability< value_t >( n, 0.01, seed ) );
+        else
+            HLR_ERROR( "unsupported matrix content : " + cmdline::appl );
             
         if ( n <= 2048 )
             io::matlab::write( M, "M" );
@@ -401,61 +403,121 @@ program_main ()
         // GPU
         //
 
-        blas::cuda::init();
+        if ( true )
+        {
+            blas::cuda::init();
         
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+            
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_jac( blas::cuda::default_handle, M2, 1e-14, 1000, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
+
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+            
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_herm( blas::cuda::default_handle, M2, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
+
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+            
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_dpt( blas::cuda::default_handle, M2, 1e-14, 1000, "frobenius", cmdline::verbosity, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "DPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
+        }// if
+        else
         {
-            auto  tic = timer::now();
-            auto  toc = timer::since( tic );
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
 
-            blas::eigen_stat  stat;
+                blas::eigen_stat  stat;
             
-            auto  M2  = blas::copy( M );
+                auto  M2  = blas::copy( M );
             
-            tic = timer::now();
+                tic = timer::now();
             
-            auto [ E, V ] = blas::cuda::eigen_jac( blas::cuda::default_handle, M2, 1e-14, 1000, & stat );
+                // auto [ E, V ] = eigen_jac_bw( M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
+                auto [ E, V ] = blas::eigen_jac( M2, 1e-14, 1000, & stat );
 
-            toc = timer::since( tic );
+                toc = timer::since( tic );
             
-            std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
-            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
-        }
+                std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
 
-        {
-            auto  tic = timer::now();
-            auto  toc = timer::since( tic );
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
 
-            blas::eigen_stat  stat;
+                blas::eigen_stat  stat;
             
-            auto  M2  = blas::copy( M );
+                auto  M2  = blas::copy( M );
             
-            tic = timer::now();
+                tic = timer::now();
             
-            auto [ E, V ] = blas::cuda::eigen_herm( blas::cuda::default_handle, M2, & stat );
+                auto [ E, V ] = blas::eigen_herm( M2, & stat );
 
-            toc = timer::since( tic );
+                toc = timer::since( tic );
             
-            std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
-            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
-        }
+                std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
 
-        {
-            auto  tic = timer::now();
-            auto  toc = timer::since( tic );
+            {
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
 
-            blas::eigen_stat  stat;
+                blas::eigen_stat  stat;
             
-            auto  M2  = blas::copy( M );
+                auto  M2  = blas::copy( M );
             
-            tic = timer::now();
+                tic = timer::now();
             
-            auto [ E, V ] = blas::cuda::eigen_dpt( blas::cuda::default_handle, M2, 1e-14, 1000, "frobenius", cmdline::verbosity, & stat );
+                auto [ E, V ] = blas::eigen_dpt( M2, 1e-14, 1000, "frobenius", cmdline::verbosity, & stat );
 
-            toc = timer::since( tic );
+                toc = timer::since( tic );
             
-            std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
-            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
-        }
+                std::cout << "DPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            }
+        }// else
 
         return;
         
@@ -517,7 +579,7 @@ program_main ()
             auto  VM        = blas::prod( value_t(1), blas::adjoint( Vd ), M );
             auto  VMV       = blas::prod( value_t(1), VM, Vd );
 
-            // auto  [ E, V ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", cmdline::verbosity );
+            // auto  [ E, V ] = blas::eigen_dpt( VMV, 1e-14, 0, "frobenius", cmdline::verbosity );
             auto  [ E, V ]  = eigen_jac_bw( VMV, cmdline::ntile, 1e-14, 1000, cmdline::verbosity );
             
             toc = timer::since( tic );
@@ -578,7 +640,7 @@ program_main ()
 
             tic = timer::now();
             
-            auto  [ E, V2 ] = blas::eigen_dpt( M2, 0, 1e-14, "frobenius", cmdline::verbosity );
+            auto  [ E, V2 ] = blas::eigen_dpt( M2, 1e-14, 0, "frobenius", cmdline::verbosity );
 
             toc = timer::since( tic );
 
@@ -613,7 +675,7 @@ program_main ()
 
             tic = timer::now();
             
-            auto  [ E, V2 ] = blas::eigen_dpt( M2, 0, 1e-14, "frobenius", cmdline::verbosity );
+            auto  [ E, V2 ] = blas::eigen_dpt( M2, 1e-14, 0, "frobenius", cmdline::verbosity );
 
             toc = timer::since( tic );
             
@@ -645,7 +707,7 @@ program_main ()
         //     auto  VM  = blas::prod( double(1), blas::adjoint(V1d), M );
         //     auto  VMV = blas::prod( double(1), VM, V1d );
             
-        //     auto  [ E, V2 ] = blas::eigen_dpt( VMV, 0, 1e-14, "frobenius", cmdline::verbosity );
+        //     auto  [ E, V2 ] = blas::eigen_dpt( VMV, 1e-14, 0, "frobenius", cmdline::verbosity );
             
         //     std::cout << "DPT in " << format_time( timer::since( tic ) ) << std::endl;
 
@@ -718,7 +780,7 @@ program_main ()
                 // auto  VM         = blas::prod( value_t(1), blas::adjoint( Wj ), M );
                 // auto  VMV        = blas::prod( value_t(1), VM, Wj );
                 // auto  [ Ed, Vd ] = blas::eigen_dpt( VMV, 0, 1e-14, "fro", 0, & stat );
-                auto  [ Ed, Vd ] = blas::eigen_dpt( Ms, 0, 1e-14, "fro", 0, & stat );
+                auto  [ Ed, Vd ] = blas::eigen_dpt( Ms, 1e-14, 0, "fro", 0, & stat );
 
                 auto  toc_dpt = timer::since( tic_dpt );
                 

@@ -230,7 +230,8 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
+    assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) ||
+            ( appl == "random"    ) || ( appl == "randcond"  ) || ( appl == "randprob"   ));
     assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
     assert( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
             ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||

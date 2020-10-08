@@ -38,9 +38,13 @@ struct eigen_stat
 template < typename value_t >
 std::pair< blas::vector< typename hpro::real_type< value_t >::type_t >,
            blas::matrix< value_t > >
-eigen_herm ( const matrix< value_t > &  M )
+eigen_herm ( const matrix< value_t > &  M,
+             eigen_stat *               stat = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
+
+    if ( ! is_null( stat ) )
+        stat->reset();
 
     const blas_int_t        n = M.nrows();
     auto                    V = copy( M );
@@ -56,6 +60,14 @@ eigen_herm ( const matrix< value_t > &  M )
 
     heev( 'V', 'L', n, V.data(), V.col_stride(), E.data(), work.data(), work.size(), rwork.data(), info );
 
+    if ( info == 0 )
+    {
+        if ( ! is_null( stat ) )
+            stat->converged = true;
+    }// if
+    else
+        HLR_ERROR( hpro::to_string( "error in heev (info == %d)", info ) );
+    
     return { std::move( E ), std::move( V ) };
 }
 
@@ -67,8 +79,8 @@ template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
 eigen_jac ( matrix< value_t > &                                M,
-            const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
+            const size_t                                       amax_sweeps = 0,
             eigen_stat *                                       stat        = nullptr )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
@@ -360,8 +372,8 @@ template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
 eigen_dpt ( matrix< value_t > &                                M,
-            const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
+            const size_t                                       amax_sweeps = 0,
             const std::string &                                error_type  = "frobenius",
             const int                                          verbosity   = 0,
             eigen_stat *                                       stat        = nullptr )
