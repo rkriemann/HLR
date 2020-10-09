@@ -17,6 +17,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/blas_eigen.hh>
 #include <hlr/arith/cuda_def.hh>
+#include <hlr/utils/io.hh> // DEBUG
 
 namespace hlr { namespace blas { namespace cuda {
 
@@ -1013,6 +1014,30 @@ eigen_herm ( handle               handle,
     return  { std::move( E ), std::move( V ) };
 }
 
+namespace device
+{
+
+template < typename value_t >
+void
+eigen_herm ( handle        handle,
+             const int     n,
+             value_t *     dev_M,
+             typename real_type< value_t >::type_t *  dev_E,
+             value_t *     dev_work,
+             const int     lwork,
+             int *         dev_info )
+{
+    //
+    // compute eigenvalues
+    //
+
+    syevd( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, n, dev_M, n, dev_E, dev_work, lwork, dev_info );
+
+    // HLR_CUDA_CHECK( cudaDeviceSynchronize, () );
+}
+
+}// namespace device
+
 //
 // compute Q = I + α·Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
 // - implemented directly in CUDA
@@ -1201,6 +1226,378 @@ eigen_dpt ( handle                                             handle,
     device_free( dev_T );
     device_free( dev_Delta );
     device_free( dev_V );
+    
+    return { std::move( E ), std::move( V ) };
+}
+
+template < typename value_t >
+std::pair< blas::vector< value_t >,
+           blas::matrix< value_t > >
+eigen_bjac ( handle                                             handle,
+             matrix< value_t > &                                M,
+             const size_t                                       block_size  = 128,
+             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
+             const size_t                                       amax_sweeps = 0,
+             const uint                                         verbosity   = 0,
+             blas::eigen_stat *                                 stat        = nullptr )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+
+    const auto    nrows      = M.nrows();
+    const auto    ncols      = M.ncols();
+    const auto    nbrows     = nrows / block_size;
+    const auto    nbcols     = ncols / block_size;
+
+    HLR_ASSERT( ( nrows / block_size ) * block_size == nrows );
+    HLR_ASSERT( ( ncols / block_size ) * block_size == ncols );
+    
+    const auto    minrc      = std::min( nrows, ncols );
+    const size_t  max_sweeps = ( amax_sweeps > 0 ? amax_sweeps : 15*minrc*minrc );
+    const real_t  tolerance  = ( atolerance > 0 ? atolerance : real_t(100) * std::numeric_limits< real_t >::epsilon() );
+    bool          converged  = false;
+    uint          sweep      = 0;
+    auto          dev_M      = std::vector< value_t * >( nrows * ncols );
+    auto          dev_A      = device_alloc< value_t >( ( 2 * block_size ) * ( 2 * block_size ) );
+    auto          dev_A00    = device_alloc< value_t >( block_size * block_size );
+    auto          dev_A01    = device_alloc< value_t >( block_size * block_size );
+    auto          dev_A10    = device_alloc< value_t >( block_size * block_size );
+    auto          dev_A11    = device_alloc< value_t >( block_size * block_size );
+    auto          dev_T0     = device_alloc< value_t >( block_size * block_size );
+    auto          dev_T1     = device_alloc< value_t >( block_size * block_size );
+    auto          dev_W      = device_alloc< value_t >( 2 * block_size );
+    auto          dev_V      = std::vector< value_t * >( nrows * ncols );
+    auto          norms      = matrix< real_t >( nbrows, nbcols );
+    auto          vone       = vector< value_t >( block_size ); // needed for Identity vector in cuda
+    const auto    lwork      = syevd_buffersize( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, 2*block_size, dev_A, 2*block_size, dev_W );
+    auto          dev_work   = device_alloc< value_t >( lwork );
+    auto          dev_info   = device_alloc< int >( 1 );
+    auto          one        = make_constant< value_t >( 1 );
+    auto          zero       = make_constant< value_t >( 0 );
+
+    auto  dbg_A = blas::matrix< value_t >( 2*block_size, 2*block_size );
+    auto  dbg_W = blas::vector< real_t >( 2*block_size );
+    
+    #define  DEV_M( i, j ) dev_M[ j*nbrows+i ]
+    #define  DEV_V( i, j ) dev_V[ j*nbrows+i ]
+    
+    //
+    // allocate block wise M/V and copy M to device and initialize V
+    // also determine initial norm of blocks in M
+    //
+
+    fill( value_t(1), vone );
+    
+    for ( size_t  i = 0; i < nbrows; ++i )
+    {
+        for ( size_t  j = 0; j < nbcols; ++j )
+        {
+            DEV_M(i,j) = device_alloc< value_t >( block_size * block_size );
+            DEV_V(i,j) = device_alloc< value_t >( block_size * block_size );
+
+            const auto  r_i  = blas::range( i*block_size, (i+1)*block_size-1 );
+            const auto  r_j  = blas::range( j*block_size, (j+1)*block_size-1 );
+            auto        M_ij = blas::matrix< value_t >( M, r_i, r_j );
+
+            to_device( M_ij, DEV_M(i,j), block_size );
+
+            norms(i,j) = norm_2( handle, block_size*block_size, DEV_M(i,j), 1 );
+            std::cout << norms(i,j) << " : " << blas::norm_F( M_ij ) << std::endl;
+            
+            if ( i == j )
+                to_device( vone, DEV_V(i,j), block_size+1 );
+        }// for
+    }// for
+    
+    //
+    // block wise Jacobi
+    //
+
+    real_t  norm_off = real_t(0);
+
+    if ( verbosity > 0 )
+        std::cout << "    sweep       off        red        error" << std::endl;
+    
+    while ( ! converged && ( sweep < max_sweeps ))
+    {
+        sweep++;
+
+        //
+        // sort norm of blocks
+        //
+
+        auto    norm_idxs = std::list< std::tuple< real_t, uint, uint > >();
+        real_t  norm_sum  = real_t(0);
+
+        for ( uint  i = 0; i < nbrows-1; i++ )
+        {
+            for ( uint  j = i + 1; j < nbcols; j++ )
+            {
+                norm_sum += 2 * math::square( norms(i,j) );
+                norm_idxs.push_back( { norms(i,j), i, j } ); 
+            }// for
+        }// for
+
+        norm_sum = math::sqrt( norm_sum );
+        
+        norm_idxs.sort( [] ( const auto &  n1, const auto &  n2 )
+                        {
+                            // reverse order for big to small!
+                            return std::get<0>( n1 ) > std::get<0>( n2 );
+                        } );
+
+        if ( verbosity > 2 )
+        {
+            for ( auto [ n, i, j ] : norm_idxs )
+                std::cout << "        " << i << " / " << j << " = " << n << std::endl;
+        }// if
+        
+        //
+        // check norm of off-diagonal part and stop if threshold was reached
+        //
+        
+        const auto  max_norm = std::get<0>( norm_idxs.front() );
+        const auto  max_i    = std::get<1>( norm_idxs.front() );
+        const auto  max_j    = std::get<2>( norm_idxs.front() );
+        const auto  error    = max_norm / std::sqrt( norms( max_i, max_i ) * norms( max_j, max_j ) );
+
+        if ( verbosity > 0 )
+            std::cout << "    "
+                      << boost::format( " %4d" ) % (sweep-1) << "  "
+                      << boost::format( "%.4e" ) % norm_sum << "  "
+                      << boost::format( "%.4e" ) % ( sweep > 1 ? norm_sum / norm_off : real_t(0) ) << "  "
+                      << boost::format( "%.4e" ) % error << std::endl;
+
+        norm_off = norm_sum;
+        
+        if ( error < tolerance )
+            break;
+
+        //
+        // set up block index pairs by successively choosing maximal norm
+        // and removing all pairs having same indices
+        //
+        
+        std::deque< std::pair< uint, uint > >  idx_pairs;
+
+        if ( true )
+        {
+            while ( ! norm_idxs.empty() )
+            {
+                auto  first = norm_idxs.front();
+
+                norm_idxs.pop_front();
+
+                const auto  i = std::get<1>( first );
+                const auto  j = std::get<2>( first );
+            
+                idx_pairs.push_back( { i, j } );
+
+                // remove all other entries containing i/j
+                for ( auto  it = norm_idxs.begin(); it != norm_idxs.end(); )
+                {
+                    auto  ti = std::get<1>( *it );
+                    auto  tj = std::get<2>( *it );
+                
+                    if (( ti == i ) || ( tj == i ) || ( ti == j ) || ( tj == j ))
+                        it = norm_idxs.erase( it );
+                    else
+                        ++it;
+                }// for
+            }// while
+        }// if
+        else
+            idx_pairs.push_back( { max_i, max_j } );
+        
+        //
+        // diagonalize ⎛M_ii  M_ij⎞, i.e., compute
+        //             ⎝M_ji  M_jj⎠
+        //
+        // ⎛V_ii  V_ij⎞' ⎛M_ii  M_ij⎞ ⎛V_ii  V_ij⎞ = ⎛D_ii    0 ⎞
+        // ⎝V_ji  V_jj⎠  ⎝M_ji  M_jj⎠ ⎝V_ji  V_jj⎠   ⎝  0   D_jj⎠
+        //
+      
+        const auto  npairs = idx_pairs.size();
+        auto        Vs     = std::vector< blas::matrix< value_t > >( npairs );
+        
+        for ( size_t  idx = 0; idx < npairs; ++idx )
+        {
+            const auto  [ i, j ] = idx_pairs[ idx ];
+
+            if ( verbosity > 1 )
+                std::cout << i << " / " << j << std::endl;
+                
+            //
+            // A = [ M_ii, M_ij ; M_ji, M_jj ]
+            //
+            
+            auto  M_ii = DEV_M(i,i);
+            auto  M_ij = DEV_M(i,j);
+            auto  M_ji = DEV_M(j,i);
+            auto  M_jj = DEV_M(j,j);
+
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, M_ii + k*block_size, 1, dev_A + k*2*block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, M_ij + k*block_size, 1, dev_A + (block_size+k)*2*block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, M_ji + k*block_size, 1, dev_A + k*2*block_size + block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, M_jj + k*block_size, 1, dev_A + (block_size+k)*2*block_size + block_size, 1 );
+
+            //
+            // compute eigenvalues of sub-system
+            //
+            
+            device::eigen_herm( handle, 2*block_size, dev_A, dev_W, dev_work, lwork, dev_info );
+
+            //
+            // split A
+            //
+            
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, dev_A + k*2*block_size, 1, dev_A00 + k*block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, dev_A + (block_size+k)*2*block_size, 1, dev_A01 + k*block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, dev_A + k*2*block_size + block_size, 1, dev_A10 + k*block_size, 1 );
+            for ( size_t  k = 0; k < block_size; ++k )
+                copy( handle, block_size, dev_A + (block_size+k)*2*block_size + block_size, 1, dev_A11 + k*block_size, 1 );
+
+            //
+            // apply local eigenvectors (stored in A) to M from left
+            //
+            
+            for ( size_t  l = 0; l < nbcols; ++l )
+            {
+                //
+                // ⎛A₀₀, A₀₁⎞' ⎛M_il⎞
+                // ⎝A₁₀, A₁₁⎠  ⎝M_jl⎠
+                //
+
+                // T0 = M_il, T1 = M_jl
+                copy( handle, block_size * block_size, DEV_M(i,l), 1, dev_T0, 1 );
+                copy( handle, block_size * block_size, DEV_M(j,l), 1, dev_T1, 1 );
+                    
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_A00, block_size, dev_T0, block_size,
+                      zero, DEV_M(i,l), block_size );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_A10, block_size, dev_T1, block_size,
+                      one, DEV_M(i,l), block_size );
+                
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_A01, block_size, dev_T0, block_size,
+                      zero, DEV_M(j,l), block_size );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_A11, block_size, dev_T1, block_size,
+                      one, DEV_M(j,l), block_size );
+                
+                norms(i,l) = norm_2( handle, block_size * block_size, DEV_M(i,l), 1 );
+                norms(j,l) = norm_2( handle, block_size * block_size, DEV_M(j,l), 1 );
+            }// for
+
+            for ( size_t  l = 0; l < nbrows; ++l )
+            {
+                //
+                // (M_li M_lj) ⎛A₀₀, A₀₁⎞
+                //             ⎝A₁₀, A₁₁⎠   
+                //
+
+                // T0 = M_li, T1 = M_lj
+                copy( handle, block_size * block_size, DEV_M(l,i), 1, dev_T0, 1 );
+                copy( handle, block_size * block_size, DEV_M(l,j), 1, dev_T1, 1 );
+                
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_T0, block_size, dev_A00, block_size,
+                      zero, DEV_M(l,i), block_size );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_T1, block_size, dev_A10, block_size,
+                      one, DEV_M(l,i), block_size );
+                
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_T0, block_size, dev_A01, block_size,
+                      zero, DEV_M(l,j), block_size );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_T1, block_size, dev_A11, block_size,
+                      one, DEV_M(l,j), block_size );
+                
+                norms(l,i) = norm_2( handle, block_size * block_size, DEV_M(l,i), 1 );
+                norms(l,j) = norm_2( handle, block_size * block_size, DEV_M(l,j), 1 );
+
+                //
+                // (V_li V_lj) ⎛A₀₀, A₀₁⎞
+                //             ⎝A₁₀, A₁₁⎠   
+                //
+
+                // T0 = V_li, T1 = V_lj
+                copy( handle, block_size * block_size, DEV_V(l,i), 1, dev_T0, 1 );
+                copy( handle, block_size * block_size, DEV_V(l,j), 1, dev_T1, 1 );
+                
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_T0, block_size, dev_A00, block_size,
+                      zero, DEV_V(l,i), block_size );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_T1, block_size, dev_A10, block_size,
+                      one, DEV_V(l,i), block_size );
+                
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one,  dev_T0, block_size, dev_A01, block_size,
+                      zero, DEV_V(l,j), block_size );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, block_size, block_size, block_size,
+                      one, dev_T1, block_size, dev_A11, block_size,
+                      one, DEV_V(l,j), block_size );
+            }// for
+        }// for
+    }// while
+
+    if ( ! is_null( stat ) )
+    {
+        stat->nsweeps   = sweep;
+        stat->converged = converged;
+    }// if
+    
+    //
+    // extract eigenvalues as diagonal elements of M
+    //
+
+    blas::vector< value_t >  E( minrc );
+    blas::matrix< value_t >  V( nrows, ncols );
+
+    for ( size_t  bi = 0; bi < nbrows; bi++ )
+    {
+        blas::vector< value_t >  Ei( block_size );
+
+        from_device( DEV_M(bi,bi), block_size+1, Ei );
+
+        for ( size_t  i = 0; i < block_size; ++i )
+            E( bi*block_size + i ) = Ei(i);
+    }// for
+
+    for ( size_t  i = 0; i < nbrows; ++i )
+    {
+        for ( size_t  j = 0; j < nbcols; ++j )
+        {
+            const auto  r_i  = blas::range( i*block_size, (i+1)*block_size-1 );
+            const auto  r_j  = blas::range( j*block_size, (j+1)*block_size-1 );
+            auto        V_ij = blas::matrix< value_t >( V, r_i, r_j );
+
+            from_device( DEV_V(i,j), block_size, V_ij );
+        }// for
+    }// for
+    
+    device_free( dev_A );
+    device_free( dev_W );
+    device_free( dev_work );
+    device_free( dev_info );
+    
+    for ( size_t  i = 0; i < nbrows; ++i )
+    {
+        for ( size_t  j = 0; j < nbcols; ++j )
+        {
+            device_free( DEV_M(i,j) );
+            device_free( DEV_V(i,j) );
+        }// for
+    }// for
     
     return { std::move( E ), std::move( V ) };
 }

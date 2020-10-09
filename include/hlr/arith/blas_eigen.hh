@@ -72,6 +72,44 @@ eigen_herm ( const matrix< value_t > &  M,
 }
 
 //
+// same as above but return eigenvectors in M
+//
+template < typename value_t >
+void
+eigen_herm ( matrix< value_t > &                                      M,
+             vector< typename hpro::real_type< value_t >::type_t > &  E,
+             eigen_stat *                                             stat = nullptr )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+
+    if ( ! is_null( stat ) )
+        stat->reset();
+
+    const blas_int_t        n = M.nrows();
+    std::vector< real_t >   rwork( hpro::is_complex_type< value_t >::value ? 3*n-2 : 0 );
+    value_t                 work_query = value_t(0);
+    blas_int_t              lwork      = -1;
+    blas_int_t              info       = 0;
+
+    if ( blas_int_t(E.length()) != n )
+        E = std::move( vector< real_t >( n ) );
+    
+    heev( 'V', 'L', n, M.data(), M.col_stride(), E.data(), & work_query, lwork, rwork.data(), info );
+
+    std::vector< value_t >  work( blas_int_t( std::real( work_query ) ) );
+
+    heev( 'V', 'L', n, M.data(), M.col_stride(), E.data(), work.data(), work.size(), rwork.data(), info );
+
+    if ( info == 0 )
+    {
+        if ( ! is_null( stat ) )
+            stat->converged = true;
+    }// if
+    else
+        HLR_ERROR( hpro::to_string( "error in heev (info == %d)", info ) );
+}
+
+//
 // compute eigenvalues and eigenvectors of M using two-sided Jacobi iteration.
 // - algorithm from "Lapack Working Notes 15"
 //
@@ -124,7 +162,7 @@ eigen_jac ( matrix< value_t > &                                M,
 
                 const auto  a   = M(i,i);
                 const auto  b   = M(j,j);
-                const auto  err = std::abs( c ) / std::real( std::sqrt( a*b ) );
+                const auto  err = std::abs( c ) / std::real( std::sqrt( std::abs(a*b) ) );
                 
                 if (  err > tolerance )
                     converged = false;
