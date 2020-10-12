@@ -9,6 +9,7 @@
 #include <mkl_service.h>
 
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 #include <tbb/blocked_range2d.h>
 
 #include <hlr/arith/blas_eigen.hh>
@@ -522,7 +523,7 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
       
         const auto  npairs = idx_pairs.size();
         auto        Vs     = std::vector< blas::matrix< value_t > >( npairs );
-        
+
         for ( size_t  idx = 0; idx < npairs; ++idx )
         {
             const auto  [ i, j ] = idx_pairs[ idx ];
@@ -569,14 +570,22 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
                 const auto  T0 = blas::copy( M(i,l) );
                 const auto  T1 = blas::copy( M(j,l) );
                     
-                blas::prod( value_t(1), blas::adjoint(A_00), T0, value_t(0), M(i,l) );
-                blas::prod( value_t(1), blas::adjoint(A_10), T1, value_t(1), M(i,l) );
+                ::tbb::parallel_invoke(
+                    [&,i,j,l] ()
+                    { 
+                        blas::prod( value_t(1), blas::adjoint(A_00), T0, value_t(0), M(i,l) );
+                        blas::prod( value_t(1), blas::adjoint(A_10), T1, value_t(1), M(i,l) );
+
+                        norms(i,l) = blas::norm_F( M(i,l) );
+                    },
                     
-                blas::prod( value_t(1), blas::adjoint(A_01), T0, value_t(0), M(j,l) );
-                blas::prod( value_t(1), blas::adjoint(A_11), T1, value_t(1), M(j,l) );
-                    
-                norms(i,l) = blas::norm_F( M(i,l) );
-                norms(j,l) = blas::norm_F( M(j,l) );
+                    [&,i,j,l] ()
+                    { 
+                        blas::prod( value_t(1), blas::adjoint(A_01), T0, value_t(0), M(j,l) );
+                        blas::prod( value_t(1), blas::adjoint(A_11), T1, value_t(1), M(j,l) );
+                        
+                        norms(j,l) = blas::norm_F( M(j,l) );
+                    } );
             }// for
 
             for ( size_t  l = 0; l < nbrows; ++l )
@@ -586,35 +595,53 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
                 //             ⎝A₁₀ A₁₁⎠   
                 //
 
-                {
-                    const auto  T0 = blas::copy( M(l,i) );
-                    const auto  T1 = blas::copy( M(l,j) );
+                ::tbb::parallel_invoke(
+                    [&,i,j,l] ()
+                    {
+                        const auto  T0 = blas::copy( M(l,i) );
+                        const auto  T1 = blas::copy( M(l,j) );
                     
-                    blas::prod( value_t(1), T0, A_00, value_t(0), M(l,i) );
-                    blas::prod( value_t(1), T1, A_10, value_t(1), M(l,i) );
+                        ::tbb::parallel_invoke(
+                            [&,i,j,l] ()
+                            { 
+                                blas::prod( value_t(1), T0, A_00, value_t(0), M(l,i) );
+                                blas::prod( value_t(1), T1, A_10, value_t(1), M(l,i) );
+
+                                norms(l,i) = blas::norm_F( M(l,i) );
+                            },
                         
-                    blas::prod( value_t(1), T0, A_01, value_t(0), M(l,j) );
-                    blas::prod( value_t(1), T1, A_11, value_t(1), M(l,j) );
-                        
-                    norms(l,i) = blas::norm_F( M(l,i) );
-                    norms(l,j) = blas::norm_F( M(l,j) );
-                }
+                            [&,i,j,l] ()
+                            { 
+                                blas::prod( value_t(1), T0, A_01, value_t(0), M(l,j) );
+                                blas::prod( value_t(1), T1, A_11, value_t(1), M(l,j) );
+
+                                norms(l,j) = blas::norm_F( M(l,j) );
+                            } );
+                    },
                     
-                //
-                // (V_li V_lj) ⎛A₀₀, A₀₁⎞
-                //             ⎝A₁₀, A₁₁⎠   
-                //
+                    //
+                    // (V_li V_lj) ⎛A₀₀, A₀₁⎞
+                    //             ⎝A₁₀, A₁₁⎠   
+                    //
                     
-                {
-                    const auto  T0 = blas::copy( V(l,i) );
-                    const auto  T1 = blas::copy( V(l,j) );
-                    
-                    blas::prod( value_t(1), T0, A_00, value_t(0), V(l,i) );
-                    blas::prod( value_t(1), T1, A_10, value_t(1), V(l,i) );
-                        
-                    blas::prod( value_t(1), T0, A_01, value_t(0), V(l,j) );
-                    blas::prod( value_t(1), T1, A_11, value_t(1), V(l,j) );
-                }
+                    [&,i,j,l] ()
+                    {
+                        const auto  T0 = blas::copy( V(l,i) );
+                        const auto  T1 = blas::copy( V(l,j) );
+
+                        ::tbb::parallel_invoke(
+                            [&,i,j,l] ()
+                            { 
+                                blas::prod( value_t(1), T0, A_00, value_t(0), V(l,i) );
+                                blas::prod( value_t(1), T1, A_10, value_t(1), V(l,i) );
+                            },
+                            
+                            [&,i,j,l] ()
+                            {
+                                blas::prod( value_t(1), T0, A_01, value_t(0), V(l,j) );
+                                blas::prod( value_t(1), T1, A_11, value_t(1), V(l,j) );
+                            } );
+                    } );
             }// for
         }// for
         
@@ -798,24 +825,23 @@ program_main ()
         }// if
         else
         {
-            {
-                auto  tic = timer::now();
-                auto  toc = timer::since( tic );
+            // {
+            //     auto  tic = timer::now();
+            //     auto  toc = timer::since( tic );
 
-                blas::eigen_stat  stat;
+            //     blas::eigen_stat  stat;
             
-                auto  M2  = blas::copy( M );
+            //     auto  M2  = blas::copy( M );
             
-                tic = timer::now();
+            //     tic = timer::now();
             
-                // auto [ E, V ] = eigen_bjac( M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
-                auto [ E, V ] = blas::eigen_jac( M2, 1e-14, 1000, & stat );
+            //     auto [ E, V ] = blas::eigen_jac( M2, 1e-14, 1000, & stat );
 
-                toc = timer::since( tic );
+            //     toc = timer::since( tic );
             
-                std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
-                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
-            }
+            //     std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            //     std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+            // }
 
             {
                 auto  tic = timer::now();

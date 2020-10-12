@@ -360,6 +360,11 @@ elif lapack == 'mklseq' :
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
 
+# add CUDA
+env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64'   ) )
+env.Append( LIBS    = [ 'cudart', 'cublas', 'cusolver' ] )
+    
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
     env.MergeFlags( os.path.join( JEMALLOC_DIR, 'lib', 'libjemalloc.a' ) )
@@ -550,9 +555,6 @@ Default( None )
 
 if 'seq' in frameworks :
     seq = env.Clone()
-    seq.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
-    seq.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64'   ) )
-    seq.Append( LIBS    = [ 'cudart', 'cublas', 'cusolver' ] )
         
     for program in programs :
         name   = program + '-seq'
