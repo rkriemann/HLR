@@ -464,10 +464,7 @@ eigen_dpt ( matrix< value_t > &                                M,
     uint    sweep     = 0;
 
     if ( ! is_null( stat ) )
-    {
-        stat->nsweeps   = 0;
-        stat->converged = false;
-    }// if
+        stat->reset();
     
     do
     {

@@ -562,8 +562,8 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
             for ( size_t  l = 0; l < nbcols; ++l )
             {
                 //
-                // ⎛A₀₀, A₀₁⎞' ⎛M_il⎞
-                // ⎝A₁₀, A₁₁⎠  ⎝M_jl⎠
+                // ⎛A₀₀ A₀₁⎞' ⎛M_il⎞
+                // ⎝A₁₀ A₁₁⎠  ⎝M_jl⎠
                 //
 
                 const auto  T0 = blas::copy( M(i,l) );
@@ -582,8 +582,8 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
             for ( size_t  l = 0; l < nbrows; ++l )
             {
                 //
-                // (M_li M_lj) ⎛A₀₀, A₀₁⎞
-                //             ⎝A₁₀, A₁₁⎠   
+                // (M_li M_lj) ⎛A₀₀ A₀₁⎞
+                //             ⎝A₁₀ A₁₁⎠   
                 //
 
                 {
@@ -591,7 +591,7 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
                     const auto  T1 = blas::copy( M(l,j) );
                     
                     blas::prod( value_t(1), T0, A_00, value_t(0), M(l,i) );
-                    blas::prod( value_t(1), T1, A_01, value_t(1), M(l,i) );
+                    blas::prod( value_t(1), T1, A_10, value_t(1), M(l,i) );
                         
                     blas::prod( value_t(1), T0, A_01, value_t(0), M(l,j) );
                     blas::prod( value_t(1), T1, A_11, value_t(1), M(l,j) );
@@ -610,7 +610,7 @@ eigen_bjac2 ( blas::matrix< value_t > &                          aM,
                     const auto  T1 = blas::copy( V(l,j) );
                     
                     blas::prod( value_t(1), T0, A_00, value_t(0), V(l,i) );
-                    blas::prod( value_t(1), T1, A_01, value_t(1), V(l,i) );
+                    blas::prod( value_t(1), T1, A_10, value_t(1), V(l,i) );
                         
                     blas::prod( value_t(1), T0, A_01, value_t(0), V(l,j) );
                     blas::prod( value_t(1), T1, A_11, value_t(1), V(l,j) );
@@ -791,7 +791,9 @@ program_main ()
                 toc = timer::since( tic );
             
                 std::cout << "DPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
-                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+
+                if ( stat.converged )
+                    std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             }
         }// if
         else
@@ -839,6 +841,8 @@ program_main ()
 
                 blas::eigen_stat  stat;
             
+                io::matlab::write( M, "M" );
+                
                 auto  M2  = blas::copy( M );
             
                 tic = timer::now();
@@ -846,7 +850,10 @@ program_main ()
                 auto [ E, V ] = eigen_bjac2( M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
 
                 toc = timer::since( tic );
-            
+
+                io::matlab::write( E, "E" );
+                io::matlab::write( V, "V" );
+                
                 std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
                 std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             }
@@ -884,7 +891,9 @@ program_main ()
                 toc = timer::since( tic );
             
                 std::cout << "DPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
-                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+                
+                if ( stat.converged )
+                    std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             }
         }// else
 
