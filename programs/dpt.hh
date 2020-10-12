@@ -713,7 +713,7 @@ program_main ()
         // GPU
         //
 
-        if ( false )
+        if ( true )
         {
             blas::cuda::init();
         

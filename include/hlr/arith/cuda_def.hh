@@ -228,6 +228,15 @@ make_constant< cuDoubleComplex > ( const double  f )
     return make_cuDoubleComplex( f, 0 );
 }
 
+// clear given memory
+template < typename value_t >
+void
+clear ( const int  n,
+        value_t *  x )
+{
+    HLR_CUDA_CHECK( cudaMemset, ( x, 0, sizeof(value_t) * n ) );
+}
+
 //////////////////////////////////////////////////////////////////////
 //
 // vector routines

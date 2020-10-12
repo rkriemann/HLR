@@ -17,6 +17,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/blas_eigen.hh>
 #include <hlr/arith/cuda_def.hh>
+#include <hlr/utils/tensor.hh> // DEBUG
 #include <hlr/utils/io.hh> // DEBUG
 
 namespace hlr { namespace blas { namespace cuda {
@@ -1257,7 +1258,7 @@ eigen_bjac ( handle                                             handle,
     const real_t  tolerance  = ( atolerance > 0 ? atolerance : real_t(100) * std::numeric_limits< real_t >::epsilon() );
     bool          converged  = false;
     uint          sweep      = 0;
-    auto          dev_M      = std::vector< value_t * >( nrows * ncols );
+    auto          dev_M      = tensor2< value_t * >( nrows, ncols );
     auto          dev_A      = device_alloc< value_t >( ( 2 * bs ) * ( 2 * bs ) );
     auto          dev_A00    = device_alloc< value_t >( bs * bs );
     auto          dev_A01    = device_alloc< value_t >( bs * bs );
@@ -1266,8 +1267,8 @@ eigen_bjac ( handle                                             handle,
     auto          dev_T0     = device_alloc< value_t >( bs * bs );
     auto          dev_T1     = device_alloc< value_t >( bs * bs );
     auto          dev_W      = device_alloc< value_t >( 2 * bs );
-    auto          dev_V      = std::vector< value_t * >( nrows * ncols );
-    auto          norms      = matrix< real_t >( nbrows, nbcols );
+    auto          dev_V      = tensor2< value_t * >( nrows, ncols );
+    auto          norms      = tensor2< real_t >( nbrows, nbcols );
     auto          vone       = vector< value_t >( bs ); // needed for Identity vector in cuda
     const auto    lwork      = syevd_buffersize( handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, 2*bs, dev_A, 2*bs, dev_W );
     auto          dev_work   = device_alloc< value_t >( lwork );
@@ -1277,9 +1278,6 @@ eigen_bjac ( handle                                             handle,
 
     auto  dbg_A = blas::matrix< value_t >( 2*bs, 2*bs );
     auto  dbg_W = blas::vector< real_t >( 2*bs );
-    
-    #define  DEV_M( i, j ) dev_M[ j*nbrows+i ]
-    #define  DEV_V( i, j ) dev_V[ j*nbrows+i ]
     
     //
     // allocate block wise M/V and copy M to device and initialize V
@@ -1292,20 +1290,20 @@ eigen_bjac ( handle                                             handle,
     {
         for ( size_t  j = 0; j < nbcols; ++j )
         {
-            DEV_M(i,j) = device_alloc< value_t >( bs * bs );
-            DEV_V(i,j) = device_alloc< value_t >( bs * bs );
+            dev_M(i,j) = device_alloc< value_t >( bs * bs );
+            dev_V(i,j) = device_alloc< value_t >( bs * bs );
 
             const auto  r_i  = blas::range( i*bs, (i+1)*bs-1 );
             const auto  r_j  = blas::range( j*bs, (j+1)*bs-1 );
             auto        M_ij = blas::matrix< value_t >( M, r_i, r_j );
 
-            to_device( M_ij, DEV_M(i,j), bs );
+            to_device( M_ij, dev_M(i,j), bs );
+            clear( bs*bs, dev_V(i,j) );
 
-            norms(i,j) = norm_2( handle, bs*bs, DEV_M(i,j), 1 );
-            std::cout << norms(i,j) << " : " << blas::norm_F( M_ij ) << std::endl;
+            norms(i,j) = norm_2( handle, bs*bs, dev_M(i,j), 1 );
             
             if ( i == j )
-                to_device( vone, DEV_V(i,j), bs+1 );
+                to_device( vone, dev_V(i,j), bs+1 );
         }// for
     }// for
     
@@ -1431,10 +1429,10 @@ eigen_bjac ( handle                                             handle,
             // A = [ M_ii, M_ij ; M_ji, M_jj ]
             //
             
-            auto  M_ii = DEV_M(i,i);
-            auto  M_ij = DEV_M(i,j);
-            auto  M_ji = DEV_M(j,i);
-            auto  M_jj = DEV_M(j,j);
+            auto  M_ii = dev_M(i,i);
+            auto  M_ij = dev_M(i,j);
+            auto  M_ji = dev_M(j,i);
+            auto  M_jj = dev_M(j,j);
 
             for ( size_t  k = 0; k < bs; ++k )
                 copy( handle, bs, M_ii + k*bs, 1, dev_A + k*2*bs, 1 );
@@ -1476,17 +1474,17 @@ eigen_bjac ( handle                                             handle,
                 //
 
                 // T0 = M_il, T1 = M_jl
-                copy( handle, bs * bs, DEV_M(i,l), 1, dev_T0, 1 );
-                copy( handle, bs * bs, DEV_M(j,l), 1, dev_T1, 1 );
+                copy( handle, bs * bs, dev_M(i,l), 1, dev_T0, 1 );
+                copy( handle, bs * bs, dev_M(j,l), 1, dev_T1, 1 );
                     
-                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A00, bs, dev_T0, bs, zero, DEV_M(i,l), bs );
-                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A10, bs, dev_T1, bs,  one, DEV_M(i,l), bs );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A00, bs, dev_T0, bs, zero, dev_M(i,l), bs );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A10, bs, dev_T1, bs,  one, dev_M(i,l), bs );
                 
-                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A01, bs, dev_T0, bs, zero, DEV_M(j,l), bs );
-                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A11, bs, dev_T1, bs,  one, DEV_M(j,l), bs );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A01, bs, dev_T0, bs, zero, dev_M(j,l), bs );
+                prod( handle, CUBLAS_OP_C, CUBLAS_OP_N, bs, bs, bs, one, dev_A11, bs, dev_T1, bs,  one, dev_M(j,l), bs );
                 
-                norms(i,l) = norm_2( handle, bs * bs, DEV_M(i,l), 1 );
-                norms(j,l) = norm_2( handle, bs * bs, DEV_M(j,l), 1 );
+                norms(i,l) = norm_2( handle, bs * bs, dev_M(i,l), 1 );
+                norms(j,l) = norm_2( handle, bs * bs, dev_M(j,l), 1 );
             }// for
 
             for ( size_t  l = 0; l < nbrows; ++l )
@@ -1497,17 +1495,17 @@ eigen_bjac ( handle                                             handle,
                 //
 
                 // T0 = M_li, T1 = M_lj
-                copy( handle, bs * bs, DEV_M(l,i), 1, dev_T0, 1 );
-                copy( handle, bs * bs, DEV_M(l,j), 1, dev_T1, 1 );
+                copy( handle, bs * bs, dev_M(l,i), 1, dev_T0, 1 );
+                copy( handle, bs * bs, dev_M(l,j), 1, dev_T1, 1 );
                 
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A00, bs, zero, DEV_M(l,i), bs );
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A10, bs,  one, DEV_M(l,i), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A00, bs, zero, dev_M(l,i), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A10, bs,  one, dev_M(l,i), bs );
                 
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A01, bs, zero, DEV_M(l,j), bs );
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A11, bs,  one, DEV_M(l,j), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A01, bs, zero, dev_M(l,j), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A11, bs,  one, dev_M(l,j), bs );
                 
-                norms(l,i) = norm_2( handle, bs * bs, DEV_M(l,i), 1 );
-                norms(l,j) = norm_2( handle, bs * bs, DEV_M(l,j), 1 );
+                norms(l,i) = norm_2( handle, bs * bs, dev_M(l,i), 1 );
+                norms(l,j) = norm_2( handle, bs * bs, dev_M(l,j), 1 );
 
                 //
                 // (V_li V_lj) ⎛A₀₀, A₀₁⎞
@@ -1515,14 +1513,14 @@ eigen_bjac ( handle                                             handle,
                 //
 
                 // T0 = V_li, T1 = V_lj
-                copy( handle, bs * bs, DEV_V(l,i), 1, dev_T0, 1 );
-                copy( handle, bs * bs, DEV_V(l,j), 1, dev_T1, 1 );
+                copy( handle, bs * bs, dev_V(l,i), 1, dev_T0, 1 );
+                copy( handle, bs * bs, dev_V(l,j), 1, dev_T1, 1 );
                 
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A00, bs, zero, DEV_V(l,i), bs );
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A10, bs,  one, DEV_V(l,i), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A00, bs, zero, dev_V(l,i), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A10, bs,  one, dev_V(l,i), bs );
                 
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A01, bs, zero, DEV_V(l,j), bs );
-                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A11, bs,  one, DEV_V(l,j), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T0, bs, dev_A01, bs, zero, dev_V(l,j), bs );
+                prod( handle, CUBLAS_OP_N, CUBLAS_OP_N, bs, bs, bs, one, dev_T1, bs, dev_A11, bs,  one, dev_V(l,j), bs );
             }// for
         }// for
     }// while
@@ -1544,7 +1542,7 @@ eigen_bjac ( handle                                             handle,
     {
         blas::vector< value_t >  Ei( bs );
 
-        from_device( DEV_M(bi,bi), bs+1, Ei );
+        from_device( dev_M(bi,bi), bs+1, Ei );
 
         for ( size_t  i = 0; i < bs; ++i )
             E( bi*bs + i ) = Ei(i);
@@ -1558,7 +1556,7 @@ eigen_bjac ( handle                                             handle,
             const auto  r_j  = blas::range( j*bs, (j+1)*bs-1 );
             auto        V_ij = blas::matrix< value_t >( V, r_i, r_j );
 
-            from_device( DEV_V(i,j), bs, V_ij );
+            from_device( dev_V(i,j), bs, V_ij );
         }// for
     }// for
     
@@ -1571,8 +1569,8 @@ eigen_bjac ( handle                                             handle,
     {
         for ( size_t  j = 0; j < nbcols; ++j )
         {
-            device_free( DEV_M(i,j) );
-            device_free( DEV_V(i,j) );
+            device_free( dev_M(i,j) );
+            device_free( dev_V(i,j) );
         }// for
     }// for
     
