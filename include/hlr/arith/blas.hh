@@ -584,9 +584,6 @@ qr2  ( matrix< value_t > &  M,
     std::vector< value_t >  tau( ncols );
     std::vector< value_t >  work( ncols );
 
-    if ( ncols > nrows )
-        HLR_ERROR( "#ncols > #rows" );
-
     #if 1
     
     blas_int_t  info = 0;

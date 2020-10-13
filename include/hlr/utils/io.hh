@@ -48,6 +48,17 @@ write ( const hpro::TMatrix &  M,
         hpro::DBG::write( M, filename, matname );
 }
 
+inline
+void
+write ( const hpro::TMatrix *  M,
+        const std::string &    matname,
+        const std::string &    filename = "" )
+{
+    HLR_ASSERT( ! is_null( M ) );
+
+    write( *M, matname, filename );
+}
+
 template < typename value_t >
 void
 write ( const blas::vector< value_t > &  v,

@@ -11,6 +11,7 @@
 #include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/seq/norm.hh>
+#include <hlr/seq/arith.hh>
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
@@ -246,15 +247,42 @@ program_main ()
 
         if ( true )
         {
+            auto  apx = approx::SVD< value_t >();
             auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  M3 = seq::matrix::copy( *M1 );
             
-            impl::uniform::tlr::lu< value_t >( *A2, acc );
+            impl::tlr::ldu< value_t >( *M3, acc, apx );
+
+            {
+                hpro::TLDUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+
+                std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
+        }
+
+        if ( true )
+        {
+            auto  apx = approx::SVD< value_t >();
+            auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  M3 = seq::matrix::copy( *M1 );
+            
+            impl::tlr::lu< value_t >( *M3, acc, apx );
+
+            {
+                hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+
+                std::cout << "      LU error   = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
+            
+            impl::uniform::tlr::lu< value_t >( *A2, acc, *M3 );
 
             auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A2 );
 
-            hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+            {
+                hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
 
-            std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                std::cout << "      LU error   = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
         }
 
         if ( false )
