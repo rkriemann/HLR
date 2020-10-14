@@ -258,6 +258,16 @@ program_main ()
 
                 std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
+
+            impl::uniform::tlr::ldu< value_t >( *A2, acc, *M3 );
+
+            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+
+            {
+                hpro::TLDUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+
+                std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
         }
 
         if ( true )

@@ -745,7 +745,7 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
             io::matlab::write( Se_kj, "Se" );
 
             blas::add( value_t(-1), M1, M2 );
-            std::cout << "extend : " << R_kj->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+            std::cout << "extend col : " << R_kj->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
             
             R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
         }// if
@@ -765,7 +765,7 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
             io::matlab::write( Se_kj, "Se" );
             
             blas::add( value_t(-1), M1, M2 );
-            std::cout << "extend : " << R_kj->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+            std::cout << "extend col : " << R_kj->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
 
             R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
         }// else
@@ -780,6 +780,203 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
+}
+
+//
+// extend row basis by W
+//
+template < typename value_t >
+void
+extend_row_basis ( hpro::TBlockMatrix &                   M,
+                   matrix::uniform_lrmatrix< value_t > &  M_ij,
+                   const uint                             i,
+                   const uint                             j,
+                   const blas::matrix< value_t > &        W,
+                   const hpro::TTruncAcc &                acc )
+{
+    using  real_t = typename hpro::real_type< value_t >::type_t;
+
+    // determine number of rows of matrix R below (sum of column ranks)
+    size_t  nrows_Q    = 0;
+    bool    have_other = false;
+    
+    for ( uint  k = 0; k < M.nblock_rows(); ++k )
+    {
+        auto  M_kj = M.block( k, j );
+        
+        if ( matrix::is_uniform_lowrank( M_kj ) )
+        {
+            if ( k != i )
+                have_other = true;
+            
+            nrows_Q += cptrcast( M_kj, matrix::uniform_lrmatrix< value_t > )->col_rank();
+        }// if
+    }// for
+
+    if ( ! have_other )
+    {
+        // since there is no other low-rank block, just replace basis by X and return
+        const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( blas::copy( W ) ) );
+        return;
+    }// if
+    
+    // extended row basis
+    auto  U  = M_ij.row_cb().basis();
+    auto  Ue = blas::join_row< value_t >( { U, W } );
+
+    io::matlab::write( U, "U" );
+    io::matlab::write( Ue, "Ue" );
+    io::matlab::write( W, "W" );
+    
+    // compute QR of column basis for each block in row and assemble
+    // all results into common matrix Q
+    auto    Qe  = blas::matrix< value_t >( nrows_Q, Ue.ncols() );
+    size_t  pos = 0;
+
+    for ( uint  k = 0; k < M.nblock_cols(); ++k )
+    {
+        auto  M_ik = M.block( i, k );
+        
+        if ( ! matrix::is_uniform_lowrank( M_ik ) )
+            continue;
+        
+        const auto  R_ik     = cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
+        const auto  rank_k   = R_ik->col_rank();
+        auto        V_k      = blas::copy( R_ik->col_cb().basis() );
+        auto        R        = blas::matrix< value_t >( rank_k, rank_k );
+
+        io::matlab::write( V_k, "Vk" );
+            
+        blas::qr( V_k, R, false );
+        
+        // std::cout << blas::norm_F( R ) << std::endl;
+        
+        const auto  S_ik     = R_ik->coeff();
+        auto        T        = blas::prod( value_t(1), R, blas::adjoint( S_ik ) );
+
+        // scale each matrix by norm (|R·S'| = |R_ik| assuming orthogonal bases)
+        // to givt each block equal weight in computed row basis
+        blas::scale( value_t(1) / blas::norm_2( T ), T );
+            
+        io::matlab::write( S_ik, "Sik" );
+            
+        if ( k == j )
+        {
+            auto  Qe_k = blas::matrix( Qe,
+                                       blas::range( pos, pos + rank_k-1 ),
+                                       blas::range( U.ncols(), Ue.ncols() - 1 ) );
+
+            blas::copy( T, Qe_k );
+        }// if
+        else
+        {
+            auto  Qe_k = blas::matrix( Qe,
+                                       blas::range( pos, pos + rank_k-1 ),
+                                       blas::range( 0, U.ncols() - 1 ) );
+
+            blas::copy( T, Qe_k );
+        }// else
+
+        pos += rank_k;
+    }// for
+
+    io::matlab::write( Qe, "Qe" );
+    
+    // compute QR of assembled matrix, and compute SVD of
+    // product with extended column basis
+    auto  R = blas::matrix< value_t >( Qe.ncols(), Qe.ncols() );
+        
+    blas::qr( Qe, R, false );
+
+    io::matlab::write( R, "R" );
+    
+    auto  UeR = blas::prod( value_t(1), Ue, blas::adjoint( R ) );
+    auto  Ss  = blas::vector< real_t >();
+
+    blas::svd( UeR, Ss );
+
+    io::matlab::write( UeR, "UeR" );
+    io::matlab::write( Ss, "Ss" );
+    
+    const auto  rank   = acc.trunc_rank( Ss );
+    const auto  U_rank = blas::matrix( UeR, blas::range::all, blas::range( 0, rank-1 ) );
+    auto        Un     = blas::copy( U_rank );
+    
+    io::matlab::write( Un, "Un" );
+
+    const auto  TU     = blas::prod( value_t(1), blas::adjoint( Un ), Ue );
+
+    io::matlab::write( TU, "TU" );
+
+    //
+    // transform coupling matrix for blocks in current block column as
+    //
+    //   TU ⎛S_kj⎞  or  TU ⎛  0 ⎞
+    //      ⎝ 0  ⎠         ⎝S_kj⎠
+    //
+
+    for ( uint  k = 0; k < M.nblock_cols(); ++k )
+    {
+        auto  B_ik = M.block( i, k );
+                    
+        if ( ! matrix::is_uniform_lowrank( B_ik ) )
+            continue;
+                    
+        auto  R_ik = ptrcast( B_ik, matrix::uniform_lrmatrix< value_t > );
+        auto  S_ik = R_ik->coeff();
+        auto  Z    = blas::zeros< value_t >( W.ncols(), S_ik.ncols() );
+
+        if ( k == i )
+        {
+            auto  Se_ik = blas::join_col< value_t >( { Z, S_ik } );
+            auto  Sn_ik = blas::prod( value_t(1), TU, Se_ik );
+
+            auto  US1   = blas::prod( value_t(1), R_ik->row_cb().basis(), S_ik );
+            auto  M1    = blas::prod( value_t(1), US1, blas::adjoint( W ) );
+
+            auto  US2   = blas::prod( value_t(1), Un, Sn_ik );
+            auto  M2    = blas::prod( value_t(1), US2, blas::adjoint( R_ik->col_cb().basis() ) );
+
+            io::matlab::write( M1, "M1" );
+            io::matlab::write( M2, "M2" );
+            io::matlab::write( Se_ik, "Se" );
+
+            blas::add( value_t(-1), M1, M2 );
+            std::cout << "extend row : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+            
+            R_ik->set_coeff_unsafe( std::move( Sn_ik ) );
+        }// if
+        else
+        {
+            auto  Se_ik = blas::join_col< value_t >( { S_ik, Z } );
+            auto  Sn_ik = blas::prod( value_t(1), TU, Se_ik );
+
+            auto  US1   = blas::prod( value_t(1), R_ik->row_cb().basis(), S_ik );
+            auto  M1    = blas::prod( value_t(1), US1, blas::adjoint( R_ik->col_cb().basis() ) );
+
+            auto  US2   = blas::prod( value_t(1), Un, Sn_ik );
+            auto  M2    = blas::prod( value_t(1), US2, blas::adjoint( R_ik->row_cb().basis() ) );
+
+            io::matlab::write( M1, "M1" );
+            io::matlab::write( M2, "M2" );
+            io::matlab::write( Se_ik, "Se" );
+            
+            blas::add( value_t(-1), M1, M2 );
+            std::cout << "extend row : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+
+            R_ik->set_coeff_unsafe( std::move( Sn_ik ) );
+        }// else
+
+        io::matlab::write( R_ik->col_cb().basis(), "V" );
+        io::matlab::write( R_ik->coeff(), "Sn" );
+        io::matlab::write( S_ik, "S" );
+    }// for
+
+    //
+    // finally adjust cluster bases
+    //
+
+    const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
 }
 
 }// namespace detail
@@ -1062,9 +1259,9 @@ ldu ( hpro::TMatrix &          A,
             else if ( matrix::is_uniform_lowrank( A_ji ) )
             {
                 //
-                // X_ji U_ii = Ũ_j Ŝ_ji Ṽ_i' U_ii = U_j S_ji V_i'
-                // is solved as U_j S_ji V_i' U_ii^-1
-                // and hence Ũ_j = U_j, Ŝ_ji = S_ji and Ṽ_i = ( U_ii^-T V_i )
+                // X_ji D_ii = Ũ_j Ŝ_ji Ṽ_i' D_ii = U_j S_ji V_i'
+                // is solved as U_j S_ji V_i' D_ii^-1
+                // and hence Ũ_j = U_j, Ŝ_ji = S_ji and Ṽ_i = ( D_ii^-T V_i )
                 //
                 
                 auto  R_ji = ptrcast( A_ji, matrix::uniform_lrmatrix< value_t > );
@@ -1094,7 +1291,7 @@ ldu ( hpro::TMatrix &          A,
                 blas::add( value_t(-1), M1, M2 );
 
                 io::matlab::write( M1, "M1" );
-                std::cout << "solve " << R_ji->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+                std::cout << "solve upper " << R_ji->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
 
                 {
                     auto  BREF    = cptrcast( &REF, hpro::TBlockMatrix );
@@ -1114,6 +1311,87 @@ ldu ( hpro::TMatrix &          A,
             }// if
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );
+        }// for
+
+        //
+        // L_ii D_ii U_ij = A_ij, since L_ii = I, we have U_ij = D_ii^-1·A_ij
+        //
+
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            auto  U_ij = BA->block( i, j );
+
+
+            // auto  DT_ij = hlr::seq::matrix::convert_to_dense< value_t >( *U_ij );
+            // auto  DC_ij = blas::copy( blas::mat< value_t >( DT_ij ) );
+
+            // blas::prod( value_t(1), D_ii, DC_ij, value_t(0), blas::mat< value_t >( DT_ij ) );
+
+            
+            
+            if ( is_dense( U_ij ) )
+            {
+                auto  D_ij = ptrcast( U_ij, hpro::TDenseMatrix );
+                auto  T_ij = blas::copy( blas::mat< value_t >( D_ij ) );
+
+                blas::prod( value_t(1), D_ii, T_ij, value_t(0), blas::mat< value_t >( D_ij ) );
+            }// else
+            else if ( matrix::is_uniform_lowrank( U_ij ) )
+            {
+                // U_ij = W·T·X' = D_ii^-1·U·S·V' = D_ii^-1·A_ij
+                // ⟶ W = D_ii^-1·U, T=S, X = V
+                auto  R_ij = ptrcast( U_ij, matrix::uniform_lrmatrix< value_t > );
+                auto  U_i  = R_ij->row_cb().basis();
+                auto  S_ij = R_ij->coeff();
+                auto  V_j  = R_ij->col_cb().basis();
+                auto  MU_i = blas::prod( value_t(1), D_ii, U_i );
+                auto  R    = blas::matrix< value_t >();
+
+                // ensure orthogonal bases (and update coefficients)
+                blas::qr( MU_i, R );
+
+                auto  Sn_ij = blas::prod( value_t(1), R, S_ij );
+
+
+                auto  US  = blas::prod( value_t(1), U_i, S_ij );
+                auto  USV = blas::prod( value_t(1), US,  blas::adjoint( V_j ) );
+                auto  M1  = blas::prod( value_t(1), D_ii, USV );
+
+                R_ij->set_coeff_unsafe( Sn_ij );
+
+                detail::extend_row_basis< value_t >( *BA, *R_ij, i, j, MU_i, acc );
+                
+
+                auto  US2 = blas::prod( value_t(1), R_ij->row_cb().basis(), R_ij->coeff() );
+                auto  M2  = blas::prod( value_t(1), US2, blas::adjoint( R_ij->col_cb().basis() ) );
+
+                blas::add( value_t(-1), M1, M2 );
+
+                std::cout << "solve lower " << R_ij->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+
+                {
+                    auto  BREF    = cptrcast( &REF, hpro::TBlockMatrix );
+                    auto  REF_ij  = cptrcast( BREF->block( i, j ), hpro::TRkMatrix );
+                    auto  DA_ij   = matrix::convert_to_dense< value_t >( *R_ij );
+                    auto  DREF_ij = matrix::convert_to_dense< value_t >( *REF_ij );
+                    auto  DA      = blas::copy( blas::mat< value_t >( DA_ij ) );
+                    auto  DREF    = blas::copy( blas::mat< value_t >( DREF_ij ) );
+
+                    // io::matlab::write( *DA_ji, "A" );
+                    // io::matlab::write( *DREF_ji, "REF" );
+                    
+                    blas::add( value_t(-1), DREF, DA );
+
+                    std::cout << "REF : " << U_ij->id() << " : " << blas::norm_F( DA ) / blas::norm_F( DREF ) << std::endl;
+                }
+            }// if
+
+
+            // auto  TT_ij = hlr::seq::matrix::convert_to_dense< value_t >( *U_ij );
+
+            // blas::add( value_t(-1), blas::mat< value_t >( *DT_ij ), blas::mat< value_t >( *TT_ij ) );
+
+            // std::cout << U_ij->id() << " : " << blas::norm_F( blas::mat< value_t >( *TT_ij ) ) << std::endl;
         }// for
 
         //
