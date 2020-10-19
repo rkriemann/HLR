@@ -3,11 +3,14 @@
 
 #include <iostream>
 #include <string>
+#include <filesystem>
 
 using std::string;
 
 #include <boost/format.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 using boost::format;
 using namespace boost::program_options;
@@ -48,8 +51,46 @@ string  adm        = "weak";       // admissibility (std,weak,hodlr)
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 
 void
+read_config ( const std::string &  filename )
+{
+    if ( ! std::filesystem::exists( filename ) )
+    {
+        HLR_ERROR( "file not found : " + filename );
+        return;
+    }// if
+    
+    auto  cfg = boost::property_tree::ptree();
+    
+    boost::property_tree::ini_parser::read_ini( filename, cfg );
+
+    appl       = cfg.get( "app.appl",    appl );
+    n          = cfg.get( "app.n",       n );
+    adm        = cfg.get( "app.adm",     adm );
+    cluster    = cfg.get( "app.cluster", cluster );
+    gridfile   = cfg.get( "app.grid",    gridfile );
+    kappa      = cfg.get( "app.kappa",   kappa );
+    matrixfile = cfg.get( "app.matrix",  matrixfile );
+    sparsefile = cfg.get( "app.sparse",  sparsefile );
+        
+    ntile      = cfg.get( "arith.ntile", ntile );
+    nbench     = cfg.get( "arith.bench", nbench );
+    eps        = cfg.get( "arith.eps",   eps );
+    k          = cfg.get( "arith.rank",  k );
+        
+    nthreads   = cfg.get( "misc.nthreads",  nthreads );
+    verbosity  = cfg.get( "misc.verbosity", verbosity );
+}
+
+void
 parse ( int argc, char ** argv )
 {
+    //
+    // read from config file
+    //
+
+    if ( std::filesystem::exists( ".config" ) )
+        read_config( ".config" );
+    
     //
     // define command line options
     //
@@ -63,6 +104,7 @@ parse ( int argc, char ** argv )
 
     // standard options
     gen_opts.add_options()
+        ( "config",      value<string>(), ": config file to read from" )
         ( "help,h",                       ": print this help text" )
         ( "noredir",                      ": do not redirect output (MPI only)" )
         ( "threads,t",   value<int>(),    ": number of parallel threads" )
@@ -134,6 +176,10 @@ parse ( int argc, char ** argv )
         exit( 1 );
     }// if
 
+    // first read from config file
+    if ( vm.count( "config" ) )
+        read_config( vm["config"].as<string>() );
+    
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
@@ -230,11 +276,16 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    assert( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) );
-    assert( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) );
-    assert( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
-            ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||
-            ( approx == "all"    ) || ( approx == "default" ) );
+    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) ) )
+        HLR_ERROR( "unknown application : " + appl );
+    
+    if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )
+        HLR_ERROR( "unknown distribution : " + distr );
+    
+    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
+             ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||
+             ( approx == "all"    ) || ( approx == "default" ) ) )
+        HLR_ERROR( "unknown approximation : " + approx );
 }
 
 }}// namespace hlr::cmdline

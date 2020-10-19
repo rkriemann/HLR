@@ -30,18 +30,41 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
-    {
-        const auto                                 seed = 1593694284; // time( nullptr );
-        std::default_random_engine                 generator( seed );
-        std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
-        auto                                       random      = [&] () { return uniform_distr( generator ); };
+    // if ( false )
+    // {
+    //     const auto                                 seed = 1593694284; // time( nullptr );
+    //     std::default_random_engine                 generator( seed );
+    //     std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
+    //     auto                                       random      = [&] () { return uniform_distr( generator ); };
 
-        auto M = blas::matrix< value_t >( 100, 100 );
+    //     auto M = blas::matrix< value_t >( 100, 100 );
 
-        blas::fill_fn( M, random );
+    //     blas::fill_fn( M, random );
         
-        // std::cout << seq::norm::spectral( M ) << std::endl;
-    }
+    //     io::matlab::write( M, "M" );
+        
+    //     std::cout << seq::norm::spectral( M ) << std::endl;
+    // }
+    
+    // {
+    //     const auto                                 seed = 1593694284; // time( nullptr );
+    //     std::default_random_engine                 generator( seed );
+    //     std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
+    //     auto                                       random      = [&] () { return uniform_distr( generator ); };
+
+    //     auto  U = blas::matrix< value_t >( 100, 10 );
+    //     auto  V = blas::matrix< value_t >( 100, 10 );
+
+    //     blas::fill_fn( U, random );
+    //     blas::fill_fn( V, random );
+        
+    //     io::matlab::write( U, "U" );
+    //     io::matlab::write( V, "V" );
+        
+    //     std::cout << seq::norm::spectral( lowrank_operator{ U, V } ) << std::endl;
+    // }
+
+    // return;
     
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
@@ -271,22 +294,31 @@ program_main ()
             {
                 hpro::TLDUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
 
+                io::matlab::write( *M3, "M1" );
                 std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
 
-            impl::uniform::tlr::ldu< value_t >( *A2, acc, *M3 );
+            auto  A3     = impl::matrix::copy( *A2 );
+            auto  rowcb2 = rowcb->copy();
+            auto  colcb2 = rowcb->copy();
 
-            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            impl::uniform::tlr::ldu< value_t >( *A3, acc, *M3 );
+
+            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
 
             {
-                hpro::TLDUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                hpro::TLDUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
 
+                io::matlab::write( *M2, "M1" );
                 std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
         }
 
-        if ( true )
+        if ( false )
         {
+            std::cout << "  " << term::bullet << term::bold << "LU" << term::reset << std::endl;
+            
             auto  apx = approx::SVD< value_t >();
             auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
             auto  M3 = seq::matrix::copy( *M1 );
@@ -298,10 +330,16 @@ program_main ()
 
                 std::cout << "      LU error   = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
-            
-            impl::uniform::tlr::lu< value_t >( *A2, acc, *M3 );
 
-            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  A3     = impl::matrix::copy( *A2 );
+            auto  rowcb2 = rowcb->copy();
+            auto  colcb2 = rowcb->copy();
+
+            matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            
+            impl::uniform::tlr::lu< value_t >( *A3, acc, *M3 );
+
+            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
 
             {
                 hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );

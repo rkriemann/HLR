@@ -564,6 +564,44 @@ HLR_BLAS_NORMM( std::complex< float >,  clange_ )
 HLR_BLAS_NORMM( std::complex< double >, zlange_ )
 #undef HLR_BLAS_NORMM
 
+//
+// Frobenius norm for lowrank matrices
+//
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+norm_F ( const matrix< value_t > &  U,
+         const matrix< value_t > &  V )
+{
+    //
+    // ∑_ij (M_ij)² = ∑_ij (∑_k u_ik v_jk')²
+    //              = ∑_ij (∑_k u_ik v_jk') (∑_l u_il v_jl')'
+    //              = ∑_ij ∑_k ∑_l u_ik v_jk' u_il' v_jl
+    //              = ∑_k ∑_l ∑_i u_ik u_il' ∑_j v_jk' v_jl
+    //              = ∑_k ∑_l (u_l)^H · u_k  v_k^H · v_l
+    //
+    
+    auto  res = value_t(0);
+    
+    for ( size_t  k = 0; k < U.ncols(); k++ )
+    {
+        auto  u_k = U.column( k );
+        auto  v_k = V.column( k );
+                
+        for ( size_t  l = 0; l < V.ncols(); l++ )
+        {
+            auto  u_l = U.column( l );
+            auto  v_l = V.column( l );
+
+            res += dot( u_k, u_l ) * dot( v_k, v_l );
+        }// for
+    }// for
+
+    return math::abs( math::sqrt( res ) );
+}
+
+// make sure, standard norm_F is found
+using hpro::BLAS::norm_F;
+
 //////////////////////////////////////////////////////////////////////
 //
 // functions related to QR factorization

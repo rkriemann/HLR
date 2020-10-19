@@ -19,6 +19,9 @@
 #include <hlr/approx/svd.hh>
 #include <hlr/seq/matrix.hh>
 
+#include <hlr/seq/norm.hh> // DEBUG
+#include <hlr/arith/operator_wrapper.hh> // DEBUG
+
 namespace hlr { namespace seq { namespace uniform {
 
 namespace hpro = HLIB;
@@ -231,6 +234,8 @@ addlr_local ( hpro::TBlockMatrix &                   M,
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 
+    std::cout << "addlr : " << M_ij.id() << std::endl;
+
     // current bases and coupling
     const auto  U_i   = M_ij.row_cb().basis();
     const auto  S_ij  = M_ij.coeff();
@@ -240,9 +245,19 @@ addlr_local ( hpro::TBlockMatrix &                   M,
     const auto  rank  = W.ncols();
     const auto  Ue_i  = blas::join_row< value_t >( { U_i, W } );
     const auto  I     = blas::identity< value_t >( rank );
-    const auto  Se_ij = blas::diag< value_t >( { S_ij, I } );
+    auto        Se_ij = blas::diag< value_t >( { S_ij, I } );
     const auto  Ve_j  = blas::join_row< value_t >( { V_j, X } );
 
+    // const auto  norm_Mij = blas::norm_F( S_ij ); // blas::norm_2( S_ij );
+    // const auto  norm_WX  = blas::norm_F( W, X ); // hlr::seq::norm::spectral( lowrank_operator{ W, X } );
+        
+    // std::cout << norm_Mij << " / " << norm_WX << std::endl;
+
+    // const auto  scale = norm_WX / norm_Mij;
+    
+    // for ( uint  l = 0; l < rank; ++l )
+    //     Se_ij( l + S_ij.nrows(), l + S_ij.ncols() ) *= scale;
+              
     if ( true )
     {
         io::matlab::write( U_i,   "U" );
@@ -306,6 +321,9 @@ addlr_local ( hpro::TBlockMatrix &                   M,
         Vn_j = std::move( blas::copy( V_rank ) );
     }
 
+    io::matlab::write( Un_i, "Un" );
+    io::matlab::write( Vn_j, "Vn" );
+    
     //
     // new B_ij is computed as
     //
@@ -320,6 +338,9 @@ addlr_local ( hpro::TBlockMatrix &                   M,
     //     TU_i = Un_i' Ue_i  and  TV_j = Vn_j' Ve_j
     //
                 
+    for ( uint  l = 0; l < rank; ++l )
+        Se_ij( l + S_ij.nrows(), l + S_ij.ncols() ) = value_t(1);
+    
     const auto  TU_i  = blas::prod( value_t(1), blas::adjoint( Un_i ), Ue_i );
     const auto  TV_j  = blas::prod( value_t(1), blas::adjoint( Vn_j ), Ve_j );
     auto        T_ij  = blas::prod( value_t(1), TU_i, Se_ij );
@@ -440,6 +461,8 @@ multiply ( const value_t               alpha,
 
     HLR_ASSERT( ! is_null_any( A_ik, B_kj ) );
 
+    std::cout << A_ik->id() << " × " << B_kj->id() << " -> " << C_ij->id() << std::endl;
+        
     // if (( A_ik->id() == 17 ) && ( B_kj->id() == 3 ) && ( C_ij->id() == 19 ))
     //     std::cout << std::endl;
     
@@ -502,7 +525,20 @@ multiply ( const value_t               alpha,
                 const auto  AW    = blas::prod( alpha,      blas::mat< value_t >( DA_ik ), RB_kj->row_cb().basis() );
                 const auto  VS    = blas::prod( value_t(1), RB_kj->col_cb().basis(), blas::adjoint( RB_kj->coeff() ) );
 
+                auto  B1  = hlr::seq::matrix::convert_to_dense< value_t >( * B_kj );
+                auto  C1  = hlr::seq::matrix::convert_to_dense< value_t >( * C_ij );
+
+                io::matlab::write( *DA_ik, "A1" );
+                io::matlab::write( *B1, "B1" );
+                io::matlab::write( *C1, "C1" );
+                io::matlab::write( AW, "U" );
+                io::matlab::write( VS, "V" );
+                
                 addlr_local< value_t >( C, *RC_ij, i, j, AW, VS, acc );
+
+                auto  C2  = hlr::seq::matrix::convert_to_dense< value_t >( * C_ij );
+
+                io::matlab::write( *C2, "C2" );
             }// if
             else if ( is_dense( B_kj ) )
             {
@@ -617,6 +653,8 @@ multiply ( const value_t               alpha,
                 
     std::cout << A_ik->id() << " × " << B_kj->id() << " -> " << C_ij->id() << " : "
               << blas::norm_F( blas::mat< value_t >( DD ) ) / blas::norm_F( blas::mat< value_t >( DC ) ) << std::endl;
+
+    std::cout << std::flush;
 }
 
 //
@@ -915,9 +953,9 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
             // std::cout << blas::norm_F( R ) << std::endl;
             
             const auto  S_kj     = R_kj->coeff();
-            auto        T        = blas::prod( value_t(1), R, S_kj );
+            auto        RS_kj    = blas::prod( value_t(1), R, S_kj );
 
-            blas::scale( value_t(1) / blas::norm_2( T ), T );
+            blas::scale( value_t(1) / blas::norm_2( RS_kj ), RS_kj );
             
             io::matlab::write( S_kj, "Skj" );
             
@@ -927,7 +965,7 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
                                            blas::range( pos, pos + rank_k-1 ),
                                            blas::range( V.ncols(), Ve.ncols() - 1 ) );
 
-                blas::copy( T, Qe_k );
+                blas::copy( RS_kj, Qe_k );
             }// if
             else
             {
@@ -935,7 +973,7 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
                                            blas::range( pos, pos + rank_k-1 ),
                                            blas::range( 0, V.ncols() - 1 ) );
 
-                blas::copy( T, Qe_k );
+                blas::copy( RS_kj, Qe_k );
             }// else
 
             pos += rank_k;
@@ -1457,7 +1495,7 @@ template < typename value_t >
 void
 ldu ( hpro::TMatrix &          A,
       const hpro::TTruncAcc &  acc,
-      const hpro::TMatrix &    REF )
+      hpro::TMatrix &          REF )
 {
     HLR_LOG( 4, hpro::to_string( "ldu( %d )", A.id() ) );
     
@@ -1467,31 +1505,32 @@ ldu ( hpro::TMatrix &          A,
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
+    auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
+    
     for ( uint  i = 0; i < nbr; ++i )
     {
         //
         // invert diagonal block
         //
         
-        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
+        HLR_ASSERT( is_dense( BA->block( i, i ) ) );
 
-        HLR_ASSERT( is_dense( A_ii ) );
-        
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  T_ii = A_ii->copy(); // need original for matrix updates below
         auto  D_ii = blas::mat< value_t >( ptrcast( A_ii, hpro::TDenseMatrix ) );
-            
+        
         blas::invert( D_ii );
 
-        {
-            auto  BREF   = cptrcast( &REF, hpro::TBlockMatrix );
-            auto  REF_ii = cptrcast( BREF->block( i, i ), hpro::TDenseMatrix );
-            auto  DA     = blas::copy( D_ii );
-            auto  DREF   = blas::copy( blas::mat< value_t >( REF_ii ) );
+        
 
-            blas::add( value_t(-1), DREF, DA );
+        auto  REF_ii   = ptrcast( BREF->block( i, i ), hpro::TDenseMatrix );
+        auto  REF_T_ii = REF_ii->copy(); // need original for matrix updates below
+        auto  REF_D_ii = blas::mat< value_t >( ptrcast( REF_ii, hpro::TDenseMatrix ) );
+            
+        blas::invert( REF_D_ii );
 
-            std::cout << "REF : " << A_ii->id() << " : " << blas::norm_F( DA ) / blas::norm_F( DREF ) << std::endl;
-        }
+        
+
 
         //
         // L_ji D_ii U_ii = A_ji, since U_ii = I, we have L_ji = A_ji D_ii^-1
@@ -1501,6 +1540,28 @@ ldu ( hpro::TMatrix &          A,
         {
             auto  A_ji = BA->block( j, i );
 
+            {
+                auto  REF_ji = BREF->block( j, i );
+
+                if ( is_lowrank( REF_ji ) )
+                {
+                    // L_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
+                    // ⟶ W = U, X = D_ii^-T·V
+                    auto  R_ji = ptrcast( REF_ji, hpro::TRkMatrix );
+                    auto  V    = blas::copy( blas::mat_V< value_t >( R_ji ) );
+                    
+                    blas::prod( value_t(1), blas::adjoint( REF_D_ii ), V, value_t(0), blas::mat_V< value_t >( R_ji ) );
+                }// if
+                else if ( is_dense( REF_ji ) )
+                {
+                    auto  D_ji = ptrcast( REF_ji, hpro::TDenseMatrix );
+                    auto  T_ji = blas::copy( blas::mat< value_t >( D_ji ) );
+                    
+                    blas::prod( value_t(1), T_ji, REF_D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
+                }// else
+            }
+
+
             if ( is_dense( A_ji ) )
             {
                 auto  D_ji = ptrcast( A_ji, hpro::TDenseMatrix );
@@ -1509,7 +1570,6 @@ ldu ( hpro::TMatrix &          A,
                 blas::prod( value_t(1), T_ji, D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
 
                 {
-                    auto  BREF   = cptrcast( &REF, hpro::TBlockMatrix );
                     auto  REF_ji = cptrcast( BREF->block( j, i ), hpro::TDenseMatrix );
                     auto  DA     = blas::copy( blas::mat< value_t >( D_ji ) );
                     auto  DREF   = blas::copy( blas::mat< value_t >( REF_ji ) );

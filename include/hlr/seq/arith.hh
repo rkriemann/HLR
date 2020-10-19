@@ -528,13 +528,6 @@ ldu ( hpro::TMatrix &          A,
         {
             auto  L_ji = BA->block( j, i );
 
-            
-            // auto  DT_ji = hlr::seq::matrix::convert_to_dense< value_t >( *L_ji );
-            // auto  DC_ji = blas::copy( blas::mat< value_t >( DT_ji ) );
-
-            // blas::prod( value_t(1), DC_ji, D_ii, value_t(0), blas::mat< value_t >( DT_ji ) );
-
-            
             if ( is_lowrank( L_ji ) )
             {
                 // L_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
@@ -551,14 +544,6 @@ ldu ( hpro::TMatrix &          A,
 
                 blas::prod( value_t(1), T_ji, D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
             }// else
-
-
-            
-            // auto  TT_ji = hlr::seq::matrix::convert_to_dense< value_t >( *L_ji );
-
-            // blas::add( value_t(-1), blas::mat< value_t >( *DT_ji ), blas::mat< value_t >( *TT_ji ) );
-
-            // std::cout << L_ji->id() << " : " << blas::norm_F( blas::mat< value_t >( *TT_ji ) ) << std::endl;
         }// for
 
         //
@@ -569,14 +554,6 @@ ldu ( hpro::TMatrix &          A,
         {
             auto  U_ij = BA->block( i, j );
 
-
-            // auto  DT_ij = hlr::seq::matrix::convert_to_dense< value_t >( *U_ij );
-            // auto  DC_ij = blas::copy( blas::mat< value_t >( DT_ij ) );
-
-            // blas::prod( value_t(1), D_ii, DC_ij, value_t(0), blas::mat< value_t >( DT_ij ) );
-
-            
-            
             if ( is_lowrank( U_ij ) )
             {
                 // U_ij = W·X' = D_ii^-1·U·V' = D_ii^-1·A_ij
@@ -593,13 +570,6 @@ ldu ( hpro::TMatrix &          A,
 
                 blas::prod( value_t(1), D_ii, T_ij, value_t(0), blas::mat< value_t >( D_ij ) );
             }// else
-
-
-            // auto  TT_ij = hlr::seq::matrix::convert_to_dense< value_t >( *U_ij );
-
-            // blas::add( value_t(-1), blas::mat< value_t >( *DT_ij ), blas::mat< value_t >( *TT_ij ) );
-
-            // std::cout << U_ij->id() << " : " << blas::norm_F( blas::mat< value_t >( *TT_ij ) ) << std::endl;
         }// for
 
         //
