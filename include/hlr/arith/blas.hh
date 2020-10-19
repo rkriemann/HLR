@@ -456,22 +456,15 @@ using hpro::BLAS::copy;
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector,
-           typename T_fill_fn >
+           typename T_value >
 void
-fill ( blas::VectorBase< T_vector > &   v,
-       T_fill_fn &                      fill_fn )
+fill ( blas::VectorBase< T_vector > &  v,
+       const T_value                   f )
 {
+    using value_v_t = typename T_vector::value_t;
+    
     for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = fill_fn();
-}
-       
-template < typename T_vector >
-void
-fill ( blas::VectorBase< T_vector > &    v,
-       const typename T_vector::value_t  f )
-{
-    for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = f;
+        v(i) = value_v_t(f);
 }
        
 template < typename T_matrix,
@@ -487,6 +480,16 @@ fill ( blas::MatrixBase< T_matrix > &    M,
             M(i,j) = value_M_t(f);
 }
 
+template < typename T_vector,
+           typename T_func >
+void
+fill_fn ( blas::VectorBase< T_vector > &   v,
+          T_func &&                        fill_fn )
+{
+    for ( size_t  i = 0; i < v.length(); ++i )
+        v(i) = fill_fn();
+}
+       
 template < typename T_matrix,
            typename T_func >
 void

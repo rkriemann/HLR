@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <random>
+
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/blas/Algebra.hh>
 
@@ -308,12 +310,12 @@ frobenius ( const double           alpha,
 //
 // compute spectral norm of A, e.g. |A|_2, via power iteration
 //
-template < typename matrix_t >
+inline
 double
-norm_2 ( const matrix_t &  A,
-         const bool        squared = true,
-         const real        atol    = 0,
-         const size_t      amax_it = 0 )
+norm_2 ( const hpro::TLinearOperator &  A,
+         const bool                     squared = true,
+         const real                     atol    = 0,
+         const size_t                   amax_it = 0 )
 {
     auto  x = A.domain_vector();
     auto  y = A.domain_vector();
@@ -336,15 +338,15 @@ norm_2 ( const matrix_t &  A,
         
         if ( squared )
         {
-            A.apply( x.get(), t.get(), hpro::apply_normal );
-            A.apply( t.get(), y.get(), hpro::apply_adjoint );
+            A.apply( x.get(), t.get(), apply_normal );
+            A.apply( t.get(), y.get(), apply_adjoint );
 
             lambda_new = hpro::Math::abs( hpro::Math::sqrt( hpro::dot( x.get(), y.get() ) ) );
             norm_y     = y->norm2();
         }// if
         else
         {
-            A.apply( x.get(), y.get(), hpro::apply_normal );
+            A.apply( x.get(), y.get(), apply_normal );
             norm_y = lambda_new = y->norm2();
         }// else
 
@@ -373,15 +375,103 @@ norm_2 ( const matrix_t &  A,
     return lambda;
 }
 
-template < typename matrix_t >
+inline
 double
-spectral ( const matrix_t &  A,
-           const bool        squared = true,
-           const real        atol    = 0,
-           const size_t      amax_it = 0 )
+spectral ( const hpro::TLinearOperator &  A,
+           const bool                     squared = true,
+           const real                     atol    = 0,
+           const size_t                   amax_it = 0 )
 {
     return norm_2( A, squared, atol, amax_it );
 }
+
+// template < typename operator_t >
+// double
+// norm_2 ( const operator_t &  A,
+//          const bool          squared = true,
+//          const real          atol    = 0,
+//          const size_t        amax_it = 0 )
+// {
+//     using  value_t = typename operator_t::value_t;
+//     using  real_t  = typename hpro::real_type< value_t >::type_t;
+
+//     const auto  nrows_A = nrows( A );
+//     const auto  ncols_A = ncols( A );
+    
+//     auto  x = blas::vector< value_t >( ncols_A );
+//     auto  y = blas::vector< value_t >( ncols_A );
+//     auto  t = blas::vector< value_t >( nrows_A );
+
+//     //
+//     // x = rand with |x| = 1
+//     //
+    
+//     auto  generator     = std::default_random_engine();
+//     auto  uniform_distr = std::uniform_real_distribution< double >( -1.0, 1.0 );
+//     auto  random        = [&] () { return uniform_distr( generator ); };
+    
+//     blas::fill_fn( x, random );
+//     blas::scale( value_t(1) / blas::norm_2(x), x );
+
+//     const size_t  max_it  = ( amax_it == 0 ? std::max( size_t(5), std::min( nrows_A, ncols_A ) / 10 ) : amax_it );
+//     const real_t  tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real_t >::epsilon() ) : atol );
+//     const real_t  abs_tol = std::min( real_t(10) * std::numeric_limits< real_t >::epsilon(), tol );
+//     const real_t  zero    = math::square( std::numeric_limits< real_t >::epsilon() );
+//     real_t        lambda  = 1.0;
+    
+//     for ( size_t  i = 0; i < max_it; i++ )
+//     {
+//         real_t  lambda_new = 0;
+//         real_t  norm_y     = 0;
+        
+//         if ( squared )
+//         {
+//             prod( value_t(1), apply_normal,  A, x, t );
+//             prod( value_t(1), apply_adjoint, A, t, y );
+
+//             lambda_new = math::abs( math::sqrt( blas::dot( x, y ) ) );
+//             norm_y     = blas::norm_2( y );
+//         }// if
+//         else
+//         {
+//             prod( value_t(1), apply_normal,  A, x, y );
+//             norm_y = lambda_new = blas::norm_2( y );
+//         }// else
+
+//         log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.8e (%.8e)", lambda_new, math::abs( ( lambda_new - lambda ) / lambda ) ) );
+        
+//         // test against given tolerance
+//         if ( math::abs( ( lambda_new - lambda ) / lambda ) < tol )
+//             return lambda_new;
+
+//         // test for machine precision
+//         if (( i > 5 ) && ( math::abs( lambda_new - lambda ) < abs_tol ))
+//             return lambda_new;
+
+//         if ( lambda_new < zero )
+//             return lambda_new;
+        
+//         lambda = lambda_new;
+
+//         if ( norm_y <= zero )
+//             break;
+        
+//         blas::scale( value_t(1) / norm_y, y );
+//         blas::copy( y, x );
+//     }// for
+
+//     return lambda;
+// }
+
+// template < typename operator_t >
+// double
+// spectral ( const operator_t &  A,
+//            const bool          squared = true,
+//            const real          atol    = 0,
+//            const size_t        amax_it = 0 )
+// {
+//     return norm_2( A, squared, atol, amax_it );
+// }
 
 //
 // compute inversion error of A vs A^-1 in spectral norm, e.g. |A-A^-1|_2

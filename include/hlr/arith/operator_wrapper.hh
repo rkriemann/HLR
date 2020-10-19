@@ -64,6 +64,26 @@ prod ( const value_t                    alpha,
     blas::prod( alpha, blas::mat_view( op_M, M ), X, value_t(1), Y );
 }
 
+//////////////////////////////////////////////////////////////////////
+//
+// wrapper functions for hpro::TLinearOperator
+//
+//////////////////////////////////////////////////////////////////////
+
+size_t  nrows ( const hpro::TLinearOperator &  M ) { return M.range_dim(); }
+size_t  ncols ( const hpro::TLinearOperator &  M ) { return M.domain_dim(); }
+
+template < typename value_t >
+void
+prod ( const value_t                    alpha,
+       const matop_t                    op_M,
+       const hpro::TLinearOperator &    M,
+       const blas::vector< value_t > &  x,
+       blas::vector< value_t > &        y )
+{
+    M.apply_add( alpha, x, y, op_M );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // operator wrapper for sum of matrices

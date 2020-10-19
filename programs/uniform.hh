@@ -30,6 +30,19 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    {
+        const auto                                 seed = 1593694284; // time( nullptr );
+        std::default_random_engine                 generator( seed );
+        std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
+        auto                                       random      = [&] () { return uniform_distr( generator ); };
+
+        auto M = blas::matrix< value_t >( 100, 100 );
+
+        blas::fill_fn( M, random );
+        
+        // std::cout << seq::norm::spectral( M ) << std::endl;
+    }
+    
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
     auto  acc     = gen_accuracy();
@@ -146,7 +159,7 @@ program_main ()
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
         auto  diff  = hpro::matrix_sum( value_t(1), A.get(), value_t(-1), A2.get() );
-        auto  error = hlr::seq::norm::norm_2( *diff, true, 1e-4 );
+        auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error ) << std::endl;
 
@@ -247,6 +260,8 @@ program_main ()
 
         if ( true )
         {
+            std::cout << "  " << term::bullet << term::bold << "LDU" << term::reset << std::endl;
+            
             auto  apx = approx::SVD< value_t >();
             auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
             auto  M3 = seq::matrix::copy( *M1 );
