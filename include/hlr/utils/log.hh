@@ -51,7 +51,10 @@ error ( const msg_t &  msg )
 #else
 #  define HLR_DBG_ASSERT( expr )                                        \
     if ( ! ( expr ) )                                                   \
-        HLR_ERROR( ( hlr::term::bold( #expr ) + " failed" ) )
+    {                                                                   \
+        breakpoint();                                                   \
+        HLR_ERROR( ( hlr::term::bold( #expr ) + " failed" ) );          \
+    }
 #endif
 
 // always-on-assert
