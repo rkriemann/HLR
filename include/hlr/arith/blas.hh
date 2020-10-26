@@ -9,6 +9,7 @@
 //
 
 #include <cassert>
+#include <type_traits>
 
 #include <hpro/blas/Matrix.hh>
 #include <hpro/blas/Vector.hh>
@@ -63,9 +64,16 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 
 //////////////////////////////////////////////////////////////////////
 //
-// template wrappers for low-rank factors as U and V
+// template wrappers for vectors, matrices and
+// low-rank factors as U and V
 //
 //////////////////////////////////////////////////////////////////////
+
+template < typename value_t >       blas::vector< value_t > & vec ( hpro::TScalarVector *       v ) { assert( ! is_null( v ) ); return hpro::blas_vec< value_t >( v ); }
+template < typename value_t > const blas::vector< value_t > & vec ( const hpro::TScalarVector * v ) { assert( ! is_null( v ) ); return hpro::blas_vec< value_t >( v ); }
+template < typename value_t >       blas::vector< value_t > & vec ( hpro::TScalarVector &       v ) { return hpro::blas_vec< value_t >( v ); }
+template < typename value_t > const blas::vector< value_t > & vec ( const hpro::TScalarVector & v ) { return hpro::blas_vec< value_t >( v ); }
+template < typename value_t >       blas::vector< value_t > & vec ( std::unique_ptr< hpro::TScalarVector > & v ) { assert( ! is_null( v.get() ) ); return hpro::blas_vec< value_t >( *v ); }
 
 template < typename value_t >       blas::matrix< value_t > & mat ( hpro::TDenseMatrix *       A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
 template < typename value_t > const blas::matrix< value_t > & mat ( const hpro::TDenseMatrix * A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
@@ -601,6 +609,105 @@ norm_F ( const matrix< value_t > &  U,
 
 // make sure, standard norm_F is found
 using hpro::BLAS::norm_F;
+
+//////////////////////////////////////////////////////////////////////
+//
+// various simplified forms of matrix addition, multiplication
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename type_t > inline constexpr bool is_vector_v = is_vector< type_t >::value;
+template < typename type_t > inline constexpr bool is_matrix_v = is_matrix< type_t >::value;
+
+template < typename T_alpha,
+           typename T_vecX,
+           typename T_vecY >
+std::enable_if_t< is_vector_v< T_vecX > &&
+                  is_vector_v< T_vecY > &&
+                  std::is_same_v< typename T_vecX::value_t, typename T_vecY::value_t >,
+                  void >
+add ( const T_alpha   alpha,
+      const T_vecX &  x,
+      T_vecY &        y )
+{
+    return hpro::BLAS::add( typename T_vecX::value_t( alpha ), x, y );
+}
+
+template < typename T_alpha,
+           typename T_matA,
+           typename T_matB >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
+                  void >
+add ( const T_alpha   alpha,
+      const T_matA &  A,
+      T_matB &        B )
+{
+    return hpro::BLAS::add( typename T_matA::value_t( alpha ), A, B );
+}
+
+template < typename T_beta,
+           typename T_matA,
+           typename T_matB,
+           typename T_matC >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  is_matrix_v< T_matC > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
+                  void >
+prod ( const T_matA &  A,
+       const T_matB &  B,
+       const T_beta    beta,
+       T_matC &        C )
+{
+    HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
+                   ( A.nrows() == C.nrows() ) &&
+                   ( B.ncols() == C.ncols() ));
+    
+    return hpro::BLAS::prod( typename T_matC::value_t(1), A, B, typename T_matC::value_t(beta), C );
+}
+
+template < typename T_alpha,
+           typename T_beta,
+           typename T_matA,
+           typename T_matB,
+           typename T_matC >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  is_matrix_v< T_matC > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
+                  void >
+prod ( const T_alpha   alpha,
+       const T_matA &  A,
+       const T_matB &  B,
+       const T_beta    beta,
+       T_matC &        C )
+{
+    HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
+                   ( A.nrows() == C.nrows() ) &&
+                   ( B.ncols() == C.ncols() ));
+    
+    return prod( typename T_matC::value_t(alpha), A, B, typename T_matC::value_t(beta), C );
+}
+
+template < typename T_matA,
+           typename T_matB >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
+                  matrix< typename T_matA::value_t > >
+prod ( const T_matA &  A,
+       const T_matB &  B )
+{
+    HLR_DBG_ASSERT( A.ncols() == B.nrows() );
+    
+    return prod( typename T_matA::value_t(1), A, B );
+}
+
+using hpro::BLAS::prod;
 
 //////////////////////////////////////////////////////////////////////
 //

@@ -30,42 +30,6 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
-    // if ( false )
-    // {
-    //     const auto                                 seed = 1593694284; // time( nullptr );
-    //     std::default_random_engine                 generator( seed );
-    //     std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
-    //     auto                                       random      = [&] () { return uniform_distr( generator ); };
-
-    //     auto M = blas::matrix< value_t >( 100, 100 );
-
-    //     blas::fill_fn( M, random );
-        
-    //     io::matlab::write( M, "M" );
-        
-    //     std::cout << seq::norm::spectral( M ) << std::endl;
-    // }
-    
-    // {
-    //     const auto                                 seed = 1593694284; // time( nullptr );
-    //     std::default_random_engine                 generator( seed );
-    //     std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
-    //     auto                                       random      = [&] () { return uniform_distr( generator ); };
-
-    //     auto  U = blas::matrix< value_t >( 100, 10 );
-    //     auto  V = blas::matrix< value_t >( 100, 10 );
-
-    //     blas::fill_fn( U, random );
-    //     blas::fill_fn( V, random );
-        
-    //     io::matlab::write( U, "U" );
-    //     io::matlab::write( V, "V" );
-        
-    //     std::cout << seq::norm::spectral( lowrank_operator{ U, V } ) << std::endl;
-    // }
-
-    // return;
-    
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
     auto  acc     = gen_accuracy();
@@ -278,10 +242,10 @@ program_main ()
         }
 
         //
-        // add low-rank matrix
+        // LDU factorization
         //
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "LDU" << term::reset << std::endl;
             
@@ -298,13 +262,16 @@ program_main ()
                 std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
 
+            auto  M4     = impl::matrix::copy( *M1 );
             auto  A3     = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
-            auto  colcb2 = rowcb->copy();
+            auto  colcb2 = colcb->copy();
 
             matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
-            impl::uniform::tlr::ldu< value_t >( *A3, acc, *M3 );
+            impl::uniform::tlr::ldu< value_t >( *A3, acc, *M4 );
 
+            matrix::print_eps( *A3, "A3" );
+            
             auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
 
             {
@@ -313,9 +280,18 @@ program_main ()
                 io::matlab::write( *M2, "M1" );
                 std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
+            {
+                hpro::TLDUInvMatrix  A_inv( M4.get(), hpro::block_wise, hpro::store_inverse );
+
+                std::cout << "      LDU error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
         }
 
-        if ( false )
+        //
+        // LU factorization
+        //
+        
+        if ( true )
         {
             std::cout << "  " << term::bullet << term::bold << "LU" << term::reset << std::endl;
             
@@ -331,13 +307,14 @@ program_main ()
                 std::cout << "      LU error   = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
             }
 
+            auto  M4     = impl::matrix::copy( *M1 );
             auto  A3     = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
-            auto  colcb2 = rowcb->copy();
+            auto  colcb2 = colcb->copy();
 
             matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
             
-            impl::uniform::tlr::lu< value_t >( *A3, acc, *M3 );
+            impl::uniform::tlr::lu< value_t >( *A3, acc, *M4 );
 
             auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
 
@@ -356,7 +333,7 @@ program_main ()
 
             auto  A3     = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
-            auto  colcb2 = rowcb->copy();
+            auto  colcb2 = colcb->copy();
 
             matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
             
