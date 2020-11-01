@@ -729,6 +729,7 @@ qr2  ( matrix< value_t > &  M,
 {
     const auto              nrows = M.nrows();
     const auto              ncols = M.ncols();
+    const auto              minrc = std::min( nrows, ncols );
     std::vector< value_t >  tau( ncols );
     std::vector< value_t >  work( ncols );
 
@@ -738,11 +739,11 @@ qr2  ( matrix< value_t > &  M,
 
     geqr2( nrows, ncols, M.data(), nrows, tau.data(), work.data(), info );
 
-    if (( R.nrows() != ncols ) || ( R.ncols() != ncols ))
-        R = std::move( blas::matrix< value_t >( ncols, ncols ) );
+    if (( R.nrows() != minrc ) || ( R.ncols() != ncols ))
+        R = std::move( blas::matrix< value_t >( minrc, ncols ) );
     
     for ( size_t  i = 0; i < ncols; ++i )
-        for ( size_t  j = 0; j <= i; ++j )
+        for ( size_t  j = 0; j <= std::min( i, minrc ); ++j )
             R(j,i) = M(j,i);
 
     if ( comp_Q )
