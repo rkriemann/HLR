@@ -13,14 +13,15 @@
 #include <tbb/task.h>
 #include <tbb/parallel_for.h>
 #include "tbb/partitioner.h"
+#include "tbb/task_group.h"
 
 #include "hlr/utils/log.hh"
 #include "hlr/tbb/dag.hh"
 
-using namespace HLIB;
-
 namespace hlr
 {
+
+namespace hpro = HLIB;
 
 namespace tbb
 {
@@ -199,7 +200,7 @@ refine ( node *                            root,
                 }// if
                 else if ( snsize > 0 )
                 {
-                    // log( 0, HLIB::to_string( "copying %d", nset.size() ) );
+                    // log( 0, hpro::to_string( "copying %d", nset.size() ) );
                     new_sets.push_back( std::move( subnodes[i] ) );
                 }// if
             }// for
@@ -255,16 +256,16 @@ namespace
 class runtime_task : public ::tbb::task
 {
 private:
-    node *             _node;
-    const TTruncAcc &  _acc;
-    node *             _final;
-    ::tbb::task *      _final_task;
+    node *                   _node;
+    const hpro::TTruncAcc &  _acc;
+    node *                   _final;
+    ::tbb::task *            _final_task;
     
 public:
-    runtime_task ( node *             anode,
-                   const TTruncAcc &  aacc,
-                   node *             afinal,
-                   ::tbb::task *      afinal_task )
+    runtime_task ( node *                   anode,
+                   const hpro::TTruncAcc &  aacc,
+                   node *                   afinal,
+                   ::tbb::task *            afinal_task )
             : _node( anode )
             , _acc( aacc )
             , _final( afinal )
@@ -293,6 +294,22 @@ public:
     }
 };
 
+void
+execute ( node *                   node,
+          const hpro::TTruncAcc &  acc,
+          ::tbb::task_group &      tg )
+{
+    node->run( acc );
+
+    for ( auto  succ : node->successors() )
+    {
+        if ( succ->dec_dep_cnt() == 0 )
+        {
+            tg.run( [&,succ] { execute( succ, acc, tg ); } );
+        }// if
+    }// for
+}
+
 }// namespace anonymous
 
 //
@@ -300,9 +317,22 @@ public:
 //
 void
 run ( graph &                  dag,
-      const HLIB::TTruncAcc &  acc )
+      const hpro::TTruncAcc &  acc )
 {
     assert( dag.end().size() == 1 );
+
+    #if 1
+
+    ::tbb::task_group  tg;
+
+    for ( auto  node : dag.start() )
+    {
+        tg.run( [&,node] { execute( node, acc, tg ); } );
+    }// for
+
+    tg.wait();
+    
+    #else
     
     //
     // create task for end node since needed by all other tasks
@@ -337,6 +367,8 @@ run ( graph &                  dag,
     final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
     final_task->execute();                            // and the final node explicitly
     ::tbb::task::destroy( * final_task );             // not done by TBB since executed manually
+
+    #endif
 }
 
 }// namespace dag
