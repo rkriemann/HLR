@@ -216,40 +216,6 @@ eigen_jac ( matrix< value_t > &                                M,
                 }// for
             }// for
         }// for
-
-        //
-        // determine diagonal dominance ( Σ_j≠i a_ij ) / a_ii
-        //
-
-        // real_t  diag_dom = real_t(0);
-        // real_t  avg_dom  = real_t(0);
-        
-        // for ( size_t  i = 0; i < nrows-1; i++ )
-        // {
-        //     real_t  row_sum = real_t(0);
-            
-        //     for ( size_t j = 0; j < ncols; j++ )
-        //     {
-        //         if ( i != j )
-        //             row_sum += std::abs( M(i,j) );
-        //     }// for
-
-        //     const auto  dom = row_sum / std::abs( M(i,i) );
-            
-        //     diag_dom = std::max( diag_dom, dom );
-        //     avg_dom += dom;
-        // }// for
-
-        // avg_dom /= nrows;
-        
-        // std::cout << "sweeps " << sweep << " : "
-        //           << "error = " << max_err << ", "
-        //           << "diag_dom = " << diag_dom << ", "
-        //           << "avg_dom = " << avg_dom 
-        //           << std::endl;
-
-        // if (( diag_dom <= 2.0 ) && ( avg_dom <= 0.05 ))
-        //     break;
     }// while
 
     // std::cout << "#sweeps = " << sweep << std::endl;

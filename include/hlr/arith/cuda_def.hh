@@ -19,21 +19,21 @@ namespace hlr { namespace blas { namespace cuda {
     {                                                       \
         auto  result = func args ;                          \
         if ( result != cudaSuccess )                        \
-            HLR_ERROR( "CUDA error in function " #func );   \
+            HLR_ERROR( "CUDA error in function " #func + hpro::to_string( " (error = %d)", result ) );   \
     }
 
 #define HLR_CUBLAS_CHECK( func, args )                      \
     {                                                       \
         auto  result = func args ;                          \
         if ( result != CUBLAS_STATUS_SUCCESS )              \
-            HLR_ERROR( "cuBLAS error in function " #func ); \
+            HLR_ERROR( "cuBLAS error in function " #func + hpro::to_string( " (error = %d)", result ) ); \
     }
 
 #define HLR_CUSOLVER_CHECK( func, args )                        \
     {                                                           \
         auto  result = func args ;                              \
         if ( result != CUSOLVER_STATUS_SUCCESS )                \
-            HLR_ERROR( "cuSOLVER error in function " #func );   \
+            HLR_ERROR( "cuSOLVER error in function " #func + hpro::to_string( " (error = %d)", result ) );   \
     }
 
 //
@@ -126,6 +126,19 @@ to_device ( const vector< value_t > &                  v_host,
                         v_host.data(), v_host.stride(),
                         v_dev, inc_dev ) );
 }
+
+template < typename value_t >
+void
+to_device ( const std::vector< value_t > &             v_host,
+            typename cuda_type_ptr< value_t >::type_t  v_dev,
+            const int                                  inc_dev )
+{
+    HLR_CUBLAS_CHECK( cublasSetVector,
+                      ( v_host.size(), sizeof(value_t),
+                        v_host.data(), 1,
+                        v_dev, inc_dev ) );
+}
+
 //
 // device to host copy
 //
@@ -253,7 +266,7 @@ clear ( const int  n,
            type *        y,                         \
            const int     inc_y )                    \
     {                                               \
-        func( handle.blas, n, x, inc_x, y, inc_y ); \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, n, x, inc_x, y, inc_y ) );   \
     }
 
 HLR_CUDA_COPY( float,           cublasScopy )
@@ -272,7 +285,7 @@ HLR_CUDA_COPY( cuDoubleComplex, cublasZcopy )
             type *      x,                         \
             const int   inc_x )                    \
     {                                              \
-        func( handle.blas, n, & alpha, x, inc_x ); \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, n, & alpha, x, inc_x ) ); \
     }
 
 HLR_CUDA_SCALE( float,           cublasSscal )
@@ -293,7 +306,7 @@ HLR_CUDA_SCALE( cuDoubleComplex, cublasZscal )
            type *        y,                         \
            const int     inc_y )                    \
     {                                               \
-        func( handle.blas, n, & alpha, x, inc_x, y, inc_y ); \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, n, & alpha, x, inc_x, y, inc_y ) ); \
     }
 
 HLR_CUDA_AXPY( float,           cublasSaxpy )
@@ -314,7 +327,7 @@ HLR_CUDA_AXPY( cuDoubleComplex, cublasZaxpy )
     {                                                \
         type  res;                                   \
                                                      \
-        func( handle.blas, n, x, incx, y, incy, & res ) ;   \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, n, x, incx, y, incy, & res ) ); \
         return res;                                  \
     }
 
@@ -332,7 +345,7 @@ HLR_CUDA_DOT( double, cublasDdot )
     {                                                \
         typename real_type< type >::type_t  res;     \
                                                      \
-        func( handle.blas, n, x, incx, & res ) ;     \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, n, x, incx, & res ) ); \
         return res;                                  \
     }
 
@@ -391,8 +404,8 @@ prod_diag ( handle                      handle,
            type *                   C,                                  \
            const int                ld_C )                              \
     {                                                                   \
-        func( handle.blas, trans_A, trans_B, nrows_C, ncols_C, nrows_A, \
-              & alpha, A, ld_A, B, ld_B, & beta, C, ld_C );             \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, trans_A, trans_B, nrows_C, ncols_C, nrows_A, \
+                                  & alpha, A, ld_A, B, ld_B, & beta, C, ld_C ) ); \
     }
 
 HLR_CUDA_GEMM( float,           cublasSgemm )
@@ -401,6 +414,36 @@ HLR_CUDA_GEMM( cuFloatComplex,  cublasCgemm )
 HLR_CUDA_GEMM( cuDoubleComplex, cublasZgemm )
 
 #undef HLR_CUDA_GEMM
+
+#define HLR_CUDA_GEMM_BATCHED( type, func )                             \
+    inline                                                              \
+    void                                                                \
+    prod_batched ( handle                   handle,                     \
+                   const cublasOperation_t  trans_A,                    \
+                   const cublasOperation_t  trans_B,                    \
+                   const int                nrows_C,                    \
+                   const int                ncols_C,                    \
+                   const int                nrows_A,                    \
+                   const type               alpha,                      \
+                   type **                  A,                          \
+                   const int                ld_A,                       \
+                   type **                  B,                          \
+                   const int                ld_B,                       \
+                   const type               beta,                       \
+                   type **                  C,                          \
+                   const int                ld_C,                       \
+                   const int                nbatch )                    \
+    {                                                                   \
+        HLR_CUBLAS_CHECK( func, ( handle.blas, trans_A, trans_B, nrows_C, ncols_C, nrows_A, \
+                                  & alpha, A, ld_A, B, ld_B, & beta, C, ld_C, nbatch ) ); \
+    }
+
+HLR_CUDA_GEMM_BATCHED( float,           cublasSgemmBatched )
+HLR_CUDA_GEMM_BATCHED( double,          cublasDgemmBatched )
+HLR_CUDA_GEMM_BATCHED( cuFloatComplex,  cublasCgemmBatched )
+HLR_CUDA_GEMM_BATCHED( cuDoubleComplex, cublasZgemmBatched )
+
+#undef HLR_CUDA_GEMM_BATCHED
 
 //////////////////////////////////////////////////////////////////////
 //

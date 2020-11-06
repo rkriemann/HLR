@@ -42,14 +42,35 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
     HLR_ASSERT( ( nrows / block_size ) * block_size == nrows );
     HLR_ASSERT( ( ncols / block_size ) * block_size == ncols );
     
-    const auto         minrc      = std::min( nrows, ncols );
-    const size_t       max_sweeps = ( amax_sweeps > 0 ? amax_sweeps : 15*minrc*minrc );
-    const real_t       tolerance  = ( atolerance > 0 ? atolerance : real_t(100) * std::numeric_limits< real_t >::epsilon() );
-    bool               converged  = false;
-    uint               sweep      = 0;
-    auto               V          = blas::matrix< value_t >( minrc, ncols );
-    auto               norms      = blas::matrix< real_t >( nbrows, nbcols );
+    const auto    minrc      = std::min( nrows, ncols );
+    const size_t  max_sweeps = ( amax_sweeps > 0 ? amax_sweeps : 15*minrc*minrc );
+    const real_t  tolerance  = ( atolerance > 0 ? atolerance : real_t(100) * std::numeric_limits< real_t >::epsilon() );
+    bool          converged  = false;
+    uint          sweep      = 0;
+    auto          V          = blas::matrix< value_t >( minrc, ncols );
+    auto          norms      = blas::matrix< real_t >( nbrows, nbcols );
 
+    // temporary workspace per block row/column
+    auto  C0 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
+    auto  C1 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
+    auto  T0 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
+    auto  T1 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
+    auto  ap = ::tbb::affinity_partitioner();
+    
+    ::tbb::parallel_for(
+        ::tbb::blocked_range< size_t >( 0, std::max( nbrows, nbcols ) ),
+        [&,block_size] ( const auto  r )
+        {
+            for ( auto  i = r.begin(); i != r.end(); ++i )
+            {
+                C0 = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                C1 = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                T0 = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                T1 = std::move( blas::matrix< value_t >( block_size, block_size ) );
+            }// for
+        },
+        ap );
+            
     // initialise V with identity
     for ( size_t  i = 0; i < minrc; i++ )
         V(i,i) = 1.0;
@@ -233,30 +254,38 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
                 const auto  VA_jj = blas::matrix< value_t >( VA, r_1, r_1 );
                 
                 // for ( size_t  l = 0; l < nbcols; ++l )
-                ::tbb::parallel_for< size_t >(
-                    0, nbcols,
-                    [&,i,j,block_size] ( const size_t  l )
+                ::tbb::parallel_for(
+                    ::tbb::blocked_range< size_t >( 0, nbcols ),
+                    [&,i,j,block_size] ( const auto  r )
                     {
-                        const auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
-                        auto        M_il = blas::matrix< value_t >( M, r_i, r_l );
-                        auto        M_jl = blas::matrix< value_t >( M, r_j, r_l );
-                        const auto  C_il = blas::copy( M_il );
-                        const auto  C_jl = blas::copy( M_jl );
-                        // auto  C_il = M_il;
-                        // auto  C_jl = M_jl;
+                        for ( auto  l = r.begin(); l != r.end(); ++l )
+                        {
+                            //
+                            // ⎛A₀₀ A₀₁⎞' ⎛M_il⎞
+                            // ⎝A₁₀ A₁₁⎠  ⎝M_jl⎠
+                            //
+
+                            const auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
+                            auto        M_il = blas::matrix< value_t >( M, r_i, r_l );
+                            auto        M_jl = blas::matrix< value_t >( M, r_j, r_l );
+
+                            blas::copy( M_il, C0[l] );
+                            blas::copy( M_jl, C1[l] );
                         
-                        auto        T_il = blas::prod( value_t(1), blas::adjoint(VA_ii), C_il );
-                        auto        T_jl = blas::prod( value_t(1), blas::adjoint(VA_ij), C_il );
+                            blas::prod( value_t(1), blas::adjoint(VA_ii), C0[l], value_t(0), T0[l] );
+                            blas::prod( value_t(1), blas::adjoint(VA_ij), C0[l], value_t(0), T1[l] );
                         
-                        blas::prod( value_t(1), blas::adjoint(VA_ji), C_jl, value_t(1), T_il );
-                        blas::prod( value_t(1), blas::adjoint(VA_jj), C_jl, value_t(1), T_jl );
+                            blas::prod( value_t(1), blas::adjoint(VA_ji), C1[l], value_t(1), T0[l] );
+                            blas::prod( value_t(1), blas::adjoint(VA_jj), C1[l], value_t(1), T1[l] );
                         
-                        norms(i,l) = blas::norm_F( T_il );
-                        norms(j,l) = blas::norm_F( T_jl );
+                            norms(i,l) = blas::norm_F( T0[l] );
+                            norms(j,l) = blas::norm_F( T1[l] );
                         
-                        blas::copy( T_il, M_il );
-                        blas::copy( T_jl, M_jl );
-                    } );
+                            blas::copy( T0[l], M_il );
+                            blas::copy( T1[l], M_jl );
+                        }// for
+                    },
+                    ap );
 
                 // save for updates below
                 Vs[ idx ] = std::move( VA );
@@ -286,16 +315,19 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
                     {
                         const auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
 
-                        // apply to M
+                        //
+                        // (M_li M_lj) ⎛A₀₀ A₀₁⎞
+                        //             ⎝A₁₀ A₁₁⎠   
+                        //
+
                         auto        M_li = blas::matrix< value_t >( M, r_l, r_i );
                         auto        M_lj = blas::matrix< value_t >( M, r_l, r_j );
+
                         const auto  C_li = blas::copy( M_li );
                         const auto  C_lj = blas::copy( M_lj );
-                        // auto  C_li = M_li;
-                        // auto  C_lj = M_lj;
                         
-                        auto  T_li = blas::prod( value_t(1), C_li, VA_ii );
-                        auto  T_lj = blas::prod( value_t(1), C_li, VA_ij );
+                        auto        T_li = blas::prod( value_t(1), C_li, VA_ii );
+                        auto        T_lj = blas::prod( value_t(1), C_li, VA_ij );
                         
                         blas::prod( value_t(1), C_lj, VA_ji, value_t(1), T_li );
                         blas::prod( value_t(1), C_lj, VA_jj, value_t(1), T_lj );
@@ -306,16 +338,19 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
                         blas::copy( T_li, M_li );
                         blas::copy( T_lj, M_lj );
 
-                        // apply to V
-                        auto        V_li = blas::matrix< value_t >( V, r_l, r_i );
-                        auto        V_lj = blas::matrix< value_t >( V, r_l, r_j );
-                        const auto  D_li = blas::copy( V_li );
-                        const auto  D_lj = blas::copy( V_lj );
-                        // auto  D_li = V_li;
-                        // auto  D_lj = V_lj;
+                        //
+                        // (V_li V_lj) ⎛A₀₀, A₀₁⎞
+                        //             ⎝A₁₀, A₁₁⎠   
+                        //
                         
-                        auto  S_li = blas::prod( value_t(1), D_li, VA_ii );
-                        auto  S_lj = blas::prod( value_t(1), D_li, VA_ij );
+                        auto  V_li = blas::matrix< value_t >( V, r_l, r_i );
+                        auto  V_lj = blas::matrix< value_t >( V, r_l, r_j );
+
+                        C_li = blas::copy( V_li, C_li );
+                        D_lj = blas::copy( V_lj, C_li );
+                        
+                        blas::prod( value_t(1), D_li, VA_ii, value_t(0), T_li );
+                        blas::prod( value_t(1), D_li, VA_ij, value_t(0), T_lj );
                         
                         blas::prod( value_t(1), D_lj, VA_ji, value_t(1), S_li );
                         blas::prod( value_t(1), D_lj, VA_jj, value_t(1), S_lj );
@@ -743,8 +778,61 @@ program_main ()
         if ( true )
         {
             blas::cuda::init();
-        
+
+            // {
+            //     auto  A1 = blas::random< value_t >( 16, 16 );
+            //     auto  A2 = blas::random< value_t >( 16, 16 );
+            //     auto  B1 = blas::random< value_t >( 16, 16 );
+            //     auto  B2 = blas::random< value_t >( 16, 16 );
+            //     auto  C1 = blas::random< value_t >( 16, 16 );
+            //     auto  C2 = blas::random< value_t >( 16, 16 );
+
+            //     io::matlab::write( A1, "A1" );
+            //     io::matlab::write( A2, "A2" );
+            //     io::matlab::write( B1, "B1" );
+            //     io::matlab::write( B2, "B2" );
+            //     io::matlab::write( C1, "C1" );
+            //     io::matlab::write( C2, "C2" );
+                
+            //     auto  dev_A1 = blas::cuda::device_alloc< value_t >( 16*16 );
+            //     auto  dev_A2 = blas::cuda::device_alloc< value_t >( 16*16 );
+            //     auto  dev_B1 = blas::cuda::device_alloc< value_t >( 16*16 );
+            //     auto  dev_B2 = blas::cuda::device_alloc< value_t >( 16*16 );
+            //     auto  dev_C1 = blas::cuda::device_alloc< value_t >( 16*16 );
+            //     auto  dev_C2 = blas::cuda::device_alloc< value_t >( 16*16 );
+
+            //     blas::cuda::to_device( A1, dev_A1, 16 );
+            //     blas::cuda::to_device( A2, dev_A2, 16 );
+            //     blas::cuda::to_device( B1, dev_B1, 16 );
+            //     blas::cuda::to_device( B2, dev_B2, 16 );
+            //     blas::cuda::to_device( C1, dev_C1, 16 );
+            //     blas::cuda::to_device( C2, dev_C2, 16 );
+
+            //     value_t *  A_ptr[2] = { dev_A1, dev_A2 };
+            //     value_t *  B_ptr[2] = { dev_B1, dev_B2 };
+            //     value_t *  C_ptr[2] = { dev_C1, dev_C2 };
+
+            //     auto  one   = blas::cuda::make_constant< value_t >( 1 );
+            //     auto  zero  = blas::cuda::make_constant< value_t >( 0 );
+
+            //     blas::cuda::prod_batched( blas::cuda::default_handle, CUBLAS_OP_C, CUBLAS_OP_N,
+            //                               16, 16, 16, one, A_ptr, 16, B_ptr, 16, zero, C_ptr, 16, 2 );
+
+            //     blas::cuda::from_device( dev_C1, 16, A1 );
+            //     blas::cuda::from_device( dev_C2, 16, A2 );
+
+            //     io::matlab::write( A1, "D1" );
+            //     io::matlab::write( A2, "D2" );
+
+            //     return;
+            // }
+
+            
+            std::cout << term::bullet << term::bold << "CUDA eigenvalue algorithms" << term::reset << std::endl;
+            
             {
+                std::cout << term::bold << "  SYEVJ" << term::reset << std::endl;
+                
                 auto  tic = timer::now();
                 auto  toc = timer::since( tic );
 
@@ -758,11 +846,13 @@ program_main ()
 
                 toc = timer::since( tic );
             
-                std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
                 std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             }
 
             {
+                std::cout << term::bold << "  block-wise Jacobi" << term::reset << std::endl;
+                
                 auto  tic = timer::now();
                 auto  toc = timer::since( tic );
 
@@ -778,7 +868,7 @@ program_main ()
 
                 toc = timer::since( tic );
             
-                std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
                 std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
 
                 io::matlab::write( E, "E" );
@@ -786,6 +876,58 @@ program_main ()
             }
 
             {
+                std::cout << term::bold << "  batched block-wise Jacobi" << term::reset << std::endl;
+                
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+
+                io::matlab::write( M, "M" );
+                
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_bjac_batched( blas::cuda::default_handle, M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+
+                io::matlab::write( E, "E" );
+                io::matlab::write( V, "V" );
+            }
+
+            {
+                std::cout << term::bold << "  multi-stream block-wise Jacobi" << term::reset << std::endl;
+                
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+
+                io::matlab::write( M, "M" );
+                
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_bjac_stream( blas::cuda::default_handle, M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+
+                io::matlab::write( E, "E" );
+                io::matlab::write( V, "V" );
+            }
+
+            {
+                std::cout << term::bold << "  SYEVD" << term::reset << std::endl;
+                
                 auto  tic = timer::now();
                 auto  toc = timer::since( tic );
 
@@ -799,11 +941,13 @@ program_main ()
 
                 toc = timer::since( tic );
             
-                std::cout << "SYEVD in  " << format_time( toc ) << std::endl;
+                std::cout << "    done in " << format_time( toc ) << std::endl;
                 std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             }
 
             {
+                std::cout << term::bold << "  DPT" << term::reset << std::endl;
+                
                 auto  tic = timer::now();
                 auto  toc = timer::since( tic );
 
@@ -817,10 +961,12 @@ program_main ()
 
                 toc = timer::since( tic );
             
-                std::cout << "DPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
 
                 if ( stat.converged )
                     std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+                else
+                    std::cout << "    not converged" << std::endl;
             }
         }// if
         else
