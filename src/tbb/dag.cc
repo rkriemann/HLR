@@ -3,14 +3,13 @@
 // File        : dag.cc
 // Description : execute DAG using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
 #include <unordered_map>
 #include <cassert>
 #include <deque>
 
-#include <tbb/task.h>
 #include <tbb/parallel_for.h>
 #include "tbb/partitioner.h"
 #include "tbb/task_group.h"
@@ -251,49 +250,8 @@ namespace
 {
 
 //
-// helper class for executing node via TBB
+// helper for task_group based task execution
 //
-class runtime_task : public ::tbb::task
-{
-private:
-    node *                   _node;
-    const hpro::TTruncAcc &  _acc;
-    node *                   _final;
-    ::tbb::task *            _final_task;
-    
-public:
-    runtime_task ( node *                   anode,
-                   const hpro::TTruncAcc &  aacc,
-                   node *                   afinal,
-                   ::tbb::task *            afinal_task )
-            : _node( anode )
-            , _acc( aacc )
-            , _final( afinal )
-            , _final_task( afinal_task )
-    {}
-
-    ::tbb::task *  execute ()
-    {
-        _node->run( _acc );
-
-        for ( auto  succ : _node->successors() )
-        {
-            if ( succ == _final )
-            {
-                succ->dec_dep_cnt();
-                if ( _final_task->decrement_ref_count() == 0 )
-                    spawn( * _final_task );
-            }// if
-            else if ( succ->dec_dep_cnt() == 0 )
-            {
-                spawn( * new ( ::tbb::task::allocate_root() ) runtime_task( succ, _acc, _final, _final_task ) );
-            }// if
-        }// for
-
-        return nullptr;
-    }
-};
-
 void
 execute ( node *                   node,
           const hpro::TTruncAcc &  acc,
@@ -321,8 +279,6 @@ run ( graph &                  dag,
 {
     assert( dag.end().size() == 1 );
 
-    #if 1
-
     ::tbb::task_group  tg;
 
     for ( auto  node : dag.start() )
@@ -331,44 +287,6 @@ run ( graph &                  dag,
     }// for
 
     tg.wait();
-    
-    #else
-    
-    //
-    // create task for end node since needed by all other tasks
-    //
-    
-    auto           final = dag.end().front();
-    ::tbb::task *  final_task = new ( ::tbb::task::allocate_root() ) runtime_task( final, acc, final, nullptr );
-    
-    final_task->set_ref_count( final->dep_cnt() );
-
-    //
-    // set up start tasks
-    //
-    
-    ::tbb::task_list  work_queue;
-    
-    for ( auto  node : dag.start() )
-    {
-        if ( node != final )
-        {
-            auto  task = new ( ::tbb::task::allocate_root() ) runtime_task( node, acc, final, final_task );
-            
-            work_queue.push_back( * task );
-        }// if
-    }// for
-
-    //
-    // run DAG
-    //
-    
-    final_task->increment_ref_count();                // for "tbb::wait" to actually wait for final node
-    final_task->spawn_and_wait_for_all( work_queue ); // execute all nodes except final node
-    final_task->execute();                            // and the final node explicitly
-    ::tbb::task::destroy( * final_task );             // not done by TBB since executed manually
-
-    #endif
 }
 
 }// namespace dag

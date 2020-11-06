@@ -226,8 +226,8 @@ mat_V ( const hpro::TRkMatrix &  A,
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector >
-typename hpro::enable_if_res< is_vector< T_vector >::value,
-                              vector< typename T_vector::value_t > >::result
+typename std::enable_if_t< is_vector< T_vector >::value,
+                           vector< typename T_vector::value_t > >
 copy ( const T_vector &  v )
 {
     using  value_t = typename T_vector::value_t;
@@ -240,8 +240,8 @@ copy ( const T_vector &  v )
 }
 
 template < typename T_matrix >
-typename hpro::enable_if_res< is_matrix< T_matrix >::value,
-                              matrix< typename T_matrix::value_t > >::result
+typename std::enable_if_t< is_matrix< T_matrix >::value,
+                           matrix< typename T_matrix::value_t > >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
