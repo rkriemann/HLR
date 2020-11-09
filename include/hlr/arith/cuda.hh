@@ -9,6 +9,7 @@
 //
 
 #include <cuda_runtime.h>
+#include <cuda_bf16.h>
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 
@@ -953,6 +954,12 @@ eigen_jac ( handle                                             handle,
     
     return  { std::move( E ), std::move( V ) };
 }
+
+void
+jacobi_bf16 ( const int        n,
+              __nv_bfloat16 *  M,
+              __nv_bfloat16 *  V,
+              __nv_bfloat16 *  E );
 
 //
 // eigenvalues for hermitean matrices

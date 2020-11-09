@@ -226,8 +226,8 @@ mat_V ( const hpro::TRkMatrix &  A,
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector >
-typename hpro::enable_if_res< is_vector< T_vector >::value,
-                              vector< typename T_vector::value_t > >::result
+typename std::enable_if_t< is_vector< T_vector >::value,
+                           vector< typename T_vector::value_t > >
 copy ( const T_vector &  v )
 {
     using  value_t = typename T_vector::value_t;
@@ -240,8 +240,8 @@ copy ( const T_vector &  v )
 }
 
 template < typename T_matrix >
-typename hpro::enable_if_res< is_matrix< T_matrix >::value,
-                              matrix< typename T_matrix::value_t > >::result
+typename std::enable_if_t< is_matrix< T_matrix >::value,
+                           matrix< typename T_matrix::value_t > >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
@@ -923,7 +923,7 @@ qr_impl  ( matrix< value_t > &       A,
 
     auto  work_query = value_t(0);
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to geqrf failed" );
@@ -934,7 +934,7 @@ qr_impl  ( matrix< value_t > &       A,
     // compute QR
     //
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "geqrf failed" );
@@ -1081,7 +1081,7 @@ compute_Q ( const matrix< value_t > &       Q,
     blas_int_t  info  = 0;
     auto        work_query = value_t(0);
 
-    orgqr< value_t >( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
+    orgqr( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to orgqr failed" );
@@ -1094,7 +1094,7 @@ compute_Q ( const matrix< value_t > &       Q,
 
     auto  M = copy( Q );
     
-    orgqr< value_t >( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
+    orgqr( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "orgqr failed" );

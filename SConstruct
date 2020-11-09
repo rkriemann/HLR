@@ -361,7 +361,8 @@ elif lapack == 'mklseq' :
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
 
 # add CUDA
-env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+# env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+env.MergeFlags( '-isystem ' + os.path.join( CUDA_DIR, 'include' ) )
 env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64'   ) )
 env.Append( LIBS    = [ 'cudart', 'cublas', 'cusolver' ] )
     
@@ -488,7 +489,8 @@ env.Alias( 'options', options_cmd )
 #
 # CUDA sources
 #
-cuda_sources = [ 'src/cuda/hmul_theta.cc' ]
+cuda_sources = [ 'src/cuda/hmul_theta.cc',
+                 'src/cuda/jacobi.cc' ]
 
 cuda_env = env.Clone()
 cuda_env.Replace( CC  = os.path.join( CUDA_DIR, 'bin', 'nvcc' ) + ' -x cu' )

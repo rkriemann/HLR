@@ -51,22 +51,25 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
     auto          norms      = blas::matrix< real_t >( nbrows, nbcols );
 
     // temporary workspace per block row/column
-    auto  C0 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
-    auto  C1 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
-    auto  T0 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
-    auto  T1 = std::vector< blas::matrix< value_t > >( std::max( nbrows, nbcols ) );
+    auto  C0 = tensor2< blas::matrix< value_t > >( std::max( nbrows, nbcols ) / 2, std::max( nbrows, nbcols ) );
+    auto  C1 = tensor2< blas::matrix< value_t > >( std::max( nbrows, nbcols ) / 2, std::max( nbrows, nbcols ) );
+    auto  T0 = tensor2< blas::matrix< value_t > >( std::max( nbrows, nbcols ) / 2, std::max( nbrows, nbcols ) );
+    auto  T1 = tensor2< blas::matrix< value_t > >( std::max( nbrows, nbcols ) / 2, std::max( nbrows, nbcols ) );
     auto  ap = ::tbb::affinity_partitioner();
     
     ::tbb::parallel_for(
         ::tbb::blocked_range< size_t >( 0, std::max( nbrows, nbcols ) ),
         [&,block_size] ( const auto  r )
         {
-            for ( auto  i = r.begin(); i != r.end(); ++i )
+            for ( size_t  l = 0; l < std::max( nbrows, nbcols ) / 2; ++l )
             {
-                C0 = std::move( blas::matrix< value_t >( block_size, block_size ) );
-                C1 = std::move( blas::matrix< value_t >( block_size, block_size ) );
-                T0 = std::move( blas::matrix< value_t >( block_size, block_size ) );
-                T1 = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                for ( auto  i = r.begin(); i != r.end(); ++i )
+                {
+                    C0(l,i) = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                    C1(l,i) = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                    T0(l,i) = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                    T1(l,i) = std::move( blas::matrix< value_t >( block_size, block_size ) );
+                }// for
             }// for
         },
         ap );
@@ -269,20 +272,27 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
                             auto        M_il = blas::matrix< value_t >( M, r_i, r_l );
                             auto        M_jl = blas::matrix< value_t >( M, r_j, r_l );
 
-                            blas::copy( M_il, C0[l] );
-                            blas::copy( M_jl, C1[l] );
+                            blas::copy( M_il, C0( idx, l ) );
+                            blas::copy( M_jl, C1( idx, l ) );
+
+                            ::tbb::parallel_invoke(
+                                [&,idx,l] ()
+                                {
+                                    blas::prod( value_t(1), blas::adjoint(VA_ii), C0( idx, l ), value_t(0), T0( idx, l ) );
+                                    blas::prod( value_t(1), blas::adjoint(VA_ji), C1( idx, l ), value_t(1), T0( idx, l ) );
+                                },
+
+                                [&,idx,l] ()
+                                {
+                                    blas::prod( value_t(1), blas::adjoint(VA_ij), C0( idx, l ), value_t(0), T1( idx, l ) );
+                                    blas::prod( value_t(1), blas::adjoint(VA_jj), C1( idx, l ), value_t(1), T1( idx, l ) );
+                                } );
                         
-                            blas::prod( value_t(1), blas::adjoint(VA_ii), C0[l], value_t(0), T0[l] );
-                            blas::prod( value_t(1), blas::adjoint(VA_ij), C0[l], value_t(0), T1[l] );
+                            norms(i,l) = blas::norm_F( T0( idx, l ) );
+                            norms(j,l) = blas::norm_F( T1( idx, l ) );
                         
-                            blas::prod( value_t(1), blas::adjoint(VA_ji), C1[l], value_t(1), T0[l] );
-                            blas::prod( value_t(1), blas::adjoint(VA_jj), C1[l], value_t(1), T1[l] );
-                        
-                            norms(i,l) = blas::norm_F( T0[l] );
-                            norms(j,l) = blas::norm_F( T1[l] );
-                        
-                            blas::copy( T0[l], M_il );
-                            blas::copy( T1[l], M_jl );
+                            blas::copy( T0( idx, l ), M_il );
+                            blas::copy( T1( idx, l ), M_jl );
                         }// for
                     },
                     ap );
@@ -309,54 +319,64 @@ eigen_bjac ( blas::matrix< value_t > &                          M,
                 const auto  VA_jj    = blas::matrix< value_t >( VA, r_1, r_1 );
                 
                 // for ( size_t  l = 0; l < nbrows; ++l )
-                ::tbb::parallel_for< size_t >(
-                    0, nbrows,
-                    [&,i,j,block_size] ( const size_t  l )
+                ::tbb::parallel_for(
+                    ::tbb::blocked_range< size_t >( 0, nbrows ),
+                    [&,i,j,block_size] ( const auto  r )
                     {
-                        const auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
+                        for ( auto  l = r.begin(); l != r.end(); ++l )
+                        {
+                            const auto  r_l  = blas::range( l*block_size, (l+1)*block_size-1 );
 
-                        //
-                        // (M_li M_lj) ⎛A₀₀ A₀₁⎞
-                        //             ⎝A₁₀ A₁₁⎠   
-                        //
+                            //
+                            // (M_li M_lj) ⎛A₀₀ A₀₁⎞
+                            //             ⎝A₁₀ A₁₁⎠   
+                            //
 
-                        auto        M_li = blas::matrix< value_t >( M, r_l, r_i );
-                        auto        M_lj = blas::matrix< value_t >( M, r_l, r_j );
+                            auto  M_li = blas::matrix< value_t >( M, r_l, r_i );
+                            auto  M_lj = blas::matrix< value_t >( M, r_l, r_j );
 
-                        const auto  C_li = blas::copy( M_li );
-                        const auto  C_lj = blas::copy( M_lj );
-                        
-                        auto        T_li = blas::prod( value_t(1), C_li, VA_ii );
-                        auto        T_lj = blas::prod( value_t(1), C_li, VA_ij );
-                        
-                        blas::prod( value_t(1), C_lj, VA_ji, value_t(1), T_li );
-                        blas::prod( value_t(1), C_lj, VA_jj, value_t(1), T_lj );
-                        
-                        norms(l,i) = blas::norm_F( T_li );
-                        norms(l,j) = blas::norm_F( T_lj );
-                        
-                        blas::copy( T_li, M_li );
-                        blas::copy( T_lj, M_lj );
+                            blas::copy( M_li, C0( idx, l ) );
+                            blas::copy( M_lj, C1( idx, l ) );
 
-                        //
-                        // (V_li V_lj) ⎛A₀₀, A₀₁⎞
-                        //             ⎝A₁₀, A₁₁⎠   
-                        //
-                        
-                        auto  V_li = blas::matrix< value_t >( V, r_l, r_i );
-                        auto  V_lj = blas::matrix< value_t >( V, r_l, r_j );
+                            ::tbb::parallel_invoke(
+                                [&,idx,l] ()
+                                {
+                                    blas::prod( value_t(1), C0( idx, l ), VA_ii, value_t(0), T0( idx, l ) );
+                                    blas::prod( value_t(1), C1( idx, l ), VA_ji, value_t(1), T0( idx, l ) );
+                                },
 
-                        C_li = blas::copy( V_li, C_li );
-                        D_lj = blas::copy( V_lj, C_li );
+                                [&,idx,l] ()
+                                {
+                                    blas::prod( value_t(1), C0( idx, l ), VA_ij, value_t(0), T1( idx, l ) );
+                                    blas::prod( value_t(1), C1( idx, l ), VA_jj, value_t(1), T1( idx, l ) );
+                                } );
                         
-                        blas::prod( value_t(1), D_li, VA_ii, value_t(0), T_li );
-                        blas::prod( value_t(1), D_li, VA_ij, value_t(0), T_lj );
+                            norms(l,i) = blas::norm_F( T0( idx, l ) );
+                            norms(l,j) = blas::norm_F( T1( idx, l ) );
                         
-                        blas::prod( value_t(1), D_lj, VA_ji, value_t(1), S_li );
-                        blas::prod( value_t(1), D_lj, VA_jj, value_t(1), S_lj );
+                            blas::copy( T0( idx, l ), M_li );
+                            blas::copy( T1( idx, l ), M_lj );
+
+                            //
+                            // (V_li V_lj) ⎛A₀₀, A₀₁⎞
+                            //             ⎝A₁₀, A₁₁⎠   
+                            //
                         
-                        blas::copy( S_li, V_li );
-                        blas::copy( S_lj, V_lj );
+                            auto  V_li = blas::matrix< value_t >( V, r_l, r_i );
+                            auto  V_lj = blas::matrix< value_t >( V, r_l, r_j );
+
+                            blas::copy( V_li, C0( idx, l ) );
+                            blas::copy( V_lj, C1( idx, l ) );
+                        
+                            blas::prod( value_t(1), C0( idx, l ), VA_ii, value_t(0), T0( idx, l ) );
+                            blas::prod( value_t(1), C0( idx, l ), VA_ij, value_t(0), T1( idx, l ) );
+                        
+                            blas::prod( value_t(1), C1( idx, l ), VA_ji, value_t(1), T0( idx, l ) );
+                            blas::prod( value_t(1), C1( idx, l ), VA_jj, value_t(1), T1( idx, l ) );
+                        
+                            blas::copy( T0( idx, l ), V_li );
+                            blas::copy( T1( idx, l ), V_lj );
+                        }// for
                     } );
             } );
         
@@ -751,25 +771,46 @@ program_main ()
 
         // M = std::move( // io::read_matlab< value_t >( "M.mat" ) );
         
-        // {
-        //     auto M2       = blas::copy( M );
-        //     auto tic      = timer::now();
-            
-        //     auto [ E1, V1 ] = eigen_bjac( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
-            
-        //     std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
-        // }
-        
-        // {
-        //     auto M2       = blas::copy< float >( M );
-        //     auto tic      = timer::now();
-            
-        //     auto [ E1, V1 ] = eigen_bjac( M2, cmdline::ntile, 1e-5, 100, cmdline::verbosity );
-            
-        //     std::cout << "Jacobi in " << format_time( timer::since( tic ) ) << std::endl;
-        // }
+        //
+        // CPU
+        //
 
-        // return;
+        if ( false )
+        {
+            {
+                std::cout << term::bold << "  Jacobi (double)" << term::reset << std::endl;
+                
+                auto M2   = blas::copy( M );
+                auto stat = blas::eigen_stat();
+                auto tic  = timer::now();
+                
+                auto [ E1, V1 ] = eigen_bjac( M2, cmdline::ntile, 1e-14, 100, cmdline::verbosity, & stat );
+                
+                auto toc = timer::since( tic );
+            
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
+            }
+            
+            {
+                std::cout << term::bold << "  Jacobi (float+double)" << term::reset << std::endl;
+                
+                auto Mf   = blas::copy< float >( M );
+                auto stat = blas::eigen_stat();
+                auto tic  = timer::now();
+                
+                auto [ E1, V1 ] = eigen_bjac( Mf, cmdline::ntile, 1e-5, 100, cmdline::verbosity, & stat );
+                
+                auto toc = timer::since( tic );
+
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+
+                
+                std::cout << "    error = " << format_error( blas::everror( Mf, E1, V1 ) ) << std::endl;
+            }
+            
+            return;
+        }// if
 
         //
         // GPU
@@ -779,53 +820,48 @@ program_main ()
         {
             blas::cuda::init();
 
-            // {
-            //     auto  A1 = blas::random< value_t >( 16, 16 );
-            //     auto  A2 = blas::random< value_t >( 16, 16 );
-            //     auto  B1 = blas::random< value_t >( 16, 16 );
-            //     auto  B2 = blas::random< value_t >( 16, 16 );
-            //     auto  C1 = blas::random< value_t >( 16, 16 );
-            //     auto  C2 = blas::random< value_t >( 16, 16 );
+            {
+                auto  M = blas::random< float >( 16, 16 );
+                auto  V = blas::matrix< float >( 16, 16 );
+                auto  E = blas::vector< float >( 16 );
 
-            //     io::matlab::write( A1, "A1" );
-            //     io::matlab::write( A2, "A2" );
-            //     io::matlab::write( B1, "B1" );
-            //     io::matlab::write( B2, "B2" );
-            //     io::matlab::write( C1, "C1" );
-            //     io::matlab::write( C2, "C2" );
+                io::matlab::write( M, "M" );
+
+                // auto  bf16_M = blas::matrix< __nv_bfloat16 >( 16, 16 );
+                __nv_bfloat16 *  bf16_M = nullptr;
+                __nv_bfloat16 *  bf16_V = nullptr;
+                __nv_bfloat16 *  bf16_E = nullptr;
+
+                cudaMallocHost( & bf16_M, sizeof(__nv_bfloat16) * 16*16 );
+
+                for ( int  i = 0; i < 16*16; ++i )
+                    bf16_M[i] = M.data()[i];
                 
-            //     auto  dev_A1 = blas::cuda::device_alloc< value_t >( 16*16 );
-            //     auto  dev_A2 = blas::cuda::device_alloc< value_t >( 16*16 );
-            //     auto  dev_B1 = blas::cuda::device_alloc< value_t >( 16*16 );
-            //     auto  dev_B2 = blas::cuda::device_alloc< value_t >( 16*16 );
-            //     auto  dev_C1 = blas::cuda::device_alloc< value_t >( 16*16 );
-            //     auto  dev_C2 = blas::cuda::device_alloc< value_t >( 16*16 );
+                auto  dev_M = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
+                auto  dev_V = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
+                auto  dev_E = blas::cuda::device_alloc< __nv_bfloat16 >( 16 );
 
-            //     blas::cuda::to_device( A1, dev_A1, 16 );
-            //     blas::cuda::to_device( A2, dev_A2, 16 );
-            //     blas::cuda::to_device( B1, dev_B1, 16 );
-            //     blas::cuda::to_device( B2, dev_B2, 16 );
-            //     blas::cuda::to_device( C1, dev_C1, 16 );
-            //     blas::cuda::to_device( C2, dev_C2, 16 );
+                cudaMemcpy( dev_M, bf16_M, 16*16, cudaMemcpyHostToDevice );
 
-            //     value_t *  A_ptr[2] = { dev_A1, dev_A2 };
-            //     value_t *  B_ptr[2] = { dev_B1, dev_B2 };
-            //     value_t *  C_ptr[2] = { dev_C1, dev_C2 };
+                blas::cuda::jacobi_bf16( n, dev_M, dev_V, dev_E );
 
-            //     auto  one   = blas::cuda::make_constant< value_t >( 1 );
-            //     auto  zero  = blas::cuda::make_constant< value_t >( 0 );
+                cudaMallocHost( & bf16_V, sizeof(__nv_bfloat16) * 16*16 );
+                cudaMallocHost( & bf16_E, sizeof(__nv_bfloat16) * 16 );
 
-            //     blas::cuda::prod_batched( blas::cuda::default_handle, CUBLAS_OP_C, CUBLAS_OP_N,
-            //                               16, 16, 16, one, A_ptr, 16, B_ptr, 16, zero, C_ptr, 16, 2 );
+                cudaMemcpy( dev_V, bf16_V, 16*16, cudaMemcpyDeviceToHost );
+                cudaMemcpy( dev_E, bf16_E, 16,    cudaMemcpyDeviceToHost );
 
-            //     blas::cuda::from_device( dev_C1, 16, A1 );
-            //     blas::cuda::from_device( dev_C2, 16, A2 );
+                for ( int  i = 0; i < 16*16; ++i )
+                    V.data()[i] = bf16_V[i];
 
-            //     io::matlab::write( A1, "D1" );
-            //     io::matlab::write( A2, "D2" );
+                for ( int  i = 0; i < 16; ++i )
+                    E.data()[i] = bf16_E[i];
 
-            //     return;
-            // }
+                io::matlab::write( V, "V" );
+                io::matlab::write( E, "E" );
+
+                return;
+            }
 
             
             std::cout << term::bullet << term::bold << "CUDA eigenvalue algorithms" << term::reset << std::endl;
