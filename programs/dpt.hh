@@ -750,7 +750,7 @@ template < typename problem_t >
 void
 program_main ()
 {
-    using value_t = double;
+    using value_t = float;
 
     if ( true )
     {
@@ -792,22 +792,22 @@ program_main ()
                 std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
             }
             
-            {
-                std::cout << term::bold << "  Jacobi (float+double)" << term::reset << std::endl;
+            // {
+            //     std::cout << term::bold << "  Jacobi (float+double)" << term::reset << std::endl;
                 
-                auto Mf   = blas::copy< float >( M );
-                auto stat = blas::eigen_stat();
-                auto tic  = timer::now();
+            //     auto Mf   = blas::copy< float >( M );
+            //     auto stat = blas::eigen_stat();
+            //     auto tic  = timer::now();
                 
-                auto [ E1, V1 ] = eigen_bjac( Mf, cmdline::ntile, 1e-5, 100, cmdline::verbosity, & stat );
+            //     auto [ E1, V1 ] = eigen_bjac( Mf, cmdline::ntile, 1e-5, 100, cmdline::verbosity, & stat );
                 
-                auto toc = timer::since( tic );
+            //     auto toc = timer::since( tic );
 
-                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+            //     std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
 
                 
-                std::cout << "    error = " << format_error( blas::everror( Mf, E1, V1 ) ) << std::endl;
-            }
+            //     std::cout << "    error = " << format_error( blas::everror( Mf, E1, V1 ) ) << std::endl;
+            // }
             
             return;
         }// if
@@ -820,48 +820,48 @@ program_main ()
         {
             blas::cuda::init();
 
-            {
-                auto  M = blas::random< float >( 16, 16 );
-                auto  V = blas::matrix< float >( 16, 16 );
-                auto  E = blas::vector< float >( 16 );
+            // {
+            //     auto  M = blas::random< float >( 16, 16 );
+            //     auto  V = blas::matrix< float >( 16, 16 );
+            //     auto  E = blas::vector< float >( 16 );
 
-                io::matlab::write( M, "M" );
+            //     io::matlab::write( M, "M" );
 
-                // auto  bf16_M = blas::matrix< __nv_bfloat16 >( 16, 16 );
-                __nv_bfloat16 *  bf16_M = nullptr;
-                __nv_bfloat16 *  bf16_V = nullptr;
-                __nv_bfloat16 *  bf16_E = nullptr;
+            //     // auto  bf16_M = blas::matrix< __nv_bfloat16 >( 16, 16 );
+            //     __nv_bfloat16 *  bf16_M = nullptr;
+            //     __nv_bfloat16 *  bf16_V = nullptr;
+            //     __nv_bfloat16 *  bf16_E = nullptr;
 
-                cudaMallocHost( & bf16_M, sizeof(__nv_bfloat16) * 16*16 );
+            //     cudaMallocHost( & bf16_M, sizeof(__nv_bfloat16) * 16*16 );
 
-                for ( int  i = 0; i < 16*16; ++i )
-                    bf16_M[i] = M.data()[i];
+            //     for ( int  i = 0; i < 16*16; ++i )
+            //         bf16_M[i] = M.data()[i];
                 
-                auto  dev_M = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
-                auto  dev_V = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
-                auto  dev_E = blas::cuda::device_alloc< __nv_bfloat16 >( 16 );
+            //     auto  dev_M = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
+            //     auto  dev_V = blas::cuda::device_alloc< __nv_bfloat16 >( 16*16 );
+            //     auto  dev_E = blas::cuda::device_alloc< __nv_bfloat16 >( 16 );
 
-                cudaMemcpy( dev_M, bf16_M, 16*16, cudaMemcpyHostToDevice );
+            //     cudaMemcpy( dev_M, bf16_M, 16*16, cudaMemcpyHostToDevice );
 
-                blas::cuda::jacobi_bf16( n, dev_M, dev_V, dev_E );
+            //     blas::cuda::jacobi_bf16( n, dev_M, dev_V, dev_E );
 
-                cudaMallocHost( & bf16_V, sizeof(__nv_bfloat16) * 16*16 );
-                cudaMallocHost( & bf16_E, sizeof(__nv_bfloat16) * 16 );
+            //     cudaMallocHost( & bf16_V, sizeof(__nv_bfloat16) * 16*16 );
+            //     cudaMallocHost( & bf16_E, sizeof(__nv_bfloat16) * 16 );
 
-                cudaMemcpy( dev_V, bf16_V, 16*16, cudaMemcpyDeviceToHost );
-                cudaMemcpy( dev_E, bf16_E, 16,    cudaMemcpyDeviceToHost );
+            //     cudaMemcpy( dev_V, bf16_V, 16*16, cudaMemcpyDeviceToHost );
+            //     cudaMemcpy( dev_E, bf16_E, 16,    cudaMemcpyDeviceToHost );
 
-                for ( int  i = 0; i < 16*16; ++i )
-                    V.data()[i] = bf16_V[i];
+            //     for ( int  i = 0; i < 16*16; ++i )
+            //         V.data()[i] = bf16_V[i];
 
-                for ( int  i = 0; i < 16; ++i )
-                    E.data()[i] = bf16_E[i];
+            //     for ( int  i = 0; i < 16; ++i )
+            //         E.data()[i] = bf16_E[i];
 
-                io::matlab::write( V, "V" );
-                io::matlab::write( E, "E" );
+            //     io::matlab::write( V, "V" );
+            //     io::matlab::write( E, "E" );
 
-                return;
-            }
+            //     return;
+            // }
 
             
             std::cout << term::bullet << term::bold << "CUDA eigenvalue algorithms" << term::reset << std::endl;
@@ -926,6 +926,31 @@ program_main ()
                 tic = timer::now();
             
                 auto [ E, V ] = blas::cuda::eigen_bjac_batched( blas::cuda::default_handle, M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
+
+                toc = timer::since( tic );
+            
+                std::cout << "    done in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+
+                io::matlab::write( E, "E" );
+                io::matlab::write( V, "V" );
+            }
+
+            {
+                std::cout << term::bold << "  batched block-wise Jacobi (TensorCores)" << term::reset << std::endl;
+                
+                auto  tic = timer::now();
+                auto  toc = timer::since( tic );
+
+                blas::eigen_stat  stat;
+
+                io::matlab::write( M, "M" );
+                
+                auto  M2  = blas::copy( M );
+            
+                tic = timer::now();
+            
+                auto [ E, V ] = blas::cuda::eigen_bjac_batched_tc( blas::cuda::default_handle, M2, cmdline::ntile, 1e-14, 1000, cmdline::verbosity, & stat );
 
                 toc = timer::since( tic );
             
@@ -1137,110 +1162,110 @@ program_main ()
         // single Jac + double Jac
         //
         
-        {
-            auto  tic = timer::now();
-            auto  toc = timer::since( tic );
+        // {
+        //     auto  tic = timer::now();
+        //     auto  toc = timer::since( tic );
 
-            blas::eigen_stat  stat;
+        //     blas::eigen_stat  stat;
             
-            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+        //     auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
 
-            tic = timer::now();
+        //     tic = timer::now();
             
-            auto  M2        = blas::copy< float >( M );
-            auto [ Es, Vs ] = eigen_bjac( M2, cmdline::ntile, 1e-4, 1000, cmdline::verbosity, & stat );
+        //     auto  M2        = blas::copy< float >( M );
+        //     auto [ Es, Vs ] = eigen_bjac( M2, cmdline::ntile, 1e-4, 1000, cmdline::verbosity, & stat );
 
-            toc = timer::since( tic );
+        //     toc = timer::since( tic );
 
-            std::cout << "single Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+        //     std::cout << "single Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
             
             
-            auto  Ed        = blas::copy< double >( Es );
-            auto  Vd        = blas::copy< double >( Vs );
+        //     auto  Ed        = blas::copy< double >( Es );
+        //     auto  Vd        = blas::copy< double >( Vs );
 
-            std::cout << "    error = " << format_error( blas::everror( M, Ed, Vd ) ) << std::endl;
+        //     std::cout << "    error = " << format_error( blas::everror( M, Ed, Vd ) ) << std::endl;
 
-            tic = timer::now();
+        //     tic = timer::now();
             
-            auto  VM        = blas::prod( value_t(1), blas::adjoint( Vd ), M );
-            auto  VMV       = blas::prod( value_t(1), VM, Vd );
+        //     auto  VM        = blas::prod( value_t(1), blas::adjoint( Vd ), M );
+        //     auto  VMV       = blas::prod( value_t(1), VM, Vd );
 
-            // auto  [ E, V ] = blas::eigen_dpt( VMV, 1e-14, 0, "frobenius", cmdline::verbosity );
-            auto  [ E, V ]  = eigen_bjac( VMV, cmdline::ntile, 1e-14, 1000, cmdline::verbosity );
+        //     // auto  [ E, V ] = blas::eigen_dpt( VMV, 1e-14, 0, "frobenius", cmdline::verbosity );
+        //     auto  [ E, V ]  = eigen_bjac( VMV, cmdline::ntile, 1e-14, 1000, cmdline::verbosity );
             
-            toc = timer::since( tic );
+        //     toc = timer::since( tic );
 
-            std::cout << "double Jacobi in " << format_time( toc ) << std::endl;
+        //     std::cout << "double Jacobi in " << format_time( toc ) << std::endl;
 
-            auto  V2 = blas::prod( double(1), V, Vd );
+        //     auto  V2 = blas::prod( double(1), V, Vd );
             
-            std::cout << "    error = " << format_error( blas::everror( M, E, V2 ) ) << std::endl;
+        //     std::cout << "    error = " << format_error( blas::everror( M, E, V2 ) ) << std::endl;
 
-            mkl_set_num_threads_local( mkl_nthreads );
+        //     mkl_set_num_threads_local( mkl_nthreads );
             
-            return;
-        }
+        //     return;
+        // }
 
         //
         // Precond + Jac + DPT
         //
         
-        {
-            auto  M2  = blas::matrix< value_t >();
-            auto  tic = timer::now();
+        // {
+        //     auto  M2  = blas::matrix< value_t >();
+        //     auto  tic = timer::now();
 
-            blas::eigen_stat  stat;
+        //     blas::eigen_stat  stat;
 
-            if ( true )
-            {
-                auto  [ Q, R ] = blas::qr( M );
-                auto  H        = blas::prod( value_t(1), R, Q );
-                auto  Delta    = blas::prod( value_t(1), M, Q );
+        //     if ( true )
+        //     {
+        //         auto  [ Q, R ] = blas::qr( M );
+        //         auto  H        = blas::prod( value_t(1), R, Q );
+        //         auto  Delta    = blas::prod( value_t(1), M, Q );
 
-                blas::prod( value_t(-1), Q, H, value_t(1), Delta );
-                blas::prod( value_t(1), blas::adjoint(Q), Delta, value_t(1), H );
+        //         blas::prod( value_t(-1), Q, H, value_t(1), Delta );
+        //         blas::prod( value_t(1), blas::adjoint(Q), Delta, value_t(1), H );
 
-                M2 = std::move( H );
-            }// if
-            else
-                M2 = std::move( blas::copy( M ) );
+        //         M2 = std::move( H );
+        //     }// if
+        //     else
+        //         M2 = std::move( blas::copy( M ) );
 
-            auto  toc      = timer::since( tic );
+        //     auto  toc      = timer::since( tic );
 
-            std::cout << "precond in " << format_time( toc ) << std::endl;
+        //     std::cout << "precond in " << format_time( toc ) << std::endl;
 
-            io::matlab::write( M2, "M2" );
+        //     io::matlab::write( M2, "M2" );
             
-            tic = timer::now();
+        //     tic = timer::now();
             
-            auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
+        //     auto  mkl_nthreads = mkl_set_num_threads_local( 1 );
                 
-            auto [ E1, V1 ] = eigen_bjac( M2, cmdline::ntile, 1e-3, 1000, cmdline::verbosity, & stat );
+        //     auto [ E1, V1 ] = eigen_bjac( M2, cmdline::ntile, 1e-3, 1000, cmdline::verbosity, & stat );
 
-            mkl_set_num_threads_local( mkl_nthreads );
+        //     mkl_set_num_threads_local( mkl_nthreads );
 
-            toc = timer::since( tic );
+        //     toc = timer::since( tic );
             
-            std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
-            std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
+        //     std::cout << "Jacobi in " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+        //     std::cout << "    error = " << format_error( blas::everror( M, E1, V1 ) ) << std::endl;
 
-            tic = timer::now();
+        //     tic = timer::now();
             
-            auto  [ E, V2 ] = blas::eigen_dpt( M2, 1e-14, 0, "frobenius", cmdline::verbosity );
+        //     auto  [ E, V2 ] = blas::eigen_dpt( M2, 1e-14, 0, "frobenius", cmdline::verbosity );
 
-            toc = timer::since( tic );
+        //     toc = timer::since( tic );
 
-            std::cout << "DPT in " << format_time( toc ) << std::endl;
+        //     std::cout << "DPT in " << format_time( toc ) << std::endl;
 
-            tic = timer::now();
+        //     tic = timer::now();
             
-            auto  V = blas::prod( double(1), V2, V1 );
+        //     auto  V = blas::prod( double(1), V2, V1 );
             
-            toc = timer::since( tic );
+        //     toc = timer::since( tic );
 
-            std::cout << "V in   " << format_time( toc ) << std::endl;
-            std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
-        }
+        //     std::cout << "V in   " << format_time( toc ) << std::endl;
+        //     std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
+        // }
 
         return;
         
@@ -1269,7 +1294,7 @@ program_main ()
 
             tic = timer::now();
             
-            auto  V = blas::prod( double(1), V2, V1 );
+            auto  V = blas::prod( value_t(1), V2, V1 );
             
             toc = timer::since( tic );
 

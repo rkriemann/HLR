@@ -15,11 +15,14 @@
 namespace hlr { namespace blas { namespace cuda {
 
 // wrapper for cuda, cuBlas and cuSolver functions
-#define HLR_CUDA_CHECK( func, args )                        \
-    {                                                       \
-        auto  result = func args ;                          \
-        if ( result != cudaSuccess )                        \
-            HLR_ERROR( "CUDA error in function " #func + hpro::to_string( " (error = %d)", result ) );   \
+#define HLR_CUDA_CHECK( func, args )                                    \
+    {                                                                   \
+        auto  result = func args ;                                      \
+        if ( result != cudaSuccess )                                    \
+        {                                                               \
+            auto  err_str = cudaGetErrorString( result );               \
+            HLR_ERROR( "CUDA error in function " #func + hpro::to_string( " (error = %d : %s)", result, err_str ) ); \
+        }                                                               \
     }
 
 #define HLR_CUBLAS_CHECK( func, args )                      \
@@ -444,6 +447,36 @@ HLR_CUDA_GEMM_BATCHED( cuFloatComplex,  cublasCgemmBatched )
 HLR_CUDA_GEMM_BATCHED( cuDoubleComplex, cublasZgemmBatched )
 
 #undef HLR_CUDA_GEMM_BATCHED
+
+template < typename value_t >
+void
+prod_batched_tc ( handle                   handle,
+                  const cublasOperation_t  trans_A,
+                  const cublasOperation_t  trans_B,
+                  const int                nrows_C,
+                  const int                ncols_C,
+                  const int                nrows_A,
+                  const value_t            alpha,
+                  value_t **               A,
+                  cudaDataType             type_A,
+                  const int                ld_A,
+                  value_t **               B,
+                  cudaDataType             type_B,
+                  const int                ld_B,
+                  const value_t            beta,
+                  value_t **               C,
+                  cudaDataType             type_C,
+                  const int                ld_C,
+                  const int                nbatch,
+                  cublasComputeType_t      type_compute )
+{
+    using  void_ptr_t  = void *;
+    using  void_dptr_t = void_ptr_t *;
+    
+    HLR_CUBLAS_CHECK( cublasGemmBatchedEx, ( handle.blas, trans_A, trans_B, nrows_C, ncols_C, nrows_A,
+                                             void_ptr_t( & alpha ), void_dptr_t(A), type_A, ld_A, void_dptr_t(B), type_B, ld_B,
+                                             void_ptr_t( & beta ),  void_dptr_t(C), type_C, ld_C, nbatch, type_compute, CUBLAS_GEMM_DEFAULT_TENSOR_OP ) );
+}
 
 //////////////////////////////////////////////////////////////////////
 //
