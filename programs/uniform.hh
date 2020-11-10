@@ -245,7 +245,7 @@ program_main ()
         // LDU factorization
         //
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "LDU" << term::reset << std::endl;
             
@@ -328,7 +328,7 @@ program_main ()
             
             tic = timer::now();
             
-            impl::uniform::tlr::lu< value_t >( *A3, acc );
+            impl::uniform::tlr::lu_lazy< value_t >( *A3, acc );
 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
