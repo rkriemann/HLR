@@ -589,38 +589,38 @@ HLR_BLAS_UNMQR( std::complex< double >, zunmqr_ )
 
 extern "C"
 {
-void sorg2r_ ( const blas_int_t *        nrows,
-               const blas_int_t *        ncols,
-               const blas_int_t *        nref,
-               float *                   A,
-               const blas_int_t *        lda,
-               float *                   tau,
-               float *                   work,
-               const blas_int_t *        info );
-void dorg2r_ ( const blas_int_t *        nrows,
-               const blas_int_t *        ncols,
-               const blas_int_t *        nref,
-               double *                  A,
-               const blas_int_t *        lda,
-               double *                  tau,
-               double *                  work,
-               const blas_int_t *        info );
-void cung2r_ ( const blas_int_t *        nrows,
-               const blas_int_t *        ncols,
-               const blas_int_t *        nref,
-               std::complex< float > *   A,
-               const blas_int_t *        lda,
-               std::complex< float > *   tau,
-               std::complex< float > *   work,
-               const blas_int_t *        info );
-void zung2r_ ( const blas_int_t *        nrows,
-               const blas_int_t *        ncols,
-               const blas_int_t *        nref,
-               std::complex< double > *  A,
-               const blas_int_t *        lda,
-               std::complex< double > *  tau,
-               std::complex< double > *  work,
-               const blas_int_t *        info );
+void sorg2r_ ( const blas_int_t *             nrows,
+               const blas_int_t *             ncols,
+               const blas_int_t *             nref,
+               float *                        A,
+               const blas_int_t *             lda,
+               const float *                  tau,
+               float *                        work,
+               const blas_int_t *             info );
+void dorg2r_ ( const blas_int_t *             nrows,
+               const blas_int_t *             ncols,
+               const blas_int_t *             nref,
+               double *                       A,
+               const blas_int_t *             lda,
+               const double *                 tau,
+               double *                       work,
+               const blas_int_t *             info );
+void cung2r_ ( const blas_int_t *             nrows,
+               const blas_int_t *             ncols,
+               const blas_int_t *             nref,
+               std::complex< float > *        A,
+               const blas_int_t *             lda,
+               const std::complex< float > *  tau,
+               std::complex< float > *        work,
+               const blas_int_t *             info );
+void zung2r_ ( const blas_int_t *             nrows,
+               const blas_int_t *             ncols,
+               const blas_int_t *             nref,
+               std::complex< double > *       A,
+               const blas_int_t *             lda,
+               const std::complex< double > * tau,
+               std::complex< double > *       work,
+               const blas_int_t *             info );
 }
 
 #define HLR_BLAS_UNG2R( type, func )                    \

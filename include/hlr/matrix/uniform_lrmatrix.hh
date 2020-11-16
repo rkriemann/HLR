@@ -58,7 +58,7 @@ private:
     const cluster_basis< value_t > *  _col_cb;
 
     // local coefficient matrix
-    blas::Matrix< value_t >           _S;
+    blas::matrix< value_t >           _S;
     
 public:
     //
@@ -139,7 +139,7 @@ public:
     const blas::matrix< value_t > &  coeff () const { return _S; }
     
     void
-    set_coeff ( const blas::Matrix< value_t > &  aS )
+    set_coeff ( const blas::matrix< value_t > &  aS )
     {
         HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
 
@@ -147,7 +147,7 @@ public:
     }
     
     void
-    set_coeff ( blas::Matrix< value_t > &&  aS )
+    set_coeff ( blas::matrix< value_t > &&  aS )
     {
         HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
 
@@ -157,13 +157,13 @@ public:
     // set coefficient matrix without checking dimensions
     // (because cluster bases need to be adjusted later)
     void
-    set_coeff_unsafe ( const blas::Matrix< value_t > &  aS )
+    set_coeff_unsafe ( const blas::matrix< value_t > &  aS )
     {
         blas::copy( aS, _S );
     }
     
     void
-    set_coeff_unsafe ( blas::Matrix< value_t > &&  aS )
+    set_coeff_unsafe ( blas::matrix< value_t > &&  aS )
     {
         _S = std::move( aS );
     }

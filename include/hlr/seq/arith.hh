@@ -487,6 +487,90 @@ lu ( hpro::TMatrix &          A,
     }// for
 }
 
+template < typename value_t,
+           typename approx_t >
+void
+lu_lazy ( hpro::TMatrix &          A,
+          const hpro::TTruncAcc &  acc,
+          const approx_t &         approx )
+{
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
+    
+    assert( is_blocked( A ) );
+
+    auto  BA  = ptrcast( & A, hpro::TBlockMatrix );
+    auto  nbr = BA->nblock_rows();
+    auto  nbc = BA->nblock_cols();
+
+    for ( uint  i = 0; i < nbr; ++i )
+    {
+        //
+        // invert diagonal block
+        //
+        
+        for ( int  k = 0; k < int(i); k++ )
+            hlr::seq::multiply< value_t >( value_t(-1),
+                                           hpro::apply_normal, *BA->block( i, k ),
+                                           hpro::apply_normal, *BA->block( k, i ),
+                                           *BA->block( i, i ), acc, approx );
+        
+        auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
+        auto  D_ii = blas::mat< value_t >( A_ii );
+            
+        blas::invert( D_ii );
+
+        //
+        // solve with L, e.g. L_ii X_ij = M_ij
+        //
+        
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            auto  A_ij = BA->block( i, j );
+
+            // only update block as L = I
+            for ( int  k = 0; k < int(i); k++ )
+                hlr::seq::multiply< value_t >( value_t(-1),
+                                               hpro::apply_normal, *BA->block( i, k ),
+                                               hpro::apply_normal, *BA->block( k, j ),
+                                               *A_ij, acc, approx );
+        }// for
+        
+        //
+        // solve with U, e.g. X_ji U_ii = M_ji
+        //
+        
+        for ( uint  j = i+1; j < nbc; ++j )
+        {
+            auto  A_ji = BA->block( j, i );
+
+            for ( int  k = 0; k < int(i); k++ )
+                hlr::seq::multiply< value_t >( value_t(-1),
+                                               hpro::apply_normal, *BA->block( j, k ),
+                                               hpro::apply_normal, *BA->block( k, i ),
+                                               *A_ji, acc, approx );
+
+            if ( is_lowrank( A_ji ) )
+            {
+                // A_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
+                // ⟶ W = U, X = D_ii^-T·V
+                auto  R_ji = ptrcast( A_ji, hpro::TRkMatrix );
+                auto  V    = blas::copy( blas::mat_V< value_t >( R_ji ) );
+
+                blas::prod( value_t(1), blas::adjoint( D_ii ), V, value_t(0), blas::mat_V< value_t >( R_ji ) );
+            }// if
+            else if ( is_dense( A_ji ) )
+            {
+                auto  D_ji = ptrcast( A_ji, hpro::TDenseMatrix );
+                auto  T_ji = blas::copy( blas::mat< value_t >( D_ji ) );
+
+                blas::prod( value_t(1), T_ji, D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + A_ji->typestr() );
+        }// for
+    }// for
+}
+
 //
 // LDU factorization A = L·D·U, with unit lower/upper triangular L/U and diagonal D
 // 

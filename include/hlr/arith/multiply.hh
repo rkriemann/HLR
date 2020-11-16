@@ -12,7 +12,7 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/add.hh"
 #include "hlr/approx/svd.hh"
-#include "hlr/seq/matrix.hh" // DEBUG
+// #include "hlr/seq/matrix.hh" // DEBUG
 
 namespace hlr
 {

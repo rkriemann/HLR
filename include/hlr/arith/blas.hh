@@ -226,6 +226,12 @@ mat_V ( const hpro::TRkMatrix &  A,
     return mat_V< value_t >( & A, op );
 }
 
+// }}// namespace hlr::blas
+
+// #include <hlr/utils/io.hh>
+
+// namespace hlr { namespace blas {
+
 //////////////////////////////////////////////////////////////////////
 //
 // general helpers
@@ -414,8 +420,8 @@ diag ( const std::list< matrix< value_t > > &  matrices )
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector >
-typename hpro::enable_if_res< is_vector< T_vector >::value,
-                              vector< typename T_vector::value_t > >::result
+typename std::enable_if_t< is_vector< T_vector >::value,
+                           vector< typename T_vector::value_t > >
 copy ( const T_vector &  v )
 {
     using  value_t = typename T_vector::value_t;
@@ -428,8 +434,8 @@ copy ( const T_vector &  v )
 }
 
 template < typename T_matrix >
-typename hpro::enable_if_res< is_matrix< T_matrix >::value,
-                              matrix< typename T_matrix::value_t > >::result
+typename std::enable_if_t< is_matrix< T_matrix >::value,
+                           matrix< typename T_matrix::value_t > >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
@@ -733,6 +739,10 @@ qr2  ( matrix< value_t > &  M,
     std::vector< value_t >  tau( ncols );
     std::vector< value_t >  work( ncols );
 
+    // // DEBUG {
+    // auto  DM = copy( M );
+    // // DEBUG }
+    
     #if 1
     
     blas_int_t  info = 0;
@@ -742,12 +752,54 @@ qr2  ( matrix< value_t > &  M,
     if (( R.nrows() != minrc ) || ( R.ncols() != ncols ))
         R = std::move( blas::matrix< value_t >( minrc, ncols ) );
     
-    for ( size_t  i = 0; i < ncols; ++i )
-        for ( size_t  j = 0; j <= std::min( i, minrc ); ++j )
-            R(j,i) = M(j,i);
-
     if ( comp_Q )
-        ung2r( nrows, ncols, ncols, M.data(), nrows, tau.data(), work.data(), info );
+    {
+        if ( ncols > nrows )
+        {
+            //
+            // copy M to R, resize M, copy M back and nullify R in
+            //
+
+            copy( M, R );
+            M = std::move( matrix< value_t >( nrows, nrows ) );
+
+            auto  RM = blas::matrix( R, range::all, range( 0, nrows-1 ) );
+
+            copy( RM, M );
+
+            for ( size_t  j = 0; j < nrows; ++j )
+                for ( size_t  i = j+1; i < nrows; ++i )
+                    R(i,j) = value_t(0);
+
+            ung2r( nrows, nrows, nrows, M.data(), nrows, tau.data(), work.data(), info );
+        }// if
+        else
+        {
+            // just copy R from M
+            for ( size_t  j = 0; j < ncols; ++j )
+                for ( size_t  i = 0; i <= j; ++i )
+                    R(i,j) = M(i,j);
+
+            ung2r( nrows, ncols, ncols, M.data(), nrows, tau.data(), work.data(), info );
+        }// else
+    }// if
+    else
+    {
+        for ( size_t  j = 0; j < ncols; ++j )
+            for ( size_t  i = 0; i <= std::min( j, minrc-1 ); ++i )
+                R(i,j) = M(i,j);
+    }// else
+
+    // // DEBUG {
+    // auto  M1 = prod( M, R );
+
+    // hlr::blas::add( value_t(-1), DM, M1 );
+
+    // const auto  err = norm_2( M1 ) / norm_2( DM );
+
+    // if ( err > 1e-15 )
+    //     std::cout << err << std::endl;
+    // // DEBUG }
     
     #else
     
@@ -954,7 +1006,7 @@ qr_impl  ( matrix< value_t > &       A,
 
     auto  work_query = value_t(0);
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to geqrf failed" );
@@ -965,7 +1017,7 @@ qr_impl  ( matrix< value_t > &       A,
     // compute QR
     //
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "geqrf failed" );
@@ -1112,7 +1164,7 @@ compute_Q ( const matrix< value_t > &       Q,
     blas_int_t  info  = 0;
     auto        work_query = value_t(0);
 
-    orgqr< value_t >( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
+    orgqr( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to orgqr failed" );
@@ -1125,7 +1177,7 @@ compute_Q ( const matrix< value_t > &       Q,
 
     auto  M = copy( Q );
     
-    orgqr< value_t >( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
+    orgqr( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "orgqr failed" );
