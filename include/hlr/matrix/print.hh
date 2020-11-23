@@ -23,6 +23,15 @@ void
 print_eps ( const hpro::TMatrix &  M,
             const std::string &    filename );
 
+//
+// print matrix <M> level wise to the files
+// <basename><lvl>.eps, e.g., each level (excluding root)
+// will be written to a separate file
+//
+void
+print_lvl_eps ( const hpro::TMatrix &  M,
+                const std::string &    basename );
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_PRINT_HH

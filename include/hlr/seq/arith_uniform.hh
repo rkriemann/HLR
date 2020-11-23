@@ -2192,9 +2192,9 @@ extend_row_col_basis ( hpro::TBlockMatrix &       M,
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 
-    io::matlab::write( W, "W" );
-    io::matlab::write( T, "T" );
-    io::matlab::write( X, "X" );
+    // io::matlab::write( W, "W" );
+    // io::matlab::write( T, "T" );
+    // io::matlab::write( X, "X" );
 
     auto  M_ij = M.block( i, j );
     auto  R_ij = ptrcast( M_ij, matrix::uniform_lrmatrix< value_t > );
@@ -2915,6 +2915,8 @@ lu ( hpro::TMatrix &          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
+        std::cout << i << std::endl;
+        
         auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  D_ii = blas::mat< value_t >( A_ii );
             
@@ -3351,6 +3353,8 @@ lu_lazy ( hpro::TMatrix &          A,
     
     for ( uint  i = 0; i < nbr; ++i )
     {
+        std::cout << i << std::endl;
+        
         //
         // invert diagonal block
         //
@@ -3410,7 +3414,7 @@ lu_lazy ( hpro::TMatrix &          A,
                 auto  [ Uu, Su, Vu ] = detail::apply_updates< value_t >( *BA, i, j, acc );
 
                 // even without solving, still need to update bases
-                detail::extend_row_col_basis_ref< value_t >( *BA, i, j, Uu, Su, Vu, acc );
+                detail::extend_row_col_basis< value_t >( *BA, i, j, Uu, Su, Vu, acc );
                 
                 // comp_error( i, j );
             }// if
@@ -3491,7 +3495,7 @@ lu_lazy ( hpro::TMatrix &          A,
                 
                 auto  T = blas::prod( Su, blas::adjoint( RV ) );
                     
-                detail::extend_row_col_basis_ref< value_t >( *BA, j, i, Uu, T, MV_i, acc );
+                detail::extend_row_col_basis< value_t >( *BA, j, i, Uu, T, MV_i, acc );
 
                 // comp_error( j, i );
             }// if
@@ -3610,6 +3614,63 @@ ldu ( hpro::TMatrix &          A,
 }
 
 }// namespace tlr
+
+// //
+// // LU factorization
+// //
+// template < typename value_t >
+// void
+// lu ( hpro::TMatrix &          A,
+//      const hpro::TTruncAcc &  acc )
+// {
+//     if ( is_blocked( A ) )
+//     {
+//         auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+
+//         for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+//         {
+//             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            
+//             lu< value_t >( * BA->block( i, i ), acc );
+
+//             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+//             {
+//                 if ( ! is_null( BA->block( j, i ) ) )
+//                     solve_upper_tri< value_t >( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc );
+//             }// for
+
+//             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
+//             {
+//                 if ( ! is_null( BA->block( i, j ) ) )
+//                     solve_lower_tri< value_t >( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, j ), acc );
+//             }// for
+
+//             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+//             {
+//                 for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
+//                 {
+//                     if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+//                     {
+//                         HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                    
+//                         multiply( value_t(-1),
+//                                   apply_normal, *BA->block( j, i ),
+//                                   apply_normal, *BA->block( i, l ),
+//                                   *BA->block( j, l ), acc );
+//                     }// if
+//                 }// for
+//             }// for
+//         }// for
+//     }// if
+//     else if ( is_dense( A ) )
+//     {
+//         auto  D = ptrcast( &A, hpro::TDenseMatrix );
+
+//         invert< value_t >( *D );
+//     }// if
+//     else
+//         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+// }
 
 }}}// namespace hlr::seq::uniform
 

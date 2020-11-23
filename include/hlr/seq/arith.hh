@@ -345,7 +345,9 @@ lu ( hpro::TMatrix &          A,
                     {
                         HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
                     
-                        multiply( value_t(-1), apply_normal, *BA->block( j, i ), apply_normal, *BA->block( i, l ),
+                        multiply( value_t(-1),
+                                  apply_normal, *BA->block( j, i ),
+                                  apply_normal, *BA->block( i, l ),
                                   *BA->block( j, l ), acc, approx );
                     }// if
                 }// for

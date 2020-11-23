@@ -6,7 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <list>
 #include <fstream>
+#include <sstream>
 
 #include <boost/filesystem.hpp>
 
@@ -25,13 +27,14 @@ namespace
 {
 
 //
-// colors
+// actual print function
 //
 void
 print_eps ( const hpro::TMatrix &  M,
-            eps_printer &          prn )
+            eps_printer &          prn,
+            const bool             recurse = true )
 {
-    if ( is_blocked( M ) )
+    if ( is_blocked( M ) && recurse )
     {
         auto  B = cptrcast( &M, hpro::TBlockMatrix );
 
@@ -40,7 +43,7 @@ print_eps ( const hpro::TMatrix &  M,
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 if ( ! is_null( B->block( i, j ) ) )
-                    print_eps( * B->block( i, j ), prn );
+                    print_eps( * B->block( i, j ), prn, recurse );
             }// for
         }// for
     }// if
@@ -177,6 +180,108 @@ print_eps ( const hpro::TMatrix &  M,
     print_eps( M, prn );
 
     prn.end();
+}
+
+//
+// print matrix <M> to file <filename>
+//
+void
+print_lvl_eps ( const hpro::TMatrix &  M,
+                const std::string &    basename )
+{
+    //
+    // common settings for all files
+    //
+    
+    const auto   max_size = std::max( std::max( M.nrows(), M.ncols() ), size_t(1) );
+    const auto   min_size = std::max( std::min( M.nrows(), M.ncols() ), size_t(1) );
+    const auto   width    = ( M.ncols() == max_size ? 500 : 500 * double(min_size) / double(max_size) );
+    const auto   height   = ( M.nrows() == max_size ? 500 : 500 * double(min_size) / double(max_size) );
+    
+    //
+    // go BFS style through matrix and print each level separately
+    //
+
+    auto  parents = std::list< const hpro::TMatrix * >();
+    auto  blocks  = std::list< const hpro::TMatrix * >{ & M };
+    uint  lvl     = 0;
+
+    while ( ! blocks.empty() )
+    {
+        if ( lvl > 0 )
+        {
+            std::ostringstream  filename;
+
+            filename << basename << lvl << ".eps";
+            
+            std::ofstream  out( filename.str() );
+            eps_printer    prn( out );
+            
+            prn.begin( width, height );
+
+            prn.scale( double(width)  / double(M.ncols()),
+                       double(height) / double(M.nrows()) );
+    
+            prn.translate( - double(M.col_ofs()),
+                           - double(M.row_ofs()) );
+    
+            prn.set_font( "Courier", 0.3 );
+
+            prn.set_line_width( 0.1 );
+
+            for ( auto  M_i : blocks )
+            {
+                print_eps( * M_i, prn, false );
+            }// for
+
+            // draw thicker frame around parent blocks to show block structure
+            if ( ! parents.empty() )
+            {
+                prn.save();
+                prn.set_gray( 0 );
+                prn.set_line_width( std::max( std::min( M.rows(), M.cols() ) / 500.0, 1.0 ) );
+                    
+                for ( auto  P_i : parents )
+                {
+                    prn.draw_rect( P_i->col_ofs(),
+                                   P_i->row_ofs(),
+                                   P_i->col_ofs() + P_i->ncols(),
+                                   P_i->row_ofs() + P_i->nrows() );
+                }// for
+
+                prn.restore();
+            }// if
+            
+            prn.end();
+        }// if
+
+        //
+        // next level
+        //
+
+        auto  sons = std::list< const hpro::TMatrix * >();
+
+        for ( auto  M_i : blocks )
+        {
+            if ( is_blocked( M_i ) )
+            {
+                auto  B_i = cptrcast( M_i, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < B_i->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < B_i->nblock_cols(); ++j )
+                    {
+                        if ( ! is_null( B_i->block( i, j ) ) )
+                            sons.push_back( B_i->block( i, j ) );
+                    }// for
+                }// for
+            }// if
+        }// for
+
+        parents = std::move( blocks );
+        blocks  = std::move( sons );
+        lvl++;
+    }// while
 }
 
 }}// namespace hlr::matrix
