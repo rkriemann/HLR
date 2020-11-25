@@ -145,7 +145,7 @@ multiply ( const value_t                    alpha,
                                                       B.typestr().c_str(), B.id(), \
                                                       C.typestr().c_str(), C.id() ) )
 //
-// forward decl.
+// forward decl.(s)
 //
 template < typename value_t,
            typename approx_t >
@@ -159,6 +159,18 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx );
 
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C );
+
+//
+// specializations
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -243,17 +255,14 @@ multiply ( const value_t               alpha,
     hlr::add< value_t >( value_t(1), *BC, C, acc, approx );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TBlockMatrix &  A,
            const hpro::matop_t         op_B,
            const hpro::TBlockMatrix &  B,
-           hpro::TDenseMatrix &        C,
-           const hpro::TTruncAcc &     acc,
-           const approx_t &            approx )
+           hpro::TDenseMatrix &        C )
 {
     HLR_MULT_PRINT;
     
@@ -278,7 +287,7 @@ multiply ( const value_t               alpha,
                     if ( is_null( C_ij ) )
                         C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type< value_t >::value );
                     
-                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
+                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij );
                 }// if
             }// if
 
@@ -392,17 +401,14 @@ multiply ( const value_t               alpha,
     C.set_lrmat( U, V );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TBlockMatrix &  A,
            const hpro::matop_t         op_B,
            const hpro::TDenseMatrix &  B,
-           hpro::TDenseMatrix &        C,
-           const hpro::TTruncAcc &     acc,
-           const approx_t &            approx )
+           hpro::TDenseMatrix &        C )
 {
     HLR_MULT_PRINT;
 
@@ -423,14 +429,14 @@ multiply ( const value_t               alpha,
                 auto  DB_j = blas::matrix< value_t >( DB, is_j - B.row_ofs(), blas::range::all );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
-                multiply( alpha, op_A, * A_ij, op_B, B_j, C_i, acc, approx );
+                multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
             }// if
             else
             {
                 auto  DB_j = blas::matrix< value_t >( DB, blas::range::all, is_j - B.col_ofs() );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
-                multiply( alpha, op_A, * A_ij, op_B, B_j, C_i, acc, approx );
+                multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
             }// else
         }// for
 
@@ -571,17 +577,14 @@ multiply ( const value_t               alpha,
     C.set_lrmat( U, V );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
            const hpro::TRkMatrix &  A,
            const hpro::matop_t      op_B,
            const hpro::TRkMatrix &  B,
-           hpro::TDenseMatrix &     C,
-           const hpro::TTruncAcc &,
-           const approx_t & )
+           hpro::TDenseMatrix &     C )
 {
     HLR_MULT_PRINT;
     
@@ -594,17 +597,14 @@ multiply ( const value_t            alpha,
     blas::prod( alpha, UT, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TDenseMatrix &  A,
            const hpro::matop_t         op_B,
            const hpro::TRkMatrix &     B,
-           hpro::TDenseMatrix &        C,
-           const hpro::TTruncAcc &,
-           const approx_t & )
+           hpro::TDenseMatrix &        C )
 {
     HLR_MULT_PRINT;
     
@@ -616,17 +616,14 @@ multiply ( const value_t               alpha,
     blas::prod( alpha, AU, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TRkMatrix &     A,
            const hpro::matop_t         op_B,
            const hpro::TDenseMatrix &  B,
-           hpro::TDenseMatrix &        C,
-           const hpro::TTruncAcc &,
-           const approx_t & )
+           hpro::TDenseMatrix &        C )
 {
     HLR_MULT_PRINT;
     
@@ -638,17 +635,14 @@ multiply ( const value_t               alpha,
     blas::prod( alpha, blas::mat_U< value_t >( A, op_A ), VB, value_t(1), hpro::blas_mat< value_t >( C ) );
 }
 
-template < typename value_t,
-           typename approx_t >
+template < typename value_t >
 void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TDenseMatrix &  A,
            const hpro::matop_t         op_B,
            const hpro::TDenseMatrix &  B,
-           hpro::TDenseMatrix &        C,
-           const hpro::TTruncAcc &,
-           const approx_t & )
+           hpro::TDenseMatrix &        C )
 {
     HLR_MULT_PRINT;
     
@@ -704,11 +698,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -727,11 +720,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TRkMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -750,11 +742,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -778,11 +769,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TRkMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -801,11 +791,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TRkMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TRkMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -824,11 +813,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TRkMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -852,11 +840,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -875,11 +862,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TRkMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -898,11 +884,10 @@ multiply ( const value_t            alpha,
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
             else if ( is_dense(   C ) )
-                multiply< value_t, approx_t >( alpha,
-                                               op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                               op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                               * ptrcast( &C, hpro::TDenseMatrix ),
-                                               acc, approx );
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -936,6 +921,103 @@ multiply ( const value_t            alpha,
     auto  apx = approx::SVD< value_t >();
 
     multiply( alpha, op_A, A, op_B, B, C, acc, apx );
+}
+
+//
+// version for matrix types without (!) approximation
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C )
+{
+    if ( ! is_dense( C ) )
+        HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+
+    if ( is_blocked( A ) )
+    {
+        if ( is_blocked( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_lowrank( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_dense(   B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+    }// if
+    else if ( is_lowrank( A ) )
+    {
+        if ( is_blocked( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_lowrank( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_dense(   B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TRkMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+    }// if
+    else if ( is_dense(   A ) )
+    {
+        if ( is_blocked( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_lowrank( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TRkMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_dense(   B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                 op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
 
 /////////////////////////////////////////////////////////////////////////////////

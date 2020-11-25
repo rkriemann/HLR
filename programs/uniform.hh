@@ -433,10 +433,10 @@ program_main ()
         }// if
         else
         {
+            auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            
             if ( true )
             {
-                auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
-            
                 {
                     std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
             
@@ -458,6 +458,39 @@ program_main ()
                     }
                 }
             }// if
+
+            if ( true )
+            {
+                std::cout << "  " << term::bullet << term::bold << "H²-LU" << term::reset << std::endl;
+            
+                auto  A3     = impl::matrix::copy( *A2 );
+                auto  rowcb2 = rowcb->copy();
+                auto  colcb2 = colcb->copy();
+                
+                matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+                
+                tic = timer::now();
+                
+                impl::uniform::lu< value_t >( *A3, acc );
+                
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+                
+                auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
+                
+                // {
+                //     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                
+                //     std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                // }
+                
+                {
+                    hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                }
+            }
         }// else
     }
 

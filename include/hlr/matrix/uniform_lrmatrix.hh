@@ -69,6 +69,8 @@ public:
             : TMatrix( hpro::value_type< value_t >::value )
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
+            , _row_cb( nullptr )
+            , _col_cb( nullptr )
     {
     }
     
@@ -77,6 +79,8 @@ public:
             : TMatrix( hpro::value_type< value_t >::value )
             , _row_is( arow_is )
             , _col_is( acol_is )
+            , _row_cb( nullptr )
+            , _col_cb( nullptr )
     {
         set_ofs( _row_is.first(), _col_is.first() );
     }

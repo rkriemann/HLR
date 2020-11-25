@@ -59,7 +59,7 @@ randlr  ( const operator_t &       M,
         auto  W = blas::vector< value_t >( ncols_M );
         auto  L = blas::vector< value_t >( nrows_M );
         
-        blas::fill( W, rand );
+        blas::fill_fn( W, rand );
         prod( value_t(1), hpro::apply_normal, M, W, L );
 
         // subtract previously computed results

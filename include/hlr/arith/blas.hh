@@ -226,6 +226,53 @@ mat_V ( const hpro::TRkMatrix &  A,
     return mat_V< value_t >( & A, op );
 }
 
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( std::unique_ptr< hpro::TRkMatrix > &  A )
+{
+    return mat_U< value_t >( *A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( std::unique_ptr< hpro::TRkMatrix > &  A )
+{
+    return mat_V< value_t >( *A );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                   op )
+{
+    return mat_U< value_t >( *A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V (  std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                    op )
+{
+    return mat_V< value_t >( *A, op );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( const std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                         op )
+{
+    return mat_U< value_t >( *A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                         op )
+{
+    return mat_V< value_t >( *A, op );
+}
+
+
 // }}// namespace hlr::blas
 
 // #include <hlr/utils/io.hh>

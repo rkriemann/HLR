@@ -165,7 +165,7 @@ prod ( const value_t                          alpha,
        blas::vector< value_t > &              y )
 {
     for ( auto &  M_i : op.M )
-        blas::mulvec( value_t(1), matrix_view( op_M, M_i ), x, value_t(1), y );
+        blas::mulvec( alpha, matrix_view( op_M, M_i ), x, value_t(1), y );
 }
 
 template < typename value_t >
@@ -177,7 +177,7 @@ prod ( const value_t                          alpha,
        blas::matrix< value_t > &              Y )
 {
     for ( auto &  M_i : op.M )
-        blas::prod( value_t(1), matrix_view( op_M, M_i ), X, value_t(1), Y );
+        blas::prod( alpha, matrix_view( op_M, M_i ), X, value_t(1), Y );
 }
 
 template < typename value_t >
@@ -585,13 +585,13 @@ struct lowranksumT_operator
     size_t  ncols () const { return V.front().nrows(); }
 
     blas::vector< value_t >
-    get_row ( const size_t  i ) const
+    get_row ( const size_t  /* i */ ) const
     {
         HLR_ERROR( "todo" );
     }
 
     blas::vector< value_t >
-    get_column ( const size_t  j ) const
+    get_column ( const size_t  /* j */ ) const
     {
         HLR_ERROR( "todo" );
     }
@@ -618,22 +618,22 @@ get_column ( const lowranksumT_operator< value_t > &  op,
 
 template < typename value_t >
 void
-prod ( const value_t                            alpha,
-       const matop_t                            op_M,
-       const lowranksumT_operator< value_t > &  op,
-       const blas::vector< value_t > &          x,
-       const blas::vector< value_t > &          y )
+prod ( const value_t                            /* alpha */,
+       const matop_t                            /* op_M */,
+       const lowranksumT_operator< value_t > &  /* op */,
+       const blas::vector< value_t > &          /* x */,
+       const blas::vector< value_t > &          /* y */ )
 {
     HLR_ERROR( "todo" );
 }
 
 template < typename value_t >
 void
-prod ( const value_t                            alpha,
-       const matop_t                            op_M,
-       const lowranksumT_operator< value_t > &  op,
-       const blas::matrix< value_t > &          X,
-       const blas::matrix< value_t > &          Y )
+prod ( const value_t                            /* alpha */,
+       const matop_t                            /* op_M */,
+       const lowranksumT_operator< value_t > &  /* op */,
+       const blas::matrix< value_t > &          /* X */,
+       const blas::matrix< value_t > &          /* Y */ )
 {
     HLR_ERROR( "todo" );
 }
