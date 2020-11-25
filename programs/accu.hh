@@ -13,7 +13,7 @@
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
 
-#include "hlr/seq/norm.hh"
+#include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
 #include <hlr/approx/svd.hh>
@@ -52,7 +52,7 @@ mm_std ( const hpro::TMatrix &    A,
     auto  toc      = timer::since( tic );
     
     auto  AxA      = hpro::matrix_product( &A, &A );
-    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
         
     for ( int i = 0; i < nbench; ++i )
@@ -86,7 +86,7 @@ mm_std ( const hpro::TMatrix &    A,
     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 }
 
 //
@@ -167,7 +167,7 @@ mm_accu ( const hpro::TMatrix &    A,
     auto  toc      = timer::since( tic );
     
     auto  AxA      = hpro::matrix_product( &A, &A );
-    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
         
     for ( int i = 0; i < nbench; ++i )
@@ -201,7 +201,7 @@ mm_accu ( const hpro::TMatrix &    A,
     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 }
 
 //
@@ -377,7 +377,7 @@ program_main ()
 
     // exact representation
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
-    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  norm_AxA = hlr::norm::spectral( *AxA );
 
     std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
@@ -424,7 +424,7 @@ program_main ()
         auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
         std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
     }
 
     //
@@ -493,7 +493,7 @@ program_main ()
         auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
         std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "      error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );

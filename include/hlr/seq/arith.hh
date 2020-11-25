@@ -21,13 +21,13 @@
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/mulvec.hh"
+#include "hlr/arith/lu.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/arith/invert.hh"
 #include "hlr/approx/svd.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
 #include "hlr/seq/matrix.hh"
-#include "hlr/seq/norm.hh"
 
 namespace hlr { namespace seq {
 
@@ -40,330 +40,31 @@ namespace hpro = HLIB;
 ///////////////////////////////////////////////////////////////////////
 
 //
-// compute y = y + α op( M ) x
+// compute y = y + α · op( M ) · x
 //
-template < typename value_t >
-void
-mul_vec ( const value_t                    alpha,
-          const matop_t                    op_M,
-          const hpro::TMatrix &            M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
-{
-    hlr::mul_vec< value_t >( alpha, op_M, M, x, y );
-}
+using hlr::mul_vec;
 
 //
-// compute y = y + α op( M ) x
+// compute C = C + α · op( A ) · op( B ) 
+// and     C = C + α · op( A ) · op( D ) · op( B )
 //
-template < typename value_t >
-void
-mul_vec ( const value_t                             alpha,
-          const matop_t                             op_M,
-          const hpro::TMatrix &                     M,
-          const vector::scalar_vector< value_t > &  x,
-          vector::scalar_vector< value_t > &        y )
-{
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
-
-    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
-}
+using hlr::multiply;
 
 //
-// compute C = C + α op( A ) op( B )
+// compute C = C + α · op( A ) · op( B ) with additional approximation
+// by omitting sub products based on Frobenius norm of factors
 //
-template < typename value_t,
-           typename approx_t >
-void
-multiply ( const value_t            alpha,
-           const matop_t            op_A,
-           const hpro::TMatrix &    A,
-           const matop_t            op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
-{
-    if ( is_blocked_all( A, B, C ) )
-    {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
-        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
-        
-        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-            {
-                auto  C_ij = BC->block(i,j);
-            
-                for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
-                {
-                    auto  A_il = BA->block( i, l, op_A );
-                    auto  B_lj = BB->block( l, j, op_B );
-                
-                    if ( is_null_any( A_il, B_lj ) )
-                        continue;
-                    
-                    HLR_ASSERT( ! is_null( C_ij ) );
-            
-                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
-                }// for
-            }// for
-        }// for
-    }// if
-    else
-    {
-        hlr::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx );
-    }// else
-}
-
-//
-// compute C = C + α · op( A ) · op( D ) · op( B )
-//
-template < typename value_t,
-           typename approx_t >
-void
-multiply ( const value_t            alpha,
-           const matop_t            op_A,
-           const hpro::TMatrix &    A,
-           const matop_t            op_D,
-           const hpro::TMatrix &    D,
-           const matop_t            op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
-{
-    hlr::multiply< value_t >( alpha, op_A, A, op_D, D, op_B, B, C, acc, approx );
-}
-
-//
-// compute C = C + α op( A ) op( B )
-//
-template < typename value_t >
-void
-multiply_apx ( const value_t            alpha,
-               const matop_t            op_A,
-               const hpro::TMatrix &    A,
-               const matop_t            op_B,
-               const hpro::TMatrix &    B,
-               hpro::TMatrix &          C,
-               const hpro::TTruncAcc &  acc,
-               typename hpro::real_type< value_t >::type_t  tol )
-{
-    if ( is_blocked_all( A, B, C ) )
-    {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
-        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
-        
-        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-            {
-                auto  C_ij = BC->block(i,j);
-            
-                for ( uint  l = 0; l < BA->nblock_rows( op_A ); ++l )
-                {
-                    auto  A_il = BA->block( i, l, op_A );
-                    auto  B_lj = BB->block( l, j, op_B );
-                
-                    if ( is_null_any( A_il, B_lj ) )
-                        continue;
-                    
-                    HLR_ASSERT( ! is_null( C_ij ) );
-            
-                    multiply_apx< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, tol );
-                }// for
-            }// for
-        }// for
-    }// if
-    else
-    {
-        if ( is_lowrank( C ) )
-        {
-            //
-            // look for Frobenius norm of factors and return if too small
-            //
-
-            const auto  norm_A = norm::norm_F( A );
-            const auto  norm_B = norm::norm_F( B );
-
-            if ( norm_A * norm_B < tol )
-                return;
-        }// if
-        
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
-    }// else
-}
+using hlr::multiply_apx;
 
 //
 // compute Hadamard product A = α A*B 
 //
-template < typename value_t,
-           typename approx_t >
-void
-multiply_hadamard ( const value_t            alpha,
-                    hpro::TMatrix &          A,
-                    const hpro::TMatrix &    B,
-                    const hpro::TTruncAcc &  acc,
-                    const approx_t &         approx )
-{
-    if ( is_blocked_all( A, B ) )
-    {
-        auto  BA = ptrcast( &A,  hpro::TBlockMatrix );
-        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
-        
-        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
-            {
-                auto  A_ij = BA->block( i, j );
-                auto  B_ij = BB->block( i, j );
-                
-                HLR_ASSERT( ! is_null_any( A_ij, B_ij ) );
-            
-                multiply_hadamard< value_t >( alpha, *A_ij, *B_ij, acc, approx );
-            }// for
-        }// for
-    }// if
-    else if ( is_dense_all( A, B ) )
-    {
-        auto        DA     = ptrcast( &A,  hpro::TDenseMatrix );
-        auto        DB     = cptrcast( &B, hpro::TDenseMatrix );
-        auto        blas_A = hpro::blas_mat< value_t >( DA );
-        auto        blas_B = hpro::blas_mat< value_t >( DB );
-        const auto  nrows  = DA->nrows();
-        const auto  ncols  = DA->ncols();
-
-        for ( size_t  i = 0; i < nrows*ncols; ++i )
-            blas_A.data()[i] *= alpha * blas_B.data()[i];
-    }// if
-    else if ( is_lowrank_all( A, B ) )
-    {
-        auto  RA = ptrcast( &A,  hpro::TRkMatrix );
-        auto  RB = cptrcast( &B, hpro::TRkMatrix );
-
-        //
-        // construct product with rank rank(A)·rank(B) and fill
-        // new low-rank vectors based on hadamard product
-        //
-        //  a_ij · b_ij = ( Σ_l u^l_i · v^l_j ) ( Σ_k w^k_i · x^k_j )
-        //              = Σ_l Σ_k ( u^l_i · w^k_i ) ( v^l_j · x^k_j )
-        //
-        //  i.e., C = Y·Z' with y^p_i = u^l_i · w^k_i and
-        //                      z^p_j = v^l_j · x^k_j
-        //
-        //  with p = l·rank(B)+k
-        //
-
-        auto  rank_A = RA->rank();
-        auto  rank_B = RB->rank();
-        auto  rank   = rank_A * rank_B;
-
-        auto  nrows = RA->nrows();
-        auto  ncols = RA->ncols();
-
-        auto  U = blas::mat_U< value_t >( RA );
-        auto  V = blas::mat_V< value_t >( RA );
-        auto  W = blas::mat_U< value_t >( RB );
-        auto  X = blas::mat_V< value_t >( RB );
-        auto  Y = blas::matrix< value_t >( nrows, rank );
-        auto  Z = blas::matrix< value_t >( ncols, rank );
-
-        uint  p = 0;
-        
-        for ( uint  l = 0; l < rank_A; ++l )
-        {
-            auto  u_l = U.column( l );
-            auto  v_l = V.column( l );
-                
-            for ( uint  k = 0; k < rank_B; ++k, ++p )
-            {
-                auto  w_k = W.column( k );
-                auto  x_k = X.column( k );
-                auto  y_p = Y.column( p );
-                auto  z_p = Z.column( p );
-
-                for ( size_t  i = 0; i < nrows; ++i )
-                    y_p(i) = alpha * u_l(i) * w_k(i);
-
-                for ( size_t  j = 0; j < ncols; ++j )
-                    z_p(j) = v_l(j) * x_k(j);
-            }// for
-        }// for
-
-        //
-        // truncate Y·Z and copy back to A
-        //
-
-        auto [ Y_acc, Z_acc ] = approx( Y, Z, acc );
-        
-        RA->set_lrmat( std::move( Y_acc ), std::move( Z_acc ) );
-    }// if
-}
+using hlr::multiply_hadamard;
 
 //
 // LU factorization
 //
-template < typename value_t,
-           typename approx_t >
-void
-lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
-{
-    if ( is_blocked( A ) )
-    {
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
-
-        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
-        {
-            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
-            
-            lu< value_t >( * BA->block( i, i ), acc, approx );
-
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
-            {
-                if ( ! is_null( BA->block( j, i ) ) )
-                    solve_upper_tri< value_t >( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
-            }// for
-
-            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
-            {
-                if ( ! is_null( BA->block( i, j ) ) )
-                    solve_lower_tri< value_t >( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
-            }// for
-
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
-            {
-                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
-                {
-                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
-                    {
-                        HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
-                    
-                        multiply( value_t(-1),
-                                  apply_normal, *BA->block( j, i ),
-                                  apply_normal, *BA->block( i, l ),
-                                  *BA->block( j, l ), acc, approx );
-                    }// if
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( is_dense( A ) )
-    {
-        auto  D = ptrcast( &A, hpro::TDenseMatrix );
-
-        invert< value_t >( *D );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
-}
-     
+using hlr::lu;     
 
 //
 // Gaussian elimination of A, e.g. A = A^-1
@@ -436,14 +137,14 @@ gauss_elim ( hpro::TMatrix *          A,
     HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
 }
 
-namespace tlr
-{
-
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for tile low-rank format
 //
 ///////////////////////////////////////////////////////////////////////
+
+namespace tlr
+{
 
 //
 // LU factorization A = L·U, with unit lower triangular L and upper triangular U
@@ -678,14 +379,14 @@ ldu ( hpro::TMatrix &          A,
 
 }// namespace tlr
 
-namespace hodlr
-{
-
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for HODLR format
 //
 ///////////////////////////////////////////////////////////////////////
+
+namespace hodlr
+{
 
 //
 // solve L X = M
@@ -865,14 +566,14 @@ lu ( hpro::TMatrix &          A,
 
 }// namespace hodlr
 
-namespace tileh
-{
-
 ///////////////////////////////////////////////////////////////////////
 //
 // arithmetic functions for tile H format
 //
 ///////////////////////////////////////////////////////////////////////
+
+namespace tileh
+{
 
 //
 // compute LU factorization of A
@@ -894,30 +595,26 @@ lu ( hpro::TMatrix *          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        hpro::LU::factorise_rec( BA->block( i, i ), acc );
+        hlr::seq::lu( * BA->block( i, i ), acc, approx );
 
         for ( uint j = i+1; j < nbr; ++j )
         {
-            solve_upper_right( BA->block( j, i ),
-                               BA->block( i, i ), nullptr, acc,
-                               hpro::solve_option_t( hpro::block_wise, hpro::general_diag, hpro::store_inverse ) );
+            hlr::solve_upper_tri( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
         }// for
             
         for ( uint  l = i+1; l < nbc; ++l )
         {
-            solve_lower_left( hpro::apply_normal, BA->block( i, i ), nullptr,
-                              BA->block( i, l ), acc,
-                              hpro::solve_option_t( hpro::block_wise, hpro::unit_diag, hpro::store_inverse ) );
+            hlr::solve_lower_tri( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, l ), acc, approx );
         }// for
             
         for ( uint  j = i+1; j < nbr; ++j )
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                hlr::seq::multiply( value_t(-1),
-                                    hpro::apply_normal, * BA->block( j, i ),
-                                    hpro::apply_normal, * BA->block( i, l ),
-                                    * BA->block( j, l ), acc, approx );
+                hlr::multiply( value_t(-1),
+                               hpro::apply_normal, *BA->block( j, i ),
+                               hpro::apply_normal, *BA->block( i, l ),
+                               *BA->block( j, l ), acc, approx );
             }// for
         }// for
     }// for
