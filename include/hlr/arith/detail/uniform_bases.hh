@@ -735,13 +735,13 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
 //
 template < typename value_t >
 void
-extend_row_col_basis ( hpro::TBlockMatrix &       M,
-                       const uint                 i,
-                       const uint                 j,
-                       blas::matrix< value_t > &  W,
-                       blas::matrix< value_t > &  T,
-                       blas::matrix< value_t > &  X,
-                       const hpro::TTruncAcc &    acc )
+replace_row_col_basis ( hpro::TBlockMatrix &       M,
+                        const uint                 i,
+                        const uint                 j,
+                        blas::matrix< value_t > &  W,
+                        blas::matrix< value_t > &  T,
+                        blas::matrix< value_t > &  X,
+                        const hpro::TTruncAcc &    acc )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 
@@ -1113,13 +1113,13 @@ extend_row_col_basis ( hpro::TBlockMatrix &       M,
 
 template < typename value_t >
 void
-extend_row_col_basis_ref ( hpro::TBlockMatrix &       M,
-                           const uint                 i,
-                           const uint                 j,
-                           blas::matrix< value_t > &  W,
-                           blas::matrix< value_t > &  T,
-                           blas::matrix< value_t > &  X,
-                           const hpro::TTruncAcc &    acc )
+replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
+                            const uint                 i,
+                            const uint                 j,
+                            blas::matrix< value_t > &  W,
+                            blas::matrix< value_t > &  T,
+                            blas::matrix< value_t > &  X,
+                            const hpro::TTruncAcc &    acc )
 {
     using  real_t = typename hpro::real_type< value_t >::type_t;
 

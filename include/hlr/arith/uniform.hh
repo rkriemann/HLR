@@ -263,7 +263,7 @@ template < typename value_t >
 void
 lu_lazy ( hpro::TMatrix &          A,
           const hpro::TTruncAcc &  acc,
-          hpro::TMatrix &          REF )
+          hpro::TMatrix &          /* REF */ )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
@@ -357,7 +357,7 @@ lu_lazy ( hpro::TMatrix &          A,
                 auto  [ Uu, Su, Vu ] = detail::apply_updates< value_t >( *BA, i, j, acc );
 
                 // even without solving, still need to update bases
-                detail::extend_row_col_basis< value_t >( *BA, i, j, Uu, Su, Vu, acc );
+                detail::replace_row_col_basis< value_t >( *BA, i, j, Uu, Su, Vu, acc );
                 
                 // comp_error( i, j );
             }// if
@@ -438,7 +438,7 @@ lu_lazy ( hpro::TMatrix &          A,
                 
                 auto  T = blas::prod( Su, blas::adjoint( RV ) );
                     
-                detail::extend_row_col_basis< value_t >( *BA, j, i, Uu, T, MV_i, acc );
+                detail::replace_row_col_basis< value_t >( *BA, j, i, Uu, T, MV_i, acc );
 
                 // comp_error( j, i );
             }// if

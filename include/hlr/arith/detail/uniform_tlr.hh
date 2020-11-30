@@ -896,7 +896,7 @@ multiply ( const value_t               alpha,
                 //
                             
                 auto        DB_kj = cptrcast( B_kj, hpro::TDenseMatrix );
-                const auto  US    = blas::prod( alpha,      RA_ik->row_cb().basis(), RA_ik->coeff() );
+                const auto  US    = blas::prod( alpha, RA_ik->row_cb().basis(), RA_ik->coeff() );
                 const auto  BW    = blas::prod( blas::adjoint( blas::mat< value_t >( DB_kj ) ), RA_ik->col_cb().basis() );
 
                 addlr_global< value_t >( C, *RC_ij, i, j, US, BW, acc );
