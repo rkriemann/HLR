@@ -13,6 +13,7 @@
 #include <hlr/arith/add.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/approx/svd.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
 
 #include <hlr/arith/detail/multiply.hh>
 #include <hlr/arith/detail/multiply_diag.hh>
@@ -300,6 +301,9 @@ multiply ( const value_t            alpha,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C )
 {
+    using hlr::matrix::is_uniform_lowrank;
+    using hlr::matrix::uniform_lrmatrix;
+    
     if ( ! is_dense( C ) )
         HLR_ERROR( "unsupported matrix type : " + C.typestr() );
 
@@ -355,7 +359,26 @@ multiply ( const value_t            alpha,
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_dense(   A ) )
+    else if ( is_uniform_lowrank( A ) )
+    {
+        if ( is_uniform_lowrank( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                 op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_dense( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                 op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+    }// if
+    else if ( is_dense( A ) )
     {
         if ( is_blocked( B ) )
         {
@@ -371,7 +394,14 @@ multiply ( const value_t            alpha,
                                  op_B, * cptrcast( &B, hpro::TRkMatrix ),
                                  * ptrcast( &C, hpro::TDenseMatrix ) );
         }// if
-        else if ( is_dense(   B ) )
+        else if ( is_uniform_lowrank( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                 op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_dense( B ) )
         {
             multiply< value_t >( alpha,
                                  op_A, * cptrcast( &A, hpro::TDenseMatrix ),

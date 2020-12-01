@@ -9,8 +9,10 @@
 //
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/norm.hh> // DEBUG
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/convert.hh> // DEBUG
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
@@ -1249,7 +1251,7 @@ multiply ( const value_t                  alpha,
     // convert to lowrank format and construct U·S·V' via QR
     //
     
-    auto  R = hlr::seq::matrix::convert_to_lowrank( *BC, acc, approx::SVD< value_t >() );
+    auto  R = hlr::matrix::convert_to_lowrank( *BC, acc, approx::SVD< value_t >() );
     auto  U  = blas::mat_U< value_t >( R );
     auto  V  = blas::mat_V< value_t >( R );
     auto  RU = blas::matrix< value_t >();
@@ -1369,8 +1371,8 @@ multiply ( const value_t                        alpha,
     auto  R = blas::matrix< value_t >();
 
     {
-        auto  VW   = blas::prod( A.col_cb( op_A ).basis(), B.row_cb( op_B ).basis() );
-        auto  SVW  = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
+        auto  VW   = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
+        auto  SVW  = blas::prod( alpha, blas::mat_view( op_A, A.coeff() ), VW );
 
         R = std::move( blas::prod( SVW, blas::mat_view( op_B, B.coeff() ) ) );
     }
@@ -1391,10 +1393,10 @@ multiply ( const value_t                        alpha,
            const uniform_map_t &                /* colmap */ )
 {
     // A·B + C = U·(S·V' × W·T)·X' + U·R·X'
-    auto  VW   = blas::prod( A.col_cb( op_A ).basis(), B.row_cb( op_B ).basis() );
+    auto  VW   = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
     auto  SVW  = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
 
-    blas::prod( SVW, blas::mat_view( op_B, B.coeff() ), value_t(1), C.coeff() );
+    blas::prod( alpha, SVW, blas::mat_view( op_B, B.coeff() ), value_t(1), C.coeff() );
 }
 
 template < typename value_t >
@@ -1486,6 +1488,12 @@ multiply ( const value_t            alpha,
            const uniform_map_t &    rowmap,
            const uniform_map_t &    colmap )
 {
+    auto  DA = matrix::convert_to_dense< value_t >( A );
+    auto  DB = matrix::convert_to_dense< value_t >( B );
+    auto  DC = matrix::convert_to_dense< value_t >( C );
+
+    hlr::multiply< value_t >( alpha, op_A, *DA, op_B, *DB, *DC );
+    
     if ( is_blocked( A ) )
     {
         if ( is_blocked( B ) )
@@ -1701,6 +1709,12 @@ multiply ( const value_t            alpha,
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+
+    auto  DD = matrix::convert_to_dense< value_t >( C );
+
+    hlr::add( value_t(-1), *DC, *DD );
+
+    std::cout << "multiply : " << A.id() << " × " << B.id() << " = " << C.id() << " : " << norm::frobenius( *DD ) << std::endl;
 }
 
 //
@@ -1781,25 +1795,32 @@ solve_lower_tri ( const eval_side_t              side,
                   const diag_type_t              diag,
                   const hpro::TMatrix &          L,
                   uniform_lrmatrix< value_t > &  M,
-                  const hpro::TTruncAcc &        /* acc */,
-                  const uniform_map_t &          /* rowmap */,
+                  const hpro::TTruncAcc &        acc,
+                  const uniform_map_t &          rowmap,
                   const uniform_map_t &          /* colmap */ )
 {
-    if ( diag == unit_diag )
+    if ( is_dense( L ) && ( diag == unit_diag ))
         return;
     
     if ( side == from_left )
     {
         //
-        // solve L M = L W T X' = U S V'
-        // as L W = U
+        // solve L×M = L×W·T·X' = U·S·V' as L×W = U
         //
 
-        auto  U = blas::copy( M.row_cb().basis() );
-        auto  D = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, U.ncols()-1 ), U );
+        auto  W = blas::copy( M.row_cb().basis() );
+        auto  D = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, W.ncols()-1 ), W );
 
         hlr::solve_lower_tri< value_t >( side, diag, L, D );
-        HLR_ERROR( "todo: update bases" );
+
+        // orthogonalise W, compute T and update row basis
+        auto  R = blas::matrix< value_t >();
+
+        blas::qr( W, R );
+
+        auto  T = blas::prod( R, M.coeff() );
+
+        update_row_basis( M, W, T, acc, rowmap );
     }// if
     else
     {
@@ -1817,6 +1838,11 @@ solve_lower_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap )
 {
+    auto  DL = hlr::seq::matrix::copy_nonuniform< value_t >( L );
+    auto  DM = matrix::convert_to_dense< value_t >( M );
+
+    hlr::solve_lower_tri< value_t >( side, diag, *DL, *DM );
+    
     if ( is_blocked( L ) )
     {
         if ( is_blocked( M ) )
@@ -1839,6 +1865,11 @@ solve_lower_tri ( const eval_side_t        side,
     }// if
     else
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
+
+    auto  DX = matrix::convert_to_dense< value_t >( M );
+
+    hlr::add( value_t(-1), *DX, *DM );
+    std::cout << "solve_lower_tri: " << M.id() << " : " << hlr::norm::frobenius( *DM ) << std::endl;
 }
 
 //
@@ -1913,10 +1944,13 @@ solve_upper_tri ( const eval_side_t              side,
                   const diag_type_t              diag,
                   const hpro::TMatrix &          U,
                   uniform_lrmatrix< value_t > &  M,
-                  const hpro::TTruncAcc &        /* acc */,
+                  const hpro::TTruncAcc &        acc,
                   const uniform_map_t &          /* rowmap */,
-                  const uniform_map_t &          /* colmap */ )
+                  const uniform_map_t &          colmap )
 {
+    if ( is_dense( U ) && ( diag == unit_diag ))
+        return;
+    
     if ( side == from_left )
     {
         HLR_ASSERT( false );
@@ -1924,15 +1958,22 @@ solve_upper_tri ( const eval_side_t              side,
     else
     {
         //
-        // solve W T X' R = U S V', e.g., X' R = V', as R' X = V
+        // solve W·T·X'×R = U·S·V', e.g., X'×R = V', as R'×X = V
         //
 
-        auto  V = blas::copy( M.col_cb().basis() );
-        auto  D = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, V.ncols()-1 ), V );
+        auto  X = blas::copy( M.col_cb().basis() );
+        auto  D = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, X.ncols()-1 ), X );
 
         hlr::solve_upper_tri< value_t >( from_left, diag, U, D );
 
-        HLR_ERROR( "todo: update bases" );
+        // orthogonalise X, compute T and update column basis
+        auto  R = blas::matrix< value_t >();
+        
+        blas::qr( X, R );
+
+        auto  T = blas::prod( M.coeff(), blas::adjoint( R ) );
+        
+        update_col_basis( M, T, X, acc, colmap );
     }// else
 }
 
@@ -1946,6 +1987,11 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap )
 {
+    auto  DU = hlr::seq::matrix::copy_nonuniform< value_t >( U );
+    auto  DM = matrix::convert_to_dense< value_t >( M );
+
+    hlr::solve_upper_tri< value_t >( side, diag, *DU, *DM );
+    
     if ( is_blocked( U ) )
     {
         if ( is_blocked( M ) )
@@ -1955,19 +2001,24 @@ solve_upper_tri ( const eval_side_t        side,
         else if ( is_dense( M ) )
             hlr::solve_upper_tri< value_t >( side, diag, * cptrcast( & U, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
         else
-            HLR_ERROR( "unsupported matrix type for M : " + U.typestr() );
+            HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
     else if ( is_dense( U ) )
     {
-        if ( is_lowrank( M ) )
+        if ( is_uniform_lowrank( M ) )
             solve_upper_tri< value_t >( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, rowmap, colmap );
         else if ( is_dense( M ) )
             hlr::solve_upper_tri< value_t >( side, diag, * cptrcast( & U, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
         else
-            HLR_ERROR( "unsupported matrix type for M : " + U.typestr() );
+            HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
     else
         HLR_ERROR( "unsupported matrix type for U : " + U.typestr() );
+
+    auto  DX = matrix::convert_to_dense< value_t >( M );
+
+    hlr::add( value_t(-1), *DX, *DM );
+    std::cout << "solve_upper_tri: " << M.id() << " : " << hlr::norm::frobenius( *DM ) << std::endl;
 }
 
 //
@@ -1978,17 +2029,27 @@ void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const uniform_map_t &    rowmap,
-     const uniform_map_t &    colmap )
+     const uniform_map_t &    colmap,
+     hpro::TMatrix &          REF )
 {
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
+        auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
 
         for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap );
+            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
+
+            {
+                auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
+                auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
+
+                hlr::add( value_t(-1), *D1, *D2 );
+                std::cout << BA->block(i,i)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
+            }
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
@@ -1996,6 +2057,14 @@ lu ( hpro::TMatrix &          A,
                     solve_upper_tri< value_t >( from_right, general_diag,
                                                 *BA->block( i, i ), *BA->block( j, i ),
                                                 acc, rowmap, colmap );
+
+                {
+                    auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
+                    auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
+                    
+                    hlr::add( value_t(-1), *D1, *D2 );
+                    std::cout << BA->block(j,i)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
+                }
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
@@ -2004,6 +2073,14 @@ lu ( hpro::TMatrix &          A,
                     solve_lower_tri< value_t >( from_left, unit_diag,
                                                 *BA->block( i, i ), *BA->block( i, j ),
                                                 acc, rowmap, colmap );
+
+                {
+                    auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
+                    auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
+                    
+                    hlr::add( value_t(-1), *D1, *D2 );
+                    std::cout << BA->block(i,j)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
+                }
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )

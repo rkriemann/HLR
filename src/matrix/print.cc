@@ -63,9 +63,14 @@ print_eps ( const hpro::TMatrix &  M,
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
                 
                 prn.set_gray( 0 );
-                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
-                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               hpro::to_string( "%dx%d", M.nrows(), M.ncols() ) );
+                if ( M.nrows() != M.ncols() )
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   hpro::to_string( "%dx%d", M.nrows(), M.ncols() ) );
+                else
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   hpro::to_string( "%d", M.nrows() ) );
                 
                 prn.restore();
             }// if

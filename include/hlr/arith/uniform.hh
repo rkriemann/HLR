@@ -57,7 +57,8 @@ mul_vec ( const value_t                             alpha,
 template < typename value_t >
 void
 lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     hpro::TMatrix &          REF )
 {
     //
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
@@ -97,7 +98,7 @@ lu ( hpro::TMatrix &          A,
     // perform actual LU factorization
     //
 
-    detail::lu< value_t >( A, acc, rowmap, colmap );
+    detail::lu< value_t >( A, acc, rowmap, colmap, REF );
 }
 
 //////////////////////////////////////////////////////////////////////

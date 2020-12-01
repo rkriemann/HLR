@@ -61,9 +61,7 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        hpro::TPSMatrixVis  mvis;
-        
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
+        matrix::print_eps( *A, "A" );
         matrix::print_lvl_eps( *A, "L" );
     }// if
 
@@ -303,8 +301,8 @@ program_main ()
         
             if ( true )
             {
-                auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
-            
+                auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
+
                 {
                     std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
             
@@ -433,30 +431,31 @@ program_main ()
         }// if
         else
         {
-            auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  REF = std::unique_ptr< hpro::TMatrix >();
             
             if ( true )
             {
+                std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
+                
+                auto  apx = approx::SVD< value_t >();
+                auto  M3 = seq::matrix::copy( *M1 );
+                
+                tic = timer::now();
+                
+                impl::lu< value_t >( *M3, acc, apx );
+                
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+                
                 {
-                    std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
-            
-                    auto  apx = approx::SVD< value_t >();
-                    auto  M3 = seq::matrix::copy( *M1 );
-                
-                    tic = timer::now();
-                
-                    impl::lu< value_t >( *M3, acc, apx );
-                
-                    toc = timer::since( tic );
-                    std::cout << "      done in  " << format_time( toc ) << std::endl;
-                    std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
-                
-                    {
-                        hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
                     
-                        std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-                    }
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
                 }
+
+                REF = std::move( M3 );
             }// if
 
             if ( true )
@@ -471,7 +470,7 @@ program_main ()
                 
                 tic = timer::now();
                 
-                impl::uniform::lu< value_t >( *A3, acc );
+                impl::uniform::lu< value_t >( *A3, acc, *REF );
                 
                 toc = timer::since( tic );
                 std::cout << "      done in  " << format_time( toc ) << std::endl;

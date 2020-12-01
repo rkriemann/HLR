@@ -98,13 +98,29 @@ multiply ( const value_t                    alpha,
 
 template < typename value_t >
 void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const blas::matrix< value_t > &              B,
+           blas::matrix< value_t > &                    C )
+{
+    HLR_ASSERT(( op_A == apply_normal ) || ( op_A == apply_adjoint ));
+    
+    auto  VB  = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B );
+    auto  SVB = blas::prod( blas::mat_view( op_A, A.coeff() ), VB );
+    
+    blas::prod( alpha, A.row_cb( op_A ).basis(), SVB, value_t(1), C );
+}
+
+template < typename value_t >
+void
 multiply ( const value_t                    alpha,
            const hpro::matop_t              op_A,
            const hpro::TDenseMatrix &       A,
            const blas::matrix< value_t > &  B,
            blas::matrix< value_t > &        C )
 {
-    blas::prod( alpha, blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ), B, value_t(1), C );
+    blas::prod( alpha, blas::mat_view( op_A, blas::mat< value_t >( A ) ), B, value_t(1), C );
 }
 
 template < typename value_t >
@@ -115,9 +131,14 @@ multiply ( const value_t                    alpha,
            const blas::matrix< value_t > &  B,
            blas::matrix< value_t > &        C )
 {
-    if      ( is_blocked( A ) ) multiply( alpha, op_A, * cptrcast( & A, hpro::TBlockMatrix ), B, C );
-    else if ( is_lowrank( A ) ) multiply( alpha, op_A, * cptrcast( & A, hpro::TRkMatrix ), B, C );
-    else if ( is_dense(   A ) ) multiply( alpha, op_A, * cptrcast( & A, hpro::TDenseMatrix ), B, C );
+    if ( is_blocked( A ) )
+        multiply( alpha, op_A, * cptrcast( & A, hpro::TBlockMatrix ), B, C );
+    else if ( is_lowrank( A ) )
+        multiply( alpha, op_A, * cptrcast( & A, hpro::TRkMatrix ), B, C );
+    else if ( matrix::is_uniform_lowrank( A ) )
+        multiply( alpha, op_A, * cptrcast( & A, matrix::uniform_lrmatrix< value_t > ), B, C );
+    else if ( is_dense( A ) )
+        multiply( alpha, op_A, * cptrcast( & A, hpro::TDenseMatrix ), B, C );
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
@@ -409,7 +430,7 @@ multiply ( const value_t               alpha,
         for ( uint  j = 0; j < A.nblock_cols( op_A ); ++j )
         {
             auto  A_ij = A.block( i, j, op_A );
-            auto  DB   = hpro::blas_mat< value_t >( B );
+            auto  DB   = blas::mat< value_t >( B );
             auto  is_j = A_ij->col_is( op_A );
 
             if ( op_B == hpro::apply_normal )
@@ -497,7 +518,7 @@ multiply ( const value_t               alpha,
     
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
     auto  VB = blas::prod( alpha,
-                           blas::adjoint( blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) ),
+                           blas::adjoint( blas::mat_view( op_B, blas::mat< value_t >( B ) ) ),
                            blas::mat_V< value_t >( A, op_A ) );
 
     std::scoped_lock  lock( C.mutex() );
@@ -525,7 +546,7 @@ multiply ( const value_t               alpha,
     
     // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
     auto  AU = blas::prod( alpha,
-                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
+                           blas::mat_view( op_A, blas::mat< value_t >( A ) ),
                            blas::mat_U< value_t >( B, op_B ) );
 
     std::scoped_lock  lock( C.mutex() );
@@ -553,8 +574,8 @@ multiply ( const value_t               alpha,
     
     // [ U(C), V(C) ] = approx( C - A B )
     auto  AB = blas::prod( alpha,
-                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
-                           blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+                           blas::mat_view( op_A, blas::mat< value_t >( A ) ),
+                           blas::mat_view( op_B, blas::mat< value_t >( B ) ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -582,7 +603,29 @@ multiply ( const value_t            alpha,
 
     std::scoped_lock  lock( C.mutex() );
     
-    blas::prod( alpha, UT, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, UT, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TDenseMatrix &                         C )
+{
+    HLR_MULT_PRINT;
+    
+    // C = C + A×B = C + (U·((S·(V' × W))·T))·X'
+    auto  VW    = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
+    auto  SVW   = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
+    auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coeff() ) );
+    auto  USVWT = blas::prod( A.row_cb( op_A ).basis(), SVWT );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, USVWT, blas::adjoint( B.col_cb( op_B ).basis() ), value_t(1), blas::mat< value_t >( C ) );
 }
 
 template < typename value_t >
@@ -597,11 +640,31 @@ multiply ( const value_t               alpha,
     HLR_MULT_PRINT;
     
     // C = C + ( A U(B) ) V(B)^H
-    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ), blas::mat_U< value_t >( B, op_B ) );
+    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, blas::mat< value_t >( A ) ), blas::mat_U< value_t >( B, op_B ) );
 
     std::scoped_lock  lock( C.mutex() );
     
-    blas::prod( alpha, AU, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, AU, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TDenseMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TDenseMatrix &                         C )
+{
+    HLR_MULT_PRINT;
+    
+    // C = C + (( A U ) S) V'
+    auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat< value_t >( A ) ), B.row_cb( op_B ).basis() );
+    auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coeff() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, AUS, blas::adjoint( B.col_cb( op_B ).basis() ), value_t(1), blas::mat< value_t >( C ) );
 }
 
 template < typename value_t >
@@ -616,11 +679,31 @@ multiply ( const value_t               alpha,
     HLR_MULT_PRINT;
     
     // C = C + U(A) ( V(A)^H B )
-    auto  VB = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A, op_A ) ), blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+    auto  VB = blas::prod( value_t(1), blas::adjoint( blas::mat_V< value_t >( A, op_A ) ), blas::mat_view( op_B, blas::mat< value_t >( B ) ) );
 
     std::scoped_lock  lock( C.mutex() );
     
-    blas::prod( alpha, blas::mat_U< value_t >( A, op_A ), VB, value_t(1), hpro::blas_mat< value_t >( C ) );
+    blas::prod( alpha, blas::mat_U< value_t >( A, op_A ), VB, value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const hpro::TDenseMatrix &                   B,
+           hpro::TDenseMatrix &                         C )
+{
+    HLR_MULT_PRINT;
+    
+    // C = C + U·(S·(V'×B))
+    auto  VB  = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), blas::mat_view( op_B, blas::mat< value_t >( B ) ) );
+    auto  SVB = blas::prod( blas::mat_view( op_B, A.coeff() ), VB );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, A.row_cb( op_A ).basis(), SVB, value_t(1), blas::mat< value_t >( C ) );
 }
 
 template < typename value_t >
@@ -638,9 +721,9 @@ multiply ( const value_t               alpha,
     
     // C = C + A B
     blas::prod( alpha,
-                blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
-                blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ),
-                value_t(1), hpro::blas_mat< value_t >( C ) );
+                blas::mat_view( op_A, blas::mat< value_t >( A ) ),
+                blas::mat_view( op_B, blas::mat< value_t >( B ) ),
+                value_t(1), blas::mat< value_t >( C ) );
 }
 
 }// namespace hlr
