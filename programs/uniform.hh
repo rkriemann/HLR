@@ -50,7 +50,10 @@ program_main ()
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+    // auto  A      = io::hpro::read( "A.hm" );
     auto  toc    = timer::since( tic );
+
+    // io::hpro::write( *A, "A.hm" );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -449,6 +452,8 @@ program_main ()
                 std::cout << "      done in  " << format_time( toc ) << std::endl;
                 std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
                 
+                matrix::print_eps( *M3, "HLU" );
+                
                 {
                     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
                     
@@ -475,6 +480,8 @@ program_main ()
                 toc = timer::since( tic );
                 std::cout << "      done in  " << format_time( toc ) << std::endl;
                 std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+                
+                matrix::print_eps( *A3, "H2LU" );
                 
                 auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
                 

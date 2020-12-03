@@ -183,7 +183,9 @@ namespace detail
 using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 //
-// compute M=U·S·V' + W·T·X'
+// compute M=U·S·V' + W·T·X' = (U W)⎛S  ⎞(V X)'
+//                                  ⎝  T⎠
+//
 // - ASSUMPTION: W and X are orthogonal
 //
 template < typename value_t >
@@ -201,23 +203,16 @@ add ( const uniform_lrmatrix< value_t > &  M,
     auto  U = M.row_cb().basis();
     auto  S = M.coeff();
     auto  V = M.col_cb().basis();
-    
-    //
-    // scale coupling matrices w.r.t. norm
-    //
-    
-    const auto  norm_USV = blas::norm2( S );
-    const auto  norm_WTX = blas::norm2( T );
-    auto        S1       = blas::copy( S );
-    auto        T1       = blas::copy( T );
 
-    blas::scale( value_t(1) / norm_USV, S1 );
-    blas::scale( value_t(1) / norm_WTX, T1 );
-    
+    //
     // extended bases and coupling
-    const auto  Ue  = blas::join_row< value_t >( { U, W } );
-    auto        Se1 = blas::diag< value_t >( { S1, T1 } );
-    const auto  Ve  = blas::join_row< value_t >( { V, X } );
+    //
+    // Remark: no scaling of S/T since need to scale both by norm of M
+    //
+    
+    const auto  Ue = blas::join_row< value_t >( { U, W } );
+    auto        Se = blas::diag< value_t >( { S, T } );
+    const auto  Ve = blas::join_row< value_t >( { V, X } );
 
     //
     // new row basis is computed as the left singular vectors of
@@ -238,7 +233,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
                 
     {
         auto  R  = blas::matrix< value_t >();
-        auto  Q  = blas::copy( blas::adjoint( Se1 ) ); // need to copy since modified during QR
+        auto  Q  = blas::copy( blas::adjoint( Se ) );
                 
         blas::qr( Q, R, false );
                 
@@ -272,7 +267,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
                 
     {
         auto  R  = blas::matrix< value_t >();
-        auto  Q  = blas::copy( Se1 ); // need to copy since modified during QR
+        auto  Q  = blas::copy( Se ); // need to copy since modified during QR
                 
         blas::qr( Q, R, false );
                     
@@ -295,7 +290,6 @@ add ( const uniform_lrmatrix< value_t > &  M,
     // with TU = Un' Ue and TV = Vn' Ve
     //
                 
-    auto        Se = blas::diag< value_t >( { S, T } );
     const auto  TU = blas::prod( blas::adjoint( Un ), Ue );
     const auto  TV = blas::prod( blas::adjoint( Vn ), Ve );
     auto        TS = blas::prod( TU, Se );
@@ -311,7 +305,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
     //         auto  UUM = blas::prod( Un, UM );
             
     //         blas::add( value_t(-1), M1, UUM );
-    //         std::cout << "          addlr Un   : " << boost::format( "%.4e" ) % ( blas::norm_F( UUM ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add Un   : " << boost::format( "%.4e" ) % ( blas::norm_F( UUM ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
 
     //     {
@@ -319,7 +313,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
     //         auto  MVV = blas::prod( MV, blas::adjoint( Vn ) );
             
     //         blas::add( value_t(-1), M1, MVV );
-    //         std::cout << "          addlr Vn   : " << boost::format( "%.4e" ) % ( blas::norm_F( MVV ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add Vn   : " << boost::format( "%.4e" ) % ( blas::norm_F( MVV ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
 
     //     {
@@ -327,7 +321,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
     //         auto  M2  = blas::prod( US2, blas::adjoint( Vn ) );
 
     //         blas::add( value_t(-1), M1, M2 );
-    //         std::cout << "          addlr     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
     // }
     // // DEBUG }
@@ -336,7 +330,8 @@ add ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
-// compute M=U·S·V' + W·T·V'
+// compute M=U·S·V' + W·T·V' = (U W)·⎛S⎞·V'
+//                                   ⎝T⎠
 // - ASSUMPTION: W is orthogonal
 //
 template < typename value_t >
@@ -354,18 +349,6 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
     auto  V = M.col_cb().basis();
     
     //
-    // scale coupling matrices w.r.t. norm
-    //
-    
-    const auto  norm_USV = blas::norm2( S );
-    const auto  norm_WTV = blas::norm2( T );
-    auto        S1       = blas::copy( blas::adjoint( S ) );
-    auto        T1       = blas::copy( blas::adjoint( T ) );
-
-    blas::scale( value_t(1) / norm_USV, S1 );
-    blas::scale( value_t(1) / norm_WTV, T1 );
-    
-    //
     // new row basis is computed as the left singular vectors of
     //
     //   (U W) ⎛S⎞ V' = (U W) (V·(S' T'))'
@@ -376,9 +359,12 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
     // With QR decomposition Q·R = (S' T') one ends up with
     // the left singular vectors of (U W) R'.
     //
+    // Remark: no scaling of S/T since need to scale both by norm of M.
+    //
 
-    auto  Q = blas::join_row< value_t >( { S1, T1 } );
-    auto  R = blas::matrix< value_t >();
+    auto  Se = blas::join_col< value_t >( { S, T } );
+    auto  Q  = blas::copy( blas::adjoint( Se ) );
+    auto  R  = blas::matrix< value_t >();
     
     blas::qr( Q, R, false );
                 
@@ -398,37 +384,28 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
     //                               ⎝T⎠
     //
                 
-    auto  Se = blas::join_col< value_t >( { S, T } );
     auto  TU = blas::prod( blas::adjoint( Un ), Ue );
     auto  Sn = blas::prod( TU, Se );
 
     // // DEBUG {
     // {
     //     auto  US1 = blas::prod( Ue, Se );
-    //     auto  M1  = blas::prod( US1, blas::adjoint( Ve ) );
+    //     auto  M1  = blas::prod( US1, blas::adjoint( V ) );
 
     //     {
     //         auto  UM  = blas::prod( blas::adjoint( Un ), M1 );
     //         auto  UUM = blas::prod( Un, UM );
             
     //         blas::add( value_t(-1), M1, UUM );
-    //         std::cout << "          addlr Un   : " << boost::format( "%.4e" ) % ( blas::norm_F( UUM ) / blas::norm_F( M1 ) ) << std::endl;
-    //     }
-
-    //     {
-    //         auto  MV  = blas::prod( M1, Vn );
-    //         auto  MVV = blas::prod( MV, blas::adjoint( Vn ) );
-            
-    //         blas::add( value_t(-1), M1, MVV );
-    //         std::cout << "          addlr Vn   : " << boost::format( "%.4e" ) % ( blas::norm_F( MVV ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add_row Un   : " << boost::format( "%.4e" ) % ( blas::norm_F( UUM ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
 
     //     {
     //         auto  US2 = blas::prod( Un, Sn );
-    //         auto  M2  = blas::prod( US2, blas::adjoint( Vn ) );
+    //         auto  M2  = blas::prod( US2, blas::adjoint( V ) );
 
     //         blas::add( value_t(-1), M1, M2 );
-    //         std::cout << "          addlr     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add_row     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
     // }
     // // DEBUG }
@@ -437,7 +414,7 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
-// compute M=U·S·V' + U·T·X'
+// compute M=U·S·V' + U·T·X', M=U·(S T)·(V X)'
 // - ASSUMPTION: X is orthogonal
 //
 template < typename value_t >
@@ -453,18 +430,12 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     auto  U = M.row_cb().basis();
     auto  S = M.coeff();
     auto  V = M.col_cb().basis();
-    
-    //
-    // scale coupling matrices w.r.t. norm
-    //
-    
-    const auto  norm_USV = blas::norm2( S );
-    const auto  norm_UTX = blas::norm2( T );
-    auto        S1       = blas::copy( S );
-    auto        T1       = blas::copy( T );
 
-    blas::scale( value_t(1) / norm_USV, S1 );
-    blas::scale( value_t(1) / norm_UTX, T1 );
+    // io::matlab::write( U, "U" );
+    // io::matlab::write( S, "S" );
+    // io::matlab::write( V, "V" );
+    // io::matlab::write( T, "T" );
+    // io::matlab::write( X, "X" );
     
     //
     // new column basis is computed as the left singular vectors of
@@ -477,12 +448,18 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     // With QR decomposition Q·R = (S T) one ends up with the left
     // singular vectors of (V X) R'.
     //
+    // Remark: no scaling of S/T since need to scale both by norm of M.
+    //
 
-    auto  Q = blas::join_row< value_t >( { S1, T1 } );
-    auto  R = blas::matrix< value_t >();
-                
+    auto  Se = blas::join_row< value_t >( { S, T } );
+    auto  Q  = blas::copy( Se );
+    auto  R  = blas::matrix< value_t >();
+    
     blas::qr( Q, R, false );
-                    
+
+    io::matlab::write( Q, "Q" );
+    io::matlab::write( R, "R" );
+    
     auto  Ve = blas::join_row< value_t >( { V, X } );
     auto  Vs = blas::prod( Ve, blas::adjoint( R ) );
     auto  Ss = blas::vector< real_t >();
@@ -497,37 +474,28 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     // new coupling matrix is ⎛S⎞·(V X)'·Vn
     //                        ⎝T⎠
                 
-    auto  Se = blas::join_row< value_t >( { S, T } );
     auto  TV = blas::prod( blas::adjoint( Ve ), Vn );
     auto  Sn = blas::prod( Se, TV );
-
+    
     // // DEBUG {
     // {
-    //     auto  US1 = blas::prod( Ue, Se );
+    //     auto  US1 = blas::prod( U, Se );
     //     auto  M1  = blas::prod( US1, blas::adjoint( Ve ) );
-
-    //     {
-    //         auto  UM  = blas::prod( blas::adjoint( Un ), M1 );
-    //         auto  UUM = blas::prod( Un, UM );
-            
-    //         blas::add( value_t(-1), M1, UUM );
-    //         std::cout << "          addlr Un   : " << boost::format( "%.4e" ) % ( blas::norm_F( UUM ) / blas::norm_F( M1 ) ) << std::endl;
-    //     }
 
     //     {
     //         auto  MV  = blas::prod( M1, Vn );
     //         auto  MVV = blas::prod( MV, blas::adjoint( Vn ) );
             
     //         blas::add( value_t(-1), M1, MVV );
-    //         std::cout << "          addlr Vn   : " << boost::format( "%.4e" ) % ( blas::norm_F( MVV ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add_col Vn   : " << boost::format( "%.4e" ) % ( blas::norm_F( MVV ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
 
     //     {
-    //         auto  US2 = blas::prod( Un, Sn );
+    //         auto  US2 = blas::prod( U, Sn );
     //         auto  M2  = blas::prod( US2, blas::adjoint( Vn ) );
 
     //         blas::add( value_t(-1), M1, M2 );
-    //         std::cout << "          addlr     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+    //         std::cout << "          add_col     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
     // }
     // // DEBUG }
@@ -591,7 +559,7 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
     
     for ( auto  M_ik : rowmap.at( M.row_is() ) )
     {
-        if ( matrix::is_uniform_lowrank( M_ik ) && ( M_ik->col_is() != M.col_is() ))
+        if ( matrix::is_uniform_lowrank( M_ik ) && ( M_ik != &M ))
             nrows_S += cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > )->col_rank();
     }// for
 
@@ -619,7 +587,7 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
             if ( ! matrix::is_uniform_lowrank( M_ik ) )
                 continue;
         
-            if ( M_ik->col_is() == M.col_is() )
+            if ( M_ik == &M )
             {
                 // R_ik = W T X' with W/X being orthogonal, hence |R_ik| = |T|
                 const auto  rank = T.ncols();
@@ -908,18 +876,18 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
     auto  Sn = blas::prod( S1, blas::adjoint( TX ) );
 
     // // DEBUG {
-    // io::matlab::write( Un, "Un" );
-    // io::matlab::write( Sn, "Sn" );
-    // io::matlab::write( Vn, "Vn" );
-    
     // {
+    //     // io::matlab::write( Un, "Un" );
+    //     // io::matlab::write( Sn, "Sn" );
+    //     // io::matlab::write( Vn, "Vn" );
+        
     //     auto  US1   = blas::prod( W, T );
     //     auto  M1    = blas::prod( US1, blas::adjoint( X ) );
     //     auto  US2   = blas::prod( Un, Sn );
     //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
                         
     //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext    /    : " << R_ij->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+    //     std::cout << "    ext    /    : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
     // }
     // // DEBUG }
     
@@ -978,7 +946,7 @@ update_row_basis ( uniform_lrmatrix< value_t > &    M,
             //     auto  M2    = blas::prod( US2, blas::adjoint( R_ik->col_cb().basis() ) );
                         
             //     blas::add( value_t(-1), M1, M2 );
-            //     std::cout << "    ext row/col : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+            //     std::cout << "    ext row     : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
             // }
             // // DEBUG }
 
@@ -994,18 +962,18 @@ update_row_basis ( uniform_lrmatrix< value_t > &    M,
     auto  Sn = blas::prod( TW, T );
 
     // // DEBUG {
-    // io::matlab::write( Un, "Un" );
-    // io::matlab::write( Sn, "Sn" );
-    // io::matlab::write( Vn, "Vn" );
-    
     // {
+    //     // io::matlab::write( Un, "Un" );
+    //     // io::matlab::write( Sn, "Sn" );
+    
+    //     auto  V     = M.col_cb().basis();
     //     auto  US1   = blas::prod( W, T );
-    //     auto  M1    = blas::prod( US1, blas::adjoint( X ) );
+    //     auto  M1    = blas::prod( US1, blas::adjoint( V ) );
     //     auto  US2   = blas::prod( Un, Sn );
-    //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
+    //     auto  M2    = blas::prod( US2, blas::adjoint( V ) );
                         
     //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext    /    : " << R_ij->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+    //     std::cout << "    ext row     : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
     // }
     // // DEBUG }
     
@@ -1061,7 +1029,7 @@ update_col_basis ( uniform_lrmatrix< value_t > &    M,
                 //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
                         
                 //     blas::add( value_t(-1), M1, M2 );
-                //     std::cout << "    ext col/row : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+                //     std::cout << "    ext col     : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
                 // }
                 // // DEBUG }
 
@@ -1078,18 +1046,18 @@ update_col_basis ( uniform_lrmatrix< value_t > &    M,
     auto  Sn = blas::prod( TX, Vn );
 
     // // DEBUG {
-    // io::matlab::write( Un, "Un" );
-    // io::matlab::write( Sn, "Sn" );
-    // io::matlab::write( Vn, "Vn" );
-    
     // {
-    //     auto  US1   = blas::prod( W, T );
+    //     // io::matlab::write( Sn, "Sn" );
+    //     // io::matlab::write( Vn, "Vn" );
+    
+    //     auto  U     = M.row_cb().basis();
+    //     auto  US1   = blas::prod( U, T );
     //     auto  M1    = blas::prod( US1, blas::adjoint( X ) );
-    //     auto  US2   = blas::prod( Un, Sn );
+    //     auto  US2   = blas::prod( U, Sn );
     //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
                         
     //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext    /    : " << R_ij->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+    //     std::cout << "    ext col     : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
     // }
     // // DEBUG }
     
@@ -1138,9 +1106,18 @@ add ( hpro::TMatrix &                  M,
     }// if
     else if ( is_uniform_lowrank( M ) )
     {
-        auto  R = ptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  R  = ptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  Uc = blas::copy( U );
+        auto  Vc = blas::copy( V );
+        auto  RU = blas::matrix< value_t >();
+        auto  RV = blas::matrix< value_t >();
 
-        auto [ Un, Sn, Vn ] = add( *R, U, S, V, acc );
+        blas::qr( Uc, RU );
+        blas::qr( Vc, RV );
+
+        auto  RUS            = blas::prod( RU, S );
+        auto  T              = blas::prod( RUS, blas::adjoint(RV) );
+        auto  [ Un, Sn, Vn ] = add( *R, Uc, T, Vc, acc );
         
         update_row_col_basis( *R, Un, Sn, Vn, acc, rowmap, colmap );
     }// if
@@ -1306,7 +1283,12 @@ multiply ( const value_t                        alpha,
 
     hlr::multiply< value_t >( alpha, op_A, A, U, AU );
 
-    auto [ Un, Sn ] = add_row( C, AU, B.coeff(), acc );
+    auto  R = blas::matrix< value_t >();
+
+    blas::qr( AU, R );
+
+    auto  T          = blas::prod( R, B.coeff() );
+    auto  [ Un, Sn ] = add_row( C, AU, T, acc );
 
     detail::update_row_basis( C, Un, Sn, acc, rowmap );
 }
@@ -1350,7 +1332,12 @@ multiply ( const value_t                        alpha,
 
     hlr::multiply< value_t >( alpha, blas::adjoint( op_B ), B, V, BV );
 
-    auto [ Sn, Vn ] = add_col( C, A.coeff(), BV, acc );
+    auto  R = blas::matrix< value_t >();
+
+    blas::qr( BV, R );
+
+    auto  T          = blas::prod( A.coeff(), blas::adjoint( R ) );
+    auto  [ Sn, Vn ] = add_col( C, T, BV, acc );
     
     detail::update_col_basis( C, Sn, Vn, acc, colmap );
 }
@@ -1413,10 +1400,15 @@ multiply ( const value_t                        alpha,
 {
     // A×B + C = U·S·(V' × B) + U·T·X' = U·S·(B' × V)' + U·T·X'
     auto  BV = blas::prod( alpha,
-                           blas::mat_view( blas::adjoint( op_B ), blas::mat< value_t >( B) ),
+                           blas::mat_view( blas::adjoint( op_B ), blas::mat< value_t >( B ) ),
                            A.col_cb( op_A ).basis() );
 
-    auto [ Sn, Vn ] = add_col( C, A.coeff(), BV, acc );
+    auto  R = blas::matrix< value_t >();
+
+    blas::qr( BV, R );
+
+    auto  T          = blas::prod( A.coeff(), blas::adjoint( R ) );
+    auto  [ Sn, Vn ] = add_col( C, T, BV, acc );
     
     detail::update_col_basis( C, Sn, Vn, acc, colmap );
 }
@@ -1438,7 +1430,12 @@ multiply ( const value_t                        alpha,
                            blas::mat_view( op_A, blas::mat< value_t >( A ) ),
                            B.row_cb( op_B ).basis() );
 
-    auto [ Un, Sn ] = add_row( C, AU, B.coeff(), acc );
+    auto  R = blas::matrix< value_t >();
+
+    blas::qr( AU, R );
+
+    auto  T          = blas::prod( R, B.coeff() );
+    auto [ Un, Sn ] = add_row( C, AU, T, acc );
     
     detail::update_row_basis( C, Un, Sn, acc, rowmap );
 }
@@ -1455,8 +1452,6 @@ multiply ( const value_t                  alpha,
            const uniform_map_t &          rowmap,
            const uniform_map_t &          colmap )
 {
-    HLR_MULT_PRINT;
-    
     auto  AB       = blas::prod( alpha,
                                  blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
                                  blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
@@ -1488,11 +1483,13 @@ multiply ( const value_t            alpha,
            const uniform_map_t &    rowmap,
            const uniform_map_t &    colmap )
 {
-    auto  DA = matrix::convert_to_dense< value_t >( A );
-    auto  DB = matrix::convert_to_dense< value_t >( B );
-    auto  DC = matrix::convert_to_dense< value_t >( C );
+    // // DEBUG {
+    // auto  DA = hlr::seq::matrix::copy_nonuniform< value_t >( A );
+    // auto  DB = hlr::seq::matrix::copy_nonuniform< value_t >( B );
+    // auto  DC = hlr::seq::matrix::copy_nonuniform< value_t >( C );
 
-    hlr::multiply< value_t >( alpha, op_A, *DA, op_B, *DB, *DC );
+    // hlr::multiply< value_t >( alpha, op_A, *DA, op_B, *DB, *DC, acc, approx::SVD< value_t >() );
+    // // DEBUG }
     
     if ( is_blocked( A ) )
     {
@@ -1710,11 +1707,15 @@ multiply ( const value_t            alpha,
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    auto  DD = matrix::convert_to_dense< value_t >( C );
+    // // DEBUG {
+    // auto  DD = hlr::seq::matrix::copy_nonuniform< value_t >( C );
+    // auto  TC = matrix::convert_to_dense< value_t >( *DC );
+    // auto  TD = matrix::convert_to_dense< value_t >( *DD );
 
-    hlr::add( value_t(-1), *DC, *DD );
+    // hlr::add( value_t(-1), *TC, *TD );
 
-    std::cout << "multiply : " << A.id() << " × " << B.id() << " = " << C.id() << " : " << norm::frobenius( *DD ) << std::endl;
+    // std::cout << "multiply : " << A.id() << " × " << B.id() << " = " << C.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *TD ) / norm::frobenius( *TC ) ) << std::endl;
+    // // DEBUG }
 }
 
 //
@@ -1838,10 +1839,12 @@ solve_lower_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap )
 {
-    auto  DL = hlr::seq::matrix::copy_nonuniform< value_t >( L );
-    auto  DM = matrix::convert_to_dense< value_t >( M );
+    // // DEBUG {
+    // auto  DL = hlr::seq::matrix::copy_nonuniform< value_t >( L );
+    // auto  DM = hlr::seq::matrix::copy_nonuniform< value_t >( M );
 
-    hlr::solve_lower_tri< value_t >( side, diag, *DL, *DM );
+    // hlr::solve_lower_tri< value_t >( side, diag, *DL, *DM, acc, approx::SVD< value_t >() );
+    // // DEBUG }
     
     if ( is_blocked( L ) )
     {
@@ -1866,10 +1869,14 @@ solve_lower_tri ( const eval_side_t        side,
     else
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
 
-    auto  DX = matrix::convert_to_dense< value_t >( M );
-
-    hlr::add( value_t(-1), *DX, *DM );
-    std::cout << "solve_lower_tri: " << M.id() << " : " << hlr::norm::frobenius( *DM ) << std::endl;
+    // // DEBUG {
+    // auto  DX = hlr::seq::matrix::copy_nonuniform< value_t >( M );
+    // auto  TM = matrix::convert_to_dense< value_t >( *DM );
+    // auto  TX = matrix::convert_to_dense< value_t >( *DX );
+    
+    // hlr::add( value_t(-1), *TM, *TX );
+    // std::cout << "solve_lower: " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *TX ) / norm::frobenius( *TM ) ) << std::endl;
+    // // DEBUG }
 }
 
 //
@@ -1987,10 +1994,12 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap )
 {
-    auto  DU = hlr::seq::matrix::copy_nonuniform< value_t >( U );
-    auto  DM = matrix::convert_to_dense< value_t >( M );
+    // // DEBUG {
+    // auto  DU = hlr::seq::matrix::copy_nonuniform< value_t >( U );
+    // auto  DM = hlr::seq::matrix::copy_nonuniform< value_t >( M );
 
-    hlr::solve_upper_tri< value_t >( side, diag, *DU, *DM );
+    // hlr::solve_upper_tri< value_t >( side, diag, *DU, *DM, acc, approx::SVD< value_t >() );
+    // // DEBUG }
     
     if ( is_blocked( U ) )
     {
@@ -2015,10 +2024,14 @@ solve_upper_tri ( const eval_side_t        side,
     else
         HLR_ERROR( "unsupported matrix type for U : " + U.typestr() );
 
-    auto  DX = matrix::convert_to_dense< value_t >( M );
-
-    hlr::add( value_t(-1), *DX, *DM );
-    std::cout << "solve_upper_tri: " << M.id() << " : " << hlr::norm::frobenius( *DM ) << std::endl;
+    // // DEBUG {
+    // auto  DX = hlr::seq::matrix::copy_nonuniform< value_t >( M );
+    // auto  TM = matrix::convert_to_dense< value_t >( *DM );
+    // auto  TX = matrix::convert_to_dense< value_t >( *DX );
+    
+    // hlr::add( value_t(-1), *TM, *TX );
+    // std::cout << "solve_upper: " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *TX ) / norm::frobenius( *TM ) ) << std::endl;
+    // // DEBUG }
 }
 
 //
@@ -2029,27 +2042,30 @@ void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const uniform_map_t &    rowmap,
-     const uniform_map_t &    colmap,
-     hpro::TMatrix &          REF )
+     const uniform_map_t &    colmap )
+// hpro::TMatrix &          REF )
 {
     if ( is_blocked( A ) )
     {
         auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
-        auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
+        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
 
         for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
+            // lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
+            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap );
 
-            {
-                auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
-                auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
+            // // DEBUG {
+            // {
+            //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
+            //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
 
-                hlr::add( value_t(-1), *D1, *D2 );
-                std::cout << BA->block(i,i)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
-            }
+            //     hlr::add( value_t(-1), *D2, *D1 );
+            //     std::cout << "ref error " << BA->block(i,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+            // }
+            // // DEBUG }
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
@@ -2058,13 +2074,15 @@ lu ( hpro::TMatrix &          A,
                                                 *BA->block( i, i ), *BA->block( j, i ),
                                                 acc, rowmap, colmap );
 
-                {
-                    auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
-                    auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
+                // // DEBUG {
+                // {
+                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
+                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
                     
-                    hlr::add( value_t(-1), *D1, *D2 );
-                    std::cout << BA->block(j,i)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
-                }
+                //     hlr::add( value_t(-1), *D2, *D1 );
+                //     std::cout << "ref error " << BA->block(j,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+                // }
+                // // DEBUG }
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
@@ -2074,13 +2092,15 @@ lu ( hpro::TMatrix &          A,
                                                 *BA->block( i, i ), *BA->block( i, j ),
                                                 acc, rowmap, colmap );
 
-                {
-                    auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
-                    auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
+                // DEBUG {
+                // {
+                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
+                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
                     
-                    hlr::add( value_t(-1), *D1, *D2 );
-                    std::cout << BA->block(i,j)->id() << " : " << norm::frobenius( *D2 ) << std::endl;
-                }
+                //     hlr::add( value_t(-1), *D2, *D1 );
+                //     std::cout << "ref error " << BA->block(i,j)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+                // }
+                // DEBUG }
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )

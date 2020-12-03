@@ -17,6 +17,36 @@
 
 namespace hlr { namespace io {
 
+namespace hpro
+{
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const HLIB::TMatrix &  M,
+        const std::string &    filename )
+{
+    HLIB::THLibMatrixIO  mio;
+
+    mio.write( &M, filename );
+}
+
+//
+// read matrix M from file <filename>
+//
+inline
+std::unique_ptr< HLIB::TMatrix >
+read ( const std::string &  filename )
+{
+    HLIB::THLibMatrixIO  mio;
+
+    return mio.read( filename );
+}
+
+}// namespace hpro
+
 namespace matlab
 {
 
@@ -31,26 +61,26 @@ write ( const blas::matrix< value_t > &  M,
         const std::string &              filename = "" )
 {
     if ( filename == "" )
-        hpro::DBG::write( M, matname + ".mat", matname );
+        HLIB::DBG::write( M, matname + ".mat", matname );
     else
-        hpro::DBG::write( M, filename, matname );
+        HLIB::DBG::write( M, filename, matname );
 }
 
 inline
 void
-write ( const hpro::TMatrix &  M,
+write ( const HLIB::TMatrix &  M,
         const std::string &    matname,
         const std::string &    filename = "" )
 {
     if ( filename == "" )
-        hpro::DBG::write( M, matname + ".mat", matname );
+        HLIB::DBG::write( M, matname + ".mat", matname );
     else
-        hpro::DBG::write( M, filename, matname );
+        HLIB::DBG::write( M, filename, matname );
 }
 
 inline
 void
-write ( const hpro::TMatrix *  M,
+write ( const HLIB::TMatrix *  M,
         const std::string &    matname,
         const std::string &    filename = "" )
 {
@@ -66,9 +96,9 @@ write ( const blas::vector< value_t > &  v,
         const std::string &              filename = "" )
 {
     if ( filename == "" )
-        hpro::DBG::write( v, vecname + ".mat", vecname );
+        HLIB::DBG::write( v, vecname + ".mat", vecname );
     else
-        hpro::DBG::write( v, filename, vecname );
+        HLIB::DBG::write( v, filename, vecname );
 }
 
 //
@@ -80,12 +110,12 @@ blas::matrix< value_t >
 read ( const std::string &  filename,
        const std::string &  matname = "" )
 {
-    hpro::TMatlabMatrixIO  mio;
+    HLIB::TMatlabMatrixIO  mio;
     auto                   D = mio.read( filename, matname );
 
     HLR_ASSERT( is_dense( *D ) );
     
-    return std::move( blas::mat< value_t >( ptrcast( D.get(), hpro::TDenseMatrix ) ) );
+    return std::move( blas::mat< value_t >( ptrcast( D.get(), HLIB::TDenseMatrix ) ) );
 }
 
 }// namespace matlab

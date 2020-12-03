@@ -98,7 +98,7 @@ lu ( hpro::TMatrix &          A,
     // perform actual LU factorization
     //
 
-    detail::lu< value_t >( A, acc, rowmap, colmap, REF );
+    detail::lu< value_t >( A, acc, rowmap, colmap );
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -39,6 +39,9 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
+    using hlr::matrix::is_uniform_lowrank;
+    using hlr::matrix::uniform_lrmatrix;
+    
     // auto  Cc = C.copy();
 
     // hpro::multiply( alpha, op_A, &A, op_B, &B, value_t(1), Cc.get(), acc );
@@ -189,7 +192,42 @@ multiply ( const value_t            alpha,
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_dense(   A ) )
+    else if ( is_uniform_lowrank( A ) )
+    {
+        if ( is_uniform_lowrank( B ) )
+        {
+            if ( is_lowrank( C ) )
+                multiply< value_t, approx_t >( alpha,
+                                               op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                               op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                               * ptrcast( &C, hpro::TRkMatrix ), acc, approx );
+            else if ( is_dense( C ) )
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
+            else
+                HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+        }// if
+        else if ( is_dense( B ) )
+        {
+            if ( is_lowrank( C ) )
+                multiply< value_t, approx_t >( alpha,
+                                               op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                               op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                               * ptrcast( &C, hpro::TRkMatrix ), acc, approx );
+            else if ( is_dense( C ) )
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
+            else
+                HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
+    }// if
+    else if ( is_dense( A ) )
     {
         if ( is_blocked( B ) )
         {
@@ -235,7 +273,23 @@ multiply ( const value_t            alpha,
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense(   B ) )
+        else if ( is_uniform_lowrank( B ) )
+        {
+            if ( is_lowrank( C ) )
+                multiply< value_t, approx_t >( alpha,
+                                               op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                               op_B, * cptrcast( &B, matrix::uniform_lrmatrix< value_t > ),
+                                               * ptrcast( &C, hpro::TRkMatrix ),
+                                               acc, approx );
+            else if ( is_dense( C ) )
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                                     op_B, * cptrcast( &B, matrix::uniform_lrmatrix< value_t > ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
+            else
+                HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+        }// if
+        else if ( is_dense( B ) )
         {
             if ( is_blocked( C ) )
                 multiply< value_t, approx_t >( alpha,

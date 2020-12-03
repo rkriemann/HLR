@@ -505,6 +505,40 @@ multiply ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TRkMatrix &                            C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // C + A×B = C + (U·((S·(V' × W))·T))·X' = C + T·X'
+    auto  T = blas::matrix< value_t >();
+
+    {
+        auto  VW    = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
+        auto  SVW   = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
+        auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coeff() ) );
+
+        T = std::move( blas::prod( alpha, A.row_cb( op_A ).basis(), SVWT ) );
+    }
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), T },
+                            { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TRkMatrix &     A,
@@ -533,6 +567,33 @@ multiply ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const hpro::TDenseMatrix &                   B,
+           hpro::TRkMatrix &                            C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // C + A × B = C + U·(S·(V' × B)) -> (B' × V)·S'
+    auto  BV  = blas::prod( blas::mat_view( blas::adjoint( op_B ), blas::mat< value_t >( B ) ), A.col_cb( op_A ).basis() );
+    auto  BVS = blas::prod( alpha, BV, blas::mat_view( blas::adjoint( op_A ), A.coeff() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), A.row_cb( op_A ).basis() },
+                            { blas::mat_V< value_t >( C ), BVS },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TDenseMatrix &  A,
@@ -553,6 +614,34 @@ multiply ( const value_t               alpha,
     
     auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), AU },
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
+                            acc );
+        
+    C.set_lrmat( U, V );
+}
+
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TDenseMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TRkMatrix &                            C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // C + A × B = C + ((A × U)·S)·V'
+    auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat< value_t >( A ) ), B.row_cb( op_B ).basis() );
+    auto  AUS = blas::prod( alpha, AU, blas::mat_view( op_B, B.coeff() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U< value_t >( C ), AUS },
+                            { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
                             acc );
         
     C.set_lrmat( U, V );
@@ -699,7 +788,7 @@ multiply ( const value_t                                alpha,
     
     // C = C + U·(S·(V'×B))
     auto  VB  = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), blas::mat_view( op_B, blas::mat< value_t >( B ) ) );
-    auto  SVB = blas::prod( blas::mat_view( op_B, A.coeff() ), VB );
+    auto  SVB = blas::prod( blas::mat_view( op_A, A.coeff() ), VB );
 
     std::scoped_lock  lock( C.mutex() );
     
