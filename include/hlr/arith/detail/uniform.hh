@@ -2131,6 +2131,103 @@ lu ( hpro::TMatrix &          A,
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
 
+//
+// recursive LU factorization
+//
+template < typename value_t >
+void
+lu_accu ( hpro::TMatrix &          A,
+          const hpro::TTruncAcc &  acc,
+          const uniform_map_t &    rowmap,
+          const uniform_map_t &    colmap,
+          hpro::TMatrix &          REF )
+{
+    if ( is_blocked( A ) )
+    {
+        auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
+        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+        {
+            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            
+            // lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
+            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap );
+
+            // // DEBUG {
+            // {
+            //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
+            //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
+
+            //     hlr::add( value_t(-1), *D2, *D1 );
+            //     std::cout << "ref error " << BA->block(i,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+            // }
+            // // DEBUG }
+
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+            {
+                if ( ! is_null( BA->block( j, i ) ) )
+                    solve_upper_tri< value_t >( from_right, general_diag,
+                                                *BA->block( i, i ), *BA->block( j, i ),
+                                                acc, rowmap, colmap );
+
+                // // DEBUG {
+                // {
+                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
+                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
+                    
+                //     hlr::add( value_t(-1), *D2, *D1 );
+                //     std::cout << "ref error " << BA->block(j,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+                // }
+                // // DEBUG }
+            }// for
+
+            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
+            {
+                if ( ! is_null( BA->block( i, j ) ) )
+                    solve_lower_tri< value_t >( from_left, unit_diag,
+                                                *BA->block( i, i ), *BA->block( i, j ),
+                                                acc, rowmap, colmap );
+
+                // DEBUG {
+                // {
+                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
+                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
+                    
+                //     hlr::add( value_t(-1), *D2, *D1 );
+                //     std::cout << "ref error " << BA->block(i,j)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+                // }
+                // DEBUG }
+            }// for
+
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+            {
+                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
+                {
+                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                    {
+                        HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                    
+                        multiply( value_t(-1),
+                                  apply_normal, *BA->block( j, i ),
+                                  apply_normal, *BA->block( i, l ),
+                                  *BA->block( j, l ),
+                                  acc, rowmap, colmap );
+                    }// if
+                }// for
+            }// for
+        }// for
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+
+        invert< value_t >( *D );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+}
+
 }}}// namespace hlr::uniform::detail
 
 #endif // __HLR_ARITH_DETAIL_UNIFORM_HH

@@ -188,7 +188,7 @@ lu ( TMatrix *          A,
                     if ( pid == p_ji )
                     {
                         // DBG::printf( "solve_U( %d, %d )", H_ii->id(), BA->block( j, i )->id() );
-                        trsmuh< value_t >( ptrcast( H_ii, TDenseMatrix ), A_ji );
+                        trsmuh< value_t >( *ptrcast( H_ii, TDenseMatrix ), *A_ji );
                     }// if
                 } );
         }
@@ -460,7 +460,7 @@ lu ( TMatrix *          A,
                     log( 4, HLIB::to_string( "solve_U( %d, %d )", H_ii->id(), A_ji->id() ) );
 
                     // solve_upper_right( A_ji, H_ii, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
-                    auto  dag = std::move( gen_dag_solve_upper( H_ii, A_ji, 128, tbb::dag::refine ) );
+                    auto  dag = std::move( gen_dag_solve_upper( *H_ii, *A_ji, 128, tbb::dag::refine ) );
 
                     tbb::dag::run( dag, acc );
                 }// if
@@ -479,7 +479,7 @@ lu ( TMatrix *          A,
                     log( 4, HLIB::to_string( "solve_L( %d, %d )", H_ii->id(), A_il->id() ) );
 
                     // solve_lower_left( apply_normal, H_ii, nullptr, A_il, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
-                    auto  dag = std::move( gen_dag_solve_lower( H_ii, A_il, 128, tbb::dag::refine ) );
+                    auto  dag = std::move( gen_dag_solve_lower( *H_ii, *A_il, 128, tbb::dag::refine ) );
 
                     tbb::dag::run( dag, acc );
                 }// if

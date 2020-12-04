@@ -72,24 +72,24 @@ using hlr::lu;
 //   structure as A
 //
 inline void
-gauss_elim ( hpro::TMatrix *          A,
-             hpro::TMatrix *          T,
+gauss_elim ( hpro::TMatrix &          A,
+             hpro::TMatrix &          T,
              const hpro::TTruncAcc &  acc )
 {
-    assert( ! is_null_any( A, T ) );
-    assert( A->type() == T->type() );
+    assert( ! is_null_any( &A, &T ) );
+    assert( A.type() == T.type() );
 
-    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( A, hpro::TBlockMatrix );
-        auto  BT = ptrcast( T, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BT = ptrcast( &T, hpro::TBlockMatrix );
         auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        hlr::seq::gauss_elim( MA(0,0), MT(0,0), acc );
+        hlr::seq::gauss_elim( *MA(0,0), *MT(0,0), acc );
         // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(0,0)->id(), norm_F( MA(0,0) ) ) );
 
         // T_01 = A_00⁻¹ · A_01
@@ -107,7 +107,7 @@ gauss_elim ( hpro::TMatrix *          A,
         // multiply( -1.0, MT(1,0), MA(0,1), MA(1,1), acc );
     
         // A_11 = A_11⁻¹
-        hlr::seq::gauss_elim( MA(1,1), MT(1,1), acc );
+        hlr::seq::gauss_elim( *MA(1,1), *MT(1,1), acc );
         // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(1,1)->id(), norm_F( MA(1,1) ) ) );
 
         // A_01 = - T_01 · A_11
@@ -126,15 +126,15 @@ gauss_elim ( hpro::TMatrix *          A,
     }// if
     else if ( is_dense( A ) )
     {
-        auto  DA = ptrcast( A, hpro::TDenseMatrix );
+        auto  DA = ptrcast( &A, hpro::TDenseMatrix );
         
-        if ( A->is_complex() ) blas::invert( DA->blas_cmat() );
-        else                   blas::invert( DA->blas_rmat() );
+        if ( A.is_complex() ) blas::invert( DA->blas_cmat() );
+        else                  blas::invert( DA->blas_rmat() );
     }// if
     else
         HLR_ASSERT( false );
 
-    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -174,7 +174,7 @@ lu ( hpro::TMatrix &          A,
         {
             // L is unit diagonal !!!
             // trsml(  A_ii, BA->block( i, j ) ); // A01->blas_rmat_A() );
-            trsmuh< value_t >( A_ii, BA->block( j, i ) ); // A10->blas_rmat_B() );
+            trsmuh< value_t >( *A_ii, *BA->block( j, i ) ); // A10->blas_rmat_B() );
         }// for
 
         for ( uint  j = i+1; j < nbr; ++j )
@@ -543,18 +543,18 @@ lu ( hpro::TMatrix &          A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        seq::hodlr::lu< value_t >( &A00, acc, approx );
+        seq::hodlr::lu< value_t >( *A00, acc, approx );
         
-        trsml(  A00, hpro::blas_mat_A< value_t >( A01 ) );
-        trsmuh( A00, hpro::blas_mat_B< value_t >( A10 ) );
+        trsml(  *A00, hpro::blas_mat_A< value_t >( A01 ) );
+        trsmuh( *A00, hpro::blas_mat_B< value_t >( A10 ) );
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
         auto  T  = blas::prod(  value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( A10 ) ), hpro::blas_mat_A< value_t >( A01 ) ); 
         auto  UT = blas::prod( value_t(-1), hpro::blas_mat_A< value_t >( A10 ), T );
 
-        seq::hodlr::addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), A11, acc, approx );
+        seq::hodlr::addlr< value_t >( UT, hpro::blas_mat_B< value_t >( A01 ), *A11, acc, approx );
         
-        seq::hodlr::lu< value_t >( &A11, acc, approx );
+        seq::hodlr::lu< value_t >( *A11, acc, approx );
     }// if
     else
     {
@@ -581,30 +581,30 @@ namespace tileh
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix *          A,
+lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx )
 {
-    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
     assert( is_blocked( A ) );
 
-    auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+    auto  BA  = ptrcast( &A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
     auto  nbc = BA->nblock_cols();
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        hlr::seq::lu( * BA->block( i, i ), acc, approx );
+        hlr::seq::lu< value_t >( *BA->block( i, i ), acc, approx );
 
         for ( uint j = i+1; j < nbr; ++j )
         {
-            hlr::solve_upper_tri( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
+            hlr::solve_upper_tri< value_t >( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
         }// for
             
         for ( uint  l = i+1; l < nbc; ++l )
         {
-            hlr::solve_lower_tri( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, l ), acc, approx );
+            hlr::solve_lower_tri< value_t >( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, l ), acc, approx );
         }// for
             
         for ( uint  j = i+1; j < nbr; ++j )

@@ -593,13 +593,13 @@ gen_dag_lu_ip ( TMatrix &      A,
 // return graph representing compute DAG for solving L X = A
 //
 graph
-gen_dag_solve_lower  ( const hpro::TMatrix *  L,
-                       hpro::TMatrix *        A,
+gen_dag_solve_lower  ( const hpro::TMatrix &  L,
+                       hpro::TMatrix &        A,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsml_node( L, A, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new trsml_node( &L, &A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -608,13 +608,13 @@ gen_dag_solve_lower  ( const hpro::TMatrix *  L,
 // return graph representing compute DAG for solving X U = A
 //
 graph
-gen_dag_solve_upper  ( const hpro::TMatrix *  U,
-                       hpro::TMatrix *        A,
+gen_dag_solve_upper  ( const hpro::TMatrix &  U,
+                       hpro::TMatrix &        A,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsmu_node( U, A, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new trsmu_node( &U, &A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -623,14 +623,14 @@ gen_dag_solve_upper  ( const hpro::TMatrix *  U,
 // return graph representing compute DAG for C = A B + C
 //
 graph
-gen_dag_update       ( const hpro::TMatrix *  A,
-                       const hpro::TMatrix *  B,
-                       hpro::TMatrix *        C,
+gen_dag_update       ( const hpro::TMatrix &  A,
+                       const hpro::TMatrix &  B,
+                       hpro::TMatrix &        C,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new update_node( A, B, C, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new update_node( &A, &B, &C, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }

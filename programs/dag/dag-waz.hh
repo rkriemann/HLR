@@ -73,7 +73,7 @@ program_main ()
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
-    std::cout << "    norm   = " << format_error( hlr::seq::norm::norm_2( *A ) ) << std::endl;
+    std::cout << "    norm   = " << format_error( hlr::norm::spectral( *A ) ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
     {
@@ -213,5 +213,5 @@ program_main ()
     auto  I_apx = hpro::matrix_product( A.get(), A_inv.get() );
     auto  I_err = hpro::matrix_sum( 1.0, I.get(), -1.0, I_apx.get() );
 
-    std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *I_err ) ) << std::endl;
+    std::cout << "    error  = " << format_error( hlr::norm::spectral( *I_err ) ) << std::endl;
 }

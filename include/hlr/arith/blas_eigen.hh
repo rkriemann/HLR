@@ -408,7 +408,7 @@ eigen_dpt ( matrix< value_t > &                                M,
     do
     {
         // T = Δ·V
-        prod( value_t(1), Delta, V, value_t(0), T );
+        blas::prod( value_t(1), Delta, V, value_t(0), T );
         
         // T = Δ·V - V·diag(Δ·V) = T - V·diag(T) 
         // computed as T(i,:) = T(i,:) - T(i,i) · V(i,:)
@@ -420,7 +420,7 @@ eigen_dpt ( matrix< value_t > &                                M,
             auto  V_i = V.column(i);
             auto  T_i = T.column(i);
 
-            add( -diag_T(i), V_i, T_i );
+            blas::add( -diag_T(i), V_i, T_i );
         }// for
 
         // I - Θ ∗ (Δ·V - V·diag(Δ·V)) = I - Θ ∗ T
@@ -434,12 +434,12 @@ eigen_dpt ( matrix< value_t > &                                M,
 
         if (( error_type == "frobenius" ) || ( error_type == "fro" ))
         {
-            add( value_t(-1), T, V );
+            blas::add( value_t(-1), T, V );
             error = norm_F( V );
         }// if
         else if (( error_type == "maximum" ) || ( error_type == "max" ))
         {
-            add( value_t(-1), T, V );
+            blas::add( value_t(-1), T, V );
             error = norm_max( V );
         }// if
         else if (( error_type == "residual" ) || ( error_type == "res" ))
@@ -669,7 +669,7 @@ everror ( const blas::matrix< value_t > &  M,
         auto  V_i = V.column( i );
         auto  T_i = T.column( i );
         
-        add( -E(i), V_i, T_i );
+        blas::add( -E(i), V_i, T_i );
     }// for
 
     return norm_F( T ) / ( normM * normV );
@@ -687,7 +687,7 @@ everror ( const blas::matrix< value_t > &  M,
     for ( int  i = 0; i < n; ++i )
     {
         // sum up M·V(i,:) - e_i·V(i,:)
-        copy( n, V.data() + i*n, 1, T.data(), 1 );
+        blas::copy( n, V.data() + i*n, 1, T.data(), 1 );
         scale( n, E[i], T.data(), 1 );
         gemv( 'N', n, n, value_t(-1), M.data(), n, V.data() + i*n, 1, value_t(1), T.data(), 1 );
 

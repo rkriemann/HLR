@@ -430,14 +430,14 @@ trsvu ( const hpro::matop_t      op_U,
 //
 template < typename value_t >
 void
-trsmuh ( const hpro::TDenseMatrix *  U,
-         hpro::TMatrix *             X )
+trsmuh ( const hpro::TDenseMatrix &  U,
+         hpro::TMatrix &             X )
 {
-    HLR_LOG( 4, hpro::to_string( "trsmuh( %d, %d )", U->id(), X->id() ) );
+    HLR_LOG( 4, hpro::to_string( "trsmuh( %d, %d )", U.id(), X.id() ) );
     
     if ( is_lowrank( X ) )
     {
-        auto  RX = ptrcast( X, hpro::TRkMatrix );
+        auto  RX = ptrcast( &X, hpro::TRkMatrix );
         auto  Y  = blas::copy( hpro::blas_mat_B< value_t >( RX ) );
 
         blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( U ) ), Y,
@@ -445,7 +445,7 @@ trsmuh ( const hpro::TDenseMatrix *  U,
     }// else
     else if ( is_dense( X ) )
     {
-        auto  DX = ptrcast( X, hpro::TDenseMatrix );
+        auto  DX = ptrcast( &X, hpro::TDenseMatrix );
         auto  Y  = copy( hpro::blas_mat< value_t >( DX ) );
     
         blas::prod( value_t(1), Y, hpro::blas_mat< value_t >( U ),

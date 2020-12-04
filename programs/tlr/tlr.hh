@@ -90,7 +90,7 @@ program_main ()
 
             tic = timer::now();
         
-            impl::tlr::lu< value_t >( C.get(), acc, apx );
+            impl::tlr::lu< value_t >( *C, acc, apx );
         
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;

@@ -70,8 +70,8 @@ prod ( const value_t                    alpha,
 //
 //////////////////////////////////////////////////////////////////////
 
-size_t  nrows ( const hpro::TLinearOperator &  M ) { return M.range_dim(); }
-size_t  ncols ( const hpro::TLinearOperator &  M ) { return M.domain_dim(); }
+inline size_t  nrows ( const hpro::TLinearOperator &  M ) { return M.range_dim(); }
+inline size_t  ncols ( const hpro::TLinearOperator &  M ) { return M.domain_dim(); }
 
 template < typename value_t >
 void

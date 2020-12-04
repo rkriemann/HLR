@@ -63,7 +63,7 @@ program_main ()
         {
             tic = timer::now();
             
-            impl::hodlr::lu< value_t >( C.get(), hpro::fixed_rank( k ), apx );
+            impl::hodlr::lu< value_t >( *C, hpro::fixed_rank( k ), apx );
             
             toc = timer::since( tic );
 

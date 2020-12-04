@@ -150,7 +150,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 void
 trsml_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = std::move( hlr::dag::gen_dag_solve_lower( L, A, 128, refine ) );
+    auto  dag = std::move( hlr::dag::gen_dag_solve_lower( *L, *A, 128, refine ) );
     
     exec( dag, acc );
 }
@@ -164,7 +164,7 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 void
 trsmu_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = std::move( hlr::dag::gen_dag_solve_upper( U, A, 128, refine ) );
+    auto  dag = std::move( hlr::dag::gen_dag_solve_upper( *U, *A, 128, refine ) );
     
     exec( dag, acc );
 }

@@ -86,7 +86,7 @@ program_main ()
               << " )" << term::reset << std::endl;
     
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
-    auto  norm_AxA = hlr::seq::norm::norm_2( *AxA );
+    auto  norm_AxA = hlr::norm::spectral( *AxA );
 
     if ( false )
     {
@@ -98,7 +98,7 @@ program_main ()
 
         tic = timer::now();
         
-        auto  dag = std::move( dag::gen_dag_update( A.get(), A.get(), C.get(), nseq, impl::dag::refine ) );
+        auto  dag = std::move( dag::gen_dag_update( *A, *A, *C, nseq, impl::dag::refine ) );
             
         toc = timer::since( tic );
             
@@ -137,7 +137,7 @@ program_main ()
         auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( true )
@@ -175,7 +175,7 @@ program_main ()
         auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
     }
 
     if ( false && (( impl_name == "seq" ) || ( impl_name == "tbb" ))) // otherwise sequential !!!
@@ -213,7 +213,7 @@ program_main ()
         auto  diff = hpro::matrix_sum( 1.0, AxA.get(), -1.0, C.get() );
 
         std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error  = " << format_error( hlr::seq::norm::norm_2( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -354,7 +354,7 @@ program_main ()
 
             tic = timer::now();
         
-            impl::tileh::lu< value_t >( C.get(), acc, apx );
+            impl::tileh::lu< value_t >( *C, acc, apx );
         
             toc = timer::since( tic );
             std::cout << "  LU in      " << format_time( toc ) << std::endl;
