@@ -17,32 +17,88 @@
 
 namespace hlr { namespace io {
 
+namespace hpro
+{
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const HLIB::TMatrix &  M,
+        const std::string &    filename )
+{
+    HLIB::THLibMatrixIO  mio;
+
+    mio.write( &M, filename );
+}
+
+//
+// read matrix M from file <filename>
+//
+inline
+std::unique_ptr< HLIB::TMatrix >
+read ( const std::string &  filename )
+{
+    HLIB::THLibMatrixIO  mio;
+
+    return mio.read( filename );
+}
+
+}// namespace hpro
+
+namespace matlab
+{
+
 //
 // write blas matrix/vector in Matlab format with given name
 // - if filename is empty, the matrix/vector name is used
 //
 template < typename value_t >
 void
-write_matlab ( const blas::matrix< value_t > &  M,
-               const std::string &              matname,
-               const std::string &              filename = "" )
+write ( const blas::matrix< value_t > &  M,
+        const std::string &              matname,
+        const std::string &              filename = "" )
 {
     if ( filename == "" )
-        hpro::DBG::write( M, matname + ".mat", matname );
+        HLIB::DBG::write( M, matname + ".mat", matname );
     else
-        hpro::DBG::write( M, filename, matname );
+        HLIB::DBG::write( M, filename, matname );
+}
+
+inline
+void
+write ( const HLIB::TMatrix &  M,
+        const std::string &    matname,
+        const std::string &    filename = "" )
+{
+    if ( filename == "" )
+        HLIB::DBG::write( M, matname + ".mat", matname );
+    else
+        HLIB::DBG::write( M, filename, matname );
+}
+
+inline
+void
+write ( const HLIB::TMatrix *  M,
+        const std::string &    matname,
+        const std::string &    filename = "" )
+{
+    HLR_ASSERT( ! is_null( M ) );
+
+    write( *M, matname, filename );
 }
 
 template < typename value_t >
 void
-write_matlab ( const blas::vector< value_t > &  v,
-               const std::string &              vecname,
-               const std::string &              filename = "" )
+write ( const blas::vector< value_t > &  v,
+        const std::string &              vecname,
+        const std::string &              filename = "" )
 {
     if ( filename == "" )
-        hpro::DBG::write( v, vecname + ".mat", vecname );
+        HLIB::DBG::write( v, vecname + ".mat", vecname );
     else
-        hpro::DBG::write( v, filename, vecname );
+        HLIB::DBG::write( v, filename, vecname );
 }
 
 //
@@ -51,16 +107,18 @@ write_matlab ( const blas::vector< value_t > &  v,
 //
 template < typename value_t >
 blas::matrix< value_t >
-read_matlab ( const std::string &  filename,
-              const std::string &  matname = "" )
+read ( const std::string &  filename,
+       const std::string &  matname = "" )
 {
-    hpro::TMatlabMatrixIO  mio;
+    HLIB::TMatlabMatrixIO  mio;
     auto                   D = mio.read( filename, matname );
 
     HLR_ASSERT( is_dense( *D ) );
     
-    return std::move( blas::mat< value_t >( ptrcast( D.get(), hpro::TDenseMatrix ) ) );
+    return std::move( blas::mat< value_t >( ptrcast( D.get(), HLIB::TDenseMatrix ) ) );
 }
+
+}// namespace matlab
 
 }}// namespace hlr::io
 

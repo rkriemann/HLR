@@ -205,7 +205,7 @@ gauss_node::refine_ ( const size_t  min_size )
 void
 gauss_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::seq::gauss_elim( A, T, acc );
+    hlr::seq::gauss_elim( *A, *T, acc );
     hlr::log( 0, HLIB::to_string( "                               %d = %.8e", A->id(), HLIB::norm_F( A ) ) );
 }
 

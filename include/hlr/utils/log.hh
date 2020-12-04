@@ -19,6 +19,16 @@ namespace hlr
 {
 
 //
+// breakpoint function as entry point for debugging
+//
+inline
+void
+breakpoint ()
+{
+    ;
+}
+
+//
 // logging function
 //
 template < typename msg_t >
@@ -31,14 +41,32 @@ error ( const msg_t &  msg )
 
 // throw exception with file info
 #define HLR_ERROR( msg )                                                \
-    throw std::runtime_error( hlr::term::italic( __FILE__ + HLIB::to_string( ":%d", __LINE__ ) ) + \
-                              std::string( " : " ) + hlr::term::red( msg ) )
+    {                                                                   \
+        hlr::breakpoint();                                              \
+        throw std::runtime_error( hlr::term::italic( __FILE__ + HLIB::to_string( ":%d", __LINE__ ) ) + \
+                                  std::string( " : " ) + hlr::term::red( msg ) ); \
+    }
 //                            std::string( " in " ) + hlr::term::italic( __PRETTY_FUNCTION__ ) + 
+
+// debug assert
+#if defined(NDEBUG)
+#  define HLR_DBG_ASSERT( expr )
+#else
+#  define HLR_DBG_ASSERT( expr )                                        \
+    if ( ! ( expr ) )                                                   \
+    {                                                                   \
+        breakpoint();                                                   \
+        HLR_ERROR( ( hlr::term::bold( #expr ) + " failed" ) );          \
+    }
+#endif
 
 // always-on-assert
 #define HLR_ASSERT( expr )                                              \
     if ( ! ( expr ) )                                                   \
-        HLR_ERROR( ( hlr::term::bold( #expr ) + " failed" ) )
+    {                                                                   \
+        breakpoint();                                                   \
+        HLR_ERROR( ( hlr::term::bold( #expr ) + " failed" ) );          \
+    }
 
 // mutex for log function
 extern std::mutex  __LOG_MUTEX;

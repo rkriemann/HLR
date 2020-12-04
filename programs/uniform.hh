@@ -11,6 +11,7 @@
 #include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/seq/norm.hh>
+#include <hlr/seq/arith.hh>
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
@@ -49,7 +50,10 @@ program_main ()
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+    // auto  A      = io::hpro::read( "A.hm" );
     auto  toc    = timer::since( tic );
+
+    // io::hpro::write( *A, "A.hm" );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -60,12 +64,15 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        hpro::TPSMatrixVis  mvis;
-        
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
+        matrix::print_eps( *A, "A" );
+        matrix::print_lvl_eps( *A, "L" );
     }// if
 
-    if ( true )
+    //
+    // H-matrix matrix vector multiplication
+    //
+    
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -141,18 +148,18 @@ program_main ()
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
         auto  diff  = hpro::matrix_sum( value_t(1), A.get(), value_t(-1), A2.get() );
-        auto  error = hlr::seq::norm::norm_2( *diff, true, 1e-4 );
+        auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
-            matrix::print_eps( *A2, "A1" );
+            matrix::print_eps( *A2, "A2" );
 
         //
         // mat-vec benchmark
         //
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
         
@@ -194,7 +201,7 @@ program_main ()
             runtime.clear();
         }
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "mat-vec (uniform)" << term::reset << std::endl;
 
@@ -235,15 +242,273 @@ program_main ()
         
             runtime.clear();
         }
+
+        if ( cmdline::cluster == "tlr" )
+        {
+            //
+            // LDU factorization
+            //
+
+            if ( false )
+            {
+                std::cout << "  " << term::bullet << term::bold << "LDU" << term::reset << std::endl;
+            
+                auto  apx = approx::SVD< value_t >();
+                auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
+                auto  M3 = seq::matrix::copy( *M1 );
+            
+                tic = timer::now();
+            
+                impl::tlr::ldu< value_t >( *M3, acc, apx );
+
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+
+                {
+                    hpro::TLDUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+
+                    io::matlab::write( *M3, "M1" );
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                }
+
+                auto  A3     = impl::matrix::copy( *A2 );
+                auto  rowcb2 = rowcb->copy();
+                auto  colcb2 = colcb->copy();
+
+                matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+
+                tic = timer::now();
+            
+                impl::uniform::tlr::ldu< value_t >( *A3, acc );
+
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+
+                matrix::print_eps( *A3, "A3" );
+            
+                auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
+
+                {
+                    hpro::TLDUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+
+                    io::matlab::write( *M2, "M1" );
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                }
+            }
+
+            //
+            // LU factorization
+            //
+        
+            if ( true )
+            {
+                auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
+
+                {
+                    std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
+            
+                    auto  apx = approx::SVD< value_t >();
+                    auto  M3 = seq::matrix::copy( *M1 );
+                
+                    tic = timer::now();
+                
+                    impl::tlr::lu< value_t >( *M3, acc, apx );
+                
+                    toc = timer::since( tic );
+                    std::cout << "      done in  " << format_time( toc ) << std::endl;
+                    std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+                
+                    {
+                        hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                        std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    }
+                }
+
+                {
+                    std::cout << "  " << term::bullet << term::bold << "H-LU (lazy)" << term::reset << std::endl;
+            
+                    auto  apx = approx::SVD< value_t >();
+                    auto  M3 = seq::matrix::copy( *M1 );
+                
+                    tic = timer::now();
+                
+                    impl::tlr::lu_lazy< value_t >( *M3, acc, apx );
+                
+                    toc = timer::since( tic );
+                    std::cout << "      done in  " << format_time( toc ) << std::endl;
+                    std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+                
+                    {
+                        hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                        std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    }
+                }
+
+                {
+                    std::cout << "  " << term::bullet << term::bold << "H²-LU" << term::reset << std::endl;
+            
+                    auto  A3     = impl::matrix::copy( *A2 );
+                    auto  rowcb2 = rowcb->copy();
+                    auto  colcb2 = colcb->copy();
+                
+                    matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+                
+                    tic = timer::now();
+                
+                    impl::uniform::tlr::lu< value_t >( *A3, acc );
+                
+                    toc = timer::since( tic );
+                    std::cout << "      done in  " << format_time( toc ) << std::endl;
+                    std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+                
+                    auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
+                
+                    // {
+                    //     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                
+                    //     std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    // }
+                
+                    {
+                        hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                        std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    }
+                }
+
+                {
+                    std::cout << "  " << term::bullet << term::bold << "H²-LU (lazy)" << term::reset << std::endl;
+            
+                    auto  A3     = impl::matrix::copy( *A2 );
+                    auto  rowcb2 = rowcb->copy();
+                    auto  colcb2 = colcb->copy();
+                
+                    matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+                
+                    tic = timer::now();
+                
+                    impl::uniform::tlr::lu_lazy< value_t >( *A3, acc, *A );
+                
+                    toc = timer::since( tic );
+                    std::cout << "      done in  " << format_time( toc ) << std::endl;
+                    std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+                
+                    auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
+                
+                    // {
+                    //     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                
+                    //     std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    // }
+                
+                    {
+                        hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                        std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    }
+                }
+            }
+
+            if ( false )
+            {
+                auto  D1 = seq::matrix::convert_to_dense< value_t >( *A2 );
+            
+                io::matlab::write( *D1, "A1" );
+
+                auto  A3     = impl::matrix::copy( *A2 );
+                auto  rowcb2 = rowcb->copy();
+                auto  colcb2 = colcb->copy();
+
+                matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            
+                impl::uniform::tlr::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *A3, acc );
+            
+                auto  D2 = seq::matrix::convert_to_dense< value_t >( *A3 );
+            
+                io::matlab::write( *D2, "A2" );
+            }
+        }// if
+        else
+        {
+            auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
+            auto  REF = std::unique_ptr< hpro::TMatrix >();
+            
+            if ( true )
+            {
+                std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
+                
+                auto  apx = approx::SVD< value_t >();
+                auto  M3 = seq::matrix::copy( *M1 );
+                
+                tic = timer::now();
+                
+                impl::lu< value_t >( *M3, acc, apx );
+                
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+                
+                matrix::print_eps( *M3, "HLU" );
+                
+                {
+                    hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                }
+
+                REF = std::move( M3 );
+            }// if
+
+            if ( true )
+            {
+                std::cout << "  " << term::bullet << term::bold << "H²-LU" << term::reset << std::endl;
+            
+                auto  A3     = impl::matrix::copy( *A2 );
+                auto  rowcb2 = rowcb->copy();
+                auto  colcb2 = colcb->copy();
+                
+                matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+                
+                tic = timer::now();
+                
+                impl::uniform::lu< value_t >( *A3, acc, *REF );
+                
+                toc = timer::since( tic );
+                std::cout << "      done in  " << format_time( toc ) << std::endl;
+                std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
+                
+                matrix::print_eps( *A3, "H2LU" );
+                
+                auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
+                
+                // {
+                //     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                
+                //     std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                // }
+                
+                {
+                    hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                }
+            }
+        }// else
     }
 
+    return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // conversion to H²
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "H² matrix" << term::reset << std::endl;
 

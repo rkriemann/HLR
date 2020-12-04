@@ -71,7 +71,7 @@ format_mem ( const size_t    m,
 std::string
 format_time ( const double  t )
 {
-    return hlr::term::cyan( str( format( "%.3e s" ) % t ) );
+    return hlr::term::cyan( str( boost::format( "%.3e s" ) % t ) );
 }
 
 template < typename duration_t >
@@ -85,7 +85,7 @@ template < typename... T >
 std::string
 format_time ( const double  t, const T... ts )
 {
-    return hlr::term::cyan( str( format( "%.3e s" ) % t ) ) + " / " + format_time( ts... );
+    return hlr::term::cyan( str( boost::format( "%.3e s" ) % t ) ) + " / " + format_time( ts... );
 }
 
 // return default formated error string
@@ -93,7 +93,7 @@ inline
 std::string
 format_error ( const double  e )
 {
-    return hlr::term::red( str( format( "%.4e" ) % e ) );
+    return hlr::term::red( str( boost::format( "%.4e" ) % e ) );
 }
 
 // return default formated norm string
@@ -101,7 +101,7 @@ inline
 std::string
 format_norm ( const double  e )
 {
-    return hlr::term::italic( str( format( "%.4e" ) % e ) );
+    return hlr::term::italic( str( boost::format( "%.4e" ) % e ) );
 }
 
 // return default formated string for FLOPs
@@ -110,7 +110,7 @@ std::string
 format_flops ( const double  f,
                const double  t )
 {
-    return str( format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
+    return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
 }
 
 //

@@ -405,7 +405,7 @@ program_main ()
         
 
         if ( n <= 2048 )
-            io::write_matlab( M, "M" );
+            io::matlab::write( M, "M" );
 
         // M = std::move( // io::read_matlab< value_t >( "M.mat" ) );
         
@@ -462,8 +462,8 @@ program_main ()
             std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
 
             if ( n <= 1024 )
-                io::write_matlab( V, "V1" );
-            io::write_matlab( E, "E1" );
+                io::matlab::write( V, "V1" );
+            io::matlab::write( E, "E1" );
         }
 
         // {
@@ -489,8 +489,8 @@ program_main ()
         //     std::cout << "V   in " << format_time( toc ) << std::endl;
 
         //     if ( n <= 1024 )
-        //         io::write_matlab( V, "V1" );
-        //     io::write_matlab( E, "E1" );
+        //         io::matlab::write( V, "V1" );
+        //     io::matlab::write( E, "E1" );
         // }
 
         {
@@ -503,8 +503,8 @@ program_main ()
             std::cout << "    error = " << format_error( blas::everror( M, E, V ) ) << std::endl;
             
             if ( n <= 1024 )
-                io::write_matlab( V, "V2" );
-            io::write_matlab( E, "E2" );
+                io::matlab::write( V, "V2" );
+            io::matlab::write( E, "E2" );
         }
 
         return;

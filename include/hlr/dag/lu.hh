@@ -90,8 +90,8 @@ gen_dag_lu_tileh ( HLIB::TMatrix &  A,
 // compute DAG for solving L X = A with lower-triangular L
 //
 graph
-gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
-                       HLIB::TMatrix *        A,
+gen_dag_solve_lower  ( const HLIB::TMatrix &  L,
+                       HLIB::TMatrix &        A,
                        const size_t           min_size,
                        refine_func_t          refine );
 
@@ -99,8 +99,8 @@ gen_dag_solve_lower  ( const HLIB::TMatrix *  L,
 // compute DAG for solving X U = A with upper triangular U
 //
 graph
-gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
-                       HLIB::TMatrix *        A,
+gen_dag_solve_upper  ( const HLIB::TMatrix &  U,
+                       HLIB::TMatrix &        A,
                        const size_t           min_size,
                        refine_func_t          refine );
 
@@ -108,9 +108,9 @@ gen_dag_solve_upper  ( const HLIB::TMatrix *  U,
 // compute DAG for C = A B + C
 //
 graph
-gen_dag_update       ( const HLIB::TMatrix *  A,
-                       const HLIB::TMatrix *  B,
-                       HLIB::TMatrix *        C,
+gen_dag_update       ( const HLIB::TMatrix &  A,
+                       const HLIB::TMatrix &  B,
+                       HLIB::TMatrix &        C,
                        const size_t           min_size,
                        refine_func_t          refine );
 

@@ -1,3 +1,4 @@
+#include <tbb/global_control.h>
 
 template < typename problem_t >
 void
