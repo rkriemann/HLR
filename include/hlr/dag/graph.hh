@@ -69,6 +69,13 @@ public:
 
         return *this;
     }
+
+    // dtor
+    ~graph ()
+    {
+        for ( auto  node : _nodes )
+            delete node;
+    }
     
     // return number of nodes
     size_t  nnodes () const { return _nodes.size(); }
