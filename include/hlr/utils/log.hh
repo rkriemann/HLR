@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <mutex>
+//#include <source_location>
 
 #include <hpro/base/config.hh>
 
@@ -42,6 +43,7 @@ error ( const msg_t &  msg )
 // throw exception with file info
 #define HLR_ERROR( msg )                                                \
     {                                                                   \
+        /* auto  location = std::source_location::current(); */         \
         hlr::breakpoint();                                              \
         throw std::runtime_error( hlr::term::italic( __FILE__ + HLIB::to_string( ":%d", __LINE__ ) ) + \
                                   std::string( " : " ) + hlr::term::red( msg ) ); \

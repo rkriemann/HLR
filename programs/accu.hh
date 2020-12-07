@@ -127,8 +127,6 @@ lu_std ( const hpro::TMatrix &    A,
         toc = timer::since( tic );
         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
-        hpro::DBG::write( C.get(), "C1.mat", "C1" );
-
         flops.push_back( get_flops( "lu" ) );
         runtime.push_back( toc.seconds() );
     }// for
@@ -205,7 +203,7 @@ mm_accu ( const hpro::TMatrix &    A,
 }
 
 //
-// standard LU
+// accumulator base LU
 //
 template < typename approx_t >
 void
@@ -242,8 +240,6 @@ lu_accu ( const hpro::TMatrix &    A,
         toc = timer::since( tic );
         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
-        hpro::DBG::write( C.get(), "C2.mat", "C2" );
-        
         flops.push_back( get_flops( "lu" ) );
         runtime.push_back( toc.seconds() );
     }// for
@@ -259,6 +255,64 @@ lu_accu ( const hpro::TMatrix &    A,
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
+// lazy mat-mul
+//
+template < typename approx_t >
+void
+mm_lazy ( const hpro::TMatrix &    A,
+          const hpro::TTruncAcc &  acc,
+          const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    approx_t  approx;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic      = timer::now();
+    auto  toc      = timer::since( tic );
+    
+    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  norm_AxA = hlr::norm::spectral( *AxA );
+    auto  C        = impl::matrix::copy( A );
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        C->scale( 0 );
+            
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hmmaccu" );
+            
+        impl::lazy::multiply< value_t >( value_t(1), hpro::apply_normal, A, hpro::apply_normal, A, *C, acc, approx );
+
+        LIKWID_MARKER_STOP( "hmmaccu" );
+            
+        toc = timer::since( tic );
+        std::cout << "      mult in  " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "mm" ) );
+        runtime.push_back( toc.seconds() );
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( nbench > 1 )
+        std::cout << "    runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 }
 
 //
@@ -504,8 +558,18 @@ program_main ()
     if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
     if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
 
+    //
+    // using accumulators
+    //
+
+    std::cout << "  " << term::bullet << term::bold << "lazy" << term::reset << std::endl;
+    
+    if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+    
     LIKWID_MARKER_CLOSE;
 
+    return;
+    
     //////////////////////////////////////////////////////////////////////
     //
     // LU factorization

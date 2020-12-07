@@ -1020,10 +1020,8 @@ qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
      const bool           comp_Q = true )
 {
-    // if ( M.nrows() > 2*M.ncols() )
-    //     blas::qrts( M, R );
-    // else
     blas::qr2( M, R, comp_Q );
+    // HLIB::BLAS::qr( M, R );
 }
 
 //
