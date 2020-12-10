@@ -12,6 +12,7 @@
 #include <hpro/matrix/TRkMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
+#include <hpro/matrix/TMatrixProduct.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -30,8 +31,130 @@ namespace hpro = HLIB;
 namespace detail
 {
 
+//
+// auxiliary types
+//
+
 using  update_t      = std::pair< const hpro::TMatrix *, const hpro::TMatrix * >;
 using  update_list_t = std::list< update_t >;
+
+//
+// operator wrapper for sum of linear operators
+//
+
+template < typename T_value >
+struct linopsum_operator
+{
+    using  value_t = T_value;
+
+    const std::list< hpro::TLinearOperator * > &  ops;
+
+    linopsum_operator ( const std::list< hpro::TLinearOperator * > &  aops )
+            : ops( aops )
+    {
+        HLR_ASSERT( ! aops.empty() );
+    }
+    
+    size_t  nrows () const { return ops.front()->range_dim(); }
+    size_t  ncols () const { return ops.front()->domain_dim(); }
+    
+    blas::vector< value_t >
+    get_row ( const size_t  j ) const
+    {
+        auto  e_j = blas::vector< value_t >( nrows() );
+        auto  row = blas::vector< value_t >( ncols() );
+
+        e_j(j) = value_t(1);
+        
+        for ( auto  op : ops )
+            op->apply_add( value_t(1), e_j, row, apply_transposed );
+        
+        return row;
+    }
+
+    blas::vector< value_t >
+    get_column ( const size_t  j ) const
+    {
+        auto  e_j = blas::vector< value_t >( ncols() );
+        auto  col = blas::vector< value_t >( nrows() );
+
+        e_j(j) = value_t(1);
+        
+        for ( auto  op : ops )
+            op->apply_add( value_t(1), e_j, col, apply_normal );
+        
+        return col;
+    }
+        
+    void
+    prod ( const value_t                    alpha,
+           const matop_t                    op_M,
+           const blas::vector< value_t > &  x,
+           blas::vector< value_t > &        y ) const
+    {
+        for ( auto  op : ops )
+            op->apply_add( alpha, x, y, op_M );
+    }
+
+    void
+    prod ( const value_t                    alpha,
+           const matop_t                    op_M,
+           const blas::matrix< value_t > &  X,
+           blas::matrix< value_t > &        Y ) const
+    {
+        for ( auto  op : ops )
+            op->apply_add( alpha, X, Y, op_M );
+    }
+};
+
+template < typename value_t > size_t  nrows ( const linopsum_operator< value_t > &  op ) { return op.nrows(); }
+template < typename value_t > size_t  ncols ( const linopsum_operator< value_t > &  op ) { return op.ncols(); }
+
+template < typename value_t >
+blas::vector< value_t >
+get_row ( const linopsum_operator< value_t > &  op,
+          const size_t                          i )
+{
+    return op.get_row( i );
+}
+
+template < typename value_t >
+blas::vector< value_t >
+get_column ( const linopsum_operator< value_t > &  op,
+             const size_t                          j )
+{
+    return op.get_column( j );
+}
+
+template < typename value_t >
+void
+prod ( const value_t                         alpha,
+       const matop_t                         op_M,
+       const linopsum_operator< value_t > &  M,
+       const blas::vector< value_t > &       x,
+       blas::vector< value_t > &             y )
+{
+    M.prod( alpha, op_M, x, y );
+}
+
+template < typename value_t >
+void
+prod ( const value_t                         alpha,
+       const matop_t                         op_M,
+       const linopsum_operator< value_t > &  M,
+       const blas::matrix< value_t > &       X,
+       blas::matrix< value_t > &             Y )
+{
+    M.prod( alpha, op_M, X, Y );
+}
+
+template < typename value_t >
+linopsum_operator< value_t >
+operator_wrapper ( const std::list< hpro::TLinearOperator * > &  M )
+{
+    return linopsum_operator< value_t > ( M );
+}
+
 
 //
 // compute C = C + α op( A ) op( B ) where A and B are provided as list of updates
@@ -266,7 +389,47 @@ multiply ( const value_t            alpha,
             }// for
         }// for
     }// if
-    else 
+    else if ( is_lowrank( C ) )
+    {
+        //
+        // set up operator for sum of matrix products plus C
+        //
+        
+        auto  op_list = std::list< hpro::TLinearOperator * >();
+
+        for ( auto  [ A, B ] : updates )
+        {
+            auto  op_AxB = hpro::matrix_product( A, B );
+
+            op_list.push_back( op_AxB.release() );
+        }// for
+
+        op_list.push_back( &C );
+
+        auto  sumop = operator_wrapper< value_t >( op_list );
+
+        // std::cout << C.id() << " : " << op_list.size() << std::endl;
+        
+        //
+        // apply lowrank approximation and update C
+        //
+        
+        auto  [ U, V ] = approx( sumop, acc );
+        auto  RC       = ptrcast( &C, hpro::TRkMatrix );
+
+        RC->set_lrmat( std::move( U ), std::move( V ) );
+
+        //
+        // clean up
+        //
+        
+        for ( auto  op : op_list )
+        {
+            if ( op != RC )
+                delete op;
+        }// for
+    }// if
+    else
     {
         // std::cout << C.id() << std::endl;
 
@@ -274,7 +437,6 @@ multiply ( const value_t            alpha,
         for ( auto  [ A, B ] : updates )
         {
             // std::cout << "    " << A->block_is() << " × " << B->block_is() << std::endl;
-            
             hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, C, acc, approx );
         }// for
     }// else
@@ -286,9 +448,9 @@ template < typename value_t,
            typename approx_t >
 void
 multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
+           const hpro::matop_t      /* op_A */,
            const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
+           const hpro::matop_t      /* op_B */,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
            const hpro::TTruncAcc &  acc,

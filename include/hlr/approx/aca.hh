@@ -549,6 +549,17 @@ struct ACA
     {
         return hlr::approx::aca( U, T, V, acc );
     }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        auto  pivot_search = aca_pivot( op );
+
+        return std::move( aca( op, pivot_search, acc, nullptr ) );
+    }
 };
 
 }}// namespace hlr::approx

@@ -28,7 +28,7 @@ namespace detail
 template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
-lanczos ( operator_t &             M,
+lanczos ( const operator_t &       M,
           const hpro::TTruncAcc &  acc,
           const bool               with_svd = false )
 {
@@ -445,6 +445,15 @@ struct Lanczos
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::lanczos( U, T, V, acc, with_svd );
+    }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        return detail::lanczos< operator_t >( op, acc );
     }
 };
 

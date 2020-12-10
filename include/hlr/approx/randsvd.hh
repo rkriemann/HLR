@@ -737,6 +737,15 @@ struct RandSVD
     {
         return hlr::approx::randsvd( U, T, V, acc, power_steps, oversampling );
     }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
+    }
 };
 
 }}// namespace hlr::approx
