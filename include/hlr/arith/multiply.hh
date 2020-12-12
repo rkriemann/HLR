@@ -12,6 +12,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/add.hh>
 #include <hlr/arith/norm.hh>
+#include <hlr/matrix/convert.hh> // DEBUG
 #include <hlr/approx/svd.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 
@@ -42,6 +43,8 @@ multiply ( const value_t            alpha,
     using hlr::matrix::is_uniform_lowrank;
     using hlr::matrix::uniform_lrmatrix;
     
+    // std::cout << A.id() << " × " << B.id() << " = " << C.id() << std::endl;
+
     // auto  Cc = C.copy();
 
     // hpro::multiply( alpha, op_A, &A, op_B, &B, value_t(1), Cc.get(), acc );
@@ -320,8 +323,8 @@ multiply ( const value_t            alpha,
     // hpro::DBG::write( C,  "C1.mat", "C1" );
     // hpro::DBG::write( *Cc, "C2.mat", "C2" );
     
-    // auto  DC1 = hpro::to_dense( &C );
-    // auto  DC2 = hpro::to_dense( Cc.get() );
+    // auto  DC1 = matrix::convert_to_dense< value_t >( C );
+    // auto  DC2 = matrix::convert_to_dense< value_t >( *Cc );
 
     // blas::add( value_t(-1), blas::mat< value_t >( DC1 ), blas::mat< value_t >( DC2 ) );
     // if ( blas::norm_F( blas::mat< value_t >( DC2 ) ) > 1e-14 )
@@ -361,6 +364,16 @@ multiply ( const value_t            alpha,
     if ( ! is_dense( C ) )
         HLR_ERROR( "unsupported matrix type : " + C.typestr() );
 
+    // std::cout << A.id() << " × " << B.id() << " = " << C.id() << std::endl;
+    
+    // auto  Cc = C.copy();
+
+    // hpro::multiply( alpha, op_A, &A, op_B, &B, value_t(1), Cc.get(), hpro::acc_exact );
+
+    // hpro::DBG::write( A, "A.mat", "A" );
+    // hpro::DBG::write( B, "B.mat", "B" );
+    // hpro::DBG::write( C, "C.mat", "C" );
+    
     if ( is_blocked( A ) )
     {
         if ( is_blocked( B ) )
@@ -467,6 +480,16 @@ multiply ( const value_t            alpha,
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+
+    // hpro::DBG::write( C,  "C1.mat", "C1" );
+    // hpro::DBG::write( *Cc, "C2.mat", "C2" );
+    
+    // auto  DC1 = matrix::convert_to_dense< value_t >( C );
+    // auto  DC2 = matrix::convert_to_dense< value_t >( *Cc );
+
+    // blas::add( value_t(-1), blas::mat< value_t >( DC1 ), blas::mat< value_t >( DC2 ) );
+    // if ( blas::norm_F( blas::mat< value_t >( DC2 ) ) > 1e-14 )
+    //     std::cout << hpro::to_string( "multiply( %d, %d, %d )", A.id(), B.id(), C.id() ) << ", error = " << blas::norm_F( blas::mat< value_t >( DC2 ) ) << std::endl;
 }
 
 //

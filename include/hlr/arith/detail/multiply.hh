@@ -435,14 +435,14 @@ multiply ( const value_t               alpha,
 
             if ( op_B == hpro::apply_normal )
             {
-                auto  DB_j = blas::matrix< value_t >( DB, is_j - B.row_ofs(), blas::range::all );
+                auto  DB_j = blas::matrix( DB, is_j - B.row_ofs(), blas::range::all );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
                 multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
             }// if
             else
             {
-                auto  DB_j = blas::matrix< value_t >( DB, blas::range::all, is_j - B.col_ofs() );
+                auto  DB_j = blas::matrix( DB, blas::range::all, is_j - B.col_ofs() );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
                 multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
@@ -450,6 +450,49 @@ multiply ( const value_t               alpha,
         }// for
 
         C.add_block( hpro::real(1), hpro::real(1), &C_i );
+    }// for
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+    {
+        HLR_ASSERT( ! is_null( B.block( 0, j, op_B ) ) );
+        
+        auto  C_j = hpro::TDenseMatrix( C.row_is(), B.block( 0, j, op_B )->col_is( op_B ) );
+        
+        for ( uint  i = 0; i < B.nblock_rows( op_B ); ++i )
+        {
+            auto  DA   = blas::mat< value_t >( A );
+            auto  B_ij = B.block( i, j, op_B );
+            auto  is_i = B_ij->row_is( op_B );
+
+            if ( op_A == hpro::apply_normal )
+            {
+                auto  DA_i = blas::matrix( DA, blas::range::all, is_i - A.col_ofs() );
+                auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );
+            }// if
+            else
+            {
+                auto  DA_i = blas::matrix( DA, is_i - A.row_ofs(), blas::range::all );
+                auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );
+            }// else
+        }// for
+
+        C.add_block( hpro::real(1), hpro::real(1), &C_j );
     }// for
 }
 
@@ -473,6 +516,28 @@ multiply ( const value_t            alpha,
     auto  R  = std::make_unique< hpro::TRkMatrix >( C.row_is(), C.col_is(), UT, blas::mat_V< value_t >( B, op_B ) );
         
     hlr::add< value_t >( value_t(1), *R, C, acc, approx );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TBlockMatrix &        C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_MULT_PRINT;
+
+    auto  DA = blas::mat< value_t >( A );
+    auto  DB = blas::mat< value_t >( B );
+    auto  DT = blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ) );
+    auto  T  = hpro::TDenseMatrix( C.row_is(), C.col_is(), std::move( DT ) );
+        
+    hlr::add< value_t >( value_t(1), T, C, acc, approx );
 }
 
 template < typename value_t,

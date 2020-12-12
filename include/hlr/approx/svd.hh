@@ -102,7 +102,7 @@ svd ( const blas::matrix< value_t > &  U,
     // truncate given low-rank matrix
     //
     
-    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) / 2 )
+    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) )
     {
         //
         // since rank is too large, build U = U·V^T and do full-SVD

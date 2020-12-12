@@ -70,11 +70,18 @@ rrqr ( blas::matrix< value_t > &  M,
 
     if ( ncols > nrows )
     {
+        //
+        // compute RRQR for M^H, e.g., M^H = U·V^H
+        // and return V·U^H
+        //
+        
         auto  MH = blas::matrix< value_t >( ncols, nrows );
 
         blas::copy( blas::adjoint( M ), MH );
 
-        return rrqr( MH, acc );
+        auto [ U, V ] = rrqr( MH, acc );
+
+        return { std::move( V ), std::move( U ) };
     }// if
     
     // for update statistics
