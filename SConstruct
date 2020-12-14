@@ -58,7 +58,8 @@ PROGRAMS     = [ 'tlr',
                  'dag-waz',
                  'dag-hodlr',
                  'uniform',
-                 'accu',
+                 'approx-mm',
+                 'approx-lu',
                  'dpt',
                  'polykern' ]
 
@@ -100,7 +101,8 @@ SUBDIRS      = { 'tlr'         : 'tlr',
                  'dag-waz'     : 'dag',
                  'dag-hodlr'   : 'dag',
                  'uniform'     : '',
-                 'accu'        : '',
+                 'approx-mm'   : 'approx',
+                 'approx-lu'   : 'approx',
                  'dpt'         : '',
                  'polykern'    : '' }
 

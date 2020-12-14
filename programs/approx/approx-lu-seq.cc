@@ -15,5 +15,5 @@
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "accu.hh"
+#include "approx-lu.hh"
 #include "seq.hh"
