@@ -323,7 +323,7 @@ program_main ()
         if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if (( cmdline::approx == "randlr"  || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_std< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
@@ -391,7 +391,7 @@ program_main ()
         if ( cmdline::approx == "pairsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::PairSVD< value_t > >( *A, acc, "PairSVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if (( cmdline::approx == "randlr"  || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
@@ -406,7 +406,7 @@ program_main ()
     
         // if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if (( cmdline::approx == "randlr"  || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_lazy< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_lazy< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
