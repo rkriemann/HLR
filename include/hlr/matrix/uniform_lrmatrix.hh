@@ -52,8 +52,7 @@ private:
     // local index set of matrix
     indexset                          _row_is, _col_is;
     
-    // low-rank factors in uniform storage:
-    // mapping of (sub-) index set to tile
+    // low-rank factors in uniform storage
     const cluster_basis< value_t > *  _row_cb;
     const cluster_basis< value_t > *  _col_cb;
 

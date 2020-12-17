@@ -69,7 +69,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TBlockMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TBlockMatrix ),
                                      op_B, * cptrcast( &B, hpro::TBlockMatrix ),
@@ -91,7 +91,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TRkMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TBlockMatrix ),
                                      op_B, * cptrcast( &B, hpro::TRkMatrix ),
@@ -113,7 +113,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TDenseMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TBlockMatrix ),
                                      op_B, * cptrcast( &B, hpro::TDenseMatrix ),
@@ -140,7 +140,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TBlockMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TRkMatrix ),
                                      op_B, * cptrcast( &B, hpro::TBlockMatrix ),
@@ -184,7 +184,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TDenseMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TRkMatrix ),
                                      op_B, * cptrcast( &B, hpro::TDenseMatrix ),
@@ -246,7 +246,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TBlockMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TDenseMatrix ),
                                      op_B, * cptrcast( &B, hpro::TBlockMatrix ),
@@ -268,7 +268,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TRkMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TDenseMatrix ),
                                      op_B, * cptrcast( &B, hpro::TRkMatrix ),
@@ -306,7 +306,7 @@ multiply ( const value_t            alpha,
                                                op_B, * cptrcast( &B, hpro::TDenseMatrix ),
                                                * ptrcast( &C, hpro::TRkMatrix ),
                                                acc, approx );
-            else if ( is_dense(   C ) )
+            else if ( is_dense( C ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, hpro::TDenseMatrix ),
                                      op_B, * cptrcast( &B, hpro::TDenseMatrix ),

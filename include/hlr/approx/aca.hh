@@ -333,7 +333,7 @@ std::pair< blas::matrix< value_t >,
 aca ( blas::matrix< value_t > &  M,
       const hpro::TTruncAcc &    acc )
 {
-    auto  pivot_search = aca_pivot( M );
+    auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
 
     // for update statistics
     HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
@@ -388,7 +388,7 @@ aca ( const blas::matrix< value_t > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
     
         return aca( op, pivot_search, acc, nullptr );
     }// else
@@ -439,7 +439,7 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
         
         return aca( op, pivot_search, acc, nullptr );
     }// else
@@ -556,7 +556,7 @@ struct ACA
     operator () ( const operator_t &       op,
                   const hpro::TTruncAcc &  acc ) const
     {
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< operator_t >( op );
 
         return std::move( aca( op, pivot_search, acc, nullptr ) );
     }

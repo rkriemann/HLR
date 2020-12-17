@@ -238,6 +238,20 @@ template < typename... T >
 bool is_dense_all   ( const hpro::TMatrix &  A,
                       T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
 
+inline
+bool is_dense_any   ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_dense( A ); }
+
+template < typename... T >
+bool is_dense_any   ( const hpro::TMatrix *  A,
+                      T&&...                 mtrs )  noexcept { return is_dense( A ) || is_dense_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_dense_all   ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_dense( A ); }
+
+template < typename... T >
+bool is_dense_all   ( const hpro::TMatrix *  A,
+                      T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
+
 
 //
 // return true if given matrix is a low-rank matrix
@@ -258,6 +272,20 @@ bool is_lowrank_all ( const hpro::TMatrix &  A )     noexcept { return is_lowran
 
 template < typename... T >
 bool is_lowrank_all ( const hpro::TMatrix &  A,
+                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_lowrank_any ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_lowrank( A ); }
+
+template < typename... T >
+bool is_lowrank_any ( const hpro::TMatrix *  A,
+                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) || is_lowrank_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_lowrank_all ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_lowrank( A ); }
+
+template < typename... T >
+bool is_lowrank_all ( const hpro::TMatrix *  A,
                       T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
 
 //

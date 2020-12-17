@@ -700,6 +700,20 @@ add ( const T_alpha   alpha,
     return hpro::BLAS::add( typename T_matA::value_t( alpha ), A, B );
 }
 
+template < typename T_matA,
+           typename T_vecX >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_vector_v< T_vecX > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t >,
+                  vector< typename T_matA::value_t > >
+mulvec ( const T_matA &  A,
+         const T_vecX &  x )
+{
+    HLR_DBG_ASSERT( A.ncols() == x.length() );
+    
+    return hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
+}
+
 template < typename T_beta,
            typename T_matA,
            typename T_matB,
@@ -760,6 +774,7 @@ prod ( const T_matA &  A,
     return prod( typename T_matA::value_t(1), A, B );
 }
 
+using hpro::BLAS::mulvec;
 using hpro::BLAS::prod;
 
 //////////////////////////////////////////////////////////////////////
@@ -810,7 +825,7 @@ qr2  ( matrix< value_t > &  M,
             copy( M, R );
             M = std::move( matrix< value_t >( nrows, nrows ) );
 
-            auto  RM = blas::matrix( R, range::all, range( 0, nrows-1 ) );
+            auto  RM = blas::matrix< value_t >( R, range::all, range( 0, nrows-1 ) );
 
             copy( RM, M );
 

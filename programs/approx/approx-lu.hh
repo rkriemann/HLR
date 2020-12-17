@@ -182,7 +182,7 @@ lu_lazy ( const hpro::TMatrix &    A,
         flops.push_back( get_flops( "lu" ) );
         runtime.push_back( toc.seconds() );
     }// for
-        
+
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )

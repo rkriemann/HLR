@@ -66,7 +66,7 @@ public:
                                     const hpro::TTruncAcc &       acc ) const
     {
         const auto  op           = coefffn_operator( bis, _coeff_fn );
-        auto        pivot_search = approx::aca_pivot( op );
+        auto        pivot_search = approx::aca_pivot< decltype(op) >( op );
         
 
         auto [ U, V ] = approx::aca( op, pivot_search, acc, nullptr );

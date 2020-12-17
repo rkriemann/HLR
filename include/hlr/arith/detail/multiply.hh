@@ -435,14 +435,14 @@ multiply ( const value_t               alpha,
 
             if ( op_B == hpro::apply_normal )
             {
-                auto  DB_j = blas::matrix( DB, is_j - B.row_ofs(), blas::range::all );
+                auto  DB_j = blas::matrix< value_t >( DB, is_j - B.row_ofs(), blas::range::all );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
                 multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
             }// if
             else
             {
-                auto  DB_j = blas::matrix( DB, blas::range::all, is_j - B.col_ofs() );
+                auto  DB_j = blas::matrix< value_t >( DB, blas::range::all, is_j - B.col_ofs() );
                 auto  B_j  = hpro::TDenseMatrix( is_j, B.col_is( op_B ), DB_j );
             
                 multiply( alpha, op_A, * A_ij, op_B, B_j, C_i );
@@ -478,14 +478,14 @@ multiply ( const value_t               alpha,
 
             if ( op_A == hpro::apply_normal )
             {
-                auto  DA_i = blas::matrix( DA, blas::range::all, is_i - A.col_ofs() );
+                auto  DA_i = blas::matrix< value_t >( DA, blas::range::all, is_i - A.col_ofs() );
                 auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
             
                 multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );
             }// if
             else
             {
-                auto  DA_i = blas::matrix( DA, is_i - A.row_ofs(), blas::range::all );
+                auto  DA_i = blas::matrix< value_t >( DA, is_i - A.row_ofs(), blas::range::all );
                 auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
             
                 multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );

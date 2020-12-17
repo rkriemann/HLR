@@ -14,9 +14,11 @@
 #include <hpro/matrix/structure.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
 
+#include "hlr/arith/multiply.hh"
+#include "hlr/matrix/lrsmatrix.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
-#include "hlr/arith/multiply.hh"
+#include "hlr/utils/io.hh"
 
 namespace hlr { namespace seq { namespace lazy {
 
@@ -32,13 +34,6 @@ namespace detail
 {
 
 //
-// auxiliary types
-//
-
-using  update_t      = std::pair< const hpro::TMatrix *, const hpro::TMatrix * >;
-using  update_list_t = std::list< update_t >;
-
-//
 // operator wrapper for sum of linear operators
 //
 
@@ -47,9 +42,9 @@ struct linopsum_operator
 {
     using  value_t = T_value;
 
-    const std::list< hpro::TLinearOperator * > &  ops;
+    const std::list< const hpro::TLinearOperator * > &  ops;
 
-    linopsum_operator ( const std::list< hpro::TLinearOperator * > &  aops )
+    linopsum_operator ( const std::list< const hpro::TLinearOperator * > &  aops )
             : ops( aops )
     {
         HLR_ASSERT( ! aops.empty() );
@@ -150,277 +145,438 @@ prod ( const value_t                         alpha,
 
 template < typename value_t >
 linopsum_operator< value_t >
-operator_wrapper ( const std::list< hpro::TLinearOperator * > &  M )
+operator_wrapper ( const std::list< const hpro::TLinearOperator * > &  M )
 {
     return linopsum_operator< value_t > ( M );
 }
 
 //
-// split given set of updates to set of updates for sub blocks
+// accumulator for lazy updates
 //
-template < typename value_t >
-std::pair< tensor2< update_list_t >,
-           std::list< std::unique_ptr< hpro::TMatrix > > >
-split_updates( const hpro::TBlockMatrix &  M,
-               const update_list_t &       updates )
-{
-    auto  sub_updates = tensor2< update_list_t >( M.nblock_rows(), M.nblock_cols() );
-    auto  created     = std::list< std::unique_ptr< hpro::TMatrix > >();
 
-    for ( uint  i = 0; i < M.nblock_rows(); ++i )
+struct lazy_accumulator
+{
+    using  update_t      = std::pair< const hpro::TMatrix *, const hpro::TMatrix * >;
+    using  update_list_t = std::list< update_t >;
+    using  create_list_t = std::list< std::unique_ptr< hpro::TMatrix > >;
+
+    update_list_t  updates;
+    create_list_t  created;
+    bool           handle_dense = false;
+
+    //
+    // add A×B to updates
+    // - α is applied _only_ if possible
+    //
+    template < typename value_t >
+    void
+    add_update ( const hpro::TMatrix *  A,
+                 const hpro::TMatrix *  B )
     {
-        for ( uint  j = 0; j < M.nblock_cols(); ++j )
+        HLR_ASSERT( ! is_null( A ) );
+        
+        if ( is_lowrank_all( A, B ) )
         {
-            auto  M_ij  = M.block( i, j );
-            auto  row_i = M_ij->row_is();
-            auto  col_j = M_ij->col_is();
+            //
+            // create U·T·V' representation with T=V(A)'·U(B)
+            //
+
+            auto  RA = cptrcast( A, hpro::TRkMatrix );
+            auto  RB = cptrcast( B, hpro::TRkMatrix );
+
+            auto  U  = blas::mat_U< value_t >( RA );
+            auto  T  = blas::prod( blas::adjoint( blas::mat_V< value_t >( RA ) ), blas::mat_U< value_t >( RB ) );
+            auto  V  = blas::mat_V< value_t >( RB );
+            
+            auto  AxB = std::make_unique< matrix::lrsmatrix< value_t > >( A->row_is(), B->col_is(), std::move( U ), std::move( T ), std::move( V ) );
+            
+            updates.push_back( { AxB.get(), nullptr } );
+            created.push_back( std::move( AxB ) );
+        }// if
+        else
+        {
+            if ( is_dense_all( A, B ) )
+                handle_dense = true;
+            
+            updates.push_back( { A, B } );
+        }// else
+    }
+
+    template < typename value_t >
+    void
+    add_update ( const hpro::TMatrix *  A )
+    {
+        add_update< value_t >( A, nullptr );
+    }
+    
+    //
+    // split given set of updates to set of updates for sub blocks
+    //
+    template < typename value_t >
+    tensor2< lazy_accumulator >
+    split ( const hpro::TBlockMatrix &  M )
+    {
+        auto  sub_accu = tensor2< lazy_accumulator >( M.nblock_rows(), M.nblock_cols() );
+
+        for ( uint  i = 0; i < M.nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < M.nblock_cols(); ++j )
+            {
+                auto  M_ij  = M.block( i, j );
+                auto  row_i = M_ij->row_is();
+                auto  col_j = M_ij->col_is();
+
+                for ( auto  [ A, B ] : updates )
+                {
+                    //
+                    // extract sub-update for M_ij based on types of A/B
+                    //
+
+                    if ( is_blocked( A ) )
+                    {
+                        auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                        
+                        if ( is_blocked( B ) )
+                        {
+                            auto  BB = cptrcast( B, hpro::TBlockMatrix );
+
+                            for ( uint  k = 0; k < BA->nblock_cols(); ++k )
+                            {
+                                HLR_ASSERT( ! is_null_all( BA->block( i, k ), BB->block( k, j ) ) );
+
+                                sub_accu(i,j).add_update< value_t >( BA->block( i, k ), BB->block( k, j ) );
+                            }// for
+                        }// if
+                        else if ( is_lowrank( B ) )
+                        {
+                            auto  RB = cptrcast( B, hpro::TRkMatrix );
+
+                            for ( uint  k = 0; k < BA->nblock_cols(); ++k )
+                            {
+                                HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
+
+                                auto  A_ik  = BA->block( i, k );
+                                auto  col_k = A_ik->col_is();
+
+                                // restrict B to col_k × col_j
+                                auto  U_k = blas::matrix< value_t >( blas::mat_U< value_t >( RB ), col_k - B->row_ofs(), blas::range::all );
+                                auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
+                                auto  B_kj = std::make_unique< hpro::TRkMatrix >( col_k, col_j, U_k, V_j );
+                                
+                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get() );
+
+                                created.push_back( std::move( B_kj ) );
+                            }// for
+                        }// if
+                        else if ( is_dense( B ) )
+                        {
+                            auto  DB = cptrcast( B, hpro::TDenseMatrix );
+
+                            for ( uint  k = 0; k < BA->nblock_cols(); ++k )
+                            {
+                                HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
+
+                                auto  A_ik  = BA->block( i, k );
+                                auto  col_k = A_ik->col_is();
+
+                                // restrict B to col_k × col_j
+                                auto  D_kj = blas::matrix< value_t >( blas::mat< value_t >( DB ), col_k - B->row_ofs(), col_j - B->col_ofs() );
+                                auto  B_kj = std::make_unique< hpro::TDenseMatrix >( col_k, col_j, D_kj );
+                                
+                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get() );
+
+                                created.push_back( std::move( B_kj ) );
+                            }// for
+                        }// if
+                        else
+                            HLR_ERROR( "unsupported matrix type: " + B->typestr() );
+                    }// if
+                    else if ( is_lowrank( A ) )
+                    {
+                        auto  RA = cptrcast( A, hpro::TRkMatrix );
+                        
+                        if ( is_blocked( B ) )
+                        {
+                            auto  BB = cptrcast( B, hpro::TBlockMatrix );
+
+                            for ( uint  k = 0; k < BB->nblock_rows(); ++k )
+                            {
+                                HLR_ASSERT( ! is_null( BB->block( k, j ) ) );
+
+                                auto  B_kj  = BB->block( k, j );
+                                auto  col_k = B_kj->row_is();
+                                
+                                // restrict A to row_i × col_k
+                                auto  U_i  = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
+                                auto  V_k  = blas::matrix< value_t >( blas::mat_V< value_t >( RA ), col_k - A->col_ofs(), blas::range::all );
+                                auto  A_ik = std::make_unique< hpro::TRkMatrix >( row_i, col_k, U_i, V_k );
+                                
+                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj );
+
+                                created.push_back( std::move( A_ik ) );
+                            }// for
+                        }// if
+                        else if ( is_lowrank( B ) )
+                        {
+                            auto  RB = cptrcast( B, hpro::TRkMatrix );
+
+                            // restrict A to row_i
+                            auto  U_i = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< hpro::TRkMatrix >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
+                            
+                            // restrict B to col_j
+                            auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
+                            auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
+                                
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
+
+                            created.push_back( std::move( A_i ) );
+                            created.push_back( std::move( B_j ) );
+                        }// if
+                        else if ( is_dense( B ) )
+                        {
+                            auto  DB = cptrcast( B, hpro::TDenseMatrix );
+
+                            // restrict A to row_i
+                            auto  U_i = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< hpro::TRkMatrix >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
+                            
+                            // restrict B to col_j
+                            auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
+                            auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
+                                
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
+
+                            created.push_back( std::move( A_i ) );
+                            created.push_back( std::move( B_j ) );
+                        }// if
+                        else
+                            HLR_ERROR( "unsupported matrix type: " + B->typestr() );
+                    }// if
+                    else if ( matrix::is_lowrankS( A ) )
+                    {
+                        auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+
+                        // A already holds full product
+                        HLR_ASSERT( is_null( B ) );
+
+                        // A already holds product of original A and B so just restrict to M_ij
+                        auto  U_i  = blas::matrix< value_t >( RA->U(), row_i - A->row_ofs(), blas::range::all );
+                        auto  V_j  = blas::matrix< value_t >( RA->V(), col_j - A->col_ofs(), blas::range::all );
+                        auto  A_ij = std::make_unique< matrix::lrsmatrix< value_t > >( row_i, col_j, U_i, RA->S(), V_j );
+
+                        sub_accu(i,j).add_update< value_t >( A_ij.get() );
+                        created.push_back( std::move( A_ij ) );
+                    }// if
+                    else if ( is_dense( A ) )
+                    {
+                        auto  DA = cptrcast( A, hpro::TDenseMatrix );
+                        
+                        if ( is_blocked( B ) )
+                        {
+                            auto  BB = cptrcast( B, hpro::TBlockMatrix );
+
+                            for ( uint  k = 0; k < BB->nblock_rows(); ++k )
+                            {
+                                HLR_ASSERT( ! is_null( BB->block( k, j ) ) );
+
+                                auto  B_kj  = BB->block( k, j );
+                                auto  col_k = B_kj->row_is();
+                                
+                                // restrict A to row_i × col_k
+                                auto  D_ik = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), col_k - A->col_ofs() );
+                                auto  A_ik = std::make_unique< hpro::TDenseMatrix >( row_i, col_k, D_ik );
+                                
+                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj );
+
+                                created.push_back( std::move( A_ik ) );
+                            }// for
+                        }// if
+                        else if ( is_lowrank( B ) )
+                        {
+                            auto  RB = cptrcast( B, hpro::TRkMatrix );
+                            
+                            // restrict A to row_i
+                            auto  D_i = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< hpro::TDenseMatrix >( row_i, A->col_is(), D_i );
+                            
+                            // restrict B to col_j
+                            auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
+                            auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
+                                
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
+
+                            created.push_back( std::move( A_i ) );
+                            created.push_back( std::move( B_j ) );
+                        }// if
+                        else if ( is_dense( B ) )
+                        {
+                            auto  DB = cptrcast( B, hpro::TDenseMatrix );
+
+                            // restrict A to row_i
+                            auto  D_i = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< hpro::TDenseMatrix >( row_i, A->col_is(), D_i );
+                            
+                            // restrict B to col_j
+                            auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
+                            auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
+                                
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
+
+                            created.push_back( std::move( A_i ) );
+                            created.push_back( std::move( B_j ) );
+                        }// if
+                        else
+                            HLR_ERROR( "unsupported matrix type: " + B->typestr() );
+                    }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type: " + A->typestr() );
+                }// for
+            }// for
+        }// for
+    
+        return sub_accu;
+    }
+
+    //
+    // apply updates to leaf matrix
+    //
+    template < typename value_t,
+               typename approx_t >
+    void
+    apply_leaf ( const value_t            alpha,
+                 hpro::TMatrix &          M,
+                 const hpro::TTruncAcc &  acc,
+                 const approx_t &         approx )
+    {
+        if ( is_lowrank( M ) )
+        {
+            auto  R = ptrcast( &M, hpro::TRkMatrix );
+
+            //
+            // an update resulted in a dense matrix, so handle all in dense format
+            //
+            
+            if ( handle_dense )
+            {
+                auto  D = matrix::convert_to_dense< value_t >( *R );
+
+                apply_leaf( alpha, *D, acc, approx );
+
+                auto  [ U, V ] = approx( blas::mat< value_t >( D ), acc );
+
+                R->set_lrmat( std::move( U ), std::move( V ) );
+                return;
+            }// if
+
+            //
+            // otherwise handle updates in low-rank format
+            //
+            
+            if ( false )
+            {
+                //
+                // add each update individually
+                //
+                
+                for ( auto  [ A, B ] : updates )
+                {
+                    if ( matrix::is_lowrankS( A ) )
+                    {
+                        HLR_ASSERT( is_null( B ) );
+                    
+                        auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                        auto  US = blas::prod( alpha, RA->U(), RA->S() );
+
+                        auto  [ U, V ] = approx( { blas::mat_U< value_t >( R ), US },
+                                                 { blas::mat_V< value_t >( R ), RA->V() },
+                                                 acc );
+            
+                        R->set_lrmat( std::move( U ), std::move( V ) );
+                    }// if
+                    else
+                    {
+                        hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, M, acc, approx );
+                    }// else
+                }// for
+            }// if
+            else
+            {
+                //
+                // set up operator for sum of matrix products plus C
+                //
+        
+                auto  op_list = std::list< const hpro::TLinearOperator * >();
+                auto  deleted = std::list< const hpro::TLinearOperator * >();
+
+                for ( auto  [ A, B ] : updates )
+                {
+                    if ( matrix::is_lowrankS( A ) )
+                    {
+                        HLR_ASSERT( is_null( B ) );
+                        
+                        auto  op_AxB = hpro::matrix_product( alpha, A );
+                        
+                        deleted.push_back( op_AxB.get() );
+                        op_list.push_back( op_AxB.release() );
+                    }// if
+                    else
+                    {
+                        auto  op_AxB = hpro::matrix_product( alpha, A, value_t(1), B );
+                        
+                        deleted.push_back( op_AxB.get() );
+                        op_list.push_back( op_AxB.release() );
+                    }// else
+                }// for
+            
+                op_list.push_back( R );
+
+                auto  sumop = operator_wrapper< value_t >( op_list );
+
+                // std::cout << C.id() << " : " << op_list.size() << std::endl;
+                
+                //
+                // apply lowrank approximation and update C
+                //
+                
+                auto  [ U, V ] = approx( sumop, acc );
+                
+                R->set_lrmat( std::move( U ), std::move( V ) );
+                
+                //
+                // clean up
+                //
+                
+                for ( auto  op : deleted )
+                    delete op;
+            }// else
+        }// if
+        else if ( is_dense( M ) )
+        {
+            auto  D = ptrcast( &M, hpro::TDenseMatrix );
 
             for ( auto  [ A, B ] : updates )
             {
-                //
-                // extract sub-update for M_ij based on types of A/B
-                //
-
-                if ( is_blocked( A ) )
+                if ( matrix::is_lowrankS( A ) )
                 {
-                    auto  BA = cptrcast( A, hpro::TBlockMatrix );
-                        
-                    if ( is_blocked( B ) )
-                    {
-                        auto  BB = cptrcast( B, hpro::TBlockMatrix );
+                    HLR_ASSERT( is_null( B ) );
+                    
+                    auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                    auto  US = blas::prod( RA->U(), RA->S() );
 
-                        for ( uint  k = 0; k < BA->nblock_cols(); ++k )
-                        {
-                            HLR_ASSERT( ! is_null_all( BA->block( i, k ), BB->block( k, j ) ) );
-
-                            sub_updates(i,j).push_back( std::make_pair( BA->block( i, k ), BB->block( k, j ) ) );
-                        }// for
-                    }// if
-                    else if ( is_lowrank( B ) )
-                    {
-                        auto  RB = cptrcast( B, hpro::TRkMatrix );
-
-                        for ( uint  k = 0; k < BA->nblock_cols(); ++k )
-                        {
-                            HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
-
-                            auto  A_ik  = BA->block( i, k );
-                            auto  col_k = A_ik->col_is();
-
-                            // restrict B to col_k × col_j
-                            auto  U_k = blas::matrix( blas::mat_U< value_t >( RB ), col_k - B->row_ofs(), blas::range::all );
-                            auto  V_j = blas::matrix( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                            auto  B_kj = std::make_unique< hpro::TRkMatrix >( col_k, col_j, U_k, V_j );
-                                
-                            sub_updates(i,j).push_back( std::make_pair( A_ik, B_kj.get() ) );
-
-                            created.push_back( std::move( B_kj ) );
-                        }// for
-                    }// if
-                    else if ( is_dense( B ) )
-                    {
-                        auto  DB = cptrcast( B, hpro::TDenseMatrix );
-
-                        for ( uint  k = 0; k < BA->nblock_cols(); ++k )
-                        {
-                            HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
-
-                            auto  A_ik  = BA->block( i, k );
-                            auto  col_k = A_ik->col_is();
-
-                            // restrict B to col_k × col_j
-                            auto  D_kj = blas::matrix( blas::mat< value_t >( DB ), col_k - B->row_ofs(), col_j - B->col_ofs() );
-                            auto  B_kj = std::make_unique< hpro::TDenseMatrix >( col_k, col_j, D_kj );
-                                
-                            sub_updates(i,j).push_back( std::make_pair( A_ik, B_kj.get() ) );
-
-                            created.push_back( std::move( B_kj ) );
-                        }// for
-                    }// if
-                    else
-                        HLR_ERROR( "unsupported matrix type: " + B->typestr() );
-                }// if
-                else if ( is_lowrank( A ) )
-                {
-                    auto  RA = cptrcast( A, hpro::TRkMatrix );
-                        
-                    if ( is_blocked( B ) )
-                    {
-                        auto  BB = cptrcast( B, hpro::TBlockMatrix );
-
-                        for ( uint  k = 0; k < BB->nblock_rows(); ++k )
-                        {
-                            HLR_ASSERT( ! is_null( BB->block( k, j ) ) );
-
-                            auto  B_kj  = BB->block( k, j );
-                            auto  col_k = B_kj->row_is();
-                                
-                            // restrict A to row_i × col_k
-                            auto  U_i  = blas::matrix( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                            auto  V_k  = blas::matrix( blas::mat_V< value_t >( RA ), col_k - A->col_ofs(), blas::range::all );
-                            auto  A_ik = std::make_unique< hpro::TRkMatrix >( row_i, col_k, U_i, V_k );
-                                
-                            sub_updates(i,j).push_back( std::make_pair( A_ik.get(), B_kj ) );
-
-                            created.push_back( std::move( A_ik ) );
-                        }// for
-                    }// if
-                    else if ( is_lowrank( B ) )
-                    {
-                        auto  RB = cptrcast( B, hpro::TRkMatrix );
-
-                        // restrict A to row_i
-                        auto  U_i = blas::matrix( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                        auto  A_i = std::make_unique< hpro::TRkMatrix >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
-                            
-                        // restrict B to col_j
-                        auto  V_j = blas::matrix( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                        auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
-                                
-                        sub_updates(i,j).push_back( std::make_pair( A_i.get(), B_j.get() ) );
-
-                        created.push_back( std::move( A_i ) );
-                        created.push_back( std::move( B_j ) );
-                    }// if
-                    else if ( is_dense( B ) )
-                    {
-                        auto  DB = cptrcast( B, hpro::TDenseMatrix );
-
-                        // restrict A to row_i
-                        auto  U_i = blas::matrix( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                        auto  A_i = std::make_unique< hpro::TRkMatrix >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
-                            
-                        // restrict B to col_j
-                        auto  D_j = blas::matrix( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
-                        auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
-                                
-                        sub_updates(i,j).push_back( std::make_pair( A_i.get(), B_j.get() ) );
-
-                        created.push_back( std::move( A_i ) );
-                        created.push_back( std::move( B_j ) );
-                    }// if
-                    else
-                        HLR_ERROR( "unsupported matrix type: " + B->typestr() );
-                }// if
-                else if ( is_dense( A ) )
-                {
-                    auto  DA = cptrcast( A, hpro::TDenseMatrix );
-                        
-                    if ( is_blocked( B ) )
-                    {
-                        auto  BB = cptrcast( B, hpro::TBlockMatrix );
-
-                        for ( uint  k = 0; k < BB->nblock_rows(); ++k )
-                        {
-                            HLR_ASSERT( ! is_null( BB->block( k, j ) ) );
-
-                            auto  B_kj  = BB->block( k, j );
-                            auto  col_k = B_kj->row_is();
-                                
-                            // restrict A to row_i × col_k
-                            auto  D_ik = blas::matrix( blas::mat< value_t >( DA ), row_i - A->row_ofs(), col_k - A->col_ofs() );
-                            auto  A_ik = std::make_unique< hpro::TDenseMatrix >( row_i, col_k, D_ik );
-                                
-                            sub_updates(i,j).push_back( std::make_pair( A_ik.get(), B_kj ) );
-
-                            created.push_back( std::move( A_ik ) );
-                        }// for
-                    }// if
-                    else if ( is_lowrank( B ) )
-                    {
-                        auto  RB = cptrcast( B, hpro::TRkMatrix );
-                            
-                        // restrict A to row_i
-                        auto  D_i = blas::matrix( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
-                        auto  A_i = std::make_unique< hpro::TDenseMatrix >( row_i, A->col_is(), D_i );
-                            
-                        // restrict B to col_j
-                        auto  V_j = blas::matrix( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                        auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
-                                
-                        sub_updates(i,j).push_back( std::make_pair( A_i.get(), B_j.get() ) );
-
-                        created.push_back( std::move( A_i ) );
-                        created.push_back( std::move( B_j ) );
-                    }// if
-                    else if ( is_dense( B ) )
-                    {
-                        auto  DB = cptrcast( B, hpro::TDenseMatrix );
-
-                        // restrict A to row_i
-                        auto  D_i = blas::matrix( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
-                        auto  A_i = std::make_unique< hpro::TDenseMatrix >( row_i, A->col_is(), D_i );
-                            
-                        // restrict B to col_j
-                        auto  D_j = blas::matrix( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
-                        auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
-                                
-                        sub_updates(i,j).push_back( std::make_pair( A_i.get(), B_j.get() ) );
-
-                        created.push_back( std::move( A_i ) );
-                        created.push_back( std::move( B_j ) );
-                    }// if
-                    else
-                        HLR_ERROR( "unsupported matrix type: " + B->typestr() );
+                    blas::prod( alpha, US, blas::adjoint( RA->V() ), value_t(1), blas::mat< value_t >( D ) );
                 }// if
                 else
-                    HLR_ERROR( "unsupported matrix type: " + A->typestr() );
+                {
+                    hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, M, acc, approx );
+                }// else
             }// for
-        }// for
-    }// for
-    
-    return { std::move( sub_updates ), std::move( created ) };
-}
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+    }
 
-//
-// apply updates to lowrank matrix
-//
-template < typename value_t,
-           typename approx_t >
-void
-apply_to_lowrank ( const value_t            alpha,
-                   hpro::TRkMatrix &        M,
-                   const update_list_t &    updates,
-                   const hpro::TTruncAcc &  acc,
-                   const approx_t &         approx )
-{
-    //
-    // set up operator for sum of matrix products plus C
-    //
-        
-    auto  op_list = std::list< hpro::TLinearOperator * >();
-
-    for ( auto  [ A, B ] : updates )
-    {
-        auto  op_AxB = hpro::matrix_product( alpha, A, value_t(1), B );
-
-        op_list.push_back( op_AxB.release() );
-    }// for
-
-    op_list.push_back( &M );
-
-    auto  sumop = operator_wrapper< value_t >( op_list );
-
-    // std::cout << C.id() << " : " << op_list.size() << std::endl;
-        
-    //
-    // apply lowrank approximation and update C
-    //
-        
-    auto  [ U, V ] = approx( sumop, acc );
-
-    M.set_lrmat( std::move( U ), std::move( V ) );
-    
-    //
-    // clean up
-    //
-        
-    for ( auto  op : op_list )
-    {
-        if ( op != &M )
-            delete op;
-    }// for
-}
+};
 
 //
 // compute C = C + α op( A ) op( B ) where A and B are provided as list of updates
@@ -430,7 +586,7 @@ template < typename value_t,
 void
 multiply ( const value_t            alpha,
            hpro::TMatrix &          C,
-           update_list_t &          updates,
+           lazy_accumulator &       accu,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
@@ -442,7 +598,7 @@ multiply ( const value_t            alpha,
         // restrict set of updates for all subblocks
         //
 
-        auto  [ sub_updates, created ] = split_updates< value_t >( *BC, updates );
+        auto  sub_accu = accu.split< value_t >( *BC );
         
         //
         // recurse
@@ -454,26 +610,14 @@ multiply ( const value_t            alpha,
             {
                 HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
                 
-                multiply< value_t >( alpha, *BC->block(i,j), sub_updates(i,j), acc, approx );
+                multiply< value_t >( alpha, *BC->block(i,j), sub_accu(i,j), acc, approx );
             }// for
         }// for
     }// if
-    else if ( is_lowrank( C ) )
-    {
-        auto  R = ptrcast( &C, hpro::TRkMatrix );
-        
-        apply_to_lowrank( alpha, *R, updates, acc, approx );
-    }// if
-    else if ( is_dense( C ) )
-    {
-        // std::cout << C.id() << std::endl;
-
-        // evaluate all updates and apply to C
-        for ( auto  [ A, B ] : updates )
-            hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, C, acc, approx );
-    }// if
     else
-        HLR_ERROR( "unsupported matrix type: " + C.typestr() );
+    {
+        accu.apply_leaf( alpha, C, acc, approx );
+    }// if
 }
 
 }// namespace detail
@@ -490,9 +634,11 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
-    detail::update_list_t  updates{ std::make_pair( &A, &B ) };
+    detail::lazy_accumulator  accu;
+
+    accu.add_update< value_t >( &A, &B );
     
-    detail::multiply< value_t >( alpha, C, updates, acc, approx );
+    detail::multiply< value_t >( alpha, C, accu, acc, approx );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -511,7 +657,7 @@ solve_lower_tri ( const eval_side_t        side,
                   const diag_type_t        diag,
                   const hpro::TMatrix &    L,
                   hpro::TMatrix &          M,
-                  update_list_t &          updates,
+                  lazy_accumulator &       accu,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
@@ -524,7 +670,7 @@ solve_lower_tri ( const eval_side_t        side,
         // restrict set of updates for all subblocks
         //
 
-        auto  [ sub_updates, created ] = split_updates< value_t >( *BM, updates );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recurse
@@ -537,11 +683,11 @@ solve_lower_tri ( const eval_side_t        side,
                 const auto  L_ii = BL->block( i, i );
             
                 for ( uint j = 0; j < BM->nblock_cols(); ++j )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j), sub_updates(i,j), acc, approx );
+                    solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j), sub_accu(i,j), acc, approx );
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                        sub_updates(k,j).push_back( { BL->block(k,i), BM->block(i,j) } );
+                        sub_accu(k,j).template add_update< value_t >( BL->block(k,i), BM->block(i,j) );
             }// for
         }// if
         else
@@ -549,22 +695,11 @@ solve_lower_tri ( const eval_side_t        side,
             HLR_ASSERT( false );
         }// else
     }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = ptrcast( &M, hpro::TRkMatrix );
-        
-        apply_to_lowrank( value_t(-1), *R, updates, acc, approx );
-        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
-    }// if
-    else if ( is_dense( M ) )
-    {
-        for ( auto  [ A, B ] : updates )
-            hlr::multiply( value_t(-1), apply_normal, *A, apply_normal, *B, M, acc, approx );
-        
-        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
-    }// if
     else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+    {
+        accu.apply_leaf( value_t(-1), M, acc, approx );
+        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+    }// else
 }
 
 template < typename value_t,
@@ -574,7 +709,7 @@ solve_upper_tri ( const eval_side_t        side,
                   const diag_type_t        diag,
                   const hpro::TMatrix &    U,
                   hpro::TMatrix &          M,
-                  update_list_t &          updates,
+                  lazy_accumulator &       accu,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
@@ -587,7 +722,7 @@ solve_upper_tri ( const eval_side_t        side,
         // restrict set of updates for all subblocks
         //
 
-        auto  [ sub_updates, created ] = split_updates< value_t >( *BM, updates );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recurse
@@ -604,37 +739,26 @@ solve_upper_tri ( const eval_side_t        side,
                 const auto  U_jj = BU->block( j, j );
             
                 for ( uint i = 0; i < BM->nblock_rows(); ++i )
-                    solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_updates(i,j), acc, approx );
+                    solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_accu(i,j), acc, approx );
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                     for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        sub_updates(i,k).push_back( { BM->block(i,j), BU->block(j,k) } );
+                        sub_accu(i,k).template add_update< value_t >( BM->block(i,j), BU->block(j,k) );
             }// for
         }// else
     }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = ptrcast( &M, hpro::TRkMatrix );
-        
-        apply_to_lowrank( value_t(-1), *R, updates, acc, approx );
-        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
-    }// if
-    else if ( is_dense( M ) )
-    {
-        for ( auto  [ A, B ] : updates )
-            hlr::multiply( value_t(-1), apply_normal, *A, apply_normal, *B, M, acc, approx );
-        
-        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
-    }// if
     else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+    {
+        accu.apply_leaf( value_t(-1), M, acc, approx );
+        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+    }// else
 }
 
 template < typename value_t,
            typename approx_t >
 void
 lu ( hpro::TMatrix &          M,
-     update_list_t &          updates,
+     lazy_accumulator &       accu,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx )
 {
@@ -650,7 +774,7 @@ lu ( hpro::TMatrix &          M,
         // restrict set of updates for all subblocks
         //
 
-        auto  [ sub_updates, created ] = split_updates< value_t >( *BM, updates );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recursive factorization
@@ -660,26 +784,25 @@ lu ( hpro::TMatrix &          M,
         {
             auto  B_ii = BM->block( i, i );
 
-            lu< value_t >( *B_ii, sub_updates(i,i), acc, approx );
+            lu< value_t >( *B_ii, sub_accu(i,i), acc, approx );
 
             for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
-                solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_updates(j,i), acc, approx );
+                solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_accu(j,i), acc, approx );
 
             for ( uint  j = i+1; j < BM->nblock_cols(); ++j )
-                solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_updates(i,j), acc, approx );
+                solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
 
             // add updates to sub lists
             for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
                 for ( uint  l = i+1; l < BM->nblock_cols(); ++l )
-                    sub_updates(j,l).push_back( { BM->block( j, i ), BM->block( i, l ) } );
+                    sub_accu(j,l).template add_update< value_t >( BM->block( j, i ), BM->block( i, l ) );
         }// for
     }// if
     else
     {
         if ( is_dense( M ) )
         {
-            for ( auto  [ A, B ] : updates )
-                hlr::multiply( value_t(-1), apply_normal, *A, apply_normal, *B, M, acc, approx );
+            accu.apply_leaf( value_t(-1), M, acc, approx );
         
             auto  D = ptrcast( &M, hpro::TDenseMatrix );
 
@@ -699,9 +822,9 @@ lu ( hpro::TMatrix &          M,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx )
 {
-    detail::update_list_t  updates;
+    detail::lazy_accumulator  accu;
     
-    detail::lu< value_t >( M, updates, acc, approx );
+    detail::lu< value_t >( M, accu, acc, approx );
 }
 
 }}}// namespace hlr::seq::lazy
