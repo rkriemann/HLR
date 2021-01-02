@@ -243,7 +243,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
         blas::svd( Us, Ss );
                     
         const auto  rank_U = acc.trunc_rank( Ss );
-        const auto  U_rank = blas::matrix( Us, blas::range::all, blas::range( 0, rank_U-1 ) );
+        const auto  U_rank = blas::matrix< value_t >( Us, blas::range::all, blas::range( 0, rank_U-1 ) );
 
         Un = std::move( blas::copy( U_rank ) );
     }
@@ -277,7 +277,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
         blas::svd( Vs, Ss );
                     
         const auto  rank_V = acc.trunc_rank( Ss );
-        const auto  V_rank = blas::matrix( Vs, blas::range::all, blas::range( 0, rank_V-1 ) );
+        const auto  V_rank = blas::matrix< value_t >( Vs, blas::range::all, blas::range( 0, rank_V-1 ) );
 
         Vn = std::move( blas::copy( V_rank ) );
     }
@@ -376,7 +376,7 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
     blas::svd( Us, Ss );
                     
     auto  rank_U = acc.trunc_rank( Ss );
-    auto  U_rank = blas::matrix( Us, blas::range::all, blas::range( 0, rank_U-1 ) );
+    auto  U_rank = blas::matrix< value_t >( Us, blas::range::all, blas::range( 0, rank_U-1 ) );
     auto  Un     = std::move( blas::copy( U_rank ) );
     
     //
@@ -467,7 +467,7 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     blas::svd( Vs, Ss );
     
     auto  rank_V = acc.trunc_rank( Ss );
-    auto  V_rank = blas::matrix( Vs, blas::range::all, blas::range( 0, rank_V-1 ) );
+    auto  V_rank = blas::matrix< value_t >( Vs, blas::range::all, blas::range( 0, rank_V-1 ) );
     auto  Vn     = std::move( blas::copy( V_rank ) );
     
     //
@@ -595,9 +595,9 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
 
                 blas::scale( value_t(1) / blas::norm_2( T ), S_ik );
 
-                auto  S_k = blas::matrix( S,
-                                          blas::range( pos, pos + rank-1 ),
-                                          blas::range( U.ncols(), Ue.ncols() - 1 ) );
+                auto  S_k = blas::matrix< value_t >( S,
+                                                     blas::range( pos, pos + rank-1 ),
+                                                     blas::range( U.ncols(), Ue.ncols() - 1 ) );
 
                 blas::copy( blas::adjoint( S_ik ), S_k );
                 pos += rank;
@@ -611,9 +611,9 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
                     
                 blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
             
-                auto  S_k = blas::matrix( S,
-                                          blas::range( pos, pos + rank-1 ),
-                                          blas::range( 0, U.ncols() - 1 ) );
+                auto  S_k = blas::matrix< value_t >( S,
+                                                     blas::range( pos, pos + rank-1 ),
+                                                     blas::range( 0, U.ncols() - 1 ) );
 
                 blas::copy( blas::adjoint( S_ik ), S_k );
                 pos += rank;
@@ -632,7 +632,7 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
         blas::svd( UeR, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  U_rank = blas::matrix( UeR, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  U_rank = blas::matrix< value_t >( UeR, blas::range::all, blas::range( 0, rank-1 ) );
 
         return std::move( blas::copy( U_rank ) );
     }// else
@@ -727,9 +727,9 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
                     
                 blas::scale( value_t(1) / blas::norm_2( T ), S_kj );
                 
-                auto  S_k = blas::matrix( S,
-                                          blas::range( pos, pos + rank-1 ),
-                                          blas::range( V.ncols(), Ve.ncols() - 1 ) );
+                auto  S_k = blas::matrix< value_t >( S,
+                                                     blas::range( pos, pos + rank-1 ),
+                                                     blas::range( V.ncols(), Ve.ncols() - 1 ) );
 
                 blas::copy( S_kj, S_k );
                 pos += rank;
@@ -743,9 +743,9 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
                     
                 blas::scale( value_t(1) / blas::norm_2( S_kj ), S_kj );
 
-                auto  S_k = blas::matrix( S,
-                                          blas::range( pos, pos + rank-1 ),
-                                          blas::range( 0, V.ncols() - 1 ) );
+                auto  S_k = blas::matrix< value_t >( S,
+                                                     blas::range( pos, pos + rank-1 ),
+                                                     blas::range( 0, V.ncols() - 1 ) );
 
                 blas::copy( S_kj, S_k );
                 pos += rank;
@@ -764,7 +764,7 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
         blas::svd( VeR, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  V_rank = blas::matrix( VeR, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
 
         return std::move( blas::copy( V_rank ) );
     }// else
@@ -1096,8 +1096,8 @@ add ( hpro::TMatrix &                  M,
                 
                 if ( ! is_null( B_ij ) )
                 {
-                    auto  U_i = blas::matrix( U, B_ij->row_is() - B->row_ofs(), blas::range::all );
-                    auto  V_j = blas::matrix( V, B_ij->col_is() - B->col_ofs(), blas::range::all );
+                    auto  U_i = blas::matrix< value_t >( U, B_ij->row_is() - B->row_ofs(), blas::range::all );
+                    auto  V_j = blas::matrix< value_t >( V, B_ij->col_is() - B->col_ofs(), blas::range::all );
                     
                     add( *B_ij, U_i, S, V_j, acc, rowmap, colmap );
                 }// if

@@ -94,7 +94,7 @@ public:
             , _coeffs( std::move( acoeff ) )
             , _blocks( acb.nsons() )
     {
-        HLR_ASSERT( ! _coeffs.length() == _basis->rank() );
+        HLR_ASSERT( ! ( _coeffs.length() == _basis->rank() ) );
     }
 
 

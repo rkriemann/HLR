@@ -21,7 +21,7 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++-10'
+CXX          = 'g++'
 CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 

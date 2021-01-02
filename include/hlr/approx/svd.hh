@@ -305,10 +305,12 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         HLR_DBG_ASSERT( U_i.nrows() == nrows );
     }// for
 
+    #if ! defined(NDEBUG)
     for ( auto &  V_i : V )
     {
         HLR_DBG_ASSERT( V_i.nrows() == ncols );
     }// for
+    #endif
     
     if ( in_rank >= std::min( nrows, ncols ) )
     {

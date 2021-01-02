@@ -121,9 +121,9 @@ convert_to_dense ( const hpro::TMatrix &  M )
 
                 auto  D_ij  = convert_to_dense< value_t >( *B_ij );
                 auto  DD_ij = blas::mat< value_t >( *D_ij );
-                auto  TD    = blas::matrix( DD,
-                                            D_ij->row_is() - M.row_ofs(),
-                                            D_ij->col_is() - M.col_ofs() );
+                auto  TD    = blas::matrix< value_t >( DD,
+                                                       D_ij->row_is() - M.row_ofs(),
+                                                       D_ij->col_is() - M.col_ofs() );
 
                 blas::copy( DD_ij, TD );
             }// for

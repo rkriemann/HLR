@@ -364,7 +364,7 @@ join_row ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M, range::all, range( pos, pos + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M, range::all, range( pos, pos + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos += ncols_i;
@@ -407,7 +407,7 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  nrows_i = M_i.nrows();
-        auto        dest_i  = matrix( M, range( pos, pos + nrows_i - 1 ), range::all );
+        auto        dest_i  = matrix< value_t >( M, range( pos, pos + nrows_i - 1 ), range::all );
 
         copy( M_i, dest_i );
         pos += nrows_i;
@@ -448,9 +448,9 @@ diag ( const std::list< matrix< value_t > > &  matrices )
     {
         const auto  nrows_i = M_i.nrows();
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M,
-                                      range( pos_r, pos_r + nrows_i - 1 ),
-                                      range( pos_c, pos_c + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M,
+                                                 range( pos_r, pos_r + nrows_i - 1 ),
+                                                 range( pos_c, pos_c + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos_r += nrows_i;
