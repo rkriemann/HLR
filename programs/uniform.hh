@@ -15,6 +15,7 @@
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/approx/randsvd.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -120,6 +121,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
+    auto  apx = approx::RandSVD< value_t >();
+    
     if ( true )
     {
         std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
@@ -253,7 +256,6 @@ program_main ()
             {
                 std::cout << "  " << term::bullet << term::bold << "LDU" << term::reset << std::endl;
             
-                auto  apx = approx::SVD< value_t >();
                 auto  M1 = seq::matrix::copy_nonuniform< value_t >( *A2 );
                 auto  M3 = seq::matrix::copy( *M1 );
             
@@ -280,7 +282,7 @@ program_main ()
 
                 tic = timer::now();
             
-                impl::uniform::tlr::ldu< value_t >( *A3, acc );
+                impl::uniform::tlr::ldu< value_t >( *A3, acc, apx );
 
                 toc = timer::since( tic );
                 std::cout << "      done in  " << format_time( toc ) << std::endl;
@@ -309,7 +311,6 @@ program_main ()
                 {
                     std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
             
-                    auto  apx = approx::SVD< value_t >();
                     auto  M3 = seq::matrix::copy( *M1 );
                 
                     tic = timer::now();
@@ -330,7 +331,6 @@ program_main ()
                 {
                     std::cout << "  " << term::bullet << term::bold << "H-LU (lazy)" << term::reset << std::endl;
             
-                    auto  apx = approx::SVD< value_t >();
                     auto  M3 = seq::matrix::copy( *M1 );
                 
                     tic = timer::now();
@@ -359,7 +359,7 @@ program_main ()
                 
                     tic = timer::now();
                 
-                    impl::uniform::tlr::lu< value_t >( *A3, acc );
+                    impl::uniform::tlr::lu< value_t >( *A3, acc, apx );
                 
                     toc = timer::since( tic );
                     std::cout << "      done in  " << format_time( toc ) << std::endl;
@@ -441,7 +441,6 @@ program_main ()
             {
                 std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
                 
-                auto  apx = approx::SVD< value_t >();
                 auto  M3 = seq::matrix::copy( *M1 );
                 
                 tic = timer::now();

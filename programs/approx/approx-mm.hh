@@ -265,7 +265,7 @@ program_main ()
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
 
-    if ( true )
+    if ( cmdline::arith == "std" || cmdline::arith == "all" )
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
@@ -273,7 +273,7 @@ program_main ()
         // reference: Hpro
         //
 
-        if ( true )
+        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
         {
             std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
@@ -313,7 +313,7 @@ program_main ()
 
             std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
             std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
-        }
+        }// if
 
         //
         // standard recursion with immediate updates
@@ -332,15 +332,11 @@ program_main ()
     // using accumulators
     //
 
-    if ( true )
+    if ( cmdline::arith == "accu" || cmdline::arith == "all" )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-        //
-        // reference: Hpro
-        //
-
-        if ( true )
+        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
         {
             std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
@@ -400,7 +396,7 @@ program_main ()
     // using lazy evaluation
     //
 
-    if ( true )
+    if ( cmdline::arith == "lazy" || cmdline::arith == "all" )
     {
         std::cout << "  " << term::bullet << term::bold << "lazy" << term::reset << std::endl;
     

@@ -49,6 +49,7 @@ auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problem
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
+string  arith      = "std";        // which kind of arithmetic to use
 
 void
 read_config ( const std::string &  filename )
@@ -125,6 +126,7 @@ parse ( int argc, char ** argv )
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
         ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
+        ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
         ( "bench",       value<int>(),    ": number of benchmark iterations" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
@@ -183,6 +185,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
+    if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
@@ -233,8 +236,21 @@ parse ( int argc, char ** argv )
                   << "  - randlr  : randomized low-rank" << std::endl
                   << "  - aca     : adaptive cross approximation" << std::endl
                   << "  - lanczos : Lanczos bidiagonalization" << std::endl
+                  << "  - hpro    : purely use Hpro functions for approximation" << std::endl
                   << "  - all     : use all for comparison" << std::endl
                   << "  - default : use default approximation (SVD)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( arith == "help" )
+    {
+        std::cout << "Arithmetic to use:" << std::endl
+                  << "  - std     : standard H-arithmetic (immediate updates)" << std::endl
+                  << "  - accu    : accumulator based H-arithmetic" << std::endl
+                  << "  - lazy    : lazy evaluation in H-arithmetic" << std::endl
+                  << "  - all     : use all types" << std::endl
+                  << "  - default : use default arithmetic (std)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -276,16 +292,20 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) ) )
+    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
     if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
-    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
-             ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||
-             ( approx == "all"    ) || ( approx == "default" ) ) )
+    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||
+             ( approx == "randlr" ) || ( approx == "aca"  ) || ( approx == "lanczos" ) ||
+             ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
         HLR_ERROR( "unknown approximation : " + approx );
+
+    if ( ! ( ( arith == "std" ) || ( arith == "accu" ) || ( arith == "lazy" ) ||
+             ( arith == "all" ) || ( arith == "default" ) ) )
+        HLR_ERROR( "unknown arithmetic : " + arith );
 }
 
 }}// namespace hlr::cmdline

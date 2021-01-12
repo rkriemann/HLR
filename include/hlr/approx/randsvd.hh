@@ -502,8 +502,10 @@ randsvd ( const blas::matrix< value_t > &  U,
         auto  OU = blas::prod( value_t(1), Q,    Vk );
         auto  OV = blas::prod( value_t(1), VUtQ, Uk );
 
-        if ( nrows_U < nrows_V ) blas::prod_diag( OU, S, out_rank );
-        else                 blas::prod_diag( OV, S, out_rank );
+        if ( nrows_U < nrows_V )
+            blas::prod_diag( OU, S, out_rank );
+        else
+            blas::prod_diag( OV, S, out_rank );
 
         return { std::move( OU ), std::move( OV ) };
     }// else
@@ -696,7 +698,7 @@ struct RandSVD
     const uint   oversampling = 0;
 
     //
-    // operators
+    // matrix approximation routines
     //
     
     std::pair< blas::matrix< value_t >,
@@ -745,6 +747,18 @@ struct RandSVD
                   const hpro::TTruncAcc &  acc ) const
     {
         return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
+    }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    template < typename operator_t >
+    blas::matrix< typename operator_t::value_t >
+    column_basis ( const operator_t &       op,
+                   const hpro::TTruncAcc &  acc ) const
+    {
+        return detail::column_basis< operator_t >( op, acc, power_steps, oversampling );
     }
 };
 

@@ -33,17 +33,17 @@ namespace detail
 // replace column basis of block M_ij by X and update basis
 // of block row to [ V, X ]
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 extend_col_basis ( hpro::TBlockMatrix &                   M,
                    matrix::uniform_lrmatrix< value_t > &  M_ij,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        X,
-                   const hpro::TTruncAcc &                acc )
+                   const hpro::TTruncAcc &                acc,
+                   const approx_t &                       approx )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
-
     //
     // compute QR of X for norm computation later
     //
@@ -150,16 +150,18 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
     // io::matlab::write( R, "R" );
     
     auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
-    auto  Ss  = blas::vector< real_t >();
+    auto  Vn  = approx.column_basis( VeR, acc );
 
-    blas::svd( VeR, Ss );
+    // auto  Ss  = blas::vector< real_t >();
 
-    // io::matlab::write( VeR, "VeR" );
-    // io::matlab::write( Ss, "Ss" );
+    // blas::svd( VeR, Ss );
+
+    // // io::matlab::write( VeR, "VeR" );
+    // // io::matlab::write( Ss, "Ss" );
     
-    const auto  rank   = acc.trunc_rank( Ss );
-    const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
-    auto        Vn     = blas::copy( V_rank );
+    // const auto  rank   = acc.trunc_rank( Ss );
+    // const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
+    // auto        Vn     = blas::copy( V_rank );
     
     // io::matlab::write( Vn, "Vn" );
 

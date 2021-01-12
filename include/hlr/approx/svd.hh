@@ -460,6 +460,11 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
+    using  real_t  = typename hpro::real_type< value_t >::type_t;
+
+    //
+    // matrix approximation routines
+    //
     
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
@@ -495,6 +500,26 @@ struct SVD
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::svd( U, T, V, acc );
+    }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    blas::matrix< value_t >
+    column_basis ( blas::matrix< value_t > &  M,
+                   const hpro::TTruncAcc &    acc ) const
+    {
+        auto  S = blas::vector< real_t >();
+
+        HLR_APPROX_RANK_STAT( "full " << std::min( nrows, ncols ) );
+        
+        blas::svd( M, S );
+
+        const auto  k  = acc.trunc_rank( S );
+        const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+
+        return  blas::copy( Uk );
     }
 };
 

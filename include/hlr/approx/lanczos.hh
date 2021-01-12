@@ -96,7 +96,7 @@ lanczos ( const operator_t &       M,
 
         // and orthogonalize u wrt. to U (except last u)
         for ( uint  i = 0; i < step; ++i )
-            blas::add( - blas::dot( u, U[i] ), U[i], u );
+            blas::add( - blas::dot( U[i], u ), U[i], u );
 
         //
         // v = M'·u - beta_step · V(:,step);
@@ -112,7 +112,7 @@ lanczos ( const operator_t &       M,
         
         // and orthogonalize v wrt. to V
         for ( uint  i = 0; i < step; ++i )
-            blas::add( - blas::dot( v, V[i] ), V[i], v );
+            blas::add( - blas::dot( V[i], v ), V[i], v );
 
         U.push_back( std::move( u ) );
         V.push_back( std::move( v ) );

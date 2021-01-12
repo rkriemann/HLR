@@ -58,7 +58,7 @@ template < typename value_t >
 void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
-     hpro::TMatrix &          REF )
+     hpro::TMatrix &          /* REF */ )
 {
     //
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
@@ -195,10 +195,12 @@ multiply ( const value_t            alpha,
 //
 // LU factorization A = L·U, with unit lower triangular L and upper triangular U
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
@@ -210,8 +212,6 @@ lu ( hpro::TMatrix &          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        std::cout << i << std::endl;
-        
         auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  D_ii = blas::mat< value_t >( A_ii );
             
@@ -244,7 +244,7 @@ lu ( hpro::TMatrix &          A,
                 auto  V_i  = R_ji->col_cb().basis();
                 auto  MV_i = blas::prod( blas::adjoint( blas::mat< value_t >( A_ii ) ), V_i );
 
-                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc );
+                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc, approx );
             }// if
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );
@@ -297,8 +297,6 @@ lu_lazy ( hpro::TMatrix &          A,
     
     for ( uint  i = 0; i < nbr; ++i )
     {
-        std::cout << i << std::endl;
-        
         //
         // invert diagonal block
         //
@@ -452,10 +450,12 @@ lu_lazy ( hpro::TMatrix &          A,
 //
 // LDU factorization A = L·D·U, with unit lower/upper triangular L/U and diagonal D
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 ldu ( hpro::TMatrix &          A,
-      const hpro::TTruncAcc &  acc )
+      const hpro::TTruncAcc &  acc,
+      const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "ldu( %d )", A.id() ) );
     
@@ -506,7 +506,7 @@ ldu ( hpro::TMatrix &          A,
                 auto  V_i  = R_ji->col_cb().basis();
                 auto  MV_i = blas::prod( blas::adjoint( D_ii ), V_i );
 
-                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc );
+                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc, approx );
             }// if
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );
