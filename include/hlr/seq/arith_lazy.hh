@@ -24,6 +24,9 @@ namespace hlr { namespace seq { namespace lazy {
 
 namespace hpro = HLIB;
 
+// define to enable some statistics output
+#define HLR_ARITH_LAZY_STAT( msg ) // std::cout << msg << std::endl
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // matrix multiplication
@@ -449,6 +452,8 @@ struct lazy_accumulator
                  const hpro::TTruncAcc &  acc,
                  const approx_t &         approx )
     {
+        HLR_ARITH_LAZY_STAT( "#updates " << std::min( M.nrows(), M.ncols() ) << " " << updates.size() );
+        
         if ( is_lowrank( M ) )
         {
             auto  R = ptrcast( &M, hpro::TRkMatrix );
@@ -473,34 +478,7 @@ struct lazy_accumulator
             // otherwise handle updates in low-rank format
             //
             
-            if ( false )
-            {
-                //
-                // add each update individually
-                //
-                
-                for ( auto  [ A, B ] : updates )
-                {
-                    if ( matrix::is_lowrankS( A ) )
-                    {
-                        HLR_ASSERT( is_null( B ) );
-                    
-                        auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
-                        auto  US = blas::prod( alpha, RA->U(), RA->S() );
-
-                        auto  [ U, V ] = approx( { blas::mat_U< value_t >( R ), US },
-                                                 { blas::mat_V< value_t >( R ), RA->V() },
-                                                 acc );
-            
-                        R->set_lrmat( std::move( U ), std::move( V ) );
-                    }// if
-                    else
-                    {
-                        hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, M, acc, approx );
-                    }// else
-                }// for
-            }// if
-            else
+            if ( approx_t::supports_general_operator )
             {
                 //
                 // set up operator for sum of matrix products plus C
@@ -549,6 +527,33 @@ struct lazy_accumulator
                 
                 for ( auto  op : deleted )
                     delete op;
+            }// if
+            else
+            {
+                //
+                // add each update individually
+                //
+                
+                for ( auto  [ A, B ] : updates )
+                {
+                    if ( matrix::is_lowrankS( A ) )
+                    {
+                        HLR_ASSERT( is_null( B ) );
+                    
+                        auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                        auto  US = blas::prod( alpha, RA->U(), RA->S() );
+
+                        auto  [ U, V ] = approx( { blas::mat_U< value_t >( R ), US },
+                                                 { blas::mat_V< value_t >( R ), RA->V() },
+                                                 acc );
+            
+                        R->set_lrmat( std::move( U ), std::move( V ) );
+                    }// if
+                    else
+                    {
+                        hlr::multiply( alpha, apply_normal, *A, apply_normal, *B, M, acc, approx );
+                    }// else
+                }// for
             }// else
         }// if
         else if ( is_dense( M ) )

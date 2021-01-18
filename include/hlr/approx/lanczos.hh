@@ -405,6 +405,10 @@ struct Lanczos
 {
     using  value_t = T_value;
 
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+
+    // use SVD after Lanczos iteration for bidiagonal matrix
     const bool  with_svd = false;
     
     //

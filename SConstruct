@@ -73,12 +73,13 @@ FRAMEWORKS   = [ 'seq',
                  'gpi2' ]
 
 # supported lapack libraries
-LAPACKLIBS   = [ 'default',   # default system implementation, e.g., -llapack -lblas
-                 'none',      # do not use any LAPACK library
-                 'mkl',       # use parallel Intel MKL (should be OpenMP version)
-                 'mklomp',    # use OpenMP based Intel MKL
-                 'mkltbb',    # use TBB based Intel MKL
-                 'mklseq' ]   # use sequential Intel MKL
+LAPACKLIBS   = [ 'default',     # default system implementation, e.g., -llapack -lblas
+                 'none',        # do not use any LAPACK library
+                 'mkl',         # use parallel Intel MKL (should be OpenMP version)
+                 'mklomp',      # use OpenMP based Intel MKL
+                 'mkltbb',      # use TBB based Intel MKL
+                 'mklseq',      # use sequential Intel MKL
+                 'accelerate' ] # Accelerate framework on MacOS
                  
 # malloc libraries (also depends on directories above)
 MALLOCS      = [ 'default',
@@ -351,6 +352,8 @@ elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
+elif lapack == 'accelerate' :
+    env.MergeFlags( '-Wl,-framework,Accelerate' )
 
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :

@@ -365,7 +365,7 @@ multiply ( const value_t            alpha,
         HLR_ERROR( "unsupported matrix type : " + C.typestr() );
 
     // std::cout << A.id() << " × " << B.id() << " = " << C.id() << std::endl;
-    
+
     // auto  Cc = C.copy();
 
     // hpro::multiply( alpha, op_A, &A, op_B, &B, value_t(1), Cc.get(), hpro::acc_exact );

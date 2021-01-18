@@ -514,6 +514,9 @@ struct ACA
 {
     using  value_t = T_value;
     
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+    
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,

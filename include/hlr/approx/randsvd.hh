@@ -691,6 +691,9 @@ struct RandSVD
 {
     using  value_t = T_value;
 
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+    
     // number of steps in power iteration during construction of column basis
     const uint   power_steps  = 0;
 

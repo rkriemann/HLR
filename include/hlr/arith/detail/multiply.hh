@@ -416,6 +416,48 @@ multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TBlockMatrix &  A,
            const hpro::matop_t         op_B,
+           const hpro::TRkMatrix &     B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·V' = W·V'
+    auto  UB = blas::mat_U< value_t >( B, op_B );
+    auto  W  = blas::matrix< value_t >( C.nrows(), B.rank() );
+
+    multiply< value_t >( alpha, op_A, A, UB, W );
+
+    // W·V' + C
+    blas::prod( value_t(1), W, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TRkMatrix &     A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    // U·(V' × B) = U·X' with X = B'·V
+    auto  VA = blas::mat_V< value_t >( A, op_A );
+    auto  X  = blas::matrix< value_t >( C.ncols(), A.rank() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, X );
+
+    // U·X' + C
+    blas::prod( value_t(1), blas::mat_U< value_t >( A, op_A ), blas::adjoint( X ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TBlockMatrix &  A,
+           const hpro::matop_t         op_B,
            const hpro::TDenseMatrix &  B,
            hpro::TDenseMatrix &        C )
 {
