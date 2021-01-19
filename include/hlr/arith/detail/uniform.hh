@@ -457,8 +457,8 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     
     blas::qr( Q, R, false );
 
-    io::matlab::write( Q, "Q" );
-    io::matlab::write( R, "R" );
+    // io::matlab::write( Q, "Q" );
+    // io::matlab::write( R, "R" );
     
     auto  Ve = blas::join_row< value_t >( { V, X } );
     auto  Vs = blas::prod( Ve, blas::adjoint( R ) );

@@ -12,6 +12,7 @@
 
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
+#include <hpro/io/TCoordVis.hh>
 
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
@@ -225,7 +226,8 @@ program_main ()
     if ( verbose( 3 ) )
     {
         hpro::TPSBlockClusterVis   bc_vis;
-        
+
+        print_vtk( coord.get(), "coord" );
         bc_vis.id( false ).print( bct->root(), "bct" );
     }// if
 

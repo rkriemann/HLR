@@ -48,10 +48,10 @@ gen_problem< hlr::apps::matern_cov > ()
 {
     print_problem_desc( "Matern Covariance" );
 
-    if ( gridfile != "" )
-        return std::make_unique< hlr::apps::matern_cov >( gridfile );
+    if (( gridfile == "randsphere" ) || ( gridfile == "randcube" ))
+        return std::make_unique< hlr::apps::matern_cov >( gridfile, n );
     else
-        return std::make_unique< hlr::apps::matern_cov >( n );
+        return std::make_unique< hlr::apps::matern_cov >( gridfile );
 }
 
 template <>

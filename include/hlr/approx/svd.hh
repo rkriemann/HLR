@@ -524,7 +524,7 @@ struct SVD
     {
         auto  S = blas::vector< real_t >();
 
-        HLR_APPROX_RANK_STAT( "full " << std::min( nrows, ncols ) );
+        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
         
         blas::svd( M, S );
 
