@@ -180,9 +180,9 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec ( const real             alpha,
+    virtual void mul_vec ( const hpro::real       alpha,
                            const hpro::TVector *  x,
-                           const real             beta,
+                           const hpro::real       beta,
                            hpro::TVector       *  y,
                            const hpro::matop_t    op = hpro::apply_normal ) const;
     
@@ -191,23 +191,23 @@ public:
 
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
-    virtual void  apply_add   ( const real                       alpha,
-                                const hlr::blas::vector< real > &     x,
-                                hlr::blas::vector< real > &           y,
-                                const matop_t                    op = apply_normal ) const;
-    virtual void  apply_add   ( const complex                    alpha,
-                                const hlr::blas::vector< complex > &  x,
-                                hlr::blas::vector< complex > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add   ( const hpro::real                           alpha,
+                                const hlr::blas::vector< hpro::real > &    x,
+                                hlr::blas::vector< hpro::real > &          y,
+                                const matop_t                              op = apply_normal ) const;
+    virtual void  apply_add   ( const hpro::complex                        alpha,
+                                const hlr::blas::vector< hpro::complex > & x,
+                                hlr::blas::vector< hpro::complex > &       y,
+                                const matop_t                              op = apply_normal ) const;
 
-    virtual void  apply_add   ( const real                       alpha,
-                                const hlr::blas::matrix< real > &     x,
-                                hlr::blas::matrix< real > &           y,
-                                const matop_t                    op = apply_normal ) const;
-    virtual void  apply_add   ( const complex                    alpha,
-                                const hlr::blas::matrix< complex > &  x,
-                                hlr::blas::matrix< complex > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add   ( const hpro::real                           alpha,
+                                const hlr::blas::matrix< hpro::real > &    x,
+                                hlr::blas::matrix< hpro::real > &          y,
+                                const matop_t                              op = apply_normal ) const;
+    virtual void  apply_add   ( const hpro::complex                        alpha,
+                                const hlr::blas::matrix< hpro::complex > & x,
+                                hlr::blas::matrix< hpro::complex > &       y,
+                                const matop_t                              op = apply_normal ) const;
 
     using TMatrix::apply_add;
     
@@ -255,9 +255,9 @@ public:
 //
 template < typename value_t >
 void
-lrsmatrix< value_t >::mul_vec ( const real             alpha,
+lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
                                 const hpro::TVector *  vx,
-                                const real             beta,
+                                const hpro::real       beta,
                                 hpro::TVector *        vy,
                                 const hpro::matop_t    op ) const
 {
@@ -276,7 +276,7 @@ lrsmatrix< value_t >::mul_vec ( const real             alpha,
     const auto  y = ptrcast(  vy, hpro::TScalarVector );
 
     // y := β·y
-    if ( beta != real(1) )
+    if ( beta != hpro::real(1) )
         hlr::blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
                      
     if ( op == hpro::apply_normal )
@@ -357,7 +357,7 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
 
 template <>
 void
-lrsmatrix< hpro::real >::apply_add   ( const complex                               /* alpha */,
+lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                         /* alpha */,
                                        const hlr::blas::vector< hpro::complex > &  /* x */,
                                        hlr::blas::vector< hpro::complex > &        /* y */,
                                        const matop_t                               /* op */ ) const
@@ -377,7 +377,7 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                      
 
 template <>
 void
-lrsmatrix< hpro::complex >::apply_add   ( const complex                               alpha,
+lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                         alpha,
                                           const hlr::blas::vector< hpro::complex > &  x,
                                           hlr::blas::vector< hpro::complex > &        y,
                                           const matop_t                               op ) const
@@ -473,7 +473,7 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                      
 
 template <>
 void
-lrsmatrix< hpro::complex >::apply_add ( const complex                               alpha,
+lrsmatrix< hpro::complex >::apply_add ( const hpro::complex                         alpha,
                                         const hlr::blas::matrix< hpro::complex > &  X,
                                         hlr::blas::matrix< hpro::complex > &        Y,
                                         const matop_t                               op ) const

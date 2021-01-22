@@ -1,12 +1,15 @@
-#ifndef __HLR_SEQ_ARITH_LAZY_HH
-#define __HLR_SEQ_ARITH_LAZY_HH
+#ifndef __HLR_TBB_ARITH_LAZY_HH
+#define __HLR_TBB_ARITH_LAZY_HH
 //
 // Project     : HLib
-// Module      : seq/arith_lazy.hh
-// Description : sequential arithmetic functions using lazy evaluation
+// Module      : tbb/arith_lazy.hh
+// Description : arithmetic functions for lazy evaluation using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
+
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range2d.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -16,16 +19,14 @@
 
 #include "hlr/arith/multiply.hh"
 #include "hlr/matrix/lrsmatrix.hh"
+#include "hlr/matrix/convert.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/io.hh"
 
-namespace hlr { namespace seq { namespace lazy {
+namespace hlr { namespace tbb { namespace lazy {
 
 namespace hpro = HLIB;
-
-// define to enable some statistics output
-#define HLR_ARITH_LAZY_STAT( msg ) // std::cout << msg << std::endl
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -163,16 +164,12 @@ struct lazy_accumulator
     using  update_t      = std::pair< const hpro::TMatrix *, const hpro::TMatrix * >;
     using  update_list_t = std::list< update_t >;
     using  create_list_t = std::list< std::unique_ptr< hpro::TMatrix > >;
-    using  accumulator_t = std::unique_ptr< hpro::TMatrix >;
 
     // list of collected updates
     update_list_t  updates;
 
     // list of created wrapper matrices
     create_list_t  created;
-
-    // optional matrix for computed updates
-    accumulator_t  accumulator;
 
     // signals dense handling of updates
     bool           handle_dense = false;
@@ -181,13 +178,10 @@ struct lazy_accumulator
     // add A×B to updates
     // - α is applied _only_ if possible
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename value_t >
     void
     add_update ( const hpro::TMatrix *    A,
-                 const hpro::TMatrix *    B,
-                 const hpro::TTruncAcc &  acc,
-                 const approx_t           approx )
+                 const hpro::TMatrix *    B )
     {
         HLR_ASSERT( ! is_null( A ) );
         
@@ -204,7 +198,7 @@ struct lazy_accumulator
             auto  T  = blas::prod( blas::adjoint( blas::mat_V< value_t >( RA ) ), blas::mat_U< value_t >( RB ) );
             auto  V  = blas::mat_V< value_t >( RB );
             
-            auto  AxB = std::make_unique< matrix::lrsmatrix< value_t > >( A->row_is(), B->col_is(), std::move( U ), std::move( T ), std::move( V ) );
+            auto  AxB = std::make_unique< hlr::matrix::lrsmatrix< value_t > >( A->row_is(), B->col_is(), std::move( U ), std::move( T ), std::move( V ) );
             
             updates.push_back( { AxB.get(), nullptr } );
             created.push_back( std::move( AxB ) );
@@ -216,57 +210,27 @@ struct lazy_accumulator
             
             updates.push_back( { A, B } );
         }// else
-
-        if ( false && ( updates.size() > 100 ))
-        {
-            if ( is_null( accumulator ) )
-            {
-                const indexset  rowis = A->row_is();
-                const indexset  colis = ( is_null( B ) ? A->col_is() : B->col_is() );
-                
-                if ( handle_dense )
-                    accumulator = std::make_unique< hpro::TDenseMatrix >( rowis, colis, hpro::value_type_v< value_t > );
-                else
-                    accumulator = std::make_unique< hpro::TRkMatrix >( rowis, colis, hpro::value_type_v< value_t > );
-            }// if
-
-            apply_leaf( value_t(1), *accumulator, acc, approx );
-        }// if
     }
 
-    template < typename value_t,
-               typename approx_t >
+    template < typename value_t >
     void
-    add_update ( const hpro::TMatrix *    A,
-                 const hpro::TTruncAcc &  acc,
-                 const approx_t           approx )
+    add_update ( const hpro::TMatrix *  A )
     {
-        add_update< value_t >( A, nullptr, acc, approx );
+        add_update< value_t >( A, nullptr );
     }
     
     //
     // split given set of updates to set of updates for sub blocks
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename value_t >
     tensor2< lazy_accumulator >
-    split ( const hpro::TBlockMatrix &  M,
-            const hpro::TTruncAcc &     acc,
-            const approx_t              approx )
+    split ( const hpro::TBlockMatrix &  M )
     {
+        using  hlr::matrix::lrsmatrix;
+        using  hlr::matrix::is_lowrankS;
+        
         auto  sub_accu = tensor2< lazy_accumulator >( M.nblock_rows(), M.nblock_cols() );
 
-        if ( ! is_null( accumulator ) )
-        {
-            for ( uint  i = 0; i < M.nblock_rows(); ++i )
-            {
-                for ( uint  j = 0; j < M.nblock_cols(); ++j )
-                {
-                    sub_accu(i,j).accumulator = std::move( hlr::matrix::restrict( *accumulator, M.block( i, j )->block_is() ) );
-                }// for
-            }// for
-        }// if
-        
         for ( uint  i = 0; i < M.nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < M.nblock_cols(); ++j )
@@ -293,7 +257,7 @@ struct lazy_accumulator
                             {
                                 HLR_ASSERT( ! is_null_all( BA->block( i, k ), BB->block( k, j ) ) );
 
-                                sub_accu(i,j).add_update< value_t >( BA->block( i, k ), BB->block( k, j ), acc, approx );
+                                sub_accu(i,j).add_update< value_t >( BA->block( i, k ), BB->block( k, j ) );
                             }// for
                         }// if
                         else if ( is_lowrank( B ) )
@@ -312,7 +276,7 @@ struct lazy_accumulator
                                 auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
                                 auto  B_kj = std::make_unique< hpro::TRkMatrix >( col_k, col_j, U_k, V_j );
                                 
-                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get(), acc, approx );
+                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get() );
 
                                 created.push_back( std::move( B_kj ) );
                             }// for
@@ -332,7 +296,7 @@ struct lazy_accumulator
                                 auto  D_kj = blas::matrix< value_t >( blas::mat< value_t >( DB ), col_k - B->row_ofs(), col_j - B->col_ofs() );
                                 auto  B_kj = std::make_unique< hpro::TDenseMatrix >( col_k, col_j, D_kj );
                                 
-                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get(), acc, approx );
+                                sub_accu(i,j).add_update< value_t >( A_ik, B_kj.get() );
 
                                 created.push_back( std::move( B_kj ) );
                             }// for
@@ -360,7 +324,7 @@ struct lazy_accumulator
                                 auto  V_k  = blas::matrix< value_t >( blas::mat_V< value_t >( RA ), col_k - A->col_ofs(), blas::range::all );
                                 auto  A_ik = std::make_unique< hpro::TRkMatrix >( row_i, col_k, U_i, V_k );
                                 
-                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj, acc, approx );
+                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj );
 
                                 created.push_back( std::move( A_ik ) );
                             }// for
@@ -377,7 +341,7 @@ struct lazy_accumulator
                             auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
                             auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
                                 
-                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get(), acc, approx );
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
@@ -394,7 +358,7 @@ struct lazy_accumulator
                             auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
                             auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
                                 
-                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get(), acc, approx );
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
@@ -402,9 +366,9 @@ struct lazy_accumulator
                         else
                             HLR_ERROR( "unsupported matrix type: " + B->typestr() );
                     }// if
-                    else if ( matrix::is_lowrankS( A ) )
+                    else if ( is_lowrankS( A ) )
                     {
-                        auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                        auto  RA = cptrcast( A, lrsmatrix< value_t > );
 
                         // A already holds full product
                         HLR_ASSERT( is_null( B ) );
@@ -412,9 +376,9 @@ struct lazy_accumulator
                         // A already holds product of original A and B so just restrict to M_ij
                         auto  U_i  = blas::matrix< value_t >( RA->U(), row_i - A->row_ofs(), blas::range::all );
                         auto  V_j  = blas::matrix< value_t >( RA->V(), col_j - A->col_ofs(), blas::range::all );
-                        auto  A_ij = std::make_unique< matrix::lrsmatrix< value_t > >( row_i, col_j, U_i, RA->S(), V_j );
+                        auto  A_ij = std::make_unique< lrsmatrix< value_t > >( row_i, col_j, U_i, RA->S(), V_j );
 
-                        sub_accu(i,j).add_update< value_t >( A_ij.get(), acc, approx );
+                        sub_accu(i,j).add_update< value_t >( A_ij.get() );
                         created.push_back( std::move( A_ij ) );
                     }// if
                     else if ( is_dense( A ) )
@@ -436,7 +400,7 @@ struct lazy_accumulator
                                 auto  D_ik = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), col_k - A->col_ofs() );
                                 auto  A_ik = std::make_unique< hpro::TDenseMatrix >( row_i, col_k, D_ik );
                                 
-                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj, acc, approx );
+                                sub_accu(i,j).add_update< value_t >( A_ik.get(), B_kj );
 
                                 created.push_back( std::move( A_ik ) );
                             }// for
@@ -453,7 +417,7 @@ struct lazy_accumulator
                             auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
                             auto  B_j = std::make_unique< hpro::TRkMatrix >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
                                 
-                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get(), acc, approx );
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
@@ -470,7 +434,7 @@ struct lazy_accumulator
                             auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
                             auto  B_j = std::make_unique< hpro::TDenseMatrix >( B->row_is(), col_j, D_j );
                                 
-                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get(), acc, approx );
+                            sub_accu(i,j).add_update< value_t >( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
@@ -498,7 +462,8 @@ struct lazy_accumulator
                  const hpro::TTruncAcc &  acc,
                  const approx_t &         approx )
     {
-        const bool  apply_to_accu = ( & M == accumulator.get() );
+        using  hlr::matrix::lrsmatrix;
+        using  hlr::matrix::is_lowrankS;
         
         if ( is_lowrank( M ) )
         {
@@ -510,22 +475,13 @@ struct lazy_accumulator
             
             if ( handle_dense )
             {
-                auto  D = matrix::convert_to_dense< value_t >( *R );
+                auto  D = hlr::matrix::convert_to_dense< value_t >( *R );
 
-                if ( apply_to_accu )
-                {
-                    accumulator = std::move( D );
+                apply_leaf( alpha, *D, acc, approx );
 
-                    apply_leaf( alpha, *accumulator, acc, approx );
-                }// if
-                else
-                {    
-                    apply_leaf( alpha, *D, acc, approx );
-
-                    auto  [ U, V ] = approx( blas::mat< value_t >( D ), acc );
+                auto  [ U, V ] = approx( blas::mat< value_t >( D ), acc );
                     
-                    R->set_lrmat( std::move( U ), std::move( V ) );
-                }// 
+                R->set_lrmat( std::move( U ), std::move( V ) );
             }// if
             else
             {
@@ -533,8 +489,6 @@ struct lazy_accumulator
                 // otherwise handle updates in low-rank format
                 //
             
-                HLR_ARITH_LAZY_STAT( "#updates lowrank " << std::min( M.nrows(), M.ncols() ) << " " << updates.size() );
-        
                 if ( approx_t::supports_general_operator )
                 {
                     //
@@ -544,17 +498,9 @@ struct lazy_accumulator
                     auto  op_list = std::list< const hpro::TLinearOperator * >();
                     auto  deleted = std::list< const hpro::TLinearOperator * >();
 
-                    if ( ! apply_to_accu && ! is_null( accumulator ) )
-                    {
-                        auto  op_AxB = hpro::matrix_product( alpha, accumulator.get() );
-                        
-                        deleted.push_back( op_AxB.get() );
-                        op_list.push_back( op_AxB.release() );
-                    }// if
-                
                     for ( auto  [ A, B ] : updates )
                     {
-                        if ( matrix::is_lowrankS( A ) )
+                        if ( is_lowrankS( A ) )
                         {
                             HLR_ASSERT( is_null( B ) );
                         
@@ -594,25 +540,16 @@ struct lazy_accumulator
                 else
                 {
                     //
-                    // add already computed updates
-                    //
-                
-                    if ( ! apply_to_accu && ! is_null( accumulator ) )
-                    {
-                        hlr::add( alpha, *accumulator, M, acc, approx );
-                    }// if
-                
-                    //
                     // add each update individually
                     //
                 
                     for ( auto  [ A, B ] : updates )
                     {
-                        if ( matrix::is_lowrankS( A ) )
+                        if ( is_lowrankS( A ) )
                         {
                             HLR_ASSERT( is_null( B ) );
                     
-                            auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                            auto  RA = cptrcast( A, lrsmatrix< value_t > );
                             auto  US = blas::prod( alpha, RA->U(), RA->S() );
 
                             auto  [ U, V ] = approx( { blas::mat_U< value_t >( R ), US },
@@ -631,23 +568,15 @@ struct lazy_accumulator
         }// if
         else if ( is_dense( M ) )
         {
-            HLR_ARITH_LAZY_STAT( "#updates dense " << std::min( M.nrows(), M.ncols() ) << " " << updates.size() );
-        
             auto  D = ptrcast( &M, hpro::TDenseMatrix );
 
-            // add already computed updates
-            if ( ! apply_to_accu && ! is_null( accumulator ) )
-            {
-                hlr::add( alpha, *accumulator, M );
-            }// if
-            
             for ( auto  [ A, B ] : updates )
             {
-                if ( matrix::is_lowrankS( A ) )
+                if ( is_lowrankS( A ) )
                 {
                     HLR_ASSERT( is_null( B ) );
                     
-                    auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
+                    auto  RA = cptrcast( A, lrsmatrix< value_t > );
                     auto  US = blas::prod( RA->U(), RA->S() );
 
                     blas::prod( alpha, US, blas::adjoint( RA->V() ), value_t(1), blas::mat< value_t >( D ) );
@@ -662,13 +591,10 @@ struct lazy_accumulator
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 
         //
-        // clean up update list and accumulator
+        // clean up update list
         //
         
         updates.clear();
-
-        if ( ! apply_to_accu )
-            accumulator.reset( nullptr );
     }
 
 };
@@ -687,27 +613,31 @@ multiply ( const value_t            alpha,
 {
     if ( is_blocked( C ) )
     {
-        auto  BC = ptrcast(  &C, hpro::TBlockMatrix );
+        auto  BC = ptrcast( &C, hpro::TBlockMatrix );
 
         //
         // restrict set of updates for all subblocks
         //
 
-        auto  sub_accu = accu.split< value_t >( *BC, acc, approx );
+        auto  sub_accu = accu.split< value_t >( *BC );
         
         //
         // recurse
         //
         
-        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, BC->nblock_rows(),
+                                            0, BC->nblock_cols() ),
+            [&,BC,alpha] ( const auto & r )
             {
-                HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                    for ( uint  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
                 
-                multiply< value_t >( alpha, *BC->block(i,j), sub_accu(i,j), acc, approx );
-            }// for
-        }// for
+                        multiply< value_t >( alpha, *BC->block(i,j), sub_accu(i,j), acc, approx );
+                    }// for
+            } );
     }// if
     else
     {
@@ -731,7 +661,7 @@ multiply ( const value_t            alpha,
 {
     detail::lazy_accumulator  accu;
 
-    accu.add_update< value_t >( &A, &B, acc, approx );
+    accu.add_update< value_t >( &A, &B );
     
     detail::multiply< value_t >( alpha, C, accu, acc, approx );
 }
@@ -765,7 +695,7 @@ solve_lower_tri ( const eval_side_t        side,
         // restrict set of updates for all subblocks
         //
 
-        auto  sub_accu = accu.split< value_t >( *BM, acc, approx );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recurse
@@ -777,12 +707,16 @@ solve_lower_tri ( const eval_side_t        side,
             {
                 const auto  L_ii = BL->block( i, i );
             
-                for ( uint j = 0; j < BM->nblock_cols(); ++j )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j), sub_accu(i,j), acc, approx );
+                ::tbb::parallel_for< uint >(
+                    0, BM->nblock_cols(),
+                    [=,&sub_accu,&acc,&approx] ( const uint j )
+                    {
+                        solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j), sub_accu(i,j), acc, approx );
+                    } );
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                        sub_accu(k,j).template add_update< value_t >( BL->block(k,i), BM->block(i,j), acc, approx );
+                        sub_accu(k,j).template add_update< value_t >( BL->block(k,i), BM->block(i,j) );
             }// for
         }// if
         else
@@ -817,7 +751,7 @@ solve_upper_tri ( const eval_side_t        side,
         // restrict set of updates for all subblocks
         //
 
-        auto  sub_accu = accu.split< value_t >( *BM, acc, approx );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recurse
@@ -833,12 +767,16 @@ solve_upper_tri ( const eval_side_t        side,
             {
                 const auto  U_jj = BU->block( j, j );
             
-                for ( uint i = 0; i < BM->nblock_rows(); ++i )
-                    solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                ::tbb::parallel_for< uint >(
+                    0, BM->nblock_rows(),
+                    [=,&sub_accu,&acc,&approx] ( const uint i )
+                    {
+                        solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                    } );
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                     for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        sub_accu(i,k).template add_update< value_t >( BM->block(i,j), BU->block(j,k), acc, approx );
+                        sub_accu(i,k).template add_update< value_t >( BM->block(i,j), BU->block(j,k) );
             }// for
         }// else
     }// if
@@ -869,7 +807,7 @@ lu ( hpro::TMatrix &          M,
         // restrict set of updates for all subblocks
         //
 
-        auto  sub_accu = accu.split< value_t >( *BM, acc, approx );
+        auto  sub_accu = accu.split< value_t >( *BM );
 
         //
         // recursive factorization
@@ -881,16 +819,31 @@ lu ( hpro::TMatrix &          M,
 
             lu< value_t >( *B_ii, sub_accu(i,i), acc, approx );
 
-            for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
-                solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_accu(j,i), acc, approx );
+            ::tbb::parallel_invoke(
+                [=,&sub_accu,&acc,&approx]
+                {
+                    ::tbb::parallel_for< uint >(
+                        i+1, BM->nblock_rows(),
+                        [=,&sub_accu,&acc,&approx] ( const uint j )
+                        {
+                            solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_accu(j,i), acc, approx );
+                        } );
+                },
 
-            for ( uint  j = i+1; j < BM->nblock_cols(); ++j )
-                solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                [=,&sub_accu,&acc,&approx]
+                {
+                    ::tbb::parallel_for< uint >(
+                        i+1, BM->nblock_cols(),
+                        [=,&sub_accu,&acc,&approx] ( const uint j )
+                        {
+                            solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                        } );
+                } );
 
             // add updates to sub lists
             for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
                 for ( uint  l = i+1; l < BM->nblock_cols(); ++l )
-                    sub_accu(j,l).template add_update< value_t >( BM->block( j, i ), BM->block( i, l ), acc, approx );
+                    sub_accu(j,l).template add_update< value_t >( BM->block( j, i ), BM->block( i, l ) );
         }// for
     }// if
     else
@@ -922,6 +875,6 @@ lu ( hpro::TMatrix &          M,
     detail::lu< value_t >( M, accu, acc, approx );
 }
 
-}}}// namespace hlr::seq::lazy
+}}}// namespace hlr::tbb::lazy
 
-#endif // __HLR_SEQ_ARITH_LAZY_HH
+#endif // __HLR_TBB_ARITH_LAZY_HH

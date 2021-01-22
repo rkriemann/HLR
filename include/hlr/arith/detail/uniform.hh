@@ -1131,6 +1131,63 @@ add ( hpro::TMatrix &                  M,
 }
 
 //
+// add D to M
+//
+template < typename value_t >
+void
+add ( hpro::TMatrix &                  M,
+      const blas::matrix< value_t > &  D,
+      const hpro::TTruncAcc &          acc,
+      const uniform_map_t &            rowmap,
+      const uniform_map_t &            colmap )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+                
+                if ( ! is_null( B_ij ) )
+                {
+                    auto  D_ij = blas::matrix< value_t >( D,
+                                                          B_ij->row_is() - B->row_ofs(),
+                                                          B_ij->col_is() - B->col_ofs() );
+                    
+                    add( *B_ij, D_ij, acc, rowmap, colmap );
+                }// if
+            }// for
+        }// for
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  R        = ptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  C        = blas::copy( D ); // need to copy because modified during SVD
+        auto  [ U, V ] = approx::svd( C, acc );
+        auto  RU       = blas::matrix< value_t >();
+        auto  RV       = blas::matrix< value_t >();
+
+        blas::qr( U, RU );
+        blas::qr( V, RV );
+
+        auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+        auto [ Un, Sn, Vn ] = add( *R, U, S, V, acc );
+        
+        update_row_col_basis( *R, Un, Sn, Vn, acc, rowmap, colmap );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  DM = ptrcast( &M, hpro::TDenseMatrix );
+
+        blas::add( value_t(1), D, blas::mat< value_t >( DM ) );
+    }// if
+}
+
+//
 // forward decl. of general version
 //
 template < typename value_t >
@@ -1438,6 +1495,25 @@ multiply ( const value_t                        alpha,
     auto [ Un, Sn ] = add_row( C, AU, T, acc );
     
     detail::update_row_basis( C, Un, Sn, acc, rowmap );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TBlockMatrix &        C,
+           const hpro::TTruncAcc &     acc,
+           const uniform_map_t &       rowmap,
+           const uniform_map_t &       colmap )
+{
+    auto  AB = blas::prod( alpha,
+                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
+                           blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+
+    add( C, AB, acc, rowmap, colmap );
 }
 
 template < typename value_t >

@@ -452,6 +452,32 @@ multiply ( const value_t               alpha,
     blas::prod( value_t(1), blas::mat_U< value_t >( A, op_A ), blas::adjoint( X ), value_t(1), blas::mat< value_t >( C ) );
 }
 
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TBlockMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TBlockMatrix &                         C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·S·V'
+    auto  UB = B.row_cb( op_B ).basis();
+    auto  UC = blas::matrix< value_t >( C.nrows(), B.ncols() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  S  = blas::copy( blas::mat_view( op_B, B.coeff() ) );
+    auto  RC = matrix::lrsmatrix< value_t >( C.row_is(), C.col_is(), UC, S, B.col_cb( op_B ).basis() );
+    
+    hlr::add< value_t >( value_t(1), RC, C, acc, approx );
+}
+
 template < typename value_t >
 void
 multiply ( const value_t               alpha,

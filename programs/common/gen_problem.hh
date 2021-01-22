@@ -48,8 +48,19 @@ gen_problem< hlr::apps::matern_cov > ()
 {
     print_problem_desc( "Matern Covariance" );
 
-    if (( gridfile == "randsphere" ) || ( gridfile == "randcube" ))
-        return std::make_unique< hlr::apps::matern_cov >( gridfile, n );
+    const auto  dashpos = gridfile.find( '-' );
+
+    if ( dashpos != std::string::npos )
+    {
+        const auto  basename = gridfile.substr( 0, dashpos );
+        const auto  size     = gridfile.substr( dashpos+1, gridfile.length() );
+        const auto  nsize    = std::atoi( size.c_str() );
+
+        if (( basename == "randsphere" ) || ( basename == "randcube" ))
+            return std::make_unique< hlr::apps::matern_cov >( basename, nsize );
+        else
+            return std::make_unique< hlr::apps::matern_cov >( gridfile, n );
+    }// if
     else
         return std::make_unique< hlr::apps::matern_cov >( gridfile );
 }

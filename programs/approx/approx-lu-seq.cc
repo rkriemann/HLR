@@ -1,7 +1,7 @@
 //
 // Project     : HLR
-// Program     : accu-seq.cc
-// Description : testing accumulator arithmetic
+// Program     : approx-lu-seq.cc
+// Description : comparing H-LU for different arith./approx.
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //

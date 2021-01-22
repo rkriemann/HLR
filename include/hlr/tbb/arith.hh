@@ -401,24 +401,25 @@ lu ( hpro::TMatrix &          A,
                                                  } );
                 } );
 
-            ::tbb::parallel_for( ::tbb::blocked_range2d< uint >( i+1, BA->nblock_rows(),
-                                                                 i+1, BA->nblock_cols() ),
-                                 [&,i,BA] ( const auto  r )
-                                 {
-                                     for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
-                                     {
-                                         for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
-                                         {
-                                             if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
-                                             {
-                                                 HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
-                                                 
-                                                 multiply( value_t(-1), apply_normal, *BA->block( j, i ), apply_normal, *BA->block( i, l ),
-                                                           *BA->block( j, l ), acc, approx );
-                                             }// if
-                                         }// for
-                                     }// for
-                                 } );
+            ::tbb::parallel_for(
+                ::tbb::blocked_range2d< uint >( i+1, BA->nblock_rows(),
+                                                i+1, BA->nblock_cols() ),
+                [&,i,BA] ( const auto  r )
+                {
+                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
+                    {
+                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
+                        {
+                            if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                            {
+                                HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                                
+                                multiply( value_t(-1), apply_normal, *BA->block( j, i ), apply_normal, *BA->block( i, l ),
+                                          *BA->block( j, l ), acc, approx );
+                            }// if
+                        }// for
+                    }// for
+                } );
         }// for
     }// if
     else if ( is_dense( A ) )

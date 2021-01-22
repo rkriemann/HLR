@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
@@ -30,9 +31,10 @@ namespace
 // actual print function
 //
 void
-print_eps ( const hpro::TMatrix &  M,
-            eps_printer &          prn,
-            const bool             recurse = true )
+print_eps ( const hpro::TMatrix &               M,
+            eps_printer &                       prn,
+            const bool                          recurse,
+            const std::vector< std::string > &  options )
 {
     if ( is_blocked( M ) && recurse )
     {
@@ -43,7 +45,7 @@ print_eps ( const hpro::TMatrix &  M,
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 if ( ! is_null( B->block( i, j ) ) )
-                    print_eps( * B->block( i, j ), prn, recurse );
+                    print_eps( * B->block( i, j ), prn, recurse, options );
             }// for
         }// for
     }// if
@@ -58,6 +60,7 @@ print_eps ( const hpro::TMatrix &  M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
+            if ( std::find( options.cbegin(), options.cend(), "nosize" ) == options.end() )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -86,7 +89,7 @@ print_eps ( const hpro::TMatrix &  M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( R->rank() > 0 )
+            if ( std::find( options.cbegin(), options.cend(), "norank" ) == options.end() )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -110,7 +113,7 @@ print_eps ( const hpro::TMatrix &  M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( R->rank() > 0 )
+            if ( std::find( options.cbegin(), options.cend(), "norank" ) == options.end() )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -134,17 +137,20 @@ print_eps ( const hpro::TMatrix &  M,
     }// else
 
     // draw ID
-    prn.save();
+    if ( std::find( options.cbegin(), options.cend(), "noid" ) == options.end() )
+    {
+        prn.save();
 
-    const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 8.0 );
-    const auto  text    = hpro::to_string( "%d", M.id() );
+        const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 8.0 );
+        const auto  text    = hpro::to_string( "%d", M.id() );
     
-    prn.set_font( "Helvetica", fn_size );
-    prn.set_rgb( 32, 74, 135 ); // SkyBlue3
-    prn.draw_text( double(M.col_ofs()) + double(M.cols()) / 2.0 - fn_size * text.length() / 4.0,
-                   double(M.row_ofs()) + double(M.rows()) / 2.0 + fn_size / 3.0,
-                   text );
-    prn.restore();
+        prn.set_font( "Helvetica", fn_size );
+        prn.set_rgb( 32, 74, 135 ); // SkyBlue3
+        prn.draw_text( double(M.col_ofs()) + double(M.cols()) / 2.0 - fn_size * text.length() / 4.0,
+                       double(M.row_ofs()) + double(M.rows()) / 2.0 + fn_size / 3.0,
+                       text );
+        prn.restore();
+    }// if
 }
 
 }// namespace anonymous
@@ -154,13 +160,18 @@ print_eps ( const hpro::TMatrix &  M,
 //
 void
 print_eps ( const hpro::TMatrix &  M,
-            const std::string &    filename )
+            const std::string &    filename,
+            const std::string &    options )
 {
     const boost::filesystem::path  filepath( filename );
     std::string                    suffix;
 
     if ( ! filepath.has_extension() )
         suffix = ".eps";
+
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
     
     std::ofstream  out( filename + suffix );
     eps_printer    prn( out );
@@ -182,7 +193,7 @@ print_eps ( const hpro::TMatrix &  M,
 
     prn.set_line_width( 0.1 );
 
-    print_eps( M, prn );
+    print_eps( M, prn, true, optarr );
 
     prn.end();
 }
@@ -192,8 +203,13 @@ print_eps ( const hpro::TMatrix &  M,
 //
 void
 print_lvl_eps ( const hpro::TMatrix &  M,
-                const std::string &    basename )
+                const std::string &    basename,
+                const std::string &    options )
 {
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+
     //
     // common settings for all files
     //
@@ -236,7 +252,7 @@ print_lvl_eps ( const hpro::TMatrix &  M,
 
             for ( auto  M_i : blocks )
             {
-                print_eps( * M_i, prn, false );
+                print_eps( * M_i, prn, false, optarr );
             }// for
 
             // draw thicker frame around parent blocks to show block structure

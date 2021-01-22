@@ -192,7 +192,7 @@ mm_lazy ( const hpro::TMatrix &    A,
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
     }// for
-        
+
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
     if ( nbench > 1 )
@@ -252,8 +252,10 @@ program_main ()
     // std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A" );
+        matrix::print_eps( *A, "A", "noid,norank,nosize" );
 
+    io::matlab::write( *A, "A" );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication

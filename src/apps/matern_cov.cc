@@ -96,7 +96,7 @@ matern_cov::coordinates () const
 std::unique_ptr< TCoeffFn< matern_cov::value_t > >
 matern_cov::coeff_func () const
 {
-    return std::make_unique< TMaternCovCoeffFn< point_t > >( 1.0, 1.29, 0.325, _vertices );
+    return std::make_unique< TMaternCovCoeffFn< point_t > >( 1.0, 1.0, 0.5, _vertices );
 }
     
 }// namespace apps

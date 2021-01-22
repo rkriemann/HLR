@@ -21,7 +21,8 @@ namespace hpro = HLIB;
 //
 void
 print_eps ( const hpro::TMatrix &  M,
-            const std::string &    filename );
+            const std::string &    filename,
+            const std::string &    options = "default" );
 
 //
 // print matrix <M> level wise to the files
@@ -30,7 +31,8 @@ print_eps ( const hpro::TMatrix &  M,
 //
 void
 print_lvl_eps ( const hpro::TMatrix &  M,
-                const std::string &    basename );
+                const std::string &    basename,
+                const std::string &    options = "default" );
 
 }}// namespace hlr::matrix
 

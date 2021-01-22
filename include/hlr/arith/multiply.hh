@@ -99,6 +99,28 @@ multiply ( const value_t            alpha,
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
+        else if ( is_uniform_lowrank( B ) )
+        {
+            if ( is_blocked( C ) )
+                multiply< value_t, approx_t >( alpha,
+                                               op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                               op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                               * ptrcast( &C, hpro::TBlockMatrix ),
+                                               acc, approx );
+            else if ( is_lowrank( C ) )
+                multiply< value_t, approx_t >( alpha,
+                                               op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                               op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                               * ptrcast( &C, hpro::TRkMatrix ),
+                                               acc, approx );
+            else if ( is_dense( C ) )
+                multiply< value_t >( alpha,
+                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
+                                     * ptrcast( &C, hpro::TDenseMatrix ) );
+            else
+                HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+        }// if
         else if ( is_dense(   B ) )
         {
             if ( is_blocked( C ) )
