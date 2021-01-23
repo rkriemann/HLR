@@ -29,11 +29,11 @@ public:
     // ctors
     //
     scalar_vector ()
-            : hpro::TScalarVector( hpro::value_type< value_t >::value )
+            : hpro::TScalarVector( hpro::value_type_v< value_t > )
     {}
 
     scalar_vector ( const indexset &                 ais )
-            : hpro::TScalarVector( ais, hpro::value_type< value_t >::value )
+            : hpro::TScalarVector( ais, hpro::value_type_v< value_t > )
     {}
 
     scalar_vector ( const indexset &                 ais,

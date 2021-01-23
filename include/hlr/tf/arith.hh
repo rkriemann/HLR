@@ -158,8 +158,6 @@ multiply ( ::tf::SubflowBuilder &   tf,
                         {
                             multiply< value_t >( sf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                         } );
-                    
-                    // multiply< value_t >( tf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
                 }// for
             }// for
         }// for

@@ -39,8 +39,6 @@ using hlr::tbb::matrix::accumulator;
 namespace detail
 {
 
-using  upd_list_t = std::list< std::pair< const hpro::TMatrix *, const hpro::TMatrix * > >;
-
 //
 // compute C = C + α op( A ) op( B ) where A and B are provided as accumulated updates
 //

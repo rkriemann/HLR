@@ -65,7 +65,7 @@ public:
     //
 
     uniform_lrmatrix ()
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
             , _row_cb( nullptr )
@@ -75,7 +75,7 @@ public:
     
     uniform_lrmatrix ( const indexset                arow_is,
                        const indexset                acol_is )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _row_cb( nullptr )
@@ -89,7 +89,7 @@ public:
                        const cluster_basis< value_t > &  arow_cb,
                        const cluster_basis< value_t > &  acol_cb,
                        hlr::blas::matrix< value_t > &&   aS )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _row_cb( &arow_cb )

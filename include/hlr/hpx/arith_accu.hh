@@ -223,7 +223,7 @@ multiply ( const value_t                 alpha,
             
             if ( is_blocked_all( *A, *B ) )
             {
-                T = std::make_unique< TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type< value_t >::value );
+                T = std::make_unique< TRkMatrix >( C.row_is(), C.col_is(), hpro::value_type_v< value_t > );
 
                 hpro::multiply( value_t(1), op_A, A, op_B, B, value_t(0), T.get(), acc );
             }// if

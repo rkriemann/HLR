@@ -1270,7 +1270,7 @@ multiply ( const value_t                  alpha,
 
                     if ( is_null( BC->block( i, j ) ) )
                         BC->set_block( i, j, new hpro::TRkMatrix( A_il->row_is( op_A ), B_lj->col_is( op_B ),
-                                                                  hpro::value_type< value_t >::value ) );
+                                                                  hpro::value_type_v< value_t > ) );
                     
                     hlr::multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx::SVD< value_t >() );
                 }// if

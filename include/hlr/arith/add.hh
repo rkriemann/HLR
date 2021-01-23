@@ -169,9 +169,9 @@ add ( const value_t               alpha,
         pos += R_i->rank();
     }// for
 
-    auto [ U_trunc, V_trunc ] = approx( U, V, acc );
+    auto [ W, X ] = approx( U, V, acc );
 
-    C.set_lrmat( std::move( U_trunc ), std::move( V_trunc ) );
+    C.set_lrmat( std::move( W ), std::move( X ) );
 }
 
 template < typename value_t,
@@ -304,7 +304,7 @@ add ( const value_t            alpha,
 
         blas::scale( alpha, UA );
 
-        auto [ U, V ] = approx( {                               UA, blas::mat_U< value_t >( C ) },
+        auto [ U, V ] = approx( {                          UA, blas::mat_U< value_t >( C ) },
                                 { blas::mat_V< value_t >( A ), blas::mat_V< value_t >( C ) },
                                 acc );
         C.set_lrmat( std::move( U ), std::move( V ) );

@@ -149,10 +149,15 @@ multiply ( const value_t                    alpha,
 //
 /////////////////////////////////////////////////////////////////////////////////
 
+#define HLR_MULT_PRINT   // std::cout << C.id() << std::endl;
+
+/*
 #define HLR_MULT_PRINT   HLR_LOG( 4, hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
                                                       A.typestr().c_str(), A.id(), \
                                                       B.typestr().c_str(), B.id(), \
                                                       C.typestr().c_str(), C.id() ) )
+*/
+
 //
 // forward decl.(s)
 //
@@ -249,7 +254,7 @@ multiply ( const value_t               alpha,
 
                     if ( is_null( BC->block( i, j ) ) )
                         BC->set_block( i, j, new hpro::TRkMatrix( A_il->row_is( op_A ), B_lj->col_is( op_B ),
-                                                                  hpro::value_type< value_t >::value ) );
+                                                                  hpro::value_type_v< value_t > ) );
                     
                     multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
                 }// if
@@ -294,7 +299,7 @@ multiply ( const value_t               alpha,
                     auto  B_lj = B.block( l, j, op_B );
 
                     if ( is_null( C_ij ) )
-                        C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type< value_t >::value );
+                        C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type_v< value_t > );
                     
                     multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij );
                 }// if
@@ -355,7 +360,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -407,7 +412,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), VC },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t >
@@ -427,6 +432,8 @@ multiply ( const value_t               alpha,
 
     multiply< value_t >( alpha, op_A, A, UB, W );
 
+    std::scoped_lock  lock( C.mutex() );
+    
     // W·V' + C
     blas::prod( value_t(1), W, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), blas::mat< value_t >( C ) );
 }
@@ -447,6 +454,8 @@ multiply ( const value_t               alpha,
     auto  X  = blas::matrix< value_t >( C.ncols(), A.rank() );
 
     multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, X );
+
+    std::scoped_lock  lock( C.mutex() );
 
     // U·X' + C
     blas::prod( value_t(1), blas::mat_U< value_t >( A, op_A ), blas::adjoint( X ), value_t(1), blas::mat< value_t >( C ) );
@@ -632,7 +641,7 @@ multiply ( const value_t            alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -666,7 +675,7 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -694,7 +703,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), VB },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -721,7 +730,7 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), BVS },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -749,7 +758,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 
@@ -777,7 +786,7 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -805,7 +814,7 @@ multiply ( const value_t               alpha,
 
     auto [ U, V ] = approx( AB, acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t >

@@ -166,7 +166,7 @@ struct accumulator : public hlr::matrix::accumulator_base
                         
                         BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
                                                                   BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                  hpro::value_type< value_t >::value ) );
+                                                                  hpro::value_type_v< value_t > ) );
                     }// for
                 }// for
             }// if

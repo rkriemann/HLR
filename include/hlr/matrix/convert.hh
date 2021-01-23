@@ -107,7 +107,7 @@ convert_to_dense ( const hpro::TMatrix &  M )
         //
 
         auto  B  = cptrcast( &M, hpro::TBlockMatrix );
-        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
+        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
         auto  DD = blas::mat< value_t >( *D );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
@@ -135,7 +135,7 @@ convert_to_dense ( const hpro::TMatrix &  M )
     {
         auto  D   = cptrcast( &M, hpro::TDenseMatrix );
         auto  DD  = blas::mat< value_t >( *D );
-        auto  DC  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
+        auto  DC  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
         auto  DDC = blas::mat< value_t >( *DC );
 
         blas::copy( DD, DDC );
@@ -145,7 +145,7 @@ convert_to_dense ( const hpro::TMatrix &  M )
     else if ( is_lowrank( M ) )
     {
         auto  R  = cptrcast( &M, hpro::TRkMatrix );
-        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
+        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
         auto  DD = blas::mat< value_t >( *D );
 
         blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ),
@@ -156,7 +156,7 @@ convert_to_dense ( const hpro::TMatrix &  M )
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
-        auto  D   = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
+        auto  D   = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
         auto  DD  = blas::mat< value_t >( *D );
         auto  UxS = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
 

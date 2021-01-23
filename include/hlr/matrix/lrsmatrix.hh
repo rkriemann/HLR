@@ -57,7 +57,7 @@ public:
     //
 
     lrsmatrix ()
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
     {
@@ -65,7 +65,7 @@ public:
     
     lrsmatrix ( const indexset                arow_is,
                 const indexset                acol_is )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
     {
@@ -77,7 +77,7 @@ public:
                 const hlr::blas::matrix< value_t > &  aU,
                 const hlr::blas::matrix< value_t > &  aS,
                 const hlr::blas::matrix< value_t > &  aV )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _U( aU )
@@ -92,7 +92,7 @@ public:
                 hlr::blas::matrix< value_t > &&  aU,
                 hlr::blas::matrix< value_t > &&  aS,
                 hlr::blas::matrix< value_t > &&  aV )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _U( std::move( aU ) )

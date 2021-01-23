@@ -23,6 +23,7 @@
 #include <hlr/approx/aca.hh>
 #include <hlr/approx/lanczos.hh>
 #include <hlr/approx/randlr.hh>
+#include <hlr/utils/io.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -242,6 +243,8 @@ program_main ()
             
     auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
 
+    // auto  A      = io::hpro::read( "A" );
+    
     LIKWID_MARKER_STOP( "build" );
     
     auto  toc    = timer::since( tic );
@@ -254,8 +257,6 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
 
-    io::matlab::write( *A, "A" );
-    
     //////////////////////////////////////////////////////////////////////
     //
     // matrix multiplication
