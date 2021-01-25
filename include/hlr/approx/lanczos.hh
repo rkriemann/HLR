@@ -409,7 +409,7 @@ struct Lanczos
     static constexpr bool supports_general_operator = true;
 
     // use SVD after Lanczos iteration for bidiagonal matrix
-    const bool  with_svd = false;
+    const bool            with_svd                  = true;
     
     //
     // operators

@@ -114,7 +114,7 @@ parse ( int argc, char ** argv )
 
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
-        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
+        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
@@ -222,7 +222,8 @@ parse ( int argc, char ** argv )
                   << "  - materncov    : Matérn covariance over given number of spatial points;" << std::endl
                   << "                   if grid is defined use grid points, otherwise n random points in 3D" << std::endl
                   << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
-                  << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl;
+                  << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl
+                  << "  - exp          : 3D integral equation with exponential kernel and piecewise constant elements" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -292,7 +293,7 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) ) )
+    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) || ( appl == "exp" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
     if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )

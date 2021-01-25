@@ -475,7 +475,8 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-sources = [ 'src/apps/helmholtz.cc',
+sources = [ 'src/apps/exp.cc',
+            'src/apps/helmholtz.cc',
             'src/apps/laplace.cc',
             'src/apps/log_kernel.cc',
             'src/apps/matern_cov.cc',

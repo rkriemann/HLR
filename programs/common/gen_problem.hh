@@ -7,6 +7,7 @@
 #include "hlr/apps/matern_cov.hh"
 #include "hlr/apps/laplace.hh"
 #include "hlr/apps/helmholtz.hh"
+#include "hlr/apps/exp.hh"
 
 #include "hlr/utils/term.hh"
 
@@ -85,6 +86,17 @@ gen_problem< hlr::apps::helmholtz_slp > ()
     assert( gridfile != "" );
     
     return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile );
+}
+
+template <>
+std::unique_ptr< hlr::apps::exp >
+gen_problem< hlr::apps::exp > ()
+{
+    print_problem_desc( "Exp" );
+
+    assert( gridfile != "" );
+    
+    return std::make_unique< hlr::apps::exp >( gridfile );
 }
 
 }// namespace hlr

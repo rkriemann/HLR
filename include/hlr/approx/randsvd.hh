@@ -95,7 +95,6 @@ column_basis ( const operator_t &       M,
         auto        TQ_i    = blas::matrix< value_t >( nrows_M, bsize );
         auto        R       = blas::matrix< value_t >( bsize,   bsize );
         auto        MtQ     = blas::matrix< value_t >( ncols_M, bsize );
-        auto        QjtQi   = blas::matrix< value_t >( bsize,   bsize );
 
         for ( uint  i = 0; i < nblocks; ++i )
         {
@@ -168,8 +167,8 @@ column_basis ( const operator_t &       M,
                 
                 for ( const auto &  Q_j : Qs )
                 {
-                    blas::prod( value_t(1), blas::adjoint(Q_j), TQ_i, value_t(0), QjtQi );
-                    blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
+                    blas::prod( value_t(1), blas::adjoint(Q_j), TQ_i, value_t(0), QhQi );
+                    blas::prod( value_t(-1), Q_j, QhQi, value_t(1), Q_i );
                 }// for
                 
                 blas::qr( Q_i, R );
