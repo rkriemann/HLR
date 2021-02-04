@@ -8,9 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <list>
+
 #include <hlr/arith/detail/uniform_bases.hh>
 #include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform.hh>
+#include <hlr/arith/detail/uniform_accu.hh>
 
 namespace hlr { namespace uniform {
 
@@ -49,6 +52,60 @@ mul_vec ( const value_t                             alpha,
 
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y );
+}
+
+//
+// matrix multiplication (eager version)
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    //
+    // construct mapping of A_{t × s} to set of uniform leaves per t/s
+    //
+
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+
+    auto  blocks = std::list< hpro::TMatrix * >{ &C };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< hpro::TMatrix * >();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  BM = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                        if ( ! is_null( BM->block( i, j ) ) )
+                            subblocks.push_back( BM->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    //
+    // perform actual LU factorization
+    //
+
+    detail::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, rowmap, colmap );
 }
 
 //
@@ -100,6 +157,66 @@ lu ( hpro::TMatrix &          A,
 
     detail::lu< value_t >( A, acc, rowmap, colmap );
 }
+
+//////////////////////////////////////////////////////////////////////
+//
+// accumulator version
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace accu
+{
+
+template < typename value_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     hpro::TMatrix &          REF )
+{
+    //
+    // construct mapping of A_{t × s} to set of uniform leaves per t/s
+    //
+
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+
+    auto  blocks = std::list< hpro::TMatrix *>{ &A };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< hpro::TMatrix *>();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  B = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                        if ( ! is_null( B->block( i, j ) ) )
+                            subblocks.push_back( B->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    //
+    // perform actual LU factorization
+    //
+
+    detail::accumulator  accu;
+    
+    detail::lu< value_t >( A, accu, acc, rowmap, colmap, REF );
+}
+
+}// namespace accu
 
 //////////////////////////////////////////////////////////////////////
 //

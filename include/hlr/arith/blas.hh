@@ -391,8 +391,8 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     {
         if ( ncols == 0 )
             ncols = M_i.ncols();
-        else
-            HLR_ASSERT( ncols == M_i.ncols() );
+        else if ( ncols != M_i.ncols() )
+            HLR_ERROR( "matrices have different column sizes" );
 
         nrows += M_i.nrows();
     }// for

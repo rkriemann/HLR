@@ -60,7 +60,7 @@ gen_problem< hlr::apps::matern_cov > ()
         if (( basename == "randsphere" ) || ( basename == "randcube" ))
             return std::make_unique< hlr::apps::matern_cov >( basename, nsize );
         else
-            return std::make_unique< hlr::apps::matern_cov >( gridfile, n );
+            return std::make_unique< hlr::apps::matern_cov >( gridfile );
     }// if
     else
         return std::make_unique< hlr::apps::matern_cov >( gridfile );

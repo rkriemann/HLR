@@ -136,9 +136,9 @@ public:
     }
 
     void
-    set_lrmat ( const hlr::blas::matrix< value_t > &&  aU,
-                const hlr::blas::matrix< value_t > &&  aS,
-                const hlr::blas::matrix< value_t > &&  aV )
+    set_lrmat ( hlr::blas::matrix< value_t > &&  aU,
+                hlr::blas::matrix< value_t > &&  aS,
+                hlr::blas::matrix< value_t > &&  aV )
     {
         HLR_ASSERT( aU.ncols() == aS.nrows() );
         HLR_ASSERT( aV.ncols() == aS.ncols() );

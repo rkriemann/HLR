@@ -605,11 +605,13 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
             else
             {
                 // R_ik = U_i S_ik V_k' with U_i/V_k being orthogonal, hence |R_ik| = |S_ik|
-                const auto  R_ik = cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
-                const auto  rank = R_ik->col_rank();
-                auto        S_ik = blas::copy( R_ik->coeff() );
-                    
-                blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
+                const auto  R_ik    = cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
+                const auto  rank    = R_ik->col_rank();
+                auto        S_ik    = blas::copy( R_ik->coeff() );
+                auto        norm_ik = blas::norm_2( S_ik );
+
+                if ( norm_ik != real_t(0) )
+                    blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
             
                 auto  S_k = blas::matrix< value_t >( S,
                                                      blas::range( pos, pos + rank-1 ),
@@ -737,11 +739,13 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
             else
             {
                 // R_kj = U_k S_kj V_j' and U_k/V_j are orthogonal, hence |R_kj| = |S_kj|
-                const auto  R_kj = cptrcast( M_kj, matrix::uniform_lrmatrix< value_t > );
-                const auto  rank = R_kj->row_rank();
-                auto        S_kj = blas::copy( R_kj->coeff() );
-                    
-                blas::scale( value_t(1) / blas::norm_2( S_kj ), S_kj );
+                const auto  R_kj    = cptrcast( M_kj, matrix::uniform_lrmatrix< value_t > );
+                const auto  rank    = R_kj->row_rank();
+                auto        S_kj    = blas::copy( R_kj->coeff() );
+                auto        norm_kj = blas::norm_2( S_kj );
+
+                if ( norm_kj != real_t(0) )
+                    blas::scale( value_t(1) / blas::norm_2( S_kj ), S_kj );
 
                 auto  S_k = blas::matrix< value_t >( S,
                                                      blas::range( pos, pos + rank-1 ),
@@ -1482,7 +1486,7 @@ multiply ( const value_t                        alpha,
            const uniform_map_t &                rowmap,
            const uniform_map_t &                /* colmap */ )
 {
-    // A×B + C = (A × U)·S·V' + W·T·V'
+    // A×B + C = (A × U)·T·V' + W·S·V'
     auto  AU = blas::prod( alpha,
                            blas::mat_view( op_A, blas::mat< value_t >( A ) ),
                            B.row_cb( op_B ).basis() );
@@ -1491,8 +1495,8 @@ multiply ( const value_t                        alpha,
 
     blas::qr( AU, R );
 
-    auto  T          = blas::prod( R, B.coeff() );
-    auto [ Un, Sn ] = add_row( C, AU, T, acc );
+    auto  T          = blas::prod( R, blas::mat_view( op_B, B.coeff() ) );
+    auto  [ Un, Sn ] = add_row( C, AU, T, acc );
     
     detail::update_row_basis( C, Un, Sn, acc, rowmap );
 }
@@ -2060,7 +2064,7 @@ solve_upper_tri ( const eval_side_t              side,
     }// else
 }
 
-    template < typename value_t >
+template < typename value_t >
 void
 solve_upper_tri ( const eval_side_t        side,
                   const diag_type_t        diag,
@@ -2120,103 +2124,6 @@ lu ( hpro::TMatrix &          A,
      const uniform_map_t &    rowmap,
      const uniform_map_t &    colmap )
 // hpro::TMatrix &          REF )
-{
-    if ( is_blocked( A ) )
-    {
-        auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
-
-        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
-        {
-            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
-            
-            // lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
-            lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap );
-
-            // // DEBUG {
-            // {
-            //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
-            //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
-
-            //     hlr::add( value_t(-1), *D2, *D1 );
-            //     std::cout << "ref error " << BA->block(i,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-            // }
-            // // DEBUG }
-
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
-            {
-                if ( ! is_null( BA->block( j, i ) ) )
-                    solve_upper_tri< value_t >( from_right, general_diag,
-                                                *BA->block( i, i ), *BA->block( j, i ),
-                                                acc, rowmap, colmap );
-
-                // // DEBUG {
-                // {
-                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
-                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
-                    
-                //     hlr::add( value_t(-1), *D2, *D1 );
-                //     std::cout << "ref error " << BA->block(j,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-                // }
-                // // DEBUG }
-            }// for
-
-            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
-            {
-                if ( ! is_null( BA->block( i, j ) ) )
-                    solve_lower_tri< value_t >( from_left, unit_diag,
-                                                *BA->block( i, i ), *BA->block( i, j ),
-                                                acc, rowmap, colmap );
-
-                // DEBUG {
-                // {
-                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
-                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
-                    
-                //     hlr::add( value_t(-1), *D2, *D1 );
-                //     std::cout << "ref error " << BA->block(i,j)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-                // }
-                // DEBUG }
-            }// for
-
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
-            {
-                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
-                {
-                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
-                    {
-                        HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
-                    
-                        multiply( value_t(-1),
-                                  apply_normal, *BA->block( j, i ),
-                                  apply_normal, *BA->block( i, l ),
-                                  *BA->block( j, l ),
-                                  acc, rowmap, colmap );
-                    }// if
-                }// for
-            }// for
-        }// for
-    }// if
-    else if ( is_dense( A ) )
-    {
-        auto  D = ptrcast( &A, hpro::TDenseMatrix );
-
-        invert< value_t >( *D );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
-}
-
-//
-// recursive LU factorization
-//
-template < typename value_t >
-void
-lu_accu ( hpro::TMatrix &          A,
-          const hpro::TTruncAcc &  acc,
-          const uniform_map_t &    rowmap,
-          const uniform_map_t &    colmap,
-          hpro::TMatrix &          REF )
 {
     if ( is_blocked( A ) )
     {

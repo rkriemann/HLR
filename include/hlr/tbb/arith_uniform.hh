@@ -9,6 +9,7 @@
 //
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/uniform.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
@@ -246,6 +247,22 @@ mul_vec ( const value_t                             alpha,
     detail::build_mutex_map( rowcb, mtx_map );
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
     detail::add_uniform_to_scalar( *uy, y );
+}
+
+//
+// matrix multiplication (eager version)
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    hlr::uniform::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc );
 }
 
 }}}// namespace hlr::tbb::uniform

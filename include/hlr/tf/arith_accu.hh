@@ -33,7 +33,7 @@ namespace detail
 template < typename value_t,
            typename approx_t >
 void
-multiply ( ::tf::SubflowBuilder &   tf,
+multiply ( ::tf::Subflow &          tf,
            const value_t            alpha,
            hpro::TMatrix &          C,
            accumulator &            accu,
@@ -75,7 +75,7 @@ multiply ( ::tf::SubflowBuilder &   tf,
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
             {
                 tf.emplace(
-                    [=,&sub_accu,&acc,&approx] ( auto &  sf )
+                    [=,&sub_accu,&acc,&approx] ( ::tf::Subflow &  sf )
                     {
                         multiply< value_t >( sf, alpha, *BC->block(i,j), sub_accu(i,j), acc, approx );
                     } );
@@ -109,7 +109,7 @@ multiply ( const value_t            alpha,
 
     ::tf::Taskflow  tf;
     
-    tf.emplace( [=,&A,&B,&C,&acc,&approx,&accu] ( auto &  sf ) { detail::multiply< value_t >( sf, alpha, C, accu, acc, approx ); } );
+    tf.emplace( [=,&A,&B,&C,&acc,&approx,&accu] ( ::tf::Subflow &  sf ) { detail::multiply< value_t >( sf, alpha, C, accu, acc, approx ); } );
 
     ::tf::Executor  executor;
     

@@ -12,6 +12,7 @@
 #include <hpro/matrix/structure.hh>
 
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/lrsmatrix.hh>
 
 namespace hlr { namespace matrix {
 
@@ -150,6 +151,17 @@ convert_to_dense ( const hpro::TMatrix &  M )
 
         blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ),
                     value_t(0), DD );
+        
+        return D;
+    }// if
+    else if ( is_lowrankS( M ) )
+    {
+        auto  R  = cptrcast( &M, matrix::lrsmatrix< value_t > );
+        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+        auto  DD = blas::mat< value_t >( *D );
+        auto  US = blas::prod( R->U(), R->S() );
+        
+        blas::prod( value_t(1), US, blas::adjoint( R->V() ), value_t(0), DD );
         
         return D;
     }// if

@@ -269,7 +269,7 @@ addlr_global ( hpro::TBlockMatrix &                   M,
     const auto  I       = blas::identity< value_t >( rank_WX );
     const auto  Se_ij   = blas::diag< value_t >( { M_ij.coeff(), I } );
     real_t      norm_ij = real_t(0);
-
+    
     {
         auto  QU = blas::copy( Ue );
         auto  QV = blas::copy( Ve );
@@ -282,6 +282,9 @@ addlr_global ( hpro::TBlockMatrix &                   M,
 
         norm_ij = blas::norm_2( T2 );
     }
+
+    if ( norm_ij == real_t(0) )
+        HLR_ERROR( "todo: zero norm" );
     
     //
     // compute new row basis
@@ -321,7 +324,7 @@ addlr_global ( hpro::TBlockMatrix &                   M,
                 
                 nrows_Q += RS_ik.nrows();
                 ncols_Q  = RS_ik.ncols();
-                
+
                 Qi.push_back( std::move( RS_ik ) );
             }// if
             else
@@ -330,14 +333,18 @@ addlr_global ( hpro::TBlockMatrix &                   M,
                 // V_k S_kj' with orthogonal V_k
                 //
                 
-                auto  S_ik = blas::copy( blas::adjoint( R_ik->coeff() ) );
+                auto  S_ik    = blas::copy( blas::adjoint( R_ik->coeff() ) );
+                auto  norm_ik = blas::norm_2( S_ik );
 
-                // std::cout << R_ik->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( S_ik ) ) << std::endl;
-                blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
+                if ( norm_ik > real_t(0) )
+                {
+                    // std::cout << R_ik->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( S_ik ) ) << std::endl;
+                    blas::scale( value_t(1) / norm_ik, S_ik );
 
-                nrows_Q += S_ik.nrows();
+                    nrows_Q += S_ik.nrows();
                 
-                Qi.push_back( std::move( S_ik ) );
+                    Qi.push_back( std::move( S_ik ) );
+                }// if
             }// else
         }// for
 
@@ -432,16 +439,20 @@ addlr_global ( hpro::TBlockMatrix &                   M,
                 // U_k ( S_kj 0 ), U_k is assumed to be orthogonal
                 //
                 
-                auto  S_kj  = R_kj->coeff();
-                auto  RS_kj = blas::copy( S_kj );
+                auto  S_kj    = R_kj->coeff();
+                auto  RS_kj   = blas::copy( S_kj );
+                auto  norm_kj = blas::norm_2( RS_kj );
 
-                // scale each matrix by norm to give each block equal weight in computed row basis
-                // std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( RS_kj ) ) << std::endl;
-                blas::scale( value_t(1) / blas::norm_2( RS_kj ), RS_kj );
+                if ( norm_kj > real_t(0) )
+                {
+                    // scale each matrix by norm to give each block equal weight in computed row basis
+                    // std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( RS_kj ) ) << std::endl;
+                    blas::scale( value_t(1) / norm_kj, RS_kj );
 
-                nrows_Q += RS_kj.nrows();
+                    nrows_Q += RS_kj.nrows();
                 
-                Qi.push_back( std::move( RS_kj ) );
+                    Qi.push_back( std::move( RS_kj ) );
+                }// if
             }// else
         }// for
 

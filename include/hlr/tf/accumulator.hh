@@ -122,7 +122,7 @@ struct accumulator : public hlr::matrix::accumulator_base
     template < typename value_t,
                typename approx_t >
     void
-    eval ( ::tf::SubflowBuilder &   tf,
+    eval ( ::tf::Subflow &          tf,
            const value_t            alpha,
            const hpro::TMatrix &    M,
            const hpro::TTruncAcc &  acc,
@@ -224,7 +224,7 @@ struct accumulator : public hlr::matrix::accumulator_base
                 for ( uint  j = 0; j < BC->nblock_cols(); ++j )
                 {
                     tf.emplace(
-                        [&,alpha,i,j] ( auto &  sf )
+                        [&,alpha,i,j] ( ::tf::Subflow &  sf )
                         {
                             sub_accu(i,j).eval( sf, alpha, *BC->block(i,j), acc, approx );
 

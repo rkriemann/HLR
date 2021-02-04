@@ -41,7 +41,7 @@ namespace detail
 template < typename coeff_t,
            typename lrapx_t >
 std::unique_ptr< HLIB::TMatrix >
-build_helper ( ::tf::SubflowBuilder &       tf,
+build_helper ( ::tf::Subflow &              tf,
                const HLIB::TBlockCluster *  bct,
                const coeff_t &              coeff,
                const lrapx_t &              lrapx,
@@ -103,7 +103,7 @@ build_helper ( ::tf::SubflowBuilder &       tf,
                 if ( bct->son( i, j ) != nullptr )
                 {
                     tf.emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,B,nseq] ( auto &  sf )
+                        [bct,i,j,&coeff,&lrapx,&acc,B,nseq] ( ::tf::Subflow &  sf )
                         {
                             auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
@@ -139,7 +139,7 @@ build ( const HLIB::TBlockCluster *  bct,
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.emplace( [&,bct,nseq] ( auto &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
+    tf.emplace( [&,bct,nseq] ( ::tf::Subflow &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
 
     ::tf::Executor  executor;
     
@@ -167,8 +167,8 @@ namespace detail
 {
 
 std::unique_ptr< HLIB::TMatrix >
-copy_helper ( ::tf::SubflowBuilder &  tf,
-              const HLIB::TMatrix &   M )
+copy_helper ( ::tf::Subflow &        tf,
+              const HLIB::TMatrix &  M )
 {
     if ( is_blocked( M ) )
     {
@@ -185,7 +185,7 @@ copy_helper ( ::tf::SubflowBuilder &  tf,
                 if ( BM->block( i, j ) != nullptr )
                 {
                     tf.emplace(
-                        [B,BM,i,j] ( auto &  sf )
+                        [B,BM,i,j] ( ::tf::Subflow &  sf )
                         {
                             auto  B_ij = copy_helper( sf, * BM->block( i, j ) );
                             
@@ -213,7 +213,7 @@ copy ( const HLIB::TMatrix &  M )
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.emplace( [&M,&res] ( auto &  sf ) { res = detail::copy_helper( sf, M ); } );
+    tf.emplace( [&M,&res] ( ::tf::Subflow &  sf ) { res = detail::copy_helper( sf, M ); } );
 
     ::tf::Executor  executor;
     
@@ -230,9 +230,9 @@ namespace detail
 {
 
 void
-copy_to_helper ( ::tf::SubflowBuilder &  tf,
-                 const HLIB::TMatrix &   A,
-                 HLIB::TMatrix &         B )
+copy_to_helper ( ::tf::Subflow &        tf,
+                 const HLIB::TMatrix &  A,
+                 HLIB::TMatrix &        B )
 {
     assert( A.type()     == B.type() );
     assert( A.block_is() == B.block_is() );
@@ -252,7 +252,7 @@ copy_to_helper ( ::tf::SubflowBuilder &  tf,
                 if ( BA->block( i, j ) != nullptr )
                 {
                     tf.emplace(
-                        [BA,BB,i,j] ( auto &  sf )
+                        [BA,BB,i,j] ( ::tf::Subflow &  sf )
                         {
                             assert( ! is_null( BB->block( i, j ) ) );
                             
@@ -276,7 +276,7 @@ copy_to ( const HLIB::TMatrix &  A,
 {
     ::tf::Taskflow  tf;
     
-    tf.emplace( [&A,&B] ( auto &  sf ) { detail::copy_to_helper( sf, A, B ); } );
+    tf.emplace( [&A,&B] ( ::tf::Subflow &  sf ) { detail::copy_to_helper( sf, A, B ); } );
 
     ::tf::Executor  executor;
     
@@ -292,8 +292,8 @@ namespace detail
 {
 
 std::unique_ptr< HLIB::TMatrix >
-realloc_helper ( ::tf::SubflowBuilder &  tf,
-                 HLIB::TMatrix *         A )
+realloc_helper ( ::tf::Subflow &  tf,
+                 HLIB::TMatrix *  A )
 {
     if ( is_null( A ) )
         return nullptr;
@@ -307,14 +307,14 @@ realloc_helper ( ::tf::SubflowBuilder &  tf,
         C->copy_struct_from( B );
 
         auto  sub_tasks = tf.emplace(
-            [B,BC] ( auto &  sf )
+            [B,BC] ( ::tf::Subflow &  sf )
             {
                 for ( uint  i = 0; i < B->nblock_rows(); ++i )
                 {
                     for ( uint  j = 0; j < B->nblock_cols(); ++j )
                     {
                         sf.emplace(
-                            [B,BC,i,j] ( auto &  ssf )
+                            [B,BC,i,j] ( ::tf::Subflow &  ssf )
                             {
                                 auto  C_ij = realloc_helper( ssf, B->block( i, j ) );
                                 
@@ -349,7 +349,7 @@ realloc ( HLIB::TMatrix *  A )
     ::tf::Taskflow                    tf;
     std::unique_ptr< HLIB::TMatrix >  res;
     
-    tf.emplace( [A,&res] ( auto &  sf ) { res = detail::realloc_helper( sf, A ); } );
+    tf.emplace( [A,&res] ( ::tf::Subflow &  sf ) { res = detail::realloc_helper( sf, A ); } );
 
     ::tf::Executor  executor;
     

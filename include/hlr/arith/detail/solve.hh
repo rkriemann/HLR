@@ -184,6 +184,32 @@ solve_lower_tri ( const eval_side_t           side,
     }// else
 }
 
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t               side,
+                  const diag_type_t               diag,
+                  const hpro::TBlockMatrix &      L,
+                  matrix::lrsmatrix< value_t > &  M )
+{
+    HLR_LOG( 4, hpro::to_string( "svltr( B %d, R %d )", L.id(), M.id() ) );
+
+    if ( side == from_left )
+    {
+        //
+        // solve L M = L U(X) S(X) V(X)' = U(M) S(M) V(M)'
+        // as L U(X) = U(M)
+        //
+        
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), M.U() );
+
+        solve_lower_tri< value_t >( side, diag, L, U );
+    }// if
+    else
+    {
+        HLR_ASSERT( false );
+    }// else
+}
+
 template < typename value_t,
            typename approx_t >
 void
@@ -263,6 +289,35 @@ solve_lower_tri ( const eval_side_t           side,
         //
         
         auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), blas::mat_U< value_t >( M ) );
+
+        solve_lower_tri< value_t >( side, diag, L, U );
+    }// if
+    else
+    {
+        HLR_ASSERT( false );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t               side,
+                  const diag_type_t               diag,
+                  const hpro::TDenseMatrix &      L,
+                  matrix::lrsmatrix< value_t > &  M )
+{
+    HLR_LOG( 4, hpro::to_string( "svltr( D %d, R %d )", L.id(), M.id() ) );
+
+    if ( diag == unit_diag )
+        return;
+    
+    if ( side == from_left )
+    {
+        //
+        // solve L M = L U(X) S(X) V(X)' = U(M) S(X) V(M)'
+        // as L U(X) = U(M)
+        //
+        
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), M.U() );
 
         solve_lower_tri< value_t >( side, diag, L, U );
     }// if
@@ -461,6 +516,33 @@ solve_upper_tri ( const eval_side_t           side,
     }// else
 }
 
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t               side,
+                  const diag_type_t               diag,
+                  const hpro::TBlockMatrix &      U,
+                  matrix::lrsmatrix< value_t > &  M )
+{
+    HLR_LOG( 4, hpro::to_string( "svutr( B %d, R %d )", U.id(), M.id() ) );
+
+    if ( side == from_left )
+    {
+        HLR_ASSERT( false );
+    }// if
+    else
+    {
+        //
+        // solve X U = U(X) S(X) V(X)' U = U(M) S(M) V(M)' = M
+        // as V(X)' U = V(M)' or
+        //    U' V(X) = V(M), respectively
+        //
+
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), M.V() );
+
+        solve_upper_tri< value_t >( from_left, diag, U, V );
+    }// else
+}
+
 template < typename value_t,
            typename approx_t >
 void
@@ -544,6 +626,36 @@ solve_upper_tri ( const eval_side_t           side,
         //
 
         auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), blas::mat_V< value_t >( M ) );
+
+        solve_upper_tri< value_t >( from_left, diag, U, V );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t               side,
+                  const diag_type_t               diag,
+                  const hpro::TDenseMatrix &      U,
+                  matrix::lrsmatrix< value_t > &  M )
+{
+    HLR_LOG( 4, hpro::to_string( "svutr( D %d, R %d )", U.id(), M.id() ) );
+
+    if ( diag == unit_diag )
+        return;
+    
+    if ( side == from_left )
+    {
+        HLR_ASSERT( false );
+    }// if
+    else
+    {
+        //
+        // solve X U = U(X) S(X) V(X)' U = U(M) S(M) V(M)' = M
+        // as V(X)' U = V(M)' or
+        //    U' V(X) = V(M), respectively
+        //
+
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), M.V() );
 
         solve_upper_tri< value_t >( from_left, diag, U, V );
     }// else
