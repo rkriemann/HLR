@@ -42,8 +42,10 @@ JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
-LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
+LIKWID_DIR   = '/opt/local/likwid'
+
+CUDA_DIR     = '/'
 
 # set of programs to build: dag-*, tlr, hodlr, tileh (or 'all')
 PROGRAMS     = [ 'tlr',
@@ -63,7 +65,8 @@ PROGRAMS     = [ 'tlr',
                  'approx-mm',
                  'approx-lu',
                  'dpt',
-                 'polykern' ]
+                 'polykern',
+                 'cuda' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -72,7 +75,8 @@ FRAMEWORKS   = [ 'seq',
                  'tf',
                  'hpx',
                  'mpi',
-                 'gpi2' ]
+                 'gpi2',
+                 'cuda' ]
 
 # supported lapack libraries
 LAPACKLIBS   = [ 'default',     # default system implementation, e.g., -llapack -lblas
@@ -109,7 +113,8 @@ SUBDIRS      = { 'tlr'         : 'tlr',
                  'approx-mm'   : 'approx',
                  'approx-lu'   : 'approx',
                  'dpt'         : '',
-                 'polykern'    : '' }
+                 'polykern'    : '',
+                 'cuda'        : '' }
 
 ######################################################################
 #
@@ -178,8 +183,8 @@ opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,   
 opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
-
 opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda',     'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
 opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
@@ -232,6 +237,7 @@ HPX_DIR      = opt_env['hpx']
 GPI2_DIR     = opt_env['gpi2']
 
 MKL_DIR      = opt_env['mkl']
+CUDA_DIR     = opt_env['cuda']
 
 JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
@@ -269,6 +275,17 @@ if MKL_DIR == None or MKL_DIR == '/' :
     else :
         MKL_DIR = '/' # to prevent error below due to invalid path
     
+# CUDA should define CUDA_ROOT or CUDA_HOME
+if CUDA_DIR == None or CUDA_DIR == '/' :
+    if 'CUDA_ROOT' in os.environ :
+        CUDA_DIR = os.environ['CUDA_ROOT']
+    elif 'CUDA_HOME' in os.environ :
+        CUDA_DIR = os.environ['CUDA_HOME']
+    else :
+        CUDA_DIR = '/' # to prevent error below due to invalid path
+    
+print( CUDA_DIR )
+
 ######################################################################
 #
 # colorization
@@ -379,6 +396,12 @@ if likwid and LIKWID_DIR != None :
     env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
     env.Append( LIBS       = 'likwid' )
 
+# add CUDA
+if 'cuda' in frameworks :
+    env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+    env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64' ) )
+    env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
+
 ######################################################################
 #
 # target 'help'
@@ -412,6 +435,8 @@ def show_help ( target, source, env ):
     print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mkl{1}        │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
@@ -578,17 +603,19 @@ if 'tf' in frameworks :
     tf.Append( LIBS = [ 'pthread' ] )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma' )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma' )
-    # tf.Append( LIBS = [ 'cudart', 'cublas', 'cusolver' ] )
     
     for program in programs :
         name   = program + '-tf'
         source = path( program, name + '.cc' )
 
+        # special case TF+CUDA
+        if program == 'cuda' and not 'cuda' in frameworks :
+            continue
+        
         if os.path.exists( source ) and os.path.isfile( source ) :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
     # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
-    # Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc'  ] ) )
 
 #
 # HPX

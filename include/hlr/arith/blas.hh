@@ -323,7 +323,7 @@ extend ( const matrix< value_t > &  M,
          const size_t               ncols )
 {
     auto  T  = matrix< value_t >( M.nrows() + nrows, M.ncols() + ncols );
-    auto  TM = matrix( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
+    auto  TM = matrix< value_t >( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
 
     copy( M, TM );
 

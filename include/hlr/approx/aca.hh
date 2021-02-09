@@ -497,7 +497,7 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, T, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
         
         return aca( op, pivot_search, acc, nullptr );
     }// else

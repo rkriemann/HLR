@@ -1,11 +1,11 @@
 #ifndef __HLR_TF_ARITH_HH
 #define __HLR_TF_ARITH_HH
 //
-// Project     : HLib
-// File        : arith.hh
-// Description : sequential arithmetic functions
+// Project     : HLR
+// Module      : tf/arith
+// Description : arithmetic functions using TF
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <taskflow/taskflow.hpp>
