@@ -330,7 +330,7 @@ spectral ( const operator_t &  A,
            const size_t        amax_it = 0 )
 {
     using  value_t = typename operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = hpro::real_type_t< value_t >;
 
     const auto  nrows_A = nrows( A );
     const auto  ncols_A = ncols( A );

@@ -284,8 +284,6 @@ if CUDA_DIR == None or CUDA_DIR == '/' :
     else :
         CUDA_DIR = '/' # to prevent error below due to invalid path
     
-print( CUDA_DIR )
-
 ######################################################################
 #
 # colorization

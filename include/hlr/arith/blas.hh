@@ -860,7 +860,7 @@ qr2  ( matrix< value_t > &  M,
     // const auto  err = norm_2( M1 ) / norm_2( DM );
 
     // if ( err > 1e-15 )
-    //     std::cout << err << std::endl;
+    //     std::cout << "qr : " << err << std::endl;
     // // DEBUG }
     
     #else
@@ -1403,6 +1403,47 @@ factorise_ortho ( const matrix< value_t > &  M,
     }// else
 }
 
+//
+// compute QR with column pivoting, i.e., M·P = Q·R
+// - upon return M holds Q
+//
+template < typename value_t >
+void
+qrp ( matrix< value_t > &   M,
+      matrix< value_t > &   R,
+      std::vector< int > &  P )
+{
+    // // DEBUG {
+    // auto  CM = copy( M );
+    // // DEBUG }
+
+    HLIB::BLAS::qrp( M, R, P );
+    
+    // // DEBUG {
+    // auto  PR = copy( R );
+    
+    // for ( size_t  i = 0; i < P.size(); ++i )
+    // {
+    //     auto  j    = P[i];
+    //     auto  R_i  = R.column( i );
+    //     auto  PR_j = PR.column( j );
+
+    //     copy( R_i, PR_j );
+    // }// for
+
+    // HLIB::DBG::write( PR, "PR.mat", "PR" );
+    
+    // auto  TM = prod( M, PR );
+
+    // blas::add( value_t(-1), CM, TM );
+
+    // const auto  err = norm_2( TM ) / norm_2( CM );
+
+    // if ( err > 1e-15 )
+    //     std::cout << "qrp : " << err << std::endl;
+    // // DEBUG }
+}
+    
 //
 // construct SVD of bidiagonal matrix with diagonal D and off-diagonal E
 //

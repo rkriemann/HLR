@@ -111,10 +111,12 @@ multiply ( const value_t            alpha,
 //
 // LU factorization (eager version)
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
      hpro::TMatrix &          /* REF */ )
 {
     //
@@ -155,7 +157,7 @@ lu ( hpro::TMatrix &          A,
     // perform actual LU factorization
     //
 
-    detail::lu< value_t >( A, acc, rowmap, colmap );
+    detail::lu< value_t >( A, acc, approx, rowmap, colmap );
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -167,10 +169,12 @@ lu ( hpro::TMatrix &          A,
 namespace accu
 {
 
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
      hpro::TMatrix &          REF )
 {
     //
@@ -213,7 +217,7 @@ lu ( hpro::TMatrix &          A,
 
     detail::accumulator  accu;
     
-    detail::lu< value_t >( A, accu, acc, rowmap, colmap, REF );
+    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
 }
 
 }// namespace accu

@@ -1,3 +1,4 @@
+#pragma once
 #ifndef __HLR_APPROX_RRQR_HH
 #define __HLR_APPROX_RRQR_HH
 //
@@ -454,9 +455,6 @@ struct RRQR
         const idx_t  nrows = idx_t( M.nrows() );
         const idx_t  ncols = idx_t( M.ncols() );
 
-        // only supporting #cols <= #rows for now
-        HLR_ASSERT( ncols <= nrows );
-    
         // for update statistics
         HLR_APPROX_RANK_STAT( "full " << std::min( nrows, ncols ) );
     
@@ -468,7 +466,7 @@ struct RRQR
         auto  k  = detail::trunc_rank( R, acc );
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
-        return Qk;
+        return blas::copy( Qk );
     }
 };
 

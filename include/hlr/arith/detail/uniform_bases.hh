@@ -237,7 +237,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
                        const blas::matrix< value_t > &        X,
                        const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // construct full block column Xt, perform SVD and
@@ -390,7 +390,7 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
                    const blas::matrix< value_t > &        W,
                    const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // compute QR of W for norm computation later
@@ -589,7 +589,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
                        const blas::matrix< value_t > &        W,
                        const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // compute full block row, perform SVD and use
@@ -745,7 +745,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
                         blas::matrix< value_t > &  X,
                         const hpro::TTruncAcc &    acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     // io::matlab::write( W, "W" );
     // io::matlab::write( T, "T" );
@@ -1123,7 +1123,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
                             blas::matrix< value_t > &  X,
                             const hpro::TTruncAcc &    acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     auto  M_ij = M.block( i, j );
     auto  R_ij = ptrcast( M_ij, matrix::uniform_lrmatrix< value_t > );

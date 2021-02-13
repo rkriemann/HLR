@@ -64,7 +64,7 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        matrix::print_eps( *A, "A" );
+        matrix::print_eps( *A, "A", "noid" );
         matrix::print_lvl_eps( *A, "L" );
     }// if
 
@@ -152,7 +152,7 @@ program_main ()
         std::cout << "    error  = " << format_error( error ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
-            matrix::print_eps( *A2, "A2" );
+            matrix::print_eps( *A2, "A2", "noid" );
 
         //
         // mat-vec benchmark
@@ -246,7 +246,7 @@ program_main ()
         {
             hpro::TPSMatrixVis  mvis;
         
-            mvis.svd( false ).print( A2.get(), "A2" );
+            mvis.svd( false ).print( A2.get(), "A3" );
         }// if
 
         //

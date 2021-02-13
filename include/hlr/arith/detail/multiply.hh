@@ -840,6 +840,22 @@ multiply ( const value_t                                alpha,
 template < typename value_t,
            typename approx_t >
 void
+multiply ( const value_t               /* alpha */,
+           const hpro::matop_t         /* op_A */,
+           const hpro::TDenseMatrix &  /* A */,
+           const hpro::matop_t         /* op_B */,
+           const hpro::TBlockMatrix &  /* B */,
+           hpro::TRkMatrix &           /* C */,
+           const hpro::TTruncAcc &     /* acc */,
+           const approx_t &            /* approx */ )
+{
+    HLR_ERROR( "todo" );
+}
+
+
+template < typename value_t,
+           typename approx_t >
+void
 multiply ( const value_t               alpha,
            const hpro::matop_t         op_A,
            const hpro::TDenseMatrix &  A,

@@ -31,9 +31,9 @@ addlr_local ( hpro::TBlockMatrix &                   M,
               const blas::matrix< value_t > &        X,
               const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
-    std::cout << "addlr : " << M_ij.id() << std::endl;
+    // std::cout << "addlr : " << M_ij.id() << std::endl;
 
     // current bases and coupling
     const auto  U_i   = M_ij.row_cb().basis();
@@ -245,7 +245,7 @@ addlr_global ( hpro::TBlockMatrix &                   M,
                const blas::matrix< value_t > &        X,
                const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     // std::cout << "addlr : " << M_ij.id() << std::endl;
 
@@ -601,9 +601,9 @@ addlr_global_ref ( hpro::TBlockMatrix &                   M,
                    const blas::matrix< value_t > &        X,
                    const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
-    std::cout << "addlr : " << M_ij.id() << std::endl;
+    // std::cout << "addlr : " << M_ij.id() << std::endl;
 
     //
     // compute new row basis
@@ -1297,7 +1297,7 @@ addlr_local ( blas::matrix< value_t > &        U,
               const blas::matrix< value_t > &  X,
               const hpro::TTruncAcc &          acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // Compute new row basis Un as column basis of

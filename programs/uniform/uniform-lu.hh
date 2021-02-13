@@ -12,10 +12,11 @@
 
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith.hh>
+#include <hlr/seq/arith_accu.hh>
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
-#include <hlr/approx/randsvd.hh>
+#include <hlr/approx/rrqr.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -33,6 +34,7 @@ program_main ()
 
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
+    auto  prnopt  = "";
     auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -65,7 +67,7 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        matrix::print_eps( *A, "A" );
+        io::eps::write( *A, "A", "noid" );
         matrix::print_lvl_eps( *A, "L" );
     }// if
 
@@ -75,7 +77,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  apx = approx::RandSVD< value_t >();
+    auto  apx = approx::SVD< value_t >();
     
     std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
 
@@ -108,7 +110,7 @@ program_main ()
     std::cout << "    error  = " << format_error( error ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
-        matrix::print_eps( *A2, "A2" );
+        matrix::print_eps( *A2, "A2", prnopt );
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -170,7 +172,7 @@ program_main ()
                 auto  colcb2 = colcb->copy();
                 
                 matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
-                
+
                 tic = timer::now();
                 
                 impl::uniform::tlr::lu< value_t >( *A3, acc, apx );
@@ -246,7 +248,7 @@ program_main ()
             std::cout << "      done in  " << format_time( toc ) << std::endl;
             std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
                 
-            matrix::print_eps( *M3, "HLU" );
+            matrix::print_eps( *M3, "HLU", prnopt );
                 
             {
                 hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
@@ -255,6 +257,29 @@ program_main ()
             }
 
             REF = std::move( M3 );
+        }// if
+
+        if ( true )
+        {
+            std::cout << "  " << term::bullet << term::bold << "H-LU (accumulator)" << term::reset << std::endl;
+                
+            auto  M3 = seq::matrix::copy( *M1 );
+                
+            tic = timer::now();
+                
+            impl::accu::lu< value_t >( *M3, acc, apx );
+                
+            toc = timer::since( tic );
+            std::cout << "      done in  " << format_time( toc ) << std::endl;
+            std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+                
+            matrix::print_eps( *M3, "HLU", prnopt );
+                
+            {
+                hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+            }
         }// if
 
         if ( true )
@@ -269,13 +294,13 @@ program_main ()
                 
             tic = timer::now();
                 
-            impl::uniform::lu< value_t >( *A3, acc, *REF );
+            impl::uniform::lu< value_t >( *A3, acc, apx, *REF );
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
             std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
                 
-            matrix::print_eps( *A3, "H2LU" );
+            matrix::print_eps( *A3, "H2LU", prnopt );
                 
             auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
                 
@@ -304,13 +329,13 @@ program_main ()
                 
             tic = timer::now();
                 
-            impl::uniform::accu::lu< value_t >( *A3, acc, *REF );
+            impl::uniform::accu::lu< value_t >( *A3, acc, apx, *REF );
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
             std::cout << "      mem    = " << format_mem( A3->byte_size() ) << std::endl;
                 
-            matrix::print_eps( *A3, "H2LUa" );
+            matrix::print_eps( *A3, "H2LUa", prnopt );
                 
             auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
                 
