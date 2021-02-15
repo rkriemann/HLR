@@ -105,9 +105,7 @@ rrqr ( blas::matrix< value_t > &  M,
 
     // U = Q_k
     auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
-    auto  U  = blas::matrix< value_t >( nrows, k );
-    
-    blas::copy( Qk, U );
+    auto  U  = blas::copy( Qk );
 
     // copy first k columns of R' to V, i.e., first k rows of R
     auto  Rk = blas::matrix< value_t >( R, blas::range( 0, k-1 ), blas::range::all );
@@ -195,10 +193,8 @@ rrqr ( const blas::matrix< T > &  U,
         
         // U = QU(:,1:k)
         auto  Qk = blas::matrix< value_t >( QU, blas::range::all, blas::range( 0, out_rank-1 ) );
-        auto  OU = blas::matrix< value_t >( nrows_U, out_rank );
+        auto  OU = blas::copy( Qk );
         
-        blas::copy( Qk, OU );
-
         // V = QV · P  (V' = P' · QV')
         auto  QV_P = blas::matrix< value_t >( nrows_V, in_rank );
         

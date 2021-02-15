@@ -43,7 +43,8 @@ bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
-int     nbench     = 1;            // perform computations <nbench> times
+int     nbench     = 1;            // perform computations <nbench> times (at most)
+double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
@@ -73,10 +74,11 @@ read_config ( const std::string &  filename )
     matrixfile = cfg.get( "app.matrix",  matrixfile );
     sparsefile = cfg.get( "app.sparse",  sparsefile );
         
-    ntile      = cfg.get( "arith.ntile", ntile );
-    nbench     = cfg.get( "arith.bench", nbench );
-    eps        = cfg.get( "arith.eps",   eps );
-    k          = cfg.get( "arith.rank",  k );
+    ntile      = cfg.get( "arith.ntile",  ntile );
+    nbench     = cfg.get( "arith.nbench", nbench );
+    tbench     = cfg.get( "arith.tbench", tbench );
+    eps        = cfg.get( "arith.eps",    eps );
+    k          = cfg.get( "arith.rank",   k );
         
     nthreads   = cfg.get( "misc.nthreads",  nthreads );
     verbosity  = cfg.get( "misc.verbosity", verbosity );
@@ -118,16 +120,17 @@ parse ( int argc, char ** argv )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
-        ( "matrix",      value<string>(), ": matrix file use" )
+        ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
-        ( "sparse",      value<string>(), ": sparse matrix file use" )
+        ( "sparse",      value<string>(), ": sparse matrix file to use" )
         ;
 
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
         ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
-        ( "bench",       value<int>(),    ": number of benchmark iterations" )
+        ( "nbench",      value<int>(),    ": (maximal) number of benchmark iterations" )
+        ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
@@ -208,7 +211,8 @@ parse ( int argc, char ** argv )
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
-    if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
+    if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<int>();
+    if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();

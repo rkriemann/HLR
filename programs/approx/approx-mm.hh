@@ -33,6 +33,30 @@ using namespace hlr;
 uint64_t
 get_flops ( const std::string &  method );
 
+template < typename value_t >
+hpro::real_type_t< value_t >
+mm_error ( const hpro::TLinearOperator &  A,
+           const hpro::TLinearOperator &  B )
+{
+    auto  n = B.domain_dim();
+    auto  T = blas::matrix< value_t >( n, 100 );
+    auto  S = blas::matrix< value_t >( n, 100 );
+
+    std::random_device          rd{};
+    std::mt19937                generator{ rd() };
+    std::normal_distribution<>  distr{ 0, 1 };
+    auto                        fill_rand = [&] () { return distr( generator ); };
+
+    blas::fill_fn( T, fill_rand );
+    blas::scale( value_t(0), S );
+    
+    auto  diff  = hpro::matrix_sum( hpro::real(1.0), &A, hpro::real(-1.0), &B );
+
+    diff->apply_add( value_t(1), T, S, apply_normal );
+
+    return hlr::norm::spectral( S ) / hlr::norm::spectral( T );
+}
+    
 //
 // standard mat-mul
 //
@@ -56,6 +80,7 @@ mm_std ( const hpro::TMatrix &    A,
     auto  AxA      = hpro::matrix_product( &A, &A );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
+    auto  tstart   = timer::now();
         
     for ( int i = 0; i < nbench; ++i )
     {
@@ -76,11 +101,14 @@ mm_std ( const hpro::TMatrix &    A,
 
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
+
+        if ( timer::since( tstart ) > tbench )
+            break;
     }// for
         
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
-    if ( nbench > 1 )
+    if ( runtime.size() > 1 )
         std::cout << "      runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
@@ -114,6 +142,7 @@ mm_accu ( const hpro::TMatrix &    A,
     auto  AxA      = hpro::matrix_product( &A, &A );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
+    auto  tstart   = timer::now();
         
     for ( int i = 0; i < nbench; ++i )
     {
@@ -134,11 +163,14 @@ mm_accu ( const hpro::TMatrix &    A,
 
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
+
+        if ( timer::since( tstart ) > tbench )
+            break;
     }// for
         
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
-    if ( nbench > 1 )
+    if ( runtime.size() > 1 )
         std::cout << "    runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
@@ -172,6 +204,7 @@ mm_lazy ( const hpro::TMatrix &    A,
     auto  AxA      = hpro::matrix_product( &A, &A );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
+    auto  tstart   = timer::now();
         
     for ( int i = 0; i < nbench; ++i )
     {
@@ -192,11 +225,14 @@ mm_lazy ( const hpro::TMatrix &    A,
 
         flops.push_back( get_flops( "mm" ) );
         runtime.push_back( toc.seconds() );
+
+        if ( timer::since( tstart ) > tbench )
+            break;
     }// for
 
     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
-    if ( nbench > 1 )
+    if ( runtime.size() > 1 )
         std::cout << "    runtime = "
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
@@ -269,7 +305,7 @@ program_main ()
 
     // exact representation
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
-    auto  norm_AxA = hlr::norm::spectral( *AxA );
+    // auto  norm_AxA = hlr::norm::spectral( *AxA );
 
     if ( cmdline::arith == "std" || cmdline::arith == "all" )
     {
@@ -318,7 +354,7 @@ program_main ()
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
             std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) ) << std::endl; //  / norm_AxA
         }// if
 
         //
@@ -328,7 +364,7 @@ program_main ()
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        // if (( cmdline::approx == "randlr"  || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_std< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
@@ -385,13 +421,13 @@ program_main ()
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
 
             std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) ) << std::endl; //  / norm_AxA
         }
 
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        // if (( cmdline::approx == "randlr"  || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
@@ -407,7 +443,7 @@ program_main ()
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_lazy< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        // if (( cmdline::approx == "randlr" || cmdline::approx == "all" ) && ( A->nrows() <= 50000 )) mm_lazy< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
         if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_lazy< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if

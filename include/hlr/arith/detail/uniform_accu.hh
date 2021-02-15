@@ -90,58 +90,7 @@ struct accumulator
             const approx_t &         approx )
     {
         if ( ! is_null( matrix ) )
-        {
-            // if ( is_lowrank( *matrix ) )
-            //     std::cout << std::min( matrix->nrows(), matrix->ncols() ) << " : " << ptrcast( matrix.get(), hpro::TRkMatrix )->rank() << std::endl;
-            
             hlr::add( alpha, *matrix, M, acc, approx );
-            
-            // if ( matrix::is_lowrankS( M ) )
-            // {
-            //     auto  RM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-                
-            //     if ( is_lowrank( *matrix ) )
-            //     {
-            //         auto  R  = ptrcast( matrix.get(), hpro::TRkMatrix );
-            //         auto  W  = blas::mat_U< value_t >( R );
-            //         auto  X  = blas::mat_V< value_t >( R );
-            //         auto  RW = blas::matrix< value_t >();
-            //         auto  RX = blas::matrix< value_t >();
-
-            //         blas::qr( W, RW );
-            //         blas::qr( X, RX );
-
-            //         auto  T = blas::prod( RW, blas::adjoint( RX ) );
-                    
-            //         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, rowmap, colmap );
-            //     }// if
-            //     else if ( is_dense( *matrix ) )
-            //     {
-            //         //
-            //         // TODO: add dense and convert
-            //         //
-
-            //         auto  approx   = approx::SVD< value_t >();
-            //         auto  D        = ptrcast( matrix.get(), hpro::TDenseMatrix );
-            //         auto  [ W, X ] = approx( blas::mat< value_t >( D ), acc );
-            //         auto  RW       = blas::matrix< value_t >();
-            //         auto  RX       = blas::matrix< value_t >();
-
-            //         blas::qr( W, RW );
-            //         blas::qr( X, RX );
-
-            //         auto  T = blas::prod( RW, blas::adjoint( RX ) );
-                    
-            //         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, rowmap, colmap );
-            //     }// if
-            //     else
-            //         HLR_ERROR( "unsupported accumulator type: " + matrix->typestr() );
-            // }// if
-            // else if ( is_dense( M ) )
-            // {
-            //     hlr::add( alpha, *matrix, M );
-            // }// if
-        }// if
 
         clear_matrix();
     }
