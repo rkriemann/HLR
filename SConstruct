@@ -290,6 +290,7 @@ if CUDA_DIR == None or CUDA_DIR == '/' :
 #
 ######################################################################
 
+# default color codes
 colors = { 'reset'  : '\033[0m',
            'bold'   : '\033[1m',
            'italic' : '\033[3m',
@@ -305,7 +306,15 @@ colors = { 'reset'  : '\033[0m',
 if not color or not sys.stdout.isatty() or os.environ['TERM'] == 'dumb' :
     for key in colors.keys() :
         colors[key] = ''
-      
+else :
+    # try to handle above codes on non-supported systems
+    try:
+        import colorama
+
+        colorama.init()
+    except :
+        pass
+        
 ######################################################################
 #
 # set up compilation environment
@@ -418,16 +427,6 @@ def show_help ( target, source, env ):
     print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( PROGRAMS ) )
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
@@ -438,6 +437,16 @@ def show_help ( target, source, env ):
     print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print() 
     print( 'The parameters {0}programs{1} and {0}frameworks{1} can get comma separated values:'.format( colors['bold'], colors['reset'] ) ) 
     print() 
@@ -472,6 +481,17 @@ def show_options ( target, source, env ):
     print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( programs ) )
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
+    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
+    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
+    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
+    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
+    print( '  {0}mkl{1}        │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
+    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
+    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
+    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
+    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
     print( ' ────────────┼───────────────────────────────┼──────────' )
@@ -481,15 +501,6 @@ def show_options ( target, source, env ):
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
-    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
-    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
-    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
-    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
-    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
-    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
-    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )

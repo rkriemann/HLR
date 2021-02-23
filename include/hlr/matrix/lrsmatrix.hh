@@ -323,6 +323,7 @@ lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         alpha,
                                        const hlr::blas::vector< hpro::real > &  x,
@@ -356,6 +357,7 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                         /* alpha */,
                                        const hlr::blas::vector< hpro::complex > &  /* x */,
@@ -366,6 +368,7 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                      
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                         /* alpha */,
                                           const hlr::blas::vector< hpro::real > &  /* x */,
@@ -376,6 +379,7 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                      
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                         alpha,
                                           const hlr::blas::vector< hpro::complex > &  x,
@@ -419,6 +423,7 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                   
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         alpha,
                                        const hlr::blas::matrix< hpro::real > &  X,
@@ -452,6 +457,7 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                         /* alpha */,
                                        const hlr::blas::matrix< hpro::complex > &  /* X */,
@@ -462,6 +468,7 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                      
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                         /* alpha */,
                                           const hlr::blas::matrix< hpro::real > &  /* X */,
@@ -472,6 +479,7 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                      
 }
 
 template <>
+inline
 void
 lrsmatrix< hpro::complex >::apply_add ( const hpro::complex                         alpha,
                                         const hlr::blas::matrix< hpro::complex > &  X,

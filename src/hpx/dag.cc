@@ -60,7 +60,7 @@ refine ( node *                            root,
         std::atomic< bool >                  any_changed = false;
 
         // first refine nodes
-        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
+        ::hpx::parallel::for_each( ::hpx::execution::par,
                                    node_sets.begin(), node_sets.end(),
                                    [&,min_size] ( const auto &  nset )
                                    {
@@ -83,7 +83,7 @@ refine ( node *                            root,
             auto  set_range = boost::irange( size_t(0), node_sets.size() );
             
             // then refine dependencies and collect new nodes
-            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
+            ::hpx::parallel::for_each( ::hpx::execution::par,
                                        set_range.begin(), set_range.end(),
                                        [&,do_lock] ( const auto  i )
                                        {
@@ -123,7 +123,7 @@ refine ( node *                            root,
                                        } );
 
             // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
+            ::hpx::parallel::for_each( ::hpx::execution::par,
                                        delnodes.begin(), delnodes.end(),
                                        [&] ( const auto &  nset )
                                        {

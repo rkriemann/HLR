@@ -253,8 +253,14 @@ program_main ()
     // std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A" );
+        io::eps::write( *A, "A" );
 
+    {
+        auto  D = matrix::convert_to_dense< value_t >( *A );
+        
+        io::hdf5::write( blas::mat< value_t >( *D ), "A" );
+    }
+    
     //////////////////////////////////////////////////////////////////////
     //
     // LU factorization

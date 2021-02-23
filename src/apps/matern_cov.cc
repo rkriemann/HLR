@@ -48,14 +48,25 @@ matern_cov::matern_cov ( const std::string &  geometry,
     else if ( geometry == "randsphere" )
     {
         std::mt19937_64                   generator{ 1 };
-        std::uniform_real_distribution<>  distr{ 0, 1 };
+        std::uniform_real_distribution<>  distr{ -1, 1 };
 
         _vertices.reserve( n );
     
         for ( size_t i = 0; i < n; i++ )
-            _vertices.push_back( spherical( 2.0 * M_PI * distr( generator ),
-                                            2.0 * M_PI * distr( generator ) - M_PI,
-                                            1.0 ) );
+        {
+            // map cube to sphere
+            // - slightly more points along mapped cube edges!
+            auto  p = point_t( distr( generator ), distr( generator ), distr( generator ) );
+
+            p *= double(1) / p.norm2();
+                
+            _vertices.push_back( p );
+
+            // "spherical" produces too many points near poles
+            // _vertices.push_back( spherical( 2.0 * M_PI * distr( generator ),
+            //                                 2.0 * M_PI * distr( generator ) - M_PI,
+            //                                 1.0 ) );
+        }// for
     }// if
     else
         throw std::runtime_error( "unknown geometry : " + geometry );
