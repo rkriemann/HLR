@@ -149,10 +149,15 @@ multiply ( const value_t                    alpha,
 //
 /////////////////////////////////////////////////////////////////////////////////
 
+#define HLR_MULT_PRINT   // std::cout << C.id() << std::endl;
+
+/*
 #define HLR_MULT_PRINT   HLR_LOG( 4, hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
                                                       A.typestr().c_str(), A.id(), \
                                                       B.typestr().c_str(), B.id(), \
                                                       C.typestr().c_str(), C.id() ) )
+*/
+
 //
 // forward decl.(s)
 //
@@ -249,7 +254,7 @@ multiply ( const value_t               alpha,
 
                     if ( is_null( BC->block( i, j ) ) )
                         BC->set_block( i, j, new hpro::TRkMatrix( A_il->row_is( op_A ), B_lj->col_is( op_B ),
-                                                                  hpro::value_type< value_t >::value ) );
+                                                                  hpro::value_type_v< value_t > ) );
                     
                     multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
                 }// if
@@ -294,7 +299,7 @@ multiply ( const value_t               alpha,
                     auto  B_lj = B.block( l, j, op_B );
 
                     if ( is_null( C_ij ) )
-                        C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type< value_t >::value );
+                        C_ij = std::make_unique< hpro::TDenseMatrix >( A_il->row_is( op_A ), B_lj->col_is( op_B ), hpro::value_type_v< value_t > );
                     
                     multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij );
                 }// if
@@ -355,7 +360,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -407,7 +412,183 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), VC },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TBlockMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TRkMatrix &     B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·V' = W·V'
+    auto  UB = blas::mat_U< value_t >( B, op_B );
+    auto  W  = blas::matrix< value_t >( C.nrows(), B.rank() );
+
+    multiply< value_t >( alpha, op_A, A, UB, W );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    // W·V' + C
+    blas::prod( value_t(1), W, blas::adjoint( blas::mat_V< value_t >( B, op_B ) ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TRkMatrix &     A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    // U·(V' × B) = U·X' with X = B'·V
+    auto  VA = blas::mat_V< value_t >( A, op_A );
+    auto  X  = blas::matrix< value_t >( C.ncols(), A.rank() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, X );
+
+    std::scoped_lock  lock( C.mutex() );
+
+    // U·X' + C
+    blas::prod( value_t(1), blas::mat_U< value_t >( A, op_A ), blas::adjoint( X ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TBlockMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TBlockMatrix &                         C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·S·V'
+    auto  UB = B.row_cb( op_B ).basis();
+    auto  UC = blas::matrix< value_t >( C.nrows(), B.ncols() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  S  = blas::copy( blas::mat_view( op_B, B.coeff() ) );
+    auto  RC = matrix::lrsmatrix< value_t >( C.row_is(), C.col_is(), UC, S, B.col_cb( op_B ).basis() );
+    
+    hlr::add< value_t >( value_t(1), RC, C, acc, approx );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TBlockMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TRkMatrix &                            C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·S·V'
+    auto  UB = B.row_basis( op_B );
+    auto  UC = blas::matrix< value_t >( C.nrows(), UB.ncols() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  US      = blas::prod( UC, blas::mat_view( op_B, B.coeff() ) );
+    auto [ W, X ] = approx( {                  US, blas::mat_U< value_t >( C ) },
+                            { B.col_basis( op_B ), blas::mat_V< value_t >( C ) },
+                            acc );
+
+    C.set_lrmat( std::move( W ), std::move( X ) );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const hpro::TBlockMatrix &                   B,
+           hpro::TRkMatrix &                            C,
+           const hpro::TTruncAcc &                      acc,
+           const approx_t &                             approx )
+{
+    HLR_MULT_PRINT;
+
+    // U·S·(V' × B) as B' × V
+    auto  VA = A.col_basis( op_A );
+    auto  VC = blas::matrix< value_t >( C.ncols(), VA.ncols() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
+
+    auto  VxS     = blas::prod( VC, blas::mat_view( blas::adjoint( op_A ), A.coeff() ) );
+    auto [ W, X ] = approx( { A.row_basis( op_A ), blas::mat_U< value_t >( C ) },
+                            {                 VxS, blas::mat_V< value_t >( C ) },
+                            acc );
+
+    C.set_lrmat( std::move( W ), std::move( X ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const hpro::TBlockMatrix &                   A,
+           const hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           hpro::TDenseMatrix &                         C )
+{
+    HLR_MULT_PRINT;
+
+    // (A × U)·S·V'
+    auto  UB = B.row_basis( op_B );
+    auto  UC = blas::matrix< value_t >( C.nrows(), UB.ncols() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  UxS = blas::prod( UC, blas::mat_view( op_B, B.coeff() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+
+    blas::prod( value_t(1), UxS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), blas::mat< value_t >( C ) );
+}
+
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const hpro::matop_t                          op_B,
+           const hpro::TBlockMatrix &                   B,
+           hpro::TDenseMatrix &                         C )
+{
+    HLR_MULT_PRINT;
+
+    // U·S·(V' × B) = U·S·VC' as B' × V = VC
+    auto  VA = A.col_basis( op_A );
+    auto  VC = blas::matrix< value_t >( C.ncols(), VA.ncols() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
+
+    auto  UxS = blas::prod( A.row_basis( op_A ), blas::mat_view( op_A, A.coeff() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+
+    blas::prod( value_t(1), UxS, blas::adjoint( VC ), value_t(1), blas::mat< value_t >( C ) );
 }
 
 template < typename value_t >
@@ -453,6 +634,49 @@ multiply ( const value_t               alpha,
     }// for
 }
 
+template < typename value_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TBlockMatrix &  B,
+           hpro::TDenseMatrix &        C )
+{
+    HLR_MULT_PRINT;
+
+    for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+    {
+        HLR_ASSERT( ! is_null( B.block( 0, j, op_B ) ) );
+        
+        auto  C_j = hpro::TDenseMatrix( C.row_is(), B.block( 0, j, op_B )->col_is( op_B ) );
+        
+        for ( uint  i = 0; i < B.nblock_rows( op_B ); ++i )
+        {
+            auto  DA   = blas::mat< value_t >( A );
+            auto  B_ij = B.block( i, j, op_B );
+            auto  is_i = B_ij->row_is( op_B );
+
+            if ( op_A == hpro::apply_normal )
+            {
+                auto  DA_i = blas::matrix< value_t >( DA, blas::range::all, is_i - A.col_ofs() );
+                auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );
+            }// if
+            else
+            {
+                auto  DA_i = blas::matrix< value_t >( DA, is_i - A.row_ofs(), blas::range::all );
+                auto  A_i  = hpro::TDenseMatrix( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( alpha, op_A, A_i, op_B, *B_ij, C_j );
+            }// else
+        }// for
+
+        C.add_block( hpro::real(1), hpro::real(1), &C_j );
+    }// for
+}
+
 template < typename value_t,
            typename approx_t >
 void
@@ -473,6 +697,28 @@ multiply ( const value_t            alpha,
     auto  R  = std::make_unique< hpro::TRkMatrix >( C.row_is(), C.col_is(), UT, blas::mat_V< value_t >( B, op_B ) );
         
     hlr::add< value_t >( value_t(1), *R, C, acc, approx );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               alpha,
+           const hpro::matop_t         op_A,
+           const hpro::TDenseMatrix &  A,
+           const hpro::matop_t         op_B,
+           const hpro::TDenseMatrix &  B,
+           hpro::TBlockMatrix &        C,
+           const hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
+{
+    HLR_MULT_PRINT;
+
+    auto  DA = blas::mat< value_t >( A );
+    auto  DB = blas::mat< value_t >( B );
+    auto  DT = blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ) );
+    auto  T  = hpro::TDenseMatrix( C.row_is(), C.col_is(), std::move( DT ) );
+        
+    hlr::add< value_t >( value_t(1), T, C, acc, approx );
 }
 
 template < typename value_t,
@@ -499,7 +745,7 @@ multiply ( const value_t            alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -533,7 +779,7 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -561,7 +807,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), VB },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -588,8 +834,24 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), BVS },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t               /* alpha */,
+           const hpro::matop_t         /* op_A */,
+           const hpro::TDenseMatrix &  /* A */,
+           const hpro::matop_t         /* op_B */,
+           const hpro::TBlockMatrix &  /* B */,
+           hpro::TRkMatrix &           /* C */,
+           const hpro::TTruncAcc &     /* acc */,
+           const approx_t &            /* approx */ )
+{
+    HLR_ERROR( "todo" );
+}
+
 
 template < typename value_t,
            typename approx_t >
@@ -616,7 +878,7 @@ multiply ( const value_t               alpha,
                             { blas::mat_V< value_t >( C ), blas::mat_V< value_t >( B, op_B ) },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 
@@ -644,7 +906,7 @@ multiply ( const value_t                                alpha,
                             { blas::mat_V< value_t >( C ), B.col_cb( op_B ).basis() },
                             acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t,
@@ -672,7 +934,7 @@ multiply ( const value_t               alpha,
 
     auto [ U, V ] = approx( AB, acc );
         
-    C.set_lrmat( U, V );
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 template < typename value_t >

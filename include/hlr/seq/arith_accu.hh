@@ -2,23 +2,19 @@
 #define __HLR_SEQ_ARITH_ACCU_HH
 //
 // Project     : HLib
-// File        : arith.hh
+// Module      : seq/arith_accu.hh
 // Description : sequential arithmetic functions using accumulators
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_add.hh>
-#include <hpro/algebra/mat_conv.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
-#include "hlr/utils/tensor.hh"
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/add.hh"
 #include "hlr/arith/solve.hh"

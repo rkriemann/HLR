@@ -28,7 +28,7 @@ namespace detail
 template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
-lanczos ( operator_t &             M,
+lanczos ( const operator_t &       M,
           const hpro::TTruncAcc &  acc,
           const bool               with_svd = false )
 {
@@ -96,7 +96,7 @@ lanczos ( operator_t &             M,
 
         // and orthogonalize u wrt. to U (except last u)
         for ( uint  i = 0; i < step; ++i )
-            blas::add( - blas::dot( u, U[i] ), U[i], u );
+            blas::add( - blas::dot( U[i], u ), U[i], u );
 
         //
         // v = M'·u - beta_step · V(:,step);
@@ -112,7 +112,7 @@ lanczos ( operator_t &             M,
         
         // and orthogonalize v wrt. to V
         for ( uint  i = 0; i < step; ++i )
-            blas::add( - blas::dot( v, V[i] ), V[i], v );
+            blas::add( - blas::dot( V[i], v ), V[i], v );
 
         U.push_back( std::move( u ) );
         V.push_back( std::move( v ) );
@@ -405,7 +405,11 @@ struct Lanczos
 {
     using  value_t = T_value;
 
-    const bool  with_svd = false;
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+
+    // use SVD after Lanczos iteration for bidiagonal matrix
+    const bool            with_svd                  = true;
     
     //
     // operators
@@ -445,6 +449,15 @@ struct Lanczos
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::lanczos( U, T, V, acc, with_svd );
+    }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        return detail::lanczos< operator_t >( op, acc );
     }
 };
 

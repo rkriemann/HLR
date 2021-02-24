@@ -13,7 +13,15 @@
 namespace hlr { namespace seq { namespace uniform {
 
 using hlr::uniform::mul_vec;
+using hlr::uniform::multiply;
 using hlr::uniform::lu;
+
+namespace accu
+{
+
+using hlr::uniform::accu::lu;
+
+}// namespace accu
 
 namespace tlr
 {

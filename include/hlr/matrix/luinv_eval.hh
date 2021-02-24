@@ -14,6 +14,7 @@
 
 #include <hpro/matrix/TLinearOperator.hh>
 
+#include <hlr/arith/blas.hh>
 #include <hlr/dag/graph.hh>
 #include <hlr/dag/solve.hh>
 #include <hlr/seq/dag.hh>
@@ -21,7 +22,6 @@
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // local matrix type
 DECLARE_TYPE( luinv_eval );
@@ -106,12 +106,21 @@ public:
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
     virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::Vector< hpro::real > &     x,
-                                blas::Vector< hpro::real > &           y,
+                                const blas::vector< hpro::real > &     x,
+                                blas::vector< hpro::real > &           y,
                                 const hpro::matop_t                    op = hpro::apply_normal ) const;
     virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::Vector< hpro::complex > &  x,
-                                blas::Vector< hpro::complex > &        y,
+                                const blas::vector< hpro::complex > &  x,
+                                blas::vector< hpro::complex > &        y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+
+    virtual void  apply_add   ( const hpro::real                       alpha,
+                                const blas::matrix< hpro::real > &     X,
+                                blas::matrix< hpro::real > &           Y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const hpro::complex                    alpha,
+                                const blas::matrix< hpro::complex > &  X,
+                                blas::matrix< hpro::complex > &        Y,
                                 const hpro::matop_t                    op = hpro::apply_normal ) const;
 
     //

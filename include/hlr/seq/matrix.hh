@@ -620,7 +620,7 @@ clear ( hpro::TMatrix &  M )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &                          M,
+copy_uniform ( const hpro::TMatrix &             M,
                const cluster_basis< value_t > &  rowcb,
                const cluster_basis< value_t > &  colcb )
 {

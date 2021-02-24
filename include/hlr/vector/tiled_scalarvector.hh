@@ -73,14 +73,14 @@ public:
     //
 
     tiled_scalarvector ()
-            : TVector( 0, hpro::value_type< value_t >::value )
+            : TVector( 0, hpro::value_type_v< value_t > )
             , _is( 0, 0 )
             , _ntile( 0 )
     {}
     
     tiled_scalarvector ( const indexset &  ais,
                          tile_is_map_t &   atile_is_map )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _ntile( 0 )
     {
@@ -89,7 +89,7 @@ public:
 
     tiled_scalarvector ( const indexset  ais,
                          const size_t    antile )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _ntile( antile )
     {
@@ -99,7 +99,7 @@ public:
     tiled_scalarvector ( const indexset                   ais,
                          const size_t                     antile,
                          const blas::Vector< value_t > &  av )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _ntile( antile )
     {

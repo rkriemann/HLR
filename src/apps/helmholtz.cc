@@ -35,7 +35,7 @@ helmholtz_slp::helmholtz_slp ( const hpro::complex  kappa,
     _grid = hpro::make_grid( grid );
         
     auto  fnspace = std::make_unique< TConstFnSpace >( _grid.get() );
-    auto  bf      = std::make_unique< THelmholtzSLPBF< TConstFnSpace, TConstFnSpace > >( kappa, fnspace.get(), fnspace.get() );
+    auto  bf      = std::make_unique< THelmholtzSLPBF< TConstFnSpace, TConstFnSpace > >( kappa, fnspace.get(), fnspace.get(), 5 );
 
     log( 1, HLIB::to_string( "    no. of indices = %d", fnspace->n_indices() ) );
     

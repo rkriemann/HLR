@@ -33,17 +33,17 @@ namespace detail
 // replace column basis of block M_ij by X and update basis
 // of block row to [ V, X ]
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 extend_col_basis ( hpro::TBlockMatrix &                   M,
                    matrix::uniform_lrmatrix< value_t > &  M_ij,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        X,
-                   const hpro::TTruncAcc &                acc )
+                   const hpro::TTruncAcc &                acc,
+                   const approx_t &                       approx )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
-
     //
     // compute QR of X for norm computation later
     //
@@ -116,9 +116,9 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
             // std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( SR_kj ) ) << std::endl;
             blas::scale( value_t(1) / blas::norm_2( SR_kj ), S_kj );
                 
-            auto  Qe_k = blas::matrix( Qe,
-                                       blas::range( pos, pos + rank_k-1 ),
-                                       blas::range( V.ncols(), Ve.ncols() - 1 ) );
+            auto  Qe_k = blas::matrix< value_t >( Qe,
+                                                  blas::range( pos, pos + rank_k-1 ),
+                                                  blas::range( V.ncols(), Ve.ncols() - 1 ) );
 
             blas::copy( S_kj, Qe_k );
         }// if
@@ -129,9 +129,9 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
             // std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( S_kj ) ) << std::endl;
             blas::scale( value_t(1) / blas::norm_2( S_kj ), S_kj );
 
-            auto  Qe_k = blas::matrix( Qe,
-                                       blas::range( pos, pos + rank_k-1 ),
-                                       blas::range( 0, V.ncols() - 1 ) );
+            auto  Qe_k = blas::matrix< value_t >( Qe,
+                                                  blas::range( pos, pos + rank_k-1 ),
+                                                  blas::range( 0, V.ncols() - 1 ) );
 
             blas::copy( S_kj, Qe_k );
         }// else
@@ -150,16 +150,18 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
     // io::matlab::write( R, "R" );
     
     auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
-    auto  Ss  = blas::vector< real_t >();
+    auto  Vn  = approx.column_basis( VeR, acc );
 
-    blas::svd( VeR, Ss );
+    // auto  Ss  = blas::vector< real_t >();
 
-    // io::matlab::write( VeR, "VeR" );
-    // io::matlab::write( Ss, "Ss" );
+    // blas::svd( VeR, Ss );
+
+    // // io::matlab::write( VeR, "VeR" );
+    // // io::matlab::write( Ss, "Ss" );
     
-    const auto  rank   = acc.trunc_rank( Ss );
-    const auto  V_rank = blas::matrix( VeR, blas::range::all, blas::range( 0, rank-1 ) );
-    auto        Vn     = blas::copy( V_rank );
+    // const auto  rank   = acc.trunc_rank( Ss );
+    // const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
+    // auto        Vn     = blas::copy( V_rank );
     
     // io::matlab::write( Vn, "Vn" );
 
@@ -235,7 +237,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
                        const blas::matrix< value_t > &        X,
                        const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // construct full block column Xt, perform SVD and
@@ -290,7 +292,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
                     D_kj = std::move( blas::prod( VS, blas::adjoint( U ) ) );
                 }// else
                 
-                auto  Xt_k = blas::matrix( Xt, blas::range::all, blas::range( pos, pos + D_kj.ncols() - 1 ) );
+                auto  Xt_k = blas::matrix< value_t >( Xt, blas::range::all, blas::range( pos, pos + D_kj.ncols() - 1 ) );
 
                 std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( D_kj ) ) << std::endl;
                 blas::scale( value_t(1) / blas::norm_2( D_kj ), D_kj );
@@ -307,7 +309,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
         blas::svd( Xt, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  V_rank = blas::matrix( Xt, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  V_rank = blas::matrix< value_t >( Xt, blas::range::all, blas::range( 0, rank-1 ) );
 
         Vn = std::move( blas::copy( V_rank ) );
 
@@ -388,7 +390,7 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
                    const blas::matrix< value_t > &        W,
                    const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // compute QR of W for norm computation later
@@ -466,9 +468,9 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
             // std::cout << R_ik->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( RS_ik ) ) << std::endl;
             blas::scale( value_t(1) / blas::norm_2( RS_ik ), S_ik );
 
-            auto  Qe_k = blas::matrix( Qe,
-                                       blas::range( pos, pos + rank_k-1 ),
-                                       blas::range( U.ncols(), Ue.ncols() - 1 ) );
+            auto  Qe_k = blas::matrix< value_t >( Qe,
+                                                  blas::range( pos, pos + rank_k-1 ),
+                                                  blas::range( U.ncols(), Ue.ncols() - 1 ) );
 
             blas::copy( blas::adjoint( S_ik ), Qe_k );
         }// if
@@ -480,9 +482,9 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
             // std::cout << R_ik->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( S_ik ) ) << std::endl;
             blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
             
-            auto  Qe_k = blas::matrix( Qe,
-                                       blas::range( pos, pos + rank_k-1 ),
-                                       blas::range( 0, U.ncols() - 1 ) );
+            auto  Qe_k = blas::matrix< value_t >( Qe,
+                                                  blas::range( pos, pos + rank_k-1 ),
+                                                  blas::range( 0, U.ncols() - 1 ) );
 
             blas::copy( blas::adjoint( S_ik ), Qe_k );
         }// else
@@ -511,7 +513,7 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
     // io::matlab::write( Ss, "Ss" );
     
     const auto  rank   = acc.trunc_rank( Ss );
-    const auto  U_rank = blas::matrix( UeR, blas::range::all, blas::range( 0, rank-1 ) );
+    const auto  U_rank = blas::matrix< value_t >( UeR, blas::range::all, blas::range( 0, rank-1 ) );
     auto        Un     = blas::copy( U_rank );
     const auto  TU     = blas::prod( blas::adjoint( Un ), U );
 
@@ -587,7 +589,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
                        const blas::matrix< value_t > &        W,
                        const hpro::TTruncAcc &                acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     //
     // compute full block row, perform SVD and use
@@ -645,7 +647,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
                 // std::cout << R_ik->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( D_ik ) ) << std::endl;
                 blas::scale( value_t(1) / blas::norm_2( D_ik ), D_ik );
                 
-                auto  Xt_k = blas::matrix( Xt, blas::range::all, blas::range( pos, pos + D_ik.ncols() - 1 ) );
+                auto  Xt_k = blas::matrix< value_t >( Xt, blas::range::all, blas::range( pos, pos + D_ik.ncols() - 1 ) );
 
                 blas::copy( D_ik, Xt_k );
 
@@ -660,7 +662,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
         blas::svd( Xt, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  U_rank = blas::matrix( Xt, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  U_rank = blas::matrix< value_t >( Xt, blas::range::all, blas::range( 0, rank-1 ) );
 
         Un = std::move( blas::copy( U_rank ) );
 
@@ -743,7 +745,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
                         blas::matrix< value_t > &  X,
                         const hpro::TTruncAcc &    acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     // io::matlab::write( W, "W" );
     // io::matlab::write( T, "T" );
@@ -833,9 +835,9 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
                     
                     blas::scale( value_t(1) / blas::norm_2( T ), S_kj );
                 
-                    auto  S_k = blas::matrix( S,
-                                              blas::range( pos, pos + rank-1 ),
-                                              blas::range( V.ncols(), Ve.ncols() - 1 ) );
+                    auto  S_k = blas::matrix< value_t >( S,
+                                                         blas::range( pos, pos + rank-1 ),
+                                                         blas::range( V.ncols(), Ve.ncols() - 1 ) );
 
                     blas::copy( S_kj, S_k );
                     pos += rank;
@@ -849,9 +851,9 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
                     
                     blas::scale( value_t(1) / blas::norm_2( S_kj ), S_kj );
 
-                    auto  S_k = blas::matrix( S,
-                                              blas::range( pos, pos + rank-1 ),
-                                              blas::range( 0, V.ncols() - 1 ) );
+                    auto  S_k = blas::matrix< value_t >( S,
+                                                         blas::range( pos, pos + rank-1 ),
+                                                         blas::range( 0, V.ncols() - 1 ) );
 
                     blas::copy( S_kj, S_k );
                     pos += rank;
@@ -870,7 +872,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
             blas::svd( VeR, Ss );
 
             const auto  rank   = acc.trunc_rank( Ss );
-            const auto  V_rank = blas::matrix( VeR, blas::range::all, blas::range( 0, rank-1 ) );
+            const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
 
             Vn = std::move( blas::copy( V_rank ) );
     
@@ -997,9 +999,9 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
 
                     blas::scale( value_t(1) / blas::norm_2( T ), S_ik );
 
-                    auto  S_k = blas::matrix( S,
-                                              blas::range( pos, pos + rank-1 ),
-                                              blas::range( U.ncols(), Ue.ncols() - 1 ) );
+                    auto  S_k = blas::matrix< value_t >( S,
+                                                         blas::range( pos, pos + rank-1 ),
+                                                         blas::range( U.ncols(), Ue.ncols() - 1 ) );
 
                     blas::copy( blas::adjoint( S_ik ), S_k );
                     pos += rank;
@@ -1013,9 +1015,9 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
                     
                     blas::scale( value_t(1) / blas::norm_2( S_ik ), S_ik );
             
-                    auto  S_k = blas::matrix( S,
-                                              blas::range( pos, pos + rank-1 ),
-                                              blas::range( 0, U.ncols() - 1 ) );
+                    auto  S_k = blas::matrix< value_t >( S,
+                                                         blas::range( pos, pos + rank-1 ),
+                                                         blas::range( 0, U.ncols() - 1 ) );
 
                     blas::copy( blas::adjoint( S_ik ), S_k );
                     pos += rank;
@@ -1034,7 +1036,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
             blas::svd( UeR, Ss );
 
             const auto  rank   = acc.trunc_rank( Ss );
-            const auto  U_rank = blas::matrix( UeR, blas::range::all, blas::range( 0, rank-1 ) );
+            const auto  U_rank = blas::matrix< value_t >( UeR, blas::range::all, blas::range( 0, rank-1 ) );
 
             Un = std::move( blas::copy( U_rank ) );
 
@@ -1121,7 +1123,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
                             blas::matrix< value_t > &  X,
                             const hpro::TTruncAcc &    acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = hpro::real_type_t< value_t >;
 
     auto  M_ij = M.block( i, j );
     auto  R_ij = ptrcast( M_ij, matrix::uniform_lrmatrix< value_t > );
@@ -1179,7 +1181,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
                     D_kj = std::move( blas::prod( VS, blas::adjoint( R_kj->row_cb().basis() ) ) );
                 }// else
                 
-                auto  Xt_k = blas::matrix( Xt, blas::range::all, blas::range( pos, pos + D_kj.ncols() - 1 ) );
+                auto  Xt_k = blas::matrix< value_t >( Xt, blas::range::all, blas::range( pos, pos + D_kj.ncols() - 1 ) );
 
                 blas::scale( value_t(1) / blas::norm_2( D_kj ), D_kj );
                 blas::copy( D_kj, Xt_k );
@@ -1193,7 +1195,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
         blas::svd( Xt, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  V_rank = blas::matrix( Xt, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  V_rank = blas::matrix< value_t >( Xt, blas::range::all, blas::range( 0, rank-1 ) );
 
         Vn = std::move( blas::copy( V_rank ) );
 
@@ -1283,7 +1285,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
 
                 blas::scale( value_t(1) / blas::norm_2( D_ik ), D_ik );
                 
-                auto  Xt_k = blas::matrix( Xt, blas::range::all, blas::range( pos, pos + D_ik.ncols() - 1 ) );
+                auto  Xt_k = blas::matrix< value_t >( Xt, blas::range::all, blas::range( pos, pos + D_ik.ncols() - 1 ) );
 
                 blas::copy( D_ik, Xt_k );
 
@@ -1296,7 +1298,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
         blas::svd( Xt, Ss );
 
         const auto  rank   = acc.trunc_rank( Ss );
-        const auto  U_rank = blas::matrix( Xt, blas::range::all, blas::range( 0, rank-1 ) );
+        const auto  U_rank = blas::matrix< value_t >( Xt, blas::range::all, blas::range( 0, rank-1 ) );
 
         Un = std::move( blas::copy( U_rank ) );
 

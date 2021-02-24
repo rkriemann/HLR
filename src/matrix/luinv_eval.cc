@@ -183,8 +183,8 @@ luinv_eval::apply_add  ( const real       /* alpha */,
 //
 void
 luinv_eval::apply_add   ( const real                       /* alpha */,
-                          const blas::Vector< real > &     /* x */,
-                          blas::Vector< real > &           /* y */,
+                          const blas::vector< real > &     /* x */,
+                          blas::vector< real > &           /* y */,
                           const matop_t                    /* op */ ) const
 {
     HLR_ASSERT( false );
@@ -192,8 +192,26 @@ luinv_eval::apply_add   ( const real                       /* alpha */,
 
 void
 luinv_eval::apply_add   ( const complex                    /* alpha */,
-                          const blas::Vector< complex > &  /* x */,
-                          blas::Vector< complex > &        /* y */,
+                          const blas::vector< complex > &  /* x */,
+                          blas::vector< complex > &        /* y */,
+                          const matop_t                    /* op */ ) const
+{
+    HLR_ASSERT( false );
+}
+
+void
+luinv_eval::apply_add   ( const real                       /* alpha */,
+                          const blas::matrix< real > &     /* x */,
+                          blas::matrix< real > &           /* y */,
+                          const matop_t                    /* op */ ) const
+{
+    HLR_ASSERT( false );
+}
+
+void
+luinv_eval::apply_add   ( const complex                    /* alpha */,
+                          const blas::matrix< complex > &  /* x */,
+                          blas::matrix< complex > &        /* y */,
                           const matop_t                    /* op */ ) const
 {
     HLR_ASSERT( false );

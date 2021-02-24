@@ -41,6 +41,7 @@ hlr_main ( int argc, char ** argv )
         else if ( hlr::appl == "materncov"    ) framework_main< hlr::apps::matern_cov >();
         else if ( hlr::appl == "laplaceslp"   ) framework_main< hlr::apps::laplace_slp >();
         else if ( hlr::appl == "helmholtzslp" ) framework_main< hlr::apps::helmholtz_slp >();
+        else if ( hlr::appl == "exp"          ) framework_main< hlr::apps::exp >();
         else
             HLR_ERROR( "unknown application (" + hlr::appl + ")" );
 

@@ -8,9 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <list>
+
 #include <hlr/arith/detail/uniform_bases.hh>
 #include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform.hh>
+#include <hlr/arith/detail/uniform_accu.hh>
 
 namespace hlr { namespace uniform {
 
@@ -52,12 +55,128 @@ mul_vec ( const value_t                             alpha,
 }
 
 //
+// matrix multiplication (eager version)
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    //
+    // construct mapping of A_{t × s} to set of uniform leaves per t/s
+    //
+
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+
+    auto  blocks = std::list< hpro::TMatrix * >{ &C };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< hpro::TMatrix * >();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  BM = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                        if ( ! is_null( BM->block( i, j ) ) )
+                            subblocks.push_back( BM->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    //
+    // perform actual LU factorization
+    //
+
+    detail::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx, rowmap, colmap );
+}
+
+//
 // LU factorization (eager version)
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
+     hpro::TMatrix &          /* REF */ )
+{
+    //
+    // construct mapping of A_{t × s} to set of uniform leaves per t/s
+    //
+
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+
+    auto  blocks = std::list< hpro::TMatrix *>{ &A };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< hpro::TMatrix *>();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  B = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                        if ( ! is_null( B->block( i, j ) ) )
+                            subblocks.push_back( B->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    //
+    // perform actual LU factorization
+    //
+
+    detail::lu< value_t >( A, acc, approx, rowmap, colmap );
+}
+
+//////////////////////////////////////////////////////////////////////
+//
+// accumulator version
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace accu
+{
+
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
      hpro::TMatrix &          REF )
 {
     //
@@ -98,8 +217,12 @@ lu ( hpro::TMatrix &          A,
     // perform actual LU factorization
     //
 
-    detail::lu< value_t >( A, acc, rowmap, colmap );
+    detail::accumulator  accu;
+    
+    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
 }
+
+}// namespace accu
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -195,10 +318,12 @@ multiply ( const value_t            alpha,
 //
 // LU factorization A = L·U, with unit lower triangular L and upper triangular U
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc )
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
@@ -210,8 +335,6 @@ lu ( hpro::TMatrix &          A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        std::cout << i << std::endl;
-        
         auto  A_ii = ptrcast( BA->block( i, i ), hpro::TDenseMatrix );
         auto  D_ii = blas::mat< value_t >( A_ii );
             
@@ -244,7 +367,7 @@ lu ( hpro::TMatrix &          A,
                 auto  V_i  = R_ji->col_cb().basis();
                 auto  MV_i = blas::prod( blas::adjoint( blas::mat< value_t >( A_ii ) ), V_i );
 
-                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc );
+                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc, approx );
             }// if
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );
@@ -297,8 +420,6 @@ lu_lazy ( hpro::TMatrix &          A,
     
     for ( uint  i = 0; i < nbr; ++i )
     {
-        std::cout << i << std::endl;
-        
         //
         // invert diagonal block
         //
@@ -452,10 +573,12 @@ lu_lazy ( hpro::TMatrix &          A,
 //
 // LDU factorization A = L·D·U, with unit lower/upper triangular L/U and diagonal D
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 ldu ( hpro::TMatrix &          A,
-      const hpro::TTruncAcc &  acc )
+      const hpro::TTruncAcc &  acc,
+      const approx_t &         approx )
 {
     HLR_LOG( 4, hpro::to_string( "ldu( %d )", A.id() ) );
     
@@ -506,7 +629,7 @@ ldu ( hpro::TMatrix &          A,
                 auto  V_i  = R_ji->col_cb().basis();
                 auto  MV_i = blas::prod( blas::adjoint( D_ii ), V_i );
 
-                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc );
+                detail::extend_col_basis< value_t >( *BA, *R_ji, j, i, MV_i, acc, approx );
             }// if
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );

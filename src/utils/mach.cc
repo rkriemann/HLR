@@ -10,7 +10,10 @@
 #  define _GNU_SOURCE
 #endif
 
-#include <sched.h>
+#if defined(__linux)
+#  include <sched.h>
+#endif
+
 #include <unistd.h>
 
 #include <fstream>
@@ -25,6 +28,8 @@ namespace hlr { namespace mach
 std::string
 cpuset ()
 {
+    #if defined(__linux)
+    
     cpu_set_t  cset;
 
     CPU_ZERO( & cset );
@@ -79,6 +84,12 @@ cpuset ()
     out << " (#" << ncores << ')';
                 
     return out.str();
+
+    #else
+
+    return "unknown";
+    
+    #endif
 }
 
 //
@@ -87,6 +98,8 @@ cpuset ()
 std::string
 cpu ()
 {
+    #if defined(__linux)
+    
     //
     // look in /proc/cpuinfo for "model name"
     //
@@ -135,6 +148,12 @@ cpu ()
     }// for
     
     return cpu;
+
+    #else
+
+    return "unknown";
+
+    #endif
 }
 
 //

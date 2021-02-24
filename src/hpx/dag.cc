@@ -60,76 +60,76 @@ refine ( node *                            root,
         std::atomic< bool >                  any_changed = false;
 
         // first refine nodes
-        ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                   node_sets.begin(), node_sets.end(),
-                                   [&,min_size] ( const auto &  nset )
-                                   {
-                                       bool          any_chg_loc = false;
-                                       
-                                       for ( auto  node : nset )
-                                       {
-                                           node->refine( min_size );
-                                           
-                                           if ( node->is_refined() )
-                                               any_chg_loc = true;
-                                       }// for
-                                       
-                                       if ( any_chg_loc )
-                                           any_changed = true;
-                                   } );
+        ::hpx::for_each( ::hpx::execution::par,
+                         node_sets.begin(), node_sets.end(),
+                         [&,min_size] ( const auto &  nset )
+                         {
+                             bool          any_chg_loc = false;
+                             
+                             for ( auto  node : nset )
+                             {
+                                 node->refine( min_size );
+                                 
+                                 if ( node->is_refined() )
+                                     any_chg_loc = true;
+                             }// for
+                             
+                             if ( any_chg_loc )
+                                 any_changed = true;
+                         } );
 
         if ( any_changed )
         {
             auto  set_range = boost::irange( size_t(0), node_sets.size() );
             
             // then refine dependencies and collect new nodes
-            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                       set_range.begin(), set_range.end(),
-                                       [&,do_lock] ( const auto  i )
-                                       {
-                                           const auto &  nset = node_sets[i];
+            ::hpx::for_each( ::hpx::execution::par,
+                             set_range.begin(), set_range.end(),
+                             [&,do_lock] ( const auto  i )
+                             {
+                                 const auto &  nset = node_sets[i];
+                                 
+                                 for ( auto  node : nset )
+                                 {
+                                     const bool  node_changed = node->refine_deps( do_lock );
                                      
-                                           for ( auto  node : nset )
-                                           {
-                                               const bool  node_changed = node->refine_deps( do_lock );
+                                     if ( node->is_refined() )       // node was refined; collect all sub nodes
+                                     {
+                                         for ( auto  sub : node->sub_nodes() )
+                                             subnodes[i].push_back( sub );
+                                         
+                                         delnodes[i].push_back( node );
+                                     }// if
+                                     else if ( node_changed )        // node was not refined but dependencies were
+                                     {
+                                         subnodes[i].push_back( node );
+                                     }// if
+                                     else                            // neither node nor dependencies changed: reached final state
+                                     {
+                                         // adjust dependency counter of successors (which were NOT refined!)
+                                         for ( auto  succ : node->successors() )
+                                             succ->inc_dep_cnt();
 
-                                               if ( node->is_refined() )       // node was refined; collect all sub nodes
-                                               {
-                                                   for ( auto  sub : node->sub_nodes() )
-                                                       subnodes[i].push_back( sub );
+                                         {
+                                             std::scoped_lock  lock( mtx );
                     
-                                                   delnodes[i].push_back( node );
-                                               }// if
-                                               else if ( node_changed )        // node was not refined but dependencies were
-                                               {
-                                                   subnodes[i].push_back( node );
-                                               }// if
-                                               else                            // neither node nor dependencies changed: reached final state
-                                               {
-                                                   // adjust dependency counter of successors (which were NOT refined!)
-                                                   for ( auto  succ : node->successors() )
-                                                       succ->inc_dep_cnt();
+                                             tasks.push_back( node );
 
-                                                   {
-                                                       std::scoped_lock  lock( mtx );
-                    
-                                                       tasks.push_back( node );
-
-                                                       if ( node->successors().empty() )
-                                                           end.push_back( node );
-                                                   }
-                                               }// else
-                                           }// for
-                                       } );
+                                             if ( node->successors().empty() )
+                                                 end.push_back( node );
+                                         }
+                                     }// else
+                                 }// for
+                             } );
 
             // delete all refined nodes (only after "dep_refine" since accessed in "refine_deps")
-            ::hpx::parallel::for_each( ::hpx::parallel::execution::par,
-                                       delnodes.begin(), delnodes.end(),
-                                       [&] ( const auto &  nset )
-                                       {
-                                           for ( auto  node : nset )
-                                               delete node;
-                                       } );
+            ::hpx::for_each( ::hpx::execution::par,
+                             delnodes.begin(), delnodes.end(),
+                             [&] ( const auto &  nset )
+                             {
+                                 for ( auto  node : nset )
+                                     delete node;
+                             } );
             
             //
             // split node sets if too large (increase parallelity)

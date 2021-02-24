@@ -52,8 +52,7 @@ private:
     // local index set of matrix
     indexset                          _row_is, _col_is;
     
-    // low-rank factors in uniform storage:
-    // mapping of (sub-) index set to tile
+    // low-rank factors in uniform storage
     const cluster_basis< value_t > *  _row_cb;
     const cluster_basis< value_t > *  _col_cb;
 
@@ -66,7 +65,7 @@ public:
     //
 
     uniform_lrmatrix ()
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
             , _row_cb( nullptr )
@@ -76,7 +75,7 @@ public:
     
     uniform_lrmatrix ( const indexset                arow_is,
                        const indexset                acol_is )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _row_cb( nullptr )
@@ -90,7 +89,7 @@ public:
                        const cluster_basis< value_t > &  arow_cb,
                        const cluster_basis< value_t > &  acol_cb,
                        hlr::blas::matrix< value_t > &&   aS )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _row_cb( &arow_cb )
@@ -116,18 +115,18 @@ public:
     uint                              row_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_rank() : col_rank(); }
     uint                              col_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_rank() : row_rank(); }
 
-    // cluster_basis< value_t > &        row_cb   ()       { return *_row_cb; }
     const cluster_basis< value_t > &  row_cb   () const { return *_row_cb; }
-
-    // cluster_basis< value_t > &        col_cb   ()       { return *_col_cb; }
     const cluster_basis< value_t > &  col_cb   () const { return *_col_cb; }
 
-    // cluster_basis< value_t > &        row_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_cb() : col_cb(); }
     const cluster_basis< value_t > &  row_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? row_cb() : col_cb(); }
-
-    // cluster_basis< value_t > &        col_cb   ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_cb() : row_cb(); }
     const cluster_basis< value_t > &  col_cb   ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? col_cb() : row_cb(); }
 
+    const blas::matrix< value_t > &   row_basis () const { return _row_cb->basis(); }
+    const blas::matrix< value_t > &   col_basis () const { return _col_cb->basis(); }
+    
+    const blas::matrix< value_t > &   row_basis ( const matop_t  op ) const { return op == hpro::apply_normal ? row_basis() : col_basis(); }
+    const blas::matrix< value_t > &   col_basis ( const matop_t  op ) const { return op == hpro::apply_normal ? col_basis() : row_basis(); }
+    
     void
     set_cluster_bases ( const cluster_basis< value_t > &  arow_cb,
                         const cluster_basis< value_t > &  acol_cb )
@@ -212,6 +211,12 @@ public:
     
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const hpro::TTruncAcc & acc );
+
+    // scale matrix by alpha
+    virtual void scale    ( const real  alpha )
+    {
+        blas::scale( value_t( alpha ), _S );
+    }
 
     //
     // RTTI

@@ -11,10 +11,11 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
 
+#include <hlr/arith/blas.hh>
+
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 using namespace hpro;
     
@@ -36,13 +37,13 @@ restrict ( TMatrix &               M,
         {
             auto  MU = RM->blas_cmat_A();
             auto  MV = RM->blas_cmat_B();
-            auto  RU = blas::Matrix< hpro::complex >( MU,
+            auto  RU = blas::matrix< hpro::complex >( MU,
                                                       bis.row_is() - M.row_ofs(),
-                                                      blas::Range::all,
+                                                      blas::range::all,
                                                       copy_value );
-            auto  RV = blas::Matrix< hpro::complex >( MV,
+            auto  RV = blas::matrix< hpro::complex >( MV,
                                                       bis.col_is() - M.col_ofs(),
-                                                      blas::Range::all,
+                                                      blas::range::all,
                                                       copy_value );
 
             R->set_lrmat( std::move( RU ), std::move( RV ) );
@@ -51,13 +52,13 @@ restrict ( TMatrix &               M,
         {
             auto  MU = RM->blas_rmat_A();
             auto  MV = RM->blas_rmat_B();
-            auto  RU = blas::Matrix< hpro::real >( MU,
+            auto  RU = blas::matrix< hpro::real >( MU,
                                                    bis.row_is() - M.row_ofs(),
-                                                   blas::Range::all,
+                                                   blas::range::all,
                                                    copy_value );
-            auto  RV = blas::Matrix< hpro::real >( MV,
+            auto  RV = blas::matrix< hpro::real >( MV,
                                                    bis.col_is() - M.col_ofs(),
-                                                   blas::Range::all,
+                                                   blas::range::all,
                                                    copy_value );
 
             R->set_lrmat( std::move( RU ), std::move( RV ) );
@@ -71,7 +72,7 @@ restrict ( TMatrix &               M,
 
         if ( M.is_complex() )
         {
-            auto  D = blas::Matrix< hpro::complex >( DM->blas_cmat(),
+            auto  D = blas::matrix< hpro::complex >( DM->blas_cmat(),
                                                      bis.row_is() - M.row_ofs(),
                                                      bis.col_is() - M.col_ofs(),
                                                      copy_value );
@@ -80,7 +81,7 @@ restrict ( TMatrix &               M,
         }// if
         else
         {
-            auto  D = blas::Matrix< hpro::real >( DM->blas_rmat(),
+            auto  D = blas::matrix< hpro::real >( DM->blas_rmat(),
                                                   bis.row_is() - M.row_ofs(),
                                                   bis.col_is() - M.col_ofs(),
                                                   copy_value );

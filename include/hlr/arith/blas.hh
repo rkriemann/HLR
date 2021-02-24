@@ -323,7 +323,7 @@ extend ( const matrix< value_t > &  M,
          const size_t               ncols )
 {
     auto  T  = matrix< value_t >( M.nrows() + nrows, M.ncols() + ncols );
-    auto  TM = matrix( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
+    auto  TM = matrix< value_t >( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
 
     copy( M, TM );
 
@@ -364,7 +364,7 @@ join_row ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M, range::all, range( pos, pos + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M, range::all, range( pos, pos + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos += ncols_i;
@@ -391,8 +391,8 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     {
         if ( ncols == 0 )
             ncols = M_i.ncols();
-        else
-            HLR_ASSERT( ncols == M_i.ncols() );
+        else if ( ncols != M_i.ncols() )
+            HLR_ERROR( "matrices have different column sizes" );
 
         nrows += M_i.nrows();
     }// for
@@ -407,7 +407,7 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  nrows_i = M_i.nrows();
-        auto        dest_i  = matrix( M, range( pos, pos + nrows_i - 1 ), range::all );
+        auto        dest_i  = matrix< value_t >( M, range( pos, pos + nrows_i - 1 ), range::all );
 
         copy( M_i, dest_i );
         pos += nrows_i;
@@ -448,9 +448,9 @@ diag ( const std::list< matrix< value_t > > &  matrices )
     {
         const auto  nrows_i = M_i.nrows();
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M,
-                                      range( pos_r, pos_r + nrows_i - 1 ),
-                                      range( pos_c, pos_c + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M,
+                                                 range( pos_r, pos_r + nrows_i - 1 ),
+                                                 range( pos_c, pos_c + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos_r += nrows_i;
@@ -700,6 +700,20 @@ add ( const T_alpha   alpha,
     return hpro::BLAS::add( typename T_matA::value_t( alpha ), A, B );
 }
 
+template < typename T_matA,
+           typename T_vecX >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_vector_v< T_vecX > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t >,
+                  vector< typename T_matA::value_t > >
+mulvec ( const T_matA &  A,
+         const T_vecX &  x )
+{
+    HLR_DBG_ASSERT( A.ncols() == x.length() );
+    
+    return hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
+}
+
 template < typename T_beta,
            typename T_matA,
            typename T_matB,
@@ -760,6 +774,7 @@ prod ( const T_matA &  A,
     return prod( typename T_matA::value_t(1), A, B );
 }
 
+using hpro::BLAS::mulvec;
 using hpro::BLAS::prod;
 
 //////////////////////////////////////////////////////////////////////
@@ -810,7 +825,7 @@ qr2  ( matrix< value_t > &  M,
             copy( M, R );
             M = std::move( matrix< value_t >( nrows, nrows ) );
 
-            auto  RM = blas::matrix( R, range::all, range( 0, nrows-1 ) );
+            auto  RM = blas::matrix< value_t >( R, range::all, range( 0, nrows-1 ) );
 
             copy( RM, M );
 
@@ -845,7 +860,7 @@ qr2  ( matrix< value_t > &  M,
     // const auto  err = norm_2( M1 ) / norm_2( DM );
 
     // if ( err > 1e-15 )
-    //     std::cout << err << std::endl;
+    //     std::cout << "qr : " << err << std::endl;
     // // DEBUG }
     
     #else
@@ -1020,10 +1035,8 @@ qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
      const bool           comp_Q = true )
 {
-    // if ( M.nrows() > 2*M.ncols() )
-    //     blas::qrts( M, R );
-    // else
     blas::qr2( M, R, comp_Q );
+    // HLIB::BLAS::qr( M, R );
 }
 
 //
@@ -1390,6 +1403,47 @@ factorise_ortho ( const matrix< value_t > &  M,
     }// else
 }
 
+//
+// compute QR with column pivoting, i.e., M·P = Q·R
+// - upon return M holds Q
+//
+template < typename value_t >
+void
+qrp ( matrix< value_t > &   M,
+      matrix< value_t > &   R,
+      std::vector< int > &  P )
+{
+    // // DEBUG {
+    // auto  CM = copy( M );
+    // // DEBUG }
+
+    HLIB::BLAS::qrp( M, R, P );
+    
+    // // DEBUG {
+    // auto  PR = copy( R );
+    
+    // for ( size_t  i = 0; i < P.size(); ++i )
+    // {
+    //     auto  j    = P[i];
+    //     auto  R_i  = R.column( i );
+    //     auto  PR_j = PR.column( j );
+
+    //     copy( R_i, PR_j );
+    // }// for
+
+    // HLIB::DBG::write( PR, "PR.mat", "PR" );
+    
+    // auto  TM = prod( M, PR );
+
+    // blas::add( value_t(-1), CM, TM );
+
+    // const auto  err = norm_2( TM ) / norm_2( CM );
+
+    // if ( err > 1e-15 )
+    //     std::cout << "qrp : " << err << std::endl;
+    // // DEBUG }
+}
+    
 //
 // construct SVD of bidiagonal matrix with diagonal D and off-diagonal E
 //

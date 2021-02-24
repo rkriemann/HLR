@@ -1,11 +1,11 @@
 #ifndef __HLR_TF_ARITH_HH
 #define __HLR_TF_ARITH_HH
 //
-// Project     : HLib
-// File        : arith.hh
-// Description : sequential arithmetic functions
+// Project     : HLR
+// Module      : tf/arith
+// Description : arithmetic functions using TF
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <taskflow/taskflow.hpp>
@@ -121,7 +121,7 @@ namespace detail
 template < typename value_t,
            typename approx_t >
 void
-multiply ( ::tf::SubflowBuilder &   tf,
+multiply ( ::tf::Subflow &          tf,
            const value_t            alpha,
            const hpro::matop_t      op_A,
            const hpro::TMatrix &    A,
@@ -154,12 +154,10 @@ multiply ( ::tf::SubflowBuilder &   tf,
                     HLR_ASSERT( ! is_null( C_ij ) );
             
                     tf.emplace(
-                        [=,&acc,&approx] ( auto &  sf )
+                        [=,&acc,&approx] ( ::tf::Subflow &  sf )
                         {
                             multiply< value_t >( sf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                         } );
-                    
-                    // multiply< value_t >( tf, alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
                 }// for
             }// for
         }// for
@@ -190,7 +188,7 @@ multiply ( const value_t            alpha,
 {
     ::tf::Taskflow  tf;
     
-    tf.emplace( [=,&A,&B,&C,&acc,&approx] ( auto &  sf ) { detail::multiply( sf, alpha, op_A, A, op_B, B, C, acc, approx ); } );
+    tf.emplace( [=,&A,&B,&C,&acc,&approx] ( ::tf::Subflow &  sf ) { detail::multiply( sf, alpha, op_A, A, op_B, B, C, acc, approx ); } );
 
     ::tf::Executor  executor;
     
@@ -206,7 +204,7 @@ namespace detail
 {
 
 inline void
-gauss_elim ( ::tf::SubflowBuilder &  tf,
+gauss_elim ( ::tf::Subflow &         tf,
              hpro::TMatrix &         A,
              hpro::TMatrix &         T,
              const TTruncAcc &       acc )
@@ -222,7 +220,7 @@ gauss_elim ( ::tf::SubflowBuilder &  tf,
         auto  BT = ptrcast( &T, TBlockMatrix );
 
         // A_00 = A_00⁻¹
-        auto  inv_a00 = tf.emplace( [BA,BT,&acc] ( auto &  sf ) { detail::gauss_elim( sf, *BA->block(0,0), *BT->block(0,0), acc ); } );
+        auto  inv_a00 = tf.emplace( [BA,BT,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, *BA->block(0,0), *BT->block(0,0), acc ); } );
 
         // T_01 = A_00⁻¹ · A_01
         auto  upd_t01 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( 1.0, apply_normal, BA->block(0,0), apply_normal, BA->block(0,1), 0.0, BT->block(0,1), acc ); } );
@@ -237,7 +235,7 @@ gauss_elim ( ::tf::SubflowBuilder &  tf,
         upd_t10.precede( upd_a11 );
     
         // A_11 = A_11⁻¹
-        auto  inv_a11 = tf.emplace( [BA,BT,&acc] ( auto &  sf ) { detail::gauss_elim( sf, *BA->block(1,1), *BT->block(1,1), acc ); } );
+        auto  inv_a11 = tf.emplace( [BA,BT,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, *BA->block(1,1), *BT->block(1,1), acc ); } );
         upd_a11.precede( inv_a11 );
 
         // A_01 = - T_01 · A_11
@@ -277,7 +275,7 @@ gauss_elim ( hpro::TMatrix &    A,
 {
     ::tf::Taskflow  tf;
 
-    tf.emplace( [&A,&T,&acc] ( auto &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
+    tf.emplace( [&A,&T,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
 
     ::tf::Executor  executor;
     
@@ -646,7 +644,7 @@ lu ( TMatrix &          A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 auto  update = tf.emplace(
-                    [=,&acc,&approx] ( auto &  sf ) 
+                    [=,&acc,&approx] ( ::tf::Subflow &  sf ) 
                     {
                         hlr::tf::detail::multiply( sf,
                                                    value_t(-1),

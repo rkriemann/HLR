@@ -8,358 +8,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <list>
-#include <cassert>
-#include <random>
-
-#include <hlr/arith/blas.hh>
-#include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/randlr.hh>
 
 namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
 using hpro::idx_t;
-
-namespace detail
-{
-
-//
-// compute basis for column space (range) of M
-//
-template < typename operator_t >
-blas::matrix< typename operator_t::value_t >
-column_basis ( const operator_t &       M,
-               const hpro::TTruncAcc &  acc,
-               const uint               power_steps,
-               const uint               oversampling )
-{
-    using  value_t = typename operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
-        
-    const auto  nrows_M = nrows( M );
-    const auto  ncols_M = ncols( M );
-
-    std::random_device          rd{};
-    std::mt19937                generator{ rd() };
-    std::normal_distribution<>  distr{ 0, 1 };
-    auto                        rand_norm = [&] () { return distr( generator ); };
-    
-    if ( acc.is_fixed_rank() )
-    {
-        const auto  k = acc.rank();
-        auto        T = blas::matrix< value_t >( ncols_M, k + oversampling );
-
-        blas::fill_fn( T, rand_norm );
-        
-        auto        Q = blas::matrix< value_t >( nrows_M, k + oversampling );
-
-        prod( value_t(1), hpro::apply_normal, M, T, Q );
-
-        //
-        // power iteration
-        //
-            
-        auto  R = blas::matrix< value_t >( k + oversampling, k + oversampling );
-
-        blas::qr( Q, R );
-
-        if ( power_steps > 0 )
-        {
-            auto  MtQ = blas::matrix< value_t >( ncols_M, k + oversampling );
-            
-            for ( uint  j = 0; j < power_steps; ++j )
-            {
-                blas::scale( value_t(0), MtQ );
-                prod( value_t(1), hpro::apply_adjoint, M, Q, MtQ );
-                blas::qr( MtQ, R );
-                
-                blas::scale( value_t(0), Q );
-                prod( value_t(1), hpro::apply_normal, M, MtQ, Q );
-                blas::qr( Q, R );
-            }// for
-        }// if
-
-        return Q;
-    }// if
-    else
-    {
-        real_t      norm_M  = real_t(0);
-        const auto  rel_eps = acc.rel_eps();
-        const auto  abs_eps = acc.abs_eps();
-        const uint  bsize   = std::min< uint >( 4, std::min< uint >( nrows_M, ncols_M ) );
-        const uint  nblocks = std::min< uint >( nrows_M, ncols_M ) / bsize;
-        auto        Qs      = std::list< blas::matrix< value_t > >();
-        auto        T_i     = blas::matrix< value_t >( ncols_M, bsize );
-        auto        QhQi    = blas::matrix< value_t >( bsize,   bsize );
-        auto        TQ_i    = blas::matrix< value_t >( nrows_M, bsize );
-        auto        R       = blas::matrix< value_t >( bsize,   bsize );
-        auto        MtQ     = blas::matrix< value_t >( ncols_M, bsize );
-        auto        QjtQi   = blas::matrix< value_t >( bsize,   bsize );
-
-        for ( uint  i = 0; i < nblocks; ++i )
-        {
-            //
-            // draw random matrix and compute approximation of remainder M - Σ_j Q_j·Q_j'·M
-            //
-            
-            blas::fill_fn( T_i, rand_norm );
-            
-            auto  Q_i = blas::matrix< value_t >( nrows_M, bsize );
-
-            prod( value_t(1), hpro::apply_normal, M, T_i, Q_i );
-
-            // subtract previous Q_j
-            if ( ! Qs.empty() )
-            {
-                blas::copy( Q_i, TQ_i );
-            
-                for ( auto  Q_j : Qs )
-                {
-                    blas::prod( value_t(1), blas::adjoint( Q_j ), TQ_i, value_t(0), QhQi );
-                    blas::prod( value_t(-1), Q_j, QhQi, value_t(1), Q_i );
-                }// for
-            }// if
-
-            //
-            // compute norm of remainder and update norm(M)
-            //
-            
-            real_t  norm_Qi = real_t(0);
-
-            for ( uint  j = 0; j < bsize; ++j )
-            {
-                const auto  Qi_j = Q_i.column( j );
-
-                norm_Qi = std::max( norm_Qi, blas::norm2( Qi_j ) );
-            }// for
-
-            norm_M = std::sqrt( math::square( norm_M ) + math::square( norm_Qi ) );
-
-            //
-            // power iteration
-            //
-            
-            blas::qr( Q_i, R );
-            
-            if ( power_steps > 0 )
-            {
-                for ( uint  j = 0; j < power_steps; ++j )
-                {
-                    blas::scale( value_t(0), MtQ );
-                    prod( value_t(1), hpro::apply_adjoint, M, Q_i, MtQ );
-                    blas::qr( MtQ, R );
-                    
-                    blas::scale( value_t(0), Q_i );
-                    prod( value_t(1), hpro::apply_normal, M, MtQ, Q_i );
-                    blas::qr( Q_i, R );
-                }// for
-            }// if
-            
-            //
-            // project Q_i away from previous Q_j
-            //
-            //    Q_i = Q_i - [ Q_0 .. Q_i-1 ] [ Q_0 .. Q_i-1 ]^H Q_i = Q_i - Σ_j=0^i-1 Q_j Q_j^H Q_i
-            //
-                
-            if ( i > 0 )
-            {
-                blas::copy( Q_i, TQ_i ); // auto  C_i   = blas::matrix< value_t >( Q_i, hpro::copy_value );
-                
-                for ( const auto &  Q_j : Qs )
-                {
-                    blas::prod( value_t(1), blas::adjoint(Q_j), TQ_i, value_t(0), QjtQi );
-                    blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
-                }// for
-                
-                blas::qr( Q_i, R );
-            }// if
-            
-            //
-            // M = M - Q_i Q_i^t M
-            //
-
-            Qs.push_back( std::move( Q_i ) );
-            
-            if (( norm_Qi <= abs_eps ) || (( norm_Qi ) <= rel_eps * norm_M ))
-                break;
-        }// for
-        
-        //
-        // collect Q_i's into final result
-        //
-
-        auto   Q   = blas::matrix< value_t >( nrows_M, Qs.size() * bsize );
-        idx_t  pos = 0;
-
-        for ( const auto &  Q_i : Qs )
-        {
-            auto  Q_sub = blas::matrix< value_t >( Q, blas::range::all, blas::range( pos, pos+bsize-1 ) );
-
-            blas::copy( Q_i, Q_sub );
-            pos += bsize;
-        }// for
-
-        return Q;
-    }// else
-}
-
-//
-// computes column basis for U·V'
-// - slightly faster than general version
-//
-template < typename value_t >
-blas::matrix< value_t >
-column_basis ( const blas::matrix< value_t > &  U,
-               const blas::matrix< value_t > &  V,
-               const hpro::TTruncAcc &          acc,
-               const uint                       power_steps,
-               const uint                       oversampling )
-{
-    const idx_t  nrows = idx_t( U.nrows() );
-    const idx_t  ncols = idx_t( V.nrows() );
-    const idx_t  rank  = idx_t( U.ncols() );
-    
-    std::random_device          rd{};
-    std::mt19937                generator{ rd() };
-    std::normal_distribution<>  distr{ 0, 1 };
-    auto                        fill_rand = [&] () { return distr( generator ); };
-    
-    if ( acc.is_fixed_rank() )
-    {
-        const idx_t  k   = idx_t(acc.rank());
-        auto         T   = blas::matrix< value_t >( nrows, k + oversampling );
-
-        blas::fill_fn( T, fill_rand );
-        
-        auto         VtT = blas::prod( value_t(1), blas::adjoint(V), T );
-        auto         Q   = blas::prod( value_t(1), U, VtT );
-        auto         R   = blas::matrix< value_t >( k + oversampling, k + oversampling );
-
-        blas::qr( Q, R );
-
-        //
-        // power iteration
-        //
-        
-        if ( power_steps > 0 )
-        {
-            auto  UtQ  = blas::matrix< value_t >( rank,  k + oversampling );
-            auto  VUtQ = blas::matrix< value_t >( ncols, k + oversampling );
-
-            for ( uint  j = 0; j < power_steps; ++j )
-            {
-                // [Q,R] = qr(Q); MtQ = M^H·Q = V·U^H·Q
-                blas::prod( value_t(1), blas::adjoint(U), Q, value_t(0), UtQ );
-                blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
-                blas::qr( VUtQ, R );
-                
-                // [Q,R] = qr(V·U^H·Q); Q = U·V^H·Q
-                blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
-                blas::prod( value_t(1), U, UtQ, value_t(0), Q );
-                blas::qr( Q, R );
-            }// for
-        }// if
-
-        return Q;
-    }// if
-    else
-    {
-        auto        Uc      = blas::copy( U ); // need copy to be modified below
-        const auto  norm_M  = lr_normF( Uc, V );
-        const auto  rel_eps = acc.rel_eps();
-        const auto  abs_eps = acc.abs_eps();
-        const uint  bsize   = std::min< uint >( 4, std::min< uint >( nrows, ncols ) );
-        const uint  nblocks = std::min( nrows, ncols ) / bsize;
-        auto        Qs      = std::list< blas::matrix< value_t > >();
-        auto        T_i     = blas::matrix< value_t >( ncols, bsize );
-        auto        VtT     = blas::matrix< value_t >( rank,  bsize );
-        auto        TQ_i    = blas::matrix< value_t >( nrows, bsize );
-        auto        UtQ     = blas::matrix< value_t >( rank,  bsize );
-        auto        VUtQ    = blas::matrix< value_t >( ncols, bsize );
-        auto        R       = blas::matrix< value_t >( bsize, bsize );
-        auto        QjtQi   = blas::matrix< value_t >( bsize, bsize );
-        auto        QtA     = blas::matrix< value_t >( bsize, rank );
-
-        for ( uint  i = 0; i < nblocks; ++i )
-        {
-            blas::fill_fn( T_i, fill_rand );
-            blas::prod( value_t(1), blas::adjoint(V), T_i, value_t(0), VtT );
-            
-            auto  Q_i = blas::prod( value_t(1), Uc, VtT );
-
-            //
-            // power iteration
-            //
-            
-            blas::qr( Q_i, R );
-            
-            if ( power_steps > 0 )
-            {
-                for ( uint  j = 0; j < power_steps; ++j )
-                {
-                    blas::prod( value_t(1), blas::adjoint(Uc), Q_i, value_t(0), UtQ );
-                    blas::prod( value_t(1), V, UtQ, value_t(0), VUtQ );
-                    blas::qr( VUtQ, R );
-                    
-                    blas::prod( value_t(1), blas::adjoint(V), VUtQ, value_t(0), UtQ );
-                    blas::prod( value_t(1), Uc, UtQ, value_t(0), Q_i );
-                    blas::qr( Q_i, R );
-                }// for
-            }// if
-            
-            //
-            // project Q_i away from previous Q_j
-            //
-                
-            if ( i > 0 )
-            {
-                blas::copy( Q_i, TQ_i );
-                
-                for ( const auto &  Q_j : Qs )
-                {
-                    blas::prod( value_t(1), blas::adjoint(Q_j), TQ_i, value_t(0), QjtQi );
-                    blas::prod( value_t(-1), Q_j, QjtQi, value_t(1), Q_i );
-                }// for
-                
-                blas::qr( Q_i, R );
-            }// if
-
-            //
-            // M = M - Q_i Q_i^T M = U·V^H - Q_i Q_i^T U·V^H = (U - Q_i Q_i^T U) V^H
-            //
-
-            blas::prod( value_t(1), blas::adjoint(Q_i), Uc, value_t(0), QtA );
-            blas::prod( value_t(-1), Q_i, QtA, value_t(1), Uc );
-            
-            const auto  norm_Qi = blas::lr_normF( Uc, V );
-
-            Qs.push_back( std::move( Q_i ) );
-            
-            if (( norm_Qi < abs_eps ) || ( norm_Qi <= rel_eps * norm_M ))
-                break;
-        }// for
-
-        //
-        // collect Q_i's into final result
-        //
-
-        auto   Q   = blas::matrix< value_t >( nrows, Qs.size() * bsize );
-        idx_t  pos = 0;
-
-        for ( const auto &  Q_i : Qs )
-        {
-            auto  Q_sub = blas::matrix< value_t >( Q, blas::range::all, blas::range( pos * bsize, (pos+1)*bsize - 1 ) );
-
-            blas::copy( Q_i, Q_sub );
-            ++pos;
-        }// for
-
-        return Q;
-    }// else
-}
-
-}// namespace detail
 
 //
 // return low-rank approximation of M with accuracy <acc>
@@ -382,7 +37,7 @@ randsvd ( const operator_t &       M,
     HLR_APPROX_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
     
     // compute column basis
-    auto  Q   = detail::column_basis( M, acc, power_steps, oversampling );
+    auto  Q   = detail::rand_column_basis( M, acc, 4, power_steps, oversampling );
     auto  k   = Q.ncols();
 
     // B = Q^H · M  or B^H = M^H · Q
@@ -475,7 +130,7 @@ randsvd ( const blas::matrix< value_t > &  U,
         // compute column basis
         //
 
-        auto  Q      = detail::column_basis( U, V, acc, power_steps, oversampling );
+        auto  Q      = detail::rand_column_basis( U, V, acc, 4, power_steps, oversampling );
         auto  k_base = idx_t(Q.ncols());
 
         // Q^H · U · V^H  = (V·U^H·Q)^H
@@ -502,8 +157,10 @@ randsvd ( const blas::matrix< value_t > &  U,
         auto  OU = blas::prod( value_t(1), Q,    Vk );
         auto  OV = blas::prod( value_t(1), VUtQ, Uk );
 
-        if ( nrows_U < nrows_V ) blas::prod_diag( OU, S, out_rank );
-        else                 blas::prod_diag( OV, S, out_rank );
+        if ( nrows_U < nrows_V )
+            blas::prod_diag( OU, S, out_rank );
+        else
+            blas::prod_diag( OV, S, out_rank );
 
         return { std::move( OU ), std::move( OV ) };
     }// else
@@ -521,7 +178,7 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
           const uint                                    power_steps,
           const uint                                    oversampling )
 {
-    assert( U.size() == V.size() );
+    HLR_ASSERT( U.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -602,8 +259,8 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
           const uint                                    power_steps,
           const uint                                    oversampling )
 {
-    assert( U.size() == T.size() );
-    assert( T.size() == V.size() );
+    HLR_ASSERT( U.size() == T.size() );
+    HLR_ASSERT( T.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -689,6 +346,9 @@ struct RandSVD
 {
     using  value_t = T_value;
 
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+    
     // number of steps in power iteration during construction of column basis
     const uint   power_steps  = 0;
 
@@ -696,7 +356,7 @@ struct RandSVD
     const uint   oversampling = 0;
 
     //
-    // operators
+    // matrix approximation routines
     //
     
     std::pair< blas::matrix< value_t >,
@@ -736,6 +396,27 @@ struct RandSVD
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::randsvd( U, T, V, acc, power_steps, oversampling );
+    }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
+    }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    template < typename operator_t >
+    blas::matrix< typename operator_t::value_t >
+    column_basis ( const operator_t &       op,
+                   const hpro::TTruncAcc &  acc ) const
+    {
+        return detail::rand_column_basis< operator_t >( op, acc, 4, power_steps, oversampling );
     }
 };
 

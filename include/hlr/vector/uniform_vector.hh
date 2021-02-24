@@ -65,20 +65,20 @@ public:
     //
 
     uniform_vector ()
-            : TVector( 0, hpro::value_type< value_t >::value )
+            : TVector( 0, hpro::value_type_v< value_t > )
             , _is( 0, 0 )
             , _basis( nullptr )
     {}
     
     uniform_vector ( const indexset &  ais )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _basis( nullptr )
     {}
 
     uniform_vector ( const indexset           ais,
                      const cluster_basis_t &  acb )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _basis( &acb )
             , _coeffs( acb.rank() )
@@ -88,13 +88,13 @@ public:
     uniform_vector ( const indexset              ais,
                      const cluster_basis_t &     acb,
                      blas::vector< value_t > &&  acoeff )
-            : TVector( ais.first(), hpro::value_type< value_t >::value )
+            : TVector( ais.first(), hpro::value_type_v< value_t > )
             , _is( ais )
             , _basis( &acb )
             , _coeffs( std::move( acoeff ) )
             , _blocks( acb.nsons() )
     {
-        HLR_ASSERT( ! _coeffs.length() == _basis->rank() );
+        HLR_ASSERT( ! ( _coeffs.length() == _basis->rank() ) );
     }
 
 

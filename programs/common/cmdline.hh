@@ -43,12 +43,14 @@ bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
-int     nbench     = 1;            // perform computations <nbench> times
+int     nbench     = 1;            // perform computations <nbench> times (at most)
+double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
+string  arith      = "std";        // which kind of arithmetic to use
 
 void
 read_config ( const std::string &  filename )
@@ -72,10 +74,11 @@ read_config ( const std::string &  filename )
     matrixfile = cfg.get( "app.matrix",  matrixfile );
     sparsefile = cfg.get( "app.sparse",  sparsefile );
         
-    ntile      = cfg.get( "arith.ntile", ntile );
-    nbench     = cfg.get( "arith.bench", nbench );
-    eps        = cfg.get( "arith.eps",   eps );
-    k          = cfg.get( "arith.rank",  k );
+    ntile      = cfg.get( "arith.ntile",  ntile );
+    nbench     = cfg.get( "arith.nbench", nbench );
+    tbench     = cfg.get( "arith.tbench", tbench );
+    eps        = cfg.get( "arith.eps",    eps );
+    k          = cfg.get( "arith.rank",   k );
         
     nthreads   = cfg.get( "misc.nthreads",  nthreads );
     verbosity  = cfg.get( "misc.verbosity", verbosity );
@@ -113,19 +116,21 @@ parse ( int argc, char ** argv )
 
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
-        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp)" )
+        ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
-        ( "matrix",      value<string>(), ": matrix file use" )
+        ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
-        ( "sparse",      value<string>(), ": sparse matrix file use" )
+        ( "sparse",      value<string>(), ": sparse matrix file to use" )
         ;
 
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
         ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
-        ( "bench",       value<int>(),    ": number of benchmark iterations" )
+        ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
+        ( "nbench",      value<int>(),    ": (maximal) number of benchmark iterations" )
+        ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
         ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
@@ -183,6 +188,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
+    if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
@@ -205,7 +211,8 @@ parse ( int argc, char ** argv )
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
-    if ( vm.count( "bench"      ) ) nbench     = vm["bench"].as<int>();
+    if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<int>();
+    if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
@@ -219,7 +226,8 @@ parse ( int argc, char ** argv )
                   << "  - materncov    : Matérn covariance over given number of spatial points;" << std::endl
                   << "                   if grid is defined use grid points, otherwise n random points in 3D" << std::endl
                   << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
-                  << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl;
+                  << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl
+                  << "  - exp          : 3D integral equation with exponential kernel and piecewise constant elements" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -233,8 +241,21 @@ parse ( int argc, char ** argv )
                   << "  - randlr  : randomized low-rank" << std::endl
                   << "  - aca     : adaptive cross approximation" << std::endl
                   << "  - lanczos : Lanczos bidiagonalization" << std::endl
+                  << "  - hpro    : purely use Hpro functions for approximation" << std::endl
                   << "  - all     : use all for comparison" << std::endl
                   << "  - default : use default approximation (SVD)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( arith == "help" )
+    {
+        std::cout << "Arithmetic to use:" << std::endl
+                  << "  - std     : standard H-arithmetic (immediate updates)" << std::endl
+                  << "  - accu    : accumulator based H-arithmetic" << std::endl
+                  << "  - lazy    : lazy evaluation in H-arithmetic" << std::endl
+                  << "  - all     : use all types" << std::endl
+                  << "  - default : use default arithmetic (std)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -276,16 +297,20 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) ) )
+    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) || ( appl == "exp" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
     if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
-    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr"    ) || ( approx == "randsvd" ) ||
-             ( approx == "randlr" ) || ( approx == "aca"     ) || ( approx == "lanczos" ) ||
-             ( approx == "all"    ) || ( approx == "default" ) ) )
+    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||
+             ( approx == "randlr" ) || ( approx == "aca"  ) || ( approx == "lanczos" ) ||
+             ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
         HLR_ERROR( "unknown approximation : " + approx );
+
+    if ( ! ( ( arith == "std" ) || ( arith == "accu" ) || ( arith == "lazy" ) ||
+             ( arith == "all" ) || ( arith == "default" ) ) )
+        HLR_ERROR( "unknown arithmetic : " + arith );
 }
 
 }}// namespace hlr::cmdline

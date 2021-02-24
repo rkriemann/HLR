@@ -73,7 +73,7 @@ public:
     //
 
     tiled_lrmatrix ()
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
             , _rank( 0 )
@@ -85,7 +85,7 @@ public:
                      const indexset              acol_is,
                      tile_storage< value_t > &&  aU,
                      tile_storage< value_t > &&  aV )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _rank( 0 )
@@ -98,7 +98,7 @@ public:
     tiled_lrmatrix ( const indexset  arow_is,
                      const indexset  acol_is,
                      const size_t    antile )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _rank( 0 )
@@ -113,7 +113,7 @@ public:
                      const size_t                     antile,
                      const blas::Matrix< value_t > &  aU,
                      const blas::Matrix< value_t > &  aV )
-            : TMatrix( hpro::value_type< value_t >::value )
+            : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
             , _rank( 0 )

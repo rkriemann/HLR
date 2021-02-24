@@ -505,7 +505,7 @@ trsmuh ( const TMatrix *            U,
 //
 template < typename value_t >
 void
-lu ( ::tf::SubflowBuilder &  tf,
+lu ( ::tf::Subflow &         tf,
      TMatrix *               A,
      const TTruncAcc &       acc,
      const size_t            ntile )
@@ -520,7 +520,7 @@ lu ( ::tf::SubflowBuilder &  tf,
         auto  A10 = ptrcast( BA->block( 1, 0 ), TRkMatrix );
         auto  A11 = BA->block( 1, 1 );
 
-        auto  lu_00   = tf.emplace( [A00,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A00, acc, ntile ); } );
+        auto  lu_00   = tf.emplace( [A00,&acc,ntile] ( ::tf::Subflow &  sf ) { hodlr::lu< value_t >( sf, A00, acc, ntile ); } );
         
         // auto  trsm_01 = tf.emplace( [A00,A01,&acc,ntile] ( auto &  sf ) { trsml(  sf, A00, mat_U< value_t >( A01 ), ntile ); } );
         // auto  tsrm_10 = tf.emplace( [A00,A10,&acc,ntile] ( auto &  sf ) { trsmuh( sf, A00, mat_V< value_t >( A10 ), ntile ); } );
@@ -533,7 +533,7 @@ lu ( ::tf::SubflowBuilder &  tf,
         //                                 hodlr::addlr< value_t >( sf, mat_U< value_t >( A10 ), T, mat_V< value_t >( A01 ), A11, acc, ntile );
         //                             } );
         
-        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( auto &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); } );
+        auto  lu_11   = tf.emplace( [A11,&acc,ntile] ( ::tf::Subflow &  sf ) { hodlr::lu< value_t >( sf, A11, acc, ntile ); } );
     }// if
     else
     {
@@ -551,7 +551,7 @@ lu ( TMatrix *          A,
 {
     ::tf::Taskflow  tf;
 
-    tf.emplace( [A,&acc,ntile] ( auto &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
+    tf.emplace( [A,&acc,ntile] ( ::tf::Subflow &  sf ) { lu< value_t >( sf, A, acc, ntile ); } );
 
     ::tf::Executor  executor;
     
