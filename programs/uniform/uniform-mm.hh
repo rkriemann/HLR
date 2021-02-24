@@ -175,7 +175,8 @@ program_main ()
         if ( true )
         {
             std::cout << "    " << term::bullet << "H²" << term::reset << std::endl;
-            
+
+            auto  apx    = approx::SVD< value_t >();
             auto  B      = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
             auto  colcb2 = colcb->copy();
@@ -186,7 +187,7 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc );
+            impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
             
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;

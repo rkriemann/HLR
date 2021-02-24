@@ -57,7 +57,8 @@ mul_vec ( const value_t                             alpha,
 //
 // matrix multiplication (eager version)
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -65,7 +66,8 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     //
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
@@ -105,7 +107,7 @@ multiply ( const value_t            alpha,
     // perform actual LU factorization
     //
 
-    detail::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, rowmap, colmap );
+    detail::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc, approx, rowmap, colmap );
 }
 
 //
