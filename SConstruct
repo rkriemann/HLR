@@ -196,7 +196,7 @@ opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
 
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
-opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
+# opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
 opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
@@ -249,7 +249,7 @@ likwid       = opt_env['likwid']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
-profile      = opt_env['profile']
+# profile      = opt_env['profile']
 optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
@@ -415,6 +415,22 @@ if 'cuda' in frameworks :
 #
 ######################################################################
 
+def split_str_array ( arr, n ) :
+    parts = []
+    line  = ''
+    for i in range( len( arr ) ) :
+        if i == len(arr)-1 : line = line + arr[i]
+        else :               line = line + arr[i] + ', '
+
+        if len( line ) > 40 :
+            parts.append( line )
+            line = ''
+
+    if line != '' :
+        parts.append( line )
+
+    return parts
+    
 def show_help ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
                  True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
@@ -424,7 +440,12 @@ def show_help ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( PROGRAMS ) )
+
+    parts = split_str_array( PROGRAMS, 40 )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    for i in range( 1, len(parts) ) :
+        print( '             │                               │', parts[i] )
+    
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
@@ -443,7 +464,7 @@ def show_help ( target, source, env ):
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -478,7 +499,13 @@ def show_options ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( programs ) )
+
+    # split "programs" into smaller pieces
+    parts = split_str_array( programs, 40 )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    for i in range( 1, len(parts) ) :
+        print( '             │                               │', parts[i] )
+        
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
@@ -497,7 +524,7 @@ def show_options ( target, source, env ):
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
+    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
