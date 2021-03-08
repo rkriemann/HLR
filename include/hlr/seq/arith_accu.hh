@@ -67,7 +67,7 @@ multiply ( const value_t            alpha,
         //  memory consumption dependent on hierarchy depth)
         //
 
-        auto  sub_accu = accu.restrict( *BC );
+        auto  sub_accu = accu.restrict< value_t >( *BC );
 
         accu.clear_matrix();
 
@@ -143,7 +143,7 @@ solve_lower_tri ( const eval_side_t        side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BM );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
 
         accu.clear_matrix();
 
@@ -202,7 +202,7 @@ solve_upper_tri ( const eval_side_t                   side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BM );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
 
         accu.clear_matrix();
 
@@ -264,7 +264,7 @@ lu ( hpro::TMatrix &          M,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BM );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
 
         accu.clear_matrix();
 

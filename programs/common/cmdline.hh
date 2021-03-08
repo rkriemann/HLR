@@ -251,11 +251,11 @@ parse ( int argc, char ** argv )
     if ( arith == "help" )
     {
         std::cout << "Arithmetic to use:" << std::endl
-                  << "  - std     : standard H-arithmetic (immediate updates)" << std::endl
-                  << "  - accu    : accumulator based H-arithmetic" << std::endl
-                  << "  - lazy    : lazy evaluation in H-arithmetic" << std::endl
-                  << "  - all     : use all types" << std::endl
-                  << "  - default : use default arithmetic (std)" << std::endl;
+                  << "  - (dag)std  : standard H-arithmetic (immediate updates)" << std::endl
+                  << "  - (dag)accu : accumulator based H-arithmetic" << std::endl
+                  << "  - (dag)lazy : lazy evaluation in H-arithmetic" << std::endl
+                  << "  - all       : use all types" << std::endl
+                  << "  - default   : use default arithmetic (std)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -308,8 +308,10 @@ parse ( int argc, char ** argv )
              ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
         HLR_ERROR( "unknown approximation : " + approx );
 
-    if ( ! ( ( arith == "std" ) || ( arith == "accu" ) || ( arith == "lazy" ) ||
-             ( arith == "all" ) || ( arith == "default" ) ) )
+    if ( ! ( ( arith == "std" )  || ( arith == "dagstd" )  ||
+             ( arith == "accu" ) || ( arith == "dagaccu" ) ||
+             ( arith == "lazy" ) || ( arith == "daglazy" ) ||
+             ( arith == "all" )  || ( arith == "default" ) ) )
         HLR_ERROR( "unknown arithmetic : " + arith );
 }
 

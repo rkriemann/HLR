@@ -557,6 +557,62 @@ multiply ( const value_t            alpha,
 }
 
 //
+// matrix multiplication with generation of result matrix
+// - only supported for non-structured results
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B )
+{
+    std::unique_ptr< hpro::TMatrix >  C;
+    
+    if ( is_lowrank( A ) )
+    {
+        // U·V' × B = W·X'
+        auto  RA = cptrcast( &A, hpro::TRkMatrix );
+        auto  V  = blas::mat_V< value_t >( RA, op_A );
+        auto  W  = blas::copy( blas::mat_U< value_t >( RA, op_A ) );
+        auto  X  = blas::matrix< value_t >( B.ncols( op_B ), RA->rank() );
+
+        multiply( alpha, blas::adjoint( op_B ), B, V, X );
+
+        if ( op_A == apply_transposed )
+        {
+            blas::conj( W );
+            blas::conj( X );
+        }// if
+
+        return std::make_unique< hpro::TRkMatrix >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
+    else if ( is_lowrank( B ) )
+    {
+        // A × U·V' = W·X'
+        auto  RB = cptrcast( &B, hpro::TRkMatrix );
+        auto  U  = blas::mat_U< value_t >( RB, op_B );
+        auto  W  = blas::matrix< value_t >( A.nrows( op_A ), RB->rank() );
+        auto  X  = blas::copy( blas::mat_V< value_t >( RB, op_B ) );
+
+        multiply( alpha, op_A, A, U, W );
+
+        return std::make_unique< hpro::TRkMatrix >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
+    else if ( is_dense_any( A, B ) )
+    {
+        C = std::make_unique< hpro::TDenseMatrix >( A.row_is( op_A ), B.col_is( op_B ), hpro::value_type_v< value_t > );
+
+        multiply( alpha, op_A, A, op_B, B, *C );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix types : " + A.typestr() + " × " + B.typestr() );
+
+    return C;
+}
+
+//
 // compute C = C + α op( A ) op( B ) with additional approximation
 // by omitting sub products based on Frobenius norm of factors
 //

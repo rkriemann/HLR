@@ -489,7 +489,7 @@ struct lazy_accumulator
                 // otherwise handle updates in low-rank format
                 //
             
-                if ( approx_t::supports_general_operator )
+                if constexpr( approx_t::supports_general_operator )
                 {
                     //
                     // set up operator for sum of matrix products plus C

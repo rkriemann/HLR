@@ -66,7 +66,8 @@ PROGRAMS     = [ 'tlr',
                  'approx-lu',
                  'dpt',
                  'polykern',
-                 'cuda' ]
+                 'cuda',
+                 'mixedprec' ]
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -114,7 +115,8 @@ SUBDIRS      = { 'tlr'         : 'tlr',
                  'approx-lu'   : 'approx',
                  'dpt'         : '',
                  'polykern'    : '',
-                 'cuda'        : '' }
+                 'cuda'        : '',
+                 'mixedprec'   : '' }
 
 ######################################################################
 #

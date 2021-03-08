@@ -429,15 +429,6 @@ struct RRQR
         return hlr::approx::rrqr( U, T, V, acc );
     }
 
-    template < typename operator_t >
-    std::pair< blas::matrix< typename operator_t::value_t >,
-               blas::matrix< typename operator_t::value_t > >
-    operator () ( const operator_t &       /* op */,
-                  const hpro::TTruncAcc &  /* acc */ ) const
-    {
-        HLR_ERROR( "general operator not supported" );
-    }
-
     //
     // compute (approximate) column basis
     //

@@ -22,6 +22,11 @@
 #include <hlr/approx/aca.hh>
 #include <hlr/approx/lanczos.hh>
 #include <hlr/approx/randlr.hh>
+#include "hlr/dag/lu.hh"
+
+#include "hlr/seq/arith.hh"
+#include "hlr/seq/arith_accu.hh"
+#include "hlr/seq/arith_lazy.hh"
 
 #include "common.hh"
 #include "common-main.hh"
@@ -63,7 +68,7 @@ lu_std ( const hpro::TMatrix &    A,
         
         LIKWID_MARKER_START( "hlustd" );
             
-        impl::lu< value_t >( *C, acc, approx );
+        hlr::seq::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hlustd" );
             
@@ -91,7 +96,69 @@ lu_std ( const hpro::TMatrix &    A,
 }
 
 //
-// accumulator base LU
+// standard LU
+//
+template < typename approx_t >
+void
+lu_std_dag ( const hpro::TMatrix &    A,
+             const hpro::TTruncAcc &  acc,
+             const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic    = timer::now();
+    auto  toc    = timer::since( tic );
+    auto  C      = impl::matrix::copy( A );
+    auto  lu_dag = hlr::dag::gen_dag_lu< value_t, approx_t >( *C, nseq, impl::dag::refine );
+
+    if ( hpro::verbose( 3 ) )
+        lu_dag.print_dot( "lu.dot" );
+    
+    auto  tstart = timer::now();
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        impl::matrix::copy_to( A, *C );
+
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hlustddag" );
+
+        impl::dag::run( lu_dag, acc );
+
+        LIKWID_MARKER_STOP( "hlustddag" );
+            
+        toc = timer::since( tic );
+        std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "lu" ) );
+        runtime.push_back( toc.seconds() );
+
+        if ( timer::since( tstart ) > tbench )
+            break;
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( runtime.size() > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
+// accumulator based LU
 //
 template < typename approx_t >
 void
@@ -122,7 +189,7 @@ lu_accu ( const hpro::TMatrix &    A,
         
         LIKWID_MARKER_START( "hluaccu" );
             
-        impl::accu::lu< value_t >( *C, acc, approx );
+        hlr::seq::accu::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hluaccu" );
             
@@ -150,7 +217,70 @@ lu_accu ( const hpro::TMatrix &    A,
 }
 
 //
-// accumulator base LU
+// accumulator based LU using DAG
+//
+template < typename approx_t >
+void
+lu_accu_dag ( const hpro::TMatrix &    A,
+              const hpro::TTruncAcc &  acc,
+              const std::string &      apx_name )
+{
+    using  value_t = typename approx_t::value_t;
+
+    std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
+    
+    std::vector< double >  runtime, flops;
+
+    auto  tic    = timer::now();
+    auto  toc    = timer::since( tic );
+    auto  C      = impl::matrix::copy( A );
+
+    auto  [ lu_dag, accu_map ] = hlr::dag::gen_dag_lu_accu< value_t, approx_t >( *C, nseq, impl::dag::refine );
+
+    if ( hpro::verbose( 3 ) )
+        lu_dag.print_dot( "lu.dot" );
+    
+    auto  tstart = timer::now();
+        
+    for ( int i = 0; i < nbench; ++i )
+    {
+        impl::matrix::copy_to( A, *C );
+
+        blas::reset_flops();
+
+        tic = timer::now();
+        
+        LIKWID_MARKER_START( "hluaccudag" );
+
+        impl::dag::run( lu_dag, acc );
+
+        LIKWID_MARKER_STOP( "hluaccudag" );
+            
+        toc = timer::since( tic );
+        std::cout << "      LU in    " << format_time( toc ) << std::endl;
+
+        flops.push_back( get_flops( "lu" ) );
+        runtime.push_back( toc.seconds() );
+
+        if ( timer::since( tstart ) > tbench )
+            break;
+    }// for
+        
+    // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+
+    if ( runtime.size() > 1 )
+        std::cout << "      runtime = "
+                  << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                  << std::endl;
+
+    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        
+    std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+}
+
+//
+// H-LU with lazy updates
 //
 template < typename approx_t >
 void
@@ -181,7 +311,7 @@ lu_lazy ( const hpro::TMatrix &    A,
         
         LIKWID_MARKER_START( "hluaccu" );
             
-        impl::lazy::lu< value_t >( *C, acc, approx );
+        hlr::seq::lazy::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hluaccu" );
             
@@ -254,12 +384,6 @@ program_main ()
 
     if ( verbose( 3 ) )
         io::eps::write( *A, "A" );
-
-    {
-        auto  D = matrix::convert_to_dense< value_t >( *A );
-        
-        io::hdf5::write( blas::mat< value_t >( *D ), "A" );
-    }
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -330,6 +454,22 @@ program_main ()
     }// if
     
     //
+    // DAG with immediate updates
+    //
+
+    if ( cmdline::arith == "dagstd" || cmdline::arith == "all" )
+    {
+        std::cout << "  " << term::bullet << term::bold << "DAG standard" << term::reset << std::endl;
+    
+        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_std_dag< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_std_dag< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_std_dag< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_std_dag< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_std_dag< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_std_dag< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+    }// if
+
+    //
     // using accumulators
     //
 
@@ -392,6 +532,18 @@ program_main ()
         if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
     
+    if ( cmdline::arith == "dagaccu" || cmdline::arith == "all" )
+    {
+        std::cout << "  " << term::bullet << term::bold << "DAG accumulator" << term::reset << std::endl;
+    
+        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_accu_dag< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+    }// if
+
     //
     // lazy evaluation
     //

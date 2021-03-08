@@ -22,6 +22,7 @@ using namespace hpro;
 //
 // return matrix restricted to subblock
 //
+inline
 std::unique_ptr< TMatrix >
 restrict ( TMatrix &               M,
            const TBlockIndexSet &  bis )

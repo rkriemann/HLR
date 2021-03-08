@@ -179,7 +179,6 @@ struct lazy_accumulator
 
     //
     // add A×B to updates
-    // - α is applied _only_ if possible
     //
     template < typename value_t,
                typename approx_t >
@@ -535,7 +534,7 @@ struct lazy_accumulator
             
                 HLR_ARITH_LAZY_STAT( "#updates lowrank " << std::min( M.nrows(), M.ncols() ) << " " << updates.size() );
         
-                if ( approx_t::supports_general_operator )
+                if constexpr( approx_t::supports_general_operator )
                 {
                     //
                     // set up operator for sum of matrix products plus C
