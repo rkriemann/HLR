@@ -102,6 +102,18 @@ write ( const HLIB::TMatrix *  M,
     write( *M, matname, filename );
 }
 
+inline
+void
+write ( const HLIB::TVector &  v,
+        const std::string &    vecname,
+        const std::string &    filename = "" )
+{
+    if ( filename == "" )
+        HLIB::DBG::write( &v, vecname + ".mat", vecname );
+    else
+        HLIB::DBG::write( &v, filename, vecname );
+}
+
 template < typename value_t >
 void
 write ( const blas::vector< value_t > &  v,

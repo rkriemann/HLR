@@ -19,6 +19,8 @@ using namespace boost::program_options;
 
 namespace hpro = HLIB;
 
+#include <hlr/utils/log.hh>
+
 namespace hlr { namespace cmdline {
 
 size_t  n          = 1024;         // problem size

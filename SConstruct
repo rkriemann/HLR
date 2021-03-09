@@ -4,6 +4,9 @@
 from __future__ import print_function
 
 import os, sys
+import re
+
+from datetime import datetime
 
 ######################################################################
 #
@@ -47,28 +50,6 @@ LIKWID_DIR   = '/opt/local/likwid'
 
 CUDA_DIR     = '/'
 
-# set of programs to build: dag-*, tlr, hodlr, tileh (or 'all')
-PROGRAMS     = [ 'tlr',
-                 'hodlr',
-                 'tileh',
-                 'tiled-h',
-                 'tiled-hca',
-                 'tiled-hodlr',
-                 'dag-lu',
-                 'dag-gauss',
-                 'dag-inv',
-                 'dag-waz',
-                 'dag-hodlr',
-                 'uniform',
-                 'uniform-mm',
-                 'uniform-lu',
-                 'approx-mm',
-                 'approx-lu',
-                 'dpt',
-                 'polykern',
-                 'cuda',
-                 'mixedprec' ]
-
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
                  'omp',
@@ -95,28 +76,6 @@ MALLOCS      = [ 'default',
                  'mimalloc',
                  'tbbmalloc',
                  'tcmalloc' ]
-
-# mapping of programs to subdirs
-SUBDIRS      = { 'tlr'         : 'tlr',
-                 'hodlr'       : 'hodlr',
-                 'tileh'       : 'tileh',
-                 'tiled-h'     : 'tiled',
-                 'tiled-hca'   : 'tiled',
-                 'tiled-hodlr' : 'tiled',
-                 'dag-lu'      : 'dag',
-                 'dag-gauss'   : 'dag',
-                 'dag-inv'     : 'dag',
-                 'dag-waz'     : 'dag',
-                 'dag-hodlr'   : 'dag',
-                 'uniform'     : 'uniform',
-                 'uniform-mm'  : 'uniform',
-                 'uniform-lu'  : 'uniform',
-                 'approx-mm'   : 'approx',
-                 'approx-lu'   : 'approx',
-                 'dpt'         : '',
-                 'polykern'    : '',
-                 'cuda'        : '',
-                 'mixedprec'   : '' }
 
 ######################################################################
 #
@@ -159,6 +118,44 @@ def path ( program, source ) :
 #     MKL_DIR = os.environ['MKLROOT']
 # else :
 #     MKL_DIR = '/' # to prevent error below due to invalid path
+
+######################################################################
+#
+# collect all programs from "programs" sub directory
+#
+######################################################################
+
+def scan_programs () :
+    cc_file = re.compile( '.*\.(cc|CC|cpp|c\+\+)\Z' )
+
+    scanned_programs = []
+    scanned_subdirs  = {}
+
+    for root, dirs, files in os.walk( "programs", topdown = False ) :
+        for filename in files :
+            if cc_file.search( filename ) != None :
+                # look for any framework
+                for fwork in FRAMEWORKS :
+                    fstr = '-' + fwork
+                    pos  = filename.find( fstr )
+                    if pos != -1 :
+                        prog = filename[:pos]
+                        if not prog in scanned_programs :
+                            scanned_programs.append( prog )
+                            if root == 'programs' : scanned_subdirs[prog] = ''
+                            else :                  scanned_subdirs[prog] = root.replace( 'programs/', '' )
+
+                        # print( root, filename[:pos], fwork )
+
+    return scanned_programs, scanned_subdirs
+
+tic = datetime.now()
+
+PROGRAMS, SUBDIRS = scan_programs()
+
+toc = datetime.now()
+
+# print( "scanned programs in %.3es" % ( toc - tic ).total_seconds() )
 
 ######################################################################
 #
@@ -417,6 +414,9 @@ if 'cuda' in frameworks :
 #
 ######################################################################
 
+#
+# split array of strings for pretty printing in table
+#
 def split_str_array ( arr, n ) :
     parts = []
     line  = ''
@@ -432,7 +432,7 @@ def split_str_array ( arr, n ) :
         parts.append( line )
 
     return parts
-    
+
 def show_help ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
                  True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
