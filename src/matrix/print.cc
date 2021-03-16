@@ -153,6 +153,78 @@ print_eps ( const hpro::TMatrix &               M,
     }// if
 }
 
+//
+// actual print function
+//
+void
+print_mem ( const hpro::TMatrix &               M,
+            eps_printer &                       prn,
+            const std::vector< std::string > &  options )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                    print_mem( * B->block( i, j ), prn, options );
+            }// for
+        }// for
+    }// if
+    else
+    {
+        if ( is_dense( M ) )
+        {
+            // background
+            prn.set_gray( 0 );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+        }// if
+        else if ( is_lowrank( M ) )
+        {
+            auto  R     = cptrcast( &M, hpro::TRkMatrix );
+            auto  rank  = R->rank();
+            auto  ratio = ( rank * double( R->nrows() + R->ncols() ) ) / ( double(R->nrows()) * double(R->ncols()) );
+            
+            // background
+            prn.set_gray( 255 - int( ratio * 255.0 ) );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+        }// if
+        else if ( is_uniform_lowrank( M ) )
+        {
+            auto  R        = cptrcast( &M, matrix::uniform_lrmatrix< hpro::real > );
+            auto  row_rank = R->row_rank();
+            auto  col_rank = R->row_rank();
+            auto  ratio    = ( ( row_rank * double( R->nrows() ) +
+                                 col_rank * double( R->ncols() ) +
+                                 double(row_rank * col_rank) ) /
+                               ( double(R->nrows()) * double(R->ncols()) ) );
+            
+            // background
+            prn.set_gray( 255 - int( ratio * 255.0 ) );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+        }// if
+
+        // draw frame
+        prn.set_gray( 0 );
+        prn.draw_rect( M.col_ofs(),
+                       M.row_ofs(),
+                       M.col_ofs() + M.ncols(),
+                       M.row_ofs() + M.nrows() );
+    }// else
+}
+
 }// namespace anonymous
 
 //
@@ -303,6 +375,49 @@ print_lvl_eps ( const hpro::TMatrix &  M,
         blocks  = std::move( sons );
         lvl++;
     }// while
+}
+
+//
+// colorize matrix blocks in <M> according to rank
+//
+void
+print_mem_eps ( const hpro::TMatrix &  M,
+                const std::string &    filename,
+                const std::string &    options )
+{
+    const boost::filesystem::path  filepath( filename );
+    std::string                    suffix;
+
+    if ( ! filepath.has_extension() )
+        suffix = ".eps";
+
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+    
+    std::ofstream  out( filename + suffix );
+    eps_printer    prn( out );
+
+    const auto   max_size = std::max( std::max( M.nrows(), M.ncols() ), size_t(1) );
+    const auto   min_size = std::max( std::min( M.nrows(), M.ncols() ), size_t(1) );
+    const auto   width    = ( M.ncols() == max_size ? 500 : 500 * double(min_size) / double(max_size) );
+    const auto   height   = ( M.nrows() == max_size ? 500 : 500 * double(min_size) / double(max_size) );
+    
+    prn.begin( width, height );
+
+    prn.scale( double(width)  / double(M.ncols()),
+               double(height) / double(M.nrows()) );
+    
+    prn.translate( - double(M.col_ofs()),
+                   - double(M.row_ofs()) );
+    
+    prn.set_font( "Courier", 0.3 );
+
+    prn.set_line_width( 0.1 );
+
+    print_mem( M, prn, optarr );
+
+    prn.end();
 }
 
 }}// namespace hlr::matrix

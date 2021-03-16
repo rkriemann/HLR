@@ -136,13 +136,13 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        return blas::mulvec( value_t(1), hlr::blas::adjoint( _V ), v );
+        return blas::mulvec( hlr::blas::adjoint( _V ), v );
     }
     
     hlr::blas::matrix< value_t >
     transform_forward  ( const hlr::blas::matrix< value_t > &  M ) const
     {
-        return blas::prod( value_t(1), hlr::blas::adjoint( _V ), M );
+        return blas::prod( hlr::blas::adjoint( _V ), M );
     }
     
     //
@@ -153,13 +153,13 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        return hlr::blas::mulvec( value_t(1), _V, s );
+        return hlr::blas::mulvec( _V, s );
     }
     
     hlr::blas::matrix< value_t >
     transform_backward  ( const hlr::blas::matrix< value_t > &  S ) const
     {
-        return hlr::blas::prod( value_t(1), _V, S );
+        return hlr::blas::prod( _V, S );
     }
 
     ///////////////////////////////////////////////////////

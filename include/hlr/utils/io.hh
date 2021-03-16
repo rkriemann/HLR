@@ -209,15 +209,36 @@ namespace eps
 {
 
 //
-// write blas matrix/vector in Matlab format with given name
-// - if filename is empty, the matrix/vector name is used
+// print matrix <M> to file <filename>
 //
 void
-write ( const HLIB::TMatrix &  M,
-        const std::string &    matname,
+print ( const HLIB::TMatrix &  M,
+        const std::string &    filename,
         const std::string &    options = "default" )
 {
-    matrix::print_eps( M, matname, options );
+    matrix::print_eps( M, filename, options );
+}
+
+//
+// print matrix <M> level-wise to files with filename <basename><lvl>
+//
+void
+print_lvl ( const HLIB::TMatrix &  M,
+            const std::string &    basename,
+            const std::string &    options = "default" )
+{
+    matrix::print_lvl_eps( M, basename, options );
+}
+
+//
+// print matrix <M> with blocks coloured according to memory consumption
+//
+void
+print_mem ( const HLIB::TMatrix &  M,
+            const std::string &    filename,
+            const std::string &    options = "default" )
+{
+    matrix::print_mem_eps( M, filename, options );
 }
 
 }// namespace eps

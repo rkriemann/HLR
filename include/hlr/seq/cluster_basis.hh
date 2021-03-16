@@ -254,7 +254,7 @@ construct_basis ( const cluster_tree &  ct,
 
                 if ( M->rank() > 0 )
                 {
-                    auto  X_i    = blas::prod( value_t(1), U< value_t >( M, adjoint ), blas::adjoint( C ) );
+                    auto  X_i    = blas::prod( U< value_t >( M, adjoint ), blas::adjoint( C ) );
                     auto  cols_i = blas::range( pos, pos + X_i.ncols() - 1 );
                     auto  X_sub  = blas::matrix< value_t >( Xt, blas::range::all, cols_i );
 

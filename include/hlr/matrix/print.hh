@@ -34,6 +34,14 @@ print_lvl_eps ( const hpro::TMatrix &  M,
                 const std::string &    basename,
                 const std::string &    options = "default" );
 
+//
+// colorize matrix blocks in <M> according to rank
+//
+void
+print_mem_eps ( const hpro::TMatrix &  M,
+                const std::string &    filename,
+                const std::string &    options = "default" );
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_PRINT_HH

@@ -308,6 +308,8 @@ solve_lower_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
+    std::cout << M.id() << std::endl;
+    
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
     
@@ -485,6 +487,8 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
+    std::cout << M.id() << std::endl;
+    
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
     
@@ -667,6 +671,8 @@ lu ( hpro::TMatrix &          A,
     // evaluate all computable updates to M
     //
 
+    std::cout << A.id() << std::endl;
+    
     accu.eval( value_t(1), A, acc, approx );
 
     //

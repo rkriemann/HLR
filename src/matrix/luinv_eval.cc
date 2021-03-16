@@ -6,9 +6,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
+#include <hpro/algebra/solve_tri.hh>
+
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
-#include <hlr/seq/dag.hh>
 
 #include <hlr/matrix/luinv_eval.hh>
 
@@ -20,44 +21,6 @@ using namespace HLIB;
 // ctor
 //
 
-luinv_eval::luinv_eval ( std::shared_ptr< TMatrix > &  M,
-                         hlr::dag::refine_func_t       refine_func,
-                         hlr::dag::exec_func_t         exec_func )
-        : _mat( M )
-        , _vec( nullptr )
-        , _exec_func( exec_func )
-{
-    assert( _mat.get() != nullptr );
-
-    //
-    // set up mutex maps
-    //
-    
-    for ( idx_t  i = _mat->row_is().first() / hlr::dag::CHUNK_SIZE; i <= idx_t(_mat->row_is().last() / hlr::dag::CHUNK_SIZE); ++i )
-        _map_rows[ i ] = std::make_unique< std::mutex >();
-
-    for ( idx_t  i = _mat->col_is().first() / hlr::dag::CHUNK_SIZE; i <= idx_t(_mat->col_is().last() / hlr::dag::CHUNK_SIZE); ++i )
-        _map_cols[ i ] = std::make_unique< std::mutex >();
-
-    //
-    // and the DAGs
-    //
-
-    auto  tic = Time::Wall::now();
-    
-    _dag_trsvl  = std::move( hlr::dag::gen_dag_solve_lower( apply_normal,  _mat.get(), & _vec, _map_rows, refine_func ) );
-    _dag_trsvlt = std::move( hlr::dag::gen_dag_solve_lower( apply_trans,   _mat.get(), & _vec, _map_cols, refine_func ) );
-    _dag_trsvlh = std::move( hlr::dag::gen_dag_solve_lower( apply_adjoint, _mat.get(), & _vec, _map_cols, refine_func ) );
-                                                                                                        
-    _dag_trsvu  = std::move( hlr::dag::gen_dag_solve_upper( apply_normal,  _mat.get(), & _vec, _map_rows, refine_func ) );
-    _dag_trsvut = std::move( hlr::dag::gen_dag_solve_upper( apply_trans,   _mat.get(), & _vec, _map_cols, refine_func ) );
-    _dag_trsvuh = std::move( hlr::dag::gen_dag_solve_upper( apply_adjoint, _mat.get(), & _vec, _map_cols, refine_func ) );
-
-    auto  toc = Time::Wall::since( tic );
-
-    log( 2, to_string( "luinv_eval : time for DAG setup = %.3e", toc.seconds() ) );
-}
-    
 //
 // linear operator mapping
 //
@@ -71,28 +34,19 @@ luinv_eval::apply  ( const TVector *  x,
                      TVector *        y,
                      const matop_t    op ) const
 {
-    assert( ! is_null( x ) && ! is_null( y ) );
+    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
-    y->assign( 1.0, x );
-
-    assert( ! is_null( dynamic_cast< TScalarVector * >( y ) ) );
-    
-    _vec = ptrcast( y, TScalarVector );
+    x->copy_to( y );
 
     if ( op == apply_normal )
     {
-        _exec_func( _dag_trsvl, acc_exact );
-        _exec_func( _dag_trsvu, acc_exact );
+        hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
+        hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
     }// if
-    else if ( op == apply_trans )
+    else
     {
-        _exec_func( _dag_trsvut, acc_exact );
-        _exec_func( _dag_trsvlt, acc_exact );
-    }// if
-    else // if ( op == apply_adjoint )
-    {
-        _exec_func( _dag_trsvuh, acc_exact );
-        _exec_func( _dag_trsvlh, acc_exact );
+        hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
+        hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
     }// else
 }
 
@@ -106,34 +60,11 @@ luinv_eval::apply_add  ( const real       alpha,
                          TVector *        y,
                          const matop_t    op ) const
 {
-    assert( ! is_null( x ) && ! is_null( y ) );
+    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
-    TScalarVector  t( x );
-    
-    _vec = ptrcast( & t, TScalarVector );
-    
-    if ( op == apply_normal )
-    {
-        auto  tic = Time::Wall::now();
-        
-        _exec_func( _dag_trsvl, acc_exact );
-        _exec_func( _dag_trsvu, acc_exact );
+    TScalarVector  t;
 
-        auto  toc = Time::Wall::since( tic );
-
-        log( 4, to_string( "luinv_eval : time for DAG run   = %.3e", toc.seconds() ) );
-    }// if
-    else if ( op == apply_trans )
-    {
-        _exec_func( _dag_trsvut, acc_exact );
-        _exec_func( _dag_trsvlt, acc_exact );
-    }// if
-    else // if ( op == apply_adjoint )
-    {
-        _exec_func( _dag_trsvuh, acc_exact );
-        _exec_func( _dag_trsvlh, acc_exact );
-    }// else
-
+    apply( x, & t, op );
     y->axpy( alpha, & t );
 }
 
@@ -143,28 +74,11 @@ luinv_eval::capply_add  ( const complex    alpha,
                           TVector *        y,
                           const matop_t    op ) const
 {
-    assert( ! is_null( x ) && ! is_null( y ) );
+    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
-    TScalarVector  t( x );
+    TScalarVector  t;
     
-    _vec = ptrcast( & t, TScalarVector );
-    
-    if ( op == apply_normal )
-    {
-        _exec_func( _dag_trsvl, acc_exact );
-        _exec_func( _dag_trsvu, acc_exact );
-    }// if
-    else if ( op == apply_trans )
-    {
-        _exec_func( _dag_trsvut, acc_exact );
-        _exec_func( _dag_trsvlt, acc_exact );
-    }// if
-    else // if ( op == apply_adjoint )
-    {
-        _exec_func( _dag_trsvuh, acc_exact );
-        _exec_func( _dag_trsvlh, acc_exact );
-    }// else
-
+    apply( x, & t, op );
     y->caxpy( alpha, & t );
 }
 
@@ -174,7 +88,7 @@ luinv_eval::apply_add  ( const real       /* alpha */,
                          TMatrix *        /* Y */,
                          const matop_t    /* op */ ) const
 {
-    assert( false );
+    HLR_ERROR( "not implemented" );
 }
 
 //
@@ -182,21 +96,27 @@ luinv_eval::apply_add  ( const real       /* alpha */,
 // not the corresponding index sets
 //
 void
-luinv_eval::apply_add   ( const real                       /* alpha */,
-                          const blas::vector< real > &     /* x */,
-                          blas::vector< real > &           /* y */,
-                          const matop_t                    /* op */ ) const
+luinv_eval::apply_add   ( const real                       alpha,
+                          const blas::vector< real > &     x,
+                          blas::vector< real > &           y,
+                          const matop_t                    op ) const
 {
-    HLR_ASSERT( false );
+    TScalarVector  sx( _mat.row_is(), x );
+    TScalarVector  sy( _mat.row_is(), y );
+    
+    apply_add( alpha, & sx, & sy, op );
 }
 
 void
-luinv_eval::apply_add   ( const complex                    /* alpha */,
-                          const blas::vector< complex > &  /* x */,
-                          blas::vector< complex > &        /* y */,
-                          const matop_t                    /* op */ ) const
+luinv_eval::apply_add   ( const complex                    alpha,
+                          const blas::vector< complex > &  x,
+                          blas::vector< complex > &        y,
+                          const matop_t                    op ) const
 {
-    HLR_ASSERT( false );
+    TScalarVector  sx( _mat.row_is(), x );
+    TScalarVector  sy( _mat.row_is(), y );
+    
+    capply_add( alpha, & sx, & sy, op );
 }
 
 void
@@ -205,7 +125,7 @@ luinv_eval::apply_add   ( const real                       /* alpha */,
                           blas::matrix< real > &           /* y */,
                           const matop_t                    /* op */ ) const
 {
-    HLR_ASSERT( false );
+    HLR_ERROR( "not implemented" );
 }
 
 void
@@ -214,7 +134,7 @@ luinv_eval::apply_add   ( const complex                    /* alpha */,
                           blas::matrix< complex > &        /* y */,
                           const matop_t                    /* op */ ) const
 {
-    HLR_ASSERT( false );
+    HLR_ERROR( "not implemented" );
 }
 
 }} // namespace hlr::matrix

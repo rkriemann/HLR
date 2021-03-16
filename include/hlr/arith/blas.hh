@@ -38,6 +38,10 @@ using hpro::diag_type_t;
 using hpro::unit_diag;
 using hpro::general_diag;
 
+using hpro::tri_type_t;
+using hpro::lower_triangular;
+using hpro::upper_triangular;
+
 using hpro::matop_t;
 using hpro::apply_normal;
 using hpro::apply_conjugate;

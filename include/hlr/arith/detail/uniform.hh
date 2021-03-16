@@ -318,14 +318,48 @@ add ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
+// compute M = U·S·V' + W·T·V' = (U W)·⎛S⎞·V'
+//                                     ⎝T⎠
+//
+// - return orthogonal row basis and new coefficients
+// - no approximation
+// - W does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,  // new row basis
+            blas::matrix< value_t > > // new coupling
+add_row ( const uniform_lrmatrix< value_t > &  M,
+          const blas::matrix< value_t > &      W,
+          const blas::matrix< value_t > &      T )
+{
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
+    
+    //
+    // new row basis is orthogonalized (U W) with updated coupling
+    //
+
+    auto  Ue = blas::join_row< value_t >( { U, W } );
+    auto  R  = blas::matrix< value_t >();
+    
+    blas::qr( Ue, R ); // Ue is orthogonal afterwards
+                
+    auto  Se = blas::join_col< value_t >( { S, T } );
+    auto  Sn = blas::prod( R, Se );
+
+    return { std::move( Ue ), std::move( Sn ) };
+}
+
+//
 // compute M=U·S·V' + W·T·V' = (U W)·⎛S⎞·V'
 //                                   ⎝T⎠
 // - ASSUMPTION: W is orthogonal
 //
 template < typename value_t,
            typename approx_t >
-std::tuple< blas::matrix< value_t >,
-            blas::matrix< value_t > >
+std::tuple< blas::matrix< value_t >,   // new row basis
+            blas::matrix< value_t > >  // new coupling
 add_row ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      W,
           const blas::matrix< value_t > &      T,
@@ -396,13 +430,46 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
+// compute M = U·S·V' + U·T·X', M = U·(S T)·(V X)'
+//
+// - return new coefficients and orthogonal column basis
+// - no approximation
+// - X does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
+add_col ( const uniform_lrmatrix< value_t > &  M,
+          const blas::matrix< value_t > &      T,
+          const blas::matrix< value_t > &      X )
+{
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
+
+    //
+    // new column basis is orthogonalized (V X) with updated coupling
+    //
+
+    auto  Ve = blas::join_row< value_t >( { V, X } );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( Ve, R ); // Ve is orthogonal afterwards
+    
+    auto  Se = blas::join_row< value_t >( { S, T } );
+    auto  Sn = blas::prod( Se, blas::adjoint( R ) );
+
+    return { std::move( Sn ), std::move( Ve ) };
+}
+
+//
 // compute M=U·S·V' + U·T·X', M=U·(S T)·(V X)'
 // - ASSUMPTION: X is orthogonal
 //
 template < typename value_t,
            typename approx_t >
-std::tuple< blas::matrix< value_t >,
-            blas::matrix< value_t > >
+std::tuple< blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
 add_col ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      T,
           const blas::matrix< value_t > &      X,
@@ -479,6 +546,44 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     return { std::move( Sn ), std::move( Vn ) };
 }
 
+//
+// compute M = U·S·V' + W·T·X' = (U W)·⎛S  ⎞·(V X)'
+//                                     ⎝  T⎠
+//
+// - return orthogonal row/column basis and new coefficients
+// - no approximation
+// - W does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,   // new row basis
+            blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
+add_row_col ( const uniform_lrmatrix< value_t > &  M,
+              const blas::matrix< value_t > &      W,
+              const blas::matrix< value_t > &      T,
+              const blas::matrix< value_t > &      X )
+{
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
+    
+    auto  Ue = blas::join_row< value_t >( { U, W } );
+    auto  RU = blas::matrix< value_t >();
+
+    blas::qr( Ue, RU ); // Ue is orthogonal afterwards
+                
+    auto  Ve = blas::join_row< value_t >( { V, X } );
+    auto  RV = blas::matrix< value_t >();
+
+    blas::qr( Ve, RV ); // Ve is orthogonal afterwards
+    
+    auto  Se = blas::diag< value_t >( { S, T } );
+    auto  S1 = blas::prod( RU, Se );
+    auto  Sn = blas::prod( S1, blas::adjoint( RV ) );
+
+    return { std::move( Ue ), std::move( Sn ), std::move( Ve ) };
+}
+    
 //
 // compute new row basis for block row of M with M being replaced by W·T·X'
 // assuming all involved bases are orthogonal (X is not needed for computation)

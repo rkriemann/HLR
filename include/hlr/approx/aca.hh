@@ -342,6 +342,22 @@ aca ( blas::matrix< value_t > &  M,
 }
 
 template < typename value_t >
+std::list< std::pair< idx_t, idx_t > >
+aca_pivots ( blas::matrix< value_t > &  M,
+             const hpro::TTruncAcc &    acc )
+{
+    auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
+
+    // for update statistics
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+
+    auto  pivots   = std::list< std::pair< idx_t, idx_t > >();
+    auto  [ U, V ] = aca( M, pivot_search, acc, & pivots );
+
+    return pivots;
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const blas::matrix< value_t > &  U,

@@ -620,9 +620,9 @@ clear ( hpro::TMatrix &  M )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &             M,
-               const cluster_basis< value_t > &  rowcb,
-               const cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix &       M,
+               cluster_basis< value_t > &  rowcb,
+               cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -665,7 +665,7 @@ copy_uniform ( const hpro::TMatrix &             M,
 
         auto  UA = rowcb.transform_forward( blas::mat_U< value_t >( R ) );
         auto  VB = colcb.transform_forward( blas::mat_V< value_t >( R ) );
-        auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
+        auto  S  = blas::prod( UA, blas::adjoint( VB ) );
         auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
                                                                     rowcb, colcb,
                                                                     std::move( S ) );
@@ -716,7 +716,7 @@ copy_nonuniform ( const hpro::TMatrix &  M )
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R  = cptrcast( &M, uniform_lrmatrix< value_t > );
-        auto  U  = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
+        auto  U  = blas::prod( R->row_cb().basis(), R->coeff() );
         auto  V  = blas::copy( R->col_cb().basis() );
         auto  SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
 

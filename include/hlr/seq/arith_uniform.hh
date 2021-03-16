@@ -26,9 +26,10 @@ using hlr::uniform::accu::lu;
 namespace tlr
 {
 
-using hlr::uniform::tlr::addlr;
+// using hlr::uniform::tlr::addlr;
 using hlr::uniform::tlr::multiply;
 using hlr::uniform::tlr::lu;
+using hlr::uniform::tlr::lu_sep;
 using hlr::uniform::tlr::lu_lazy;
 using hlr::uniform::tlr::ldu;
 

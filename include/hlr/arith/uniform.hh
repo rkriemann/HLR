@@ -11,8 +11,8 @@
 #include <list>
 
 #include <hlr/arith/detail/uniform_bases.hh>
-#include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform.hh>
+#include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform_accu.hh>
 
 namespace hlr { namespace uniform {
@@ -236,47 +236,47 @@ namespace tlr
 //
 // add global low-rank matrix W·X' to H²-matrix M
 //
-template < typename value_t >
-void
-addlr ( hpro::TMatrix &                  M,
-        const blas::matrix< value_t > &  W,
-        const blas::matrix< value_t > &  X,
-        const hpro::TTruncAcc &          acc )
-{
-    HLR_ASSERT( is_blocked( M ) );
+// template < typename value_t >
+// void
+// addlr ( hpro::TMatrix &                  M,
+//         const blas::matrix< value_t > &  W,
+//         const blas::matrix< value_t > &  X,
+//         const hpro::TTruncAcc &          acc )
+// {
+//     HLR_ASSERT( is_blocked( M ) );
 
-    auto  B = ptrcast( &M, hpro::TBlockMatrix );
+//     auto  B = ptrcast( &M, hpro::TBlockMatrix );
     
-    //
-    // use inefficient method adding only local updates
-    //
+//     //
+//     // use inefficient method adding only local updates
+//     //
 
-    for ( uint  i = 0; i < B->nblock_rows(); ++i )
-    {
-        for ( uint  j = 0; j < B->nblock_cols(); ++j )
-        {
-            auto  B_ij = B->block( i, j );
-            auto  W_i  = blas::matrix( W, B_ij->row_is() - B->row_ofs(), blas::range::all );
-            auto  X_j  = blas::matrix( X, B_ij->col_is() - B->col_ofs(), blas::range::all );
-            auto  I    = blas::identity< value_t >( X_j.ncols() );
+//     for ( uint  i = 0; i < B->nblock_rows(); ++i )
+//     {
+//         for ( uint  j = 0; j < B->nblock_cols(); ++j )
+//         {
+//             auto  B_ij = B->block( i, j );
+//             auto  W_i  = blas::matrix( W, B_ij->row_is() - B->row_ofs(), blas::range::all );
+//             auto  X_j  = blas::matrix( X, B_ij->col_is() - B->col_ofs(), blas::range::all );
+//             auto  I    = blas::identity< value_t >( X_j.ncols() );
                         
-            if ( matrix::is_uniform_lowrank( B_ij ) )
-            {
-                auto  R_ij = ptrcast( B_ij, matrix::uniform_lrmatrix< value_t > );
+//             if ( matrix::is_uniform_lowrank( B_ij ) )
+//             {
+//                 auto  R_ij = ptrcast( B_ij, matrix::uniform_lrmatrix< value_t > );
 
-                detail::addlr_global( *B, *R_ij, i, j, W_i, X_j, acc );
-            }// if
-            else if ( is_dense( B_ij ) )
-            {
-                auto  D_ij = ptrcast( B_ij, hpro::TDenseMatrix );
+//                 detail::addlr_global( *B, *R_ij, i, j, W_i, X_j, acc );
+//             }// if
+//             else if ( is_dense( B_ij ) )
+//             {
+//                 auto  D_ij = ptrcast( B_ij, hpro::TDenseMatrix );
 
-                blas::prod( value_t(1), W_i, blas::adjoint( X_j ), value_t(1), blas::mat< value_t >( D_ij ) );
-            }// if
-            else
-                HLR_ERROR( "unsupported matrix type : " + B_ij->typestr() );
-        }// for
-    }// for
-}
+//                 blas::prod( value_t(1), W_i, blas::adjoint( X_j ), value_t(1), blas::mat< value_t >( D_ij ) );
+//             }// if
+//             else
+//                 HLR_ERROR( "unsupported matrix type : " + B_ij->typestr() );
+//         }// for
+//     }// for
+// }
 
 //
 // matrix multiplication
@@ -372,21 +372,120 @@ lu ( hpro::TMatrix &          A,
             else
                 HLR_ERROR( "matrix type not supported : " + A_ji->typestr() );
         }// for
-
+        
         for ( uint  j = i+1; j < nbr; ++j )
         {
             for ( uint  l = i+1; l < nbc; ++l )
             {
-                detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, j, i, l, acc );
+                detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, j, i, l, acc, approx );
             }// for
         }// for
     }// for
 }
 
-template < typename value_t >
+//
+// LU factorization A = L·U, with unit lower triangular L and upper triangular U
+// - version with separate matrices for L/U and also separate cluster bases
+// - A is assumed to be stored in L (lower part) and U (upper part including diagonal)
+//   upon entry
+//
+template < typename value_t,
+           typename approx_t >
+void
+lu_sep ( hpro::TMatrix &          L,
+         hpro::TMatrix &          U,
+         const hpro::TTruncAcc &  acc,
+         const approx_t &         approx )
+{
+    HLR_LOG( 4, hpro::to_string( "lu( %d )", U.id() ) );
+    
+    HLR_ASSERT( is_blocked_all( L, U ) );
+
+    auto  BL  = ptrcast( &L, hpro::TBlockMatrix );
+    auto  BU  = ptrcast( &U, hpro::TBlockMatrix );
+    auto  nbr = BU->nblock_rows();
+    auto  nbc = BU->nblock_cols();
+
+    HLR_ASSERT(( BL->nblock_rows() == BU->nblock_rows() ) &&
+               ( BL->nblock_cols() == BU->nblock_cols() ));
+    
+    for ( uint  i = 0; i < nbr; ++i )
+    {
+        auto  U_ii  = ptrcast( BU->block( i, i ), hpro::TDenseMatrix );
+        auto  L_ii  = ptrcast( BL->block( i, i ), hpro::TDenseMatrix );
+        auto  DU_ii = blas::mat< value_t >( U_ii );
+        auto  DL_ii = blas::mat< value_t >( L_ii );
+            
+        blas::invert( DU_ii );
+        DL_ii = blas::identity< value_t >( DL_ii.nrows() );
+
+        //
+        // X_ji U_ii = U_j S_ji ( V_i' U_ii ) = U_j S_ji X_i'
+        // is solved as X_i = U_ii'^-1 V_i
+        //
+        // As V_i is shared among all X_ji, so is X_i.
+        //
+
+        // update shared column basis of L
+        for ( uint  j = i+1; j < nbc; ++j )
+        {
+            auto  L_ji = BL->block( j, i );
+
+            if ( matrix::is_uniform_lowrank( L_ji ) )
+            {
+                auto  R_ji = ptrcast( L_ji, matrix::uniform_lrmatrix< value_t > );
+                auto  V_i  = R_ji->col_basis();
+                auto  X_i  = blas::prod( blas::adjoint( DU_ii ), V_i );
+
+                // const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( blas::copy( QX ) ) );
+                R_ji->col_cb().set_basis( std::move( X_i ) );
+
+                break;
+            }// if
+        }// for
+
+        // solve dense blocks
+        for ( uint  j = i+1; j < nbc; ++j )
+        {
+            auto  L_ji = BL->block( j, i );
+
+            if ( is_dense( L_ji ) )
+            {
+                auto  D_ji = ptrcast( L_ji, hpro::TDenseMatrix );
+                auto  T_ji = blas::copy( blas::mat< value_t >( D_ji ) );
+
+                blas::prod( value_t(1), T_ji, DU_ii, value_t(0), blas::mat< value_t >( D_ji ) );
+            }// if
+        }// for
+
+        //
+        // update trailing submatrix
+        //
+        
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            for ( uint  l = i+1; l < j; ++l )
+            {
+                detail::multiply( value_t(-1), apply_normal, *BL, apply_normal, *BU, *BL, j, i, l, acc, approx );
+            }// for
+        }// for
+
+        for ( uint  j = i+1; j < nbr; ++j )
+        {
+            for ( uint  l = j; l < nbc; ++l )
+            {
+                detail::multiply( value_t(-1), apply_normal, *BL, apply_normal, *BU, *BU, j, i, l, acc, approx );
+            }// for
+        }// for
+    }// for
+}
+
+template < typename value_t,
+           typename approx_t >
 void
 lu_lazy ( hpro::TMatrix &          A,
           const hpro::TTruncAcc &  acc,
+          const approx_t &         approx,
           hpro::TMatrix &          /* REF */ )
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
@@ -425,7 +524,7 @@ lu_lazy ( hpro::TMatrix &          A,
         //
         
         for ( int  k = 0; k < int(i); ++k )
-            detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, i, k, i, acc );
+            detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, i, k, i, acc, approx );
 
         // // DEBUG {
         // for ( int  k = 0; k < int(i); k++ )
@@ -472,7 +571,7 @@ lu_lazy ( hpro::TMatrix &          A,
             if ( is_dense( A_ij ) )
             {
                 for ( int  k = 0; k < int(i); ++k )
-                    detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, i, k, j, acc );
+                    detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, i, k, j, acc, approx );
             }// if
             else if ( matrix::is_uniform_lowrank( A_ij ) )
             {
@@ -506,7 +605,7 @@ lu_lazy ( hpro::TMatrix &          A,
             if ( is_dense( A_ji ) )
             {
                 for ( int  k = 0; k < int(i); ++k )
-                    detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, j, k, i, acc );
+                    detail::multiply( value_t(-1), apply_normal, *BA, apply_normal, *BA, *BA, j, k, i, acc, approx );
                 
                 // // DEBUG {
                 // {

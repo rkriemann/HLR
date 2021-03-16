@@ -1,9 +1,9 @@
-#ifndef __HLR_MATRIX_LUINV_EVAL_HH
-#define __HLR_MATRIX_LUINV_EVAL_HH
+#ifndef __HLR_MATRIX_TRIINV_EVAL_HH
+#define __HLR_MATRIX_TRIINV_EVAL_HH
 //
 // Project     : HLR
-// File        : luinv_eval.hh
-// Description : evaluation operator for the inverse of LU factorizations
+// File        : triinv_eval.hh
+// Description : evaluation operator for the inverse of triangular matrices
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -15,30 +15,43 @@
 #include <hpro/matrix/TLinearOperator.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/dag/graph.hh>
+#include <hlr/dag/solve.hh>
+#include <hlr/seq/dag.hh>
 
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
 
 // local matrix type
-DECLARE_TYPE( luinv_eval );
+DECLARE_TYPE( triinv_eval );
 
 //
 // implements vector solving for LU using DAGs
 //
-class luinv_eval : public hpro::TLinearOperator
+class triinv_eval : public hpro::TLinearOperator
 {
 private:
-    // matrix containing LU data
-    const hpro::TMatrix &  _mat;
+    // upper or lower triangular
+    blas::tri_type_t   _shape;
+    
+    // diagonal evaluation
+    blas::diag_type_t  _diag;
+    
+    // matrix containing triangular matrix
+    hpro::TMatrix &    _mat;
 
 public:
     //
     // ctor
     //
 
-    luinv_eval ( const hpro::TMatrix &  M )
-            : _mat( M )
+    triinv_eval ( hpro::TMatrix &          M,
+                  const blas::tri_type_t   shape,
+                  const blas::diag_type_t  diag )
+            : _shape( shape )
+            , _diag( diag )
+            , _mat( M )
     {}
     
     //
@@ -128,7 +141,7 @@ public:
     //
 
     // RTTI
-    HLIB_RTTI_DERIVED( luinv_eval, hpro::TLinearOperator )
+    HLIB_RTTI_DERIVED( triinv_eval, hpro::TLinearOperator )
 };
 
 

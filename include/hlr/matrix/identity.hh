@@ -30,16 +30,18 @@ class identity_operator : public hpro::TLinearOperator
 {
 private:
     // index set of identity
-    indexset  _is;
+    block_indexset  _bis;
     
 public:
     //
     // ctor
     //
 
-    identity_operator ( const indexset  is )
-            : _is( is )
-    {}
+    identity_operator ( const block_indexset  bis )
+            : _bis( bis )
+    {
+        HLR_ASSERT( bis.row_is() == bis.col_is() );
+    }
     
     //
     // linear operator properties
@@ -146,16 +148,16 @@ public:
     //
 
     // return dimension of domain
-    virtual size_t  domain_dim     () const { return _is.size(); }
+    virtual size_t  domain_dim     () const { return _bis.col_is().size(); }
     
     // return dimension of range
-    virtual size_t  range_dim      () const { return _is.size(); }
+    virtual size_t  range_dim      () const { return _bis.row_is().size(); }
     
     // return vector in domain space
-    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _is ); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.col_is() ); }
 
     // return vector in range space
-    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _is ); }
+    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.row_is() ); }
 
     //
     // misc.
@@ -170,9 +172,9 @@ public:
 //
 inline
 std::unique_ptr< identity_operator >
-identity ( const indexset &  is )
+identity ( const block_indexset &  bis )
 {
-    return std::make_unique< identity_operator >( is );
+    return std::make_unique< identity_operator >( bis );
 }
 
 }} // namespace hlr::matrix
