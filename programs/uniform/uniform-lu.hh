@@ -370,7 +370,7 @@ program_main ()
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2()->bytesize() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
                 
             io::eps::print( *A3, "H2LU", prnopt );
                 
@@ -405,7 +405,7 @@ program_main ()
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2()->bytesize() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
                 
             io::eps::print( *A3, "H2LUa", prnopt );
                 

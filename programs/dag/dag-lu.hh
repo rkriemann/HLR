@@ -337,7 +337,7 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            matrix::luinv_eval   A_inv2( C, impl::dag::refine, impl::dag::run );
+            matrix::luinv_eval   A_inv2( *C ); // , impl::dag::refine, impl::dag::run );
             hpro::TScalarVector  v( x );
         
             runtime.clear();

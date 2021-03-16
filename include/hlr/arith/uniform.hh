@@ -177,7 +177,7 @@ void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx,
-     hpro::TMatrix &          REF )
+     hpro::TMatrix &          /* REF */ )
 {
     //
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
