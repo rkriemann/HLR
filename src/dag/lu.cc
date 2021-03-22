@@ -226,7 +226,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
-    
+
     hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
@@ -510,7 +510,7 @@ gen_dag_lu_ip ( TMatrix &      A,
         //
         // add apply/shift nodes with shift(A) as new start
         //
-        
+
         for ( auto  node : apply_nodes )
         {
             dag.nodes().push_back( node );
@@ -520,9 +520,13 @@ gen_dag_lu_ip ( TMatrix &      A,
                 succ->inc_dep_cnt();
         }// for
 
+        // update old nodes as well
+        for ( auto  node : dag.nodes() )
+            node->finalize();
+        
         dag.start().clear();
         dag.start().push_back( apply_map[ A.id() ] );
-
+        
         return dag;
     }// else
 

@@ -170,8 +170,8 @@ program_main ()
     //
     // benchmark DAG generation
     //
-    
-    std::vector< double >  runtime;
+
+    auto  runtime = std::vector< double >();
     
     LIKWID_MARKER_INIT;
         

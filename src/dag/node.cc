@@ -469,18 +469,6 @@ node::refine ( const size_t  min_size )
 }
 
 //
-// finalize node data (if internal data will not change)
-//
-void
-node::finalize ()
-{
-    _ndeps = _dep_cnt;
-    
-    _in_blk_deps.resize( 0 );
-    _out_blk_deps.resize( 0 );
-}
-
-//
 // print node with full edge information
 //
 void

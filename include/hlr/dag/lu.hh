@@ -63,6 +63,10 @@ gen_dag_lu_accu ( hpro::TMatrix &  A,
             succ->inc_dep_cnt();
     }// for
 
+    // update old nodes as well
+    for ( auto  node : dag.nodes() )
+        node->finalize();
+    
     dag.start().clear();
     dag.start().push_back( apply_map[ A.id() ] );
         
