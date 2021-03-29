@@ -67,6 +67,19 @@ using hlr::multiply_hadamard;
 using hlr::lu;     
 
 //
+// LU factorization for nested dissection type matrices
+//
+template < typename value_t,
+           typename approx_t >
+void
+lu_nd ( hpro::TMatrix &          A,
+        const hpro::TTruncAcc &  acc,
+        const approx_t &         approx )
+{
+    lu< value_t >( A, acc, approx );
+}
+    
+//
 // Gaussian elimination of A, e.g. A = A^-1
 // - T is used as temporary space and has to have the same
 //   structure as A

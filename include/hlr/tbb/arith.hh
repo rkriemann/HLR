@@ -451,6 +451,54 @@ lu ( hpro::TMatrix &          A,
 }
 
 //
+// LU factorization for nested dissection type matrices
+//
+template < typename value_t,
+           typename approx_t >
+void
+lu_nd ( hpro::TMatrix &          A,
+        const hpro::TTruncAcc &  acc,
+        const approx_t &         approx )
+{
+    if ( is_dd( &A ) )
+    {
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+
+        HLR_ASSERT( BA->nblock_rows() == BA->nblock_cols() );
+
+        const auto  last = BA->nblock_rows()-1;
+        
+        ::tbb::parallel_for< uint >( 0, BA->nblock_rows()-1,
+                                     [=,&acc,&approx] ( const uint  i )
+                                     {
+                                         auto  A_ii = BA->block( i, i );
+                                         
+                                         lu_nd< value_t >( *A_ii, acc, approx );
+
+                                         solve_upper_tri< value_t >( from_right, general_diag, *A_ii, *BA->block( last, i ), acc, approx );
+                                         solve_lower_tri< value_t >( from_left,  unit_diag,    *A_ii, *BA->block( i, last ), acc, approx );
+                                         
+                                         multiply( value_t(-1), apply_normal, *BA->block( last, i ), apply_normal, *BA->block( i, last ),
+                                                   *BA->block( last, last ), acc, approx );
+                                     } );
+
+        lu< value_t >( *BA->block( last, last ), acc, approx );
+    }// if
+    else if ( is_blocked( A ) )
+    {
+        hlr::lu< value_t >( A, acc, approx );
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+
+        invert< value_t >( *D );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+}
+
+//
 // Gaussian elimination of A, e.g. A = A^-1
 // - T is used as temporary space and has to have the same
 //   structure as A

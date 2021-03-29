@@ -11,6 +11,7 @@
 #include <string>
 
 #include <hpro/io/TMatrixIO.hh>
+#include <hpro/io/TClusterVis.hh>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
@@ -207,6 +208,30 @@ write ( const HLIB::TMatrix *  M,
 
 namespace eps
 {
+
+//
+// print cluster <cl> to file <filename>
+//
+void
+print ( const HLIB::TCluster &  cl,
+        const std::string &     filename )
+{
+    HLIB::TPSClusterVis  vis;
+
+    vis.print( & cl, filename );
+}
+
+//
+// print blockcluster <cl> to file <filename>
+//
+void
+print ( const HLIB::TBlockCluster &  cl,
+        const std::string &          filename )
+{
+    HLIB::TPSBlockClusterVis  vis;
+
+    vis.print( & cl, filename );
+}
 
 //
 // print matrix <M> to file <filename>

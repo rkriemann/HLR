@@ -43,6 +43,9 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
+    if (( alpha == value_t(0) ) || A.is_zero() || B.is_zero() )
+        return;
+    
     using hlr::matrix::is_uniform_lowrank;
     using hlr::matrix::uniform_lrmatrix;
 
@@ -54,7 +57,7 @@ multiply ( const value_t            alpha,
     auto  Bc = matrix::convert_to_dense< value_t >( B );
     auto  Cc = matrix::convert_to_dense< value_t >( C );
 
-    hpro::multiply( alpha, op_A, Ac.get(), op_B, Bc.get(), value_t(1), Cc.get(), acc );
+    hlr::multiply( alpha, op_A, *Ac, op_B, *Bc, *Cc );
 
     // hpro::DBG::write( A, "A.mat", "A" );
     // hpro::DBG::write( B, "B.mat", "B" );
@@ -407,6 +410,9 @@ multiply ( const value_t            alpha,
            const hpro::TMatrix &    B,
            hpro::TMatrix &          C )
 {
+    if (( alpha == value_t(0) ) || A.is_zero() || B.is_zero() )
+        return;
+    
     using hlr::matrix::is_uniform_lowrank;
     using hlr::matrix::uniform_lrmatrix;
     

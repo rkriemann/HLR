@@ -45,6 +45,9 @@ solve_lower_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
+    if ( M.is_zero() )
+        return;
+    
     // auto  Mc = M.copy();
 
     // if ( side == from_left )
@@ -100,6 +103,9 @@ solve_lower_tri ( const eval_side_t        side,
                   const hpro::TMatrix &    L,
                   hpro::TMatrix &          M )
 {
+    if ( M.is_zero() )
+        return;
+    
     if ( is_blocked( L ) )
     {
         if ( is_lowrank( M ) )
@@ -254,6 +260,9 @@ solve_upper_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
+    if ( M.is_zero() )
+        return;
+    
     // auto  Mc = M.copy();
 
     // if ( side == from_left )
@@ -305,6 +314,9 @@ solve_upper_tri ( const eval_side_t        side,
                   const hpro::TMatrix &    U,
                   hpro::TMatrix &          M )
 {
+    if ( M.is_zero() )
+        return;
+    
     if ( is_blocked( U ) )
     {
         if ( is_lowrank( M ) )
