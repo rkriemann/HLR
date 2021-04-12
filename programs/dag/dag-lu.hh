@@ -21,6 +21,7 @@
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/likwid.hh"
+#include "hlr/utils/io.hh"
 
 using namespace hlr;
 
@@ -81,15 +82,23 @@ program_main ()
         auto  S = ptrcast( M.get(), hpro::TSparseMatrix );
 
         // convert to H
-        hpro::TMETISAlgPartStrat  part_strat;
-        hpro::TAlgCTBuilder       ct_builder( & part_strat, ntile );
-        hpro::TAlgNDCTBuilder     nd_ct_builder( & ct_builder, ntile );
-        auto                      cl = nd_ct_builder.build( S );
-        hpro::TWeakAlgAdmCond     adm_cond( S, cl->perm_i2e() );
-        hpro::TBCBuilder          bct_builder;
-        auto                      bcl = bct_builder.build( cl.get(), cl.get(), & adm_cond );
-        hpro::TSparseMatBuilder   h_builder( S, cl->perm_i2e(), cl->perm_e2i() );
+        auto  part_strat    = hpro::TMongooseAlgPartStrat();
+        auto  ct_builder    = hpro::TAlgCTBuilder( & part_strat, ntile );
+        auto  nd_ct_builder = hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+        auto  cl            = nd_ct_builder.build( S );
+        auto  adm_cond      = hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
+        auto  bct_builder   = hpro::TBCBuilder();
+        auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+        auto  h_builder     = hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
 
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( * cl->root(), "ct" );
+            io::eps::print( * bcl->root(), "bct" );
+        }// if
+
+        h_builder.set_use_zero_mat( true );
+        
         A = h_builder.build( bcl.get(), acc );
     }// else
 

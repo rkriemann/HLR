@@ -105,7 +105,10 @@ solve_lower_tri ( const eval_side_t        side,
 {
     if ( M.is_zero() )
         return;
-    
+
+    HLR_ASSERT( (( side == from_left  ) && ( L.col_is() == M.row_is() )) ||
+                (( side == from_right ) && ( M.col_is() == L.row_is() )) );
+                
     if ( is_blocked( L ) )
     {
         if ( is_lowrank( M ) )

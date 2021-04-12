@@ -251,7 +251,67 @@ solve_lower_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
-    if ( is_blocked_all( L, M ) )
+    if ( is_nd( L ) && is_blocked( M ) )
+    {
+        auto  BL  = cptrcast( &L, hpro::TBlockMatrix );
+        auto  BM  =  ptrcast( &M, hpro::TBlockMatrix );
+        auto  nbr = BM->nblock_rows();
+        auto  nbc = BM->nblock_cols();
+        
+        if ( side == from_left )
+        {
+            HLR_ASSERT( ( BL->nblock_rows() == nbr ) && ( BL->nblock_cols() == nbr ) );
+            
+            ::tbb::parallel_for(
+                ::tbb::blocked_range2d< size_t >( 0, nbr-1,
+                                                  0, nbc ),
+                [=,&acc,&approx] ( const auto &  r )
+                {
+                    for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                    {
+                        for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                        {
+                            auto  L_ii = BL->block( i, i );
+                            auto  M_ij = BM->block( i, j );
+
+                            HLR_ASSERT( ! is_null( L_ii ) );
+                            
+                            if ( ! is_null( M_ij ) )
+                            {
+                                solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx );
+
+                                if ( ! is_null( BL->block( nbr-1, i ) ) )
+                                {
+                                    HLR_ASSERT( ! is_null( BM->block( nbr-1, j ) ) );
+                                    
+                                    multiply< value_t >( value_t(-1),
+                                                         apply_normal, *BL->block( nbr-1, i ),
+                                                         apply_normal, *M_ij,
+                                                         *BM->block( nbr-1, j ), acc, approx );
+                                }// if
+                            }// if
+                        }// for
+                    }// for
+                } );
+                
+            HLR_ASSERT( ! is_null( BL->block( nbr-1, nbr-1 ) ) );
+            
+            ::tbb::parallel_for< uint >(
+                0, nbc,
+                [=,&acc,&approx] ( const uint  j )
+                {
+                    auto  M_ij = BM->block( nbr-1, j );
+                    
+                    if ( ! is_null( M_ij ) )
+                        solve_lower_tri< value_t >( side, diag, *BL->block( nbr-1, nbr-1 ), *M_ij, acc, approx );
+                } );
+        }// if
+        else
+        {
+            HLR_ASSERT( false );
+        }// else
+    }// if
+    else if ( is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
@@ -319,7 +379,67 @@ solve_upper_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
-    if ( is_blocked_all( U, M ) )
+    if ( is_nd( U ) && is_blocked( M ) )
+    {
+        auto  BU  = cptrcast( &U, hpro::TBlockMatrix );
+        auto  BM  =  ptrcast( &M, hpro::TBlockMatrix );
+        auto  nbr = BM->nblock_rows();
+        auto  nbc = BM->nblock_cols();
+        
+        if ( side == from_left )
+        {
+            HLR_ASSERT( false );
+        }// if
+        else
+        {
+            HLR_ASSERT( ( BU->nblock_rows() == nbc ) && ( BU->nblock_cols() == nbc ) );
+            
+            ::tbb::parallel_for(
+                ::tbb::blocked_range2d< size_t >( 0, nbr,
+                                                  0, nbc-1 ),
+                [=,&acc,&approx] ( const auto &  r )
+                {
+                    for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                    {
+                        for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                        {
+                            auto  U_jj = BU->block( j, j );
+                            auto  M_ij = BM->block( i, j );
+
+                            HLR_ASSERT( ! is_null( U_jj ) );
+                            
+                            if ( ! is_null( M_ij ) )
+                            {
+                                solve_upper_tri< value_t >( side, diag, *U_jj, *M_ij, acc, approx );
+
+                                if ( ! is_null( BU->block( j, nbc-1 ) ) )
+                                {
+                                    HLR_ASSERT( ! is_null( BM->block( i, nbc-1 ) ) );
+                                    
+                                    multiply< value_t >( value_t(-1),
+                                                         apply_normal, *M_ij,
+                                                         apply_normal, *BU->block( j, nbc-1 ),
+                                                         *BM->block( i, nbc-1 ), acc, approx );
+                                }// if
+                            }// if
+                        }// for
+                    }// for
+                } );
+                
+            HLR_ASSERT( ! is_null( BU->block( nbc-1, nbc-1 ) ) );
+            
+            ::tbb::parallel_for< uint >(
+                0, nbr,
+                [=,&acc,&approx] ( const uint  i )
+                {
+                    auto  M_ij = BM->block( i, nbc-1 );
+                    
+                    if ( ! is_null( M_ij ) )
+                        solve_upper_tri< value_t >( side, diag, *BU->block( nbc-1, nbc-1 ), *M_ij, acc, approx );
+                } );
+        }// else
+    }// if
+    else if ( is_blocked_all( U, M ) )
     {
         auto  BU = cptrcast( &U, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
@@ -460,7 +580,7 @@ lu_nd ( hpro::TMatrix &          A,
         const hpro::TTruncAcc &  acc,
         const approx_t &         approx )
 {
-    if ( is_dd( &A ) )
+    if ( is_nd( A ) )
     {
         auto  BA = ptrcast( &A, hpro::TBlockMatrix );
 

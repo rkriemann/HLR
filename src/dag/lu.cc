@@ -174,40 +174,84 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( min_size, A ) )
+    if ( ! is_small( min_size, A ) )
     {
-        auto        B   = ptrcast( A, TBlockMatrix );
-        const auto  nbr = B->block_rows();
-        const auto  nbc = B->block_cols();
-
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+        if ( is_nd( A ) )
         {
-            //
-            // factorise diagonal block
-            //
+            auto        B   = ptrcast( A, TBlockMatrix );
+            const auto  nbr = B->block_rows();
+            const auto  nbc = B->block_cols();
+
+            for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+            {
+                //
+                // factorise diagonal block
+                //
             
-            auto  A_ii  = B->block( i, i );
+                auto  A_ii  = B->block( i, i );
 
-            assert( A_ii != nullptr );
+                assert( A_ii != nullptr );
 
-            g.alloc_node< lu_node >( A_ii, apply_nodes );
+                g.alloc_node< lu_node >( A_ii, apply_nodes );
 
-            for ( uint j = i+1; j < nbr; j++ )
-                if ( ! is_null( B->block( j, i ) ) )
-                    g.alloc_node< trsmu_node >( A_ii, B->block( j, i ), apply_nodes );
+                if ( ! is_null( B->block( nbr-1, i ) ) )
+                    g.alloc_node< trsmu_node >( A_ii, B->block( nbr-1, i ), apply_nodes );
 
-            for ( uint j = i+1; j < nbc; j++ )
-                if ( ! is_null( B->block( i, j ) ) )
-                    g.alloc_node< trsml_node >( A_ii, B->block( i, j ), apply_nodes );
+                if ( ! is_null( B->block( i, nbc-1 ) ) )
+                    g.alloc_node< trsml_node >( A_ii, B->block( i, nbc-1 ), apply_nodes );
 
-            for ( uint j = i+1; j < nbr; j++ )
-                for ( uint l = i+1; l < nbc; l++ )
-                    if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
-                        g.alloc_node< update_node >( B->block( j, i ),
-                                                     B->block( i, l ),
-                                                     B->block( j, l ),
-                                                     apply_nodes );
-        }// for
+                if ( ! is_null_any( B->block( nbr-1, i ), B->block( i, nbc-1 ), B->block( nbr-1, nbc-1 ) ) )
+                    g.alloc_node< update_node >( B->block( nbr-1, i ),
+                                                 B->block( i, nbc-1 ),
+                                                 B->block( nbr-1, nbc-1 ),
+                                                 apply_nodes );
+            }// for
+
+            g.alloc_node< lu_node >( B->block( nbr-1, nbc-1 ), apply_nodes );
+        }// if
+        else if ( is_blocked( A ) )
+        {
+            auto        B   = ptrcast( A, TBlockMatrix );
+            const auto  nbr = B->block_rows();
+            const auto  nbc = B->block_cols();
+
+            for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+            {
+                //
+                // factorise diagonal block
+                //
+            
+                auto  A_ii  = B->block( i, i );
+
+                assert( A_ii != nullptr );
+
+                g.alloc_node< lu_node >( A_ii, apply_nodes );
+
+                for ( uint j = i+1; j < nbr; j++ )
+                    if ( ! is_null( B->block( j, i ) ) )
+                        g.alloc_node< trsmu_node >( A_ii, B->block( j, i ), apply_nodes );
+
+                for ( uint j = i+1; j < nbc; j++ )
+                    if ( ! is_null( B->block( i, j ) ) )
+                        g.alloc_node< trsml_node >( A_ii, B->block( i, j ), apply_nodes );
+
+                for ( uint j = i+1; j < nbr; j++ )
+                    for ( uint l = i+1; l < nbc; l++ )
+                        if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
+                            g.alloc_node< update_node >( B->block( j, i ),
+                                                         B->block( i, l ),
+                                                         B->block( j, l ),
+                                                         apply_nodes );
+            }// for
+        }// if
+        else if ( CFG::Arith::use_accu )
+        {
+            auto  apply = apply_nodes[ A->id() ];
+            
+            assert( apply != nullptr );
+            
+            apply->before( this );
+        }// if
     }// if
     else if ( CFG::Arith::use_accu )
     {

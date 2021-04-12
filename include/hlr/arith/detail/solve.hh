@@ -60,42 +60,94 @@ solve_lower_tri ( const eval_side_t           side,
 
     if ( side == from_left )
     {
-        //
-        // from top to bottom in L
-        // - solve in current block row
-        // - update matrices in remaining block rows
-        //
-        
-        for ( uint i = 0; i < M.nblock_rows(); ++i )
-        {
-            const auto  L_ii = L.block( i, i );
+        auto  nbr = M.nblock_rows();
+        auto  nbc = M.nblock_cols();
 
-            HLR_ASSERT( ! is_null( L_ii ) );
+        HLR_ASSERT( ( L.nblock_rows() == nbr ) && ( L.nblock_cols() == nbr ) );
             
-            for ( uint j = 0; j < M.nblock_cols(); ++j )
+        if ( is_nd( L ) )
+        {
+            //
+            // exploiting nested disection structure:
+            //
+            //   no updates for solve only with diagonal blocks and update
+            //
+            
+            for ( auto  i = 0; i < int(nbr-1); ++i )
             {
-                auto  M_ij = M.block( i, j );
-                
-                if ( ! is_null( M_ij ) )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx );
-            }// for
-
-            for ( uint  k = i+1; k < M.nblock_rows(); ++k )
-            {
-                for ( uint  j = 0; j < M.nblock_cols(); ++j )
+                for ( auto  j = 0; j < int(nbc); ++j )
                 {
-                    if ( ! is_null_any( L.block(k,i), M.block(i,j) ) )
+                    auto  L_ii = L.block( i, i );
+                    auto  M_ij = M.block( i, j );
+
+                    HLR_ASSERT( ! is_null( L_ii ) );
+                            
+                    if ( ! is_null( M_ij ) )
                     {
-                        HLR_ASSERT( ! is_null( M.block(k,j) ) );
-                        
-                        multiply< value_t >( value_t(-1),
-                                             apply_normal, *L.block(k,i),
-                                             apply_normal, *M.block(i,j),
-                                             *M.block(k,j), acc, approx );
+                        solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx );
+
+                        if ( ! is_null( L.block( nbr-1, i ) ) )
+                        {
+                            HLR_ASSERT( ! is_null( M.block( nbr-1, j ) ) );
+                                    
+                            multiply< value_t >( value_t(-1),
+                                                 apply_normal, *L.block( nbr-1, i ),
+                                                 apply_normal, *M_ij,
+                                                 *M.block( nbr-1, j ), acc, approx );
+                        }// if
                     }// if
                 }// for
             }// for
-        }// for
+
+            HLR_ASSERT( ! is_null( L.block( nbr-1, nbr-1 ) ) );
+            
+            for ( auto  j = 0; j < int(nbc); ++j )
+            {
+                auto  M_ij = M.block( nbr-1, j );
+                
+                if ( ! is_null( M_ij ) )
+                    solve_lower_tri< value_t >( side, diag, *L.block( nbr-1, nbr-1 ), *M_ij, acc, approx );
+            }// for
+        }// if
+        else
+        {
+            //
+            // from top to bottom in L
+            // - solve in current block row
+            // - update matrices in remaining block rows
+            //
+        
+            for ( uint i = 0; i < nbr; ++i )
+            {
+                const auto  L_ii = L.block( i, i );
+
+                HLR_ASSERT( ! is_null( L_ii ) );
+            
+                for ( uint j = 0; j < nbc; ++j )
+                {
+                    auto  M_ij = M.block( i, j );
+                
+                    if ( ! is_null( M_ij ) )
+                        solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx );
+                }// for
+
+                for ( uint  k = i+1; k < nbr; ++k )
+                {
+                    for ( uint  j = 0; j < nbc; ++j )
+                    {
+                        if ( ! is_null_any( L.block(k,i), M.block(i,j) ) )
+                        {
+                            HLR_ASSERT( ! is_null( M.block(k,j) ) );
+                        
+                            multiply< value_t >( value_t(-1),
+                                                 apply_normal, *L.block(k,i),
+                                                 apply_normal, *M.block(i,j),
+                                                 *M.block(k,j), acc, approx );
+                        }// if
+                    }// for
+                }// for
+            }// for
+        }// else
     }// if
     else
     {

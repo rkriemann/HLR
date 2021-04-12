@@ -167,7 +167,55 @@ lu_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( min_size, A ) )
+    if ( is_nd( A ) && ! is_small( min_size, A ) )
+    {
+        auto        BA       = ptrcast( A, hpro::TBlockMatrix );
+        auto        BU       = BA;
+        auto        BL       = BA;
+        const auto  nbr      = BA->block_rows();
+        const auto  nbc      = BA->block_cols();
+        auto        finished = tensor2< node * >( nbr, nbc );
+
+        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+        {
+            auto  A_ii  = BA->block( i, i );
+            auto  U_ii  = A_ii;
+            auto  L_ii  = A_ii;
+
+            assert( A_ii != nullptr );
+
+            finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii );
+
+            if ( ! is_null( BA->block( nbr-1, i ) ) )
+            {
+                finished( nbr-1, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( nbr-1, i ) );
+                finished( nbr-1, i )->after( finished( i, i ) );
+            }// if
+
+            if ( ! is_null( BA->block( i, nbc-1 ) ) )
+            {
+                finished( i, nbc-1 ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, nbc-1 ) );
+                finished( i, nbc-1 )->after( finished( i, i ) );
+            }// if
+        }// for
+        
+        finished( nbr-1, nbc-1 ) = g.alloc_node< lu_node >( BA->block( nbr-1, nbc-1 ) );
+        
+        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+        {
+            if ( ! is_null_any( BL->block( nbr-1, i ), BU->block( i, nbc-1 ), BA->block( nbr-1, nbc-1 ) ) )
+            {
+                auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( nbr-1, i ),
+                                                                                 BU->block( i, nbc-1 ),
+                                                                                 BA->block( nbr-1, nbc-1 ) );
+                
+                update->after( finished( nbr-1, i ) );
+                update->after( finished( i, nbc-1 ) );
+                finished( nbr-1, nbc-1 )->after( update );
+            }// if
+        }// for
+    }// if
+    else if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        BA  = ptrcast( A, hpro::TBlockMatrix );
         auto        BL  = BA;
@@ -907,7 +955,56 @@ lu_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked( A ) && ! is_small( min_size, A ) )
+    if ( is_nd( A ) && ! is_small( min_size, A ) )
+    {
+        auto        BA       = ptrcast( A, hpro::TBlockMatrix );
+        auto        BU       = BA;
+        auto        BL       = BA;
+        const auto  nbr      = BA->block_rows();
+        const auto  nbc      = BA->block_cols();
+        auto        finished = tensor2< node * >( nbr, nbc );
+
+        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+        {
+            auto  A_ii  = BA->block( i, i );
+            auto  U_ii  = A_ii;
+            auto  L_ii  = A_ii;
+
+            assert( A_ii != nullptr );
+
+            finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii, apply_map );
+
+            if ( ! is_null( BA->block( nbr-1, i ) ) )
+            {
+                finished( nbr-1, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( nbr-1, i ), apply_map );
+                finished( nbr-1, i )->after( finished( i, i ) );
+            }// if
+
+            if ( ! is_null( BA->block( i, nbc-1 ) ) )
+            {
+                finished( i, nbc-1 ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, nbc-1 ), apply_map );
+                finished( i, nbc-1 )->after( finished( i, i ) );
+            }// if
+        }// for
+        
+        finished( nbr-1, nbc-1 ) = g.alloc_node< lu_node >( BA->block( nbr-1, nbc-1 ), apply_map );
+        
+        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+        {
+            if ( ! is_null_any( BL->block( nbr-1, i ), BU->block( i, nbc-1 ), BA->block( nbr-1, nbc-1 ) ) )
+            {
+                auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( nbr-1, i ),
+                                                                                 BU->block( i, nbc-1 ),
+                                                                                 BA->block( nbr-1, nbc-1 ),
+                                                                                 apply_map );
+                
+                update->after( finished( nbr-1, i ) );
+                update->after( finished( i, nbc-1 ) );
+                finished( nbr-1, nbc-1 )->after( update );
+            }// if
+        }// for
+    }// if
+    else if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        BA  = ptrcast( A, hpro::TBlockMatrix );
         auto        BL  = BA;
