@@ -22,6 +22,7 @@
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/convert.hh"
+#include "hlr/matrix/restrict.hh"
 
 namespace hlr { namespace seq { namespace matrix {
 
@@ -86,6 +87,86 @@ build ( const hpro::TBlockCluster *  bct,
                 if ( bct->son( i, j ) != nullptr )
                 {
                     auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
+
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// build representation of sparse matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <M>. If low rank blocks are not zero, they are
+// truncated to accuracy <acc> using approximation method <apx>
+//
+template < typename approx_t >
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
+        const hpro::TSparseMatrix &  S,
+        const hpro::TTruncAcc &      acc,
+        const approx_t &             apx,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using  value_t = typename approx_t::value_t;
+    
+    // static_assert( std::is_same< typename coeff_t::value_t,
+    //                              typename lrapx_t::value_t >::value,
+    //                "coefficient function and low-rank approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< hpro::TMatrix >  M;
+    
+    if ( bct->is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct->is() );
+        
+        if ( bct->is_adm() )
+        {
+            M = matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else
+        {
+            M = matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( bct->son( i, j ) != nullptr )
+                {
+                    auto  B_ij = build( bct->son( i, j ), S, acc, apx, nseq );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if

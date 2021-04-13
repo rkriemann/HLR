@@ -302,27 +302,52 @@ solve_upper_node< value_t, approx_t >::refine_ ( const size_t  min_size )
         {
             const auto  U_jj = BU->block( j, j );
         
-            assert( ! is_null( U_jj ) );
-
+            HLR_ASSERT( ! is_null( U_jj ) );
+ 
             for ( uint i = 0; i < nbr; ++i )
-                if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< solve_upper_node< value_t, approx_t > >(  U_jj, BA->block( i, j ) );
+            {
+                auto  A_ij = BA->block( i, j );
+                    
+                if ( ! is_null( A_ij ) )
+                    finished( i, j ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_jj, A_ij );
+            }// for
         }// for
         
-        for ( uint j = 0; j < nbc; ++j )
+        if ( is_nd( U ) )
         {
-            for ( uint  k = j+1; k < nbc; ++k )
-                for ( uint  i = 0; i < nbr; ++i )
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+            for ( uint j = 0; j < nbc-1; ++j )
+            {
+                for ( uint i = 0; i < nbr; ++i )
+                {
+                    if ( ! is_null_any( BA->block( i, j ), BU->block( j, nbc-1 ), BA->block( i, nbc-1 ) ) )
                     {
-                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BX->block( i, j ),
-                                                                                         BU->block( j, k ),
-                                                                                         BA->block( i, k ) );
+                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BA->block( i, j ),
+                                                                                         BU->block( j, nbc-1 ),
+                                                                                         BA->block( i, nbc-1 ) );
 
-                        update->after( finished( i, j ) );
-                        finished( i, k )->after( update );
+                        update->after( finished(i,j) );
+                        finished(i,nbc-1)->after( update );
                     }// if
-        }// for
+                }// for
+            }// for
+        }// if
+        else
+        {
+            for ( uint j = 0; j < nbc; ++j )
+            {
+                for ( uint  k = j+1; k < nbc; ++k )
+                    for ( uint  i = 0; i < nbr; ++i )
+                        if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+                        {
+                            auto  update = g.alloc_node< update_node< value_t, approx_t > >( BX->block( i, j ),
+                                                                                             BU->block( j, k ),
+                                                                                             BA->block( i, k ) );
+
+                            update->after( finished( i, j ) );
+                            finished( i, k )->after( update );
+                        }// if
+            }// for
+        }// if
     }// if
 
     g.finalize();
@@ -350,28 +375,53 @@ solve_lower_node< value_t, approx_t >::refine_ ( const size_t  min_size )
         for ( uint i = 0; i < nbr; ++i )
         {
             const auto  L_ii = BL->block( i, i );
-        
-            assert( ! is_null( L_ii ) );
-
+                
+            HLR_ASSERT( ! is_null( L_ii ) );
+            
             for ( uint j = 0; j < nbc; ++j )
-                if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< solve_lower_node< value_t, approx_t > >(  L_ii, BA->block( i, j ) );
+            {
+                auto  A_ij = BA->block( i, j );
+                
+                if ( ! is_null( A_ij ) )
+                    finished( i, j ) = g.alloc_node< solve_lower_node< value_t, approx_t > >(  L_ii, A_ij );
+            }// for
         }// for
-        
-        for ( uint i = 0; i < nbr; ++i )
-        {
-            for ( uint  k = i+1; k < nbr; ++k )
-                for ( uint  j = 0; j < nbc; ++j )
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                    {
-                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( k, i ),
-                                                                                         BX->block( i, j ),
-                                                                                         BA->block( k, j ) );
 
-                        update->after( finished( i, j ) );
-                        finished( k, j )->after( update );
+        if ( is_nd( L ) )
+        {
+            for ( uint j = 0; j < nbc-1; ++j )
+            {
+                for ( uint i = 0; i < nbr; ++i )
+                {
+                    if ( ! is_null_any( BL->block( nbr-1, i ), BA->block( i, j ), BA->block( nbr-1, j ) ) )
+                    {
+                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( nbr-1, i ),
+                                                                                         BA->block( i, j ),
+                                                                                         BA->block( nbr-1, j ) );
+
+                        update->after( finished(i,j) );
+                        finished(nbr-1,j)->after( update );
                     }// if
-        }// for
+                }// for
+            }// for
+        }// if
+        else
+        {
+            for ( uint i = 0; i < nbr; ++i )
+            {
+                for ( uint  k = i+1; k < nbr; ++k )
+                    for ( uint  j = 0; j < nbc; ++j )
+                        if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
+                        {
+                            auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( k, i ),
+                                                                                             BX->block( i, j ),
+                                                                                             BA->block( k, j ) );
+
+                            update->after( finished( i, j ) );
+                            finished( k, j )->after( update );
+                        }// if
+            }// for
+        }// else
     }// if
 
     g.finalize();
@@ -955,7 +1005,7 @@ lu_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_nd( A ) && ! is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
         auto        BA       = ptrcast( A, hpro::TBlockMatrix );
         auto        BU       = BA;
@@ -963,107 +1013,103 @@ lu_node< value_t, approx_t >::refine_  ( const size_t  min_size )
         const auto  nbr      = BA->block_rows();
         const auto  nbc      = BA->block_cols();
         auto        finished = tensor2< node * >( nbr, nbc );
-
-        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
-        {
-            auto  A_ii  = BA->block( i, i );
-            auto  U_ii  = A_ii;
-            auto  L_ii  = A_ii;
-
-            assert( A_ii != nullptr );
-
-            finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii, apply_map );
-
-            if ( ! is_null( BA->block( nbr-1, i ) ) )
-            {
-                finished( nbr-1, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( nbr-1, i ), apply_map );
-                finished( nbr-1, i )->after( finished( i, i ) );
-            }// if
-
-            if ( ! is_null( BA->block( i, nbc-1 ) ) )
-            {
-                finished( i, nbc-1 ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, nbc-1 ), apply_map );
-                finished( i, nbc-1 )->after( finished( i, i ) );
-            }// if
-        }// for
         
-        finished( nbr-1, nbc-1 ) = g.alloc_node< lu_node >( BA->block( nbr-1, nbc-1 ), apply_map );
-        
-        for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
+        if ( is_nd( A ) )
         {
-            if ( ! is_null_any( BL->block( nbr-1, i ), BU->block( i, nbc-1 ), BA->block( nbr-1, nbc-1 ) ) )
+            for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
             {
-                auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( nbr-1, i ),
-                                                                                 BU->block( i, nbc-1 ),
-                                                                                 BA->block( nbr-1, nbc-1 ),
-                                                                                 apply_map );
-                
-                update->after( finished( nbr-1, i ) );
-                update->after( finished( i, nbc-1 ) );
-                finished( nbr-1, nbc-1 )->after( update );
-            }// if
-        }// for
-    }// if
-    else if ( is_blocked( A ) && ! is_small( min_size, A ) )
-    {
-        auto        BA  = ptrcast( A, hpro::TBlockMatrix );
-        auto        BL  = BA;
-        auto        BU  = BA;
-        const auto  nbr = BA->nblock_rows();
-        const auto  nbc = BA->nblock_cols();
-        auto        finished = tensor2< node * >( nbr, nbc );
-        
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
-            //
-            // factorise diagonal block
-            //
-            
-            auto  A_ii  = BA->block( i, i );
-            auto  L_ii  = A_ii;
-            auto  U_ii  = A_ii;
+                auto  A_ii  = BA->block( i, i );
+                auto  U_ii  = A_ii;
+                auto  L_ii  = A_ii;
 
-            HLR_ASSERT( ! is_null_any( A_ii, L_ii, U_ii ) );
+                HLR_ASSERT( A_ii != nullptr );
 
-            finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii, apply_map );
+                finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii, apply_map );
 
-            for ( uint j = i+1; j < nbr; j++ )
-            {
-                if ( ! is_null( BA->block( j, i ) ) )
+                if ( ! is_null( BA->block( nbr-1, i ) ) )
                 {
-                    finished( j, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( j, i ), apply_map );
-                    finished( j, i )->after( finished( i, i ) );
+                    finished( nbr-1, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( nbr-1, i ), apply_map );
+                    finished( nbr-1, i )->after( finished( i, i ) );
+                }// if
+
+                if ( ! is_null( BA->block( i, nbc-1 ) ) )
+                {
+                    finished( i, nbc-1 ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, nbc-1 ), apply_map );
+                    finished( i, nbc-1 )->after( finished( i, i ) );
                 }// if
             }// for
-
-            for ( uint j = i+1; j < nbc; j++ )
-                if ( ! is_null( BA->block( i, j ) ) )
-                {
-                    finished( i, j ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, j ), apply_map );
-                    finished( i, j )->after( finished( i, i ) );
-                }// if
-        }// for
         
-        for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
-        {
-            for ( uint j = i+1; j < nbr; j++ )
+            finished( nbr-1, nbc-1 ) = g.alloc_node< lu_node >( BA->block( nbr-1, nbc-1 ), apply_map );
+        
+            for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
             {
-                for ( uint l = i+1; l < nbc; l++ )
+                if ( ! is_null_any( BL->block( nbr-1, i ), BU->block( i, nbc-1 ), BA->block( nbr-1, nbc-1 ) ) )
                 {
-                    if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
-                    {
-                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( j, i ),
-                                                                                         BU->block( i, l ),
-                                                                                         BA->block( j, l ),
-                                                                                         apply_map );
+                    auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( nbr-1, i ),
+                                                                                     BU->block( i, nbc-1 ),
+                                                                                     BA->block( nbr-1, nbc-1 ),
+                                                                                     apply_map );
+                
+                    update->after( finished( nbr-1, i ) );
+                    update->after( finished( i, nbc-1 ) );
+                    finished( nbr-1, nbc-1 )->after( update );
+                }// if
+            }// for
+        }// if
+        else
+        {
+            for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+            {
+                //
+                // factorise diagonal block
+                //
+            
+                auto  A_ii  = BA->block( i, i );
+                auto  L_ii  = A_ii;
+                auto  U_ii  = A_ii;
 
-                        update->after( finished( j, i ) );
-                        update->after( finished( i, l ) );
-                        finished( j, l )->after( update );
+                HLR_ASSERT( ! is_null_any( A_ii, L_ii, U_ii ) );
+
+                finished( i, i ) = g.alloc_node< lu_node< value_t, approx_t > >( A_ii, apply_map );
+
+                for ( uint j = i+1; j < nbr; j++ )
+                {
+                    if ( ! is_null( BA->block( j, i ) ) )
+                    {
+                        finished( j, i ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_ii, BA->block( j, i ), apply_map );
+                        finished( j, i )->after( finished( i, i ) );
                     }// if
                 }// for
+
+                for ( uint j = i+1; j < nbc; j++ )
+                    if ( ! is_null( BA->block( i, j ) ) )
+                    {
+                        finished( i, j ) = g.alloc_node< solve_lower_node< value_t, approx_t > >( L_ii, BA->block( i, j ), apply_map );
+                        finished( i, j )->after( finished( i, i ) );
+                    }// if
             }// for
-        }// for
+        
+            for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
+            {
+                for ( uint j = i+1; j < nbr; j++ )
+                {
+                    for ( uint l = i+1; l < nbc; l++ )
+                    {
+                        if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
+                        {
+                            auto  update = g.alloc_node< update_node< value_t, approx_t > >( BL->block( j, i ),
+                                                                                             BU->block( i, l ),
+                                                                                             BA->block( j, l ),
+                                                                                             apply_map );
+
+                            update->after( finished( j, i ) );
+                            update->after( finished( i, l ) );
+                            finished( j, l )->after( update );
+                        }// if
+                    }// for
+                }// for
+            }// for
+        }// if
     }// if
     else
     {
@@ -1095,33 +1141,70 @@ solve_upper_node< value_t, approx_t >::refine_  ( const size_t  min_size )
         const auto  nbc = BA->nblock_cols();
 
         auto        finished = tensor2< node * >( nbr, nbc );
-        
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            const auto  U_jj = BU->block( j, j );
-        
-            assert( ! is_null( U_jj ) );
 
-            for ( uint i = 0; i < nbr; ++i )
-                if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< solve_upper_node< value_t, approx_t > >(  U_jj, BA->block( i, j ), apply_map );
-        }// for
-        
-        for ( uint j = 0; j < nbc; ++j )
+        if ( is_nd( U ) )
         {
-            for ( uint  k = j+1; k < nbc; ++k )
-                for ( uint  i = 0; i < nbr; ++i )
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+            for ( uint j = 0; j < nbc; ++j )
+            {
+                const auto  U_jj = BU->block( j, j );
+                
+                HLR_ASSERT( ! is_null( U_jj ) );
+                
+                for ( uint i = 0; i < nbr; ++i )
+                {
+                    auto  A_ij = BA->block( i, j );
+                    
+                    if ( ! is_null( A_ij ) )
+                        finished( i, j ) = g.alloc_node< solve_upper_node< value_t, approx_t > >( U_jj, A_ij, apply_map );
+                }// for
+            }// for
+                
+            for ( uint j = 0; j < nbc-1; ++j )
+            {
+                for ( uint i = 0; i < nbr; ++i )
+                {
+                    if ( ! is_null_any( BA->block( i, j ), BU->block( j, nbc-1 ), BA->block( i, nbc-1 ) ) )
                     {
-                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BX->block( i, j ),
-                                                                                         BU->block( j, k ),
-                                                                                         BA->block( i, k ),
+                        auto  update = g.alloc_node< update_node< value_t, approx_t > >( BA->block( i, j ),
+                                                                                         BU->block( j, nbc-1 ),
+                                                                                         BA->block( i, nbc-1 ),
                                                                                          apply_map );
 
-                        update->after( finished( i, j ) );
-                        finished( i, k )->after( update );
+                        update->after( finished(i,j) );
+                        finished(i,nbc-1)->after( update );
                     }// if
-        }// for
+                }// for
+            }// for
+        }// if
+        else
+        {
+            for ( uint j = 0; j < nbc; ++j )
+            {
+                const auto  U_jj = BU->block( j, j );
+        
+                assert( ! is_null( U_jj ) );
+
+                for ( uint i = 0; i < nbr; ++i )
+                    if ( ! is_null( BA->block(i,j) ) )
+                        finished( i, j ) = g.alloc_node< solve_upper_node< value_t, approx_t > >(  U_jj, BA->block( i, j ), apply_map );
+            }// for
+        
+            for ( uint j = 0; j < nbc; ++j )
+            {
+                for ( uint  k = j+1; k < nbc; ++k )
+                    for ( uint  i = 0; i < nbr; ++i )
+                        if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+                        {
+                            auto  update = g.alloc_node< update_node< value_t, approx_t > >( BX->block( i, j ),
+                                                                                             BU->block( j, k ),
+                                                                                             BA->block( i, k ),
+                                                                                             apply_map );
+
+                            update->after( finished( i, j ) );
+                            finished( i, k )->after( update );
+                        }// if
+            }// for
+        }// else
     }// if
     else
     {

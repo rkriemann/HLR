@@ -126,7 +126,33 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.restore();
             }// if
         }// if
+        else if ( is_sparse( M ) )
+        {
+            auto  S = cptrcast( &M, hpro::TSparseMatrix );
+            
+            // background
+            prn.set_rgb( 253, 250, 167 ); // Butter1!50!White 242,229,188
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
 
+            if ( std::find( options.cbegin(), options.cend(), "pattern" ) != options.end() )
+            {
+                prn.set_gray( 0 );
+
+                for ( uint  i = 0; i < S->nrows(); ++i )
+                {
+                    const auto  lb = S->rowptr( i );
+                    const auto  ub = S->rowptr( i+1 );
+                    
+                    for ( uint  l = lb; l < ub; ++l )
+                        prn.fill_rect( S->colind(l),   i,
+                                       S->colind(l)+1, i+1 );
+                }// for
+            }// if
+        }// else
+        
         // draw frame
         prn.set_gray( 0 );
         prn.draw_rect( M.col_ofs(),

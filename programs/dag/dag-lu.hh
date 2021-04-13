@@ -47,11 +47,8 @@ program_main ()
     
         if ( hpro::verbose( 3 ) )
         {
-            hpro::TPSClusterVis       cl_vis;
-            hpro::TPSBlockClusterVis  bc_vis;
-        
-            cl_vis.print( ct->root(), "ct" );
-            bc_vis.id( false ).print( bct->root(), "bct" );
+            io::eps::print( *ct->root(), "ct" );
+            io::eps::print( *bct->root(), "ct" );
         }// if
     
         auto  coeff  = problem->coeff_func();
@@ -86,20 +83,29 @@ program_main ()
         auto  ct_builder    = hpro::TAlgCTBuilder( & part_strat, ntile );
         auto  nd_ct_builder = hpro::TAlgNDCTBuilder( & ct_builder, ntile );
         auto  cl            = nd_ct_builder.build( S );
-        auto  adm_cond      = hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
+
+        S->permute( *cl->perm_e2i(), *cl->perm_e2i() );
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *S, "S", "noid,pattern" );
+        
+        auto  adm_cond      = hpro::TWeakAlgAdmCond( S );
         auto  bct_builder   = hpro::TBCBuilder();
         auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
-        auto  h_builder     = hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
+        // auto  h_builder     = hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
 
         if ( hpro::verbose( 3 ) )
         {
             io::eps::print( * cl->root(), "ct" );
             io::eps::print( * bcl->root(), "bct" );
         }// if
-
-        h_builder.set_use_zero_mat( true );
         
-        A = h_builder.build( bcl.get(), acc );
+        // h_builder.set_use_zero_mat( true );
+        // A = h_builder.build( bcl.get(), acc );
+
+        approx::SVD< value_t >  apx;
+            
+        A = impl::matrix::build( bcl->root(), *S, acc, apx, nseq );
     }// else
 
     auto  toc    = timer::since( tic );

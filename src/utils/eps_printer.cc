@@ -192,9 +192,9 @@ eps_printer::fill_rect ( const double x1, const double y1, const double x2, cons
 
 void
 eps_printer::draw_text ( const double         x,
-                        const double         y,
-                        const std::string &  text,
-                        const char           justification )
+                         const double         y,
+                         const std::string &  text,
+                         const char           justification )
 {
     _output << x << ' ' << y << " (" << text << ") ";
 

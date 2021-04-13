@@ -24,7 +24,7 @@ using namespace hpro;
 //
 inline
 std::unique_ptr< TMatrix >
-restrict ( TMatrix &               M,
+restrict ( const TMatrix &         M,
            const TBlockIndexSet &  bis )
 {
     HLR_ASSERT( bis.is_subset_of( M.block_is() ) );
@@ -89,6 +89,12 @@ restrict ( TMatrix &               M,
                                                
             return std::make_unique< TDenseMatrix >( bis.row_is(), bis.col_is(), std::move( D ) );
         }// else
+    }// if
+    else if ( is_sparse( M ) )
+    {
+        auto  SM = cptrcast( &M, TSparseMatrix );
+
+        return SM->restrict( bis.row_is(), bis.col_is() );
     }// if
     else
         HLR_ERROR( "unsupported matrix type " + M.typestr() );

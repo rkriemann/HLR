@@ -23,6 +23,7 @@
 #include <hlr/approx/lanczos.hh>
 #include <hlr/approx/randlr.hh>
 #include "hlr/dag/lu.hh"
+#include "hlr/utils/io.hh"
 
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_accu.hh"
@@ -349,41 +350,79 @@ program_main ()
 
     using value_t = typename problem_t::value_t;
 
-    auto  tic     = timer::now();
-    auto  problem = gen_problem< problem_t >();
-    auto  coord   = problem->coordinates();
-    auto  ct      = gen_ct( *coord );
-    auto  bct     = gen_bct( *ct, *ct );
-    
-    if ( verbose( 3 ) )
+    auto  tic = timer::now();
+    auto  acc = gen_accuracy();
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
+
+    if ( matrixfile == "" && sparsefile == "" )
     {
-        hpro::TPSBlockClusterVis   bc_vis;
-        
-        bc_vis.id( false ).print( bct->root(), "bct" );
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
+    
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( *ct->root(), "ct" );
+            io::eps::print( *bct->root(), "ct" );
+        }// if
+    
+        auto  coeff  = problem->coeff_func();
+        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
+
+        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
     }// if
+    else if ( matrixfile != "" )
+    {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    matrix = " << matrixfile
+                  << std::endl;
 
-    blas::reset_flops();
-    
-    auto  acc    = gen_accuracy();
-    auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< bem::aca_lrapx< hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+        A = hpro::read_matrix( matrixfile );
 
-    LIKWID_MARKER_START( "build" );
-            
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        // for spreading memory usage
+        if ( docopy )
+            A = impl::matrix::realloc( A.release() );
+    }// if
+    else if ( sparsefile != "" )
+    {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    sparse matrix = " << sparsefile
+                  << std::endl;
 
-    LIKWID_MARKER_STOP( "build" );
-    
+        auto  M = hpro::read_matrix( sparsefile );
+        auto  S = ptrcast( M.get(), hpro::TSparseMatrix );
+
+        // convert to H
+        auto  part_strat    = hpro::TMongooseAlgPartStrat();
+        auto  ct_builder    = hpro::TAlgCTBuilder( & part_strat, ntile );
+        auto  nd_ct_builder = hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+        auto  cl            = nd_ct_builder.build( S );
+        auto  adm_cond      = hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
+        auto  bct_builder   = hpro::TBCBuilder();
+        auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+        auto  h_builder     = hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
+
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( * cl->root(), "ct" );
+            io::eps::print( * bcl->root(), "bct" );
+        }// if
+
+        h_builder.set_use_zero_mat( true );
+        
+        A = h_builder.build( bcl.get(), acc );
+    }// else
+
     auto  toc    = timer::since( tic );
     
-    std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
-    // std::cout << "    flops = " << format_flops( get_flops( "build" ), toc.seconds() ) << std::endl;
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
+    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::write( *A, "A" );
+        io::eps::print( *A, "A" );
     
     //////////////////////////////////////////////////////////////////////
     //

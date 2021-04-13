@@ -41,6 +41,7 @@ string  sparsefile = "";           // sparse matrix instead of application
 bool    onlydag    = false;        // only compute task graph, no DAG execution
 bool    docopy     = true;         // copy matrix before further comp. to distr. memory
 bool    levelwise  = false;        // use levelwise task graph construction
+bool    ip_lu      = false;        // use in-place task graph
 bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
@@ -145,6 +146,7 @@ parse ( int argc, char ** argv )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "nosparsify",                   ": do not sparsify DAG" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
+        ( "ip",                           ": do in-place LU" )
         ( "oop",                          ": do out-of-place LU" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
@@ -209,6 +211,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "onlydag"    ) ) onlydag    = true;
     if ( vm.count( "nocopy"     ) ) docopy     = false;
     if ( vm.count( "lvl"        ) ) levelwise  = true;
+    if ( vm.count( "ip"         ) ) ip_lu      = true;
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;

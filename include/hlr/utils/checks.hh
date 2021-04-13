@@ -23,6 +23,7 @@ namespace hpro = HLIB;
 using hpro::is_blocked;
 using hpro::is_dense;
 using hpro::is_lowrank;
+using hpro::is_sparse;
 
 //
 // return true, if pointer is null
@@ -289,6 +290,41 @@ bool is_lowrank_all ( const hpro::TMatrix *  A,
                       T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
 
 //
+// return true if given matrix is a sparse matrix
+//
+
+inline
+bool is_sparse     ( const hpro::TMatrix &  A )     noexcept { return is_sparse( & A ); }
+
+inline
+bool is_sparse_any ( const hpro::TMatrix &  A )     noexcept { return is_sparse( A ); }
+
+template < typename... T >
+bool is_sparse_any ( const hpro::TMatrix &  A,
+                     T&&...                 mtrs )  noexcept { return is_sparse( A ) || is_sparse_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_sparse_all ( const hpro::TMatrix &  A )     noexcept { return is_sparse( A ); }
+
+template < typename... T >
+bool is_sparse_all ( const hpro::TMatrix &  A,
+                     T&&...                 mtrs )  noexcept { return is_sparse( A ) && is_sparse_all( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_sparse_any ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_sparse( A ); }
+
+template < typename... T >
+bool is_sparse_any ( const hpro::TMatrix *  A,
+                     T&&...                 mtrs )  noexcept { return is_sparse( A ) || is_sparse_any( std::forward< T >( mtrs )... ); }
+
+inline
+bool is_sparse_all ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_sparse( A ); }
+
+template < typename... T >
+bool is_sparse_all ( const hpro::TMatrix *  A,
+                     T&&...                 mtrs )  noexcept { return is_sparse( A ) && is_sparse_all( std::forward< T >( mtrs )... ); }
+
+//
 // return true if given matrix has nested dissection structure
 //
 
@@ -300,14 +336,14 @@ bool is_nd_any ( const hpro::TMatrix &  A )     noexcept { return is_nd( A ); }
 
 template < typename... T >
 bool is_nd_any ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_nd( A ) || is_nd_any( std::forward< T >( mtrs )... ); }
+                 T&&...                 mtrs )  noexcept { return is_nd( A ) || is_nd_any( std::forward< T >( mtrs )... ); }
 
 inline
 bool is_nd_all ( const hpro::TMatrix &  A )     noexcept { return is_nd( A ); }
 
 template < typename... T >
 bool is_nd_all ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_nd( A ) && is_nd_all( std::forward< T >( mtrs )... ); }
+                 T&&...                 mtrs )  noexcept { return is_nd( A ) && is_nd_all( std::forward< T >( mtrs )... ); }
 
 inline
 bool is_nd     ( const hpro::TMatrix *  A )     noexcept { return HLIB::is_dd( A ); }
@@ -317,14 +353,14 @@ bool is_nd_any ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A )
 
 template < typename... T >
 bool is_nd_any ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_nd( A ) || is_nd_any( std::forward< T >( mtrs )... ); }
+                 T&&...                 mtrs )  noexcept { return is_nd( A ) || is_nd_any( std::forward< T >( mtrs )... ); }
 
 inline
 bool is_nd_all ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_nd( A ); }
 
 template < typename... T >
 bool is_nd_all ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_nd( A ) && is_nd_all( std::forward< T >( mtrs )... ); }
+                 T&&...                 mtrs )  noexcept { return is_nd( A ) && is_nd_all( std::forward< T >( mtrs )... ); }
 
 //
 // return true if given vector is a scalar vector

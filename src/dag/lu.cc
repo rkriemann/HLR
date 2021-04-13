@@ -21,6 +21,7 @@
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
 #include "hlr/dag/lu.hh"
+#include "hlr/approx/svd.hh"
 
 namespace hlr { namespace dag {
 
@@ -174,14 +175,14 @@ lu_node::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( ! is_small( min_size, A ) )
+    if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
+        auto        B   = ptrcast( A, TBlockMatrix );
+        const auto  nbr = B->block_rows();
+        const auto  nbc = B->block_cols();
+        
         if ( is_nd( A ) )
         {
-            auto        B   = ptrcast( A, TBlockMatrix );
-            const auto  nbr = B->block_rows();
-            const auto  nbc = B->block_cols();
-
             for ( uint i = 0; i < std::min( nbr, nbc )-1; ++i )
             {
                 //
@@ -209,12 +210,8 @@ lu_node::refine_ ( const size_t  min_size )
 
             g.alloc_node< lu_node >( B->block( nbr-1, nbc-1 ), apply_nodes );
         }// if
-        else if ( is_blocked( A ) )
+        else
         {
-            auto        B   = ptrcast( A, TBlockMatrix );
-            const auto  nbr = B->block_rows();
-            const auto  nbc = B->block_cols();
-
             for ( uint i = 0; i < std::min( nbr, nbc ); ++i )
             {
                 //
@@ -243,15 +240,7 @@ lu_node::refine_ ( const size_t  min_size )
                                                          B->block( j, l ),
                                                          apply_nodes );
             }// for
-        }// if
-        else if ( CFG::Arith::use_accu )
-        {
-            auto  apply = apply_nodes[ A->id() ];
-            
-            assert( apply != nullptr );
-            
-            apply->before( this );
-        }// if
+        }// else
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -271,7 +260,20 @@ lu_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
 
-    hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    // hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+
+    if ( A->is_complex() )
+    {
+        hlr::approx::SVD< hpro::complex >  apx;
+    
+        hlr::lu< hpro::complex >( *A, acc, apx );
+    }// if
+    else
+    {
+        hlr::approx::SVD< hpro::real >  apx;
+    
+        hlr::lu< hpro::real >( *A, acc, apx );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -288,29 +290,67 @@ trsmu_node::refine_ ( const size_t  min_size )
     if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BA  =  ptrcast( A, TBlockMatrix );
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        for ( uint j = 0; j < nbc; ++j )
-        {
-            const auto  U_jj = BU->block( j, j );
-        
-            if ( ! is_null( U_jj ) )
-            {
-                for ( uint i = 0; i < nbr; ++i )
-                    if ( ! is_null( BA->block(i,j) ) )
-                        g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes );
-            }// if
+        // if ( is_nd( U ) )
+        // {
+        //     for ( uint j = 0; j < nbc-1; ++j )
+        //     {
+        //         const auto  U_jj = BU->block( j, j );
+                
+        //         HLR_ASSERT( ! is_null( U_jj ) );
+                
+        //         for ( uint i = 0; i < nbr; ++i )
+        //         {
+        //             auto  A_ij = BA->block( i, j );
+                    
+        //             if ( ! is_null( A_ij ) )
+        //             {
+        //                 g.alloc_node< trsmu_node >( U_jj, A_ij, apply_nodes );
 
-            for ( uint  k = j+1; k < nbc; ++k )
-                for ( uint  i = 0; i < nbr; ++i )
-                    if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        g.alloc_node< update_node >( BA->block( i, j ),
-                                                     BU->block( j, k ),
-                                                     BA->block( i, k ),
-                                                     apply_nodes );
-        }// for
+        //                 if ( ! is_null_any( BU->block( j, nbc-1 ), BA->block( i, nbc-1 ) ) )
+        //                     g.alloc_node< update_node >( A_ij,
+        //                                                  BU->block( j, nbc-1 ),
+        //                                                  BA->block( i, nbc-1 ),
+        //                                                  apply_nodes );
+        //             }// if
+        //         }// for
+        //     }// for
+                
+        //     HLR_ASSERT( ! is_null( BU->block( nbc-1, nbc-1 ) ) );
+            
+        //     for ( uint  i = 0; i < nbr; ++i )
+        //     {
+        //         auto  A_ij = BA->block( i, nbc-1 );
+                
+        //         if ( ! is_null( A_ij ) )
+        //             g.alloc_node< trsmu_node >( BU->block( nbc-1, nbc-1 ), A_ij, apply_nodes );
+        //     }// for
+        // }// if
+        // else
+        {
+            for ( uint j = 0; j < nbc; ++j )
+            {
+                const auto  U_jj = BU->block( j, j );
+                
+                if ( ! is_null( U_jj ) )
+                {
+                    for ( uint i = 0; i < nbr; ++i )
+                        if ( ! is_null( BA->block(i,j) ) )
+                            g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes );
+                }// if
+                
+                for ( uint  k = j+1; k < nbc; ++k )
+                    for ( uint  i = 0; i < nbr; ++i )
+                        if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
+                            g.alloc_node< update_node >( BA->block( i, j ),
+                                                         BU->block( j, k ),
+                                                         BA->block( i, k ),
+                                                         apply_nodes );
+            }// for
+        }// else
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -330,7 +370,20 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
     
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    
+    if ( A->is_complex() )
+    {
+        hlr::approx::SVD< hpro::complex >  apx;
+    
+        hlr::solve_upper_tri< hpro::complex >( from_right, general_diag, *U, *A, acc, apx );
+    }// if
+    else
+    {
+        hlr::approx::SVD< hpro::real >  apx;
+    
+        hlr::solve_upper_tri< hpro::real >( from_right, general_diag, *U, *A, acc, apx );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -351,29 +404,35 @@ trsml_node::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        for ( uint i = 0; i < nbr; ++i )
+        if ( is_nd( L ) )
         {
-            const auto  L_ii = BL->block( i, i );
-        
-            //
-            // solve in current block row
-            //
-
-            if ( ! is_null( L_ii ) )
+        }// if
+        else
+        {
+            for ( uint i = 0; i < nbr; ++i )
             {
-                for ( uint j = 0; j < nbc; ++j )
-                    if ( ! is_null( BA->block( i, j ) ) )
-                        g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes );
-            }// if
+                const auto  L_ii = BL->block( i, i );
+        
+                //
+                // solve in current block row
+                //
 
-            for ( uint  k = i+1; k < nbr; ++k )
-                for ( uint  j = 0; j < nbc; ++j )
-                    if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        g.alloc_node< update_node >( BL->block( k, i ),
-                                                     BA->block( i, j ),
-                                                     BA->block( k, j ),
-                                                     apply_nodes );
-        }// for
+                if ( ! is_null( L_ii ) )
+                {
+                    for ( uint j = 0; j < nbc; ++j )
+                        if ( ! is_null( BA->block( i, j ) ) )
+                            g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes );
+                }// if
+
+                for ( uint  k = i+1; k < nbr; ++k )
+                    for ( uint  j = 0; j < nbc; ++j )
+                        if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
+                            g.alloc_node< update_node >( BL->block( k, i ),
+                                                         BA->block( i, j ),
+                                                         BA->block( k, j ),
+                                                         apply_nodes );
+            }// for
+        }// else
     }// if
     else if ( CFG::Arith::use_accu )
     {
@@ -393,7 +452,20 @@ trsml_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
     
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+
+    if ( A->is_complex() )
+    {
+        hlr::approx::SVD< hpro::complex >  apx;
+    
+        hlr::solve_lower_tri< hpro::complex >( from_left, unit_diag, *L, *A, acc, apx );
+    }// if
+    else
+    {
+        hlr::approx::SVD< hpro::real >  apx;
+    
+        hlr::solve_lower_tri< hpro::real >( from_left, unit_diag, *L, *A, acc, apx );
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -459,7 +531,22 @@ update_node::run_ ( const TTruncAcc &  acc )
                      apply_normal, B,
                      C, acc );
     else
-        multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    {
+        // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+
+        if ( A->is_complex() )
+        {
+            hlr::approx::SVD< hpro::complex >  apx;
+    
+            hlr::multiply( hpro::complex(-1), apply_normal, *A, apply_normal, *B, *C, acc, apx );
+        }// if
+        else
+        {
+            hlr::approx::SVD< hpro::real >  apx;
+    
+            hlr::multiply( hpro::real(-1), apply_normal, *A, apply_normal, *B, *C, acc, apx );
+        }// else
+    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

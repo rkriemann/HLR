@@ -90,6 +90,48 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
         
         return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
+    else if ( is_sparse( M ) )
+    {
+        auto  S = cptrcast( &M, hpro::TSparseMatrix );
+
+        // use each non-zero row of S as a column vector and
+        // set the corresponding row vector to the unit vector
+
+        const auto  nrows = S->nrows();
+        const auto  ncols = S->ncols();
+        uint        k     = 0;
+
+        // determine rank (number of non-zero rows)
+        for ( size_t  i = 0; i < nrows; ++i )
+            k += ( S->rowptr(i) != S->rowptr(i+1) ? 1 : 0 );
+
+        // copy coefficients
+        auto  U = blas::matrix< value_t >( nrows, k );
+        auto  V = blas::matrix< value_t >( ncols, k );
+
+        // reuse as counter
+        k = 0;
+        
+        for ( size_t  i = 0; i < nrows; ++i )
+        {
+            auto  lb = S->rowptr(i);
+            auto  ub = S->rowptr(i+1);
+
+            if ( lb == ub )
+                continue;
+
+            U(i,k) = value_t(1);
+            
+            for ( auto  l = lb; l < ub; ++l )
+                V( S->colind(l), k ) = math::conj( hpro::coeff< value_t >( S, l ) );
+
+            ++k;
+        }// for
+
+        auto  [ W, X ] = approx( U, V, acc );
+        
+        return std::make_unique< hpro::TRkMatrix >( S->row_is(), S->col_is(), std::move( W ), std::move( X ) );
+    }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
@@ -174,6 +216,25 @@ convert_to_dense ( const hpro::TMatrix &  M )
 
         blas::prod( value_t(1), UxS, blas::adjoint( R->col_cb().basis() ),
                     value_t(0), DD );
+        
+        return D;
+    }// if
+    else if ( is_sparse( M ) )
+    {
+        auto  S  = cptrcast( &M, hpro::TSparseMatrix );
+        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+        auto  DD = blas::mat< value_t >( *D );
+
+        const auto  nrows = S->nrows();
+
+        for ( size_t  i = 0; i < nrows; ++i )
+        {
+            auto  lb = S->rowptr(i);
+            auto  ub = S->rowptr(i+1);
+
+            for ( auto  l = lb; l < ub; ++l )
+                DD( i, S->colind(l) ) = hpro::coeff< value_t >( S, l );
+        }// for
         
         return D;
     }// if
