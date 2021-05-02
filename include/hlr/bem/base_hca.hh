@@ -26,8 +26,6 @@ namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
 
-using namespace hpro;
-
 //////////////////////////////////////////////////////////////////////
 //
 // base class for HCA algorithms

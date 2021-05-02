@@ -7,7 +7,6 @@
 //
 
 #include <hpro/vector/TScalarVector.hh>
-#include <hpro/algebra/mul_vec.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/seq/arith.hh"

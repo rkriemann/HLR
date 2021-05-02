@@ -139,8 +139,19 @@ struct accumulator : public hlr::matrix::accumulator_base
         // handle all, actually computable updates, i.e., one factor is a leaf block
         //
 
-        const bool  handle_dense = check_dense( M );
-    
+        bool  handle_dense = check_dense( M );
+
+        for ( auto  [ op_A, A, op_B, B ] : pending )
+        {
+            if ( is_dense_all( A, B ) ||
+                 ( is_blocked( A ) && is_dense(   B ) ) ||
+                 ( is_dense(   A ) && is_blocked( B ) ))
+            {
+                handle_dense = true;
+                break;
+            }// if
+        }// for
+        
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             if ( is_blocked_all( *A, *B, M ) )
@@ -191,6 +202,9 @@ struct accumulator : public hlr::matrix::accumulator_base
 
                 auto  T = hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B );
 
+                if ( handle_dense && ! is_dense( *T ) )
+                    T = matrix::convert_to_dense< value_t >( *T );
+                
                 //
                 // apply update to accumulator
                 //
@@ -202,7 +216,7 @@ struct accumulator : public hlr::matrix::accumulator_base
                 else if ( ! is_dense( *matrix ) && is_dense( *T ) )
                 {
                     // prefer dense format to avoid unnecessary truncations
-                    hlr::add( value_t(1), *matrix, *T, acc, approx );
+                    hlr::add( value_t(1), *matrix, *T );
                     matrix = std::move( T );
                 }// if
                 else

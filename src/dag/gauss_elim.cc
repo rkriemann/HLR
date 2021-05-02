@@ -9,10 +9,8 @@
 #include <cassert>
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_inv.hh>
-#include <hpro/algebra/mat_norm.hh>
 
+#include "hlr/arith/norm.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
@@ -205,8 +203,12 @@ gauss_node::refine_ ( const size_t  min_size )
 void
 gauss_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::seq::gauss_elim( *A, *T, acc );
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e", A->id(), HLIB::norm_F( A ) ) );
+    if ( A->is_complex() )
+        hlr::seq::gauss_elim< hpro::complex >( *A, *T, acc );
+    else
+        hlr::seq::gauss_elim< hpro::real >( *A, *T, acc );
+    
+    hlr::log( 0, HLIB::to_string( "                               %d = %.8e", A->id(), norm::frobenius( *A ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -256,9 +258,16 @@ update_node::refine_ ( const size_t  min_size )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e, %d = %.8e, %d = %.8e" , A->id(), HLIB::norm_F( A ), B->id(), HLIB::norm_F( B ), C->id(), HLIB::norm_F( C ) ) );
-    multiply( alpha, apply_normal, A, apply_normal, B, beta, C, acc );
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e", C->id(), HLIB::norm_F( C ) ) );
+    hlr::log( 0, HLIB::to_string( "                               %d = %.8e, %d = %.8e, %d = %.8e" ,
+                                  A->id(), norm::frobenius( *A ),
+                                  B->id(), norm::frobenius( *B ),
+                                  C->id(), norm::frobenius( *C ) ) );
+
+    HLR_ERROR( "todo" );
+    
+    // multiply( alpha, apply_normal, A, apply_normal, B, beta, C, acc );
+    hlr::log( 0, HLIB::to_string( "                               %d = %.8e",
+                                  C->id(), norm::frobenius( *C ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

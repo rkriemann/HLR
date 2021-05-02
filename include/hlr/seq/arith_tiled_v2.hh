@@ -11,7 +11,6 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_norm.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -616,7 +615,7 @@ addlr ( const tile_storage< value_t > &  U,
         auto        D = ptrcast( A, hpro::TDenseMatrix );
         const auto  W = blas::prod( value_t(1), U.at( A->row_is() ), T );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( norm::frobenius( *D ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     U = " + normstr( blas::norm_F( U.at( A->row_is() ) ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     T = " + normstr( blas::norm_F( T ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     W = " + normstr( blas::norm_F( W ) ) );
@@ -624,7 +623,7 @@ addlr ( const tile_storage< value_t > &  U,
         blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
                     value_t(1), hpro::blas_mat< value_t >( D ) );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( norm::frobenius( *D ) ) );
     }// else
 }
 
@@ -750,7 +749,7 @@ lu ( hpro::TMatrix *          A,
         
         blas::invert( hpro::blas_mat< value_t >( DA ) );
 
-        HLR_LOG( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
+        HLR_LOG( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm::frobenius( *A ) ) );
     }// else
 }
 

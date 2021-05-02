@@ -26,6 +26,16 @@ namespace hpro = HLIB;
 
 using hlr::seq::matrix::accumulator;
 
+namespace timer = HLIB::Time::Wall;
+
+extern double  t_apply;
+extern double  t_eval;
+
+// #define ACCU_TIC       auto  __tic = timer::now()
+// #define ACCU_TOC( t )  { auto  __toc = timer::since( __tic ); t += __toc.seconds(); }
+#define ACCU_TIC       {}
+#define ACCU_TOC( t )  {}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // accumulator based matrix multiplication
@@ -129,7 +139,13 @@ solve_lower_tri ( const eval_side_t        side,
                   const approx_t &         approx )
 {
     // apply computable updates
+    {
+    ACCU_TIC;
+
     accu.eval( value_t(1), M, acc, approx );
+
+    ACCU_TOC( t_eval );
+    }
     
     if ( is_blocked_all( L, M ) )
     {
@@ -167,6 +183,19 @@ solve_lower_tri ( const eval_side_t        side,
             HLR_ASSERT( false );
         }// else
     }// if
+    else if ( is_lowrank( M ) )
+    {
+        // no recursive updates left, apply accumulated updates and solve
+        {
+        ACCU_TIC;
+        
+        accu.apply( value_t(-1), M, acc, approx );
+
+        ACCU_TOC( t_apply );
+        }
+
+        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+    }// if
     else
     {
         // no recursive updates left, apply accumulated updates and solve
@@ -188,7 +217,13 @@ solve_upper_tri ( const eval_side_t                   side,
                   const approx_t &                    approx )
 {
     // apply computable updates
+    {
+    ACCU_TIC;
+
     accu.eval( value_t(1), M, acc, approx );
+
+    ACCU_TOC( t_eval );
+    }
     
     if ( is_blocked_all( U, M ) )
     {
@@ -226,6 +261,19 @@ solve_upper_tri ( const eval_side_t                   side,
             }// for
         }// else
     }// if
+    else if ( is_lowrank( M ) )
+    {
+        // no recursive updates left, apply accumulated updates and solve
+        {
+        ACCU_TIC;
+        
+        accu.apply( value_t(-1), M, acc, approx );
+
+        ACCU_TOC( t_apply );
+        }
+        
+        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+    }// if
     else
     {
         // no recursive updates left, apply accumulated updates and solve
@@ -247,7 +295,13 @@ lu ( hpro::TMatrix &          M,
     // evaluate all computable updates to M
     //
 
+    {
+    ACCU_TIC;
+
     accu.eval( value_t(1), M, acc, approx );
+
+    ACCU_TOC( t_eval );
+    }
     
     //
     // (recursive) LU factorization

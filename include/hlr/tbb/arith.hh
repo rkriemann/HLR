@@ -595,8 +595,14 @@ lu_nd ( hpro::TMatrix &          A,
                                          
                                          lu_nd< value_t >( *A_ii, acc, approx );
 
-                                         solve_upper_tri< value_t >( from_right, general_diag, *A_ii, *BA->block( last, i ), acc, approx );
-                                         solve_lower_tri< value_t >( from_left,  unit_diag,    *A_ii, *BA->block( i, last ), acc, approx );
+                                         ::tbb::parallel_invoke(
+                                             [&,A_ii,BA] () {
+                                                 solve_upper_tri< value_t >( from_right, general_diag, *A_ii, *BA->block( last, i ), acc, approx );
+                                             },
+                                             [&,A_ii,BA] () {
+                                                 solve_lower_tri< value_t >( from_left,  unit_diag,    *A_ii, *BA->block( i, last ), acc, approx );
+                                             }
+                                         );
                                          
                                          multiply( value_t(-1), apply_normal, *BA->block( last, i ), apply_normal, *BA->block( i, last ),
                                                    *BA->block( last, last ), acc, approx );

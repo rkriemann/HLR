@@ -14,10 +14,7 @@ using boost::format;
 #include <hpro/base/init.hh>
 #include <hpro/base/System.hh>
 #include <hpro/algebra/TLowRankApx.hh>
-#include <hpro/algebra/mat_norm.hh>
-#include <hpro/algebra/mat_conv.hh>
 #include <hpro/io/TMatrixIO.hh>
-#include <hpro/io/TMatrixVis.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/cluster/TBCBuilder.hh>
 #include <hpro/cluster/TGeomAdmCond.hh>

@@ -1448,8 +1448,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                /* colmap */ )
+           const uniform_map_t &                rowmap )
 {
     // A·B + C = (A·U)·S·V' + W·T·V'
     auto  U  = B.row_cb( op_B ).basis();
@@ -1501,7 +1500,6 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                /* rowmap */,
            const uniform_map_t &                colmap )
 {
     // U·S·(V'·B) + U·T·X' with V'·B computed as B'·V
@@ -1554,10 +1552,7 @@ multiply ( const value_t                        alpha,
            const uniform_lrmatrix< value_t > &  A,
            const hpro::matop_t                  op_B,
            const uniform_lrmatrix< value_t > &  B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              /* acc */,
-           const uniform_map_t &                /* rowmap */,
-           const uniform_map_t &                /* colmap */ )
+           uniform_lrmatrix< value_t > &        C )
 {
     // A·B + C = U·(S·V' × W·T)·X' + U·R·X'
     auto  VW   = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
@@ -1577,7 +1572,6 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                /* rowmap */,
            const uniform_map_t &                colmap )
 {
     // A×B + C = U·S·(V' × B) + U·T·X' = U·S·(B' × V)' + U·T·X'
@@ -1606,8 +1600,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                /* colmap */ )
+           const uniform_map_t &                rowmap )
 {
     // A×B + C = (A × U)·T·V' + W·S·V'
     auto  AU = blas::prod( alpha,
@@ -1737,7 +1730,7 @@ multiply ( const value_t            alpha,
                                      op_A, * cptrcast( &A, hpro::TBlockMatrix ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, rowmap );
             else if ( is_dense(   C ) )
                 hlr::multiply< value_t >( alpha,
                                           op_A, * cptrcast( &A, hpro::TBlockMatrix ),
@@ -1786,7 +1779,7 @@ multiply ( const value_t            alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                      op_B, * cptrcast( &B, hpro::TBlockMatrix ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, colmap );
             else if ( is_dense(   C ) )
                 hlr::multiply< value_t >( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
@@ -1807,8 +1800,7 @@ multiply ( const value_t            alpha,
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, rowmap, colmap );
+                                     * ptrcast( &C, uniform_lrmatrix< value_t > ) );
             else if ( is_dense(   C ) )
                 hlr::multiply< value_t >( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
@@ -1830,7 +1822,7 @@ multiply ( const value_t            alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                      op_B, * cptrcast( &B, hpro::TDenseMatrix ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, colmap );
             else if ( is_dense(   C ) )
                 hlr::multiply< value_t >( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
@@ -1879,7 +1871,7 @@ multiply ( const value_t            alpha,
                                      op_A, * cptrcast( &A, hpro::TDenseMatrix ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, rowmap );
             else if ( is_dense(   C ) )
                 hlr::multiply< value_t >( alpha,
                                           op_A, * cptrcast( &A, hpro::TDenseMatrix ),

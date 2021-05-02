@@ -308,7 +308,7 @@ solve_lower_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
-    std::cout << M.id() << std::endl;
+    // std::cout << M.id() << std::endl;
     
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
@@ -487,7 +487,7 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
-    std::cout << M.id() << std::endl;
+    // std::cout << M.id() << std::endl;
     
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
@@ -538,12 +538,12 @@ solve_upper_tri ( const eval_side_t        side,
         //
 
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(), std::move( blas::prod( UM->row_basis(), UM->coeff() ) ), std::move( blas::copy( UM->col_basis() ) ) );
+        auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
         
         // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), R, acc, approx );
+        accu.apply( value_t(-1), *R, acc, approx );
 
-        hlr::solve_upper_tri< value_t >( side, diag, U, R, acc, approx );
+        hlr::solve_upper_tri< value_t >( side, diag, U, *R, acc, approx );
 
         // // DEBUG {
         // {
@@ -559,8 +559,8 @@ solve_upper_tri ( const eval_side_t        side,
         // now replace M by R and update row/column bases
         //
 
-        auto  W  = blas::mat_U< value_t >( R );
-        auto  X  = blas::mat_V< value_t >( R );
+        auto  W  = blas::mat_U< value_t >( *R );
+        auto  X  = blas::mat_V< value_t >( *R );
         auto  RW = blas::matrix< value_t >();
         auto  RX = blas::matrix< value_t >();
 
@@ -671,7 +671,7 @@ lu ( hpro::TMatrix &          A,
     // evaluate all computable updates to M
     //
 
-    std::cout << A.id() << std::endl;
+    // std::cout << A.id() << std::endl;
     
     accu.eval( value_t(1), A, acc, approx );
 

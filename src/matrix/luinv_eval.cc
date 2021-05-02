@@ -6,11 +6,10 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <hpro/algebra/solve_tri.hh>
-
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
+#include <hlr/arith/solve.hh>
 #include <hlr/matrix/luinv_eval.hh>
 
 namespace hlr { namespace matrix {
@@ -35,18 +34,25 @@ luinv_eval::apply  ( const TVector *  x,
                      const matop_t    op ) const
 {
     HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
-
+    HLR_ASSERT( is_scalar_all( x, y ) );
+    
     x->copy_to( y );
 
     if ( op == apply_normal )
     {
-        hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
-        hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
+        // hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
+        // hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
+
+        hlr::solve_lower_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), unit_diag );
+        hlr::solve_upper_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), general_diag );
     }// if
     else
     {
-        hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
-        hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
+        // hpro::solve_upper( op, &_mat, y, hpro::solve_option_t( block_wise, general_diag, store_inverse ) );
+        // hpro::solve_lower( op, &_mat, y, hpro::solve_option_t( block_wise, unit_diag,    store_inverse ) );
+
+        hlr::solve_upper_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), general_diag );
+        hlr::solve_lower_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), unit_diag );
     }// else
 }
 

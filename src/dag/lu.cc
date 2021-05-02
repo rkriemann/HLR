@@ -13,9 +13,6 @@
 #include <map>
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/solve_tri.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
@@ -526,10 +523,14 @@ void
 update_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
-        add_product( real(-1),
-                     apply_normal, A,
-                     apply_normal, B,
-                     C, acc );
+    {
+        HLR_ERROR( "todo" );
+    
+        // add_product( real(-1),
+        //              apply_normal, A,
+        //              apply_normal, B,
+        //              C, acc );
+    }// if
     else
     {
         // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );

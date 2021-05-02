@@ -17,7 +17,7 @@
 namespace hlr { namespace matrix {
 
 //
-// convert given matrix into lowrank format
+// convert given matrix into lowrank format with truncation
 //
 template < typename approx_t >
 std::unique_ptr< hpro::TRkMatrix >
@@ -131,6 +131,34 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
         auto  [ W, X ] = approx( U, V, acc );
         
         return std::make_unique< hpro::TRkMatrix >( S->row_is(), S->col_is(), std::move( W ), std::move( X ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+}
+
+//
+// convert given matrix into lowrank format without truncation
+// (only implemented for lowrank compatible formats)
+//
+template < typename value_t >
+std::unique_ptr< hpro::TRkMatrix >
+convert_to_lowrank ( const hpro::TMatrix &  M )
+{
+    if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, hpro::TRkMatrix );
+        
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(),
+                                                    std::move( blas::copy( blas::mat_U< value_t >( R ) ) ),
+                                                    std::move( blas::copy( blas::mat_V< value_t >( R ) ) ) );
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  U = blas::prod( R->row_basis(), R->coeff() );
+        auto  V = blas::copy( R->col_basis() );
+        
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );

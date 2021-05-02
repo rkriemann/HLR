@@ -11,11 +11,14 @@
 #include <random>
 
 #include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TMatrixSum.hh>
+#include <hpro/matrix/TMatrixProduct.hh>
 
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/operator_wrapper.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
+#include <hlr/matrix/identity.hh>
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/text.hh"
@@ -368,7 +371,7 @@ spectral ( const operator_t &  A,
             blas::fill( y, value_t(0) );
             prod( value_t(1), apply_adjoint, A, t, y );
 
-            lambda_new = math::abs( math::sqrt( blas::dot( x, y ) ) );
+            lambda_new = math::sqrt( math::abs( blas::dot( x, y ) ) );
             norm_y     = blas::norm_2( y );
         }// if
         else
@@ -434,7 +437,7 @@ spectral< hpro::TLinearOperator > ( const hpro::TLinearOperator &  A,
             A.apply( x.get(), t.get(), apply_normal );
             A.apply( t.get(), y.get(), apply_adjoint );
 
-            lambda_new = hpro::Math::abs( hpro::Math::sqrt( hpro::dot( x.get(), y.get() ) ) );
+            lambda_new = math::sqrt( math::abs( hpro::dot( x.get(), y.get() ) ) );
             norm_y     = y->norm2();
         }// if
         else
@@ -477,6 +480,18 @@ spectral< hpro::TMatrix > ( const hpro::TMatrix &  A,
                             const size_t           amax_it )
 {
     return spectral< hpro::TLinearOperator >( A, squared, atol, amax_it );
+}
+
+inline
+double
+inv_error_2 ( const hpro::TMatrix &          A,
+              const hpro::TLinearOperator &  A_inv )
+{
+    auto  AxInv   = hpro::matrix_product( &A, &A_inv );
+    auto  I       = matrix::identity( A.block_is() );
+    auto  inv_err = hpro::matrix_sum( 1.0, I.get(), -1.0, AxInv.get() );
+
+    return spectral( *inv_err );
 }
 
 //

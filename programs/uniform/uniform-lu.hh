@@ -6,10 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/TMatrixProduct.hh>
-#include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith.hh>
@@ -26,6 +24,26 @@
 #include "common-main.hh"
 
 using namespace hlr;
+
+namespace hlr { namespace uniform { namespace accu2 {
+double  t_basis = 0.0;
+double  t_apply = 0.0;
+double  t_eval  = 0.0;
+double  t_eval_lower  = 0.0;
+double  t_eval_upper  = 0.0;
+double  t_eval_lu  = 0.0;
+double  t_eval_uni   = 0.0;
+double  t_eval_uniA  = 0.0;
+double  t_eval_uniB  = 0.0;
+double  t_eval_dense = 0.0;
+double  t_eval_rest  = 0.0;
+double  t_eval_rec   = 0.0;
+}}}
+
+namespace hlr { namespace seq { namespace accu {
+double  t_apply = 0.0;
+double  t_eval  = 0.0;
+}}}
 
 //
 // main function
@@ -186,9 +204,13 @@ program_main ()
                 std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
                 
                 {
-                    hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    auto  A_inv   = matrix::luinv_eval( *M3 );
                     
-                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
+                    
+                    // hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    // std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
                 }
             }
 
@@ -219,9 +241,13 @@ program_main ()
                 // }
                 
                 {
-                    hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    auto  A_inv   = matrix::luinv_eval( *M2 );
                     
-                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
+
+                    // hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    // std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
                 }
             }
 
@@ -294,9 +320,13 @@ program_main ()
                 // }
                 
                 {
-                    hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    auto  A_inv   = matrix::luinv_eval( *M2 );
                     
-                    std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
+                    std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
+
+                    // hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+                    
+                    // std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
                 }
             }
         }
@@ -306,116 +336,152 @@ program_main ()
         auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
         auto  REF = std::unique_ptr< hpro::TMatrix >();
             
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
                 
-            auto  M3 = seq::matrix::copy( *M1 );
+            auto  LU = seq::matrix::copy( *M1 );
                 
             tic = timer::now();
                 
-            impl::lu< value_t >( *M3, acc, apx );
+            impl::lu< value_t >( *LU, acc, apx );
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( LU->byte_size() ) << std::endl;
                 
-            io::eps::print( *M3, "HLU", prnopt );
+            io::eps::print( *LU, "HLU", prnopt );
                 
-            {
-                hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+            auto  A_inv = matrix::luinv_eval( *LU );
                     
-                std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-            }
+            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
 
-            REF = std::move( M3 );
+            REF = std::move( LU );
+
+            {
+                //
+                // try to represent L/U factors as uniform matrices with given shared bases
+                //
+
+                std::cout << "  " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
+
+                auto  LU2     = impl::matrix::copy_uniform< value_t >( *REF, *rowcb, *colcb );
+                auto  LU2_inv = matrix::luinv_eval( *LU2 );
+                    
+                std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, LU2_inv ) ) << std::endl;
+            }
         }// if
 
         if ( true )
         {
             std::cout << "  " << term::bullet << term::bold << "H-LU (accumulator)" << term::reset << std::endl;
                 
-            auto  M3 = seq::matrix::copy( *M1 );
+            auto  LU = seq::matrix::copy( *M1 );
                 
             tic = timer::now();
                 
-            impl::accu::lu< value_t >( *M3, acc, apx );
+            impl::accu::lu< value_t >( *LU, acc, apx );
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( M3->byte_size() ) << std::endl;
+            std::cout << "        apply  " << format_time( hlr::seq::accu::t_apply ) << std::endl;
+            std::cout << "        eval   " << format_time( hlr::seq::accu::t_eval ) << std::endl;
+            std::cout << "      mem    = " << format_mem( LU->byte_size() ) << std::endl;
                 
-            io::eps::print( *M3, "HLU", prnopt );
+            io::eps::print( *LU, "HLU", prnopt );
                 
-            {
-                hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
+            auto  A_inv = matrix::luinv_eval( *LU );
                     
-                std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-            }
+            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
         }// if
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << term::bold << "H²-LU" << term::reset << std::endl;
             
-            auto  A3     = impl::matrix::copy( *A2 );
+            auto  LU     = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
             auto  colcb2 = colcb->copy();
                 
-            matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            matrix::replace_cluster_basis( *LU, *rowcb2, *colcb2 );
                 
             tic = timer::now();
                 
-            impl::uniform::lu< value_t >( *A3, acc, apx, *REF );
+            impl::uniform::lu< value_t >( *LU, acc, apx, *REF );
                 
             toc = timer::since( tic );
             std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
                 
-            io::eps::print( *A3, "H2LU", prnopt );
+            io::eps::print( *LU, "H2LU", prnopt );
                 
-            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
-                
-            // {
-            //     hpro::TLUInvMatrix  A_inv( M3.get(), hpro::block_wise, hpro::store_inverse );
-                
-            //     std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-            // }
-                
-            {
-                hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+            auto  A_inv = matrix::luinv_eval( *LU );
                     
-                std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-            }
+            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
+        }// if
+
+        if ( false )
+        {
+            std::cout << "  " << term::bullet << term::bold << "H²-LU (accumulated)" << term::reset << std::endl;
+            
+            auto  LU     = impl::matrix::copy( *A2 );
+            auto  rowcb2 = rowcb->copy();
+            auto  colcb2 = colcb->copy();
+                
+            matrix::replace_cluster_basis( *LU, *rowcb2, *colcb2 );
+                
+            tic = timer::now();
+                
+            impl::uniform::accu::lu< value_t >( *LU, acc, apx, *REF );
+                
+            toc = timer::since( tic );
+            std::cout << "      done in  " << format_time( toc ) << std::endl;
+            std::cout << "      mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
+                
+            io::eps::print( *LU, "H2LUa", prnopt );
+                
+            auto  A_inv = matrix::luinv_eval( *LU );
+                    
+            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
         }// if
 
         if ( true )
         {
-            std::cout << "  " << term::bullet << term::bold << "H²-LU (accumulated)" << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "H²-LU (accumulated v2)" << term::reset << std::endl;
             
-            auto  A3     = impl::matrix::copy( *A2 );
+            auto  LU     = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
             auto  colcb2 = colcb->copy();
                 
-            matrix::replace_cluster_basis( *A3, *rowcb2, *colcb2 );
+            matrix::replace_cluster_basis( *LU, *rowcb2, *colcb2 );
                 
             tic = timer::now();
                 
-            impl::uniform::accu::lu< value_t >( *A3, acc, apx, *REF );
+            impl::uniform::accu2::lu< value_t >( *LU, acc, apx, *REF );
                 
             toc = timer::since( tic );
-            std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
+            std::cout << "      done in   " << format_time( toc ) << std::endl;
+            std::cout << "        basis   " << format_time( hlr::uniform::accu2::t_basis ) << std::endl;
+            std::cout << "        apply   " << format_time( hlr::uniform::accu2::t_apply ) << std::endl;
+            std::cout << "        eval    " << format_time( hlr::uniform::accu2::t_eval ) << std::endl;
+            std::cout << "          lower " << format_time( hlr::uniform::accu2::t_eval_lower ) << std::endl;
+            std::cout << "          upper " << format_time( hlr::uniform::accu2::t_eval_upper ) << std::endl;
+            std::cout << "          lu    " << format_time( hlr::uniform::accu2::t_eval_lu ) << std::endl;
+            std::cout << "          uni   " << format_time( hlr::uniform::accu2::t_eval_uni ) << std::endl;
+            std::cout << "          uniA  " << format_time( hlr::uniform::accu2::t_eval_uniA ) << std::endl;
+            std::cout << "          uniB  " << format_time( hlr::uniform::accu2::t_eval_uniB ) << std::endl;
+            std::cout << "          dense " << format_time( hlr::uniform::accu2::t_eval_dense ) << std::endl;
+            std::cout << "          rest  " << format_time( hlr::uniform::accu2::t_eval_rest ) << std::endl;
+            std::cout << "          rec   " << format_time( hlr::uniform::accu2::t_eval_rec ) << std::endl;
+            std::cout << "          sum   " << format_time( hlr::uniform::accu2::t_eval_uni + hlr::uniform::accu2::t_eval_uniA + hlr::uniform::accu2::t_eval_uniB +
+                                                            hlr::uniform::accu2::t_eval_dense + hlr::uniform::accu2::t_eval_rest + hlr::uniform::accu2::t_eval_rec ) << std::endl;
+            std::cout << "      mem    =  " << format_mem( LU->byte_size(), rowcb2->byte_size() + colcb2->byte_size() ) << std::endl;
                 
-            io::eps::print( *A3, "H2LUa", prnopt );
+            io::eps::print( *LU, "H2LUa", prnopt );
                 
-            auto  M2 = seq::matrix::copy_nonuniform< value_t >( *A3 );
-                
-            {
-                hpro::TLUInvMatrix  A_inv( M2.get(), hpro::block_wise, hpro::store_inverse );
+            auto  A_inv = matrix::luinv_eval( *LU );
                     
-                std::cout << "      error  = " << format_error( inv_approx_2( M1.get(), & A_inv ) ) << std::endl;
-            }
+            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
         }// if
     }// else
 }

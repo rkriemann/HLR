@@ -12,9 +12,6 @@
 #include <hpro/matrix/TRkMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
-#include <hpro/algebra/solve_tri.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -84,7 +81,8 @@ lu_nd ( hpro::TMatrix &          A,
 // - T is used as temporary space and has to have the same
 //   structure as A
 //
-inline void
+template < typename value_t >
+void
 gauss_elim ( hpro::TMatrix &          A,
              hpro::TMatrix &          T,
              const hpro::TTruncAcc &  acc )
@@ -100,49 +98,49 @@ gauss_elim ( hpro::TMatrix &          A,
         auto  BT = ptrcast( &T, hpro::TBlockMatrix );
         auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
+        auto  apx = approx::SVD< value_t >();
 
         // A_00 = A_00⁻¹
-        hlr::seq::gauss_elim( *MA(0,0), *MT(0,0), acc );
+        hlr::seq::gauss_elim< value_t >( *MA(0,0), *MT(0,0), acc );
         // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(0,0)->id(), norm_F( MA(0,0) ) ) );
 
         // T_01 = A_00⁻¹ · A_01
-        hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
-        // seq::matrix::clear( *MT(0,1) );
-        // multiply( 1.0, MA(0,0), MA(0,1), MT(0,1), acc );
+        // hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+        seq::matrix::clear( *MT(0,1) );
+        multiply< value_t >( value_t(1), apply_normal, *MA(0,0), apply_normal, *MA(0,1), *MT(0,1), acc, apx );
         
         // T_10 = A_10 · A_00⁻¹
-        hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
-        // seq::matrix::clear( *MT(1,0) );
-        // multiply( 1.0, MA(1,0), MA(0,0), MT(1,0), acc );
+        // hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+        seq::matrix::clear( *MT(1,0) );
+        multiply< value_t >( value_t(1), apply_normal, *MA(1,0), apply_normal, *MA(0,0), *MT(1,0), acc, apx );
 
         // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
-        // multiply( -1.0, MT(1,0), MA(0,1), MA(1,1), acc );
+        // hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        multiply< value_t >( value_t(-1), apply_normal, *MT(1,0), apply_normal, *MA(0,1), *MA(1,1), acc, apx );
     
         // A_11 = A_11⁻¹
-        hlr::seq::gauss_elim( *MA(1,1), *MT(1,1), acc );
+        hlr::seq::gauss_elim< value_t >( *MA(1,1), *MT(1,1), acc );
         // hlr::log( 0, hpro::to_string( "                               %d = %.8e", MA(1,1)->id(), norm_F( MA(1,1) ) ) );
 
         // A_01 = - T_01 · A_11
-        hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
-        // seq::matrix::clear( *MA(0,1) );
-        // multiply( -1.0, MT(0,1), MA(1,1), MA(0,1), acc );
+        // hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+        seq::matrix::clear( *MA(0,1) );
+        multiply( value_t(-1), apply_normal, *MT(0,1), apply_normal, *MA(1,1), *MA(0,1), acc, apx );
             
         // A_10 = - A_11 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
-        // seq::matrix::clear( *MA(1,0) );
-        // multiply( -1.0, MA(1,1), MT(1,0), MA(1,0), acc );
+        // hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+        seq::matrix::clear( *MA(1,0) );
+        multiply< value_t >( value_t(-1), apply_normal, *MA(1,1), apply_normal, *MT(1,0), *MA(1,0), acc, apx );
 
         // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
-        // multiply( -1.0, MA(0,1), MT(1,0), MA(0,0), acc );
+        // hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        multiply< value_t >( value_t(-1), apply_normal, *MA(0,1), apply_normal, *MT(1,0), *MA(0,0), acc, apx );
     }// if
     else if ( is_dense( A ) )
     {
         auto  DA = ptrcast( &A, hpro::TDenseMatrix );
         
-        if ( A.is_complex() ) blas::invert( DA->blas_cmat() );
-        else                  blas::invert( DA->blas_rmat() );
+        blas::invert( blas::mat< value_t >( DA ) );
     }// if
     else
         HLR_ASSERT( false );

@@ -633,6 +633,9 @@ is_lowrankS ( const hpro::TMatrix *  M )
     return ! is_null( M ) && IS_TYPE( M, lrsmatrix );
 }
 
+HLR_TEST_ALL( is_lowrankS, hpro::TMatrix )
+HLR_TEST_ANY( is_lowrankS, hpro::TMatrix )
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_LRSMATRIX_HH

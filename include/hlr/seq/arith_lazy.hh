@@ -775,13 +775,17 @@ solve_lower_tri ( const eval_side_t        side,
             for ( uint i = 0; i < BM->nblock_rows(); ++i )
             {
                 const auto  L_ii = BL->block( i, i );
-            
+
+                HLR_ASSERT( ! is_null( L_ii ) );
+                
                 for ( uint j = 0; j < BM->nblock_cols(); ++j )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j), sub_accu(i,j), acc, approx );
+                    if ( ! is_null( BM->block( i, j ) ) )
+                        solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                        sub_accu(k,j).template add_update< value_t >( BL->block(k,i), BM->block(i,j), acc, approx );
+                        if ( ! is_null_any( BL->block( k, i ), BM->block( i, j ) ) )
+                            sub_accu(k,j).template add_update< value_t >( BL->block( k, i ), BM->block( i, j ), acc, approx );
             }// for
         }// if
         else
@@ -832,12 +836,16 @@ solve_upper_tri ( const eval_side_t        side,
             {
                 const auto  U_jj = BU->block( j, j );
             
+                HLR_ASSERT( ! is_null( U_jj ) );
+                
                 for ( uint i = 0; i < BM->nblock_rows(); ++i )
-                    solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                    if ( ! is_null( BM->block( i, j ) ) )
+                        solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ), sub_accu(i,j), acc, approx );
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                     for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        sub_accu(i,k).template add_update< value_t >( BM->block(i,j), BU->block(j,k), acc, approx );
+                        if ( ! is_null_any( BM->block( i, j ), BU->block( j, k ) ) )
+                            sub_accu(i,k).template add_update< value_t >( BM->block(i,j), BU->block(j,k), acc, approx );
             }// for
         }// else
     }// if
@@ -878,33 +886,35 @@ lu ( hpro::TMatrix &          M,
         {
             auto  B_ii = BM->block( i, i );
 
+            HLR_ASSERT( ! is_null( B_ii ) );
+            
             lu< value_t >( *B_ii, sub_accu(i,i), acc, approx );
 
             for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
-                solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_accu(j,i), acc, approx );
+                if ( ! is_null( BM->block( j, i ) ) )
+                    solve_upper_tri< value_t >( from_right, general_diag, *B_ii, *BM->block( j, i ), sub_accu(j,i), acc, approx );
 
             for ( uint  j = i+1; j < BM->nblock_cols(); ++j )
-                solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
+                if ( ! is_null( BM->block( i, j ) ) )
+                    solve_lower_tri< value_t >( from_left, unit_diag, *B_ii, *BM->block( i, j ), sub_accu(i,j), acc, approx );
 
             // add updates to sub lists
             for ( uint  j = i+1; j < BM->nblock_rows(); ++j )
                 for ( uint  l = i+1; l < BM->nblock_cols(); ++l )
-                    sub_accu(j,l).template add_update< value_t >( BM->block( j, i ), BM->block( i, l ), acc, approx );
+                    if ( ! is_null_any( BM->block( j, i ), BM->block( i, l ) ) )
+                        sub_accu(j,l).template add_update< value_t >( BM->block( j, i ), BM->block( i, l ), acc, approx );
         }// for
     }// if
-    else
+    else if ( is_dense( M ) )
     {
-        if ( is_dense( M ) )
-        {
-            accu.apply_leaf( value_t(-1), M, acc, approx );
+        accu.apply_leaf( value_t(-1), M, acc, approx );
         
-            auto  D = ptrcast( &M, hpro::TDenseMatrix );
-
-            invert< value_t >( *D );
-        }// if
-        else
-            HLR_ERROR( "unsupported matrix type : " + M.typestr() );
-    }// else
+        auto  D = ptrcast( &M, hpro::TDenseMatrix );
+        
+        invert< value_t >( *D );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
 }// namespace detail

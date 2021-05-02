@@ -494,7 +494,14 @@ multiply ( const value_t            alpha,
     }// if
     else if ( is_uniform_lowrank( A ) )
     {
-        if ( is_uniform_lowrank( B ) )
+        if ( is_blocked( B ) )
+        {
+            multiply< value_t >( alpha,
+                                 op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
+                                 op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                 * ptrcast( &C, hpro::TDenseMatrix ) );
+        }// if
+        else if ( is_uniform_lowrank( B ) )
         {
             multiply< value_t >( alpha,
                                  op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),

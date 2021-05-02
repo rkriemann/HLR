@@ -146,12 +146,12 @@ solve_lower_tri ( const eval_side_t        side,
 
 inline
 void
-trsvl ( const hpro::matop_t      op_L,
-        const hpro::TMatrix &    L,
-        hpro::TScalarVector &    v,
-        const hpro::diag_type_t  diag_mode )
+solve_lower_tri ( const hpro::matop_t      op_L,
+                  const hpro::TMatrix &    L,
+                  hpro::TScalarVector &    v,
+                  const hpro::diag_type_t  diag_mode )
 {
-    HLR_LOG( 4, HLIB::to_string( "trsvl( %d )", L.id() ) );
+    HLR_LOG( 4, HLIB::to_string( "solve_lower_tri( %d )", L.id() ) );
         
     if ( is_blocked( L ) )
     {
@@ -175,7 +175,7 @@ trsvl ( const hpro::matop_t      op_L,
                 {
                     auto  v_i = v.sub_vector( L_ii->col_is() );
                 
-                    trsvl( op_L, *L_ii, v_i, diag_mode );
+                    solve_lower_tri( op_L, *L_ii, v_i, diag_mode );
                 }// if
             
                 for ( uint  j = i+1; j < nbr; ++j )
@@ -207,8 +207,8 @@ trsvl ( const hpro::matop_t      op_L,
                 if ( ! is_null( L_ii ) )
                 {
                     auto  v_i = v.sub_vector( L_ii->row_is() );
-                
-                    trsvl( op_L, *L_ii, v_i, diag_mode );
+                    
+                    solve_lower_tri( op_L, *L_ii, v_i, diag_mode );
                 }// if
 
                 for ( int  j = i-1; j >= 0; --j )
@@ -242,6 +242,16 @@ trsvl ( const hpro::matop_t      op_L,
     }// if
     else
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
+}
+
+inline
+void
+trsvl ( const hpro::matop_t      op_L,
+        const hpro::TMatrix &    L,
+        hpro::TScalarVector &    v,
+        const hpro::diag_type_t  diag_mode )
+{
+    solve_lower_tri( op_L, L, v, diag_mode );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -357,12 +367,12 @@ solve_upper_tri ( const eval_side_t        side,
 
 inline
 void
-trsvu ( const hpro::matop_t      op_U,
-        const hpro::TMatrix &    U,
-        hpro::TScalarVector &    v,
-        const hpro::diag_type_t  diag_mode )
+solve_upper_tri ( const hpro::matop_t      op_U,
+                  const hpro::TMatrix &    U,
+                  hpro::TScalarVector &    v,
+                  const hpro::diag_type_t  diag_mode )
 {
-    HLR_LOG( 4, HLIB::to_string( "trsvu( %d )", U.id() ) );
+    HLR_LOG( 4, HLIB::to_string( "solve_upper_tri( %d )", U.id() ) );
         
     if ( is_blocked( U ) )
     {
@@ -386,7 +396,7 @@ trsvu ( const hpro::matop_t      op_U,
                 {
                     auto  v_i = v.sub_vector( U_ii->col_is() );
                 
-                    trsvu( op_U, *U_ii, v_i, diag_mode );
+                    solve_upper_tri( op_U, *U_ii, v_i, diag_mode );
                 }// if
             
                 for ( int j = i-1; j >= 0; --j )
@@ -419,7 +429,7 @@ trsvu ( const hpro::matop_t      op_U,
                 {
                     auto  v_i = v.sub_vector( U_ii->row_is() );
                 
-                    trsvu( op_U, *U_ii, v_i, diag_mode );
+                    solve_upper_tri( op_U, *U_ii, v_i, diag_mode );
                 }// if
 
                 for ( uint  j = i+1; j < nbc; ++j )
@@ -454,6 +464,16 @@ trsvu ( const hpro::matop_t      op_U,
     }// if
     else
         HLR_ERROR( "unsupported matrix type for U : " + U.typestr() );
+}
+
+inline
+void
+trsvu ( const hpro::matop_t      op_U,
+        const hpro::TMatrix &    U,
+        hpro::TScalarVector &    v,
+        const hpro::diag_type_t  diag_mode )
+{
+    solve_upper_tri( op_U, U, v, diag_mode );
 }
 
 //
