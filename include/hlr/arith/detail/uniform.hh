@@ -9,10 +9,10 @@
 //
 
 #include <hlr/arith/blas.hh>
-#include <hlr/arith/norm.hh> // DEBUG
+#include <hlr/arith/norm.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/matrix/convert.hh> // DEBUG
+#include <hlr/matrix/convert.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
@@ -1294,7 +1294,8 @@ add ( hpro::TMatrix &                  M,
 }
 
 //
-// forward decl. of general version
+// matrix multiplication C := α·A·B + C
+// (forward decl.)
 //
 template < typename value_t,
            typename approx_t >
@@ -1311,7 +1312,7 @@ multiply ( const value_t            alpha,
            const uniform_map_t &    colmap );
 
 //
-// matrix multiplication C := α·A·B + C
+// blocked x blocked = blocked
 //
 template < typename value_t,
            typename approx_t >
@@ -1346,6 +1347,9 @@ multiply ( const value_t               alpha,
     }// for
 }
 
+//
+// blocked x blocked = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1414,6 +1418,42 @@ multiply ( const value_t                  alpha,
     update_row_col_basis( C, Un, Sn, Vn, acc, approx, rowmap, colmap );
 }
 
+//
+// blocked x dense = uniform
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                   alpha,
+           const hpro::matop_t                             op_A,
+           const hpro::TBlockMatrix &                      A,
+           const hpro::matop_t                             op_B,
+           const hpro::TDenseMatrix &                      B,
+           matrix::uniform_lrmatrix< value_t > &           C,
+           const hpro::TTruncAcc &                         acc,
+           const approx_t &                                approx,
+           const uniform_map_t &                           rowmap,
+           const uniform_map_t &                           colmap )
+{
+    auto  D = matrix::convert_to_dense< value_t >( C );
+
+    hlr::multiply( alpha, op_A, A, op_B, B, *D );
+    
+    auto  [ U, V ] = approx( blas::mat< value_t >( *D ), acc );
+    auto  RU       = blas::matrix< value_t >();
+    auto  RV       = blas::matrix< value_t >();
+
+    blas::qr( U, RU );
+    blas::qr( V, RV );
+
+    auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+    detail::update_row_col_basis( C, U, S, V, acc, approx, rowmap, colmap );
+}
+
+//
+// blocked x uniform = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1437,6 +1477,9 @@ multiply ( const value_t                        alpha,
     add( C, AU, B.coeff(), B.col_cb().basis(), acc, approx, rowmap, colmap );
 }
 
+//
+// blocked x uniform = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1466,6 +1509,42 @@ multiply ( const value_t                        alpha,
     detail::update_row_basis( C, Un, Sn, acc, approx, rowmap );
 }
 
+//
+// dense x blocked = uniform
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                   alpha,
+           const hpro::matop_t                             op_A,
+           const hpro::TDenseMatrix &                      A,
+           const hpro::matop_t                             op_B,
+           const hpro::TBlockMatrix &                      B,
+           matrix::uniform_lrmatrix< value_t > &           C,
+           const hpro::TTruncAcc &                         acc,
+           const approx_t &                                approx,
+           const uniform_map_t &                           rowmap,
+           const uniform_map_t &                           colmap )
+{
+    auto  D = matrix::convert_to_dense< value_t >( C );
+
+    hlr::multiply( alpha, op_A, A, op_B, B, *D );
+    
+    auto  [ U, V ] = approx( blas::mat< value_t >( *D ), acc );
+    auto  RU       = blas::matrix< value_t >();
+    auto  RV       = blas::matrix< value_t >();
+
+    blas::qr( U, RU );
+    blas::qr( V, RV );
+
+    auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+    detail::update_row_col_basis( C, U, S, V, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x blocked = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1489,6 +1568,9 @@ multiply ( const value_t                        alpha,
     add( C, A.row_cb().basis(), A.coeff(), BV, acc, approx, rowmap, colmap );
 }
 
+//
+// uniform x blocked = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1518,6 +1600,40 @@ multiply ( const value_t                        alpha,
     detail::update_col_basis( C, Sn, Vn, acc, approx, colmap );
 }
 
+//
+// dense x uniform = blocked
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                   alpha,
+           const hpro::matop_t                             op_A,
+           const hpro::TDenseMatrix &                      A,
+           const hpro::matop_t                             op_B,
+           const matrix::uniform_lrmatrix< value_t > &     B,
+           hpro::TBlockMatrix &                            C,
+           const hpro::TTruncAcc &                         acc,
+           const approx_t &                                approx,
+           const uniform_map_t &                           rowmap,
+           const uniform_map_t &                           colmap )
+{
+    auto  U = B.row_basis( op_B );
+    auto  S = B.coeff();
+    auto  V = B.col_basis( op_B );
+
+    auto  AU = blas::prod( alpha, blas::mat_view( op_A, blas::mat< value_t >( A ) ), U );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( AU, R );
+
+    auto  SR = blas::prod( R, blas::mat_view( op_B, S ) );
+    
+    add( C, AU, SR, V, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x uniform = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1545,6 +1661,9 @@ multiply ( const value_t                        alpha,
     add( C, A.row_cb().basis(), R, B.col_cb().basis(), acc, approx, rowmap, colmap );
 }
 
+//
+// uniform x uniform = uniform
+//
 template < typename value_t >
 void
 multiply ( const value_t                        alpha,
@@ -1561,6 +1680,40 @@ multiply ( const value_t                        alpha,
     blas::prod( alpha, SVW, blas::mat_view( op_B, B.coeff() ), value_t(1), C.coeff() );
 }
 
+//
+// uniform x dense = blocked
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                   alpha,
+           const hpro::matop_t                             op_A,
+           const matrix::uniform_lrmatrix< value_t > &     A,
+           const hpro::matop_t                             op_B,
+           const hpro::TDenseMatrix &                      B,
+           hpro::TBlockMatrix &                            C,
+           const hpro::TTruncAcc &                         acc,
+           const approx_t &                                approx,
+           const uniform_map_t &                           rowmap,
+           const uniform_map_t &                           colmap )
+{
+    auto  U = A.row_basis( op_A );
+    auto  S = A.coeff();
+    auto  V = A.col_basis( op_A );
+
+    auto  VB = blas::prod( alpha, blas::mat_view( blas::adjoint( op_B ), blas::mat< value_t >( B ) ), V );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( VB, R );
+
+    auto  SR = blas::prod( blas::mat_view( op_A, S ), blas::adjoint( R ) );
+    
+    add( C, U, SR, VB, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x dense = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1589,6 +1742,9 @@ multiply ( const value_t                        alpha,
     detail::update_col_basis( C, Sn, Vn, acc, approx, colmap );
 }
 
+//
+// dense x uniform = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1617,6 +1773,9 @@ multiply ( const value_t                        alpha,
     detail::update_row_basis( C, Un, Sn, acc, approx, rowmap );
 }
 
+//
+// dense x dense = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1638,6 +1797,9 @@ multiply ( const value_t               alpha,
     add( C, AB, acc, approx, rowmap, colmap );
 }
 
+//
+// dense x dense = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
@@ -1669,8 +1831,9 @@ multiply ( const value_t                  alpha,
     detail::update_row_col_basis( C, Un, Sn, Vn, acc, approx, rowmap, colmap );
 }
 
-
-
+//
+// general function
+//
 template < typename value_t,
            typename approx_t >
 void

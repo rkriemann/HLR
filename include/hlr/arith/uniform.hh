@@ -15,8 +15,49 @@
 #include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform_accu.hh>
 #include <hlr/arith/detail/uniform_accu2.hh>
+#include <hlr/arith/detail/uniform_accu3.hh>
 
 namespace hlr { namespace uniform {
+
+//
+// construct mappings of A_{t × s} to set of uniform leaves per t/s
+//
+std::pair< detail::uniform_map_t,
+           detail::uniform_map_t >
+construct_indexset_to_block_maps ( hpro::TMatrix &  A )
+{
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+
+    auto  blocks = std::list< hpro::TMatrix * >{ &A };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< hpro::TMatrix * >();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  BM = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                        if ( ! is_null( BM->block( i, j ) ) )
+                            subblocks.push_back( BM->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    return { std::move( rowmap ), std::move( colmap ) };
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -180,45 +221,8 @@ lu ( hpro::TMatrix &          A,
      const approx_t &         approx,
      hpro::TMatrix &          /* REF */ )
 {
-    //
-    // construct mapping of A_{t × s} to set of uniform leaves per t/s
-    //
-
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
-
-    auto  blocks = std::list< hpro::TMatrix *>{ &A };
-
-    while ( ! blocks.empty() )
-    {
-        auto  subblocks = std::list< hpro::TMatrix *>();
-
-        for ( auto  M : blocks )
-        {
-            if ( is_blocked( M ) )
-            {
-                auto  B = ptrcast( M, hpro::TBlockMatrix );
-
-                for ( uint  i = 0; i < B->nblock_rows(); ++i )
-                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
-                        if ( ! is_null( B->block( i, j ) ) )
-                            subblocks.push_back( B->block( i, j ) );
-            }// if
-            else if ( matrix::is_uniform_lowrank( M ) )
-            {
-                rowmap[ M->row_is() ].push_back( M );
-                colmap[ M->col_is() ].push_back( M );
-            }// if
-        }// for
-
-        blocks = std::move( subblocks );
-    }// while
-
-    //
-    // perform actual LU factorization
-    //
-
-    detail::accumulator  accu;
+    auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( A );
+    auto  accu               = detail::accumulator();
     
     detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
 }
@@ -232,55 +236,63 @@ namespace accu2
 template < typename value_t,
            typename approx_t >
 void
+multiply ( const value_t            alpha,
+           const matop_t            op_A,
+           const hpro::TMatrix &    A,
+           const matop_t            op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( C );
+    auto  accu               = detail::accumulator();
+
+    accu.add_update( op_A, A, op_B, B );
+    
+    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap ); //, REF );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx,
      hpro::TMatrix &          /* REF */ )
 {
-    //
-    // construct mapping of A_{t × s} to set of uniform leaves per t/s
-    //
+    auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( A );
+    auto  accu               = detail::accumulator();
 
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
-
-    auto  blocks = std::list< hpro::TMatrix *>{ &A };
-
-    while ( ! blocks.empty() )
-    {
-        auto  subblocks = std::list< hpro::TMatrix *>();
-
-        for ( auto  M : blocks )
-        {
-            if ( is_blocked( M ) )
-            {
-                auto  B = ptrcast( M, hpro::TBlockMatrix );
-
-                for ( uint  i = 0; i < B->nblock_rows(); ++i )
-                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
-                        if ( ! is_null( B->block( i, j ) ) )
-                            subblocks.push_back( B->block( i, j ) );
-            }// if
-            else if ( matrix::is_uniform_lowrank( M ) )
-            {
-                rowmap[ M->row_is() ].push_back( M );
-                colmap[ M->col_is() ].push_back( M );
-            }// if
-        }// for
-
-        blocks = std::move( subblocks );
-    }// while
-
-    //
-    // perform actual LU factorization
-    //
-
-    detail::accumulator  accu;
-    
     detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
 }
 
 }// namespace accu2
+
+
+namespace accu3
+{
+
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     hpro::TMatrix &          L,
+     hpro::TMatrix &          U,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
+     hpro::TMatrix &          /* REF */ )
+{
+    auto  [ rowmap_L, colmap_L ] = construct_indexset_to_block_maps( L );
+    auto  [ rowmap_U, colmap_U ] = construct_indexset_to_block_maps( U );
+    auto  accu                   = detail::accumulator();
+    
+    detail::lu< value_t >( A, L, U, accu, acc, approx,
+                           rowmap_L, colmap_L,
+                           rowmap_U, colmap_U ); //, REF );
+}
+
+}// namespace accu3
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -339,7 +351,8 @@ namespace tlr
 //
 // matrix multiplication
 //
-template < typename value_t >
+template < typename value_t,
+           typename approx_t >
 void
 multiply ( const value_t            alpha,
            const hpro::matop_t      op_A,
@@ -347,7 +360,8 @@ multiply ( const value_t            alpha,
            const hpro::matop_t      op_B,
            const hpro::TMatrix &    aB,
            hpro::TMatrix &          aC,
-           const hpro::TTruncAcc &  acc )
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
 {
     HLR_ASSERT( is_blocked_all( aA, aB, aC ) );
 
@@ -367,7 +381,7 @@ multiply ( const value_t            alpha,
 
             for ( uint  k = 0; k < A->nblock_cols( op_A ); ++k )
             {
-                detail::multiply( alpha, op_A, *A, op_B, *B, *C, i, k, j, acc );
+                detail::multiply( alpha, op_A, *A, op_B, *B, *C, i, k, j, acc, approx );
             }// for
         }// for
     }// for

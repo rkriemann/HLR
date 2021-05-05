@@ -259,7 +259,7 @@ multiply ( const value_t                                alpha,
     HLR_ASSERT(( op_B == apply_normal ) || ( op_B == apply_adjoint ));
 
     // A × U·S·V'
-    auto  AU  = blas::prod( A, B.col_basis( op_B ) );
+    auto  AU  = blas::prod( A, B.row_basis( op_B ) );
     auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coeff() ) );
     
     blas::prod( alpha, AUS, B.col_basis( op_B ), value_t(1), C );

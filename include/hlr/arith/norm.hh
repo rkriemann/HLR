@@ -11,14 +11,14 @@
 #include <random>
 
 #include <hpro/matrix/TMatrix.hh>
-#include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/matrix/TMatrixProduct.hh>
 
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/operator_wrapper.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include <hlr/matrix/identity.hh>
+#include <hlr/matrix/sum.hh>
+#include <hlr/matrix/product.hh>
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/text.hh"
@@ -487,9 +487,9 @@ double
 inv_error_2 ( const hpro::TMatrix &          A,
               const hpro::TLinearOperator &  A_inv )
 {
-    auto  AxInv   = hpro::matrix_product( &A, &A_inv );
+    auto  AxInv   = matrix::product( A, A_inv );
     auto  I       = matrix::identity( A.block_is() );
-    auto  inv_err = hpro::matrix_sum( 1.0, I.get(), -1.0, AxInv.get() );
+    auto  inv_err = matrix::sum( 1.0, *I, -1.0, *AxInv );
 
     return spectral( *inv_err );
 }
