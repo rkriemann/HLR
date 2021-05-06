@@ -144,7 +144,7 @@ program_main ()
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << "eager" << term::reset << std::endl;
             

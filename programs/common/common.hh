@@ -21,7 +21,6 @@ using boost::format;
 #include <hpro/cluster/TAlgPartStrat.hh>
 #include <hpro/cluster/TAlgCTBuilder.hh>
 #include <hpro/cluster/TAlgAdmCond.hh>
-#include <hpro/matrix/TMatBuilder.hh>
 
 #include <hlr/cluster/tlr.hh>
 #include <hlr/cluster/mblr.hh>
@@ -29,7 +28,6 @@ using boost::format;
 #include <hlr/cluster/h.hh>
 
 namespace hpro = HLIB;
-//namespace blas = HLIB::BLAS;
 
 #include "cmdline.hh"
 #include "gen_problem.hh"
