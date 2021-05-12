@@ -56,6 +56,11 @@ struct eps_printer
     // 2D - drawing
     //
 
+    void draw_line    ( const double  x1,
+                        const double  y1,
+                        const double  x2,
+                        const double  y2 );
+    
     void draw_rect    ( const double  x1,
                         const double  y1,
                         const double  x2,

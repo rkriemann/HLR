@@ -27,6 +27,7 @@ namespace accu2
 {
 
 using hlr::uniform::accu2::multiply;
+using hlr::uniform::accu2::multiply_cached;
 using hlr::uniform::accu2::lu;
 
 }// namespace accu

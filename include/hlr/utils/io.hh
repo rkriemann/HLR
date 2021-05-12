@@ -212,6 +212,7 @@ namespace eps
 //
 // print cluster <cl> to file <filename>
 //
+inline
 void
 print ( const HLIB::TCluster &  cl,
         const std::string &     filename )
@@ -224,6 +225,7 @@ print ( const HLIB::TCluster &  cl,
 //
 // print blockcluster <cl> to file <filename>
 //
+inline
 void
 print ( const HLIB::TBlockCluster &  cl,
         const std::string &          filename )
@@ -236,6 +238,7 @@ print ( const HLIB::TBlockCluster &  cl,
 //
 // print matrix <M> to file <filename>
 //
+inline
 void
 print ( const HLIB::TMatrix &  M,
         const std::string &    filename,
@@ -247,6 +250,7 @@ print ( const HLIB::TMatrix &  M,
 //
 // print matrix <M> level-wise to files with filename <basename><lvl>
 //
+inline
 void
 print_lvl ( const HLIB::TMatrix &  M,
             const std::string &    basename,
@@ -258,12 +262,25 @@ print_lvl ( const HLIB::TMatrix &  M,
 //
 // print matrix <M> with blocks coloured according to memory consumption
 //
+inline
 void
 print_mem ( const HLIB::TMatrix &  M,
             const std::string &    filename,
             const std::string &    options = "default" )
 {
     matrix::print_mem_eps( M, filename, options );
+}
+
+//
+// print cluster basis <cl> to file <filename>
+//
+template < typename cluster_basis_t >
+void
+print ( const cluster_basis_t &  cb,
+        const std::string &      filename,
+        const std::string &      options = "default" )
+{
+    hlr::matrix::print_eps( cb, filename, options );
 }
 
 }// namespace eps

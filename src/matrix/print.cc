@@ -19,6 +19,7 @@
 
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/eps_printer.hh>
+#include <hlr/utils/tools.hh>
 
 #include <hlr/matrix/print.hh>
 
@@ -60,7 +61,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( std::find( options.cbegin(), options.cend(), "nosize" ) == options.end() )
+            if ( contains( options, "nosize" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -89,7 +90,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( std::find( options.cbegin(), options.cend(), "norank" ) == options.end() )
+            if ( contains( options, "norank" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -113,7 +114,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( std::find( options.cbegin(), options.cend(), "norank" ) == options.end() )
+            if ( contains( options, "norank" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -137,7 +138,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( std::find( options.cbegin(), options.cend(), "pattern" ) != options.end() )
+            if ( contains( options, "pattern" ) )
             {
                 prn.set_gray( 0 );
 
@@ -163,7 +164,7 @@ print_eps ( const hpro::TMatrix &               M,
     }// else
 
     // draw ID
-    if ( std::find( options.cbegin(), options.cend(), "noid" ) == options.end() )
+    if ( contains( options, "noid" ) )
     {
         prn.save();
 
@@ -445,5 +446,164 @@ print_mem_eps ( const hpro::TMatrix &  M,
 
     prn.end();
 }
+
+//
+// print cluster basis <cl> to file <filename>
+//
+template < typename cluster_basis_t >
+void
+print_eps ( const cluster_basis_t &  cb,
+            const std::string &      filename,
+            const std::string &      options )
+{
+    using value_t = typename cluster_basis_t::value_t;
+    using real_t  = hpro::real_type_t< value_t >;
+    
+    const boost::filesystem::path  filepath( filename );
+    std::string                    suffix;
+
+    if ( ! filepath.has_extension() )
+        suffix = ".eps";
+
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+    
+    std::ofstream  out( filename + suffix );
+    eps_printer    prn( out );
+
+    const uint    depth     = uint( cb.depth() );
+    const uint    size      = uint( cb.cluster().size() );
+    const double  max_x     = 500.0;
+    const double  scale_x   = max_x / double(size);
+    const double  scale_y   = std::min( 500.0 / double(depth+1), 20.0 );
+    const double  prn_width = max_x;
+    auto          bases     = std::list< const cluster_basis_t * >{ & cb };
+    uint          level     = 0;
+
+    prn.begin( uint(prn_width), uint(( depth ) * scale_y) );
+    prn.set_line_width( 1.0 / std::max( scale_x, scale_y ) );
+
+    while ( ! bases.empty() )
+    {
+        decltype( bases )  sons;
+
+        for ( auto  clb : bases )
+        {
+            const indexset  is      = clb->cluster();
+            const double    fn_size = std::min( 5.0, scale_x * double(is.size()) / 2.0 );
+
+            if ( clb->rank() != 0 )
+            {
+                uint  text_col = 0;
+                
+                if ( contains( optarr, "mem" ) )
+                {
+                    uint  bg_col = std::max< int >( 0, 255 - std::floor( 255.0 * double( clb->basis().ncols() ) / double( clb->basis().nrows() ) ) );
+
+                    if ( bg_col < 96 )
+                        text_col = 255;
+                    
+                    prn.save();
+
+                    prn.set_gray( bg_col );
+                    prn.fill_rect( scale_x * is.first(),        scale_y * level,
+                                   scale_x * ( is.last() + 1 ), scale_y * ( level + 1 ) );
+                    
+                    prn.restore();
+                }// if
+                
+                if ( contains( optarr, "svd" ) )
+                {
+                    auto  V = blas::copy( clb->basis() );
+                    auto  S = blas::vector< real_t >();
+
+                    blas::sv( V, S );
+
+                    const auto  max_k = math::log10( S(0) );
+                    const auto  min_k = math::log10( S(S.length()-1) );
+                    const auto  h_gap = scale_x * is.size() * 0.05;
+                    const auto  v_gap = scale_y * 0.05;
+
+                    prn.save();
+
+                    prn.translate( scale_x * is.first() + h_gap, scale_y * (level+1) - v_gap );
+                    prn.scale( ( scale_x * is.size() - 2.0 * h_gap ) / double( S.length() ),
+                               -( scale_y - 2.0 * v_gap ) / ( max_k - min_k + 1.0 ) );
+
+                    prn.set_rgb( 32,74,135 ); // SkyBlue3
+                    
+                    auto  y_last = real_t(-1);
+                    
+                    for ( idx_t  i = 0; i < idx_t( S.length() ); i++ )
+                    {
+                        const auto  y = math::log10( S(i) ) - min_k + 1;
+
+                        if ( y > 0.0 )
+                        {
+                            if ( y_last >= real_t(0) )
+                                prn.draw_line( double(i)-0.5, y_last, double(i)+0.5, y );
+                        }// if
+
+                        y_last = y;
+                    }// for
+
+                    prn.restore();
+                }// if
+                
+                if ( ! contains( optarr, "norank" ) )
+                {
+                    std::ostringstream  srank;
+
+                    srank << clb->rank();
+                
+                    prn.save();
+
+                    if ( text_col != 0 )
+                        prn.set_gray( text_col );
+                    
+                    prn.set_font( "Helvetica", fn_size );
+                    prn.draw_text( scale_x * (is.first() + is.last() + 1) / 2.0,
+                                   scale_y * (level + 0.5) + fn_size * 0.4,
+                                   srank.str(),
+                                   'c' );
+                
+                    prn.restore();
+                }// if
+            }// if
+            
+            prn.draw_rect( scale_x * is.first(),    scale_y * level,
+                           scale_x * (is.last()+1), scale_y * ( level+1 ) );
+
+            for ( uint  i = 0; i < clb->nsons(); ++i )
+            {
+                if ( clb->son( i ) != nullptr )
+                    sons.push_back( clb->son( i ) );
+            }// for
+        }// while
+
+        bases = std::move( sons );
+
+        ++level;
+    }// while
+    
+    prn.end();
+}
+
+template void print_eps< cluster_basis< float > >                  ( const cluster_basis< float > & ,
+                                                                     const std::string &,
+                                                                     const std::string & );
+
+template void print_eps< cluster_basis< double > >                 ( const cluster_basis< double > & ,
+                                                                     const std::string &,
+                                                                     const std::string & );
+
+template void print_eps< cluster_basis< std::complex< float > > >  ( const cluster_basis< std::complex< float > > & ,
+                                                                     const std::string &,
+                                                                     const std::string & );
+
+template void print_eps< cluster_basis< std::complex< double > > > ( const cluster_basis< std::complex< double > > & ,
+                                                                     const std::string &,
+                                                                     const std::string & );
 
 }}// namespace hlr::matrix

@@ -1521,7 +1521,9 @@ sv ( const matrix< value_t > &  U,
 
     return S;
 }
-    
+
+using HLIB::BLAS::sv;
+
 }}// namespace hlr::blas
 
 #endif // __HLR_ARITH_BLAS_HH

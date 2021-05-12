@@ -42,6 +42,15 @@ print_mem_eps ( const hpro::TMatrix &  M,
                 const std::string &    filename,
                 const std::string &    options = "default" );
 
+//
+// print cluster basis <cl> to file <filename>
+//
+template < typename cluster_basis_t >
+void
+print_eps ( const cluster_basis_t &  cb,
+            const std::string &      filename,
+            const std::string &      options = "default" );
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_PRINT_HH

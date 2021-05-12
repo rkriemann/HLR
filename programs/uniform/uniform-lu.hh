@@ -24,12 +24,17 @@
 using namespace hlr;
 
 namespace hlr { namespace uniform { namespace accu2 {
-double  t_basis      = 0.0;
-double  t_apply      = 0.0;
-double  t_eval       = 0.0;
-double  t_eval_uni   = 0.0;
-double  t_eval_rest  = 0.0;
-double  t_eval_rec   = 0.0;
+double  t_basis       = 0.0;
+double  t_apply       = 0.0;
+double  t_apply_uni   = 0.0;
+double  t_apply_dense = 0.0;
+double  t_eval        = 0.0;
+double  t_eval_uni    = 0.0;
+double  t_eval_rest   = 0.0;
+double  t_eval_rec    = 0.0;
+size_t  n_inner       = 0;
+size_t  n_prodA       = 0;
+size_t  n_prodB       = 0;
 }}}
 
 namespace hlr { namespace uniform { namespace accu3 {

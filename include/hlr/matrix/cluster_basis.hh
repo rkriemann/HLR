@@ -194,6 +194,18 @@ public:
 
         return  n;
     }
+
+    // return depth of cluster basis
+    size_t
+    depth () const
+    {
+        size_t  d = 0;
+
+        for ( auto  son : _sons )
+            d = std::max( d, son->depth() );
+
+        return d+1;
+    }
 };
 
 }} // namespace hlr::matrix

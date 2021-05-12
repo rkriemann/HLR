@@ -34,15 +34,27 @@ namespace timer = HLIB::Time::Wall;
 
 extern double  t_basis;
 extern double  t_apply;
+extern double  t_apply_uni;
+extern double  t_apply_dense;
 extern double  t_eval;
 extern double  t_eval_uni;
 extern double  t_eval_rest;
 extern double  t_eval_rec;
-    
+extern size_t  n_inner;
+extern size_t  n_prodA;
+extern size_t  n_prodB;
+
 namespace detail
 {
 
+// maps index set to set of blocks sharing it
 using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
+
+// maps index set to product U×V' of inner matrix product
+using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
+
+// maps τ×σ to product A×U or V'×B with U/V from uniform matrices
+using  prod_map_t    = std::unordered_map< block_indexset, blas::matrix< hpro::real >, block_indexset_hash >;
 
 struct accumulator
 {
@@ -66,17 +78,33 @@ struct accumulator
     // accumulated pending (recursive) updates
     update_list                        pending;
 
+    // cached products
+    inner_map_t *                      prod_inner;
+    prod_map_t *                       prod_A;
+    prod_map_t *                       prod_B;
+    
     //
     // ctors
     //
 
-    accumulator ()
+    accumulator ( inner_map_t *                        aprod_inner = nullptr,
+                  prod_map_t *                         aprod_A     = nullptr,
+                  prod_map_t *                         aprod_B     = nullptr )
+            : prod_inner( aprod_inner )
+            , prod_A( aprod_A )
+            , prod_B( aprod_B )
     {}
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
-                  update_list &&                       apending )
+                  update_list &&                       apending,
+                  inner_map_t *                        aprod_inner = nullptr,
+                  prod_map_t *                         aprod_A     = nullptr,
+                  prod_map_t *                         aprod_B     = nullptr )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
+            , prod_inner( aprod_inner )
+            , prod_A( aprod_A )
+            , prod_B( aprod_B )
     {}
     
     //
@@ -177,7 +205,7 @@ struct accumulator
             }// for
         }// for
 
-        return accumulator{ std::move( U_ij ), std::move( P_ij ) };
+        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner, prod_A, prod_B };
     }
 
     //
@@ -284,7 +312,21 @@ struct accumulator
                         auto  V   = RA->col_basis( op_A );
                         auto  W   = RB->row_basis( op_B );
                         auto  T   = RB->coeff();
-                        auto  VW  = blas::prod( blas::adjoint( V ), W );
+                        auto  VW  = blas::matrix< value_t >();
+
+                        if ( ! is_null( prod_inner ) )
+                        {
+                            // store product if not present
+                            if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
+                                prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( V ), W ) ) );
+                            else
+                                n_inner++;
+
+                            VW = prod_inner->at( RA->col_is( op_A ) );
+                        }// if
+                        else
+                            VW = std::move( blas::prod( blas::adjoint( V ), W ) );
+                        
                         auto  SVW = blas::prod( blas::mat_view( op_A, S ), VW );
 
                         if ( coeff.nrows() > 0 )
@@ -326,7 +368,8 @@ struct accumulator
             //
             //   U ( Σ_i S_i V_i' ) × B = U ( Σ_i S_i ( V_i' × B ) )
             //                          = U ( Σ_i S_i X_i' ) with X_i = B' × V_i
-            //                          = U ( Σ_i (X_i S_i')' )
+            //                          = U ( Σ_i (X_i S_i'))'
+            //                          = U X'               with X   = Σ_i (X_i S_i')
             //
 
             if ( n_uniA >= 1 )
@@ -350,9 +393,28 @@ struct accumulator
                             X = std::move( blas::matrix< value_t >( M.ncols(), U.ncols() ) );
                         }// if
 
-                        auto  X_i = blas::matrix< value_t >( B->ncols(), V.ncols() );
+                        auto  X_i = blas::matrix< value_t >();
 
-                        hlr::multiply( alpha, blas::adjoint( op_B ), *B, V, X_i );
+                        if ( ! is_null( prod_B ) )
+                        {
+                            // store product if not present
+                            if ( prod_B->find( B->block_is( op_B ) ) == prod_B->end() )
+                            {
+                                X_i = std::move( blas::matrix< value_t >( B->ncols(), V.ncols() ) );
+                                hlr::multiply( alpha, blas::adjoint( op_B ), *B, V, X_i );
+                                
+                                prod_B->emplace( B->block_is( op_B ), std::move( X_i ) );
+                            }// if
+                            else
+                                n_prodB++;
+
+                            X_i = prod_B->at( B->block_is( op_B ) );
+                        }// if
+                        else
+                        {
+                            X_i = std::move( blas::matrix< value_t >( B->ncols(), V.ncols() ) );
+                            hlr::multiply( alpha, blas::adjoint( op_B ), *B, V, X_i );
+                        }// else
                     
                         blas::prod( value_t(1), X_i, blas::adjoint( S ), value_t(1), X );
                     }// if
@@ -361,7 +423,7 @@ struct accumulator
                 }// for
 
                 HLR_ASSERT( U.ncols() > 0 );
-            
+
                 // apply to accumulator
                 if ( is_null( matrix ) )
                     matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(),
@@ -407,10 +469,29 @@ struct accumulator
                             W = std::move( blas::matrix< value_t >( M.nrows(), V.ncols() ) );
                         }// if
 
-                        auto  W_i = blas::matrix< value_t >( A->nrows(), U.ncols() );
+                        auto  W_i = blas::matrix< value_t >();
 
-                        hlr::multiply( alpha, op_A, *A, U, W_i );
-                    
+                        if ( ! is_null( prod_A ) )
+                        {
+                            // store product if not present
+                            if ( prod_A->find( A->block_is( op_A ) ) == prod_A->end() )
+                            {
+                                W_i = std::move( blas::matrix< value_t >( A->nrows(), U.ncols() ) );
+                                hlr::multiply( alpha, op_A, *A, U, W_i );
+                                
+                                prod_A->emplace( A->block_is( op_A ), std::move( W_i ) );
+                            }// if
+                            else
+                                n_prodA++;
+
+                            W_i = prod_A->at( A->block_is( op_A ) );
+                        }// if
+                        else
+                        {
+                            W_i = std::move( blas::matrix< value_t >( A->nrows(), U.ncols() ) );
+                            hlr::multiply( alpha, op_A, *A, U, W_i );
+                        }// else
+
                         blas::prod( value_t(1), W_i, S, value_t(1), W );
                     }// if
                     else
@@ -679,8 +760,6 @@ multiply ( const value_t            alpha,
     // evaluate all computable updates to M
     //
 
-    // std::cout << M.id() << std::endl;
-
     ACCU2_TIC( eval );
     
     accu.eval( value_t(1), M, acc, approx );
@@ -721,12 +800,12 @@ multiply ( const value_t            alpha,
                                     std::move( blas::prod( UM->row_basis(), UM->coeff() ) ),
                                     std::move( blas::copy( UM->col_basis() ) ) );
 
-        ACCU2_TIC( apply );
+        ACCU2_TIC( apply_uni );
         
         // no recursive updates left, apply accumulated updates and solve
         accu.apply( alpha, R, acc, approx );
 
-        ACCU2_TOC( apply );
+        ACCU2_TOC( apply_uni );
         
         //
         // now replace M by R and update row/column bases
@@ -760,8 +839,12 @@ multiply ( const value_t            alpha,
     }// if
     else
     {
+        ACCU2_TIC( apply_dense );
+        
         accu.apply( alpha, M, acc, approx );
 
+        ACCU2_TOC( apply_dense );
+        
         // // DEBUG {
         // {
         //     auto  D1 = matrix::convert_to_dense< value_t >( M );
