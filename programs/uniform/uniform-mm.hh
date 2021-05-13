@@ -3,7 +3,7 @@
 // File        : uniform.hh
 // Description : program for testing uniform matrix arithmetic
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <hlr/seq/norm.hh>
@@ -19,7 +19,7 @@
 
 using namespace hlr;
 
-namespace hlr { namespace uniform { namespace accu2 {
+namespace hlr { namespace uniform { namespace accu {
 double  t_basis       = 0.0;
 double  t_apply       = 0.0;
 double  t_apply_uni   = 0.0;
@@ -28,6 +28,7 @@ double  t_eval        = 0.0;
 double  t_eval_uni    = 0.0;
 double  t_eval_rest   = 0.0;
 double  t_eval_rec    = 0.0;
+double  t_add_accu    = 0.0;
 size_t  n_inner       = 0;
 size_t  n_prodA       = 0;
 size_t  n_prodB       = 0;
@@ -180,7 +181,7 @@ program_main ()
         }
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
             
@@ -291,28 +292,30 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::accu2::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+            impl::uniform::accu::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
             
             toc = timer::since( tic );
             std::cout << "    done in   " << format_time( toc ) << std::endl;
-            std::cout << "      basis   " << format_time( hlr::uniform::accu2::t_basis ) << std::endl;
-            std::cout << "      apply   " << format_time( hlr::uniform::accu2::t_apply ) << std::endl;
-            std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_apply_uni ) << std::endl;
-            std::cout << "        dense " << format_time( hlr::uniform::accu2::t_apply_dense ) << std::endl;
-            std::cout << "      eval    " << format_time( hlr::uniform::accu2::t_eval ) << std::endl;
-            std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_eval_uni ) << std::endl;
-            std::cout << "        rest  " << format_time( hlr::uniform::accu2::t_eval_rest ) << std::endl;
-            std::cout << "        rec   " << format_time( hlr::uniform::accu2::t_eval_rec ) << std::endl;
+            std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
+            std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
+            std::cout << "        uni   " << format_time( hlr::uniform::accu::t_apply_uni ) << std::endl;
+            std::cout << "        dense " << format_time( hlr::uniform::accu::t_apply_dense ) << std::endl;
+            std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
+            std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
+            std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
+            std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
+            std::cout << "        add   " << format_time( hlr::uniform::accu::t_add_accu ) << std::endl;
             std::cout << "    mem    =  " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            hlr::uniform::accu2::t_basis = 0;
-            hlr::uniform::accu2::t_apply = 0;
-            hlr::uniform::accu2::t_apply_uni = 0;
-            hlr::uniform::accu2::t_apply_dense = 0;
-            hlr::uniform::accu2::t_eval = 0;
-            hlr::uniform::accu2::t_eval_uni = 0;
-            hlr::uniform::accu2::t_eval_rest = 0;
-            hlr::uniform::accu2::t_eval_rec = 0;
+            hlr::uniform::accu::t_basis = 0;
+            hlr::uniform::accu::t_apply = 0;
+            hlr::uniform::accu::t_apply_uni = 0;
+            hlr::uniform::accu::t_apply_dense = 0;
+            hlr::uniform::accu::t_eval = 0;
+            hlr::uniform::accu::t_eval_uni = 0;
+            hlr::uniform::accu::t_eval_rest = 0;
+            hlr::uniform::accu::t_eval_rec = 0;
+            hlr::uniform::accu::t_add_accu = 0;
             
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
 
@@ -325,7 +328,7 @@ program_main ()
             }// if
         }// if
 
-        if ( false )
+        if ( true )
         {
             std::cout << "  " << term::bullet << "accumulator (cached)" << term::reset << std::endl;
 
@@ -339,22 +342,22 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::accu2::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+            impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
             
             toc = timer::since( tic );
             std::cout << "    done in   " << format_time( toc ) << std::endl;
-            std::cout << "      basis   " << format_time( hlr::uniform::accu2::t_basis ) << std::endl;
-            std::cout << "      apply   " << format_time( hlr::uniform::accu2::t_apply ) << std::endl;
-            std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_apply_uni ) << std::endl;
-            std::cout << "        dense " << format_time( hlr::uniform::accu2::t_apply_dense ) << std::endl;
-            std::cout << "      eval    " << format_time( hlr::uniform::accu2::t_eval ) << std::endl;
-            std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_eval_uni ) << std::endl;
-            std::cout << "        rest  " << format_time( hlr::uniform::accu2::t_eval_rest ) << std::endl;
-            std::cout << "        rec   " << format_time( hlr::uniform::accu2::t_eval_rec ) << std::endl;
+            std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
+            std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
+            std::cout << "        uni   " << format_time( hlr::uniform::accu::t_apply_uni ) << std::endl;
+            std::cout << "        dense " << format_time( hlr::uniform::accu::t_apply_dense ) << std::endl;
+            std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
+            std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
+            std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
+            std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
             std::cout << "    hits      " << std::endl;
-            std::cout << "      inner   " << hlr::uniform::accu2::n_inner << std::endl;
-            std::cout << "      prodA   " << hlr::uniform::accu2::n_prodA << std::endl;
-            std::cout << "      prodB   " << hlr::uniform::accu2::n_prodB << std::endl;
+            std::cout << "      inner   " << hlr::uniform::accu::n_inner << std::endl;
+            std::cout << "      prodA   " << hlr::uniform::accu::n_prodA << std::endl;
+            std::cout << "      prodB   " << hlr::uniform::accu::n_prodB << std::endl;
             std::cout << "    mem    =  " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );

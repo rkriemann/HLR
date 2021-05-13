@@ -14,7 +14,6 @@
 #include <hlr/arith/detail/uniform.hh>
 #include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform_accu.hh>
-#include <hlr/arith/detail/uniform_accu2.hh>
 #include <hlr/arith/detail/uniform_accu3.hh>
 
 namespace hlr { namespace uniform {
@@ -216,26 +215,6 @@ namespace accu
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     hpro::TMatrix &          /* REF */ )
-{
-    auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( A );
-    auto  accu               = detail::accumulator();
-    
-    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
-}
-
-}// namespace accu
-
-
-namespace accu2
-{
-
-template < typename value_t,
-           typename approx_t >
-void
 multiply ( const value_t            alpha,
            const matop_t            op_A,
            const hpro::TMatrix &    A,
@@ -329,7 +308,7 @@ lu ( hpro::TMatrix &          A,
     detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
 }
 
-}// namespace accu2
+}// namespace accu
 
 
 namespace accu3

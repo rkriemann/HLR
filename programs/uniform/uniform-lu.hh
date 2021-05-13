@@ -23,7 +23,7 @@
 
 using namespace hlr;
 
-namespace hlr { namespace uniform { namespace accu2 {
+namespace hlr { namespace uniform { namespace accu {
 double  t_basis       = 0.0;
 double  t_apply       = 0.0;
 double  t_apply_uni   = 0.0;
@@ -32,6 +32,7 @@ double  t_eval        = 0.0;
 double  t_eval_uni    = 0.0;
 double  t_eval_rest   = 0.0;
 double  t_eval_rec    = 0.0;
+double  t_add_accu    = 0.0;
 size_t  n_inner       = 0;
 size_t  n_prodA       = 0;
 size_t  n_prodB       = 0;
@@ -282,7 +283,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulated" << term::reset << std::endl;
             
@@ -298,37 +299,12 @@ program_main ()
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
-                
-        io::eps::print( *LU, "H2LUa", prnopt );
-                
-        auto  A_inv = matrix::luinv_eval( *LU );
-                    
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
-    }// if
-
-    if ( true )
-    {
-        std::cout << "  " << term::bullet << term::bold << "accumulated v2" << term::reset << std::endl;
-            
-        auto  LU     = impl::matrix::copy( *A2 );
-        auto  rowcb2 = rowcb->copy();
-        auto  colcb2 = colcb->copy();
-                
-        matrix::replace_cluster_basis( *LU, *rowcb2, *colcb2 );
-                
-        tic = timer::now();
-                
-        impl::uniform::accu2::lu< value_t >( *LU, acc, apx, *REF );
-                
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        // std::cout << "      basis   " << format_time( hlr::uniform::accu2::t_basis ) << std::endl;
-        // std::cout << "      apply   " << format_time( hlr::uniform::accu2::t_apply ) << std::endl;
-        // std::cout << "      eval    " << format_time( hlr::uniform::accu2::t_eval ) << std::endl;
-        // std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_eval_uni ) << std::endl;
-        // std::cout << "        rest  " << format_time( hlr::uniform::accu2::t_eval_rest ) << std::endl;
-        // std::cout << "        rec   " << format_time( hlr::uniform::accu2::t_eval_rec ) << std::endl;
+        std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
+        std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
+        std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
+        std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
+        std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
+        std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
         std::cout << "    mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
                 
         io::eps::print( *LU, "H2LUa", prnopt );
@@ -362,12 +338,12 @@ program_main ()
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        // std::cout << "      basis   " << format_time( hlr::uniform::accu2::t_basis ) << std::endl;
-        // std::cout << "      apply   " << format_time( hlr::uniform::accu2::t_apply ) << std::endl;
-        // std::cout << "      eval    " << format_time( hlr::uniform::accu2::t_eval ) << std::endl;
-        // std::cout << "        uni   " << format_time( hlr::uniform::accu2::t_eval_uni ) << std::endl;
-        // std::cout << "        rest  " << format_time( hlr::uniform::accu2::t_eval_rest ) << std::endl;
-        // std::cout << "        rec   " << format_time( hlr::uniform::accu2::t_eval_rec ) << std::endl;
+        // std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
+        // std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
+        // std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
+        // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
+        // std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
+        // std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
         std::cout << "    mem L  = " << format_mem( L->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
         std::cout << "    mem U  = " << format_mem( U->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
                 

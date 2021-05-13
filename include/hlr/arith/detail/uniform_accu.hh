@@ -8,6 +8,11 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <boost/format.hpp>
+
+#include <hpro/base/System.hh>
+
+#include <hlr/arith/multiply.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/detail/uniform.hh>
@@ -20,10 +25,37 @@
 
 namespace hlr { namespace uniform { namespace accu {
 
+namespace timer = HLIB::Time::Wall;
+
+// #define HLR_UNIFORM_ACCU_TIC( t )    auto  __tic ## t = timer::now()
+// #define HLR_UNIFORM_ACCU_TOC( t )  { auto  __toc ## t = timer::since( __tic ## t ); t_ ## t += __toc ## t.seconds(); }
+#define HLR_UNIFORM_ACCU_TIC( t )  {}
+#define HLR_UNIFORM_ACCU_TOC( t )  {}
+
+extern double  t_basis;
+extern double  t_apply;
+extern double  t_apply_uni;
+extern double  t_apply_dense;
+extern double  t_eval;
+extern double  t_eval_uni;
+extern double  t_eval_rest;
+extern double  t_eval_rec;
+extern double  t_add_accu;
+extern size_t  n_inner;
+extern size_t  n_prodA;
+extern size_t  n_prodB;
+
 namespace detail
 {
 
+// maps index set to set of blocks sharing it
 using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
+
+// maps index set to product U×V' of inner matrix product
+using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
+
+// maps τ×σ to product A×U or V'×B with U/V from uniform matrices
+using  prod_map_t    = std::unordered_map< block_indexset, blas::matrix< hpro::real >, block_indexset_hash >;
 
 struct accumulator
 {
@@ -47,17 +79,33 @@ struct accumulator
     // accumulated pending (recursive) updates
     update_list                        pending;
 
+    // cached products
+    inner_map_t *                      prod_inner;
+    prod_map_t *                       prod_A;
+    prod_map_t *                       prod_B;
+    
     //
     // ctors
     //
 
-    accumulator ()
+    accumulator ( inner_map_t *                        aprod_inner = nullptr,
+                  prod_map_t *                         aprod_A     = nullptr,
+                  prod_map_t *                         aprod_B     = nullptr )
+            : prod_inner( aprod_inner )
+            , prod_A( aprod_A )
+            , prod_B( aprod_B )
     {}
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
-                  update_list &&                       apending )
+                  update_list &&                       apending,
+                  inner_map_t *                        aprod_inner = nullptr,
+                  prod_map_t *                         aprod_A     = nullptr,
+                  prod_map_t *                         aprod_B     = nullptr )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
+            , prod_inner( aprod_inner )
+            , prod_A( aprod_A )
+            , prod_B( aprod_B )
     {}
     
     //
@@ -79,6 +127,25 @@ struct accumulator
     }
 
     //
+    // add update A×B
+    //
+    void
+    add_update ( const hpro::TMatrix &  A,
+                 const hpro::TMatrix &  B )
+    {
+        pending.push_back( { apply_normal, &A, apply_normal, &B } );
+    }
+
+    void
+    add_update ( const matop_t          op_A,
+                 const hpro::TMatrix &  A,
+                 const matop_t          op_B,
+                 const hpro::TMatrix &  B )
+    {
+        pending.push_back( { op_A, &A, op_B, &B } );
+    }
+    
+    //
     // apply accumulated updates and free accumulator matrix
     //
     template < typename value_t,
@@ -98,6 +165,7 @@ struct accumulator
     //
     // return restriction of updates to block (i,j) of given block matrix
     //
+    template < typename value_t >
     accumulator
     restrict ( const uint                  i,
                const uint                  j,
@@ -111,6 +179,10 @@ struct accumulator
             HLR_ASSERT( ! is_null( M.block( i, j ) ) );
             
             U_ij = hlr::matrix::restrict( *matrix, M.block( i, j )->block_is() );
+
+            // prefer dense if destination is dense
+            if ( check_dense( *M.block( i, j ) ) && ! is_dense( *U_ij ) )
+                U_ij = std::move( hlr::matrix::convert_to_dense< value_t >( *U_ij ) );
         }// if
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
@@ -134,12 +206,13 @@ struct accumulator
             }// for
         }// for
 
-        return accumulator{ std::move( U_ij ), std::move( P_ij ) };
+        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner, prod_A, prod_B };
     }
 
     //
     // return restriction of updates to all sub blocks of given block matrix
     //
+    template < typename value_t >
     tensor2< accumulator >
     restrict ( const hpro::TBlockMatrix &  M ) const
     {
@@ -151,7 +224,7 @@ struct accumulator
             {
                 HLR_ASSERT( ! is_null( M.block( i, j ) ) );
 
-                sub_accu(i,j) = restrict( i, j, M );
+                sub_accu(i,j) = restrict< value_t >( i, j, M );
             }// for
         }// for
 
@@ -164,99 +237,472 @@ struct accumulator
     template < typename value_t,
                typename approx_t >
     void
-    eval ( const value_t            alpha,
-           const hpro::TMatrix &    M,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
+    eval ( const value_t                    alpha,
+           const hpro::TMatrix &            M,
+           const hpro::TTruncAcc &          acc,
+           const approx_t &                 approx )
     {
-        std::unique_ptr< hpro::TBlockMatrix >  BC; // for recursive handling
+        auto  BC = std::unique_ptr< hpro::TBlockMatrix >(); // for recursive handling
+
+        bool  handle_dense = check_dense( M );
 
         //
-        // handle all, actually computable updates, i.e., one factor is a leaf block
+        // count types of uniform updates
         //
-    
+
+        size_t  n_uni  = 0;
+        size_t  n_uniA = 0;
+        size_t  n_uniB = 0;
+        
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             if ( is_blocked_all( *A, *B, M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( matrix::is_uniform_lowrank_all( A, B ) )
             {
-                //
-                // if M is a leaf and A _and_ B are blocked, a temporary matrix
-                // is created for further recursive update handling
-                //
-
-                if ( ! is_null( BC ) )
-                    continue;
-                
-                // TODO: non low-rank M
-                if ( ! ( is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
-                    HLR_ERROR( "unsupported matrix type: " + M.typestr() );
-                
-                auto  BA = cptrcast( A, hpro::TBlockMatrix );
-                auto  BB = cptrcast( B, hpro::TBlockMatrix );
-                
-                BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
-
-                BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
-
-                for ( uint  i = 0; i < BC->nblock_rows(); ++i )
-                {
-                    for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-                    {
-                        HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
-                        
-                        BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                  BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                  hpro::value_type_v< value_t > ) );
-                    }// for
-                }// for
+                n_uni++;
+                n_uniA++;
+                n_uniB++;
             }// if
-            else
+            else if ( matrix::is_uniform_lowrank( A ) )
+                n_uniA++;
+            else if ( matrix::is_uniform_lowrank( B ) )
+                n_uniB++;
+            else if ( is_dense_all( A, B ) ||
+                      ( is_blocked( A ) && is_dense(   B ) ) ||
+                      ( is_dense(   A ) && is_blocked( B ) ))
             {
-                //
-                // compute update (either A or B is a leaf)
-                //
-
-                auto  T = std::unique_ptr< hpro::TMatrix >();
-
-                if ( is_dense_all( A, B ) ||
-                     ( is_blocked( A ) && is_dense( B ) ) ||
-                     ( is_blocked( B ) && is_dense( A ) ))
-                    T = std::make_unique< hpro::TDenseMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
-                else
-                    T = std::make_unique< hpro::TRkMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
-
-                hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
-
-                //
-                // apply update to accumulator
-                //
-            
-                if ( is_null( matrix ) )
-                {
-                    matrix = std::move( T );
-                }// if
-                else if ( ! is_dense( *matrix ) && is_dense( *T ) )
-                {
-                    // prefer dense format to avoid unnecessary truncations
-                    hlr::add( value_t(1), *matrix, *T, acc, approx );
-                    matrix = std::move( T );
-                }// if
-                else
-                {
-                    hlr::add( value_t(1), *T, *matrix, acc, approx );
-                }// else
-            }// else
+                handle_dense = true;
+                break;
+            }// if
         }// for
 
+        // std::cout << M.id() << " : " << n_uni << " / " << n_uniA << " / " << n_uniB << std::endl;
+        
+        decltype( pending )  remaining;
+
+        if ( ! handle_dense )
+        {
+            HLR_UNIFORM_ACCU_TIC( eval_uni );
+            
+            //
+            // first uniform x uniform only as only coefficients need to be added without
+            // truncation due to shared bases:
+            //
+            //   U ( Σ_i S_i X_i' W_i T_i ) V' = U R V'  with R = Σ_i S_i X_i' W_i T_i
+            //
+
+            auto  U = blas::matrix< value_t >();
+            auto  V = blas::matrix< value_t >();
+            auto  R = blas::matrix< value_t >();
+
+            if ( n_uni >= 1 )
+            {
+                n_uniA -= n_uni;
+                n_uniB -= n_uni;
+            
+                for ( auto  [ op_A, A, op_B, B ] : pending )
+                {
+                    if ( matrix::is_uniform_lowrank_all( A, B ) )
+                    {
+                        auto  RA  = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                        auto  RB  = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
+
+                        auto  S   = RA->coeff();
+                        auto  X   = RA->col_basis( op_A );
+                        auto  W   = RB->row_basis( op_B );
+                        auto  T   = RB->coeff();
+                        auto  XW  = blas::matrix< value_t >();
+
+                        if ( ! is_null( prod_inner ) )
+                        {
+                            // store product if not present
+                            if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
+                                prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
+                            else
+                                n_inner++;
+
+                            XW = prod_inner->at( RA->col_is( op_A ) );
+                        }// if
+                        else
+                            XW = std::move( blas::prod( blas::adjoint( X ), W ) );
+                        
+                        auto  SXW = blas::prod( blas::mat_view( op_A, S ), XW );
+
+                        if ( R.nrows() > 0 )
+                        {
+                            blas::prod( value_t(1), SXW, blas::mat_view( op_B, T ), value_t(1), R );
+                        }// if
+                        else
+                        {
+                            U = RA->row_basis( op_A );
+                            V = RB->col_basis( op_B );
+                            R = std::move( blas::prod( SXW, blas::mat_view( op_B, T ) ) );
+                        }// else
+                    }// if
+                    else
+                        remaining.push_back( { op_A, A, op_B, B } );
+                }// for
+
+                HLR_ASSERT( U.ncols() > 0 );
+
+                // restrict to remaining updates
+                pending = std::move( remaining );
+            }// if
+        
+            //
+            // now handle all uniform x non-uniform
+            //
+            //   U ( Σ_i S_i X_i' ) × B_i = U ( Σ_i S_i ( X_i' × B_i ) )
+            //                            = U ( Σ_i S_i Z_i' )   with Z_i = B_i' × X_i
+            //                            = U ( Σ_i (Z_i B_i'))'
+            //                            = U Z'                 with Z   = Σ_i (Z_i S_i')
+            //
+
+            auto  Z = blas::matrix< value_t >();
+
+            if ( n_uniA >= 1 )
+            {
+                remaining.clear();
+            
+                for ( auto  [ op_A, A, op_B, B ] : pending )
+                {
+                    if ( matrix::is_uniform_lowrank( A ) )
+                    {
+                        auto  RA = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                        auto  S  = RA->coeff();
+                        auto  X  = RA->col_basis( op_A );
+
+                        if ( Z.ncols() == 0 )
+                        {
+                            U = RA->row_basis( op_A );
+                            Z = std::move( blas::matrix< value_t >( M.ncols(), U.ncols() ) );
+                        }// if
+
+                        auto  Z_i = blas::matrix< value_t >();
+
+                        if ( ! is_null( prod_B ) )
+                        {
+                            // store product if not present
+                            if ( prod_B->find( B->block_is( op_B ) ) == prod_B->end() )
+                            {
+                                Z_i = std::move( blas::matrix< value_t >( B->ncols(), X.ncols() ) );
+                                hlr::multiply( alpha, blas::adjoint( op_B ), *B, X, Z_i );
+                                
+                                prod_B->emplace( B->block_is( op_B ), std::move( Z_i ) );
+                            }// if
+                            else
+                                n_prodB++;
+
+                            Z_i = prod_B->at( B->block_is( op_B ) );
+                        }// if
+                        else
+                        {
+                            Z_i = std::move( blas::matrix< value_t >( B->ncols(), X.ncols() ) );
+                            hlr::multiply( alpha, blas::adjoint( op_B ), *B, X, Z_i );
+                        }// else
+                    
+                        blas::prod( value_t(1), Z_i, blas::adjoint( S ), value_t(1), Z );
+                    }// if
+                    else
+                        remaining.push_back( { op_A, A, op_B, B } );
+                }// for
+
+                HLR_ASSERT( Z.ncols() > 0 );
+
+                // restrict to remaining updates
+                pending = std::move( remaining );
+            }// if
+        
+            //
+            // now handle all non-uniform x uniform
+            //
+            //   A_i × ( Σ_i W_i S_i ) V' = ( Σ_i ( A_i × W_i ) S_i ) V'
+            //                            = ( Σ_i Y_i S_i ) V' with Y_i = A_i × W_i
+            //                            = ( Σ_i (Y_i S_i) ) V'
+            //                            = Y V'
+            //
+
+            auto  Y = blas::matrix< value_t >();
+
+            if ( n_uniB >= 1 )
+            {
+                remaining.clear();
+            
+                for ( auto  [ op_A, A, op_B, B ] : pending )
+                {
+                    if ( matrix::is_uniform_lowrank( B ) )
+                    {
+                        auto  RB = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
+                        auto  W  = RB->row_basis( op_B );
+                        auto  S  = RB->coeff();
+
+                        if ( Y.ncols() == 0 )
+                        {
+                            V = RB->col_basis( op_B );
+                            Y = std::move( blas::matrix< value_t >( M.nrows(), V.ncols() ) );
+                        }// if
+
+                        auto  Y_i = blas::matrix< value_t >();
+
+                        if ( ! is_null( prod_A ) )
+                        {
+                            // store product if not present
+                            if ( prod_A->find( A->block_is( op_A ) ) == prod_A->end() )
+                            {
+                                Y_i = std::move( blas::matrix< value_t >( A->nrows(), W.ncols() ) );
+                                hlr::multiply( alpha, op_A, *A, W, Y_i );
+                                
+                                prod_A->emplace( A->block_is( op_A ), std::move( Y_i ) );
+                            }// if
+                            else
+                                n_prodA++;
+
+                            Y_i = prod_A->at( A->block_is( op_A ) );
+                        }// if
+                        else
+                        {
+                            Y_i = std::move( blas::matrix< value_t >( A->nrows(), W.ncols() ) );
+                            hlr::multiply( alpha, op_A, *A, W, Y_i );
+                        }// else
+
+                        blas::prod( value_t(1), Y_i, S, value_t(1), Y );
+                    }// if
+                    else
+                        remaining.push_back( { op_A, A, op_B, B } );
+                }// for
+
+                HLR_ASSERT( Y.ncols() > 0 );
+            
+                // restrict to remaining updates
+                pending = std::move( remaining );
+            }// if
+
+            HLR_UNIFORM_ACCU_TOC( eval_uni );
+            
+            //
+            // sum up individual updates
+            //
+
+            HLR_UNIFORM_ACCU_TIC( add_accu );
+                    
+            if ( R.ncols() > 0 )
+            {
+                if ( Z.ncols() > 0 )
+                {
+                    // Z = Z + V·R'
+                    blas::prod( value_t(1), V, blas::adjoint( R ), value_t(1), Z );
+                }// if
+                else if ( Y.ncols() > 0 )
+                {
+                    // Y = Y + U·R
+                    blas::prod( value_t(1), U, R, value_t(1), Y );
+                }// if
+                else
+                {
+                    //
+                    // just update with U·R·V'
+                    //
+                    if ( is_null( matrix ) )
+                        matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(),
+                                                                      std::move( blas::prod( alpha, U, R ) ),
+                                                                      std::move( blas::copy( V ) ) );
+                    else
+                    {
+                        auto  US = blas::prod( alpha, U, R );
+                        auto  T  = hpro::TRkMatrix( M.row_is(), M.col_is(), US, V );
+                
+                        hlr::add( alpha, T, *matrix, acc, approx );
+
+                    }// else
+                }// else
+            }// if
+
+            // if (( Z.ncols() > 0 ) && ( Y.ncols() > 0 ))
+            // {
+            //     auto  UY = blas::join_row< value_t >( { U, Y } );
+            //     auto  ZV = blas::join_row< value_t >( { Z, V } );
+                
+            //     if ( is_null( matrix ) )
+            //         matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( UY ), std::move( ZV ) );
+            //     else
+            //     {
+            //         auto  T = hpro::TRkMatrix( M.row_is(), M.col_is(), UY, ZV );
+                    
+            //         hlr::add( value_t(1), T, *matrix, acc, approx );
+            //     }// else
+            // }// if
+            if ( Z.ncols() > 0 )
+            {
+                if ( is_null( matrix ) )
+                    matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
+                else
+                {
+                    auto  T = hpro::TRkMatrix( M.row_is(), M.col_is(), U, Z );
+                    
+                    hlr::add( value_t(1), T, *matrix, acc, approx );
+                }// else
+            }// if
+            
+            if ( Y.ncols() > 0 )
+            {
+                if ( is_null( matrix ) )
+                    matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
+                else
+                {
+                    auto  T = hpro::TRkMatrix( M.row_is(), M.col_is(), Y, V );
+                    
+                    hlr::add( value_t(1), T, *matrix, acc, approx );
+                }// else
+            }// if
+
+            HLR_UNIFORM_ACCU_TOC( add_accu );
+        }// if
+
+        //
+        // handle remaining computable updates, i.e., one factor is a leaf block
+        //
+
+        {
+            HLR_UNIFORM_ACCU_TIC( eval_rest );
+            
+            for ( auto  [ op_A, A, op_B, B ] : pending )
+            {
+                if ( is_blocked_all( *A, *B, M ) )
+                    continue;
+        
+                if ( is_blocked_all( A, B ) )
+                {
+                    //
+                    // if M is a leaf and A _and_ B are blocked, a temporary matrix
+                    // is created for further recursive update handling
+                    //
+
+                    if ( ! is_null( BC ) )
+                        continue;
+                
+                    // TODO: non low-rank M
+                    if ( ! ( is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
+                        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+                
+                    auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                    auto  BB = cptrcast( B, hpro::TBlockMatrix );
+                
+                    BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
+
+                    BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
+
+                    for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+                    {
+                        for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                        {
+                            HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
+                        
+                            if ( handle_dense )
+                                BC->set_block( i, j, new hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                             BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                             hpro::value_type_v< value_t > ) );
+                            else
+                                BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                          BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                          hpro::value_type_v< value_t > ) );
+                        }// for
+                    }// for
+                }// if
+                else
+                {
+                    //
+                    // compute update (either A or B is a leaf)
+                    //
+
+                    auto  T = std::unique_ptr< hpro::TMatrix >();
+
+                    if ( handle_dense ||
+                         is_dense_all( A, B ) ||
+                         ( is_blocked( A ) && is_dense(   B ) ) ||
+                         ( is_dense(   A ) && is_blocked( B ) ))
+                        T = std::make_unique< hpro::TDenseMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                    else
+                    {
+                        std::cout << "!!! : " << M.id() << " : " << A->typestr() << " x " << B->typestr() << std::endl;
+                        T = std::make_unique< hpro::TRkMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                    }// else
+
+                    hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
+
+                    // if ( false & ( is_lowrank( *T ) && matrix::is_uniform_lowrank( M ) ))
+                    // {
+                    //     HLR_ASSERT( ( row_basis.nrows() > 0 ) && ( col_basis.nrows() > 0 ) );
+                        
+                    //     // check error when representing in local basis
+                    //     auto  R  = ptrcast( T.get(), hpro::TRkMatrix );
+                    //     auto  U  = blas::copy( blas::mat_U< value_t >( R ) );
+                    //     auto  V  = blas::copy( blas::mat_V< value_t >( R ) );
+
+                    //     io::matlab::write( U, "U" );
+                    //     io::matlab::write( V, "V" );
+
+                    //     io::matlab::write( row_basis, "W" );
+                    //     io::matlab::write( col_basis, "X" );
+                    
+                    //     auto  RU = blas::matrix< value_t >();
+                    //     auto  RV = blas::matrix< value_t >();
+
+                    //     blas::qr( U, RU );
+                    //     blas::qr( V, RV );
+
+                    //     // T = W W' U (X X' V)' = W W' U V' X X', with W being the row basis and X the column basis
+                    //     auto  TU  = blas::prod( blas::adjoint( row_basis ), U );
+                    //     auto  TV  = blas::prod( blas::adjoint( col_basis ), V );
+                    //     auto  S1  = blas::prod( RU, blas::adjoint( RV ) );
+                    //     auto  S2  = blas::prod( TU, S1 );
+                    //     auto  S   = blas::prod( S2, blas::adjoint( TV ) );
+
+                    //     auto  M1  = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
+                    //     auto  T2  = blas::prod( row_basis, S );
+                    //     auto  M2  = blas::prod( T2, blas::adjoint( col_basis ) );
+
+                    //     io::matlab::write( M1, "M1" );
+                    //     io::matlab::write( M2, "M2" );
+                    
+                    //     blas::add( value_t(-1), M1, M2 );
+                    //     std::cout << M.id() << " : " << boost::format( "%.4e" ) % blas::norm_F( M2 )
+                    //               << " / " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+                    // }// if
+                
+                    //
+                    // apply update to accumulator
+                    //
+            
+                    if ( is_null( matrix ) )
+                    {
+                        matrix = std::move( T );
+                    }// if
+                    else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+                    {
+                        // prefer dense format to avoid unnecessary truncations
+                        hlr::add( value_t(1), *matrix, *T, acc, approx );
+                        matrix = std::move( T );
+                    }// if
+                    else
+                    {
+                        hlr::add( value_t(1), *T, *matrix, acc, approx );
+                    }// else
+                }// else
+            }// for
+
+            HLR_UNIFORM_ACCU_TOC( eval_rest );
+        }
+        
         //
         // now handle recursive updates if M is a leaf block
         //
     
         if ( ! is_null( BC ) )
         {
+            HLR_UNIFORM_ACCU_TIC( eval_rec );
+            
             //
             // TODO: try with empty sub_mat, don't release U and add sub results later
             //
@@ -266,7 +712,7 @@ struct accumulator
             // (to release matrix before recursion)
             //
 
-            auto  sub_accu = restrict( *BC );
+            auto  sub_accu = restrict< value_t >( *BC );
 
             matrix.reset( nullptr );
         
@@ -278,7 +724,7 @@ struct accumulator
             {
                 for ( uint  j = 0; j < BC->nblock_cols(); ++j )
                 {
-                    sub_accu(i,j).eval< value_t >( alpha, *BC->block(i,j), acc, approx );
+                    sub_accu(i,j).eval( alpha, *BC->block(i,j), acc, approx );
 
                     // replace block in BC by accumulator matrix for agglomeration below
                     BC->delete_block( i, j );
@@ -290,10 +736,167 @@ struct accumulator
             // finally convert subblocks to single low-rank matrix for new accumulated updates
             //
 
-            matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
+            if ( handle_dense )
+                matrix = seq::matrix::convert_to_dense< value_t >( *BC );
+            else
+                matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
+
+            HLR_UNIFORM_ACCU_TOC( eval_rec );
         }// if
     }
+
+    //
+    // return true if given matrix is dense
+    //
+    bool
+    check_dense ( const hpro::TMatrix &  M ) const
+    {
+        // return false;
+        if ( is_dense( M ) )
+        {
+            return true;
+        }// if
+        else if ( is_blocked( M ) )
+        {
+            //
+            // test if all subblocks are dense
+            //
+
+            auto  B = cptrcast( &M, hpro::TBlockMatrix );
+
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( B->block( i, j ) ) && ! is_dense( B->block( i, j ) ) )
+                         return false;
+                }// for
+            }// for
+
+            return true;
+        }// if
+        else
+        {
+            return false;
+        }// else
+    }
 };
+
+//
+// recursive LU factorization
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           hpro::TMatrix &          M,
+           accumulator &            accu,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx,
+           const uniform_map_t &    rowmap,
+           const uniform_map_t &    colmap )
+           // hpro::TMatrix &          REF )
+{
+    //
+    // evaluate all computable updates to M
+    //
+
+    HLR_UNIFORM_ACCU_TIC( eval );
+    
+    accu.eval( value_t(1), M, acc, approx );
+    
+    HLR_UNIFORM_ACCU_TOC( eval );
+
+    //
+    // recurse
+    //
+
+    if ( is_blocked( M ) )
+    {
+        auto  BM       = ptrcast( &M, hpro::TBlockMatrix );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
+
+        accu.clear_matrix();
+
+        for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+            {
+                if ( is_null( BM->block( i, j ) ) )
+                    continue;
+
+                multiply( alpha, * BM->block( i, j ), sub_accu( i, j ),
+                          acc, approx, rowmap, colmap );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_uniform_lowrank( M ) )
+    {
+        //
+        // update local matrix as standard low-rank matrix
+        //
+
+        auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(),
+                                    std::move( blas::prod( UM->row_basis(), UM->coeff() ) ),
+                                    std::move( blas::copy( UM->col_basis() ) ) );
+
+        HLR_UNIFORM_ACCU_TIC( apply_uni );
+        
+        // no recursive updates left, apply accumulated updates and solve
+        accu.apply( alpha, R, acc, approx );
+
+        HLR_UNIFORM_ACCU_TOC( apply_uni );
+        
+        //
+        // now replace M by R and update row/column bases
+        //
+
+        HLR_UNIFORM_ACCU_TIC( basis );
+        
+        auto  W  = blas::mat_U< value_t >( R );
+        auto  X  = blas::mat_V< value_t >( R );
+        auto  RW = blas::matrix< value_t >();
+        auto  RX = blas::matrix< value_t >();
+
+        blas::qr( W, RW );
+        blas::qr( X, RX );
+
+        auto  T = blas::prod( RW, blas::adjoint( RX ) );
+                    
+        hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
+
+        HLR_UNIFORM_ACCU_TOC( basis );
+        
+        // // DEBUG {
+        // {
+        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
+        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
+            
+        //     hlr::add( value_t(-1), *D2, *D1 );
+        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+        // }
+        // // DEBUG }
+    }// if
+    else
+    {
+        HLR_UNIFORM_ACCU_TIC( apply_dense );
+        
+        accu.apply( alpha, M, acc, approx );
+
+        HLR_UNIFORM_ACCU_TOC( apply_dense );
+        
+        // // DEBUG {
+        // {
+        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
+        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
+            
+        //     hlr::add( value_t(-1), *D2, *D1 );
+        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
+        // }
+        // // DEBUG }
+    }// else
+}
 
 template < typename value_t,
            typename approx_t >
@@ -311,7 +914,11 @@ solve_lower_tri ( const eval_side_t        side,
     // std::cout << M.id() << std::endl;
     
     // apply computable updates
+    HLR_UNIFORM_ACCU_TIC( eval );
+
     accu.eval( value_t(1), M, acc, approx );
+
+    HLR_UNIFORM_ACCU_TOC( eval );
     
     if ( is_blocked_all( L, M ) )
     {
@@ -326,7 +933,7 @@ solve_lower_tri ( const eval_side_t        side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BM );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
 
         accu.clear_matrix();
 
@@ -342,8 +949,7 @@ solve_lower_tri ( const eval_side_t        side,
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                        sub_accu(k,j).pending.push_back( { apply_normal, BL->block(k,i),
-                                                           apply_normal, BM->block(i,j) } );
+                        sub_accu(k,j).add_update( *BL->block(k,i), *BM->block(i,j) );
             }// for
         }// if
         else
@@ -353,17 +959,20 @@ solve_lower_tri ( const eval_side_t        side,
     }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
-        #if 1
         //
         // update and solve local matrix
         //
 
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
         auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(), std::move( blas::prod( UM->row_basis(), UM->coeff() ) ), std::move( blas::copy( UM->col_basis() ) ) );
+
+        HLR_UNIFORM_ACCU_TIC( apply );
         
         // no recursive updates left, apply accumulated updates and solve
         accu.apply( value_t(-1), R, acc, approx );
 
+        HLR_UNIFORM_ACCU_TOC( apply );
+        
         hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
 
         // // DEBUG {
@@ -379,6 +988,8 @@ solve_lower_tri ( const eval_side_t        side,
         //
         // now replace M by R and update row/column bases
         //
+
+        HLR_UNIFORM_ACCU_TIC( basis );
         
         auto  W  = blas::mat_U< value_t >( R );
         auto  X  = blas::mat_V< value_t >( R );
@@ -391,6 +1002,8 @@ solve_lower_tri ( const eval_side_t        side,
         auto  T = blas::prod( RW, blas::adjoint( RX ) );
                     
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
+
+        HLR_UNIFORM_ACCU_TOC( basis );
         
         // // DEBUG {
         // {
@@ -401,60 +1014,6 @@ solve_lower_tri ( const eval_side_t        side,
         //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
         // }
         // // DEBUG }
-        #else
-        //
-        // update and solve local matrix
-        //
-
-        auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  R  = matrix::lrsmatrix< value_t >( UM->row_is(), UM->col_is(),
-                                                 blas::copy( UM->row_basis() ),
-                                                 blas::copy( UM->coeff() ),
-                                                 blas::copy( UM->col_basis() ) );
-        
-        // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), R, acc, approx );
-
-        hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
-
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( R );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-
-        //
-        // now replace M by R and update row/column bases
-        //
-        
-        auto  W  = R.U();
-        auto  T  = R.S();
-        auto  X  = R.V();
-        auto  RW = blas::matrix< value_t >();
-        auto  RX = blas::matrix< value_t >();
-
-        blas::qr( W, RW );
-        blas::qr( X, RX );
-
-        auto  T1 = blas::prod( RW, T );
-        auto  T2 = blas::prod( T1, blas::adjoint( RX ) );
-                    
-        hlr::uniform::detail::update_row_col_basis( *UM, W, T2, X, acc, approx, rowmap, colmap );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-        #endif
     }// if
     else
     {
@@ -488,9 +1047,13 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
     // std::cout << M.id() << std::endl;
+
+    HLR_UNIFORM_ACCU_TIC( eval );
     
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
+
+    HLR_UNIFORM_ACCU_TOC( eval );
     
     if ( is_blocked_all( U, M ) )
     {
@@ -505,7 +1068,7 @@ solve_upper_tri ( const eval_side_t        side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BM );
+        auto  sub_accu = accu.restrict< value_t >( *BM );
 
         accu.clear_matrix();
 
@@ -525,40 +1088,34 @@ solve_upper_tri ( const eval_side_t        side,
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                     for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        sub_accu(i,k).pending.push_back( { apply_normal, BM->block(i,j),
-                                                           apply_normal, BU->block(j,k) } );
+                        sub_accu(i,k).add_update( *BM->block(i,j), *BU->block(j,k) );
             }// for
         }// else
     }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
-        #if 1
         //
         // update and solve local matrix
         //
 
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
         auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
+
+        HLR_UNIFORM_ACCU_TIC( apply );
         
         // no recursive updates left, apply accumulated updates and solve
         accu.apply( value_t(-1), *R, acc, approx );
 
-        hlr::solve_upper_tri< value_t >( side, diag, U, *R, acc, approx );
+        HLR_UNIFORM_ACCU_TOC( apply );
 
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( R );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
+        hlr::solve_upper_tri< value_t >( side, diag, U, *R, acc, approx );
 
         //
         // now replace M by R and update row/column bases
         //
 
+        HLR_UNIFORM_ACCU_TIC( basis );
+        
         auto  W  = blas::mat_U< value_t >( *R );
         auto  X  = blas::mat_V< value_t >( *R );
         auto  RW = blas::matrix< value_t >();
@@ -571,69 +1128,7 @@ solve_upper_tri ( const eval_side_t        side,
         
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
         
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-        #else
-        //
-        // update and solve local matrix
-        //
-
-        auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  R  = matrix::lrsmatrix< value_t >( UM->row_is(), UM->col_is(),
-                                                 blas::copy( UM->row_basis() ),
-                                                 blas::copy( UM->coeff() ),
-                                                 blas::copy( UM->col_basis() ) );
-        
-        // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), R, acc, approx );
-
-        hlr::solve_upper_tri< value_t >( side, diag, U, R, acc, approx );
-
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( R );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-
-        //
-        // now replace M by R and update row/column bases
-        //
-
-        auto  W  = R.U();
-        auto  T  = R.S();
-        auto  X  = R.V();
-        auto  RW = blas::matrix< value_t >();
-        auto  RX = blas::matrix< value_t >();
-
-        blas::qr( W, RW );
-        blas::qr( X, RX );
-
-        auto  T1 = blas::prod( RW, T );
-        auto  T2 = blas::prod( T1, blas::adjoint( RX ) );
-        
-        hlr::uniform::detail::update_row_col_basis( *UM, W, T2, X, acc, approx, rowmap, colmap );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-        #endif
+        HLR_UNIFORM_ACCU_TOC( basis );
     }// if
     else
     {
@@ -672,8 +1167,12 @@ lu ( hpro::TMatrix &          A,
     //
 
     // std::cout << A.id() << std::endl;
+
+    HLR_UNIFORM_ACCU_TIC( eval );
     
     accu.eval( value_t(1), A, acc, approx );
+
+    HLR_UNIFORM_ACCU_TOC( eval );
 
     //
     // (recursive) LU factorization
@@ -691,7 +1190,7 @@ lu ( hpro::TMatrix &          A,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict( *BA );
+        auto  sub_accu = accu.restrict< value_t >( *BA );
 
         accu.clear_matrix();
 
@@ -725,8 +1224,7 @@ lu ( hpro::TMatrix &          A,
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
                 for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
                     if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
-                        sub_accu(j,l).pending.push_back( { apply_normal, BA->block( j, i ),
-                                                           apply_normal, BA->block( i, l ) } );
+                        sub_accu(j,l).add_update( *BA->block( j, i ), *BA->block( i, l ) );
         }// for
     }// if
     else if ( is_dense( A ) )

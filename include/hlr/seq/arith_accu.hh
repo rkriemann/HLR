@@ -31,10 +31,10 @@ namespace timer = HLIB::Time::Wall;
 extern double  t_apply;
 extern double  t_eval;
 
-// #define ACCU_TIC       auto  __tic = timer::now()
-// #define ACCU_TOC( t )  { auto  __toc = timer::since( __tic ); t += __toc.seconds(); }
-#define ACCU_TIC       {}
-#define ACCU_TOC( t )  {}
+// #define HLR_ACCU_TIC( t )    auto  __tic ## t = timer::now()
+// #define HLR_ACCU_TOC( t )  { auto  __toc ## t = timer::since( __tic ## t ); t_ ## t += __toc ## t.seconds(); }
+#define HLR_ACCU_TIC( t )  {}
+#define HLR_ACCU_TOC( t )  {}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -139,13 +139,11 @@ solve_lower_tri ( const eval_side_t        side,
                   const approx_t &         approx )
 {
     // apply computable updates
-    {
-    ACCU_TIC;
+    HLR_ACCU_TIC( eval );
 
     accu.eval( value_t(1), M, acc, approx );
 
-    ACCU_TOC( t_eval );
-    }
+    HLR_ACCU_TOC( eval );
     
     if ( is_blocked_all( L, M ) )
     {
@@ -186,13 +184,11 @@ solve_lower_tri ( const eval_side_t        side,
     else if ( is_lowrank( M ) )
     {
         // no recursive updates left, apply accumulated updates and solve
-        {
-        ACCU_TIC;
+        HLR_ACCU_TIC( apply );
         
         accu.apply( value_t(-1), M, acc, approx );
 
-        ACCU_TOC( t_apply );
-        }
+        HLR_ACCU_TOC( apply );
 
         hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
     }// if
@@ -217,13 +213,11 @@ solve_upper_tri ( const eval_side_t                   side,
                   const approx_t &                    approx )
 {
     // apply computable updates
-    {
-    ACCU_TIC;
+    HLR_ACCU_TIC( eval );
 
     accu.eval( value_t(1), M, acc, approx );
 
-    ACCU_TOC( t_eval );
-    }
+    HLR_ACCU_TOC( eval );
     
     if ( is_blocked_all( U, M ) )
     {
@@ -264,13 +258,11 @@ solve_upper_tri ( const eval_side_t                   side,
     else if ( is_lowrank( M ) )
     {
         // no recursive updates left, apply accumulated updates and solve
-        {
-        ACCU_TIC;
+        HLR_ACCU_TIC( apply );
         
         accu.apply( value_t(-1), M, acc, approx );
 
-        ACCU_TOC( t_apply );
-        }
+        HLR_ACCU_TOC( apply );
         
         hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
     }// if
@@ -295,13 +287,11 @@ lu ( hpro::TMatrix &          M,
     // evaluate all computable updates to M
     //
 
-    {
-    ACCU_TIC;
+    HLR_ACCU_TIC( eval );
 
     accu.eval( value_t(1), M, acc, approx );
 
-    ACCU_TOC( t_eval );
-    }
+    HLR_ACCU_TOC( eval );
     
     //
     // (recursive) LU factorization
