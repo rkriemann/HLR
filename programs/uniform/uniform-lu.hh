@@ -314,47 +314,47 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
     }// if
 
-    if ( true )
-    {
-        std::cout << "  " << term::bullet << term::bold << "accumulated v3" << term::reset << std::endl;
+    // if ( true )
+    // {
+    //     std::cout << "  " << term::bullet << term::bold << "accumulated v3" << term::reset << std::endl;
             
-        auto  A3     = impl::matrix::copy( *A2 );
-        auto  L      = impl::matrix::copy_ll( *A2 );
-        auto  U      = impl::matrix::copy_ur( *A2 );
-        auto  rowcbA = rowcb->copy();
-        auto  colcbA = colcb->copy();
-        auto  rowcbL = rowcb->copy();
-        auto  colcbL = colcb->copy();
-        auto  rowcbU = rowcb->copy();
-        auto  colcbU = colcb->copy();
+    //     auto  A3     = impl::matrix::copy( *A2 );
+    //     auto  L      = impl::matrix::copy_ll( *A2 );
+    //     auto  U      = impl::matrix::copy_ur( *A2 );
+    //     auto  rowcbA = rowcb->copy();
+    //     auto  colcbA = colcb->copy();
+    //     auto  rowcbL = rowcb->copy();
+    //     auto  colcbL = colcb->copy();
+    //     auto  rowcbU = rowcb->copy();
+    //     auto  colcbU = colcb->copy();
                 
-        matrix::replace_cluster_basis( *A3, *rowcbA, *colcbA );
-        matrix::replace_cluster_basis( *L, *rowcbL, *colcbL );
-        matrix::replace_cluster_basis( *U, *rowcbU, *colcbU );
+    //     matrix::replace_cluster_basis( *A3, *rowcbA, *colcbA );
+    //     matrix::replace_cluster_basis( *L, *rowcbL, *colcbL );
+    //     matrix::replace_cluster_basis( *U, *rowcbU, *colcbU );
                 
-        tic = timer::now();
+    //     tic = timer::now();
                 
-        impl::uniform::accu3::lu< value_t >( *A, *L, *U, acc, apx, *REF );
+    //     impl::uniform::accu3::lu< value_t >( *A, *L, *U, acc, apx, *REF );
                 
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        // std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
-        // std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
-        // std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
-        // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
-        // std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
-        // std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
-        std::cout << "    mem L  = " << format_mem( L->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
-        std::cout << "    mem U  = " << format_mem( U->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
+    //     toc = timer::since( tic );
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+    //     // std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
+    //     // std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
+    //     // std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
+    //     // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
+    //     // std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
+    //     // std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
+    //     std::cout << "    mem L  = " << format_mem( L->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
+    //     std::cout << "    mem U  = " << format_mem( U->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
                 
-        auto  L_inv  = matrix::triinv_eval( *L, blas::lower_triangular, unit_diag );
-        auto  U_inv  = matrix::triinv_eval( *U, blas::upper_triangular, general_diag );
-        auto  LU_inv = matrix::product( U_inv, L_inv );
+    //     auto  L_inv  = matrix::triinv_eval( *L, blas::lower_triangular, unit_diag );
+    //     auto  U_inv  = matrix::triinv_eval( *U, blas::upper_triangular, general_diag );
+    //     auto  LU_inv = matrix::product( U_inv, L_inv );
 
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, *LU_inv ) ) << std::endl;
+    //     std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, *LU_inv ) ) << std::endl;
         
-        // auto  A_inv = matrix::luinv_eval( *LU );
+    //     // auto  A_inv = matrix::luinv_eval( *LU );
                     
-        // std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
-    }// if
+    //     // std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
+    // }// if
 }

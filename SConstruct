@@ -624,6 +624,7 @@ if 'tbb' in frameworks :
     tbb = env.Clone()
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
+    tbb.Append( LIBS    = [ 'tbb' ] )
 
     for program in programs :
         name   = program + '-tbb'

@@ -15,6 +15,8 @@
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
+#include <hlr/arith/uniform.hh>
+#include <hlr/tbb/detail/uniform_accu.hh>
 
 namespace hlr { namespace tbb { namespace uniform {
 
@@ -264,6 +266,74 @@ multiply ( const value_t            alpha,
 {
     hlr::uniform::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc );
 }
+
+//////////////////////////////////////////////////////////////////////
+//
+// accumulator version
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace accu
+{
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const matop_t            op_A,
+           const hpro::TMatrix &    A,
+           const matop_t            op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
+    auto  inner_prod         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( nullptr );
+
+    accu.add_update( op_A, A, op_B, B );
+    
+    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply_cached ( const value_t            alpha,
+                  const matop_t            op_A,
+                  const hpro::TMatrix &    A,
+                  const matop_t            op_B,
+                  const hpro::TMatrix &    B,
+                  hpro::TMatrix &          C,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
+    auto  prod_inner         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( & prod_inner );
+
+    accu.add_update( op_A, A, op_B, B );
+    
+    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
+     hpro::TMatrix &          /* REF */ )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( A );
+    auto  inner_prod         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( & inner_prod );
+
+    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
+}
+
+}// namespace accu
 
 }}}// namespace hlr::tbb::uniform
 

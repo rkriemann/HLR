@@ -96,56 +96,6 @@ mul_vec_reduce ( const value_t                             alpha,
 //
 // compute C = C + α op( A ) op( B )
 //
-template < typename value_t >
-void
-multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
-           const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
-{
-    if ( is_blocked_all( A, B, C ) )
-    {
-        auto  BA = cptrcast( &A, TBlockMatrix );
-        auto  BB = cptrcast( &B, TBlockMatrix );
-        auto  BC = ptrcast(  &C, TBlockMatrix );
-
-        ::tbb::parallel_for(
-            ::tbb::blocked_range3d< size_t >( 0, BC->nblock_rows(),
-                                              0, BC->nblock_cols(),
-                                              0, BA->nblock_cols( op_A ) ),
-            [=,&acc] ( const auto &  r )
-            {
-                for ( auto  i = r.pages().begin(); i != r.pages().end(); ++i )
-                {
-                    for ( auto  j = r.rows().begin(); j != r.rows().end(); ++j )
-                    {
-                        for ( auto  l = r.cols().begin(); l != r.cols().end(); ++l )
-                        {
-                            auto  C_ij = BC->block( i, j );
-                            auto  A_il = BA->block( i, l, op_A );
-                            auto  B_lj = BB->block( l, j, op_B );
-                
-                            if ( is_null_any( A_il, B_lj ) )
-                                continue;
-                    
-                            HLR_ASSERT( ! is_null( C_ij ) );
-            
-                            multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc );
-                        }// for
-                    }// for
-                }// for
-            } );
-    }// if
-    else
-        hpro::multiply< value_t >( alpha, op_A, &A, op_B, &B, value_t(1), &C, acc );
-}
-
-//
-// compute C = C + α op( A ) op( B )
-//
 template < typename value_t,
            typename approx_t >
 void
@@ -629,10 +579,12 @@ lu_nd ( hpro::TMatrix &          A,
 // - T is used as temporary space and has to have the same
 //   structure as A
 //
+template < typename approx_t >
 inline void
 gauss_elim ( hpro::TMatrix &          A,
              hpro::TMatrix &          T,
-             const hpro::TTruncAcc &  acc )
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
 {
     assert( ! is_null_any( &A, &T ) );
     assert( A.type() == T.type() );
@@ -647,42 +599,46 @@ gauss_elim ( hpro::TMatrix &          A,
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        tbb::gauss_elim( *MA(0,0), *MT(0,0), acc );
+        tbb::gauss_elim( *MA(0,0), *MT(0,0), acc, approx );
 
         ::tbb::parallel_invoke(
             [&]
             { 
                 // T_01 = A_00⁻¹ · A_01
-                hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+                MT(0,1)->scale( 0.0 );
+                hlr::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), MT(0,1), acc, approx );
             },
 
             [&]
             {
                 // T_10 = A_10 · A_00⁻¹
-                hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+                MT(1,0)->scale( 0.0 );
+                hlr::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), MT(1,0), acc, approx );
             } );
 
         // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), MA(1,1), acc, approx );
     
         // A_11 = A_11⁻¹
-        gauss_elim( *MA(1,1), *MT(1,1), acc );
+        gauss_elim( *MA(1,1), *MT(1,1), acc, approx );
 
         ::tbb::parallel_invoke(
             [&]
             { 
                 // A_01 = - T_01 · A_11
-                hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+                MA(0,1)->scale( 0.0 );
+                hlr::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), MA(0,1), acc, approx );
             },
             
             [&]
             { 
                 // A_10 = - A_11 · T_10
-                hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+                MA(1,0)->scale( 0.0 );
+                hlr::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), MA(1,0), acc, approx );
             } );
 
         // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), MA(0,0), acc, approx );
     }// if
     else if ( is_dense( A ) )
     {

@@ -620,9 +620,9 @@ realloc ( hpro::TMatrix *  A )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &                          M,
-               const hlr::matrix::cluster_basis< value_t > &  rowcb,
-               const hlr::matrix::cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix &                    M,
+               hlr::matrix::cluster_basis< value_t > &  rowcb,
+               hlr::matrix::cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
