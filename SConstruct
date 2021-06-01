@@ -25,7 +25,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17'
+CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'

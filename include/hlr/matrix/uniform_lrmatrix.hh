@@ -88,6 +88,21 @@ public:
                        const indexset                   acol_is,
                        cluster_basis< value_t > &       arow_cb,
                        cluster_basis< value_t > &       acol_cb,
+                       hlr::blas::matrix< value_t > &   aS )
+            : TMatrix( hpro::value_type_v< value_t > )
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _row_cb( &arow_cb )
+            , _col_cb( &acol_cb )
+            , _S( blas::copy( aS ) )
+    {
+        set_ofs( _row_is.first(), _col_is.first() );
+    }
+
+    uniform_lrmatrix ( const indexset                   arow_is,
+                       const indexset                   acol_is,
+                       cluster_basis< value_t > &       arow_cb,
+                       cluster_basis< value_t > &       acol_cb,
                        hlr::blas::matrix< value_t > &&  aS )
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
@@ -112,8 +127,8 @@ public:
     uint                              row_rank () const { return _S.nrows(); }
     uint                              col_rank () const { return _S.ncols(); }
 
-    uint                              row_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_rank() : col_rank(); }
-    uint                              col_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_rank() : row_rank(); }
+    uint                              row_rank ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? row_rank() : col_rank(); }
+    uint                              col_rank ( const hpro::matop_t  op ) const { return op == hpro::apply_normal ? col_rank() : row_rank(); }
 
     cluster_basis< value_t > &        row_cb   () const { return *_row_cb; }
     cluster_basis< value_t > &        col_cb   () const { return *_col_cb; }

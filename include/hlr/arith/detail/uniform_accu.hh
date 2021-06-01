@@ -54,9 +54,6 @@ using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * 
 // maps index set to product U×V' of inner matrix product
 using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
 
-// maps τ×σ to product A×U or V'×B with U/V from uniform matrices
-using  prod_map_t    = std::unordered_map< block_indexset, blas::matrix< hpro::real >, block_indexset_hash >;
-
 struct accumulator
 {
     //
@@ -81,31 +78,21 @@ struct accumulator
 
     // cached products
     inner_map_t *                      prod_inner;
-    prod_map_t *                       prod_A;
-    prod_map_t *                       prod_B;
     
     //
     // ctors
     //
 
-    accumulator ( inner_map_t *                        aprod_inner = nullptr,
-                  prod_map_t *                         aprod_A     = nullptr,
-                  prod_map_t *                         aprod_B     = nullptr )
+    accumulator ( inner_map_t *                        aprod_inner = nullptr )
             : prod_inner( aprod_inner )
-            , prod_A( aprod_A )
-            , prod_B( aprod_B )
     {}
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
                   update_list &&                       apending,
-                  inner_map_t *                        aprod_inner = nullptr,
-                  prod_map_t *                         aprod_A     = nullptr,
-                  prod_map_t *                         aprod_B     = nullptr )
+                  inner_map_t *                        aprod_inner = nullptr )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
             , prod_inner( aprod_inner )
-            , prod_A( aprod_A )
-            , prod_B( aprod_B )
     {}
     
     //
@@ -206,7 +193,7 @@ struct accumulator
             }// for
         }// for
 
-        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner, prod_A, prod_B };
+        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner };
     }
 
     //
@@ -242,50 +229,48 @@ struct accumulator
            const hpro::TTruncAcc &          acc,
            const approx_t &                 approx )
     {
-        auto  BC = std::unique_ptr< hpro::TBlockMatrix >(); // for recursive handling
+        //
+        // first check for dense handling
+        //
 
         bool  handle_dense = check_dense( M );
 
-        //
-        // count types of uniform updates
-        //
-
-        size_t  n_uni  = 0;
-        size_t  n_uniA = 0;
-        size_t  n_uniB = 0;
-        
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
-                continue;
-        
-            if ( matrix::is_uniform_lowrank_all( A, B ) )
-            {
-                n_uni++;
-                n_uniA++;
-                n_uniB++;
-            }// if
-            else if ( matrix::is_uniform_lowrank( A ) )
-                n_uniA++;
-            else if ( matrix::is_uniform_lowrank( B ) )
-                n_uniB++;
-            else if ( is_dense_all( A, B ) ||
-                      ( is_blocked( A ) && is_dense(   B ) ) ||
-                      ( is_dense(   A ) && is_blocked( B ) ))
+            if ( is_dense_all( A, B ) ||
+                 ( is_blocked( A ) && is_dense(   B ) ) ||
+                 ( is_dense(   A ) && is_blocked( B ) ))
             {
                 handle_dense = true;
                 break;
             }// if
         }// for
-
-        // std::cout << M.id() << " : " << n_uni << " / " << n_uniA << " / " << n_uniB << std::endl;
         
-        decltype( pending )  remaining;
-
         if ( ! handle_dense )
         {
             HLR_UNIFORM_ACCU_TIC( eval_uni );
             
+            //
+            // filter out different variants of uniform factors
+            //
+            
+            update_list  pending_uniAB;
+            update_list  pending_uniA;
+            update_list  pending_uniB;
+        
+            auto  is_uniform_AB = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank_all( upd.A, upd.B ); };
+            auto  is_uniform_A  = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank( upd.A ); };
+            auto  is_uniform_B  = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank( upd.B ); };
+            
+            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniAB), is_uniform_AB );
+            std::erase_if( pending, is_uniform_AB );
+        
+            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniA), is_uniform_A );
+            std::erase_if( pending, is_uniform_A );
+        
+            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniB), is_uniform_B );
+            std::erase_if( pending, is_uniform_B );
+        
             //
             // first uniform x uniform only as only coefficients need to be added without
             // truncation due to shared bases:
@@ -297,59 +282,43 @@ struct accumulator
             auto  V = blas::matrix< value_t >();
             auto  R = blas::matrix< value_t >();
 
-            if ( n_uni >= 1 )
+            for ( auto  [ op_A, A, op_B, B ] : pending_uniAB )
             {
-                n_uniA -= n_uni;
-                n_uniB -= n_uni;
-            
-                for ( auto  [ op_A, A, op_B, B ] : pending )
+                auto  RA  = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                auto  RB  = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
+
+                auto  S   = RA->coeff();
+                auto  X   = RA->col_basis( op_A );
+                auto  W   = RB->row_basis( op_B );
+                auto  T   = RB->coeff();
+                auto  XW  = blas::matrix< value_t >();
+
+                if ( ! is_null( prod_inner ) )
                 {
-                    if ( matrix::is_uniform_lowrank_all( A, B ) )
-                    {
-                        auto  RA  = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
-                        auto  RB  = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
-
-                        auto  S   = RA->coeff();
-                        auto  X   = RA->col_basis( op_A );
-                        auto  W   = RB->row_basis( op_B );
-                        auto  T   = RB->coeff();
-                        auto  XW  = blas::matrix< value_t >();
-
-                        if ( ! is_null( prod_inner ) )
-                        {
-                            // store product if not present
-                            if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
-                                prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
-                            else
-                                n_inner++;
-
-                            XW = prod_inner->at( RA->col_is( op_A ) );
-                        }// if
-                        else
-                            XW = std::move( blas::prod( blas::adjoint( X ), W ) );
-                        
-                        auto  SXW = blas::prod( blas::mat_view( op_A, S ), XW );
-
-                        if ( R.nrows() > 0 )
-                        {
-                            blas::prod( value_t(1), SXW, blas::mat_view( op_B, T ), value_t(1), R );
-                        }// if
-                        else
-                        {
-                            U = RA->row_basis( op_A );
-                            V = RB->col_basis( op_B );
-                            R = std::move( blas::prod( SXW, blas::mat_view( op_B, T ) ) );
-                        }// else
-                    }// if
+                    // store product if not present
+                    if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
+                        prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
                     else
-                        remaining.push_back( { op_A, A, op_B, B } );
-                }// for
+                        n_inner++;
 
-                HLR_ASSERT( U.ncols() > 0 );
+                    XW = prod_inner->at( RA->col_is( op_A ) );
+                }// if
+                else
+                    XW = std::move( blas::prod( blas::adjoint( X ), W ) );
+                        
+                auto  SXW = blas::prod( blas::mat_view( op_A, S ), XW );
 
-                // restrict to remaining updates
-                pending = std::move( remaining );
-            }// if
+                if ( U.ncols() == 0 )
+                    U = RA->row_basis( op_A );
+
+                if ( V.ncols() == 0 )
+                    V = RB->col_basis( op_B );
+                
+                if ( R.nrows() == 0 )
+                    R = std::move( blas::prod( SXW, blas::mat_view( op_B, T ) ) );
+                else 
+                    blas::prod( value_t(1), SXW, blas::mat_view( op_B, T ), value_t(1), R );
+            }// for
         
             //
             // now handle all uniform x non-uniform
@@ -362,58 +331,23 @@ struct accumulator
 
             auto  Z = blas::matrix< value_t >();
 
-            if ( n_uniA >= 1 )
+            for ( auto  [ op_A, A, op_B, B ] : pending_uniA )
             {
-                remaining.clear();
-            
-                for ( auto  [ op_A, A, op_B, B ] : pending )
-                {
-                    if ( matrix::is_uniform_lowrank( A ) )
-                    {
-                        auto  RA = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
-                        auto  S  = RA->coeff();
-                        auto  X  = RA->col_basis( op_A );
+                auto  RA = cptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                auto  S  = RA->coeff();
+                auto  X  = RA->col_basis( op_A );
 
-                        if ( Z.ncols() == 0 )
-                        {
-                            U = RA->row_basis( op_A );
-                            Z = std::move( blas::matrix< value_t >( M.ncols(), U.ncols() ) );
-                        }// if
+                if ( U.ncols() == 0 )
+                    U = RA->row_basis( op_A );
+                
+                if ( Z.ncols() == 0 )
+                    Z = std::move( blas::matrix< value_t >( M.ncols(), U.ncols() ) );
 
-                        auto  Z_i = blas::matrix< value_t >();
+                auto  Z_i = std::move( blas::matrix< value_t >( B->ncols(), X.ncols() ) );
 
-                        if ( ! is_null( prod_B ) )
-                        {
-                            // store product if not present
-                            if ( prod_B->find( B->block_is( op_B ) ) == prod_B->end() )
-                            {
-                                Z_i = std::move( blas::matrix< value_t >( B->ncols(), X.ncols() ) );
-                                hlr::multiply( alpha, blas::adjoint( op_B ), *B, X, Z_i );
-                                
-                                prod_B->emplace( B->block_is( op_B ), std::move( Z_i ) );
-                            }// if
-                            else
-                                n_prodB++;
-
-                            Z_i = prod_B->at( B->block_is( op_B ) );
-                        }// if
-                        else
-                        {
-                            Z_i = std::move( blas::matrix< value_t >( B->ncols(), X.ncols() ) );
-                            hlr::multiply( alpha, blas::adjoint( op_B ), *B, X, Z_i );
-                        }// else
-                    
-                        blas::prod( value_t(1), Z_i, blas::adjoint( S ), value_t(1), Z );
-                    }// if
-                    else
-                        remaining.push_back( { op_A, A, op_B, B } );
-                }// for
-
-                HLR_ASSERT( Z.ncols() > 0 );
-
-                // restrict to remaining updates
-                pending = std::move( remaining );
-            }// if
+                hlr::multiply( alpha, blas::adjoint( op_B ), *B, X, Z_i );
+                blas::prod( value_t(1), Z_i, blas::adjoint( S ), value_t(1), Z );
+            }// for
         
             //
             // now handle all non-uniform x uniform
@@ -426,58 +360,23 @@ struct accumulator
 
             auto  Y = blas::matrix< value_t >();
 
-            if ( n_uniB >= 1 )
+            for ( auto  [ op_A, A, op_B, B ] : pending_uniB )
             {
-                remaining.clear();
-            
-                for ( auto  [ op_A, A, op_B, B ] : pending )
-                {
-                    if ( matrix::is_uniform_lowrank( B ) )
-                    {
-                        auto  RB = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
-                        auto  W  = RB->row_basis( op_B );
-                        auto  S  = RB->coeff();
+                auto  RB = cptrcast( B, matrix::uniform_lrmatrix< value_t > );
+                auto  W  = RB->row_basis( op_B );
+                auto  S  = RB->coeff();
 
-                        if ( Y.ncols() == 0 )
-                        {
-                            V = RB->col_basis( op_B );
-                            Y = std::move( blas::matrix< value_t >( M.nrows(), V.ncols() ) );
-                        }// if
+                if ( V.ncols() == 0 )
+                    V = RB->col_basis( op_B );
+                    
+                if ( Y.ncols() == 0 )
+                    Y = std::move( blas::matrix< value_t >( M.nrows(), V.ncols() ) );
 
-                        auto  Y_i = blas::matrix< value_t >();
+                auto  Y_i = std::move( blas::matrix< value_t >( A->nrows(), W.ncols() ) );
 
-                        if ( ! is_null( prod_A ) )
-                        {
-                            // store product if not present
-                            if ( prod_A->find( A->block_is( op_A ) ) == prod_A->end() )
-                            {
-                                Y_i = std::move( blas::matrix< value_t >( A->nrows(), W.ncols() ) );
-                                hlr::multiply( alpha, op_A, *A, W, Y_i );
-                                
-                                prod_A->emplace( A->block_is( op_A ), std::move( Y_i ) );
-                            }// if
-                            else
-                                n_prodA++;
-
-                            Y_i = prod_A->at( A->block_is( op_A ) );
-                        }// if
-                        else
-                        {
-                            Y_i = std::move( blas::matrix< value_t >( A->nrows(), W.ncols() ) );
-                            hlr::multiply( alpha, op_A, *A, W, Y_i );
-                        }// else
-
-                        blas::prod( value_t(1), Y_i, S, value_t(1), Y );
-                    }// if
-                    else
-                        remaining.push_back( { op_A, A, op_B, B } );
-                }// for
-
-                HLR_ASSERT( Y.ncols() > 0 );
-            
-                // restrict to remaining updates
-                pending = std::move( remaining );
-            }// if
+                hlr::multiply( alpha, op_A, *A, W, Y_i );
+                blas::prod( value_t(1), Y_i, S, value_t(1), Y );
+            }// for
 
             HLR_UNIFORM_ACCU_TOC( eval_uni );
             
@@ -564,136 +463,136 @@ struct accumulator
         // handle remaining computable updates, i.e., one factor is a leaf block
         //
 
-        {
-            HLR_UNIFORM_ACCU_TIC( eval_rest );
+        auto  BC = std::unique_ptr< hpro::TBlockMatrix >(); // for recursive handling
+
+        HLR_UNIFORM_ACCU_TIC( eval_rest );
             
-            for ( auto  [ op_A, A, op_B, B ] : pending )
-            {
-                if ( is_blocked_all( *A, *B, M ) )
-                    continue;
+        for ( auto  [ op_A, A, op_B, B ] : pending )
+        {
+            if ( is_blocked_all( *A, *B, M ) )
+                continue;
         
-                if ( is_blocked_all( A, B ) )
+            if ( is_blocked_all( A, B ) )
+            {
+                //
+                // if M is a leaf and A _and_ B are blocked, a temporary matrix
+                // is created for further recursive update handling
+                //
+
+                if ( ! is_null( BC ) )
+                    continue;
+                
+                // TODO: non low-rank M
+                if ( ! ( is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
+                    HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+                
+                auto  BA = cptrcast( A, hpro::TBlockMatrix );
+                auto  BB = cptrcast( B, hpro::TBlockMatrix );
+                
+                BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
+
+                BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
+
+                for ( uint  i = 0; i < BC->nblock_rows(); ++i )
                 {
-                    //
-                    // if M is a leaf and A _and_ B are blocked, a temporary matrix
-                    // is created for further recursive update handling
-                    //
-
-                    if ( ! is_null( BC ) )
-                        continue;
-                
-                    // TODO: non low-rank M
-                    if ( ! ( is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
-                        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
-                
-                    auto  BA = cptrcast( A, hpro::TBlockMatrix );
-                    auto  BB = cptrcast( B, hpro::TBlockMatrix );
-                
-                    BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
-
-                    BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
-
-                    for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BC->nblock_cols(); ++j )
                     {
-                        for ( uint  j = 0; j < BC->nblock_cols(); ++j )
-                        {
-                            HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
+                        HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                         
-                            if ( handle_dense )
-                                BC->set_block( i, j, new hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                             BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                             hpro::value_type_v< value_t > ) );
-                            else
-                                BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                          BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                          hpro::value_type_v< value_t > ) );
-                        }// for
+                        if ( handle_dense )
+                            BC->set_block( i, j, new hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                         BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                         hpro::value_type_v< value_t > ) );
+                        else
+                            BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                      BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                      hpro::value_type_v< value_t > ) );
                     }// for
+                }// for
+            }// if
+            else
+            {
+                //
+                // compute update (either A or B is a leaf)
+                //
+
+                auto  T = std::unique_ptr< hpro::TMatrix >();
+
+                if ( handle_dense ||
+                     is_dense_all( A, B ) ||
+                     ( is_blocked( A ) && is_dense(   B ) ) ||
+                     ( is_dense(   A ) && is_blocked( B ) ))
+                    T = std::make_unique< hpro::TDenseMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                else
+                {
+                    std::cout << "!!! : " << M.id() << " : " << A->typestr() << " x " << B->typestr() << std::endl;
+                    T = std::make_unique< hpro::TRkMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                }// else
+
+                hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
+
+                // if ( false & ( is_lowrank( *T ) && matrix::is_uniform_lowrank( M ) ))
+                // {
+                //     HLR_ASSERT( ( row_basis.nrows() > 0 ) && ( col_basis.nrows() > 0 ) );
+                        
+                //     // check error when representing in local basis
+                //     auto  R  = ptrcast( T.get(), hpro::TRkMatrix );
+                //     auto  U  = blas::copy( blas::mat_U< value_t >( R ) );
+                //     auto  V  = blas::copy( blas::mat_V< value_t >( R ) );
+
+                //     io::matlab::write( U, "U" );
+                //     io::matlab::write( V, "V" );
+
+                //     io::matlab::write( row_basis, "W" );
+                //     io::matlab::write( col_basis, "X" );
+                    
+                //     auto  RU = blas::matrix< value_t >();
+                //     auto  RV = blas::matrix< value_t >();
+
+                //     blas::qr( U, RU );
+                //     blas::qr( V, RV );
+
+                //     // T = W W' U (X X' V)' = W W' U V' X X', with W being the row basis and X the column basis
+                //     auto  TU  = blas::prod( blas::adjoint( row_basis ), U );
+                //     auto  TV  = blas::prod( blas::adjoint( col_basis ), V );
+                //     auto  S1  = blas::prod( RU, blas::adjoint( RV ) );
+                //     auto  S2  = blas::prod( TU, S1 );
+                //     auto  S   = blas::prod( S2, blas::adjoint( TV ) );
+
+                //     auto  M1  = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
+                //     auto  T2  = blas::prod( row_basis, S );
+                //     auto  M2  = blas::prod( T2, blas::adjoint( col_basis ) );
+
+                //     io::matlab::write( M1, "M1" );
+                //     io::matlab::write( M2, "M2" );
+                    
+                //     blas::add( value_t(-1), M1, M2 );
+                //     std::cout << M.id() << " : " << boost::format( "%.4e" ) % blas::norm_F( M2 )
+                //               << " / " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+                // }// if
+                
+                //
+                // apply update to accumulator
+                //
+            
+                if ( is_null( matrix ) )
+                {
+                    matrix = std::move( T );
+                }// if
+                else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+                {
+                    // prefer dense format to avoid unnecessary truncations
+                    hlr::add( value_t(1), *matrix, *T, acc, approx );
+                    matrix = std::move( T );
                 }// if
                 else
                 {
-                    //
-                    // compute update (either A or B is a leaf)
-                    //
-
-                    auto  T = std::unique_ptr< hpro::TMatrix >();
-
-                    if ( handle_dense ||
-                         is_dense_all( A, B ) ||
-                         ( is_blocked( A ) && is_dense(   B ) ) ||
-                         ( is_dense(   A ) && is_blocked( B ) ))
-                        T = std::make_unique< hpro::TDenseMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
-                    else
-                    {
-                        std::cout << "!!! : " << M.id() << " : " << A->typestr() << " x " << B->typestr() << std::endl;
-                        T = std::make_unique< hpro::TRkMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
-                    }// else
-
-                    hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
-
-                    // if ( false & ( is_lowrank( *T ) && matrix::is_uniform_lowrank( M ) ))
-                    // {
-                    //     HLR_ASSERT( ( row_basis.nrows() > 0 ) && ( col_basis.nrows() > 0 ) );
-                        
-                    //     // check error when representing in local basis
-                    //     auto  R  = ptrcast( T.get(), hpro::TRkMatrix );
-                    //     auto  U  = blas::copy( blas::mat_U< value_t >( R ) );
-                    //     auto  V  = blas::copy( blas::mat_V< value_t >( R ) );
-
-                    //     io::matlab::write( U, "U" );
-                    //     io::matlab::write( V, "V" );
-
-                    //     io::matlab::write( row_basis, "W" );
-                    //     io::matlab::write( col_basis, "X" );
-                    
-                    //     auto  RU = blas::matrix< value_t >();
-                    //     auto  RV = blas::matrix< value_t >();
-
-                    //     blas::qr( U, RU );
-                    //     blas::qr( V, RV );
-
-                    //     // T = W W' U (X X' V)' = W W' U V' X X', with W being the row basis and X the column basis
-                    //     auto  TU  = blas::prod( blas::adjoint( row_basis ), U );
-                    //     auto  TV  = blas::prod( blas::adjoint( col_basis ), V );
-                    //     auto  S1  = blas::prod( RU, blas::adjoint( RV ) );
-                    //     auto  S2  = blas::prod( TU, S1 );
-                    //     auto  S   = blas::prod( S2, blas::adjoint( TV ) );
-
-                    //     auto  M1  = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
-                    //     auto  T2  = blas::prod( row_basis, S );
-                    //     auto  M2  = blas::prod( T2, blas::adjoint( col_basis ) );
-
-                    //     io::matlab::write( M1, "M1" );
-                    //     io::matlab::write( M2, "M2" );
-                    
-                    //     blas::add( value_t(-1), M1, M2 );
-                    //     std::cout << M.id() << " : " << boost::format( "%.4e" ) % blas::norm_F( M2 )
-                    //               << " / " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
-                    // }// if
-                
-                    //
-                    // apply update to accumulator
-                    //
-            
-                    if ( is_null( matrix ) )
-                    {
-                        matrix = std::move( T );
-                    }// if
-                    else if ( ! is_dense( *matrix ) && is_dense( *T ) )
-                    {
-                        // prefer dense format to avoid unnecessary truncations
-                        hlr::add( value_t(1), *matrix, *T, acc, approx );
-                        matrix = std::move( T );
-                    }// if
-                    else
-                    {
-                        hlr::add( value_t(1), *T, *matrix, acc, approx );
-                    }// else
+                    hlr::add( value_t(1), *T, *matrix, acc, approx );
                 }// else
-            }// for
+            }// else
+        }// for
 
-            HLR_UNIFORM_ACCU_TOC( eval_rest );
-        }
+        HLR_UNIFORM_ACCU_TOC( eval_rest );
         
         //
         // now handle recursive updates if M is a leaf block

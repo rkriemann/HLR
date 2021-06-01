@@ -247,9 +247,6 @@ multiply_cached ( const value_t            alpha,
 {
     auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( C );
     auto  prod_inner         = detail::inner_map_t();
-    auto  prod_A             = detail::prod_map_t();
-    auto  prod_B             = detail::prod_map_t();
-    // auto  accu               = detail::accumulator( & prod_inner, & prod_A, & prod_B );
     auto  accu               = detail::accumulator( & prod_inner );
 
     accu.add_update( op_A, A, op_B, B );

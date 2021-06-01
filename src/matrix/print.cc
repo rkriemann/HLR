@@ -473,7 +473,7 @@ print_eps ( const cluster_basis_t &  cb,
     eps_printer    prn( out );
 
     const uint    depth     = uint( cb.depth() );
-    const uint    size      = uint( cb.cluster().size() );
+    const uint    size      = uint( cb.is().size() );
     const double  max_x     = 500.0;
     const double  scale_x   = max_x / double(size);
     const double  scale_y   = std::min( 500.0 / double(depth+1), 20.0 );
@@ -490,8 +490,8 @@ print_eps ( const cluster_basis_t &  cb,
 
         for ( auto  clb : bases )
         {
-            const indexset  is      = clb->cluster();
-            const double    fn_size = std::min( 5.0, scale_x * double(is.size()) / 2.0 );
+            const auto    is      = clb->is();
+            const double  fn_size = std::min( 5.0, scale_x * double(is.size()) / 2.0 );
 
             if ( clb->rank() != 0 )
             {

@@ -311,56 +311,6 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
-        //
-        // reference: Hpro
-        //
-
-        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
-        {
-            std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
-
-            std::vector< double >  runtime, flops;
-
-            auto  C   = impl::matrix::copy( *A );
-        
-            for ( int i = 0; i < nbench; ++i )
-            {
-                C->scale( 0 );
-            
-                blas::reset_flops();
-
-                tic = timer::now();
-        
-                LIKWID_MARKER_START( "hmm" );
-            
-                hpro::multiply( value_t(1), apply_normal, A.get(), apply_normal, A.get(), value_t(1), C.get(), acc );
-
-                LIKWID_MARKER_STOP( "hmm" );
-            
-                toc = timer::since( tic );
-                std::cout << "      mult in  " << format_time( toc ) << std::endl;
-
-                flops.push_back( get_flops( "mm" ) );
-                runtime.push_back( toc.seconds() );
-            }// for
-        
-            // std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
-
-            if ( nbench > 1 )
-                std::cout << "    runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
-
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
-
-            std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) ) << std::endl; //  / norm_AxA
-        }// if
-
-        //
-        // standard recursion with immediate updates
-        //
-
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
@@ -377,53 +327,6 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
-        {
-            std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
-
-            std::vector< double >  runtime, flops;
-            auto                   old_config = hpro::CFG::Arith::use_accu;
-
-            hpro::CFG::Arith::use_accu = true;
-        
-            auto  C   = impl::matrix::copy( *A );
-        
-            for ( int i = 0; i < nbench; ++i )
-            {
-                C->scale( 0 );
-            
-                blas::reset_flops();
-
-                tic = timer::now();
-        
-                LIKWID_MARKER_START( "hmm" );
-            
-                hpro::multiply_accu( value_t(1), apply_normal, A.get(), apply_normal, A.get(), value_t(1), C.get(), acc );
-
-                LIKWID_MARKER_STOP( "hmm" );
-            
-                toc = timer::since( tic );
-                std::cout << "      mult in  " << format_time( toc ) << std::endl;
-
-                flops.push_back( get_flops( "mm" ) );
-                runtime.push_back( toc.seconds() );
-            }// for
-        
-            hpro::CFG::Arith::use_accu = old_config;
-
-            // std::cout     << "    flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
-
-            if ( nbench > 1 )
-                std::cout << "    runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
-
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
-
-            std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) ) << std::endl; //  / norm_AxA
-        }
-
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
         if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );

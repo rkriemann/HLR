@@ -180,8 +180,7 @@ build_matrix_map ( const cluster_tree &   ct,
 //
 // Construct total cluster basis X_t:
 //
-//    X_t = [ X_1, X_2, ... ]
-//        = [ U_1 · C_1^H, U_2 · C_2^H, ... ]
+//    X_t = [ X₁, X₂, … ] = [ U₁·C₁', U₂·C₂',  … ]
 //
 // with C_i from  Q_i C_i = qr( V_i )
 //
@@ -208,11 +207,11 @@ construct_basis ( const cluster_tree &  ct,
     {
         //
         // first, construct column basis for each block and store coefficients, e.g.,
-        // for M, compute M = U·V^H = U·(P·C)^H with orthogonal P and store C
+        // for M, compute M = U·V' = U·(P·C)' with orthogonal P and store C
         //
 
-        std::list< blas::matrix< value_t > >  condensed_mat;
-        uint                                  rank_sum = 0;
+        auto  condensed_mat = std::list< blas::matrix< value_t > >();
+        uint  rank_sum      = 0;
         
         for ( auto  M : mat_map[ ct ] )
         {
@@ -220,14 +219,6 @@ construct_basis ( const cluster_tree &  ct,
             {
                 auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
 
-                // {
-                //     auto  T = blas::prod( value_t(1), Q, C );
-
-                //     blas::add( value_t(-1), V< value_t >( M, adjoint ), T );
-
-                //     std::cout << blas::norm_F( T ) << std::endl;
-                // }
-                
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
             }// if
@@ -238,10 +229,10 @@ construct_basis ( const cluster_tree &  ct,
             //
             // build X_t, the total cluster basis
             //
-            //  X_t = [ U₀·C₀^H, U₁·C₁^H, ... ]
+            //  X_t = [ U₀·C₀', U₁·C₁', … ]
             //
             
-            blas::matrix< value_t >  Xt( ct.size(), rank_sum );
+            auto   Xt     = blas::matrix< value_t >( ct.size(), rank_sum );
 
             auto   iter_M = mat_map[ ct ].begin();
             auto   iter_C = condensed_mat.begin();
@@ -254,10 +245,11 @@ construct_basis ( const cluster_tree &  ct,
 
                 if ( M->rank() > 0 )
                 {
-                    auto  X_i    = blas::prod( U< value_t >( M, adjoint ), blas::adjoint( C ) );
-                    auto  cols_i = blas::range( pos, pos + X_i.ncols() - 1 );
-                    auto  X_sub  = blas::matrix< value_t >( Xt, blas::range::all, cols_i );
-
+                    auto  X_i   = blas::prod( U< value_t >( M, adjoint ), blas::adjoint( C ) );
+                    auto  X_sub = blas::matrix< value_t >( Xt,
+                                                           blas::range::all,
+                                                           blas::range( pos, pos + X_i.ncols() - 1 ) );
+                    
                     blas::copy( X_i, X_sub );
 
                     pos += X_i.ncols();
@@ -271,17 +263,7 @@ construct_basis ( const cluster_tree &  ct,
             // approximate basis up to given accuracy and update cluster basis
             //
 
-            // hpro::DBG::write( Xt, "Xt.mat", "Xt" );
-            
             auto  [ Q, R ] = blas::factorise_ortho( Xt, acc );
-
-            // {
-            //     auto  T = blas::prod( value_t(1), Q, R );
-
-            //     blas::add( value_t(-1), Xt, T );
-
-            //     std::cout << hpro::to_string( "%.6e", blas::norm_F( T ) / blas::norm_F( Xt ) ) << std::endl;
-            // }
                 
             cb->set_basis( std::move( Q ) );
         }// if

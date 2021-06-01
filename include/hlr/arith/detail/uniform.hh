@@ -603,28 +603,28 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
     //
     // compute new row basis of
     //
-    //   (U·S_1· V_1'  U·S_2·V_2'  ...  U·S_j·V_j'  W·T·X')
+    //   (U·S₁·V₁'  U·S₂·V₂'  …  U·S_j·V_j'  W·T·X')
     //
-    //    = (U W) ⎛S_1·V_1'  S_2·V_2' ... S_j·V_j'  0  ⎞
-    //            ⎝   0         0            0     T·X'⎠
+    //    = (U W) ⎛S₁·V₁'  S₂·V₂' …  S_j·V_j'  0  ⎞
+    //            ⎝  0       0          0     T·X'⎠
     //
-    //    = (U W) ⎛V_1·S_1'  0  ⎞'
-    //            ⎜V_2·S_2'  0  ⎟
-    //            ⎜      ...    ⎟
+    //    = (U W) ⎛V₁·S₁'    0  ⎞'
+    //            ⎜V₂·S₂'    0  ⎟
+    //            ⎜      …      ⎟
     //            ⎜V_j·S_j'  0  ⎟
     //            ⎝   0     X·T'⎠
     //
-    //    = (U W) ⎛⎛V_1              ⎞ ⎛S_1'  0 ⎞⎞'
-    //            ⎜⎜    V_2          ⎟ ⎜S_2'  0 ⎟⎟
-    //            ⎜⎜        ...      ⎟·⎜   ...  ⎟⎟
-    //            ⎜⎜            V_j  ⎟ ⎜S_j'  0 ⎟⎟
-    //            ⎝⎝                X⎠ ⎝ 0    T'⎠⎠
+    //    = (U W) ⎛⎛V₁         ⎞ ⎛S₁'   0 ⎞⎞'
+    //            ⎜⎜  V₂       ⎟ ⎜S₂'   0 ⎟⎟
+    //            ⎜⎜    …      ⎟·⎜   ...  ⎟⎟
+    //            ⎜⎜      V_j  ⎟ ⎜S_j'  0 ⎟⎟
+    //            ⎝⎝          X⎠ ⎝ 0    T'⎠⎠
     //
     // Since V_i and X are orthogonal, one can skip those for bases computation.
     // Compute QR factorization
     //
-    //   Q·R = ⎛S_1' 0 ⎞ = S
-    //         ⎜S_2' 0 ⎟
+    //   Q·R = ⎛S₁' 0 ⎞ = S
+    //         ⎜S₂' 0 ⎟
     //         ⎜  ...  ⎟
     //         ⎜S_j' 0 ⎟
     //         ⎝ 0   T'⎠
@@ -746,26 +746,26 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
     //
     // compute new column basis
     //
-    //   ⎛U_1 S_1 V'⎞' 
-    //   ⎜U_2 S_2 V'⎟
-    //   ⎜  ...     ⎟ = (V X) ⎛S_1'·U_1' S_2'·U_2' ... S_j'·U_j'   0  ⎞
-    //   ⎜U_j S_j V'⎟         ⎝    0         0             0     T'·W'⎠
+    //   ⎛ U₁·S₁·V' ⎞' 
+    //   ⎜ U₂·S₂·V' ⎟
+    //   ⎜  ...     ⎟ = (V X) ⎛S₁'·U₁' S₂'·U₂' ... S_j'·U_j'   0  ⎞
+    //   ⎜U_j S_j V'⎟         ⎝   0       0            0     T'·W'⎠
     //   ⎝  W T X'  ⎠
     //
-    //                = (V X) ⎛U_1·S_1⎞'   (V X) ⎛⎛U_1           ⎞⎛S_1⎞⎞'
-    //                        ⎜U_2·S_2⎟          ⎜⎜   U_2        ⎟⎜S_2⎟⎟
-    //                        ⎜  ...  ⎟  =       ⎜⎜      ...     ⎟⎜...⎟⎟
-    //                        ⎜U_j·S_j⎟          ⎜⎜         U_j  ⎟⎜S_j⎟⎟
-    //                        ⎝  W·T  ⎠          ⎝⎝             W⎠⎝ T ⎠⎠
+    //                = (V X) ⎛ U₁·S₁ ⎞'   (V X) ⎛⎛U₁         ⎞⎛S₁ ⎞⎞'
+    //                        ⎜ U₂·S₂ ⎟          ⎜⎜  U₂       ⎟⎜S₂ ⎟⎟
+    //                        ⎜  ...  ⎟  =       ⎜⎜    ...    ⎟⎜...⎟⎟
+    //                        ⎜U_j·S_j⎟          ⎜⎜       U_j ⎟⎜S_j⎟⎟
+    //                        ⎝  W·T  ⎠          ⎝⎝          W⎠⎝ T ⎠⎠
     //
     // Since U_* and W are orthogonal, one can skip those for bases computation.
     // Compute QR factorization
     //
-    //   Q·R = ⎛S_1  0⎞ = S
-    //         ⎜S_2  0⎟
-    //         ⎜ ...  ⎟
-    //         ⎜S_j  0⎟
-    //         ⎝ 0   T⎠
+    //   Q·R = ⎛S₁  0⎞ = S
+    //         ⎜S₂  0⎟
+    //         ⎜ ... ⎟
+    //         ⎜S_j 0⎟
+    //         ⎝ 0  T⎠
     //
     // and finally column basis of
     //

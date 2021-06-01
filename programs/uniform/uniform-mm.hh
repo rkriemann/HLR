@@ -59,7 +59,6 @@ program_main ()
 
     auto  runtime = std::vector< double >();
     auto  prnopt  = "noid";
-    auto  tic     = timer::now();
     auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -75,6 +74,8 @@ program_main ()
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
+
+    auto  tic    = timer::now();
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     // auto  A      = io::hpro::read( "A.hm" );
     auto  toc    = timer::since( tic );
@@ -95,6 +96,29 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // directly build uniform matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    {
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        
+        {
+            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+            auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error ) << std::endl;
+        }
+    }
+    
     //////////////////////////////////////////////////////////////////////
     //
     // conversion to uniform
@@ -150,7 +174,7 @@ program_main ()
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << "eager" << term::reset << std::endl;
             
@@ -181,7 +205,7 @@ program_main ()
         }
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
             
@@ -278,7 +302,7 @@ program_main ()
         //     std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
         // }// if
 
-        if ( true )
+        if ( false )
         {
             std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
 
