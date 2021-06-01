@@ -244,18 +244,38 @@ struct accumulator
             update_list  pending_uniA;
             update_list  pending_uniB;
         
-            auto  is_uniform_AB = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank_all( upd.A, upd.B ); };
-            auto  is_uniform_A  = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank( upd.A ); };
-            auto  is_uniform_B  = [] ( auto &  upd ) { return hlr::matrix::is_uniform_lowrank( upd.B ); };
+            for ( auto  it = pending.begin(); it != pending.end(); )
+            {
+                if ( hlr::matrix::is_uniform_lowrank_all( (*it).A, (*it).B ) )
+                {
+                    pending_uniAB.push_back( *it );
+                    it = pending.erase( it );
+                }// if
+                else
+                    ++it;
+            }// for
             
-            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniAB), is_uniform_AB );
-            std::erase_if( pending, is_uniform_AB );
-        
-            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniA), is_uniform_A );
-            std::erase_if( pending, is_uniform_A );
-        
-            std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_uniB), is_uniform_B );
-            std::erase_if( pending, is_uniform_B );
+            for ( auto  it = pending.begin(); it != pending.end(); )
+            {
+                if ( hlr::matrix::is_uniform_lowrank( (*it).A ) )
+                {
+                    pending_uniA.push_back( *it );
+                    it = pending.erase( it );
+                }// if
+                else
+                    ++it;
+            }// for
+
+            for ( auto  it = pending.begin(); it != pending.end(); )
+            {
+                if ( hlr::matrix::is_uniform_lowrank( (*it).B ) )
+                {
+                    pending_uniB.push_back( *it );
+                    it = pending.erase( it );
+                }// if
+                else
+                    ++it;
+            }// for
 
             //
             // initialize matrices
@@ -413,11 +433,17 @@ struct accumulator
         
         update_list  pending_comp;
         
-        auto  is_computable = [] ( auto &  upd ) { return ! is_blocked_all( upd.A, upd.B ); };
+        for ( auto  it = pending.begin(); it != pending.end(); )
+        {
+            if ( ! is_blocked_all( (*it).A, (*it).B ) )
+            {
+                pending_comp.push_back( *it );
+                it = pending.erase( it );
+            }// if
+            else
+                ++it;
+        }// for
         
-        std::copy_if( std::begin(pending), std::end(pending), std::back_inserter(pending_comp), is_computable );
-        std::erase_if( pending, is_computable );
-
         if ( ! pending_comp.empty() )
         {
             std::vector< update >  vpending;
