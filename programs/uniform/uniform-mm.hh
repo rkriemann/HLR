@@ -205,7 +205,7 @@ program_main ()
         }
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
             

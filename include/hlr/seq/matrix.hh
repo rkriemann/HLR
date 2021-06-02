@@ -213,9 +213,6 @@ build_uniform ( const hpro::TBlockCluster *  bct,
     using lrmat_map_t   = std::unordered_map< indexset, std::list< hpro::TRkMatrix * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< hpro::idx_t, hpro::TBlockMatrix * >;
 
-    size_t  base_mem = hpro::Mem::usage();
-    size_t  max_mem  = hpro::Mem::usage();
-
     //
     // TODO: argument for approximation object
     //
@@ -776,8 +773,6 @@ build_uniform ( const hpro::TBlockCluster *  bct,
         // now convert all blocks on this level
         //
 
-        max_mem = std::max( max_mem, hpro::Mem::usage() );
-        
         for ( auto  R : lrmat )
         {
             auto  rowcb = rowcb_map.at( R->row_is() );
@@ -816,8 +811,6 @@ build_uniform ( const hpro::TBlockCluster *  bct,
         }// for
     }// while
 
-    std::cout << max_mem - base_mem << std::endl;
-    
     return { std::move( rowcb_root ),
              std::move( colcb_root ),
              std::move( M_root ) };
