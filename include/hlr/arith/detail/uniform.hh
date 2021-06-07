@@ -106,11 +106,11 @@ std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
                     const scalar_vector< value_t > &  v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.rank() > 0 )
     {
-        auto  v_cb = blas::vector< value_t >( blas::vec< value_t >( v ), cb.cluster() - v.ofs() );
+        auto  v_cb = blas::vector< value_t >( blas::vec< value_t >( v ), cb.is() - v.ofs() );
         auto  s    = cb.transform_forward( v_cb );
 
         u->set_coeffs( std::move( s ) );
@@ -132,7 +132,7 @@ template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 make_uniform ( const cluster_basis< value_t > &  cb )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.nsons() > 0 )
     {

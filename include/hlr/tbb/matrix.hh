@@ -220,18 +220,22 @@ build ( const hpro::TBlockCluster *  bct,
 //   shared bases are constructed on-the-fly
 //
 template < typename coeff_t,
-           typename lrapx_t >
+           typename lrapx_t,
+           typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hpro::TMatrix > >
 build_uniform ( const hpro::TBlockCluster *  bct,
                 const coeff_t &              coeff,
                 const lrapx_t &              lrapx,
+                const basisapx_t &           basisapx,
                 const hpro::TTruncAcc &      acc,
                 const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
     
     assert( bct != nullptr );
 
@@ -241,12 +245,6 @@ build_uniform ( const hpro::TBlockCluster *  bct,
     using lrmat_map_t   = std::unordered_map< indexset, std::list< hpro::TRkMatrix * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< hpro::idx_t, hpro::TBlockMatrix * >;
 
-    //
-    // TODO: argument for approximation object
-    //
-
-    const auto  approx = approx::SVD< value_t >();
-    
     //
     // go BFS-style through block cluster tree and construct leaves per level
     // then convert lowrank to uniform lowrank while constructing bases
@@ -578,7 +576,7 @@ build_uniform ( const hpro::TBlockCluster *  bct,
                         // QR of S and computation of row basis
                         //
 
-                        auto  Un = approx.column_basis( U, acc );
+                        auto  Un = basisapx.column_basis( U, acc );
             
                         // finally assign to cluster basis object
                         // (no change to "rowcb_map", therefore no lock)
@@ -679,7 +677,7 @@ build_uniform ( const hpro::TBlockCluster *  bct,
                             pos += k;
                         }// for
 
-                        auto  Vn = approx.column_basis( V, acc );
+                        auto  Vn = basisapx.column_basis( V, acc );
 
                         // finally assign to cluster basis object
                         // (no change to "colcb_map", therefore no lock)

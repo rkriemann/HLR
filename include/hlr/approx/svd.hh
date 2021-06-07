@@ -513,16 +513,44 @@ struct SVD
     column_basis ( blas::matrix< value_t > &  M,
                    const hpro::TTruncAcc &    acc ) const
     {
-        auto  S = blas::vector< real_t >();
+        if ( M.ncols() > M.nrows() / 2 )
+        {
+            //
+            // directly use first k column of U from M = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  S = blas::vector< real_t >();
 
-        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
         
-        blas::svd( M, S );
+            blas::svd( M, S );
 
-        const auto  k  = acc.trunc_rank( S );
-        const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
-        return  blas::copy( Uk );
+            return  blas::copy( Uk );
+        }// if
+        else
+        {
+            //
+            // M = Q·R = Q·U·S·V' with R = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  R = blas::matrix< value_t >();
+
+            blas::qr( M, R );
+
+            auto  S = blas::vector< real_t >();
+
+            blas::svd( R, S );
+            
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( R, blas::range::all, blas::range( 0, k-1 ) );
+
+            return  blas::prod( M, Uk );
+        }// else
     }
 };
 

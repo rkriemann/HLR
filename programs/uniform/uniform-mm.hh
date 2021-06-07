@@ -103,9 +103,11 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     {
+        auto  apx = approx::SVD< value_t >();
+        
         tic = timer::now();
     
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, acc, nseq );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

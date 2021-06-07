@@ -439,11 +439,10 @@ struct RRQR
     {
         // see "rrqr" above for comments
 
-        const idx_t  nrows = idx_t( M.nrows() );
         const idx_t  ncols = idx_t( M.ncols() );
 
         // for update statistics
-        HLR_APPROX_RANK_STAT( "full " << std::min( nrows, ncols ) );
+        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
     
         auto  R = blas::matrix< value_t >( ncols, ncols );
         auto  P = std::vector< int >( ncols, 0 );
