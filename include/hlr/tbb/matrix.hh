@@ -225,12 +225,12 @@ template < typename coeff_t,
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hpro::TMatrix > >
-build_uniform ( const hpro::TBlockCluster *  bct,
-                const coeff_t &              coeff,
-                const lrapx_t &              lrapx,
-                const basisapx_t &           basisapx,
-                const hpro::TTruncAcc &      acc,
-                const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );

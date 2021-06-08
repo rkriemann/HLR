@@ -99,6 +99,8 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
+    const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // conversion to uniform
@@ -135,7 +137,7 @@ program_main ()
     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
     auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
         
-    std::cout << "    error  = " << format_error( error ) << std::endl;
+    std::cout << "    error  = " << format_error( error / normA ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
     {

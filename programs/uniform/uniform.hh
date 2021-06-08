@@ -20,6 +20,7 @@
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/sum.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/approx/randsvd.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -73,6 +74,8 @@ program_main ()
         matrix::print_lvl_eps( *A, "L" );
     }// if
 
+    const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // directly build uniform matrix
@@ -81,11 +84,11 @@ program_main ()
 
     auto  apx = approx::SVD< value_t >();
     
-    std::cout << "  " << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     
     tic = timer::now();
     
-    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, lrapx, apx, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -95,7 +98,27 @@ program_main ()
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-        std::cout << "    error  = " << format_error( error ) << std::endl;
+        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+    }
+
+    {
+        std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
+        
+        {
+            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+            auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+    
     }
     
     //////////////////////////////////////////////////////////////////////
@@ -132,7 +155,7 @@ program_main ()
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-        std::cout << "    error  = " << format_error( error ) << std::endl;
+        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             matrix::print_eps( *A3, "A3", "noid" );

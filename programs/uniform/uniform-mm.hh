@@ -96,6 +96,8 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
+    const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // directly build uniform matrix
@@ -107,7 +109,7 @@ program_main ()
         
         tic = timer::now();
     
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, lrapx, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -117,7 +119,7 @@ program_main ()
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
             auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
         
-            std::cout << "    error  = " << format_error( error ) << std::endl;
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
     }
     
@@ -156,7 +158,7 @@ program_main ()
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
         auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
         
-        std::cout << "    error  = " << format_error( error ) << std::endl;
+        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }
 
     if ( hpro::verbose( 3 ) )

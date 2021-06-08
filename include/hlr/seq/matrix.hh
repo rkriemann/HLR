@@ -26,6 +26,8 @@
 #include "hlr/matrix/convert.hh"
 #include "hlr/matrix/restrict.hh"
 
+#include "hlr/seq/detail/matrix.hh"
+
 namespace hlr { namespace seq { namespace matrix {
 
 namespace hpro = HLIB;
@@ -197,12 +199,12 @@ template < typename coeff_t,
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hpro::TMatrix > >
-build_uniform ( const hpro::TBlockCluster *  bct,
-                const coeff_t &              coeff,
-                const lrapx_t &              lrapx,
-                const basisapx_t &           basisapx,
-                const hpro::TTruncAcc &      acc,
-                const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -467,99 +469,76 @@ build_uniform ( const hpro::TBlockCluster *  bct,
             //
             // compute column basis for
             //
-            //   ( U₀·S₀·V₀'  U₁·S₁·V₁'  U₂·S₂·V₂'  … ) =
+            //   ( U₀×V₀'               U₁×V₁'                U₂×V₂'               … ) =
             //
-            //                  ⎛ S₀·V₀'              ⎞
-            //   ( U₀ U₁ U₂ … ) ⎜       S₁·V₁'        ⎟ =
-            //                  ⎜             S₂·V₂'  ⎟
-            //                  ⎝                   … ⎠
+            //   ( Qu₀·Ru₀×(Qv₀·Rv₀)'   Qu₁·Ru₁×·(Qv₁·Rv₁)'   Qu₂·Ru₂×(Qv₂·Rv₂)'   … ) =
             //
-            //                  ⎛ V₀·S₀'              ⎞'
-            //   ( U₀ U₁ U₂ … ) ⎜       V₁·S₁'        ⎟ =
-            //                  ⎜             V₂·S₂'  ⎟
-            //                  ⎝                   … ⎠
+            //   ( Qu₀·(Ru₀×Rv₀')·Qv₀'  Qu₁·(Ru₁×·Rv₁')·Qv₁'  Qu₂·(Ru₂×Rv₂')·Qv₂'  … ) =
             //
-            //                  ⎛⎛V₀     ⎞ ⎛S₀'        ⎞⎞'
-            //   ( U₀ U₁ U₂ … ) ⎜⎜  V₁   ⎟·⎜   S₁'     ⎟⎟ =
-            //                  ⎜⎜    V₂ ⎟ ⎜      S₂'  ⎟⎟
-            //                  ⎝⎝      …⎠ ⎝         … ⎠⎠
+            //   ( Qu₀·S₀·Qv₀'          Qu₁·S₁·Qv₁'           Qu₂·S₂·Qv₂'          … ) =   with S_i = Ru_i × Rv_i'
             //
-            // Since diag(V_i) is orthogonal, it can be omitted for row bases
+            //                     ⎛ Qv₀·S₀             ⎞'
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜      Qv₁·S₁        ⎟ =
+            //                     ⎜           Qv₂·S₂   ⎟
+            //                     ⎝                  … ⎠
+            //
+            //                     ⎛⎛Qv₀       ⎞ ⎛S₀     ⎞⎞'
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜⎜   Qv₁    ⎟·⎜  S₁   ⎟⎟ =
+            //                     ⎜⎜      Qv₂ ⎟ ⎜    S₂ ⎟⎟
+            //                     ⎝⎝         …⎠ ⎝      …⎠⎠
+            //
+            // Since diag(Qv_i) is orthogonal, it can be omitted for row bases
             // computation, leaving
             //
-            //                  ⎛S₀'       ⎞'                 ⎛  ⎛S₀'        ⎞⎞'
-            //   ( U₀ U₁ U₂ … ) ⎜   S₁'    ⎟ = ( U₀ U₁ U₂ … ) ⎜qr⎜   S₁'     ⎟⎟ =
-            //                  ⎜     S₂'  ⎟                  ⎜  ⎜      S₂'  ⎟⎟
-            //                  ⎝        … ⎠                  ⎝  ⎝         … ⎠⎠
+            //                     ⎛S₀     ⎞'                 
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜  S₁   ⎟ = ( Qu₀·S₀' Qu₁·S₁' Qu₂·S₂' … )
+            //                     ⎜    S₂ ⎟                  
+            //                     ⎝      …⎠                  
             //
-            //   ( U₀ U₁ U₂ … ) ( Q·R )'
+            // of which a column basis is computed.
             //
-            // of which again Q can be omitted due to orthogonality.
-            // Finally one needs to compute the row basis of
-            //
-            //   ( U₀ U₁ U₂ … ) R'
-            //
-            // Also, the local coupling matrices S_i are scaled w.r.t. spectral norm
-            // to achieve even approximation for all blocks.
+            // Also: S_i is scaled with respect to spectral norm.
             //
 
-            //                                          ⎛S₀'        ⎞
-            // form matrices U = ( U₀ U₁ U₂ … ) and S = ⎜   S₁'     ⎟
-            //                                          ⎜      S₂'  ⎟
-            //                                          ⎝         … ⎠
+            //
+            // form U = ( Qu₀·S₀' Qu₁·S₁' Qu₂·S₁' … )
             //
             
             size_t  nrows_U = is.size();
             size_t  ncols_U = 0;
-            size_t  ncols_S = 0;
 
             for ( auto &  R : matrices )
-            {
                 ncols_U += R->rank();
-                ncols_S  = std::max( ncols_S, R->rank() );
-            }// for
 
             auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
-            auto    S   = blas::matrix< value_t >( ncols_U, ncols_S );
             size_t  pos = 0;
 
             for ( auto &  R : matrices )
             {
-                // R = U·V' = W·T·X'
-                auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
-                auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
-                auto  RW = blas::matrix< value_t >();
-                auto  RX = blas::matrix< value_t >();
-                auto  k  = R->rank();
+                // R = U·V' = Qu·Ru×Rv'·Qv'
+                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  Ru_i = blas::matrix< value_t >();
+                auto  Rv_i = blas::matrix< value_t >();
+                auto  k    = R->rank();
                 
-                blas::qr( W, RW );
-                blas::qr( X, RX );
+                blas::qr( U_i, Ru_i );
+                blas::qr( V_i, Rv_i );
 
-                auto  T = blas::prod( RW, blas::adjoint( RX ) );
+                auto  S_i    = blas::prod( Ru_i, blas::adjoint( Rv_i ) );
+                auto  norm_i = blas::norm_2( S_i );
 
-                blas::scale( value_t(1) / norm::spectral( T ), T );
-                
-                auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
-                auto  S_i = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + k - 1 ),
-                                                     blas::range( 0, k - 1 ) );
+                blas::scale( value_t(1) / norm_i, S_i );
 
-                blas::copy( W, U_i );
-                blas::copy( blas::adjoint( T ), S_i );
+                auto  US_i   = blas::prod( U_i, blas::adjoint( S_i ) );
+                auto  U_sub  = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( US_i, U_sub );
                 
                 pos += k;
             }// for
 
-            //
-            // QR of S and computation of row basis
-            //
-
-            auto  R = blas::matrix< value_t >();
-        
-            blas::qr( S, R, false );
-
-            auto  UR = blas::prod( U, blas::adjoint( R ) );
-            auto  Un = approx.column_basis( UR, acc );
+            auto  Un = basisapx.column_basis( U, acc );
 
             #endif
             
@@ -657,109 +636,86 @@ build_uniform ( const hpro::TBlockCluster *  bct,
             //
             // compute column basis for
             //
-            //   ⎛U₀·S₀·V₀'⎞ 
-            //   ⎜U₁·S₁·V₁'⎟
-            //   ⎜U₂·S₂·V₂'⎟
-            //   ⎝    …    ⎠
+            //   ⎛U₀·V₀'⎞ 
+            //   ⎜U₁·V₁'⎟
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
             //
             // or row basis of
             //
-            //   ⎛U₀·S₀·V₀'⎞ 
-            //   ⎜U₁·S₁·V₁'⎟ = ( V₀·S₀'·U₀'  V₁·S₁'·U₁'  V₂·S₂'·U₂'  … ) =
-            //   ⎜U₂·S₂·V₂'⎟
-            //   ⎝    …    ⎠
+            //   ⎛U₀·V₀'⎞' 
+            //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
             //
-            //                  ⎛ S₀'·U₀'                ⎞
-            //   ( V₀ V₁ V₂ … ) ⎜        S₁'·U₁'         ⎟ =
-            //                  ⎜               S₂'·U₂'  ⎟
-            //                  ⎝                      … ⎠
+            //   ( Qv₀·Rv₀×(Qu₀·Ru₀)'   Qv₁·Rv₁×(Qu₁·Ru₁)'   Qv₂·Rv₂×(Qu₂·Ru₂)'  … ) =
             //
-            //                  ⎛ U₀·S₀               ⎞'
-            //   ( V₀ V₁ V₂ … ) ⎜       U₁·S₁         ⎟ =
-            //                  ⎜             U₂·S₂   ⎟
-            //                  ⎝                   … ⎠
+            //   ( Qv₀·(Rv₀×Ru₀')·Qu₀'  Qv₁·(Rv₁×Ru₁')·Qu₁'  Qv₂·(Rv₂×Ru₂')·Qu₂' … ) =
             //
-            //                  ⎛⎛U₀     ⎞ ⎛S₀⎞⎞'
-            //   ( V₀ V₁ V₂ … ) ⎜⎜  U₁   ⎟·⎜S₁⎟⎟ =
-            //                  ⎜⎜    U₂ ⎟ ⎜S₂⎟⎟
-            //                  ⎝⎝      …⎠ ⎝… ⎠⎠
+            //   ( Qv₀·S₀·Qu₀'          Qv₁·S₁·Qu₁'          Qv₂·S₂·Qu₂'         … ) =   with  S_i = Rv_i × Ru_i'
             //
-            // Since diag(U_i) is orthogonal, it can be omitted for column bases
+            //                     ⎛ Qu₀·S₀'                ⎞'
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜        Qu₁·S₁'         ⎟ =
+            //                     ⎜               Qu₂·S₂'  ⎟
+            //                     ⎝                      … ⎠
+            //
+            //                     ⎛⎛Qu₀       ⎞ ⎛S₀'       ⎞⎞'
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜⎜   Qu₁    ⎟·⎜   S₁'    ⎟⎟ =
+            //                     ⎜⎜      Qu₂ ⎟ ⎜      S₂' ⎟⎟
+            //                     ⎝⎝         …⎠ ⎝         …⎠⎠
+            //
+            // Since diag(Qu_i) is orthogonal, it can be omitted for column bases
             // computation, leaving
             //
-            //                  ⎛S₀⎞'                 ⎛  ⎛V₀⎞⎞'
-            //   ( V₀ V₁ V₂ … ) ⎜S₁⎟ = ( V₀ V₁ V₂ … ) ⎜qr⎜V₁⎟⎟ =
-            //                  ⎜S₂⎟                  ⎜  ⎜V₂⎟⎟
-            //                  ⎝… ⎠                  ⎝  ⎝… ⎠⎠
+            //                     ⎛S₀'       ⎞'                
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜   S₁'    ⎟ = ( Qv₀·S₀ Qv₁·S₁ Qv₂·S₂ … )
+            //                     ⎜      S₂' ⎟                
+            //                     ⎝         …⎠
             //
-            //   ( V₀ V₁ V₂ … ) ( Q·R )'
+            // of which a column basis is computed.
             //
-            // of which again Q can be omitted due to orthogonality.
-            // Finally one needs to compute the row basis of
-            //
-            //   ( V₀ V₁ V₂ … ) R'
-            //
-            // Also, the local coupling matrices S_i are scaled w.r.t. spectral norm
-            // to achieve even approximation for all blocks.
+            // Also: the matrices S_i are scaled with respect to their spectral norm.
             //
 
-            //                                          ⎛S₀⎞
-            // form matrices V = ( V₀ V₁ V₂ … ) and S = ⎜S₁⎟
-            //                                          ⎜S₂⎟
-            //                                          ⎝… ⎠
+            //
+            // form matrix V = ( Qv₀·S₀ Qv₁·S₁ Qv₂·S₂ … )
             //
 
             size_t  nrows_V = is.size();
             size_t  ncols_V = 0;
-            size_t  ncols_S = 0;
 
             for ( auto &  R : matrices )
-            {
                 ncols_V += R->rank();
-                ncols_S  = std::max( ncols_S, R->rank() );
-            }// for
 
             auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
-            auto    S   = blas::matrix< value_t >( ncols_V, ncols_S );
             size_t  pos = 0;
 
             for ( auto &  R : matrices )
             {
                 // R' = (U·V')' = V·U' = X·T'·W'
-                auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
-                auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
-                auto  RX = blas::matrix< value_t >();
-                auto  RW = blas::matrix< value_t >();
-                auto  k  = R->rank();
+                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  Rv_i = blas::matrix< value_t >();
+                auto  Ru_i = blas::matrix< value_t >();
+                auto  k    = R->rank();
                 
-                blas::qr( X, RX );
-                blas::qr( W, RW );
+                blas::qr( V_i, Rv_i );
+                blas::qr( U_i, Ru_i );
 
-                auto  T = blas::prod( RW, blas::adjoint( RX ) );
+                auto  S_i    = blas::prod( Rv_i, blas::adjoint( Ru_i ) );
+                auto  norm_i = blas::norm_2( S_i );
 
-                blas::scale( value_t(1) / norm::spectral( T ), T );
+                blas::scale( value_t(1) / norm_i, S_i );
                 
-                auto  V_i = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
-                auto  S_i = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + k - 1 ),
-                                                     blas::range( 0, k - 1 ) );
+                auto  VS_i   = blas::prod( V_i, S_i );
+                auto  V_sub  = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
 
-                blas::copy( X, V_i );
-                blas::copy( T, S_i );
+                blas::copy( VS_i, V_sub );
                 
                 pos += k;
             }// for
 
-            //
-            // QR of S and computation of row basis (column basis of initial problem)
-            //
-
-            auto  R = blas::matrix< value_t >();
-        
-            blas::qr( S, R, false );
-
-            auto  VR = blas::prod( V, blas::adjoint( R ) );
-            auto  Vn = approx.column_basis( VR, acc );
+            auto  Vn = basisapx.column_basis( V, acc );
 
             #endif
             
@@ -814,6 +770,49 @@ build_uniform ( const hpro::TBlockCluster *  bct,
              std::move( M_root ) };
 }
 
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+    
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+    
+    auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+    
 //
 // assign block cluster to matrix
 //
