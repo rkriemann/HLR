@@ -56,7 +56,7 @@ private:
     cluster_basis< value_t > *  _row_cb;
     cluster_basis< value_t > *  _col_cb;
 
-    // local coefficient matrix
+    // local coupling matrix
     blas::matrix< value_t >     _S;
     
 public:
@@ -172,7 +172,7 @@ public:
         _S = std::move( aS );
     }
 
-    // set coefficient matrix without checking dimensions
+    // set coupling matrix without bases consistency check
     // (because cluster bases need to be adjusted later)
     void
     set_coeff_unsafe ( const blas::matrix< value_t > &  aS )

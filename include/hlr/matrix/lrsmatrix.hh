@@ -49,7 +49,7 @@ private:
     indexset                      _row_is, _col_is;
     
     // low-rank factors
-    hlr::blas::matrix< value_t >  _U, _S, _V;
+    blas::matrix< value_t >  _U, _S, _V;
     
 public:
     //
@@ -74,9 +74,9 @@ public:
 
     lrsmatrix ( const indexset                        arow_is,
                 const indexset                        acol_is,
-                const hlr::blas::matrix< value_t > &  aU,
-                const hlr::blas::matrix< value_t > &  aS,
-                const hlr::blas::matrix< value_t > &  aV )
+                const blas::matrix< value_t > &  aU,
+                const blas::matrix< value_t > &  aS,
+                const blas::matrix< value_t > &  aV )
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -89,9 +89,9 @@ public:
 
     lrsmatrix ( const indexset                   arow_is,
                 const indexset                   acol_is,
-                hlr::blas::matrix< value_t > &&  aU,
-                hlr::blas::matrix< value_t > &&  aS,
-                hlr::blas::matrix< value_t > &&  aV )
+                blas::matrix< value_t > &&  aU,
+                blas::matrix< value_t > &&  aS,
+                blas::matrix< value_t > &&  aV )
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -118,14 +118,14 @@ public:
     uint  row_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? row_rank() : col_rank(); }
     uint  col_rank ( const hpro::matop_t  op )       { return op == hpro::apply_normal ? col_rank() : row_rank(); }
 
-    const hlr::blas::matrix< value_t > &  U () const { return _U; }
-    const hlr::blas::matrix< value_t > &  S () const { return _S; }
-    const hlr::blas::matrix< value_t > &  V () const { return _V; }
+    const blas::matrix< value_t > &  U () const { return _U; }
+    const blas::matrix< value_t > &  S () const { return _S; }
+    const blas::matrix< value_t > &  V () const { return _V; }
     
     void
-    set_lrmat ( const hlr::blas::matrix< value_t > &  aU,
-                const hlr::blas::matrix< value_t > &  aS,
-                const hlr::blas::matrix< value_t > &  aV )
+    set_lrmat ( const blas::matrix< value_t > &  aU,
+                const blas::matrix< value_t > &  aS,
+                const blas::matrix< value_t > &  aV )
     {
         HLR_ASSERT( aU.ncols() == aS.nrows() );
         HLR_ASSERT( aV.ncols() == aS.ncols() );
@@ -136,9 +136,9 @@ public:
     }
 
     void
-    set_lrmat ( hlr::blas::matrix< value_t > &&  aU,
-                hlr::blas::matrix< value_t > &&  aS,
-                hlr::blas::matrix< value_t > &&  aV )
+    set_lrmat ( blas::matrix< value_t > &&  aU,
+                blas::matrix< value_t > &&  aS,
+                blas::matrix< value_t > &&  aV )
     {
         HLR_ASSERT( aU.ncols() == aS.nrows() );
         HLR_ASSERT( aV.ncols() == aS.ncols() );
@@ -147,6 +147,26 @@ public:
         _S = std::move( aS );
         _V = std::move( aV );
     }
+
+    // modify coefficients S even if not consistent with U/V
+    void
+    set_coeff_unsafe ( const blas::matrix< value_t > &  T )
+    {
+        blas::copy( T, _S );
+    }
+    
+    void
+    set_coeff_unsafe ( blas::matrix< value_t > &&  T )
+    {
+        if (( _S.nrows() == T.nrows() ) && ( _S.ncols() == T.ncols() ))
+            blas::copy( T, _S );
+        else
+            _S = std::move( T );
+    }
+
+    // clear row/column "bases" (HACK for parallel handling!!!)
+    void clear_row_basis () { _U = blas::matrix< value_t >(); }
+    void clear_col_basis () { _V = blas::matrix< value_t >(); }
     
     //
     // matrix data
@@ -192,21 +212,21 @@ public:
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
     virtual void  apply_add   ( const hpro::real                           alpha,
-                                const hlr::blas::vector< hpro::real > &    x,
-                                hlr::blas::vector< hpro::real > &          y,
+                                const blas::vector< hpro::real > &    x,
+                                blas::vector< hpro::real > &          y,
                                 const matop_t                              op = apply_normal ) const;
     virtual void  apply_add   ( const hpro::complex                        alpha,
-                                const hlr::blas::vector< hpro::complex > & x,
-                                hlr::blas::vector< hpro::complex > &       y,
+                                const blas::vector< hpro::complex > & x,
+                                blas::vector< hpro::complex > &       y,
                                 const matop_t                              op = apply_normal ) const;
 
     virtual void  apply_add   ( const hpro::real                           alpha,
-                                const hlr::blas::matrix< hpro::real > &    x,
-                                hlr::blas::matrix< hpro::real > &          y,
+                                const blas::matrix< hpro::real > &    x,
+                                blas::matrix< hpro::real > &          y,
                                 const matop_t                              op = apply_normal ) const;
     virtual void  apply_add   ( const hpro::complex                        alpha,
-                                const hlr::blas::matrix< hpro::complex > & x,
-                                hlr::blas::matrix< hpro::complex > &       y,
+                                const blas::matrix< hpro::complex > & x,
+                                blas::matrix< hpro::complex > &       y,
                                 const matop_t                              op = apply_normal ) const;
 
     using TMatrix::apply_add;
@@ -277,7 +297,7 @@ lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
 
     // y := β·y
     if ( beta != hpro::real(1) )
-        hlr::blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
+        blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
                      
     if ( op == hpro::apply_normal )
     {
@@ -285,10 +305,10 @@ lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
         // y = y + α U·(S·(V' x))
         //
         
-        auto  t = hlr::blas::mulvec( hlr::blas::adjoint( _V ), hlr::blas::vec< value_t >( x ) );
-        auto  s = hlr::blas::mulvec( value_t(1), _S, t );
+        auto  t = blas::mulvec( blas::adjoint( _V ), blas::vec< value_t >( x ) );
+        auto  s = blas::mulvec( value_t(1), _S, t );
 
-        hlr::blas::mulvec( value_t(alpha), _U, s, value_t(1), hlr::blas::vec< value_t >( y ) );
+        blas::mulvec( value_t(alpha), _U, s, value_t(1), blas::vec< value_t >( y ) );
     }// if
     else if ( op == hpro::apply_transposed )
     {
@@ -297,16 +317,16 @@ lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
         //   = y + conj(V)·(S^T·(U^T x))
         //
         
-        auto  t = hlr::blas::mulvec( hlr::blas::transposed(_U), hlr::blas::vec< value_t >( x ) );
-        auto  s = hlr::blas::mulvec( hlr::blas::transposed(_S), t );
+        auto  t = blas::mulvec( blas::transposed(_U), blas::vec< value_t >( x ) );
+        auto  s = blas::mulvec( blas::transposed(_S), t );
 
-        hlr::blas::conj( s );
+        blas::conj( s );
         
-        auto  r = hlr::blas::mulvec( _V, s );
+        auto  r = blas::mulvec( _V, s );
 
-        hlr::blas::conj( r );
+        blas::conj( r );
         
-        hlr::blas::add( value_t(alpha), r, hlr::blas::vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, blas::vec< value_t >( y ) );
     }// if
     else if ( op == hpro::apply_adjoint )
     {
@@ -315,10 +335,10 @@ lrsmatrix< value_t >::mul_vec ( const hpro::real       alpha,
         //   = y + α·V·(S'·(U' x))
         //
         
-        auto  t = hlr::blas::mulvec( hlr::blas::adjoint(_U), hlr::blas::vec< value_t >( x ) );
-        auto  s = hlr::blas::mulvec( hlr::blas::adjoint(_S), t );
+        auto  t = blas::mulvec( blas::adjoint(_U), blas::vec< value_t >( x ) );
+        auto  s = blas::mulvec( blas::adjoint(_S), t );
 
-        hlr::blas::mulvec( value_t(alpha), _V, s, value_t(1), hlr::blas::vec< value_t >( y ) );
+        blas::mulvec( value_t(alpha), _V, s, value_t(1), blas::vec< value_t >( y ) );
     }// if
 }
 
@@ -326,8 +346,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         alpha,
-                                       const hlr::blas::vector< hpro::real > &  x,
-                                       hlr::blas::vector< hpro::real > &        y,
+                                       const blas::vector< hpro::real > &  x,
+                                       blas::vector< hpro::real > &        y,
                                        const matop_t                            op ) const
 {
     switch ( op )
@@ -336,10 +356,10 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
         case apply_conjugate :
         {
             // y = y + U·(S·(V'·x))
-            auto  t1 = hlr::blas::mulvec( hlr::blas::adjoint( _V ), x );
-            auto  t2 = hlr::blas::mulvec( _S, t1 );
+            auto  t1 = blas::mulvec( blas::adjoint( _V ), x );
+            auto  t2 = blas::mulvec( _S, t1 );
 
-            hlr::blas::mulvec( alpha, _U, t2, hpro::real(1), y );
+            blas::mulvec( alpha, _U, t2, hpro::real(1), y );
         }
         break;
 
@@ -347,10 +367,10 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
         case apply_adjoint :
         {
             // y = y + V·(S'·(U'·x))
-            auto  t1 = hlr::blas::mulvec( hlr::blas::adjoint( _U ), x );
-            auto  t2 = hlr::blas::mulvec( hlr::blas::adjoint( _S ), t1 );
+            auto  t1 = blas::mulvec( blas::adjoint( _U ), x );
+            auto  t2 = blas::mulvec( blas::adjoint( _S ), t1 );
 
-            hlr::blas::mulvec( alpha, _V, t2, hpro::real(1), y );
+            blas::mulvec( alpha, _V, t2, hpro::real(1), y );
         }
         break;
     }// switch
@@ -360,8 +380,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                         /* alpha */,
-                                       const hlr::blas::vector< hpro::complex > &  /* x */,
-                                       hlr::blas::vector< hpro::complex > &        /* y */,
+                                       const blas::vector< hpro::complex > &  /* x */,
+                                       blas::vector< hpro::complex > &        /* y */,
                                        const matop_t                               /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
@@ -371,8 +391,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                         /* alpha */,
-                                          const hlr::blas::vector< hpro::real > &  /* x */,
-                                          hlr::blas::vector< hpro::real > &        /* y */,
+                                          const blas::vector< hpro::real > &  /* x */,
+                                          blas::vector< hpro::real > &        /* y */,
                                           const matop_t                            /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
@@ -382,8 +402,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                         alpha,
-                                          const hlr::blas::vector< hpro::complex > &  x,
-                                          hlr::blas::vector< hpro::complex > &        y,
+                                          const blas::vector< hpro::complex > &  x,
+                                          blas::vector< hpro::complex > &        y,
                                           const matop_t                               op ) const
 {
     switch ( op )
@@ -391,10 +411,10 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                   
         case apply_normal :
         {
             // y = y + U·(S·(V'·x))
-            auto  t1 = hlr::blas::mulvec( hlr::blas::adjoint( _V ), x );
-            auto  t2 = hlr::blas::mulvec( _S, t1 );
+            auto  t1 = blas::mulvec( blas::adjoint( _V ), x );
+            auto  t2 = blas::mulvec( _S, t1 );
 
-            hlr::blas::mulvec( alpha, _U, t2, hpro::complex(1), y );
+            blas::mulvec( alpha, _U, t2, hpro::complex(1), y );
         }
         break;
 
@@ -413,10 +433,10 @@ lrsmatrix< hpro::complex >::apply_add   ( const hpro::complex                   
         case apply_adjoint :
         {
             // y = y + V·(S'·(U'·x))
-            auto  t1 = hlr::blas::mulvec( hlr::blas::adjoint( _U ), x );
-            auto  t2 = hlr::blas::mulvec( hlr::blas::adjoint( _S ), t1 );
+            auto  t1 = blas::mulvec( blas::adjoint( _U ), x );
+            auto  t2 = blas::mulvec( blas::adjoint( _S ), t1 );
 
-            hlr::blas::mulvec( alpha, _V, t2, hpro::complex(1), y );
+            blas::mulvec( alpha, _V, t2, hpro::complex(1), y );
         }
         break;
     }// switch
@@ -426,8 +446,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         alpha,
-                                       const hlr::blas::matrix< hpro::real > &  X,
-                                       hlr::blas::matrix< hpro::real > &        Y,
+                                       const blas::matrix< hpro::real > &  X,
+                                       blas::matrix< hpro::real > &        Y,
                                        const matop_t                            op ) const
 {
     switch ( op )
@@ -436,10 +456,10 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
         case apply_conjugate :
         {
             // Y = Y + U·(S·(V'·X))
-            auto  T1 = hlr::blas::prod( hlr::blas::adjoint( _V ), X );
-            auto  T2 = hlr::blas::prod( _S, T1 );
+            auto  T1 = blas::prod( blas::adjoint( _V ), X );
+            auto  T2 = blas::prod( _S, T1 );
 
-            hlr::blas::prod( alpha, _U, T2, hpro::real(1), Y );
+            blas::prod( alpha, _U, T2, hpro::real(1), Y );
         }
         break;
 
@@ -447,10 +467,10 @@ lrsmatrix< hpro::real >::apply_add   ( const hpro::real                         
         case apply_adjoint :
         {
             // Y = Y + V·(S'·(U'·X))
-            auto  T1 = hlr::blas::prod( hlr::blas::adjoint( _U ), X );
-            auto  T2 = hlr::blas::prod( hlr::blas::adjoint( _S ), T1 );
+            auto  T1 = blas::prod( blas::adjoint( _U ), X );
+            auto  T2 = blas::prod( blas::adjoint( _S ), T1 );
 
-            hlr::blas::prod( alpha, _V, T2, hpro::real(1), Y );
+            blas::prod( alpha, _V, T2, hpro::real(1), Y );
         }
         break;
     }// switch
@@ -460,8 +480,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::real >::apply_add   ( const hpro::complex                         /* alpha */,
-                                       const hlr::blas::matrix< hpro::complex > &  /* X */,
-                                       hlr::blas::matrix< hpro::complex > &        /* Y */,
+                                       const blas::matrix< hpro::complex > &  /* X */,
+                                       blas::matrix< hpro::complex > &        /* Y */,
                                        const matop_t                               /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
@@ -471,8 +491,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::complex >::apply_add   ( const hpro::real                         /* alpha */,
-                                          const hlr::blas::matrix< hpro::real > &  /* X */,
-                                          hlr::blas::matrix< hpro::real > &        /* Y */,
+                                          const blas::matrix< hpro::real > &  /* X */,
+                                          blas::matrix< hpro::real > &        /* Y */,
                                           const matop_t                            /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
@@ -482,8 +502,8 @@ template <>
 inline
 void
 lrsmatrix< hpro::complex >::apply_add ( const hpro::complex                         alpha,
-                                        const hlr::blas::matrix< hpro::complex > &  X,
-                                        hlr::blas::matrix< hpro::complex > &        Y,
+                                        const blas::matrix< hpro::complex > &  X,
+                                        blas::matrix< hpro::complex > &        Y,
                                         const matop_t                               op ) const
 {
     switch ( op )
@@ -491,10 +511,10 @@ lrsmatrix< hpro::complex >::apply_add ( const hpro::complex                     
         case apply_normal :
         {
             // Y = Y + U·(S·(V'·X))
-            auto  T1 = hlr::blas::prod( hlr::blas::adjoint( _V ), X );
-            auto  T2 = hlr::blas::prod( _S, T1 );
+            auto  T1 = blas::prod( blas::adjoint( _V ), X );
+            auto  T2 = blas::prod( _S, T1 );
 
-            hlr::blas::prod( alpha, _U, T2, hpro::real(1), Y );
+            blas::prod( alpha, _U, T2, hpro::real(1), Y );
         }
         break;
 
@@ -513,10 +533,10 @@ lrsmatrix< hpro::complex >::apply_add ( const hpro::complex                     
         case apply_adjoint :
         {
             // Y = Y + V·(S'·(U'·X))
-            auto  T1 = hlr::blas::prod( hlr::blas::adjoint( _U ), X );
-            auto  T2 = hlr::blas::prod( hlr::blas::adjoint( _S ), T1 );
+            auto  T1 = blas::prod( blas::adjoint( _U ), X );
+            auto  T2 = blas::prod( blas::adjoint( _S ), T1 );
 
-            hlr::blas::prod( alpha, _V, T2, hpro::real(1), Y );
+            blas::prod( alpha, _V, T2, hpro::real(1), Y );
         }
         break;
     }// switch
@@ -539,9 +559,9 @@ std::unique_ptr< hpro::TMatrix >
 lrsmatrix< value_t >::copy () const
 {
     auto  M = std::make_unique< lrsmatrix >( _row_is, _col_is,
-                                             std::move( hlr::blas::copy( _U ) ),
-                                             std::move( hlr::blas::copy( _S ) ),
-                                             std::move( hlr::blas::copy( _V ) ) );
+                                             std::move( blas::copy( _U ) ),
+                                             std::move( blas::copy( _S ) ),
+                                             std::move( blas::copy( _V ) ) );
 
     M->copy_struct_from( this );
     
@@ -584,9 +604,9 @@ lrsmatrix< value_t >::copy_to ( hpro::TMatrix *  A ) const
 
     R->_row_is = _row_is;
     R->_col_is = _col_is;
-    R->_U      = std::move( hlr::blas::copy( _U ) );
-    R->_S      = std::move( hlr::blas::copy( _S ) );
-    R->_V      = std::move( hlr::blas::copy( _V ) );
+    R->_U      = std::move( blas::copy( _U ) );
+    R->_S      = std::move( blas::copy( _S ) );
+    R->_V      = std::move( blas::copy( _V ) );
 }
 
 //

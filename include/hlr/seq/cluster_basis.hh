@@ -33,18 +33,18 @@ namespace detail
 using  indexset = hpro::TIndexSet;
 
 // mapping of clusters/indexsets to corresponding matrix blocks
-using  matrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
+using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
 
 void
-build_matrix_map ( const cluster_tree &   ct,
-                   const hpro::TMatrix &  M,
-                   matrix_map_t &         mat_map,
-                   const bool             adjoint );
+build_lrmatrix_map ( const cluster_tree &   ct,
+                     const hpro::TMatrix &  M,
+                     lrmatrix_map_t &         mat_map,
+                     const bool             adjoint );
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
+                  lrmatrix_map_t &        mat_map,
                   const accuracy &      acc,
                   const bool            adjoint );
 
@@ -68,10 +68,10 @@ construct_from_H ( const cluster_tree &   rowct,
     // set of associated matrix blocks in H-matrix
     //
 
-    detail::matrix_map_t  row_map, col_map;
+    detail::lrmatrix_map_t  row_map, col_map;
     
-    detail::build_matrix_map( rowct, M, row_map, false );
-    detail::build_matrix_map( colct, M, col_map, true  );
+    detail::build_lrmatrix_map( rowct, M, row_map, false );
+    detail::build_lrmatrix_map( colct, M, col_map, true  );
 
     //
     // next, construct cluster basis for each cluster in cluster tree
@@ -111,10 +111,10 @@ V ( const hpro::TRkMatrix *  M,
 // construct map from index sets to matrix blocks for row clusters
 //
 void
-build_matrix_map ( const cluster_tree &   ct,
-                   const hpro::TMatrix &  M,
-                   matrix_map_t &         mat_map,
-                   const bool             adjoint )
+build_lrmatrix_map ( const cluster_tree &   ct,
+                     const hpro::TMatrix &  M,
+                     lrmatrix_map_t &       mat_map,
+                     const bool             adjoint )
 {
     HLR_ASSERT( ct == M.row_is( adjoint ? hpro::apply_transposed : hpro::apply_normal ) );
     
@@ -135,7 +135,7 @@ build_matrix_map ( const cluster_tree &   ct,
                     auto  B_ij = B->block( i, j );
                 
                     if ( ! is_null( B_ij ) )
-                        build_matrix_map( *ct_j, *B_ij, mat_map, adjoint );
+                        build_lrmatrix_map( *ct_j, *B_ij, mat_map, adjoint );
                 }// for
             }// for
         }// if
@@ -152,7 +152,7 @@ build_matrix_map ( const cluster_tree &   ct,
                     auto  B_ij = B->block( i, j );
                 
                     if ( ! is_null( B_ij ) )
-                        build_matrix_map( *ct_i, *B_ij, mat_map, adjoint );
+                        build_lrmatrix_map( *ct_i, *B_ij, mat_map, adjoint );
                 }// for
             }// for
         }// else
@@ -193,7 +193,7 @@ build_matrix_map ( const cluster_tree &   ct,
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
+                  lrmatrix_map_t &      mat_map,
                   const accuracy &      acc,
                   const bool            adjoint )
 {
