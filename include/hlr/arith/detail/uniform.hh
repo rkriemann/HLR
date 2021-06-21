@@ -773,11 +773,11 @@ compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
     //   ⎜U_j S_j V'⎟         ⎝   0       0            0     T'·W'⎠
     //   ⎝  W T X'  ⎠
     //
-    //                = (V X) ⎛ U₁·S₁ ⎞'   (V X) ⎛⎛U₁         ⎞⎛S₁ ⎞⎞'
-    //                        ⎜ U₂·S₂ ⎟          ⎜⎜  U₂       ⎟⎜S₂ ⎟⎟
-    //                        ⎜  ...  ⎟  =       ⎜⎜    ...    ⎟⎜...⎟⎟
-    //                        ⎜U_j·S_j⎟          ⎜⎜       U_j ⎟⎜S_j⎟⎟
-    //                        ⎝  W·T  ⎠          ⎝⎝          W⎠⎝ T ⎠⎠
+    //                = (V X) ⎛ U₁·S₁     ⎞'   (V X) ⎛⎛U₁         ⎞⎛S₁   ⎞⎞'
+    //                        ⎜ U₂·S₂     ⎟          ⎜⎜  U₂       ⎟⎜S₂   ⎟⎟
+    //                        ⎜    ...    ⎟  =       ⎜⎜    ...    ⎟⎜ ... ⎟⎟
+    //                        ⎜U_j·S_j    ⎟          ⎜⎜       U_j ⎟⎜S_j  ⎟⎟
+    //                        ⎝        W·T⎠          ⎝⎝          W⎠⎝    T⎠⎠
     //
     // Since U_* and W are orthogonal, one can skip those for bases computation.
     // Compute QR factorization

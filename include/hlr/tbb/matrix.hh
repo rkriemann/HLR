@@ -271,6 +271,8 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 
     rowcb->set_nsons( bct->rowcl()->nsons() );
     colcb->set_nsons( bct->colcl()->nsons() );
+
+    detail::init_cluster_bases( bct, *rowcb, *colcb );
     
     auto  basis_data = detail::rec_basis_data_t();
     auto  M          = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data );
