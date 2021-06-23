@@ -70,8 +70,8 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        matrix::print_eps( *A, "A", "noid" );
-        matrix::print_lvl_eps( *A, "L" );
+        io::eps::print( *A, "A", "noinnerid" );
+        io::eps::print_lvl( *A, "L" );
     }// if
 
     const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
@@ -162,7 +162,7 @@ program_main ()
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
-            matrix::print_eps( *A3, "A3", "noid" );
+            io::eps::print( *A3, "A3", "noid" );
     }// if
     
     //////////////////////////////////////////////////////////////////////

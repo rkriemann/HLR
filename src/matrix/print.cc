@@ -61,7 +61,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( contains( options, "nosize" ) )
+            if ( ! contains( options, "nosize" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -90,7 +90,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( contains( options, "norank" ) )
+            if ( ! contains( options, "norank" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -114,7 +114,7 @@ print_eps ( const hpro::TMatrix &               M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
 
-            if ( contains( options, "norank" ) )
+            if ( ! contains( options, "norank" ) )
             {
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
@@ -164,11 +164,11 @@ print_eps ( const hpro::TMatrix &               M,
     }// else
 
     // draw ID
-    if ( contains( options, "noid" ) )
+    if ( ! ( contains( options, "noid" ) || ( contains( options, "noinnerid" ) && is_blocked( M ) )) )
     {
         prn.save();
 
-        const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 8.0 );
+        const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 );
         const auto  text    = hpro::to_string( "%d", M.id() );
     
         prn.set_font( "Helvetica", fn_size );

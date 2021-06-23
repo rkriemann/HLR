@@ -5,7 +5,7 @@
 // File        : matrix.hh
 // Description : matrix related functionality
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <tbb/blocked_range2d.h>
@@ -1402,7 +1402,6 @@ struct rec_basis_data_t
         
         auto    couplings = std::list< blas::matrix< value_t > >();
         size_t  nrows_S   = T.ncols();
-        // auto    lock_is   = std::scoped_lock( rowmtxs[ cb.is() ] );
         auto    uni_mats  = matrix_list_t();
         auto    mat_ids   = std::vector< int >();
 
@@ -1533,7 +1532,6 @@ struct rec_basis_data_t
         
         auto    couplings = std::list< blas::matrix< value_t > >();
         size_t  nrows_S   = T.nrows();
-        // auto    lock_is   = std::scoped_lock( colmtxs[ cb.is() ] );
         auto    uni_mats  = matrix_list_t();
         auto    mat_ids   = std::vector< int >();
 
@@ -1758,14 +1756,36 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 HLR_ASSERT( Rx.ncols() != 0 );
                 
                 auto  T       = blas::prod( Rw, blas::adjoint( Rx ) );
-                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                // auto  lock_rcb = std::scoped_lock( rowcb.mutex() );
+                // auto  lock_ccb = std::scoped_lock( colcb.mutex() );
 
-                // std::cout << bct->id() << '<' << std::endl;
+                char  buf[32];
+
+                while ( ! rowcb.mutex().try_lock() )
+                {
+                    snprintf( buf, 32, "[%d<-r%d]", bct->id(), rowcb.mtx_id );
+                    std::cout << buf << std::endl;
+                }// while
+
+                rowcb.mtx_id = bct->id();
+
+                while ( ! colcb.mutex().try_lock() )
+                {
+                    snprintf( buf, 32, "[%d<-c%d]", bct->id(), colcb.mtx_id );
+                    std::cout << buf << std::endl;
+                }// while
+
+                colcb.mtx_id = bct->id();
+
+                // rowcb.mutex().lock(); rowcb.mtx_id = bct->id();
+                // colcb.mutex().lock(); colcb.mtx_id = bct->id();
+
+                snprintf( buf, 32, "%d{", bct->id() );
+                std::cout << buf << std::endl;
                 
                 ::tbb::parallel_invoke(
                     [&] ()
                     {
-                        auto  id = bct->id();
                         auto  Un = basis_data.compute_extended_row_basis( rowcb, W, T, acc, basisapx );
                         
                         basis_data.update_row_coupling( rowcb, Un );
@@ -1774,7 +1794,6 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 
                     [&] ()
                     {
-                        auto  id = bct->id();
                         auto  Vn = basis_data.compute_extended_col_basis( colcb, X, T, acc, basisapx );
                         
                         basis_data.update_col_coupling( colcb, Vn );
@@ -1803,8 +1822,13 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                     basis_data.colmap[ colcb.is() ].push_back( RU.get() );
                 }
 
+                colcb.mtx_id = -1 ; colcb.mutex().unlock();
+                rowcb.mtx_id = -1 ; rowcb.mutex().unlock();
+
                 // std::cout << bct->id() << ':' << rowcb.basis().ncols() << ',' << RU->coeff().nrows() << ',' << RU->coeff().ncols() << ',' << colcb.basis().ncols() << ">}" << std::endl;
-                /// std::cout << bct->id() << '>' << '}' << std::endl;
+                snprintf( buf, 32, "}%d", bct->id() );
+                std::cout << buf << std::endl;
+                
                 M = std::move( RU );
             }// if
         }// if

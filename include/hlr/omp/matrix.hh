@@ -17,6 +17,8 @@
 
 #include "hlr/seq/matrix.hh"
 
+#include "hlr/omp/detail/matrix.hh"
+
 namespace hlr
 {
 
@@ -48,7 +50,7 @@ build_task ( const HLIB::TBlockCluster *  bct,
                    typename lrapx_t::value_t >::value,
                    "coefficient function and low-rank approximation must have equal value type" );
 
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
 
     //
     // decide upon cluster type, how to construct matrix
@@ -152,6 +154,83 @@ build ( const HLIB::TBlockCluster *  bct,
 }
 
 //
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+
+    detail::init_cluster_bases( bct, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = std::unique_ptr< hpro::TMatrix >();
+    
+    // spawn parallel region for tasks
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            #pragma omp task
+            {
+                M = std::move( detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data ) );
+            }// omp task
+        }// omp single
+    }// omp parallel
+    
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
+//
 // assign block cluster to matrix
 //
 inline
@@ -241,16 +320,16 @@ void
 copy_to_task ( const HLIB::TMatrix &  A,
                HLIB::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, HLIB::TBlockMatrix );
         auto  BB = ptrcast(  &B, HLIB::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -260,7 +339,7 @@ copy_to_task ( const HLIB::TMatrix &  A,
                 {
                     #pragma omp task
                     {
-                        assert( ! is_null( BB->block( i, j ) ) );
+                        HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
 
                         copy_to_task( * BA->block( i, j ), * BB->block( i, j ) );
                     }// omp task

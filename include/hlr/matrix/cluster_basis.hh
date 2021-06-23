@@ -57,6 +57,10 @@ private:
     std::mutex                                 _mtx;
     
 public:
+    // DEBUG
+    int                                        mtx_id;
+    
+public:
     
     // construct cluster basis corresponding to cluster <cl>
     cluster_basis ( const indexset &  ais )

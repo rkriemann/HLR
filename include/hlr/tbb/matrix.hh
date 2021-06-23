@@ -27,17 +27,10 @@
 
 #include "hlr/tbb/detail/matrix.hh"
 
-namespace hlr
-{
+namespace hlr { namespace tbb { namespace matrix {
 
 namespace hpro = HLIB;
     
-namespace tbb
-{
-
-namespace matrix
-{
-
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -839,10 +832,6 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
-}// namespace matrix
-
-}// namespace tbb
-
-}// namespace hlr
+}}}// namespace hlr::tbb::matrix
 
 #endif // __HLR_TBB_MATRIX_HH
