@@ -1,5 +1,5 @@
-#ifndef __HLR_OMP_DETAIL_MATRIX_HH
-#define __HLR_OMP_DETAIL_MATRIX_HH
+#ifndef __HLR_HPX_DETAIL_MATRIX_HH
+#define __HLR_HPX_DETAIL_MATRIX_HH
 //
 // Project     : HLib
 // File        : matrix.hh
@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <hpx/parallel/task_block.hpp>
+#include <hpx/parallel/algorithms/for_each.hpp>
+
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TBlockMatrix.hh>
 
@@ -15,11 +18,15 @@
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 
-namespace hlr { namespace omp { namespace matrix { namespace detail {
+namespace hlr { namespace hpx { namespace matrix { namespace detail {
 
 namespace hpro = HLIB;
 
 using namespace hlr::matrix;
+
+using ::hpx::parallel::v2::define_task_block;
+using ::hpx::for_each;
+using ::hpx::execution::par;
 
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
@@ -188,307 +195,298 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         auto  colmap   = lrmat_map_t();
         auto  lrmat    = std::deque< hpro::TRkMatrix * >();
         
-        #pragma omp taskgroup
-        {
-            #pragma omp taskloop default(shared)
-            for ( size_t  idx = 0; idx < nodes.size(); ++idx )
-            {
-                auto  node = nodes[idx];
-                auto  M    = std::unique_ptr< hpro::TMatrix >();
-
-                if ( node->is_leaf() )
-                {
-                    if ( node->is_adm() )
-                    {
-                        M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
-                        
-                        if ( is_lowrank( *M ) )
-                        {
-                            auto  R    = ptrcast( M.get(), hpro::TRkMatrix );
-                            auto  lock = std::scoped_lock( lmtx );
+        for_each( par, nodes.begin(), nodes.end(), 
+                  [&] ( auto  node )
+                  {
+                      auto  M = std::unique_ptr< hpro::TMatrix >();
+                      
+                      if ( node->is_leaf() )
+                      {
+                          // handled above
+                          if ( node->is_adm() )
+                          {
+                              M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
+                              
+                              if ( is_lowrank( *M ) )
+                              {
+                                  auto  R    = ptrcast( M.get(), hpro::TRkMatrix );
+                                  auto  lock = std::scoped_lock( lmtx );
+                                  
+                                  lrmat.push_back( R );
+                                  rowmap[ M->row_is() ].push_back( R );
+                                  colmap[ M->col_is() ].push_back( R );
+                              }// if
+                          }// if
+                          else
+                              M = coeff.build( node->is().row_is(), node->is().col_is() );
+                      }// if
+                      else
+                      {
+                          // collect children
+                          {
+                              auto  lock = std::scoped_lock( cmtx );
                             
-                            lrmat.push_back( R );
-                            rowmap[ M->row_is() ].push_back( R );
-                            colmap[ M->col_is() ].push_back( R );
-                        }// if
-                    }// if
-                    else 
-                        M = coeff.build( node->is().row_is(), node->is().col_is() );
-                }// if
-                else
-                {
-                    // collect children
-                    {
-                        auto  lock = std::scoped_lock( cmtx );
-                            
-                        for ( uint  i = 0; i < node->nrows(); ++i )
-                            for ( uint  j = 0; j < node->ncols(); ++j )
-                                if ( node->son( i, j ) != nullptr )
-                                    children.push_back( node->son( i, j ) );
-                    }
+                              for ( uint  i = 0; i < node->nrows(); ++i )
+                                  for ( uint  j = 0; j < node->ncols(); ++j )
+                                      if ( node->son( i, j ) != nullptr )
+                                          children.push_back( node->son( i, j ) );
+                          }
 
-                    M = std::make_unique< hpro::TBlockMatrix >( node );
+                          M = std::make_unique< hpro::TBlockMatrix >( node );
         
-                    auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+                          auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
 
-                    // make sure, block structure is correct
-                    if (( B->nblock_rows() != node->nrows() ) ||
-                        ( B->nblock_cols() != node->ncols() ))
-                        B->set_block_struct( node->nrows(), node->ncols() );
+                          // make sure, block structure is correct
+                          if (( B->nblock_rows() != node->nrows() ) ||
+                              ( B->nblock_cols() != node->ncols() ))
+                              B->set_block_struct( node->nrows(), node->ncols() );
 
-                    // make value type consistent in block matrix and sub blocks
-                    B->adjust_value_type();
+                          // make value type consistent in block matrix and sub blocks
+                          B->adjust_value_type();
 
-                    // remember all block matrices for setting up hierarchy
-                    {
-                        auto  lock = std::scoped_lock( bmtx );
+                          // remember all block matrices for setting up hierarchy
+                          {
+                              auto  lock = std::scoped_lock( bmtx );
                         
-                        bmat_map[ node->id() ] = B;
-                    }
-                }// else
+                              bmat_map[ node->id() ] = B;
+                          }
+                      }// else
 
-                M->set_id( node->id() );
-                M->set_procs( node->procs() );
+                      M->set_id( node->id() );
+                      M->set_procs( node->procs() );
 
-                insert_hier( node, M );
-                create_cb( node );
-            }// omp taskloop for
-        }// omp taskgroup
-        
+                      insert_hier( node, M );
+                      create_cb( node );
+                  } );
+
         nodes = std::move( children );
         
-        #pragma omp taskgroup
+        define_task_block( [&] ( auto &  tb )
         {
-            #pragma omp task default(shared)
+            tb.run( [&] ()
             {
                 //
                 // construct row bases for all block rows constructed on this level
                 //
-
+                    
                 auto  rowiss = std::deque< indexset >();
-
+                    
                 for ( auto  [ is, matrices ] : rowmap )
                     rowiss.push_back( is );
 
-                #pragma omp taskloop default(shared)
-                for ( size_t  idx = 0; idx < rowiss.size(); ++idx )
-                {
-                    auto  is       = rowiss[ idx ];
-                    auto  matrices = rowmap.at( is );
+                for_each( par, rowiss.begin(), rowiss.end(), 
+                          [&] ( auto  is )
+                          {
+                              auto  matrices = rowmap.at( is );
                     
-                    if ( matrices.size() == 0 )
-                        continue;
+                              if ( matrices.size() == 0 )
+                                  return;
 
-                    //
-                    // compute column basis for
-                    //
-                    //   ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … ) =
-                    //
-                    //                  ⎛ V₀'        ⎞
-                    //   ( U₀ U₁ U₂ … ) ⎜    V₁'     ⎟ =
-                    //                  ⎜       V₂'  ⎟
-                    //                  ⎝          … ⎠
-                    //
-                    //                  ⎛ Q₀·R₀             ⎞'
-                    //   ( U₀ U₁ U₂ … ) ⎜      Q₁·R₁        ⎟ =
-                    //                  ⎜           Q₂·R₂   ⎟
-                    //                  ⎝                 … ⎠
-                    //
-                    //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
-                    //   ( U₀ U₁ U₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
-                    //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
-                    //                  ⎝⎝      …⎠ ⎝      …⎠⎠
-                    //
-                    // Since diag(Q_i) is orthogonal, it can be omitted for row bases
-                    // computation, leaving
-                    //
-                    //                  ⎛R₀     ⎞'                 
-                    //   ( U₀ U₁ U₂ … ) ⎜  R₁   ⎟ = ( U₀·R₀' U₁·R₁' U₂·R₂' … )
-                    //                  ⎜    R₂ ⎟                  
-                    //                  ⎝      …⎠                  
-                    //
-                    // of which a column basis is computed.
-                    //
+                              //
+                              // compute column basis for
+                              //
+                              //   ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … ) =
+                              //
+                              //                  ⎛ V₀'        ⎞
+                              //   ( U₀ U₁ U₂ … ) ⎜    V₁'     ⎟ =
+                              //                  ⎜       V₂'  ⎟
+                              //                  ⎝          … ⎠
+                              //
+                              //                  ⎛ Q₀·R₀             ⎞'
+                              //   ( U₀ U₁ U₂ … ) ⎜      Q₁·R₁        ⎟ =
+                              //                  ⎜           Q₂·R₂   ⎟
+                              //                  ⎝                 … ⎠
+                              //
+                              //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
+                              //   ( U₀ U₁ U₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
+                              //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
+                              //                  ⎝⎝      …⎠ ⎝      …⎠⎠
+                              //
+                              // Since diag(Q_i) is orthogonal, it can be omitted for row bases
+                              // computation, leaving
+                              //
+                              //                  ⎛R₀     ⎞'                 
+                              //   ( U₀ U₁ U₂ … ) ⎜  R₁   ⎟ = ( U₀·R₀' U₁·R₁' U₂·R₂' … )
+                              //                  ⎜    R₂ ⎟                  
+                              //                  ⎝      …⎠                  
+                              //
+                              // of which a column basis is computed.
+                              //
 
-                    //
-                    // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
-                    //
+                              //
+                              // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
+                              //
             
-                    size_t  nrows_U = is.size();
-                    size_t  ncols_U = 0;
+                              size_t  nrows_U = is.size();
+                              size_t  ncols_U = 0;
 
-                    for ( auto &  R : matrices )
-                        ncols_U += R->rank();
+                              for ( auto &  R : matrices )
+                                  ncols_U += R->rank();
 
-                    auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
-                    size_t  pos = 0;
+                              auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
+                              size_t  pos = 0;
 
-                    for ( auto &  R : matrices )
-                    {
-                        // R = U·V' = W·T·X'
-                        auto  U_i = blas::mat_U< value_t >( R );
-                        auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
-                        auto  R_i = blas::matrix< value_t >();
-                        auto  k   = R->rank();
+                              for ( auto &  R : matrices )
+                              {
+                                  // R = U·V' = W·T·X'
+                                  auto  U_i = blas::mat_U< value_t >( R );
+                                  auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                                  auto  R_i = blas::matrix< value_t >();
+                                  auto  k   = R->rank();
                 
-                        blas::qr( V_i, R_i );
+                                  blas::qr( V_i, R_i );
 
-                        auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
-                        auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+                                  auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+                                  auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
 
-                        blas::copy( UR_i, U_sub );
+                                  blas::copy( UR_i, U_sub );
                 
-                        pos += k;
-                    }// for
+                                  pos += k;
+                              }// for
 
-                    //
-                    // QR of S and computation of row basis
-                    //
+                              //
+                              // QR of S and computation of row basis
+                              //
 
-                    auto  Un = basisapx.column_basis( U, acc );
+                              auto  Un = basisapx.column_basis( U, acc );
             
-                    // finally assign to cluster basis object
-                    // (no change to "rowcb_map", therefore no lock)
-                    rowcb_map.at( is )->set_basis( std::move( Un ) );
-                }// omp taskloop for
-            }// omp task
+                              // finally assign to cluster basis object
+                              // (no change to "rowcb_map", therefore no lock)
+                              rowcb_map.at( is )->set_basis( std::move( Un ) );
+                          } );
+            } );
 
-            #pragma omp task default(shared)
+            tb.run( [&] ()
             {
                 //
                 // construct column bases for all block columns constructed on this level
                 //
-
+                    
                 auto  coliss = std::deque< indexset >();
-            
+                    
                 for ( auto  [ is, matrices ] : colmap )
                     coliss.push_back( is );
 
-                #pragma omp taskloop default(shared)
-                for ( size_t  idx = 0; idx < coliss.size(); ++idx )
-                {
-                    auto  is       = coliss[ idx ];
-                    auto  matrices = colmap.at( is );
+                for_each( par, coliss.begin(), coliss.end(), 
+                          [&] ( auto  is )
+                          {
+                              auto  matrices = colmap.at( is );
 
-                    if ( matrices.size() == 0 )
-                        continue;
+                              if ( matrices.size() == 0 )
+                                  return;
 
-                    //
-                    // compute column basis for
-                    //
-                    //   ⎛U₀·V₀'⎞ 
-                    //   ⎜U₁·V₁'⎟
-                    //   ⎜U₂·V₂'⎟
-                    //   ⎝  …   ⎠
-                    //
-                    // or row basis of
-                    //
-                    //   ⎛U₀·V₀'⎞' 
-                    //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
-                    //   ⎜U₂·V₂'⎟
-                    //   ⎝  …   ⎠
-                    //
-                    //                  ⎛ U₀      ⎞'
-                    //   ( V₀ V₁ V₂ … ) ⎜   U₁    ⎟ =
-                    //                  ⎜     U₂  ⎟
-                    //                  ⎝       … ⎠
-                    //
-                    //                  ⎛ Q₀·R₀               ⎞'
-                    //   ( V₀ V₁ V₂ … ) ⎜       Q₁·R₁         ⎟ =
-                    //                  ⎜             Q₂·R₂   ⎟
-                    //                  ⎝                   … ⎠
-                    //
-                    //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
-                    //   ( V₀ V₁ V₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
-                    //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
-                    //                  ⎝⎝      …⎠ ⎝      …⎠⎠
-                    //
-                    // Since diag(Q_i) is orthogonal, it can be omitted for column bases
-                    // computation, leaving
-                    //
-                    //                  ⎛R₀     ⎞'                
-                    //   ( V₀ V₁ V₂ … ) ⎜  R₁   ⎟ = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
-                    //                  ⎜    R₂ ⎟                
-                    //                  ⎝      …⎠
-                    //
-                    // of which a column basis is computed.
-                    //
+                              //
+                              // compute column basis for
+                              //
+                              //   ⎛U₀·V₀'⎞ 
+                              //   ⎜U₁·V₁'⎟
+                              //   ⎜U₂·V₂'⎟
+                              //   ⎝  …   ⎠
+                              //
+                              // or row basis of
+                              //
+                              //   ⎛U₀·V₀'⎞' 
+                              //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
+                              //   ⎜U₂·V₂'⎟
+                              //   ⎝  …   ⎠
+                              //
+                              //                  ⎛ U₀      ⎞'
+                              //   ( V₀ V₁ V₂ … ) ⎜   U₁    ⎟ =
+                              //                  ⎜     U₂  ⎟
+                              //                  ⎝       … ⎠
+                              //
+                              //                  ⎛ Q₀·R₀               ⎞'
+                              //   ( V₀ V₁ V₂ … ) ⎜       Q₁·R₁         ⎟ =
+                              //                  ⎜             Q₂·R₂   ⎟
+                              //                  ⎝                   … ⎠
+                              //
+                              //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
+                              //   ( V₀ V₁ V₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
+                              //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
+                              //                  ⎝⎝      …⎠ ⎝      …⎠⎠
+                              //
+                              // Since diag(Q_i) is orthogonal, it can be omitted for column bases
+                              // computation, leaving
+                              //
+                              //                  ⎛R₀     ⎞'                
+                              //   ( V₀ V₁ V₂ … ) ⎜  R₁   ⎟ = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+                              //                  ⎜    R₂ ⎟                
+                              //                  ⎝      …⎠
+                              //
+                              // of which a column basis is computed.
+                              //
 
-                    //
-                    // form matrix V = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
-                    //
+                              //
+                              // form matrix V = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+                              //
 
-                    size_t  nrows_V = is.size();
-                    size_t  ncols_V = 0;
+                              size_t  nrows_V = is.size();
+                              size_t  ncols_V = 0;
 
-                    for ( auto &  R : matrices )
-                        ncols_V += R->rank();
+                              for ( auto &  R : matrices )
+                                  ncols_V += R->rank();
 
-                    auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
-                    size_t  pos = 0;
+                              auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
+                              size_t  pos = 0;
 
-                    for ( auto &  R : matrices )
-                    {
-                        // R' = (U·V')' = V·U' = X·T'·W'
-                        auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
-                        auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
-                        auto  R_i = blas::matrix< value_t >();
-                        auto  k   = R->rank();
+                              for ( auto &  R : matrices )
+                              {
+                                  // R' = (U·V')' = V·U' = X·T'·W'
+                                  auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                                  auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
+                                  auto  R_i = blas::matrix< value_t >();
+                                  auto  k   = R->rank();
                 
-                        blas::qr( U_i, R_i );
+                                  blas::qr( U_i, R_i );
 
-                        auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
-                        auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
+                                  auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
+                                  auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
 
-                        blas::copy( VR_i, V_sub );
+                                  blas::copy( VR_i, V_sub );
                 
-                        pos += k;
-                    }// for
+                                  pos += k;
+                              }// for
 
-                    auto  Vn = basisapx.column_basis( V, acc );
+                              auto  Vn = basisapx.column_basis( V, acc );
 
-                    // finally assign to cluster basis object
-                    // (no change to "colcb_map", therefore no lock)
-                    colcb_map.at( is )->set_basis( std::move( Vn ) );
-                }// omp taskloop for
-            }// omp task
-        }// omp taskgroup
+                              // finally assign to cluster basis object
+                              // (no change to "colcb_map", therefore no lock)
+                              colcb_map.at( is )->set_basis( std::move( Vn ) );
+                          } );
+            } );
+        } );
 
         //
         // now convert all blocks on this level
         //
 
-        #pragma omp taskgroup
-        {
-            #pragma omp taskloop default(shared)
-            for ( size_t  idx = 0; idx < lrmat.size(); ++idx )
-            {
-                auto  R     = lrmat[ idx ];
-                auto  rowcb = rowcb_map.at( R->row_is() );
-                auto  colcb = colcb_map.at( R->col_is() );
-                auto  Un    = rowcb->basis();
-                auto  Vn    = colcb->basis();
+        for_each( par, lrmat.begin(), lrmat.end(),
+                  [&] ( auto  R )
+                  {
+                      auto  rowcb = rowcb_map.at( R->row_is() );
+                      auto  colcb = colcb_map.at( R->col_is() );
+                      auto  Un    = rowcb->basis();
+                      auto  Vn    = colcb->basis();
 
-                //
-                // R = U·V' ≈ Un (Un' U V' Vn) Vn'
-                //          = Un S Vn'  with  S = Un' U V' Vn
-                //
+                      //
+                      // R = U·V' ≈ Un (Un' U V' Vn) Vn'
+                      //          = Un S Vn'  with  S = Un' U V' Vn
+                      //
 
-                auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
-                auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
-                auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
+                      auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
+                      auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+                      auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
 
-                auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
-                                                                                          R->col_is(),
-                                                                                          *rowcb,
-                                                                                          *colcb,
-                                                                                          std::move( S ) );
+                      auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
+                                                                                                R->col_is(),
+                                                                                                *rowcb,
+                                                                                                *colcb,
+                                                                                                std::move( S ) );
             
-                // replace standard lowrank block by uniform lowrank block
-                R->parent()->replace_block( R, RU.release() );
-                delete R;
-            }// omp taskloop for
-        }// omp taskgroup
+                      // replace standard lowrank block by uniform lowrank block
+                      R->parent()->replace_block( R, RU.release() );
+                      delete R;
+                  } );
     }// while
     
     return { std::move( rowcb_root ),
@@ -702,7 +700,7 @@ struct rec_basis_data_t
                 couplings.push_back( std::move( S_i ) );
             }// if
         }// for
-
+        
         //
         // assemble all scaled coupling matrices into joined matrix
         //
@@ -876,41 +874,49 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 auto  Rw = blas::matrix< value_t >();
                 auto  Rx = blas::matrix< value_t >();
 
-                #pragma omp taskgroup
+                define_task_block( [&] ( auto &  tb )
                 {
-                    #pragma omp task default(shared)
-                    blas::qr( W, Rw );
-                    
-                    #pragma omp task default(shared)
-                    blas::qr( X, Rx );
-                }// omp taskgroup
-
+                    tb.run( [&] () { blas::qr( W, Rw ); } );
+                    tb.run( [&] () { blas::qr( X, Rx ); } );
+                } );
+                
                 HLR_ASSERT( Rw.ncols() != 0 );
                 HLR_ASSERT( Rx.ncols() != 0 );
                 
                 auto  T       = blas::prod( Rw, blas::adjoint( Rx ) );
-                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                // auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                // char  buf[32];
 
-                // std::cout << bct->id() << '<' << std::endl;
+                auto  id       = bct->id();
+                auto  lock_rcb = std::scoped_lock( rowcb.mutex() );
+                
+                rowcb.mtx_id = bct->id();
 
-                #pragma omp taskgroup
+                auto  lock_ccb = std::scoped_lock( colcb.mutex() );
+
+                colcb.mtx_id = bct->id();
+
+                // snprintf( buf, 32, "%d{", bct->id() );
+                // std::cout << buf << std::endl;
+                
+                // define_task_block( [&] ( auto &  tb )
                 {
-                    #pragma omp task default(shared)
+                    // tb.run( [&] ()
                     {
                         auto  Un = basis_data.compute_extended_row_basis( rowcb, W, T, acc, basisapx );
                         
                         basis_data.update_row_coupling( rowcb, Un );
                         rowcb.set_basis( std::move( Un ) );
-                    }// omp task
-                
-                    #pragma omp task default(shared)
+                    } // );
+                    
+                    // tb.run( [&] ()
                     {
                         auto  Vn = basis_data.compute_extended_col_basis( colcb, X, T, acc, basisapx );
                         
                         basis_data.update_col_coupling( colcb, Vn );
                         colcb.set_basis( std::move( Vn ) );
-                    }// omp task
-                }// omp taskgroup
+                    } // );
+                } // );
 
                 //
                 // transform T into new bases
@@ -931,8 +937,12 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                     basis_data.colmap[ colcb.is() ].push_back( RU.get() );
                 }
 
-                // std::cout << bct->id() << ':' << rowcb.basis().ncols() << ',' << RU->coeff().nrows() << ',' << RU->coeff().ncols() << ',' << colcb.basis().ncols() << ">}" << std::endl;
-                /// std::cout << bct->id() << '>' << '}' << std::endl;
+                rowcb.mtx_id = -1;
+                colcb.mtx_id = -1;
+                
+                // snprintf( buf, 32, "%d}", bct->id() );
+                // std::cout << buf << std::endl;
+                
                 M = std::move( RU );
             }// if
         }// if
@@ -950,30 +960,29 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
         // make sure, block structure is correct
         B->set_block_struct( bct->nrows(), bct->ncols() );
 
-        #pragma omp taskgroup
+        define_task_block( [&] ( auto &  tb )
         {
             for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                auto  rowcb_i = rowcb.son( i );
-                
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    auto  colcb_j = colcb.son( j );
-                
                     if ( ! is_null( bct->son( i, j ) ) )
                     {
-                        #pragma omp task default(shared)
+                        tb.run( [&,B,i,j] ()
                         {
+                            auto  rowcb_i = rowcb.son( i );
+                            auto  colcb_j = colcb.son( j );
+                            
                             HLR_ASSERT( ! is_null_all( rowcb_i, colcb_j ) );
-                        
+                            
                             auto  B_ij = build_uniform_rec( bct->son( i, j ), coeff, lrapx, basisapx, acc, *rowcb_i, *colcb_j, basis_data );
-                        
+                            
                             B->set_block( i, j, B_ij.release() );
-                        }// omp task
+                        } );
                     }// if
                 }// for
             }// for
-        }// omp taskgroup
+        } );
 
         // make value type consistent in block matrix and sub blocks
         B->adjust_value_type();
@@ -1053,6 +1062,6 @@ init_cluster_bases ( const hpro::TBlockCluster *  bct,
     }// if
 }
 
-}}}}// namespace hlr::omp::matrix::detail
+}}}}// namespace hlr::hpx::matrix::detail
 
-#endif // __HLR_OMP_DETAIL_MATRIX_HH
+#endif // __HLR_HPX_DETAIL_MATRIX_HH

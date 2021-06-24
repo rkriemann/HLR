@@ -239,10 +239,10 @@ namespace detail
 
 template < typename approx_t >
 void
-gauss_elim_helper ( hpro::TMatrix &          A,
-                    hpro::TMatrix &          T,
-                    const hpro::TTruncAcc &  acc,
-                    const approx_t &         approx )
+gauss_elim_task ( hpro::TMatrix &          A,
+                  hpro::TMatrix &          T,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
 {
     HLR_ASSERT( ! is_null_any( &A, &T ) );
     HLR_ASSERT( A.type() == T.type() );
@@ -257,7 +257,7 @@ gauss_elim_helper ( hpro::TMatrix &          A,
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        gauss_elim_helper( *MA(0,0), *MT(0,0), acc, approx );
+        gauss_elim_task( *MA(0,0), *MT(0,0), acc, approx );
 
         // T_01 = A_00⁻¹ · A_01
         #pragma omp taskgroup
@@ -280,7 +280,7 @@ gauss_elim_helper ( hpro::TMatrix &          A,
         hlr::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), MA(1,1), acc, approx );
     
         // A_11 = A_11⁻¹
-        gauss_elim_helper( *MA(1,1), *MT(1,1), acc, approx );
+        gauss_elim_task( *MA(1,1), *MT(1,1), acc, approx );
 
         #pragma omp taskgroup
         {
@@ -330,7 +330,7 @@ gauss_elim ( hpro::TMatrix &          A,
         {
             #pragma omp task
             {
-                detail::gauss_elim_helper( A, T, acc, approx );
+                detail::gauss_elim_task( A, T, acc, approx );
             }// # task
         }// single 
     }// omp

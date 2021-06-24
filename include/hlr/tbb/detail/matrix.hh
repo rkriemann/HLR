@@ -1756,32 +1756,32 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 HLR_ASSERT( Rx.ncols() != 0 );
                 
                 auto  T       = blas::prod( Rw, blas::adjoint( Rx ) );
-                // auto  lock_rcb = std::scoped_lock( rowcb.mutex() );
-                // auto  lock_ccb = std::scoped_lock( colcb.mutex() );
+                auto  lock_rcb = std::scoped_lock( rowcb.mutex() );
+                auto  lock_ccb = std::scoped_lock( colcb.mutex() );
 
-                char  buf[32];
+                // char  buf[32];
 
-                while ( ! rowcb.mutex().try_lock() )
-                {
-                    snprintf( buf, 32, "[%d<-r%d]", bct->id(), rowcb.mtx_id );
-                    std::cout << buf << std::endl;
-                }// while
+                // while ( ! rowcb.mutex().try_lock() )
+                // {
+                //     snprintf( buf, 32, "[%d<-r%d]", bct->id(), rowcb.mtx_id );
+                //     std::cout << buf << std::endl;
+                // }// while
 
                 rowcb.mtx_id = bct->id();
 
-                while ( ! colcb.mutex().try_lock() )
-                {
-                    snprintf( buf, 32, "[%d<-c%d]", bct->id(), colcb.mtx_id );
-                    std::cout << buf << std::endl;
-                }// while
+                // while ( ! colcb.mutex().try_lock() )
+                // {
+                //     snprintf( buf, 32, "[%d<-c%d]", bct->id(), colcb.mtx_id );
+                //     std::cout << buf << std::endl;
+                // }// while
 
                 colcb.mtx_id = bct->id();
 
                 // rowcb.mutex().lock(); rowcb.mtx_id = bct->id();
                 // colcb.mutex().lock(); colcb.mtx_id = bct->id();
 
-                snprintf( buf, 32, "%d{", bct->id() );
-                std::cout << buf << std::endl;
+                // snprintf( buf, 32, "%d{", bct->id() );
+                // std::cout << buf << std::endl;
                 
                 ::tbb::parallel_invoke(
                     [&] ()
@@ -1826,8 +1826,8 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 rowcb.mtx_id = -1 ; rowcb.mutex().unlock();
 
                 // std::cout << bct->id() << ':' << rowcb.basis().ncols() << ',' << RU->coeff().nrows() << ',' << RU->coeff().ncols() << ',' << colcb.basis().ncols() << ">}" << std::endl;
-                snprintf( buf, 32, "}%d", bct->id() );
-                std::cout << buf << std::endl;
+                // snprintf( buf, 32, "}%d", bct->id() );
+                // std::cout << buf << std::endl;
                 
                 M = std::move( RU );
             }// if

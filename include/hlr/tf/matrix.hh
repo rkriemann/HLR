@@ -20,14 +20,11 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/seq/matrix.hh"
 
-namespace hlr
-{
-    
-namespace tf
-{
+#include "hlr/tf/detail/matrix.hh"
 
-namespace matrix
-{
+namespace hlr { namespace tf { namespace matrix {
+
+namespace hpro = HLIB;
 
 //
 // build representation of dense matrix with
@@ -40,25 +37,25 @@ namespace detail
 
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
+std::unique_ptr< hpro::TMatrix >
 build_helper ( ::tf::Subflow &              tf,
-               const HLIB::TBlockCluster *  bct,
+               const hpro::TBlockCluster *  bct,
                const coeff_t &              coeff,
                const lrapx_t &              lrapx,
-               const HLIB::TTruncAcc &      acc,
+               const hpro::TTruncAcc &      acc,
                const size_t                 nseq )
 {
     static_assert( std::is_same< typename coeff_t::value_t,
                    typename lrapx_t::value_t >::value,
                    "coefficient function and low-rank approximation must have equal value type" );
 
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
 
     //
     // decide upon cluster type, how to construct matrix
     //
 
-    auto        M     = std::unique_ptr< HLIB::TMatrix >();
+    auto        M     = std::unique_ptr< hpro::TMatrix >();
     const auto  rowis = bct->is().row_is();
     const auto  colis = bct->is().col_is();
 
@@ -70,7 +67,7 @@ build_helper ( ::tf::Subflow &              tf,
     {
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< HLIB::TMatrix >( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< hpro::TMatrix >( lrapx.build( bct, acc ) );
         }// if
         else
         {
@@ -83,9 +80,9 @@ build_helper ( ::tf::Subflow &              tf,
     }// if
     else
     {
-        M = std::make_unique< HLIB::TBlockMatrix >( bct );
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
         
-        auto  B = ptrcast( M.get(), HLIB::TBlockMatrix );
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -102,13 +99,12 @@ build_helper ( ::tf::Subflow &              tf,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    tf.emplace(
-                        [bct,i,j,&coeff,&lrapx,&acc,B,nseq] ( ::tf::Subflow &  sf )
-                        {
-                            auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc, nseq );
-                            
-                            B->set_block( i, j, B_ij.release() );
-                        } );
+                    tf.emplace( [=,&coeff,&lrapx,&acc] ( ::tf::Subflow &  sf )
+                    {
+                        auto  B_ij = build_helper( sf, bct->son( i, j ), coeff, lrapx, acc, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    } );
                 }// if
             }// for
         }// for
@@ -129,15 +125,15 @@ build_helper ( ::tf::Subflow &              tf,
 
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< HLIB::TMatrix >
-build ( const HLIB::TBlockCluster *  bct,
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const HLIB::TTruncAcc &      acc,
+        const hpro::TTruncAcc &      acc,
         const size_t                 nseq = hpro::CFG::Arith::max_seq_size )
 {
     ::tf::Taskflow                    tf;
-    std::unique_ptr< HLIB::TMatrix >  res;
+    std::unique_ptr< hpro::TMatrix >  res;
     
     tf.emplace( [&,bct,nseq] ( ::tf::Subflow &  sf ) { res = detail::build_helper( sf, bct, coeff, lrapx, acc, nseq ); } );
 
@@ -146,6 +142,71 @@ build ( const HLIB::TBlockCluster *  bct,
     executor.run( tf ).wait();
 
     return res;
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+
+    detail::init_cluster_bases( bct, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
 //
@@ -166,15 +227,15 @@ assign_cluster ( hpro::TMatrix &              M,
 namespace detail
 {
 
-std::unique_ptr< HLIB::TMatrix >
+std::unique_ptr< hpro::TMatrix >
 copy_helper ( ::tf::Subflow &        tf,
-              const HLIB::TMatrix &  M )
+              const hpro::TMatrix &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, HLIB::TBlockMatrix );
-        auto  N  = std::make_unique< HLIB::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), HLIB::TBlockMatrix );
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
 
         B->copy_struct_from( BM );
         
@@ -207,11 +268,11 @@ copy_helper ( ::tf::Subflow &        tf,
 
 }// namespace detail
 
-std::unique_ptr< HLIB::TMatrix >
-copy ( const HLIB::TMatrix &  M )
+std::unique_ptr< hpro::TMatrix >
+copy ( const hpro::TMatrix &  M )
 {
     ::tf::Taskflow                    tf;
-    std::unique_ptr< HLIB::TMatrix >  res;
+    std::unique_ptr< hpro::TMatrix >  res;
     
     tf.emplace( [&M,&res] ( ::tf::Subflow &  sf ) { res = detail::copy_helper( sf, M ); } );
 
@@ -231,19 +292,19 @@ namespace detail
 
 void
 copy_to_helper ( ::tf::Subflow &        tf,
-                 const HLIB::TMatrix &  A,
-                 HLIB::TMatrix &        B )
+                 const hpro::TMatrix &  A,
+                 hpro::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, HLIB::TBlockMatrix );
-        auto  BB = ptrcast(  &B, HLIB::TBlockMatrix );
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -254,7 +315,7 @@ copy_to_helper ( ::tf::Subflow &        tf,
                     tf.emplace(
                         [BA,BB,i,j] ( ::tf::Subflow &  sf )
                         {
-                            assert( ! is_null( BB->block( i, j ) ) );
+                            HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
                             
                             copy_to_helper( sf, * BA->block( i, j ), * BB->block( i, j ) );
                         } );
@@ -271,8 +332,8 @@ copy_to_helper ( ::tf::Subflow &        tf,
 }// namespace detail
 
 void
-copy_to ( const HLIB::TMatrix &  A,
-          HLIB::TMatrix &        B )
+copy_to ( const hpro::TMatrix &  A,
+          hpro::TMatrix &        B )
 {
     ::tf::Taskflow  tf;
     
@@ -291,18 +352,18 @@ copy_to ( const HLIB::TMatrix &  A,
 namespace detail
 {
 
-std::unique_ptr< HLIB::TMatrix >
+std::unique_ptr< hpro::TMatrix >
 realloc_helper ( ::tf::Subflow &  tf,
-                 HLIB::TMatrix *  A )
+                 hpro::TMatrix *  A )
 {
     if ( is_null( A ) )
         return nullptr;
     
     if ( is_blocked( A ) )
     {
-        auto  B  = ptrcast( A, HLIB::TBlockMatrix );
-        auto  C  = std::make_unique< HLIB::TBlockMatrix >();
-        auto  BC = ptrcast( C.get(), HLIB::TBlockMatrix );
+        auto  B  = ptrcast( A, hpro::TBlockMatrix );
+        auto  C  = std::make_unique< hpro::TBlockMatrix >();
+        auto  BC = ptrcast( C.get(), hpro::TBlockMatrix );
 
         C->copy_struct_from( B );
 
@@ -343,11 +404,11 @@ realloc_helper ( ::tf::Subflow &  tf,
 
 }// namespace detail
 
-std::unique_ptr< HLIB::TMatrix >
-realloc ( HLIB::TMatrix *  A )
+std::unique_ptr< hpro::TMatrix >
+realloc ( hpro::TMatrix *  A )
 {
     ::tf::Taskflow                    tf;
-    std::unique_ptr< HLIB::TMatrix >  res;
+    std::unique_ptr< hpro::TMatrix >  res;
     
     tf.emplace( [A,&res] ( ::tf::Subflow &  sf ) { res = detail::realloc_helper( sf, A ); } );
 

@@ -22,16 +22,9 @@
 
 #include "hlr/hpx/dag.hh"
 
-namespace hlr
-{
+namespace hlr { namespace hpx { namespace dag {
 
 using namespace HLIB;
-
-namespace hpx
-{
-
-namespace dag
-{
 
 using hlr::dag::node;
 using hlr::dag::graph;
@@ -363,8 +356,4 @@ run ( graph &                  dag,
     log( 2, "time for HPX DAG run     = " + HLIB::to_string( "%.2fs", toc.seconds() ) );
 }
 
-}// namespace HPX
-
-}// namespace DAG
-
-}// namespace HLR
+}}}// namespace hlr::hpx::dag

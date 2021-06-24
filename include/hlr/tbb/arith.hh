@@ -580,7 +580,7 @@ lu_nd ( hpro::TMatrix &          A,
 //   structure as A
 //
 template < typename approx_t >
-inline void
+void
 gauss_elim ( hpro::TMatrix &          A,
              hpro::TMatrix &          T,
              const hpro::TTruncAcc &  acc,

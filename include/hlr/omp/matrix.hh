@@ -93,25 +93,20 @@ build_task ( const HLIB::TBlockCluster *  bct,
         // recurse
         #pragma omp taskgroup
         {
+            #pragma omp taskloop collapse(2) default(shared)
             for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
                     if ( bct->son( i, j ) != nullptr )
                     {
-                        #pragma omp task
-                        {
-                            auto  B_ij = build_task( bct->son( i, j ), coeff, lrapx, acc, nseq );
-                    
-                            B->set_block( i, j, B_ij.release() );
-                        }// omp task
+                        auto  B_ij = build_task( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
                     }// if
                 }// for
             }// for
         }// omp taskgroup
-
-        // wait for child tasks
-        // #pragma omp taskwait
 
         // make value type consistent in block matrix and sub blocks
         B->adjust_value_type();
@@ -140,15 +135,9 @@ build ( const HLIB::TBlockCluster *  bct,
 
     // spawn parallel region for tasks
     #pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                res = detail::build_task( bct, coeff, lrapx, acc, nseq );
-            }// omp task
-        }// omp single
-    }// omp parallel
+    #pragma omp single
+    #pragma omp task
+    res = detail::build_task( bct, coeff, lrapx, acc, nseq );
 
     return res;
 }
@@ -172,7 +161,21 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                     const hpro::TTruncAcc &      acc,
                     const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb = std::unique_ptr< cluster_basis >();
+    auto  colcb = std::unique_ptr< cluster_basis >();
+    auto  M     = std::unique_ptr< hpro::TMatrix >();
+    
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    {
+        std::tie( rowcb, colcb, M ) = detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+    }// omp task
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
 //
@@ -217,15 +220,11 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     
     // spawn parallel region for tasks
     #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
     {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                M = std::move( detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data ) );
-            }// omp task
-        }// omp single
-    }// omp parallel
+        M = std::move( detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data ) );
+    }// omp task
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -258,26 +257,25 @@ copy_task ( const HLIB::TMatrix &  M )
         auto  B  = ptrcast( N.get(), HLIB::TBlockMatrix );
 
         B->copy_struct_from( BM );
-        
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+
+        #pragma omp taskgroup
         {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            #pragma omp taskloop collapse(2)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                if ( BM->block( i, j ) != nullptr )
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    #pragma omp task
+                    if ( BM->block( i, j ) != nullptr )
                     {
                         auto  B_ij = copy_task( * BM->block( i, j ) );
                             
                         B_ij->set_parent( B );
                         B->set_block( i, j, B_ij.release() );
-                    }// omp task
-                }// if
-            }// for
-        }// for
+                    }// if
+                }// for
+            }// omp taskloop for
+        }// omp taskgroup
 
-        #pragma omp taskwait
-        
         return N;
     }// if
     else
@@ -296,15 +294,9 @@ copy ( const HLIB::TMatrix &  M )
 
     // spawn parallel region for tasks
     #pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                res = detail::copy_task( M );
-            }// omp task
-        }// omp single
-    }// omp parallel
+    #pragma omp single
+    #pragma omp task
+    res = detail::copy_task( M );
 
     return res;
 }
@@ -330,22 +322,20 @@ copy_to_task ( const HLIB::TMatrix &  A,
 
         HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
         HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
-        
+
+        #pragma omp taskloop collapse(2)
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < BA->nblock_cols(); ++j )
             {
                 if ( BA->block( i, j ) != nullptr )
                 {
-                    #pragma omp task
-                    {
-                        HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
 
-                        copy_to_task( * BA->block( i, j ), * BB->block( i, j ) );
-                    }// omp task
+                    copy_to_task( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
             }// for
-        }// for
+        }// omp taskloop for
     }// if
     else
     {
@@ -361,15 +351,9 @@ copy_to ( const HLIB::TMatrix &  A,
 {
     // spawn parallel region for tasks
     #pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                detail::copy_to_task( A, B );
-            }// omp task
-        }// omp single
-    }// omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::copy_to_task( A, B );
 }
 
 //
@@ -394,21 +378,20 @@ realloc_task ( HLIB::TMatrix *  A )
 
         C->copy_struct_from( B );
 
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        #pragma omp taskgroup
         {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            #pragma omp taskloop collapse(2)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                #pragma omp task
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
                     auto  C_ij = realloc_task( B->block( i, j ) );
                     
                     BC->set_block( i, j, C_ij.release() );
                     B->set_block( i, j, nullptr );
-                }
+                }// for
             }// for
-        }// for
-
-        #pragma omp taskwait
+        }// omp taskgroup
         
         delete B;
 
@@ -433,15 +416,9 @@ realloc ( HLIB::TMatrix *  A )
 
     // spawn parallel region for tasks
     #pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp task
-            {
-                res = detail::realloc_task( A );
-            }// omp task
-        }// omp single
-    }// omp parallel
+    #pragma omp single
+    #pragma omp task
+    res = detail::realloc_task( A );
 
     return res;
 }
