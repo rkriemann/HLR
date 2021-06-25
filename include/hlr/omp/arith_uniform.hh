@@ -48,9 +48,9 @@ mul_vec ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    #pragma parallel
-    #pragma single
-    #pragma task default(shared)
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task default(shared) firstprivate(alpha,op_M)
     {
         detail::mutex_map_t  mtx_map;
 
@@ -126,7 +126,7 @@ multiply ( const value_t            alpha,
 
     #pragma omp parallel
     #pragma omp single
-    #pragma omp task
+    #pragma omp task default(shared) firstprivate(alpha,op_A,op_B)
     {
         detail::multiply( alpha, C, accu, acc, approx, basis_data );
     }// omp task
@@ -152,7 +152,7 @@ multiply_cached ( const value_t            alpha,
 
     #pragma omp parallel
     #pragma omp single
-    #pragma omp task
+    #pragma omp task firstprivate(alpha,op_A,op_B)
     {
         detail::multiply( alpha, C, accu, acc, approx, basis_data );
     }// omp task
