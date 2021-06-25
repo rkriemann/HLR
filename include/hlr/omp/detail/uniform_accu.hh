@@ -58,22 +58,33 @@ struct accumulator
 
     // cached products
     inner_map_t *                      prod_inner;
+    std::mutex *                       prod_inner_mtx;
     
     //
     // ctors
     //
 
-    accumulator ( inner_map_t *                        aprod_inner = nullptr )
+    accumulator ( inner_map_t *                        aprod_inner     = nullptr,
+                  std::mutex *                         aprod_inner_mtx = nullptr )
             : prod_inner( aprod_inner )
-    {}
+            , prod_inner_mtx( aprod_inner_mtx )
+    {
+        if ( ! is_null( prod_inner ) )
+            HLR_ASSERT( ! is_null( prod_inner_mtx ) );
+    }
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
                   update_list &&                       apending,
-                  inner_map_t *                        aprod_inner = nullptr )
+                  inner_map_t *                        aprod_inner     = nullptr,
+                  std::mutex *                         aprod_inner_mtx = nullptr )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
             , prod_inner( aprod_inner )
-    {}
+            , prod_inner_mtx( aprod_inner_mtx )
+    {
+        if ( ! is_null( prod_inner ) )
+            HLR_ASSERT( ! is_null( prod_inner_mtx ) );
+    }
     
     //
     // remove update matrix
@@ -313,8 +324,6 @@ struct accumulator
             // handle different uniform product variants in parallel
             //
 
-            std::mutex  mtx_pi; // mutex for access to "prod_inner"
-
             #pragma omp taskgroup
             {
                 #pragma omp task default(shared)
@@ -325,7 +334,7 @@ struct accumulator
 
                         vpending.reserve( pending_uniAB.size() );
                         std::copy( std::begin( pending_uniAB ), std::end( pending_uniAB ), std::back_inserter( vpending ) );
-                        R = std::move( sum_uni_uni< value_t >( 0, vpending.size(), vpending, mtx_pi ) );
+                        R = std::move( sum_uni_uni< value_t >( 0, vpending.size(), vpending ) );
                     }// if
                 }// omp task
 
@@ -568,8 +577,7 @@ struct accumulator
     blas::matrix< value_t >
     sum_uni_uni ( const int                lb,
                   const int                ub,
-                  std::vector< update > &  updates,
-                  std::mutex &             mtx_pi )
+                  std::vector< update > &  updates )
     {
         if ( ub - lb <= 1 )
         {
@@ -593,18 +601,12 @@ struct accumulator
 
             if ( ! is_null( prod_inner ) )
             {
-                {
-                    std::scoped_lock  lock( mtx_pi );
+                std::scoped_lock  lock( * prod_inner_mtx );
                                                        
-                    if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
-                        prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
-                }// if
-                                                   
-                {
-                    std::scoped_lock  lock( mtx_pi );
-                                                       
-                    XW = prod_inner->at( RA->col_is( op_A ) );
-                }// else
+                if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
+                    prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
+                
+                XW = prod_inner->at( RA->col_is( op_A ) );
             }// if
             else
                 XW = std::move( blas::prod( blas::adjoint( X ), W ) );
@@ -623,12 +625,12 @@ struct accumulator
             {
                 #pragma omp task default(shared) firstprivate(lb,mid)
                 {
-                    R1 = sum_uni_uni< value_t >( lb, mid, updates, mtx_pi );
+                    R1 = sum_uni_uni< value_t >( lb, mid, updates );
                 }// omp task
                 
                 #pragma omp task default(shared) firstprivate(mid,ub)
                 {
-                    R2 = sum_uni_uni< value_t >( mid, ub, updates, mtx_pi );
+                    R2 = sum_uni_uni< value_t >( mid, ub, updates );
                 }// omp task
             }// omp taskgroup
             

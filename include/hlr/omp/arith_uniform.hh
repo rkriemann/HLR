@@ -118,8 +118,9 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
+    auto  pi_mtx     = std::mutex();
     auto  prod_inner = detail::inner_map_t();
-    auto  accu       = detail::accumulator( & prod_inner );
+    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
     auto  basis_data = detail::rec_basis_data_t( C );
 
     accu.add_update( op_A, A, op_B, B );
@@ -144,8 +145,9 @@ multiply_cached ( const value_t            alpha,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
+    auto  pi_mtx     = std::mutex();
     auto  prod_inner = detail::inner_map_t();
-    auto  accu       = detail::accumulator( & prod_inner );
+    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
     auto  basis_data = detail::rec_basis_data_t( C );
 
     accu.add_update( op_A, A, op_B, B );
