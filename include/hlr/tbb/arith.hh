@@ -26,7 +26,7 @@
 #include <hlr/dag/lu.hh>
 #include <hlr/tbb/dag.hh>
 
-#include <hlr/tbb/arith_impl.hh>
+#include <hlr/tbb/detail/arith.hh>
 
 namespace hlr { namespace tbb {
 

@@ -513,7 +513,7 @@ struct rec_basis_data_t
 
     // mutexes for the lists within rowmap/colmap
     // mutex_map_t    rowmtxs, colmtxs;
-
+    
     //
     // extend row basis <cb> by block W·T·X' (X is not needed for computation)
     //

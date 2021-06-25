@@ -130,7 +130,8 @@ multiply_task ( const value_t            alpha,
         auto  BA = cptrcast( &A, TBlockMatrix );
         auto  BB = cptrcast( &B, TBlockMatrix );
         auto  BC = ptrcast(  &C, TBlockMatrix );
-        
+
+        #pragma omp taskloop collapse(3) default(shared) firstprivate(alpha,op_A,op_B)
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
@@ -146,13 +147,10 @@ multiply_task ( const value_t            alpha,
                     
                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    #pragma omp task
-                    {
-                        multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
-                    }// omp task
+                    multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                 }// for
             }// for
-        }// for
+        }// omp taskloop for
     }// if
     else
         hlr::multiply( alpha, op_A, A, op_B, B, C, acc, approx );
@@ -176,7 +174,7 @@ multiply_parfor ( const value_t            alpha,
         auto  BB = cptrcast( &B, TBlockMatrix );
         auto  BC = ptrcast(  &C, TBlockMatrix );
 
-        #pragma omp for collapse(3)
+        #pragma omp for collapse(3) firstprivate(alpha,op_A,op_B)
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
