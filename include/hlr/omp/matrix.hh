@@ -223,6 +223,48 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 }
 
 //
+// build uniform-H version from given H-matrix <A>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TMatrix &    A,
+                    const basisapx_t &       basisapx,
+                    const hpro::TTruncAcc &  acc,
+                    const size_t             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
+    }// if
+
+    detail::init_cluster_bases( A, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = std::unique_ptr< hpro::TMatrix >();
+    
+    // spawn parallel region for tasks
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    {
+        M = std::move( detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, basis_data ) );
+    }// omp task
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
+//
 // assign block cluster to matrix
 //
 inline
