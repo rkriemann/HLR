@@ -1397,13 +1397,10 @@ struct rec_basis_data_t
             return std::move( blas::copy( W ) );
             
         //
-        // collect all scaled coupling matrices
+        // copy uniform matrices for basis to local list for minimal blocking
         //
         
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.ncols();
-        auto    uni_mats  = matrix_list_t();
-        auto    mat_ids   = std::vector< int >();
+        auto  uni_mats = matrix_list_t();
 
         {
             auto  lock = std::scoped_lock( rowmapmtx );
@@ -1411,41 +1408,48 @@ struct rec_basis_data_t
             HLR_ASSERT( rowmap.find( cb.is() ) != rowmap.end() );
             
             for ( auto  M_i : rowmap.at( cb.is() ) )
-            {
                 uni_mats.push_back( M_i );
-                mat_ids.push_back( M_i->id() );
-            }// for
         }
 
-        for ( auto  M_i : uni_mats )
-        {
-            const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto        S_i = blas::matrix< value_t >();
-                        
-            {
-                auto  lock_i = std::scoped_lock( M_i->mutex() );
-
-                S_i = std::move( blas::copy( R_i->coeff() ) );
-            }
-                        
-            HLR_ASSERT( S_i.nrows() == cb.basis().ncols() );
-            
-            auto  norm = norm::spectral( S_i );
-                        
-            if ( norm != real_t(0) )
-            {
-                blas::scale( value_t(1) / norm, S_i );
-                nrows_S += S_i.ncols();
-                couplings.push_back( std::move( S_i ) );
-                // std::cout << M_i->id() << '(' << nrows_S << ',' << S_i.ncols() << ')' << std::endl;
-            }// if
-            // else
-            //     // std::cout << M_i->id() << "(=0)" << std::endl;
-        }// for
-
-        // if ( uni_mats.size() != 0 )
-        //     HLR_ASSERT( nrows_S > T.ncols() );
+        //
+        // collect scaled coupling matrices and filter out zero couplings
+        //
         
+        auto    couplings = std::list< blas::matrix< value_t > >();
+        size_t  nrows_S   = T.ncols();
+        auto    cmtx      = std::mutex();
+        
+        ::tbb::parallel_for< size_t >(
+            0, uni_mats.size(),
+            [&] ( const uint  i )
+            {
+                auto        M_i = uni_mats[i];
+                const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto        S_i = blas::matrix< value_t >();
+
+                {
+                    auto  lock = std::scoped_lock( M_i->mutex() );
+
+                    S_i = std::move( blas::copy( blas::adjoint( R_i->coeff() ) ) );
+                }
+                
+                HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
+                
+                const auto  norm = norm::spectral( S_i );
+
+                if ( norm != real_t(0) )
+                {
+                    blas::scale( value_t(1) / norm, S_i );
+
+                    {
+                        auto  lock = std::scoped_lock( cmtx );
+                    
+                        nrows_S += S_i.nrows();
+                        couplings.push_back( std::move( S_i ) );
+                    }
+                }// if
+            } );
+
         //
         // assemble all scaled coupling matrices into joined matrix
         //
@@ -1454,42 +1458,38 @@ struct rec_basis_data_t
         auto    Ue  = blas::join_row< value_t >( { U, W } );
         auto    S   = blas::matrix< value_t >( nrows_S, Ue.ncols() );
         size_t  pos = 0;
-
-        int  id_i = 0;
             
         for ( auto  S_i : couplings )
         {
-            HLR_ASSERT( pos + S_i.ncols() <= S.nrows() );
-            HLR_ASSERT( S_i.nrows() == U.ncols() );
+            HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+            HLR_ASSERT( S_i.ncols() == U.ncols() );
             
             auto  S_sub = blas::matrix< value_t >( S,
-                                                   blas::range( pos, pos + S_i.ncols()-1 ),
+                                                   blas::range( pos, pos + S_i.nrows()-1 ),
                                                    blas::range( 0, U.ncols() - 1 ) );
                         
-            blas::copy( blas::adjoint( S_i ), S_sub );
-            pos += S_i.ncols();
-
-            id_i++;
+            blas::copy( S_i, S_sub );
+            pos += S_i.nrows();
         }// for
 
         //
         // add part from W·T·X'
         //
         
-        auto  S_i  = blas::copy( T );
+        auto  S_i  = blas::copy( blas::adjoint( T ) );
         auto  norm = norm::spectral( T );
             
         if ( norm != real_t(0) )
             blas::scale( value_t(1) / norm, S_i );
             
-        HLR_ASSERT( pos + S_i.ncols() <= S.nrows() );
-        HLR_ASSERT( S_i.nrows() == Ue.ncols() - U.ncols() );
+        HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+        HLR_ASSERT( S_i.ncols() == Ue.ncols() - U.ncols() );
         
         auto  S_sub = blas::matrix< value_t >( S,
-                                               blas::range( pos, pos + T.ncols()-1 ),
+                                               blas::range( pos, pos + S_i.nrows()-1 ),
                                                blas::range( U.ncols(), Ue.ncols() - 1 ) );
             
-        blas::copy( blas::adjoint( S_i ), S_sub );
+        blas::copy( S_i, S_sub );
         
         //
         // form product Ue·S and compute column basis
@@ -1527,13 +1527,10 @@ struct rec_basis_data_t
             return std::move( blas::copy( X ) );
             
         //
-        // collect all scaled coupling matrices
+        // copy uniform matrices for basis to local list for minimal blocking
         //
         
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.nrows();
-        auto    uni_mats  = matrix_list_t();
-        auto    mat_ids   = std::vector< int >();
+        auto  uni_mats = matrix_list_t();
 
         {
             auto  lock = std::scoped_lock( colmapmtx );
@@ -1541,41 +1538,48 @@ struct rec_basis_data_t
             HLR_ASSERT( colmap.find( cb.is() ) != colmap.end() );
             
             for ( auto  M_i : colmap.at( cb.is() ) )
-            {
                 uni_mats.push_back( M_i );
-                mat_ids.push_back( M_i->id() );
-            }// for
         }
 
-        for ( auto  M_i : uni_mats )
-        {
-            const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto        S_i = blas::matrix< value_t >();
-
-            {
-                auto  lock_i = std::scoped_lock( M_i->mutex() );
-                
-                S_i = std::move( blas::copy( R_i->coeff() ) );
-            }
-                        
-            HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
-            
-            auto  norm = norm::spectral( S_i );
-
-            if ( norm != real_t(0) )
-            {
-                blas::scale( value_t(1) / norm, S_i );
-                nrows_S += S_i.nrows();
-                couplings.push_back( std::move( S_i ) );
-                // std::cout << M_i->id() << '(' << nrows_S << ',' << S_i.nrows() << ')' << std::endl;
-            }// if
-            // else
-            //     // std::cout << M_i->id() << "(=0)" << std::endl;
-        }// for
-
-        // if ( uni_mats.size() != 0 )
-        //     HLR_ASSERT( nrows_S > T.nrows() );
+        //
+        // collect scaled coupling matrices and filter out zero couplings
+        //
         
+        size_t  nrows_S   = T.nrows();
+        auto    couplings = std::list< blas::matrix< value_t > >();
+        auto    cmtx      = std::mutex();
+        
+        ::tbb::parallel_for< size_t >(
+            0, uni_mats.size(),
+            [&] ( const uint  i )
+            {
+                auto        M_i = uni_mats[i];
+                const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto        S_i = blas::matrix< value_t >();
+
+                {
+                    auto  lock = std::scoped_lock( M_i->mutex() );
+                    
+                    S_i = std::move( blas::copy( R_i->coeff() ) );
+                }
+
+                HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
+
+                const auto  norm = norm::spectral( S_i );
+
+                if ( norm != real_t(0) )
+                {
+                    blas::scale( value_t(1) / norm, S_i );
+
+                    {
+                        auto  lock = std::scoped_lock( cmtx );
+                    
+                        nrows_S += S_i.nrows();
+                        couplings.push_back( std::move( S_i ) );
+                    }
+                }// if
+            } );
+
         //
         // assemble all scaled coupling matrices into joined matrix
         //
@@ -1584,8 +1588,6 @@ struct rec_basis_data_t
         auto    Ve  = blas::join_row< value_t >( { V, X } );
         auto    S   = blas::matrix< value_t >( nrows_S, Ve.ncols() );
         size_t  pos = 0;
-
-        int  id_i = 0;
             
         for ( auto  S_i : couplings )
         {
@@ -1598,8 +1600,6 @@ struct rec_basis_data_t
 
             blas::copy( S_i, S_sub );
             pos += S_i.nrows();
-
-            id_i++;
         }// for
 
         //
@@ -1661,14 +1661,17 @@ struct rec_basis_data_t
         auto  U  = cb.basis();
         auto  TU = blas::prod( blas::adjoint( Un ), U );
 
-        for ( auto  M_i : uni_mats )
-        {
-            auto  lock_i = std::scoped_lock( M_i->mutex() );
-            auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i    = blas::prod( TU, R_i->coeff() );
-
-            R_i->set_coeff_unsafe( std::move( S_i ) );
-        }// for
+        ::tbb::parallel_for< size_t >(
+            0, uni_mats.size(),
+            [&] ( const uint  i )
+            {
+                auto  M_i    = uni_mats[i];
+                auto  lock_i = std::scoped_lock( M_i->mutex() );
+                auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto  S_i    = blas::prod( TU, R_i->coeff() );
+                
+                R_i->set_coeff_unsafe( std::move( S_i ) );
+            } );
     }
 
     //
@@ -1697,14 +1700,17 @@ struct rec_basis_data_t
         auto  V  = cb.basis();
         auto  TV = blas::prod( blas::adjoint( Vn ), V );
 
-        for ( auto  M_i : uni_mats )
-        {
-            auto  lock_i = std::scoped_lock( M_i->mutex() );
-            auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i    = blas::prod( R_i->coeff(), blas::adjoint( TV ) );
+        ::tbb::parallel_for< size_t >(
+            0, uni_mats.size(),
+            [&] ( const uint  i )
+            {
+                auto  M_i    = uni_mats[i];
+                auto  lock_i = std::scoped_lock( M_i->mutex() );
+                auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto  S_i    = blas::prod( R_i->coeff(), blas::adjoint( TV ) );
                 
-            R_i->set_coeff_unsafe( std::move( S_i ) );
-        }// for
+                R_i->set_coeff_unsafe( std::move( S_i ) );
+            } );
     }
 };
 

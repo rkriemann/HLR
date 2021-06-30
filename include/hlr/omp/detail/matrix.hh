@@ -121,11 +121,11 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         // cluster bases hierarchy
         //
 
-        auto             rowcl = node->rowcl();
-        auto             colcl = node->colcl();
-        cluster_basis *  rowcb = nullptr;
-        cluster_basis *  colcb = nullptr;
-        auto             lock  = std::scoped_lock( cbmtx );
+        auto              rowcl = node->rowcl();
+        auto              colcl = node->colcl();
+        cluster_basis *   rowcb = nullptr;
+        cluster_basis *   colcb = nullptr;
+        std::scoped_lock  lock( cbmtx );
                     
         if ( rowcb_map.find( *rowcl ) == rowcb_map.end() )
         {
@@ -188,72 +188,68 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         auto  colmap   = lrmat_map_t();
         auto  lrmat    = std::deque< hpro::TRkMatrix * >();
         
-        #pragma omp taskgroup
+        #pragma omp taskloop default(shared)
+        for ( auto  node : nodes )
         {
-            #pragma omp taskloop default(shared)
-            for ( size_t  idx = 0; idx < nodes.size(); ++idx )
+            auto  M = std::unique_ptr< hpro::TMatrix >();
+
+            if ( node->is_leaf() )
             {
-                auto  node = nodes[idx];
-                auto  M    = std::unique_ptr< hpro::TMatrix >();
-
-                if ( node->is_leaf() )
+                if ( node->is_adm() )
                 {
-                    if ( node->is_adm() )
-                    {
-                        M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
+                    M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
                         
-                        if ( is_lowrank( *M ) )
-                        {
-                            auto  R    = ptrcast( M.get(), hpro::TRkMatrix );
-                            auto  lock = std::scoped_lock( lmtx );
+                    if ( is_lowrank( *M ) )
+                    {
+                        auto  R    = ptrcast( M.get(), hpro::TRkMatrix );
+                        auto  lock = std::scoped_lock( lmtx );
                             
-                            lrmat.push_back( R );
-                            rowmap[ M->row_is() ].push_back( R );
-                            colmap[ M->col_is() ].push_back( R );
-                        }// if
+                        lrmat.push_back( R );
+                        rowmap[ M->row_is() ].push_back( R );
+                        colmap[ M->col_is() ].push_back( R );
                     }// if
-                    else 
-                        M = coeff.build( node->is().row_is(), node->is().col_is() );
                 }// if
-                else
+                else 
+                    M = coeff.build( node->is().row_is(), node->is().col_is() );
+            }// if
+            else
+            {
+                // collect children
                 {
-                    // collect children
-                    {
-                        auto  lock = std::scoped_lock( cmtx );
+                    auto  lock = std::scoped_lock( cmtx );
                             
-                        for ( uint  i = 0; i < node->nrows(); ++i )
-                            for ( uint  j = 0; j < node->ncols(); ++j )
-                                if ( node->son( i, j ) != nullptr )
-                                    children.push_back( node->son( i, j ) );
-                    }
+                    for ( uint  i = 0; i < node->nrows(); ++i )
+                        for ( uint  j = 0; j < node->ncols(); ++j )
+                            if ( node->son( i, j ) != nullptr )
+                                children.push_back( node->son( i, j ) );
+                }
 
-                    M = std::make_unique< hpro::TBlockMatrix >( node );
+                M = std::make_unique< hpro::TBlockMatrix >( node );
         
-                    auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+                auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
 
-                    // make sure, block structure is correct
-                    if (( B->nblock_rows() != node->nrows() ) ||
-                        ( B->nblock_cols() != node->ncols() ))
-                        B->set_block_struct( node->nrows(), node->ncols() );
+                // make sure, block structure is correct
+                if (( B->nblock_rows() != node->nrows() ) ||
+                    ( B->nblock_cols() != node->ncols() ))
+                    B->set_block_struct( node->nrows(), node->ncols() );
 
-                    // make value type consistent in block matrix and sub blocks
-                    B->adjust_value_type();
+                // make value type consistent in block matrix and sub blocks
+                B->adjust_value_type();
 
-                    // remember all block matrices for setting up hierarchy
-                    {
-                        auto  lock = std::scoped_lock( bmtx );
+                // remember all block matrices for setting up hierarchy
+                {
+                    auto  lock = std::scoped_lock( bmtx );
                         
-                        bmat_map[ node->id() ] = B;
-                    }
-                }// else
+                    bmat_map[ node->id() ] = B;
+                }
+            }// else
 
-                M->set_id( node->id() );
-                M->set_procs( node->procs() );
+            M->set_id( node->id() );
+            M->set_procs( node->procs() );
 
-                insert_hier( node, M );
-                create_cb( node );
-            }// omp taskloop for
-        }// omp taskgroup
+            insert_hier( node, M );
+            create_cb( node );
+        }// omp taskloop for
         
         nodes = std::move( children );
         
@@ -271,9 +267,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                     rowiss.push_back( is );
 
                 #pragma omp taskloop default(shared)
-                for ( size_t  idx = 0; idx < rowiss.size(); ++idx )
+                for ( auto  is : rowiss )
                 {
-                    auto  is       = rowiss[ idx ];
                     auto  matrices = rowmap.at( is );
                     
                     if ( matrices.size() == 0 )
@@ -365,9 +360,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                     coliss.push_back( is );
 
                 #pragma omp taskloop default(shared)
-                for ( size_t  idx = 0; idx < coliss.size(); ++idx )
+                for ( auto  is : coliss )
                 {
-                    auto  is       = coliss[ idx ];
                     auto  matrices = colmap.at( is );
 
                     if ( matrices.size() == 0 )
@@ -458,37 +452,33 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         // now convert all blocks on this level
         //
 
-        #pragma omp taskgroup
+        #pragma omp taskloop default(shared)
+        for ( auto  R : lrmat )
         {
-            #pragma omp taskloop default(shared)
-            for ( size_t  idx = 0; idx < lrmat.size(); ++idx )
-            {
-                auto  R     = lrmat[ idx ];
-                auto  rowcb = rowcb_map.at( R->row_is() );
-                auto  colcb = colcb_map.at( R->col_is() );
-                auto  Un    = rowcb->basis();
-                auto  Vn    = colcb->basis();
+            auto  rowcb = rowcb_map.at( R->row_is() );
+            auto  colcb = colcb_map.at( R->col_is() );
+            auto  Un    = rowcb->basis();
+            auto  Vn    = colcb->basis();
 
-                //
-                // R = U·V' ≈ Un (Un' U V' Vn) Vn'
-                //          = Un S Vn'  with  S = Un' U V' Vn
-                //
+            //
+            // R = U·V' ≈ Un (Un' U V' Vn) Vn'
+            //          = Un S Vn'  with  S = Un' U V' Vn
+            //
 
-                auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
-                auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
-                auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
+            auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
+            auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+            auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
 
-                auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
-                                                                                          R->col_is(),
-                                                                                          *rowcb,
-                                                                                          *colcb,
-                                                                                          std::move( S ) );
+            auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
+                                                                                      R->col_is(),
+                                                                                      *rowcb,
+                                                                                      *colcb,
+                                                                                      std::move( S ) );
             
-                // replace standard lowrank block by uniform lowrank block
-                R->parent()->replace_block( R, RU.release() );
-                delete R;
-            }// omp taskloop for
-        }// omp taskgroup
+            // replace standard lowrank block by uniform lowrank block
+            R->parent()->replace_block( R, RU.release() );
+            delete R;
+        }// omp taskloop for
     }// while
     
     return { std::move( rowcb_root ),
@@ -511,9 +501,6 @@ struct rec_basis_data_t
     matrix_map_t   rowmap, colmap;
     std::mutex     rowmapmtx, colmapmtx;
 
-    // mutexes for the lists within rowmap/colmap
-    // mutex_map_t    rowmtxs, colmtxs;
-    
     //
     // extend row basis <cb> by block W·T·X' (X is not needed for computation)
     //
@@ -536,13 +523,10 @@ struct rec_basis_data_t
             return std::move( blas::copy( W ) );
             
         //
-        // collect all scaled coupling matrices
+        // copy uniform matrices for basis to local list for minimal blocking
         //
         
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.ncols();
-        auto    uni_mats  = matrix_list_t();
-        auto    mat_ids   = std::vector< int >();
+        auto  uni_mats = matrix_list_t();
 
         {
             auto  lock = std::scoped_lock( rowmapmtx );
@@ -550,34 +534,45 @@ struct rec_basis_data_t
             HLR_ASSERT( rowmap.find( cb.is() ) != rowmap.end() );
             
             for ( auto  M_i : rowmap.at( cb.is() ) )
-            {
                 uni_mats.push_back( M_i );
-                mat_ids.push_back( M_i->id() );
-            }// for
         }
 
+        //
+        // collect scaled coupling matrices and filter out zero couplings
+        //
+
+        auto    couplings = std::list< blas::matrix< value_t > >();
+        size_t  nrows_S   = T.ncols();
+        auto    cmtx      = std::mutex();
+
+        #pragma omp taskloop default(shared)
         for ( auto  M_i : uni_mats )
         {
             const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
             auto        S_i = blas::matrix< value_t >();
                         
             {
-                auto  lock_i = std::scoped_lock( M_i->mutex() );
+                auto  lock = std::scoped_lock( M_i->mutex() );
 
-                S_i = std::move( blas::copy( R_i->coeff() ) );
+                S_i = std::move( blas::copy( blas::adjoint( R_i->coeff() ) ) );
             }
                         
-            HLR_ASSERT( S_i.nrows() == cb.basis().ncols() );
+            HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
             
-            auto  norm = norm::spectral( S_i );
+            const auto  norm = norm::spectral( S_i );
                         
             if ( norm != real_t(0) )
             {
                 blas::scale( value_t(1) / norm, S_i );
-                nrows_S += S_i.ncols();
-                couplings.push_back( std::move( S_i ) );
+
+                {
+                    auto  lock = std::scoped_lock( cmtx );
+                    
+                    nrows_S += S_i.nrows();
+                    couplings.push_back( std::move( S_i ) );
+                }
             }// if
-        }// for
+        }// omp taskloop for
 
         //
         // assemble all scaled coupling matrices into joined matrix
@@ -587,42 +582,38 @@ struct rec_basis_data_t
         auto    Ue  = blas::join_row< value_t >( { U, W } );
         auto    S   = blas::matrix< value_t >( nrows_S, Ue.ncols() );
         size_t  pos = 0;
-
-        int  id_i = 0;
             
         for ( auto  S_i : couplings )
         {
-            HLR_ASSERT( pos + S_i.ncols() <= S.nrows() );
-            HLR_ASSERT( S_i.nrows() == U.ncols() );
+            HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+            HLR_ASSERT( S_i.ncols() == U.ncols() );
             
             auto  S_sub = blas::matrix< value_t >( S,
-                                                   blas::range( pos, pos + S_i.ncols()-1 ),
+                                                   blas::range( pos, pos + S_i.nrows()-1 ),
                                                    blas::range( 0, U.ncols() - 1 ) );
                         
-            blas::copy( blas::adjoint( S_i ), S_sub );
-            pos += S_i.ncols();
-
-            id_i++;
+            blas::copy( S_i, S_sub );
+            pos += S_i.nrows();
         }// for
 
         //
         // add part from W·T·X'
         //
         
-        auto  S_i  = blas::copy( T );
+        auto  S_i  = blas::copy( blas::adjoint( T ) );
         auto  norm = norm::spectral( T );
             
         if ( norm != real_t(0) )
             blas::scale( value_t(1) / norm, S_i );
             
-        HLR_ASSERT( pos + S_i.ncols() <= S.nrows() );
-        HLR_ASSERT( S_i.nrows() == Ue.ncols() - U.ncols() );
+        HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+        HLR_ASSERT( S_i.ncols() == Ue.ncols() - U.ncols() );
         
         auto  S_sub = blas::matrix< value_t >( S,
-                                               blas::range( pos, pos + T.ncols()-1 ),
+                                               blas::range( pos, pos + S_i.nrows()-1 ),
                                                blas::range( U.ncols(), Ue.ncols() - 1 ) );
             
-        blas::copy( blas::adjoint( S_i ), S_sub );
+        blas::copy( S_i, S_sub );
         
         //
         // form product Ue·S and compute column basis
@@ -660,13 +651,10 @@ struct rec_basis_data_t
             return std::move( blas::copy( X ) );
             
         //
-        // collect all scaled coupling matrices
+        // copy uniform matrices for basis to local list for minimal blocking
         //
         
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.nrows();
-        auto    uni_mats  = matrix_list_t();
-        auto    mat_ids   = std::vector< int >();
+        auto  uni_mats = matrix_list_t();
 
         {
             auto  lock = std::scoped_lock( colmapmtx );
@@ -674,35 +662,46 @@ struct rec_basis_data_t
             HLR_ASSERT( colmap.find( cb.is() ) != colmap.end() );
             
             for ( auto  M_i : colmap.at( cb.is() ) )
-            {
                 uni_mats.push_back( M_i );
-                mat_ids.push_back( M_i->id() );
-            }// for
         }
 
+        //
+        // collect scaled coupling matrices and filter out zero couplings
+        //
+        
+        auto    couplings = std::list< blas::matrix< value_t > >();
+        size_t  nrows_S   = T.nrows();
+        auto    cmtx      = std::mutex();
+        
+        #pragma omp taskloop default(shared)
         for ( auto  M_i : uni_mats )
         {
             const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
             auto        S_i = blas::matrix< value_t >();
 
             {
-                auto  lock_i = std::scoped_lock( M_i->mutex() );
+                auto  lock = std::scoped_lock( M_i->mutex() );
                 
                 S_i = std::move( blas::copy( R_i->coeff() ) );
             }
                         
             HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
             
-            auto  norm = norm::spectral( S_i );
+            const auto  norm = norm::spectral( S_i );
 
             if ( norm != real_t(0) )
             {
                 blas::scale( value_t(1) / norm, S_i );
-                nrows_S += S_i.nrows();
-                couplings.push_back( std::move( S_i ) );
-            }// if
-        }// for
 
+                {
+                    auto  lock = std::scoped_lock( cmtx );
+                    
+                    nrows_S += S_i.nrows();
+                    couplings.push_back( std::move( S_i ) );
+                }
+            }// if
+        }// omp taskloop for
+        
         //
         // assemble all scaled coupling matrices into joined matrix
         //
@@ -711,8 +710,6 @@ struct rec_basis_data_t
         auto    Ve  = blas::join_row< value_t >( { V, X } );
         auto    S   = blas::matrix< value_t >( nrows_S, Ve.ncols() );
         size_t  pos = 0;
-
-        int  id_i = 0;
             
         for ( auto  S_i : couplings )
         {
@@ -725,8 +722,6 @@ struct rec_basis_data_t
 
             blas::copy( S_i, S_sub );
             pos += S_i.nrows();
-
-            id_i++;
         }// for
 
         //
@@ -773,7 +768,6 @@ struct rec_basis_data_t
         if ( cb.basis().ncols() == 0 )
             return;
             
-        // auto  lock_is  = std::scoped_lock( rowmtxs[ cb.is() ] );
         auto  uni_mats = matrix_list_t();
 
         {
@@ -788,14 +782,15 @@ struct rec_basis_data_t
         auto  U  = cb.basis();
         auto  TU = blas::prod( blas::adjoint( Un ), U );
 
+        #pragma omp taskloop default(shared)
         for ( auto  M_i : uni_mats )
         {
-            auto  lock_i = std::scoped_lock( M_i->mutex() );
-            auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i    = blas::prod( TU, R_i->coeff() );
+            auto  lock = std::scoped_lock( M_i->mutex() );
+            auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
+            auto  S_i  = blas::prod( TU, R_i->coeff() );
 
             R_i->set_coeff_unsafe( std::move( S_i ) );
-        }// for
+        }// omp taskloop for
     }
 
     //
@@ -809,7 +804,6 @@ struct rec_basis_data_t
         if ( cb.basis().ncols() == 0 )
             return;
         
-        // auto  lock_is  = std::scoped_lock( colmtxs[ cb.is() ] );
         auto  uni_mats = matrix_list_t();
 
         {
@@ -824,14 +818,15 @@ struct rec_basis_data_t
         auto  V  = cb.basis();
         auto  TV = blas::prod( blas::adjoint( Vn ), V );
 
+        #pragma omp taskloop default(shared)
         for ( auto  M_i : uni_mats )
         {
-            auto  lock_i = std::scoped_lock( M_i->mutex() );
-            auto  R_i    = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i    = blas::prod( R_i->coeff(), blas::adjoint( TV ) );
+            auto  lock = std::scoped_lock( M_i->mutex() );
+            auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
+            auto  S_i  = blas::prod( R_i->coeff(), blas::adjoint( TV ) );
                 
             R_i->set_coeff_unsafe( std::move( S_i ) );
-        }// for
+        }// omp taskloop for
     }
 };
 
