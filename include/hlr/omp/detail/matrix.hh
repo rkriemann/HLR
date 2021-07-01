@@ -510,11 +510,14 @@ struct rec_basis_data_t
     template < typename value_t,
                typename basis_approx_t >
     blas::matrix< value_t >
-    compute_extended_row_basis ( const cluster_basis< value_t > &  cb,
-                                 const blas::matrix< value_t > &   W,
-                                 const blas::matrix< value_t > &   T,
-                                 const hpro::TTruncAcc &           acc,
-                                 const basis_approx_t &            basisapx )
+    compute_extended_basis ( const cluster_basis< value_t > &  cb,
+                             const blas::matrix< value_t > &   W,
+                             const blas::matrix< value_t > &   T,
+                             const hpro::TTruncAcc &           acc,
+                             const basis_approx_t &            basisapx,
+                             matrix_map_t &                    matmap,
+                             std::mutex &                      matmapmtx,
+                             const matop_t                     op )
     {
         using  real_t = hpro::real_type_t< value_t >;
 
@@ -529,11 +532,11 @@ struct rec_basis_data_t
         auto  uni_mats = matrix_list_t();
 
         {
-            auto  lock = std::scoped_lock( rowmapmtx );
+            auto  lock = std::scoped_lock( matmapmtx );
 
-            HLR_ASSERT( rowmap.find( cb.is() ) != rowmap.end() );
+            HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
             
-            for ( auto  M_i : rowmap.at( cb.is() ) )
+            for ( auto  M_i : matmap.at( cb.is() ) )
                 uni_mats.push_back( M_i );
         }
 
@@ -554,7 +557,7 @@ struct rec_basis_data_t
             {
                 auto  lock = std::scoped_lock( M_i->mutex() );
 
-                S_i = std::move( blas::copy( blas::adjoint( R_i->coeff() ) ) );
+                S_i = std::move( blas::copy( blas::mat_view( op, R_i->coeff() ) ) );
             }
                         
             HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
@@ -600,7 +603,7 @@ struct rec_basis_data_t
         // add part from W·T·X'
         //
         
-        auto  S_i  = blas::copy( blas::adjoint( T ) );
+        auto  S_i  = blas::copy( blas::mat_view( op, T ) );
         auto  norm = norm::spectral( T );
             
         if ( norm != real_t(0) )
@@ -629,141 +632,40 @@ struct rec_basis_data_t
         return  Un;
     }
 
-    //
-    // extend column basis <cb> by block W·T·X' (W is not needed for computation)
-    //
-    // - identical to implementation in "arith/detail/uniform.hh" but thread-safe,
-    //   hence, for details look into original code
-    //
     template < typename value_t,
-               typename approx_t >
+               typename basis_approx_t >
+    blas::matrix< value_t >
+    compute_extended_row_basis ( const cluster_basis< value_t > &  cb,
+                                 const blas::matrix< value_t > &   W,
+                                 const blas::matrix< value_t > &   T,
+                                 const hpro::TTruncAcc &           acc,
+                                 const basis_approx_t &            basisapx )
+    {
+        return compute_extended_basis( cb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint );
+    }
+
+    template < typename value_t,
+               typename basis_approx_t >
     blas::matrix< value_t >
     compute_extended_col_basis ( const cluster_basis< value_t > &  cb,
                                  const blas::matrix< value_t > &   X,
                                  const blas::matrix< value_t > &   T,
                                  const hpro::TTruncAcc &           acc,
-                                 const approx_t &                  approx )
+                                 const basis_approx_t &            basisapx )
     {
-        using  real_t = hpro::real_type_t< value_t >;
-
-        // non-zero matrix implies non-empty matrix list
-        if ( cb.basis().ncols() == 0 )
-            return std::move( blas::copy( X ) );
-            
-        //
-        // copy uniform matrices for basis to local list for minimal blocking
-        //
-        
-        auto  uni_mats = matrix_list_t();
-
-        {
-            auto  lock = std::scoped_lock( colmapmtx );
-                    
-            HLR_ASSERT( colmap.find( cb.is() ) != colmap.end() );
-            
-            for ( auto  M_i : colmap.at( cb.is() ) )
-                uni_mats.push_back( M_i );
-        }
-
-        //
-        // collect scaled coupling matrices and filter out zero couplings
-        //
-        
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.nrows();
-        auto    cmtx      = std::mutex();
-        
-        #pragma omp taskloop default(shared)
-        for ( auto  M_i : uni_mats )
-        {
-            const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto        S_i = blas::matrix< value_t >();
-
-            {
-                auto  lock = std::scoped_lock( M_i->mutex() );
-                
-                S_i = std::move( blas::copy( R_i->coeff() ) );
-            }
-                        
-            HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
-            
-            const auto  norm = norm::spectral( S_i );
-
-            if ( norm != real_t(0) )
-            {
-                blas::scale( value_t(1) / norm, S_i );
-
-                {
-                    auto  lock = std::scoped_lock( cmtx );
-                    
-                    nrows_S += S_i.nrows();
-                    couplings.push_back( std::move( S_i ) );
-                }
-            }// if
-        }// omp taskloop for
-        
-        //
-        // assemble all scaled coupling matrices into joined matrix
-        //
-        
-        auto    V   = cb.basis();
-        auto    Ve  = blas::join_row< value_t >( { V, X } );
-        auto    S   = blas::matrix< value_t >( nrows_S, Ve.ncols() );
-        size_t  pos = 0;
-            
-        for ( auto  S_i : couplings )
-        {
-            HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
-            HLR_ASSERT( S_i.ncols() == V.ncols() );
-            
-            auto  S_sub = blas::matrix< value_t >( S,
-                                                   blas::range( pos, pos + S_i.nrows()-1 ),
-                                                   blas::range( 0, V.ncols() - 1 ) );
-
-            blas::copy( S_i, S_sub );
-            pos += S_i.nrows();
-        }// for
-
-        //
-        // add part from W·T·X'
-        //
-        
-        auto  S_i  = blas::copy( T );
-        auto  norm = norm::spectral( T );
-            
-        if ( norm != real_t(0) )
-            blas::scale( value_t(1) / norm, S_i );
-            
-        HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
-        HLR_ASSERT( S_i.ncols() == Ve.ncols() - V.ncols() );
-        
-        auto  S_sub = blas::matrix< value_t >( S,
-                                               blas::range( pos, pos + T.nrows()-1 ),
-                                               blas::range( V.ncols(), Ve.ncols() - 1 ) );
-            
-        blas::copy( S_i, S_sub );
-        
-        //
-        // form product Ve·S' and compute column basis
-        //
-            
-        auto  R = blas::matrix< value_t >();
-
-        blas::qr( S, R, false );
-
-        auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
-        auto  Vn  = approx.column_basis( VeR, acc );
-        
-        return  Vn;
+        return compute_extended_basis( cb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal );
     }
 
     //
-    // update coupling matrices for all blocks sharing row basis <cb> to new basis <Un>
+    // update coupling matrices for all blocks sharing basis <cb> to new basis <Un>
     //
     template < typename value_t >
     void
-    update_row_coupling ( const cluster_basis< value_t > &  cb,
-                          const blas::matrix< value_t > &   Un )
+    update_coupling ( const cluster_basis< value_t > &  cb,
+                      const blas::matrix< value_t > &   Un,
+                      matrix_map_t &                    matmap,
+                      std::mutex &                      matmapmtx,
+                      const bool                        cols )
     {
         if ( cb.basis().ncols() == 0 )
             return;
@@ -771,11 +673,11 @@ struct rec_basis_data_t
         auto  uni_mats = matrix_list_t();
 
         {
-            auto  lock = std::scoped_lock( rowmapmtx );
+            auto  lock = std::scoped_lock( matmapmtx );
                     
-            HLR_ASSERT( rowmap.find( cb.is() ) != rowmap.end() );
+            HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
             
-            for ( auto  M_i : rowmap.at( cb.is() ) )
+            for ( auto  M_i : matmap.at( cb.is() ) )
                 uni_mats.push_back( M_i );
         }
         
@@ -787,46 +689,28 @@ struct rec_basis_data_t
         {
             auto  lock = std::scoped_lock( M_i->mutex() );
             auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i  = blas::prod( TU, R_i->coeff() );
+            auto  S_i  = ( cols
+                           ? blas::prod( R_i->coeff(), blas::adjoint( TU ) )
+                           : blas::prod( TU, R_i->coeff() ) );
 
             R_i->set_coeff_unsafe( std::move( S_i ) );
         }// omp taskloop for
     }
 
-    //
-    // update coupling matrices for all blocks sharing column basis <cb> to new basis <Vn>
-    //
+    template < typename value_t >
+    void
+    update_row_coupling ( const cluster_basis< value_t > &  cb,
+                          const blas::matrix< value_t > &   Un )
+    {
+        update_coupling( cb, Un, rowmap, rowmapmtx, false );
+    }
+
     template < typename value_t >
     void
     update_col_coupling ( const cluster_basis< value_t > &  cb,
                           const blas::matrix< value_t > &   Vn )
     {
-        if ( cb.basis().ncols() == 0 )
-            return;
-        
-        auto  uni_mats = matrix_list_t();
-
-        {
-            auto  lock = std::scoped_lock( colmapmtx );
-                    
-            HLR_ASSERT( colmap.find( cb.is() ) != colmap.end() );
-
-            for ( auto  M_i : colmap.at( cb.is() ) )
-                uni_mats.push_back( M_i );
-        }
-            
-        auto  V  = cb.basis();
-        auto  TV = blas::prod( blas::adjoint( Vn ), V );
-
-        #pragma omp taskloop default(shared)
-        for ( auto  M_i : uni_mats )
-        {
-            auto  lock = std::scoped_lock( M_i->mutex() );
-            auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
-            auto  S_i  = blas::prod( R_i->coeff(), blas::adjoint( TV ) );
-                
-            R_i->set_coeff_unsafe( std::move( S_i ) );
-        }// omp taskloop for
+        update_coupling( cb, Vn, colmap, colmapmtx, true );
     }
 };
 

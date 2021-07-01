@@ -288,13 +288,14 @@ multiply ( const value_t            alpha,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx )
 {
-    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
-    auto  inner_prod         = detail::inner_map_t();
-    auto  accu               = detail::accumulator( nullptr );
+    auto  pi_mtx     = std::mutex();
+    auto  prod_inner = detail::inner_map_t();
+    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
+    auto  basis_data = detail::rec_basis_data_t( C );
 
     accu.add_update( op_A, A, op_B, B );
     
-    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+    detail::multiply( alpha, C, accu, acc, approx, basis_data );
 }
 
 template < typename value_t,
@@ -309,13 +310,14 @@ multiply_cached ( const value_t            alpha,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
 {
-    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
-    auto  prod_inner         = detail::inner_map_t();
-    auto  accu               = detail::accumulator( & prod_inner );
+    auto  pi_mtx     = std::mutex();
+    auto  prod_inner = detail::inner_map_t();
+    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
+    auto  basis_data = detail::rec_basis_data_t( C );
 
     accu.add_update( op_A, A, op_B, B );
-    
-    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+
+    detail::multiply( alpha, C, accu, acc, approx, basis_data );
 }
 
 template < typename value_t,

@@ -303,7 +303,7 @@ build_uniform_rec ( const hpro::TMatrix &    A,
     
     auto  basis_data = detail::rec_basis_data_t();
     auto  M          = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, basis_data );
-
+    
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
