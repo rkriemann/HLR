@@ -106,8 +106,8 @@ program_main ()
     
         tic = timer::now();
     
-        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( bct->root(), pcoeff, lrapx, apx, acc, nseq );
-        // auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+        // auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

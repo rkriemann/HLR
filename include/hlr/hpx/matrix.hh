@@ -83,25 +83,24 @@ build ( const HLIB::TBlockCluster *  bct,
             B->set_block_struct( bct->nrows(), bct->ncols() );
 
         // recurse
-        ::hpx::parallel::v2::define_task_block(
-            [&,B,bct] ( auto &  tb )
+        ::hpx::parallel::v2::define_task_block( [&,B,bct] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                for ( uint  j = 0; j < B->nblock_rows(); ++j )
                 {
-                    for ( uint  j = 0; j < B->nblock_rows(); ++j )
+                    if ( bct->son( i, j ) != nullptr )
                     {
-                        if ( bct->son( i, j ) != nullptr )
+                        tb.run( [=,&coeff,&lrapx,&acc] ()
                         {
-                            tb.run( [=,&coeff,&lrapx,&acc]
-                                    {
-                                        auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
 
-                                        B->set_block( i, j, B_ij.release() );
-                                    } );
-                        }// if
-                    }// for
+                            B->set_block( i, j, B_ij.release() );
+                        } );
+                    }// if
                 }// for
-            } );
+            }// for
+        } );
 
         // make value type consistent in block matrix and sub blocks
         B->adjust_value_type();
@@ -181,6 +180,40 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 }
 
 //
+// build uniform-H version from given H-matrix <A>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TMatrix &    A,
+                    const basisapx_t &       basisapx,
+                    const hpro::TTruncAcc &  acc,
+                    const size_t             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
+    }// if
+
+    detail::init_cluster_bases( A, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, basis_data );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
+//
 // assign block cluster to matrix
 //
 inline
@@ -206,26 +239,25 @@ copy ( const HLIB::TMatrix &  M )
 
         B->copy_struct_from( BM );
         
-        ::hpx::parallel::v2::define_task_block(
-            [B,BM] ( auto &  tb )
+        ::hpx::parallel::v2::define_task_block( [B,BM] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                for ( uint  j = 0; j < B->nblock_rows(); ++j )
                 {
-                    for ( uint  j = 0; j < B->nblock_rows(); ++j )
+                    if ( BM->block( i, j ) != nullptr )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        tb.run( [BM,B,i,j] ()
                         {
-                            tb.run( [BM,B,i,j]
-                                    {
-                                        auto  B_ij = copy( * BM->block( i, j ) );
+                            auto  B_ij = copy( * BM->block( i, j ) );
                             
-                                        B_ij->set_parent( B );
-                                        B->set_block( i, j, B_ij.release() );
-                                    } );
-                        }// if
-                    }// for
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        } );
+                    }// if
                 }// for
-            } );
+            }// for
+        } );
 
         return N;
     }// if
@@ -255,25 +287,24 @@ copy_to ( const HLIB::TMatrix &  A,
         assert( BA->nblock_rows() == BB->nblock_rows() );
         assert( BA->nblock_cols() == BB->nblock_cols() );
         
-        ::hpx::parallel::v2::define_task_block(
-            [BA,BB] ( auto &  tb )
+        ::hpx::parallel::v2::define_task_block( [BA,BB] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < BA->nblock_rows(); ++i )
             {
-                for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+                for ( uint  j = 0; j < BA->nblock_cols(); ++j )
                 {
-                    for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+                    if ( BA->block( i, j ) != nullptr )
                     {
-                        if ( BA->block( i, j ) != nullptr )
+                        tb.run( [BA,BB,i,j] ()
                         {
-                            tb.run( [BA,BB,i,j]
-                                    {
-                                        assert( ! is_null( BB->block( i, j ) ) );
+                            assert( ! is_null( BB->block( i, j ) ) );
                                         
-                                        copy_to( * BA->block( i, j ), * BB->block( i, j ) );
-                                    } );
-                        }// if
-                    }// for
+                            copy_to( * BA->block( i, j ), * BB->block( i, j ) );
+                        } );
+                    }// if
                 }// for
-            } );
+            }// for
+        } );
     }// if
     else
     {
@@ -300,23 +331,22 @@ realloc ( HLIB::TMatrix *  A )
 
         C->copy_struct_from( B );
 
-        ::hpx::parallel::v2::define_task_block(
-            [B,BC] ( auto &  tb )
+        ::hpx::parallel::v2::define_task_block( [B,BC] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
-                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                    tb.run( [BC,B,i,j] ()
                     {
-                        tb.run( [BC,B,i,j]
-                                {
-                                    auto  C_ij = realloc( B->block( i, j ) );
+                        auto  C_ij = realloc( B->block( i, j ) );
                         
-                                    BC->set_block( i, j, C_ij.release() );
-                                    B->set_block( i, j, nullptr );
-                                } );
-                    }// for
+                        BC->set_block( i, j, C_ij.release() );
+                        B->set_block( i, j, nullptr );
+                    } );
                 }// for
-            } );
+            }// for
+        } );
 
         delete B;
 
@@ -330,6 +360,155 @@ realloc ( HLIB::TMatrix *  A )
 
         return C;
     }// else
+}
+
+//
+// return copy of matrix with uniform low-rank matrices
+// - TODO: add cluster basis as template argument to allow
+//         different bases
+//
+template < typename value_t >
+std::unique_ptr< hpro::TMatrix >
+copy_uniform ( const hpro::TMatrix &                    M,
+               hlr::matrix::cluster_basis< value_t > &  rowcb,
+               hlr::matrix::cluster_basis< value_t > &  colcb )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+
+        HLR_ASSERT( B->nblock_rows() == rowcb.nsons() );
+        HLR_ASSERT( B->nblock_cols() == colcb.nsons() );
+
+        ::hpx::parallel::v2::define_task_block( [&,B,BM] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( BM->block( i, j ) != nullptr )
+                    {
+                        tb.run( [&,B,BM,i,j] ()
+                        {
+                            auto  B_ij = copy_uniform( * BM->block( i, j ), * rowcb.son(i), * colcb.son(j) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        } );
+                    }// if
+                }// for
+            }// for
+        } );
+        
+        return N;
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        //
+        // project into row/column cluster basis:
+        //
+        //   M = A·B^H = (V·V^H·A) (U·U^H·B)^H
+        //             = U · (U^H·A)·(V^H·B)^H · V^H
+        //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
+
+        auto  R  = cptrcast( &M, hpro::TRkMatrix );
+
+        auto  UA = rowcb.transform_forward( hpro::blas_mat_A< value_t >( R ) );
+        auto  VB = colcb.transform_forward( hpro::blas_mat_B< value_t >( R ) );
+        auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
+        
+        return std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                             rowcb, colcb,
+                                                                             std::move( S ) );
+    }// if
+    else
+    {
+        // assuming dense block (no low-rank)
+        return M.copy();
+    }// else
+}
+
+//
+// convert given matrix into lowrank format
+//
+template < typename approx_t >
+std::unique_ptr< hpro::TRkMatrix >
+convert_to_lowrank ( const hpro::TMatrix &    M,
+                     const hpro::TTruncAcc &  acc,
+                     const approx_t &         approx )
+{
+    using  value_t = typename approx_t::value_t;
+    
+    if ( is_blocked( M ) )
+    {
+        //
+        // convert each sub block into low-rank format and 
+        // enlarge to size of M (pad with zeroes)
+        //
+
+        auto  B   = cptrcast( &M, hpro::TBlockMatrix );
+        auto  Us  = std::list< blas::matrix< value_t > >();
+        auto  Vs  = std::list< blas::matrix< value_t > >();
+        auto  mtx = std::mutex();
+
+        ::hpx::parallel::v2::define_task_block( [&,B] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    auto  B_ij = B->block( i, j );
+                
+                    if ( is_null( B_ij ) )
+                        continue;
+
+                    tb.run( [&,B_ij] ()
+                    {
+                        auto  R_ij = convert_to_lowrank( *B_ij, acc, approx );
+                        auto  U    = blas::matrix< value_t >( M.nrows(), R_ij->rank() );
+                        auto  V    = blas::matrix< value_t >( M.ncols(), R_ij->rank() );
+                        auto  U_i  = blas::matrix< value_t >( U, R_ij->row_is() - M.row_ofs(), blas::range::all );
+                        auto  V_j  = blas::matrix< value_t >( V, R_ij->col_is() - M.col_ofs(), blas::range::all );
+
+                        blas::copy( hpro::blas_mat_A< value_t >( R_ij ), U_i );
+                        blas::copy( hpro::blas_mat_B< value_t >( R_ij ), V_j );
+
+                        std::scoped_lock  lock( mtx );
+                            
+                        Us.push_back( std::move( U ) );
+                        Vs.push_back( std::move( V ) );
+                    } );
+                }// for
+            }// for
+        } );
+        
+        auto  [ U, V ] = approx( Us, Vs, acc );
+
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D        = cptrcast( &M, hpro::TDenseMatrix );
+        auto  T        = std::move( blas::copy( hpro::blas_mat< value_t >( D ) ) );
+        auto  [ U, V ] = approx( T, acc );
+
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R        = cptrcast( &M, hpro::TRkMatrix );
+        auto  [ U, V ] = approx( hpro::blas_mat_A< value_t >( R ),
+                                 hpro::blas_mat_B< value_t >( R ),
+                                 acc );
+        
+        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
 }}}// namespace hlr::hpx::matrix

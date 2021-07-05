@@ -13,14 +13,5 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-// #include "common.hh"
-// #include "common-main.hh"
-
-// template < typename problem_t >
-// void
-// program_main ()
-// {
-// }
-
 #include "uniform-mm.hh"
 #include "tbb.hh"

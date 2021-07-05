@@ -497,8 +497,6 @@ copy_uniform_task ( const hpro::TMatrix &                    M,
                 }// if
             }// for
         }// omp taskloop for
-
-        #pragma omp taskwait
         
         return N;
     }// if
@@ -599,8 +597,6 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
                 Vs.push_back( std::move( V ) );
             }// for
         }// omp taskloop for
-
-        #pragma omp taskwait
         
         auto  [ U, V ] = approx( Us, Vs, acc );
 
