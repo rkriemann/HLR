@@ -48,6 +48,9 @@ TCMALLOC_DIR = '/'
 likwid       = False
 LIKWID_DIR   = '/opt/local/likwid'
 
+scorep       = False
+SCOREP_DIR   = '/opt/local/scorep/7.0'
+
 CUDA_DIR     = '/'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
@@ -192,6 +195,7 @@ opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DI
 opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
 opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
+opts.Add( BoolVariable( 'scorep',   'use Score-P library',           scorep ) )
 
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
@@ -245,6 +249,7 @@ TCMALLOC_DIR = opt_env['tcmalloc']
 lapack       = opt_env['lapack']
 malloc       = opt_env['malloc']
 likwid       = opt_env['likwid']
+scorep       = opt_env['scorep']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
@@ -401,6 +406,12 @@ if likwid and LIKWID_DIR != None :
     env.Append( CPPPATH    = os.path.join( LIKWID_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
     env.Append( LIBS       = 'likwid' )
+
+# include Score-P tracing library
+if scorep and SCOREP_DIR != None :
+    env.Replace( CXX = os.path.join( SCOREP_DIR, 'bin', 'scorep' ) + ' --user --thread=pthread --mpp=none ' + CXX )
+    env.Append( LIBPATH    = os.path.join( SCOREP_DIR, 'lib' ) )
+    env.Append( CPPDEFINES = 'HAS_SCOREP' )
 
 # add CUDA
 if 'cuda' in frameworks :
@@ -570,6 +581,7 @@ sources = [ 'src/apps/exp.cc',
             'src/dag/node.cc',
             'src/dag/solve.cc',
             'src/matrix/level_matrix.cc',
+            'src/matrix/lduinv_eval.cc',
             'src/matrix/luinv_eval.cc',
             'src/matrix/triinv_eval.cc',
             'src/matrix/print.cc',

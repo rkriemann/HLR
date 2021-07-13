@@ -16,7 +16,6 @@
 #include <hpro/matrix/structure.hh>
 #include <hpro/base/TTruncAcc.hh>
 
-#include "hlr/utils/checks.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/norm.hh"
 #include "hlr/approx/svd.hh" // DEBUG
@@ -25,6 +24,7 @@
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/convert.hh"
 #include "hlr/matrix/restrict.hh"
+#include "hlr/utils/checks.hh"
 
 #include "hlr/seq/detail/matrix.hh"
 
@@ -52,7 +52,7 @@ build ( const hpro::TBlockCluster *  bct,
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
     
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
     
     //
     // decide upon cluster type, how to construct matrix
@@ -233,7 +233,7 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
                    "coefficient function and basis approximation must have equal value type" );
     
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
 
     using value_t       = typename coeff_t::value_t;
     using cluster_basis = hlr::matrix::cluster_basis< value_t >;
@@ -449,7 +449,7 @@ copy_nontiled ( const hpro::TMatrix &  M )
         // copy low-rank data into tiled form
         //
 
-        assert( M.is_real() );
+        HLR_ASSERT( M.is_real() );
         
         auto  RM = cptrcast( & M, tiled_lrmatrix< real > );
         auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
@@ -464,6 +464,40 @@ copy_nontiled ( const hpro::TMatrix &  M )
     else
     {
         // assuming non-structured block
+        return M.copy();
+    }// else
+}
+
+//
+// return copy of (block-wise) diagonal part of matrix
+//
+inline
+std::unique_ptr< hpro::TMatrix >
+copy_diag ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            if ( BM->block( i, i ) != nullptr )
+            {
+                auto  B_ii = copy_diag( * BM->block( i, i ) );
+                    
+                B_ii->set_parent( B );
+                B->set_block( i, i, B_ii.release() );
+            }// if
+        }// for
+        
+        return N;
+    }// if
+    else
+    {
         return M.copy();
     }// else
 }
@@ -509,7 +543,7 @@ copy_ll ( const hpro::TMatrix &    M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                assert( is_dense( T.get() ) );
+                HLR_ASSERT( is_dense( T.get() ) );
 
                 auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
@@ -565,7 +599,7 @@ copy_ur ( const hpro::TMatrix &    M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                assert( is_dense( T.get() ) );
+                HLR_ASSERT( is_dense( T.get() ) );
 
                 auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
@@ -589,16 +623,16 @@ void
 copy_to ( const hpro::TMatrix &  A,
           hpro::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
         auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -606,12 +640,12 @@ copy_to ( const hpro::TMatrix &  A,
             {
                 if ( BA->block( i, j ) != nullptr )
                 {
-                    assert( ! is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
 
                     copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
                 else
-                    assert( is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( is_null( BB->block( i, j ) ) );
             }// for
         }// for
     }// if
@@ -630,16 +664,16 @@ void
 copy_to_ll ( const hpro::TMatrix &  A,
              hpro::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
         auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -647,7 +681,7 @@ copy_to_ll ( const hpro::TMatrix &  A,
             {
                 if ( BA->block( i, j ) != nullptr )
                 {
-                    assert( ! is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
 
                     if ( i == j )
                         copy_to_ll( * BA->block( i, j ), * BB->block( i, j ) );
@@ -655,7 +689,7 @@ copy_to_ll ( const hpro::TMatrix &  A,
                         copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
                 else
-                    assert( is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( is_null( BB->block( i, j ) ) );
             }// for
         }// for
     }// if
@@ -674,16 +708,16 @@ void
 copy_to_ur ( const hpro::TMatrix &  A,
              hpro::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
         auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -691,7 +725,7 @@ copy_to_ur ( const hpro::TMatrix &  A,
             {
                 if ( BA->block( i, j ) != nullptr )
                 {
-                    assert( ! is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
 
                     if ( i == j )
                         copy_to_ur( * BA->block( i, j ), * BB->block( i, j ) );
@@ -699,7 +733,7 @@ copy_to_ur ( const hpro::TMatrix &  A,
                         copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                 }// if
                 else
-                    assert( is_null( BB->block( i, j ) ) );
+                    HLR_ASSERT( is_null( BB->block( i, j ) ) );
             }// for
         }// for
     }// if
@@ -792,7 +826,7 @@ clear ( hpro::TMatrix &  M )
             blas::fill( hpro::blas_mat< hpro::real >( D ), hpro::real(0) );
     }// if
     else
-        assert( false );
+        HLR_ASSERT( false );
 }
 
 //

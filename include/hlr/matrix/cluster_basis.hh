@@ -186,6 +186,20 @@ public:
         return cb;
     }
     
+    // return structural copy (no data) of cluster basis
+    std::unique_ptr< cluster_basis >
+    copy_struct () const
+    {
+        auto  cb = std::make_unique< cluster_basis >( _is );
+
+        cb->set_nsons( nsons() );
+
+        for ( uint  i = 0; i < nsons(); ++i )
+            cb->set_son( i, son(i)->copy_struct().release() );
+
+        return cb;
+    }
+    
     // return memory consumption
     size_t
     byte_size () const

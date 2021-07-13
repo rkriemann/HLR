@@ -19,35 +19,6 @@
 
 using namespace hlr;
 
-namespace hlr { namespace uniform { namespace accu {
-double  t_basis       = 0.0;
-double  t_apply       = 0.0;
-double  t_apply_uni   = 0.0;
-double  t_apply_dense = 0.0;
-double  t_eval        = 0.0;
-double  t_eval_uni    = 0.0;
-double  t_eval_rest   = 0.0;
-double  t_eval_rec    = 0.0;
-double  t_add_accu    = 0.0;
-size_t  n_inner       = 0;
-size_t  n_prodA       = 0;
-size_t  n_prodB       = 0;
-}}}
-
-// namespace hlr { namespace uniform { namespace accu3 {
-// double  t_basis      = 0.0;
-// double  t_apply      = 0.0;
-// double  t_eval       = 0.0;
-// double  t_eval_uni   = 0.0;
-// double  t_eval_rest  = 0.0;
-// double  t_eval_rec   = 0.0;
-// }}}
-
-namespace hlr { namespace seq { namespace accu {
-double  t_apply = 0.0;
-double  t_eval  = 0.0;
-}}}
-
 //
 // main function
 //
@@ -285,27 +256,8 @@ program_main ()
             
             toc = timer::since( tic );
             std::cout << "    done in  " << format_time( toc ) << std::endl;
-            // std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
-            // std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
-            // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_apply_uni ) << std::endl;
-            // std::cout << "        dense " << format_time( hlr::uniform::accu::t_apply_dense ) << std::endl;
-            // std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
-            // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
-            // std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
-            // std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
-            // std::cout << "        add   " << format_time( hlr::uniform::accu::t_add_accu ) << std::endl;
             std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            hlr::uniform::accu::t_basis = 0;
-            hlr::uniform::accu::t_apply = 0;
-            hlr::uniform::accu::t_apply_uni = 0;
-            hlr::uniform::accu::t_apply_dense = 0;
-            hlr::uniform::accu::t_eval = 0;
-            hlr::uniform::accu::t_eval_uni = 0;
-            hlr::uniform::accu::t_eval_rest = 0;
-            hlr::uniform::accu::t_eval_rec = 0;
-            hlr::uniform::accu::t_add_accu = 0;
-            
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
 
             std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -335,18 +287,6 @@ program_main ()
             
             toc = timer::since( tic );
             std::cout << "    done in  " << format_time( toc ) << std::endl;
-            // std::cout << "      basis   " << format_time( hlr::uniform::accu::t_basis ) << std::endl;
-            // std::cout << "      apply   " << format_time( hlr::uniform::accu::t_apply ) << std::endl;
-            // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_apply_uni ) << std::endl;
-            // std::cout << "        dense " << format_time( hlr::uniform::accu::t_apply_dense ) << std::endl;
-            // std::cout << "      eval    " << format_time( hlr::uniform::accu::t_eval ) << std::endl;
-            // std::cout << "        uni   " << format_time( hlr::uniform::accu::t_eval_uni ) << std::endl;
-            // std::cout << "        rest  " << format_time( hlr::uniform::accu::t_eval_rest ) << std::endl;
-            // std::cout << "        rec   " << format_time( hlr::uniform::accu::t_eval_rec ) << std::endl;
-            // std::cout << "    hits      " << std::endl;
-            // std::cout << "      inner   " << hlr::uniform::accu::n_inner << std::endl;
-            // std::cout << "      prodA   " << hlr::uniform::accu::n_prodA << std::endl;
-            // std::cout << "      prodB   " << hlr::uniform::accu::n_prodB << std::endl;
             std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
             auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );

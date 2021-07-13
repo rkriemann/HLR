@@ -34,7 +34,7 @@ multiply ( const value_t                    alpha,
 {
     for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
     {
-        HLR_ASSERT( ! is_null( A.block( i, 0 ) ) );
+        HLR_ASSERT( ! is_null( A.block( i, 0, op_A ) ) );
         
         auto  C_i = blas::matrix< value_t >( C, A.block( i, 0, op_A )->row_is( op_A ) - A.row_ofs( op_A ), blas::range::all );
         
@@ -161,7 +161,7 @@ multiply ( const value_t                    alpha,
 {
     for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
     {
-        HLR_ASSERT( ! is_null( B.block( 0, j ) ) );
+        HLR_ASSERT( ! is_null( B.block( 0, j, op_B ) ) );
         
         auto  C_0j = blas::matrix< value_t >( C, blas::range::all, B.block( 0, j, op_B )->col_is( op_B ) - B.col_ofs( op_B ) );
         

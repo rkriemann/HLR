@@ -28,6 +28,153 @@ namespace hpro = HLIB;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// matrix solving with diagonal matrix D
+//
+// solve D·X = M (from_left) or X·D = M (from_right)
+// - on exit, M contains X
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t,
+           typename approx_t >
+void
+solve_diag ( const eval_side_t        side,
+             const diag_type_t        diag,
+             const matop_t            op_D,
+             const hpro::TMatrix &    D,
+             hpro::TMatrix &          M,
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
+{
+    if ( M.is_zero() )
+        return;
+    
+    if ( is_blocked( D ) )
+    {
+        if ( is_blocked( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TBlockMatrix ), acc, approx );
+        else if ( is_lowrank( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TRkMatrix ) );
+        else if ( matrix::is_lowrankS( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, matrix::lrsmatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+        else
+            HLR_ERROR( "unsupported matrix type for M : " + D.typestr() );
+    }// if
+    else if ( is_dense( D ) )
+    {
+        if ( is_blocked( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TBlockMatrix ), acc, approx );
+        else if ( is_lowrank( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TRkMatrix ) );
+        else if ( matrix::is_lowrankS( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, matrix::lrsmatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+        else
+            HLR_ERROR( "unsupported matrix type for M : " + D.typestr() );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type for D : " + D.typestr() );
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t      side,
+             const diag_type_t      diag,
+             const matop_t          op_D,
+             const hpro::TMatrix &  D,
+             hpro::TMatrix &        M )
+{
+    if ( M.is_zero() )
+        return;
+
+    HLR_ASSERT( (( side == from_left  ) && ( D.col_is() == M.row_is() )) ||
+                (( side == from_right ) && ( M.col_is() == D.row_is() )) );
+                
+    if ( is_blocked( D ) )
+    {
+        if ( is_lowrank( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TRkMatrix ) );
+        else if ( matrix::is_lowrankS( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, matrix::lrsmatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+        else
+            HLR_ERROR( "unsupported matrix type for M : " + D.typestr() );
+    }// if
+    else if ( is_dense( D ) )
+    {
+        if ( is_lowrank( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TRkMatrix ) );
+        else if ( matrix::is_lowrankS( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, matrix::lrsmatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_diag< value_t >( side, diag, op_D, * cptrcast( & D, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+        else
+            HLR_ERROR( "unsupported matrix type for M : " + D.typestr() );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type for D : " + D.typestr() );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// vector solving with lower triangular matrix D
+//
+// solve op(D) x = v 
+// - on exit, v contains x
+//
+////////////////////////////////////////////////////////////////////////////////
+
+inline
+void
+solve_diag ( const hpro::matop_t      op_D,
+             const hpro::TMatrix &    D,
+             hpro::TScalarVector &    v,
+             const hpro::diag_type_t  diag_mode )
+{
+    HLR_LOG( 4, HLIB::to_string( "solve_diag( %d )", D.id() ) );
+        
+    if ( is_blocked( D ) )
+    {
+        auto        BD  = cptrcast( & D, hpro::TBlockMatrix );
+        const auto  nbr = BD->nblock_rows();
+        const auto  nbc = BD->nblock_cols();
+            
+        for ( uint  i = 0; i < std::min( nbr, nbc ); ++i )
+        {
+            auto  D_ii = BD->block( i, i );
+            
+            if ( ! is_null( D_ii ) )
+            {
+                auto  v_i = v.sub_vector( D_ii->col_is() );
+                
+                solve_diag( op_D, *D_ii, v_i, diag_mode );
+            }// if
+        }// for
+    }// if
+    else if ( is_dense( D ) )
+    {
+        if ( diag_mode == hpro::general_diag )
+        {
+            //
+            // assuming D contains inverse (store_inverse!)
+            //
+
+            auto  vc = hpro::TScalarVector( v );
+
+            v.scale( 0 );
+            mul_vec( real(1), op_D, D, vc, v );
+        }// if
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type for D : " + D.typestr() );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // matrix solving with lower triangular matrix L
 //
 // solve L·X = M (from_left) or X·L = M (from_right)

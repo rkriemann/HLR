@@ -10,7 +10,7 @@
 
 #include <unordered_map>
 
-#include <hlr/arith/detail/uniform.hh>
+#include <hlr/arith/detail/uniform_bases.hh>
 
 namespace hlr { namespace seq { namespace matrix { namespace detail {
 
@@ -825,10 +825,14 @@ build_uniform_rec ( const hpro::TMatrix &                            A,
         rowcb.set_basis( std::move( Un ) );
         colcb.set_basis( std::move( Vn ) );
                 
-        M = std::make_unique< uniform_lrmatrix< value_t > >( R->row_is(), R->col_is(), rowcb, colcb, std::move( S ) );
+        auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( R->row_is(), R->col_is(), rowcb, colcb, std::move( S ) );
 
-        rowmap[ rowcb.is() ].push_back( M.get() );
-        colmap[ colcb.is() ].push_back( M.get() );
+        // std::cout << R->id() << " " << R->rank() << " " << RU->row_rank() << " " << RU->col_rank() << std::endl;
+
+        rowmap[ rowcb.is() ].push_back( RU.get() );
+        colmap[ colcb.is() ].push_back( RU.get() );
+
+        M = std::move( RU );
     }// if
     else if ( is_blocked( A ) )
     {

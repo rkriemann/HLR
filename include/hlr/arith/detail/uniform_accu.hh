@@ -22,28 +22,11 @@
 #include <hlr/matrix/restrict.hh>
 #include <hlr/utils/hash.hh>
 #include <hlr/utils/tensor.hh>
+#include <hlr/utils/trace.hh>
 
 namespace hlr { namespace uniform { namespace accu {
 
 namespace timer = HLIB::Time::Wall;
-
-// #define HLR_UNIFORM_ACCU_TIC( t )    auto  __tic ## t = timer::now()
-// #define HLR_UNIFORM_ACCU_TOC( t )  { auto  __toc ## t = timer::since( __tic ## t ); t_ ## t += __toc ## t.seconds(); }
-#define HLR_UNIFORM_ACCU_TIC( t )  {}
-#define HLR_UNIFORM_ACCU_TOC( t )  {}
-
-extern double  t_basis;
-extern double  t_apply;
-extern double  t_apply_uni;
-extern double  t_apply_dense;
-extern double  t_eval;
-extern double  t_eval_uni;
-extern double  t_eval_rest;
-extern double  t_eval_rec;
-extern double  t_add_accu;
-extern size_t  n_inner;
-extern size_t  n_prodA;
-extern size_t  n_prodB;
 
 namespace detail
 {
@@ -224,10 +207,10 @@ struct accumulator
     template < typename value_t,
                typename approx_t >
     void
-    eval ( const value_t                    alpha,
-           const hpro::TMatrix &            M,
-           const hpro::TTruncAcc &          acc,
-           const approx_t &                 approx )
+    eval ( const value_t            alpha,
+           const hpro::TMatrix &    M,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
     {
         //
         // first check for dense handling
@@ -248,7 +231,7 @@ struct accumulator
         
         if ( ! handle_dense )
         {
-            HLR_UNIFORM_ACCU_TIC( eval_uni );
+            trace::region_start( "eval uni" );
             
             //
             // filter out different variants of uniform factors
@@ -318,8 +301,6 @@ struct accumulator
                     // store product if not present
                     if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
                         prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
-                    else
-                        n_inner++;
 
                     XW = prod_inner->at( RA->col_is( op_A ) );
                 }// if
@@ -398,13 +379,13 @@ struct accumulator
                 blas::prod( value_t(1), Y_i, S, value_t(1), Y );
             }// for
 
-            HLR_UNIFORM_ACCU_TOC( eval_uni );
+            trace::region_end( "eval uni" );
             
             //
             // sum up individual updates
             //
 
-            HLR_UNIFORM_ACCU_TIC( add_accu );
+            trace::region_start( "add accu" );
                     
             if ( R.ncols() > 0 )
             {
@@ -476,7 +457,7 @@ struct accumulator
                 }// else
             }// if
 
-            HLR_UNIFORM_ACCU_TOC( add_accu );
+            trace::region_end( "add accu" );
         }// if
 
         //
@@ -485,7 +466,7 @@ struct accumulator
 
         auto  BC = std::unique_ptr< hpro::TBlockMatrix >(); // for recursive handling
 
-        HLR_UNIFORM_ACCU_TIC( eval_rest );
+        trace::region_start( "eval rest" );
             
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
@@ -612,7 +593,7 @@ struct accumulator
             }// else
         }// for
 
-        HLR_UNIFORM_ACCU_TOC( eval_rest );
+        trace::region_end( "eval rest" );
         
         //
         // now handle recursive updates if M is a leaf block
@@ -620,7 +601,7 @@ struct accumulator
     
         if ( ! is_null( BC ) )
         {
-            HLR_UNIFORM_ACCU_TIC( eval_rec );
+            trace::region_start( "eval rec" );
             
             //
             // TODO: try with empty sub_mat, don't release U and add sub results later
@@ -660,7 +641,7 @@ struct accumulator
             else
                 matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
 
-            HLR_UNIFORM_ACCU_TOC( eval_rec );
+            trace::region_end( "eval rec" );
         }// if
     }
 
@@ -720,11 +701,11 @@ multiply ( const value_t            alpha,
     // evaluate all computable updates to M
     //
 
-    HLR_UNIFORM_ACCU_TIC( eval );
+    trace::region_start( "eval" );
     
     accu.eval( value_t(1), M, acc, approx );
     
-    HLR_UNIFORM_ACCU_TOC( eval );
+    trace::region_end( "eval" );
 
     //
     // recurse
@@ -756,22 +737,20 @@ multiply ( const value_t            alpha,
         //
 
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(),
-                                    std::move( blas::prod( UM->row_basis(), UM->coeff() ) ),
-                                    std::move( blas::copy( UM->col_basis() ) ) );
+        auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
 
-        HLR_UNIFORM_ACCU_TIC( apply_uni );
+        trace::region_start( "apply uni" );
         
         // no recursive updates left, apply accumulated updates and solve
-        accu.apply( alpha, R, acc, approx );
+        accu.apply( alpha, *R, acc, approx );
 
-        HLR_UNIFORM_ACCU_TOC( apply_uni );
+        trace::region_end( "apply uni" );
         
         //
         // now replace M by R and update row/column bases
         //
 
-        HLR_UNIFORM_ACCU_TIC( basis );
+        trace::region_start( "basis" );
         
         auto  W  = blas::mat_U< value_t >( R );
         auto  X  = blas::mat_V< value_t >( R );
@@ -785,7 +764,7 @@ multiply ( const value_t            alpha,
                     
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
 
-        HLR_UNIFORM_ACCU_TOC( basis );
+        trace::region_end( "basis" );
         
         // // DEBUG {
         // {
@@ -799,11 +778,11 @@ multiply ( const value_t            alpha,
     }// if
     else
     {
-        HLR_UNIFORM_ACCU_TIC( apply_dense );
+        trace::region_start( "apply dense" );
         
         accu.apply( alpha, M, acc, approx );
 
-        HLR_UNIFORM_ACCU_TOC( apply_dense );
+        trace::region_end( "apply dense" );
         
         // // DEBUG {
         // {
@@ -830,17 +809,22 @@ solve_lower_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
-    // std::cout << M.id() << std::endl;
-    
-    // apply computable updates
-    HLR_UNIFORM_ACCU_TIC( eval );
+    //
+    // evaluate all computable updates to M
+    //
+
+    trace::region_start( "eval" );
 
     accu.eval( value_t(1), M, acc, approx );
 
-    HLR_UNIFORM_ACCU_TOC( eval );
+    trace::region_end( "eval" );
     
     if ( is_blocked_all( L, M ) )
     {
+        //
+        // recurse
+        //
+
         auto  BL = cptrcast( &L, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
         // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
@@ -883,16 +867,16 @@ solve_lower_tri ( const eval_side_t        side,
         //
 
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(), std::move( blas::prod( UM->row_basis(), UM->coeff() ) ), std::move( blas::copy( UM->col_basis() ) ) );
+        auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
 
-        HLR_UNIFORM_ACCU_TIC( apply );
+        trace::region_start( "apply" );
         
         // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), R, acc, approx );
+        accu.apply( value_t(-1), *R, acc, approx );
 
-        HLR_UNIFORM_ACCU_TOC( apply );
+        trace::region_end( "apply" );
         
-        hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
+        hlr::solve_lower_tri< value_t >( side, diag, L, *R, acc, approx );
 
         // // DEBUG {
         // {
@@ -908,7 +892,7 @@ solve_lower_tri ( const eval_side_t        side,
         // now replace M by R and update row/column bases
         //
 
-        HLR_UNIFORM_ACCU_TIC( basis );
+        trace::region_start( "basis" );
         
         auto  W  = blas::mat_U< value_t >( R );
         auto  X  = blas::mat_V< value_t >( R );
@@ -922,7 +906,7 @@ solve_lower_tri ( const eval_side_t        side,
                     
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
 
-        HLR_UNIFORM_ACCU_TOC( basis );
+        trace::region_end( "basis" );
         
         // // DEBUG {
         // {
@@ -965,17 +949,22 @@ solve_upper_tri ( const eval_side_t        side,
                   const uniform_map_t &    rowmap,
                   const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
 {
-    // std::cout << M.id() << std::endl;
+    //
+    // evaluate all computable updates to M
+    //
 
-    HLR_UNIFORM_ACCU_TIC( eval );
+    trace::region_start( "eval" );
     
-    // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
 
-    HLR_UNIFORM_ACCU_TOC( eval );
+    trace::region_end( "eval" );
     
     if ( is_blocked_all( U, M ) )
     {
+        //
+        // recurse
+        //
+
         auto  BU = cptrcast( &U, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
         // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
@@ -1020,12 +1009,12 @@ solve_upper_tri ( const eval_side_t        side,
         auto  UM = ptrcast( &M, matrix::uniform_lrmatrix< value_t > );
         auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
 
-        HLR_UNIFORM_ACCU_TIC( apply );
+        trace::region_start( "apply" );
         
         // no recursive updates left, apply accumulated updates and solve
         accu.apply( value_t(-1), *R, acc, approx );
 
-        HLR_UNIFORM_ACCU_TOC( apply );
+        trace::region_end( "apply" );
 
         hlr::solve_upper_tri< value_t >( side, diag, U, *R, acc, approx );
 
@@ -1033,7 +1022,7 @@ solve_upper_tri ( const eval_side_t        side,
         // now replace M by R and update row/column bases
         //
 
-        HLR_UNIFORM_ACCU_TIC( basis );
+        trace::region_start( "basis" );
         
         auto  W  = blas::mat_U< value_t >( *R );
         auto  X  = blas::mat_V< value_t >( *R );
@@ -1047,7 +1036,7 @@ solve_upper_tri ( const eval_side_t        side,
         
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
         
-        HLR_UNIFORM_ACCU_TOC( basis );
+        trace::region_end( "basis" );
     }// if
     else
     {
@@ -1085,16 +1074,14 @@ lu ( hpro::TMatrix &          A,
     // evaluate all computable updates to M
     //
 
-    // std::cout << A.id() << std::endl;
-
-    HLR_UNIFORM_ACCU_TIC( eval );
+    trace::region_start( "eval" );
     
     accu.eval( value_t(1), A, acc, approx );
 
-    HLR_UNIFORM_ACCU_TOC( eval );
+    trace::region_end( "eval" );
 
     //
-    // (recursive) LU factorization
+    // recurse
     //
 
     if ( is_blocked( A ) )
