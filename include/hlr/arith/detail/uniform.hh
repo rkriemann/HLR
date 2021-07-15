@@ -20,7 +20,7 @@
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
 
-#include <hlr/arith/detail/uniform_bases.hh>
+#include <hlr/arith/detail/uniform_basis.hh>
 
 namespace hlr { namespace uniform { namespace detail {
 
@@ -184,8 +184,6 @@ using  indexset = hpro::TIndexSet;
 
 namespace detail
 {
-
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 //
 // compute M=U·S·V' + W·T·X' = (U W)⎛S  ⎞(V X)'
@@ -600,8 +598,8 @@ add ( hpro::TMatrix &                  M,
       const blas::matrix< value_t > &  V,
       const hpro::TTruncAcc &          acc,
       const approx_t &                 approx,
-      const uniform_map_t &            rowmap,
-      const uniform_map_t &            colmap )
+      const is_matrix_map_t &          rowmap,
+      const is_matrix_map_t &          colmap )
 {
     if ( is_blocked( M ) )
     {
@@ -659,8 +657,8 @@ add ( hpro::TMatrix &                  M,
       const blas::matrix< value_t > &  D,
       const hpro::TTruncAcc &          acc,
       const approx_t &                 approx,
-      const uniform_map_t &            rowmap,
-      const uniform_map_t &            colmap )
+      const is_matrix_map_t &          rowmap,
+      const is_matrix_map_t &          colmap )
 {
     if ( is_blocked( M ) )
     {
@@ -723,8 +721,8 @@ multiply ( const value_t            alpha,
            hpro::TMatrix &          C,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx,
-           const uniform_map_t &    rowmap,
-           const uniform_map_t &    colmap );
+           const is_matrix_map_t &  rowmap,
+           const is_matrix_map_t &  colmap );
 
 //
 // blocked x blocked = blocked
@@ -740,8 +738,8 @@ multiply ( const value_t               alpha,
            hpro::TBlockMatrix &        C,
            const hpro::TTruncAcc &     acc,
            const approx_t &            approx,
-           const uniform_map_t &       rowmap,
-           const uniform_map_t &       colmap )
+           const is_matrix_map_t &     rowmap,
+           const is_matrix_map_t &     colmap )
 {
     for ( uint  i = 0; i < C.nblock_rows(); ++i )
     {
@@ -776,8 +774,8 @@ multiply ( const value_t                  alpha,
            uniform_lrmatrix< value_t > &  C,
            const hpro::TTruncAcc &        acc,
            const approx_t &               approx,
-           const uniform_map_t &          rowmap,
-           const uniform_map_t &          colmap )
+           const is_matrix_map_t &        rowmap,
+           const is_matrix_map_t &        colmap )
 {
     //
     // compute temporary standard low-rank block matrix BC
@@ -847,8 +845,8 @@ multiply ( const value_t                                   alpha,
            matrix::uniform_lrmatrix< value_t > &           C,
            const hpro::TTruncAcc &                         acc,
            const approx_t &                                approx,
-           const uniform_map_t &                           rowmap,
-           const uniform_map_t &                           colmap )
+           const is_matrix_map_t &                         rowmap,
+           const is_matrix_map_t &                         colmap )
 {
     auto  D = matrix::convert_to_dense< value_t >( C );
 
@@ -880,8 +878,8 @@ multiply ( const value_t                        alpha,
            hpro::TBlockMatrix &                 C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t &              rowmap,
+           const is_matrix_map_t &              colmap )
 {
     // (A·U)·S·V' + C
     auto  U  = B.row_cb( op_B ).basis();
@@ -906,7 +904,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap )
+           const is_matrix_map_t &              rowmap )
 {
     // A·B + C = (A·U)·S·V' + W·T·V'
     auto  U  = B.row_cb( op_B ).basis();
@@ -938,8 +936,8 @@ multiply ( const value_t                                   alpha,
            matrix::uniform_lrmatrix< value_t > &           C,
            const hpro::TTruncAcc &                         acc,
            const approx_t &                                approx,
-           const uniform_map_t &                           rowmap,
-           const uniform_map_t &                           colmap )
+           const is_matrix_map_t &                         rowmap,
+           const is_matrix_map_t &                         colmap )
 {
     auto  D = matrix::convert_to_dense< value_t >( C );
 
@@ -971,8 +969,8 @@ multiply ( const value_t                        alpha,
            hpro::TBlockMatrix &                 C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t &              rowmap,
+           const is_matrix_map_t &              colmap )
 {
     // U·S·(V'·B) + C with V'·B computed as B'·V
     auto  V  = A.col_cb( op_A ).basis();
@@ -997,7 +995,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t &              colmap )
 {
     // U·S·(V'·B) + U·T·X' with V'·B computed as B'·V
     auto  V  = A.col_cb( op_A ).basis();
@@ -1029,8 +1027,8 @@ multiply ( const value_t                                   alpha,
            hpro::TBlockMatrix &                            C,
            const hpro::TTruncAcc &                         acc,
            const approx_t &                                approx,
-           const uniform_map_t &                           rowmap,
-           const uniform_map_t &                           colmap )
+           const is_matrix_map_t &                         rowmap,
+           const is_matrix_map_t &                         colmap )
 {
     auto  U = B.row_basis( op_B );
     auto  S = B.coeff();
@@ -1060,8 +1058,8 @@ multiply ( const value_t                        alpha,
            hpro::TBlockMatrix &                 C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t &              rowmap,
+           const is_matrix_map_t &              colmap )
 {
     // U·(S·V' × W·T)·X' + C = U·R·X' + C
     auto  R = blas::matrix< value_t >();
@@ -1109,8 +1107,8 @@ multiply ( const value_t                                   alpha,
            hpro::TBlockMatrix &                            C,
            const hpro::TTruncAcc &                         acc,
            const approx_t &                                approx,
-           const uniform_map_t &                           rowmap,
-           const uniform_map_t &                           colmap )
+           const is_matrix_map_t &                         rowmap,
+           const is_matrix_map_t &                         colmap )
 {
     auto  U = A.row_basis( op_A );
     auto  S = A.coeff();
@@ -1140,7 +1138,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t &              colmap )
 {
     // A×B + C = U·S·(V' × B) + U·T·X' = U·S·(B' × V)' + U·T·X'
     auto  BV = blas::prod( alpha,
@@ -1171,7 +1169,7 @@ multiply ( const value_t                        alpha,
            uniform_lrmatrix< value_t > &        C,
            const hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap )
+           const is_matrix_map_t &              rowmap )
 {
     // A×B + C = (A × U)·T·V' + W·S·V'
     auto  AU = blas::prod( alpha,
@@ -1202,8 +1200,8 @@ multiply ( const value_t               alpha,
            hpro::TBlockMatrix &        C,
            const hpro::TTruncAcc &     acc,
            const approx_t &            approx,
-           const uniform_map_t &       rowmap,
-           const uniform_map_t &       colmap )
+           const is_matrix_map_t &     rowmap,
+           const is_matrix_map_t &     colmap )
 {
     auto  AB = blas::prod( alpha,
                            blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
@@ -1226,8 +1224,8 @@ multiply ( const value_t                  alpha,
            uniform_lrmatrix< value_t > &  C,
            const hpro::TTruncAcc &        acc,
            const approx_t &               approx,
-           const uniform_map_t &          rowmap,
-           const uniform_map_t &          colmap )
+           const is_matrix_map_t &        rowmap,
+           const is_matrix_map_t &        colmap )
 {
     auto  AB       = blas::prod( alpha,
                                  blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
@@ -1260,8 +1258,8 @@ multiply ( const value_t            alpha,
            hpro::TMatrix &          C,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx,
-           const uniform_map_t &    rowmap,
-           const uniform_map_t &    colmap )
+           const is_matrix_map_t &  rowmap,
+           const is_matrix_map_t &  colmap )
 {
     // // DEBUG {
     // auto  DA = hlr::seq::matrix::copy_nonuniform< value_t >( A );
@@ -1510,8 +1508,8 @@ solve_lower_tri ( const eval_side_t        side,
                   hpro::TMatrix &          M,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap );
+                  const is_matrix_map_t &  rowmap,
+                  const is_matrix_map_t &  colmap );
 
 template < typename value_t,
            typename approx_t >
@@ -1522,8 +1520,8 @@ solve_lower_tri ( const eval_side_t           side,
                   hpro::TBlockMatrix &        M,
                   const hpro::TTruncAcc &     acc,
                   const approx_t &            approx,
-                  const uniform_map_t &       rowmap,
-                  const uniform_map_t &       colmap )
+                  const is_matrix_map_t &     rowmap,
+                  const is_matrix_map_t &     colmap )
 {
     HLR_LOG( 4, hpro::to_string( "svltr( B %d, B %d )", L.id(), M.id() ) );
 
@@ -1582,8 +1580,8 @@ solve_lower_tri ( const eval_side_t              side,
                   uniform_lrmatrix< value_t > &  M,
                   const hpro::TTruncAcc &        acc,
                   const approx_t &               approx,
-                  const uniform_map_t &          rowmap,
-                  const uniform_map_t &          /* colmap */ )
+                  const is_matrix_map_t &        rowmap,
+                  const is_matrix_map_t &        /* colmap */ )
 {
     if ( is_dense( L ) && ( diag == unit_diag ))
         return;
@@ -1623,8 +1621,8 @@ solve_lower_tri ( const eval_side_t        side,
                   hpro::TMatrix &          M,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap )
+                  const is_matrix_map_t &  rowmap,
+                  const is_matrix_map_t &  colmap )
 {
     // // DEBUG {
     // auto  DL = hlr::seq::matrix::copy_nonuniform< value_t >( L );
@@ -1679,8 +1677,8 @@ solve_upper_tri ( const eval_side_t        side,
                   hpro::TMatrix &          M,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap );
+                  const is_matrix_map_t &  rowmap,
+                  const is_matrix_map_t &  colmap );
 
 template < typename value_t,
            typename approx_t >
@@ -1691,8 +1689,8 @@ solve_upper_tri ( const eval_side_t           side,
                   hpro::TBlockMatrix &        M,
                   const hpro::TTruncAcc &     acc,
                   const approx_t &            approx,
-                  const uniform_map_t &       rowmap,
-                  const uniform_map_t &       colmap )
+                  const is_matrix_map_t &     rowmap,
+                  const is_matrix_map_t &     colmap )
 {
     HLR_LOG( 4, hpro::to_string( "svutr( B %d, B %d )", U.id(), M.id() ) );
     
@@ -1745,8 +1743,8 @@ solve_upper_tri ( const eval_side_t              side,
                   uniform_lrmatrix< value_t > &  M,
                   const hpro::TTruncAcc &        acc,
                   const approx_t &               approx,
-                  const uniform_map_t &          /* rowmap */,
-                  const uniform_map_t &          colmap )
+                  const is_matrix_map_t &        /* rowmap */,
+                  const is_matrix_map_t &        colmap )
 {
     if ( is_dense( U ) && ( diag == unit_diag ))
         return;
@@ -1786,8 +1784,8 @@ solve_upper_tri ( const eval_side_t        side,
                   hpro::TMatrix &          M,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap )
+                  const is_matrix_map_t &  rowmap,
+                  const is_matrix_map_t &  colmap )
 {
     // // DEBUG {
     // auto  DU = hlr::seq::matrix::copy_nonuniform< value_t >( U );
@@ -1838,8 +1836,8 @@ void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx,
-     const uniform_map_t &    rowmap,
-     const uniform_map_t &    colmap )
+     const is_matrix_map_t &  rowmap,
+     const is_matrix_map_t &  colmap )
 // hpro::TMatrix &          REF )
 {
     if ( is_blocked( A ) )

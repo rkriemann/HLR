@@ -1,5 +1,5 @@
-#ifndef __HLR_ARITH_DETAIL_UNIFORM_BASES_HH
-#define __HLR_ARITH_DETAIL_UNIFORM_BASES_HH
+#ifndef __HLR_ARITH_DETAIL_UNIFORM_BASIS_HH
+#define __HLR_ARITH_DETAIL_UNIFORM_BASIS_HH
 //
 // Project     : HLib
 // Module      : arith/uniform
@@ -8,14 +8,19 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <boost/format.hpp> // DEBUG
+// #include <boost/format.hpp> // DEBUG
 
 #include <hlr/arith/blas.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/utils/io.hh> // DEBUG
+// #include <hlr/utils/io.hh> // DEBUG
 
 namespace hlr { namespace uniform {
+
+//
+// maps index set to set of all matrices in block row (or column)
+//
+using  is_matrix_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -29,8 +34,6 @@ namespace detail
 using matrix::cluster_basis;
 using matrix::uniform_lrmatrix;
 using matrix::is_uniform_lowrank;
-
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 //
 // extend row basis <cb> by block W·T·X' (X is not needed for computation)
@@ -47,7 +50,7 @@ compute_extended_row_basis ( const cluster_basis< value_t > &     cb,
                              const blas::matrix< value_t > &      T,
                              const hpro::TTruncAcc &              acc,
                              const approx_t &                     approx,
-                             const uniform_map_t &                matmap,
+                             const is_matrix_map_t &              matmap,
                              const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     using  real_t = hpro::real_type_t< value_t >;
@@ -72,7 +75,7 @@ compute_extended_row_basis ( const cluster_basis< value_t > &     cb,
     //            ⎜⎜      V_j  ⎟ ⎜S_j'  0 ⎟⎟
     //            ⎝⎝          X⎠ ⎝ 0    T'⎠⎠
     //
-    // Since V_i and X are orthogonal, one can skip those for bases computation.
+    // Since V_i and X are orthogonal, one can skip those for basis computation.
     // Compute QR factorization
     //
     //   Q·R = ⎛S₁'  0 ⎞ = S
@@ -186,7 +189,7 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
                             const blas::matrix< value_t > &      T,
                             const hpro::TTruncAcc &              acc,
                             const approx_t &                     approx,
-                            const uniform_map_t &                matmap )
+                            const is_matrix_map_t &              matmap )
 {
     return compute_extended_row_basis( M.row_cb(), W, T, acc, approx, matmap, &M );
 }
@@ -206,7 +209,7 @@ compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
                              const blas::matrix< value_t > &      X,
                              const hpro::TTruncAcc &              acc,
                              const approx_t &                     approx,
-                             const uniform_map_t &                matmap,
+                             const is_matrix_map_t &              matmap,
                              const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     using  real_t = hpro::real_type_t< value_t >;
@@ -226,7 +229,7 @@ compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
     //                        ⎜U_j·S_j    ⎟          ⎜⎜       U_j ⎟⎜S_j  ⎟⎟
     //                        ⎝        W·T⎠          ⎝⎝          W⎠⎝    T⎠⎠
     //
-    // Since U_* and W are orthogonal, one can skip those for bases computation.
+    // Since U_* and W are orthogonal, one can skip those for basis computation.
     // Compute QR factorization
     //
     //   Q·R = ⎛S₁  0⎞ = S
@@ -343,7 +346,7 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
                             const blas::matrix< value_t > &      X,
                             const hpro::TTruncAcc &              acc,
                             const approx_t &                     approx,
-                            const uniform_map_t &                matmap )
+                            const is_matrix_map_t &              matmap )
 {
     return compute_extended_col_basis( M.col_cb(), T, X, acc, approx, matmap, &M );
 }
@@ -358,7 +361,7 @@ template < typename value_t >
 void
 update_col_coupling ( const cluster_basis< value_t > &     cb,
                       const blas::matrix< value_t > &      Vn,
-                      const uniform_map_t &                matmap,
+                      const is_matrix_map_t &              matmap,
                       const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     //
@@ -405,7 +408,7 @@ template < typename value_t >
 void
 update_row_coupling ( const cluster_basis< value_t > &     cb,
                       const blas::matrix< value_t > &      Un,
-                      const uniform_map_t &                matmap,
+                      const is_matrix_map_t &              matmap,
                       const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     //
@@ -443,7 +446,7 @@ update_row_coupling ( const cluster_basis< value_t > &     cb,
 }
 
 //
-// replace U·S·V' of M by W·T·X' and update row/column bases
+// replace U·S·V' of M by W·T·X' and update row/column basis
 // - ASSUMPTION: W and X are orthogonal
 //
 template < typename value_t,
@@ -455,8 +458,8 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
                        const blas::matrix< value_t > &  X,
                        const hpro::TTruncAcc &          acc,
                        const approx_t &                 approx,
-                       const uniform_map_t &            rowmap,
-                       const uniform_map_t &            colmap )
+                       const is_matrix_map_t &          rowmap,
+                       const is_matrix_map_t &          colmap )
 {
     // io::matlab::write( W, "W" );
     // io::matlab::write( T, "T" );
@@ -570,7 +573,7 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
     M.set_coeff_unsafe( std::move( Sn ) );
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
@@ -578,7 +581,7 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
 }
 
 //
-// replace M=U·S·V' by W·T·V' and update row bases of
+// replace M=U·S·V' by W·T·V' and update row basis of
 // all other blocks in block row
 // - ASSUMPTION: W is orthogonal
 //
@@ -590,7 +593,7 @@ update_row_basis ( uniform_lrmatrix< value_t > &    M,
                    const blas::matrix< value_t > &  T,
                    const hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
-                   const uniform_map_t &            rowmap )
+                   const is_matrix_map_t &          rowmap )
 {
     auto  Un = compute_updated_row_basis( M, W, T, acc, approx, rowmap );
 
@@ -658,14 +661,14 @@ update_row_basis ( uniform_lrmatrix< value_t > &    M,
     M.set_coeff_unsafe( std::move( Sn ) );
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
 }
 
 //
-// replace M=U·S·V' by U·T·X' and update row bases of
+// replace M=U·S·V' by U·T·X' and update row basis of
 // all other blocks in block column
 // - ASSUMPTION: X is orthogonal
 //
@@ -677,7 +680,7 @@ update_col_basis ( uniform_lrmatrix< value_t > &    M,
                    const blas::matrix< value_t > &  X,
                    const hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
-                   const uniform_map_t &            colmap )
+                   const is_matrix_map_t &          colmap )
 {
     auto  Vn = compute_updated_col_basis( M, T, X, acc, approx, colmap );
 
@@ -744,7 +747,7 @@ update_col_basis ( uniform_lrmatrix< value_t > &    M,
     M.set_coeff_unsafe( std::move( Sn ) );
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
@@ -952,7 +955,7 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
     }// for
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
@@ -1029,7 +1032,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
                 
                 auto  Xt_k = blas::matrix< value_t >( Xt, blas::range::all, blas::range( pos, pos + D_kj.ncols() - 1 ) );
 
-                std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( D_kj ) ) << std::endl;
+                // std::cout << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_2( D_kj ) ) << std::endl;
                 blas::scale( value_t(1) / blas::norm_2( D_kj ), D_kj );
                 blas::copy( D_kj, Xt_k );
 
@@ -1084,7 +1087,7 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
             auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
 
             blas::add( value_t(-1), M1, M2 );
-            std::cout << "    extend col : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+            // std::cout << "    extend col : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
             
             R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
         }// if
@@ -1099,14 +1102,14 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
             auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
 
             blas::add( value_t(-1), M1, M2 );
-            std::cout << "    extend col : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+            // std::cout << "    extend col : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
 
             R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
         }// else
     }// for
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
@@ -1303,7 +1306,7 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
     }// for
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
@@ -1454,7 +1457,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
     }// for
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
@@ -1464,7 +1467,7 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
 // recompute i'th row basis and j'th column basis while replacing
 // block M_ij by W·T·X', e.g., extend row basis to cover [ U, W ]
 // and column basis for [ V, X ] with U,V being the current row/
-// column bases
+// column basis
 //
 // ASSUMPTIONs
 //  - W and X are orthogonal
@@ -1503,7 +1506,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
     //                         ⎜U_j·S_j  0 ⎟
     //                         ⎝   0    W·T⎠
     //
-    // Since U_i and W are orthogonal, one can skip those for bases computation.
+    // Since U_i and W are orthogonal, one can skip those for basis computation.
     // Compute QR factorization
     //
     //   Q·R = ⎛S_1  0⎞ = S
@@ -1669,7 +1672,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
     //            ⎜⎜            V_j  ⎟ ⎜S_j'  0 ⎟⎟
     //            ⎝⎝                X⎠ ⎝ 0    T'⎠⎠
     //
-    // Since V_i and X are orthogonal, one can skip those for bases computation.
+    // Since V_i and X are orthogonal, one can skip those for basis computation.
     // Compute QR factorization
     //
     //   Q·R = ⎛S_1' 0 ⎞ = S
@@ -1841,7 +1844,7 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
     R_ij->set_coeff_unsafe( std::move( Sn ) );
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
@@ -2096,7 +2099,7 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
     R_ij->set_coeff_unsafe( std::move( Sn ) );
 
     //
-    // finally adjust cluster bases
+    // finally adjust cluster basis
     //
 
     const_cast< matrix::cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
@@ -2105,4 +2108,4 @@ replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
 
 }}}}// namespace hlr::uniform::tlr::detail
 
-#endif // __HLR_ARITH_DETAIL_UNIFORM_BASES_HH
+#endif // __HLR_ARITH_DETAIL_UNIFORM_BASIS_HH

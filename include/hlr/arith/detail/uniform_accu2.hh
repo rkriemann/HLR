@@ -925,9 +925,9 @@ lu ( hpro::TMatrix &             A,
 
     if ( is_blocked( A ) )
     {
-        auto  BA   = ptrcast( &A, hpro::TBlockMatrix );
-        auto  BL   = ptrcast( &L, hpro::TBlockMatrix );
-        auto  BU   = ptrcast( &U, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BL = ptrcast( &L, hpro::TBlockMatrix );
+        auto  BU = ptrcast( &U, hpro::TBlockMatrix );
 
         HLR_ASSERT( is_blocked_all( L, U ) );
         

@@ -2,22 +2,15 @@
 #define __HLR_TBB_DETAIL_UNIFORM_ACCU_HH
 //
 // Project     : HLib
-// Module      : arith/uniform
+// Module      : arith/detail/uniform_accu
 // Description : arithmetic functions for uniform matrices using accumulators
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
-#include <algorithm>
-
 #include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
 #include <tbb/blocked_range2d.h>
 #include <tbb/task_arena.h>
-
-#include <boost/format.hpp>
-
-#include <hpro/base/System.hh>
 
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/blas.hh>
@@ -25,24 +18,28 @@
 #include <hlr/arith/detail/uniform.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/restrict.hh>
 #include <hlr/utils/hash.hh>
 #include <hlr/utils/tensor.hh>
 
+#include <hlr/tbb/detail/uniform_basis.hh>
+
 namespace hlr { namespace tbb { namespace uniform { namespace accu { namespace detail {
-
-// maps index set to set of blocks sharing it
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
-
-// maps index set to product U×V' of inner matrix product
-using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
 
 using  hlr::matrix::cluster_basis;
 using  hlr::matrix::is_uniform_lowrank;
 using  hlr::matrix::is_uniform_lowrank_all;
 using  hlr::matrix::uniform_lrmatrix;
+using  hlr::uniform::is_matrix_map_t;
+using  hlr::tbb::uniform::detail::compute_extended_basis;
+using  hlr::tbb::uniform::detail::update_coupling;
 
+// maps index set to product U×V' of inner matrix product
+using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
+
+//
+// matrix update accumulator with parallel update handling
+//
 struct accumulator
 {
     //
@@ -835,707 +832,642 @@ struct accumulator
     }
 };
 
-//
-// structure for handling basis updates
-//
 
-using  matrix_list_t = std::vector< hpro::TMatrix * >;
-using  matrix_map_t  = std::unordered_map< indexset, matrix_list_t, indexset_hash >;
+//
+// build block mappings (indexset to matrix block)
+//
+void
+build_block_maps ( hpro::TMatrix &    A,
+                   is_matrix_map_t &  rowmap,
+                   is_matrix_map_t &  colmap )
+{
+    auto  blocks = std::list< hpro::TMatrix * >{ &A };
 
-struct rec_basis_data_t
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = decltype( blocks )();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  BM = ptrcast( M, hpro::TBlockMatrix );
+
+                for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                        if ( ! is_null( BM->block( i, j ) ) )
+                            subblocks.push_back( BM->block( i, j ) );
+            }// if
+            else if ( is_uniform_lowrank( M ) )
+            {
+                rowmap[ M->row_is() ].push_back( M );
+                colmap[ M->col_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+}
+
+//
+// implements recursive matrix multiplication with accumulator
+//
+struct rec_matrix_mult
 {
     // maps indexsets to set of uniform matrices sharing corresponding cluster basis
-    matrix_map_t   rowmap, colmap;
+    is_matrix_map_t   rowmap, colmap;
 
     //
     // ctor
     //
-    rec_basis_data_t ( hpro::TMatrix &  A )
+    rec_matrix_mult ( hpro::TMatrix &  A )
     {
-        auto  blocks = std::list< hpro::TMatrix * >{ &A };
-
-        while ( ! blocks.empty() )
-        {
-            auto  subblocks = decltype( blocks )();
-
-            for ( auto  M : blocks )
-            {
-                if ( is_blocked( M ) )
-                {
-                    auto  BM = ptrcast( M, hpro::TBlockMatrix );
-
-                    for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                            if ( ! is_null( BM->block( i, j ) ) )
-                                subblocks.push_back( BM->block( i, j ) );
-                }// if
-                else if ( is_uniform_lowrank( M ) )
-                {
-                    rowmap[ M->row_is() ].push_back( M );
-                    colmap[ M->col_is() ].push_back( M );
-                }// if
-            }// for
-
-            blocks = std::move( subblocks );
-        }// while
+        build_block_maps( A, rowmap, colmap );
     }
 
-    //
-    // extend row basis <cb> by block W·T·X' (X is not needed for computation)
-    //
-    // - identical to implementation in "arith/detail/uniform.hh" but thread-safe,
-    //   hence, for details look into original code
-    //
     template < typename value_t,
-               typename basisapx_t >
-    blas::matrix< value_t >
-    compute_extended_basis ( uniform_lrmatrix< value_t > &     M,
-                             const cluster_basis< value_t > &  cb,
-                             const blas::matrix< value_t > &   W,
-                             const blas::matrix< value_t > &   T,
-                             const hpro::TTruncAcc &           acc,
-                             const basisapx_t &                basisapx,
-                             matrix_map_t &                    matmap,
-                             const matop_t                     op )
+               typename approx_t >
+    void
+    multiply ( const value_t            alpha,
+               hpro::TMatrix &          M,
+               accumulator &            accu,
+               const hpro::TTruncAcc &  acc,
+               const approx_t &         approx )
     {
-        using  real_t = hpro::real_type_t< value_t >;
-
-        // zero basis implies empty matrix list
-        if ( cb.basis().ncols() == 0 )
-            return std::move( blas::copy( W ) );
-            
         //
-        // collect scaled coupling matrices and filter out zero couplings
+        // evaluate all computable updates to M
         //
 
-        HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
+        accu.eval( value_t(1), M, acc, approx );
 
-        auto    uni_mats  = matmap.at( cb.is() );
-        auto    couplings = std::list< blas::matrix< value_t > >();
-        size_t  nrows_S   = T.ncols();
-        auto    cmtx      = std::mutex();
+        //
+        // recurse
+        //
 
-        ::tbb::parallel_for_each(
-            uni_mats,
-            [&] ( auto  M_i )
-            {
-                if ( M_i == &M )
-                    return;
-            
-                const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
-                auto        S_i = blas::matrix< value_t >();
-                        
+        if ( is_blocked( M ) )
+        {
+            auto  BM       = ptrcast( &M, hpro::TBlockMatrix );
+            auto  sub_accu = accu.restrict< value_t >( *BM );
+
+            accu.clear_matrix();
+
+            ::tbb::parallel_for(
+                ::tbb::blocked_range2d< uint >( 0, BM->nblock_rows(),
+                                                0, BM->nblock_cols() ),
+
+                [&,alpha] ( const auto &  r )
                 {
-                    auto  lock = std::scoped_lock( M_i->mutex() );
-
-                    S_i = std::move( blas::copy( blas::mat_view( op, R_i->coeff() ) ) );
-                }
-                        
-                HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
-            
-                const auto  norm = norm::spectral( S_i );
-                        
-                if ( norm != real_t(0) )
-                {
-                    blas::scale( value_t(1) / norm, S_i );
-
+                    for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                     {
-                        auto  lock = std::scoped_lock( cmtx );
-                    
-                        nrows_S += S_i.nrows();
-                        couplings.push_back( std::move( S_i ) );
-                    }
-                }// if
-            } );
+                        for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                        {
+                            if ( is_null( BM->block( i, j ) ) )
+                                continue;
 
-        //
-        // assemble all scaled coupling matrices into joined matrix
-        //
-
-        auto    U   = cb.basis();
-        auto    Ue  = blas::join_row< value_t >( { U, W } );
-        auto    S   = blas::matrix< value_t >( nrows_S, Ue.ncols() );
-        size_t  pos = 0;
-            
-        for ( auto  S_i : couplings )
+                            multiply( alpha, * BM->block( i, j ), sub_accu( i, j ), acc, approx );
+                        }// for
+                    }// for
+                } );
+        }// if
+        else if ( hlr::matrix::is_uniform_lowrank( M ) )
         {
-            HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
-            HLR_ASSERT( S_i.ncols() == U.ncols() );
-            
-            auto  S_sub = blas::matrix< value_t >( S,
-                                                   blas::range( pos, pos + S_i.nrows()-1 ),
-                                                   blas::range( 0, U.ncols() - 1 ) );
-                        
-            blas::copy( S_i, S_sub );
-            pos += S_i.nrows();
-        }// for
+            //
+            // update local matrix as standard low-rank matrix
+            //
 
-        //
-        // add part from W·T·X'
-        //
-        
-        auto  S_i  = blas::copy( blas::mat_view( op, T ) );
-        auto  norm = norm::spectral( T );
-            
-        if ( norm != real_t(0) )
-            blas::scale( value_t(1) / norm, S_i );
-            
-        HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
-        HLR_ASSERT( S_i.ncols() == Ue.ncols() - U.ncols() );
-        
-        auto  S_sub = blas::matrix< value_t >( S,
-                                               blas::range( pos, pos + S_i.nrows()-1 ),
-                                               blas::range( U.ncols(), Ue.ncols() - 1 ) );
-            
-        blas::copy( S_i, S_sub );
-        
-        //
-        // form product Ue·S and compute column basis
-        //
-            
-        auto  R = blas::matrix< value_t >();
-        
-        blas::qr( S, R, false );
+            auto    U     = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+            auto &  rowcb = U->row_cb();
+            auto &  colcb = U->col_cb();
+            auto    R     = hpro::TRkMatrix( U->row_is(), U->col_is(), hpro::value_type_v< value_t > );
 
-        auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
-        auto  Un  = basisapx.column_basis( UeR, acc );
-
-        return  Un;
-    }
-
-    template < typename value_t,
-               typename basisapx_t >
-    blas::matrix< value_t >
-    compute_extended_row_basis ( uniform_lrmatrix< value_t > &     M,
-                                 const cluster_basis< value_t > &  cb,
-                                 const blas::matrix< value_t > &   W,
-                                 const blas::matrix< value_t > &   T,
-                                 const hpro::TTruncAcc &           acc,
-                                 const basisapx_t &                basisapx )
-    {
-        return compute_extended_basis( M, cb, W, T, acc, basisapx, rowmap, apply_adjoint );
-    }
-
-    //
-    // extend column basis <cb> by block W·T·X' (W is not needed for computation)
-    //
-    // - identical to implementation in "arith/detail/uniform.hh" but thread-safe,
-    //   hence, for details look into original code
-    //
-    template < typename value_t,
-               typename basisapx_t >
-    blas::matrix< value_t >
-    compute_extended_col_basis ( uniform_lrmatrix< value_t > &     M,
-                                 const cluster_basis< value_t > &  cb,
-                                 const blas::matrix< value_t > &   X,
-                                 const blas::matrix< value_t > &   T,
-                                 const hpro::TTruncAcc &           acc,
-                                 const basisapx_t &                basisapx )
-    {
-        return compute_extended_basis( M, cb, X, T, acc, basisapx, colmap, apply_normal );
-    }
-
-    //
-    // update coupling matrices for all blocks sharing basis <cb> to new basis <Un>
-    //
-    template < typename value_t >
-    void
-    update_coupling ( uniform_lrmatrix< value_t > &     M,
-                      const cluster_basis< value_t > &  cb,
-                      const blas::matrix< value_t > &   Un,
-                      matrix_map_t &                    matmap,
-                      const bool                        cols )
-    {
-        if ( cb.basis().ncols() == 0 )
-            return;
-            
-        HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
-            
-        auto  uni_mats = matmap.at( cb.is() );
-        auto  U        = cb.basis();
-        auto  TU       = blas::prod( blas::adjoint( Un ), U );
-
-        ::tbb::parallel_for_each(
-            uni_mats,
-            [&] ( auto  M_i )
             {
-                if ( M_i == &M )
-                    return;
-            
-                auto  lock = std::scoped_lock( M_i->mutex() );
-                auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
-                auto  S_i  = ( cols
-                               ? blas::prod( R_i->coeff(), blas::adjoint( TU ) )
-                               : blas::prod( TU, R_i->coeff() ) );
+                std::scoped_lock  lock( U->mutex(), rowcb.mutex(), colcb.mutex() );
 
-                R_i->set_coeff_unsafe( std::move( S_i ) );
+                R.set_lrmat( std::move( blas::prod( U->row_basis(), U->coeff() ) ),
+                             std::move( blas::copy( U->col_basis() ) ) );
+            }
+        
+            // no recursive updates left, apply accumulated updates and solve
+            accu.apply( alpha, R, acc, approx );
+        
+            //
+            // now replace M by R and update row/column bases
+            //
+
+            auto  W  = std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  RW = blas::matrix< value_t >();
+            auto  RX = blas::matrix< value_t >();
+
+            ::tbb::parallel_invoke( [&] () { blas::qr( W, RW ); },
+                                    [&] () { blas::qr( X, RX ); } );
+
+            auto  T  = blas::prod( RW, blas::adjoint( RX ) );
+
+            ::tbb::this_task_arena::isolate( [&] ()
+            {
+                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                
+                ::tbb::parallel_invoke(
+                    [&] ()
+                    {
+                        auto  mtx = std::mutex(); // just dummy
+                        auto  Un  = compute_extended_basis( rowcb, W, T, acc, approx, rowmap, mtx, apply_adjoint, U );
+                        
+                        update_coupling( rowcb, Un, rowmap, mtx, false, U );
+                        rowcb.set_basis( std::move( Un ) );
+                    },
+                
+                    [&] ()
+                    {
+                        auto  mtx = std::mutex(); // just dummy
+                        auto  Vn  = compute_extended_basis( colcb, X, T, acc, approx, colmap, mtx, apply_normal, U );
+                        
+                        update_coupling( colcb, Vn, colmap, mtx, true, U );
+                        colcb.set_basis( std::move( Vn ) );
+                    }
+                );
+
+                //
+                // transform M into new bases
+                //
+
+                auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
+                auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
+                auto  TS = blas::prod( TU, T );
+                auto  S  = blas::prod( TS, blas::adjoint( TV ) );
+
+                U->set_coeff( std::move( S ) );
             } );
-    }
-
-    template < typename value_t >
-    void
-    update_row_coupling ( uniform_lrmatrix< value_t > &     M,
-                          const cluster_basis< value_t > &  cb,
-                          const blas::matrix< value_t > &   Un )
-    {
-        update_coupling( M, cb, Un, rowmap, false );
-    }
-    
-    template < typename value_t >
-    void
-    update_col_coupling ( uniform_lrmatrix< value_t > &     M,
-                          const cluster_basis< value_t > &  cb,
-                          const blas::matrix< value_t > &   Vn )
-    {
-        update_coupling( M, cb, Vn, colmap, true );
+        }// if
+        else
+        {
+            accu.apply( alpha, M, acc, approx );
+        }// else
     }
 };
 
 //
-// recursive LU factorization
+// implements recursive LU factorization with accumulator
 //
-template < typename value_t,
-           typename approx_t >
-void
-multiply ( const value_t            alpha,
-           hpro::TMatrix &          M,
-           accumulator &            accu,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx,
-           rec_basis_data_t &       basis_data )
+struct rec_lu_factorization
 {
+    // maps indexsets to set of uniform matrices sharing corresponding cluster basis
+    is_matrix_map_t   rowmap_L, colmap_L;
+    is_matrix_map_t   rowmap_U, colmap_U;
+
+    // mutices for mappings
+    std::mutex        rowmap_L_mtx, colmap_L_mtx;
+    std::mutex        rowmap_U_mtx, colmap_U_mtx;
+    
     //
-    // evaluate all computable updates to M
+    // ctor
     //
+    rec_lu_factorization ( hpro::TMatrix &  L,
+                           hpro::TMatrix &  U )
+    {}
 
-    accu.eval( value_t(1), M, acc, approx );
-
-    //
-    // recurse
-    //
-
-    if ( is_blocked( M ) )
-    {
-        auto  BM       = ptrcast( &M, hpro::TBlockMatrix );
-        auto  sub_accu = accu.restrict< value_t >( *BM );
-
-        accu.clear_matrix();
-
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, BM->nblock_rows(),
-                                            0, BM->nblock_cols() ),
-
-            [&,alpha] ( const auto &  r )
-            {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        if ( is_null( BM->block( i, j ) ) )
-                            continue;
-
-                        multiply( alpha, * BM->block( i, j ), sub_accu( i, j ), acc, approx, basis_data );
-                    }// for
-                }// for
-            } );
-    }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    template < typename value_t,
+               typename approx_t >
+    void
+    solve_lower_tri ( const eval_side_t           side,
+                      const diag_type_t           diag,
+                      const hpro::TMatrix &       L,
+                      hpro::TMatrix &             M,
+                      accumulator &               accu,
+                      const hpro::TTruncAcc &     acc,
+                      const approx_t &            approx,
+                      cluster_basis< value_t > &  rowcb,   // new cluster bases for M
+                      cluster_basis< value_t > &  colcb )
     {
         //
-        // update local matrix as standard low-rank matrix
+        // evaluate all computable updates to M
         //
 
-        auto    U = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        auto &  rowcb = U->row_cb();
-        auto &  colcb = U->col_cb();
-        auto    R = hpro::TRkMatrix( U->row_is(), U->col_is(), hpro::value_type_v< value_t > );
+        trace::region_start( "eval" );
 
+        accu.eval( value_t(1), M, acc, approx );
+
+        trace::region_end( "eval" );
+    
+        if ( is_blocked_all( L, M ) )
         {
-            std::scoped_lock  lock( U->mutex(), rowcb.mutex(), colcb.mutex() );
-
-            R.set_lrmat( std::move( blas::prod( U->row_basis(), U->coeff() ) ),
-                         std::move( blas::copy( U->col_basis() ) ) );
-        }
+            auto  BL = cptrcast( &L, hpro::TBlockMatrix );
+            auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
         
-        // no recursive updates left, apply accumulated updates and solve
-        accu.apply( alpha, R, acc, approx );
-        
-        //
-        // now replace M by R and update row/column bases
-        //
-
-        auto  W  = std::move( blas::mat_U< value_t >( R ) );
-        auto  X  = std::move( blas::mat_V< value_t >( R ) );
-        auto  RW = blas::matrix< value_t >();
-        auto  RX = blas::matrix< value_t >();
-
-        ::tbb::parallel_invoke( [&] () { blas::qr( W, RW ); },
-                                [&] () { blas::qr( X, RX ); } );
-
-        auto  T  = blas::prod( RW, blas::adjoint( RX ) );
-
-        ::tbb::this_task_arena::isolate( [&] ()
-        {
-            auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
-                
-            ::tbb::parallel_invoke(
-                [&] ()
-                {
-                    auto  Un = basis_data.compute_extended_row_basis( *U, rowcb, W, T, acc, approx );
-                        
-                    basis_data.update_row_coupling( *U, rowcb, Un );
-                    rowcb.set_basis( std::move( Un ) );
-                },
-                
-                [&] ()
-                {
-                    auto  Vn = basis_data.compute_extended_col_basis( *U, colcb, X, T, acc, approx );
-                        
-                    basis_data.update_col_coupling( *U, colcb, Vn );
-                    colcb.set_basis( std::move( Vn ) );
-                }
-            );
-
             //
-            // transform M into new bases
+            // first, split accumulated updates U and recursive updates upd_rec
+            // into subblock updates
+            // - to release U before recursion and by that avoid memory
+            //   consumption dependent on hierarchy depth
             //
 
-            auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
-            auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
-            auto  TS = blas::prod( TU, T );
-            auto  S  = blas::prod( TS, blas::adjoint( TV ) );
+            auto  sub_accu = accu.restrict< value_t >( *BM );
 
-            U->set_coeff( std::move( S ) );
-        } );
-    }// if
-    else
-    {
-        accu.apply( alpha, M, acc, approx );
-    }// else
-}
+            accu.clear_matrix();
 
-template < typename value_t,
-           typename approx_t >
-void
-solve_lower_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    L,
-                  hpro::TMatrix &          M,
-                  accumulator &            accu,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
-{
-    // std::cout << M.id() << std::endl;
-    
-    // apply computable updates
-    accu.eval( value_t(1), M, acc, approx );
-    
-    if ( is_blocked_all( L, M ) )
-    {
-        auto  BL = cptrcast( &L, hpro::TBlockMatrix );
-        auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
-        
-        //
-        // first, split accumulated updates U and recursive updates upd_rec
-        // into subblock updates
-        // - to release U before recursion and by that avoid memory
-        //   consumption dependent on hierarchy depth
-        //
-
-        auto  sub_accu = accu.restrict< value_t >( *BM );
-
-        accu.clear_matrix();
-
-        if ( side == from_left )
-        {
-            for ( uint i = 0; i < BM->nblock_rows(); ++i )
+            if ( side == from_left )
             {
-                const auto  L_ii = BL->block( i, i );
-            
-                for ( uint j = 0; j < BM->nblock_cols(); ++j )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
-                                                sub_accu(i,j), acc, approx, rowmap, colmap ); // *BREF->block( i, j ) );
-
-                for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
-                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
-                        sub_accu(k,j).add_update( *BL->block(k,i), *BM->block(i,j) );
-            }// for
-        }// if
-        else
-        {
-            HLR_ASSERT( false );
-        }// else
-    }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
-    {
-        //
-        // update and solve local matrix
-        //
-
-        auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        auto  R  = hpro::TRkMatrix( UM->row_is(), UM->col_is(), std::move( blas::prod( UM->row_basis(), UM->coeff() ) ), std::move( blas::copy( UM->col_basis() ) ) );
-
-        // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), R, acc, approx );
-        
-        hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
-
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( R );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-
-        //
-        // now replace M by R and update row/column bases
-        //
-
-        auto  W  = blas::mat_U< value_t >( R );
-        auto  X  = blas::mat_V< value_t >( R );
-        auto  RW = blas::matrix< value_t >();
-        auto  RX = blas::matrix< value_t >();
-
-        blas::qr( W, RW );
-        blas::qr( X, RX );
-
-        auto  T = blas::prod( RW, blas::adjoint( RX ) );
-                    
-        hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-    }// if
-    else
-    {
-        accu.apply( value_t(-1), M, acc, approx );
-
-        hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-    }// else
-}
-
-template < typename value_t,
-           typename approx_t >
-void
-solve_upper_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    U,
-                  hpro::TMatrix &          M,
-                  accumulator &            accu,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
-{
-    // std::cout << M.id() << std::endl;
-
-    // apply computable updates
-    accu.eval( value_t(1), M, acc, approx );
-    
-    if ( is_blocked_all( U, M ) )
-    {
-        auto  BU = cptrcast( &U, hpro::TBlockMatrix );
-        auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
-        
-        //
-        // first, split accumulated updates U and recursive updates upd_rec
-        // into subblock updates
-        // - to release U before recursion and by that avoid memory
-        //   consumption dependent on hierarchy depth
-        //
-
-        auto  sub_accu = accu.restrict< value_t >( *BM );
-
-        accu.clear_matrix();
-
-        if ( side == from_left )
-        {
-            HLR_ASSERT( false );
-        }// if
-        else
-        {
-            for ( uint j = 0; j < BM->nblock_cols(); ++j )
-            {
-                const auto  U_jj = BU->block( j, j );
-            
                 for ( uint i = 0; i < BM->nblock_rows(); ++i )
-                    solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
-                                                sub_accu(i,j), acc, approx, rowmap, colmap ); // *BREF->block( i, j ) );
+                {
+                    const auto  L_ii = BL->block( i, i );
             
-                for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
-                    for ( uint  i = 0; i < BM->nblock_rows(); ++i )
-                        sub_accu(i,k).add_update( *BM->block(i,j), *BU->block(j,k) );
-            }// for
-        }// else
-    }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
-    {
-        //
-        // update and solve local matrix
-        //
+                    HLR_ASSERT( ! is_null( rowcb.son(i) ) );
+                    
+                    ::tbb::parallel_for< uint >(
+                        0, BM->nblock_cols(),
+                        [&,side,diag,L_ii,BM,i] ( const uint  j )
+                        {
+                            HLR_ASSERT( ! is_null( colcb.son(j) ) );
+                    
+                            solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
+                                                        sub_accu(i,j), acc, approx,
+                                                        *rowcb.son(i), *colcb.son(j) );
+                        } );
 
-        auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        auto  R  = hlr::matrix::convert_to_lowrank< value_t >( M );
-
-        // no recursive updates left, apply accumulated updates and solve
-        accu.apply( value_t(-1), *R, acc, approx );
-
-        hlr::solve_upper_tri< value_t >( side, diag, U, *R, acc, approx );
-
-        //
-        // now replace M by R and update row/column bases
-        //
-
-        auto  W  = blas::mat_U< value_t >( *R );
-        auto  X  = blas::mat_V< value_t >( *R );
-        auto  RW = blas::matrix< value_t >();
-        auto  RX = blas::matrix< value_t >();
-
-        blas::qr( W, RW );
-        blas::qr( X, RX );
-
-        auto  T = blas::prod( RW, blas::adjoint( RX ) );
-        
-        hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
-    }// if
-    else
-    {
-        accu.apply( value_t(-1), M, acc, approx );
-
-        hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-    }// else
-}
-
-//
-// recursive LU factorization
-//
-template < typename value_t,
-           typename approx_t >
-void
-lu ( hpro::TMatrix &          A,
-     accumulator &            accu,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     const uniform_map_t &    rowmap,
-     const uniform_map_t &    colmap )
-// hpro::TMatrix &          REF )
-{
-    //
-    // evaluate all computable updates to M
-    //
-
-    // std::cout << A.id() << std::endl;
-
-    accu.eval( value_t(1), A, acc, approx );
-
-    //
-    // (recursive) LU factorization
-    //
-
-    if ( is_blocked( A ) )
-    {
-        auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
-
-        //
-        // first, split accumulated updates U and recursive updates upd_rec
-        // into subblock updates
-        // - to release U before recursion and by that avoid memory
-        //   consumption dependent on hierarchy depth
-        //
-
-        auto  sub_accu = accu.restrict< value_t >( *BA );
-
-        accu.clear_matrix();
-
-        //
-        // recursive LU factorization but add updates to accumulator
-        // instead of applying them
-        //
-        
-        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+                    for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
+                        for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                            sub_accu(k,j).add_update( *BL->block(k,i), *BM->block(i,j) );
+                }// for
+            }// if
+            else
+            {
+                HLR_ASSERT( false );
+            }// else
+        }// if
+        else if ( hlr::matrix::is_uniform_lowrank( M ) )
         {
-            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
             
-            lu< value_t >( * BA->block( i, i ), sub_accu(i,i), acc, approx, rowmap, colmap ); // , *BREF->block( i, i ) );
+            //
+            // update and solve local matrix
+            //
 
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+            auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+            auto  R  = hpro::TRkMatrix( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+
             {
-                if ( ! is_null( BA->block( j, i ) ) )
-                    solve_upper_tri< value_t >( from_right, general_diag,
-                                                *BA->block( i, i ), *BA->block( j, i ),
-                                                sub_accu(j,i), acc, approx, rowmap, colmap ); // *BREF->block( j, i ) );
-            }// for
+                std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
 
-            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
-            {
-                if ( ! is_null( BA->block( i, j ) ) )
-                    solve_lower_tri< value_t >( from_left, unit_diag,
-                                                *BA->block( i, i ), *BA->block( i, j ),
-                                                sub_accu(i,j), acc, approx, rowmap, colmap ); // *BREF->block( i, j ) );
-            }// for
-
-            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
-                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
-                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
-                        sub_accu(j,l).add_update( *BA->block( j, i ), *BA->block( i, l ) );
-        }// for
-    }// if
-    else if ( is_dense( A ) )
-    {
-        auto  D = ptrcast( &A, hpro::TDenseMatrix );
-
-        accu.apply( value_t(-1), A, acc, approx );
+                R.set_lrmat( std::move( blas::prod( UM->row_basis(), UM->coeff() ) ),
+                             std::move( blas::copy( UM->col_basis() ) ) );
+            }
+            
+            trace::region_start( "apply" );
+            
+            // no recursive updates left, apply accumulated updates and solve
+            accu.apply( value_t(-1), R, acc, approx );
         
-        invert< value_t >( *D );
+            trace::region_end( "apply" );
+            
+            hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
 
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( A );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
+            //
+            // now replace M by R and update row/column bases
+            //
 
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << A.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
-}
+            trace::region_start( "basis" );
+        
+            auto  W  = std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  RW = blas::matrix< value_t >();
+            auto  RX = blas::matrix< value_t >();
+
+            ::tbb::parallel_invoke( [&] () { blas::qr( W, RW ); },
+                                    [&] () { blas::qr( X, RX ); } );
+
+            auto  T  = blas::prod( RW, blas::adjoint( RX ) );
+
+            ::tbb::this_task_arena::isolate( [&] ()
+            {
+                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                
+                ::tbb::parallel_invoke(
+                    [&] ()
+                    {
+                        auto  Un = compute_extended_basis( rowcb, W, T, acc, approx, rowmap_U, rowmap_U_mtx, apply_adjoint );
+
+                        update_coupling( rowcb, Un, rowmap_U, rowmap_U_mtx, false );
+                        rowcb.set_basis( std::move( Un ) );
+                    },
+                        
+                    [&] ()
+                    {
+                        auto  Vn = compute_extended_basis( colcb, X, T, acc, approx, colmap_U, colmap_U_mtx, apply_normal );
+            
+                        update_coupling( colcb, Vn, colmap_U, colmap_U_mtx, true );
+                        colcb.set_basis( std::move( Vn ) );
+                    }
+                );
+
+                //
+                // update new basis and replace data in M
+                //
+        
+                auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
+                auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
+                auto  TS = blas::prod( TU, T );
+                auto  Sn = blas::prod( TS, blas::adjoint( TV ) );
+
+                UM->set_coeff_unsafe( std::move( Sn ) );
+                UM->set_cluster_bases( rowcb, colcb );
+
+                // M now also part of matrices sharing rowcb/colcb
+                {
+                    auto  lock_is = std::scoped_lock( rowmap_U_mtx, colmap_U_mtx );
+                    
+                    rowmap_U[ rowcb.is() ].push_back( UM );
+                    colmap_U[ colcb.is() ].push_back( UM );
+                }
+                
+                trace::region_end( "basis" );
+            } );
+        }// if
+        else
+        {
+            accu.apply( value_t(-1), M, acc, approx );
+
+            hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+        }// else
+    }
+
+    template < typename value_t,
+               typename approx_t >
+    void
+    solve_upper_tri ( const eval_side_t           side,
+                      const diag_type_t           diag,
+                      const hpro::TMatrix &       U,
+                      hpro::TMatrix &             M,
+                      accumulator &               accu,
+                      const hpro::TTruncAcc &     acc,
+                      const approx_t &            approx,
+                      cluster_basis< value_t > &  rowcb,   // new cluster bases for M
+                      cluster_basis< value_t > &  colcb )
+    {
+        //
+        // evaluate all computable updates to M
+        //
+
+        trace::region_start( "eval" );
+    
+        accu.eval( value_t(1), M, acc, approx );
+    
+        trace::region_end( "eval" );
+        
+        if ( is_blocked_all( U, M ) )
+        {
+            auto  BU = cptrcast( &U, hpro::TBlockMatrix );
+            auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
+        
+            //
+            // first, split accumulated updates U and recursive updates upd_rec
+            // into subblock updates
+            // - to release U before recursion and by that avoid memory
+            //   consumption dependent on hierarchy depth
+            //
+
+            auto  sub_accu = accu.restrict< value_t >( *BM );
+
+            accu.clear_matrix();
+
+            if ( side == from_left )
+            {
+                HLR_ASSERT( false );
+            }// if
+            else
+            {
+                for ( uint j = 0; j < BM->nblock_cols(); ++j )
+                {
+                    const auto  U_jj = BU->block( j, j );
+                    
+                    HLR_ASSERT( ! is_null_any( U_jj, colcb.son(j) ) );
+                    
+                    ::tbb::parallel_for< uint >(
+                        0, BM->nblock_rows(),
+                        [&,side,diag,U_jj,BM,j] ( const uint  i )
+                        {
+                            HLR_ASSERT( ! is_null( rowcb.son(i) ) );
+                    
+                            solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
+                                                        sub_accu(i,j), acc, approx, 
+                                                        *rowcb.son(i), *colcb.son(j) );
+                        } );
+            
+                    for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
+                        for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                            sub_accu(i,k).add_update( *BM->block(i,j), *BU->block(j,k) );
+                }// for
+            }// else
+        }// if
+        else if ( hlr::matrix::is_uniform_lowrank( M ) )
+        {
+            std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
+            
+            //
+            // update and solve local matrix
+            //
+
+            auto  UM = ptrcast( &M, uniform_lrmatrix< value_t > );
+            auto  R  = hpro::TRkMatrix( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+                                             
+            {
+                std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
+
+                R.set_lrmat( std::move( blas::prod( UM->row_basis(), UM->coeff() ) ),
+                             std::move( blas::copy( UM->col_basis() ) ) );
+            }
+
+            trace::region_start( "apply" );
+        
+            // no recursive updates left, apply accumulated updates and solve
+            accu.apply( value_t(-1), R, acc, approx );
+
+            trace::region_end( "apply" );
+
+            hlr::solve_upper_tri< value_t >( side, diag, U, R, acc, approx );
+
+            //
+            // now replace M by R and update row/column bases
+            //
+
+            trace::region_start( "basis" );
+        
+            auto  W  = std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  RW = blas::matrix< value_t >();
+            auto  RX = blas::matrix< value_t >();
+
+            ::tbb::parallel_invoke( [&] () { blas::qr( W, RW ); },
+                                    [&] () { blas::qr( X, RX ); } );
+
+            auto  T = blas::prod( RW, blas::adjoint( RX ) );
+
+            ::tbb::this_task_arena::isolate( [&] ()
+            {
+                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                
+                ::tbb::parallel_invoke(
+                    [&] ()
+                    {
+                        auto  Un = compute_extended_basis( rowcb, W, T, acc, approx, rowmap_L, rowmap_L_mtx, apply_adjoint );
+
+                        update_coupling( rowcb, Un, rowmap_L, rowmap_L_mtx, false );
+                        rowcb.set_basis( std::move( Un ) );
+                    },
+                        
+                    [&] ()
+                    {
+                        auto  Vn = compute_extended_basis( colcb, X, T, acc, approx, colmap_L, colmap_L_mtx, apply_normal );
+            
+                        update_coupling( colcb, Vn, colmap_L, colmap_L_mtx, true );
+                        colcb.set_basis( std::move( Vn ) );
+                    }
+                );
+
+                //
+                // update new basis and replace data in M
+                //
+                
+                auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
+                auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
+                auto  TS = blas::prod( TU, T );
+                auto  Sn = blas::prod( TS, blas::adjoint( TV ) );
+                
+                UM->set_coeff_unsafe( std::move( Sn ) );
+                UM->set_cluster_bases( rowcb, colcb );
+
+                // M now also part of matrices sharing rowcb/colcb
+                {
+                    auto  lock_is = std::scoped_lock( rowmap_L_mtx, colmap_L_mtx );
+                    
+                    rowmap_L[ rowcb.is() ].push_back( UM );
+                    colmap_L[ colcb.is() ].push_back( UM );
+                }
+
+                trace::region_end( "basis" );
+            } );
+        }// if
+        else
+        {
+            accu.apply( value_t(-1), M, acc, approx );
+            
+            hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+        }// else
+    }
+                      
+    //
+    // recursive LU factorization
+    //
+    template < typename value_t,
+               typename approx_t >
+    void
+    lu ( hpro::TMatrix &             A,
+         hpro::TMatrix &             L,
+         hpro::TMatrix &             U,
+         accumulator &               accu,
+         const hpro::TTruncAcc &     acc,
+         const approx_t &            approx,
+         cluster_basis< value_t > &  rowcb_L, // new cluster bases for L
+         cluster_basis< value_t > &  colcb_L,
+         cluster_basis< value_t > &  rowcb_U, // new cluster bases for U
+         cluster_basis< value_t > &  colcb_U )
+    {
+        //
+        // evaluate all computable updates to M
+        //
+
+        trace::region_start( "eval" );
+    
+        accu.eval( value_t(1), A, acc, approx );
+    
+        trace::region_end( "eval" );
+
+        //
+        // (recursive) LU factorization
+        //
+
+        if ( is_blocked( A ) )
+        {
+            auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+            auto  BL = ptrcast( &L, hpro::TBlockMatrix );
+            auto  BU = ptrcast( &U, hpro::TBlockMatrix );
+
+            //
+            // first, split accumulated updates U and recursive updates upd_rec
+            // into subblock updates
+            // - to release U before recursion and by that avoid memory
+            //   consumption dependent on hierarchy depth
+            //
+
+            auto  sub_accu = accu.restrict< value_t >( *BA );
+
+            accu.clear_matrix();
+
+            //
+            // recursive LU factorization but add updates to accumulator
+            // instead of applying them
+            //
+        
+            for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+            {
+                HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            
+                lu< value_t >( * BA->block( i, i ), * BL->block( i, i ), * BU->block( i, i ),
+                               sub_accu(i,i), acc, approx,
+                               *rowcb_L.son(i), *colcb_L.son(i),
+                               *rowcb_U.son(i), *colcb_U.son(i) );
+
+                ::tbb::parallel_invoke( 
+                    [&,i,BA,BU,BL] ()
+                    {
+                        ::tbb::parallel_for< uint >(
+                            i+1, BA->nblock_rows(),
+                            [&,i,BA,BU,BL] ( const uint  j )
+                            {
+                                if ( ! is_null( BA->block( j, i ) ) )
+                                    solve_upper_tri< value_t >( from_right, general_diag,
+                                                                *BU->block( i, i ), *BL->block( j, i ),
+                                                                sub_accu(j,i), acc, approx,
+                                                                *rowcb_L.son(j), *colcb_L.son(i) );
+                            } );
+                    },
+                    
+                    [&,i,BA,BU,BL] ()
+                    {
+                        ::tbb::parallel_for< uint >(
+                            i+1, BA->nblock_cols(),
+                            [&,i,BA,BU,BL] ( const uint  j )
+                            {
+                                if ( ! is_null( BA->block( i, j ) ) )
+                                    solve_lower_tri< value_t >( from_left, unit_diag,
+                                                                *BL->block( i, i ), *BU->block( i, j ),
+                                                                sub_accu(i,j), acc, approx,
+                                                                *rowcb_U.son(i), *colcb_U.son(j) );
+                            } );
+                    }
+                );
+
+                for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+                    for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
+                        if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                            sub_accu(j,l).add_update( *BL->block( j, i ), *BU->block( i, l ) );
+            }// for
+        }// if
+        else if ( is_dense( A ) )
+        {
+            auto  DA = ptrcast( &A, hpro::TDenseMatrix );
+            auto  DU = ptrcast( &U, hpro::TDenseMatrix );
+
+            accu.apply( value_t(-1), A, acc, approx );
+
+            blas::copy( blas::mat< value_t >( *DA ), blas::mat< value_t >( *DU ) );
+        
+            invert< value_t >( *DU );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+    }
+};
 
 }}}}}// namespace hlr::tbb::uniform::accu::detail
 

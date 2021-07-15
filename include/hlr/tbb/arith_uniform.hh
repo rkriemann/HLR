@@ -291,11 +291,11 @@ multiply ( const value_t            alpha,
     auto  pi_mtx     = std::mutex();
     auto  prod_inner = detail::inner_map_t();
     auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
-    auto  basis_data = detail::rec_basis_data_t( C );
+    auto  mm         = detail::rec_matrix_mult( C );
 
     accu.add_update( op_A, A, op_B, B );
-    
-    detail::multiply( alpha, C, accu, acc, approx, basis_data );
+
+    mm.multiply( alpha, C, accu, acc, approx );
 }
 
 template < typename value_t,
@@ -313,29 +313,41 @@ multiply_cached ( const value_t            alpha,
     auto  pi_mtx     = std::mutex();
     auto  prod_inner = detail::inner_map_t();
     auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
-    auto  basis_data = detail::rec_basis_data_t( C );
+    auto  mm         = detail::rec_matrix_mult( C );
 
     accu.add_update( op_A, A, op_B, B );
 
-    detail::multiply( alpha, C, accu, acc, approx, basis_data );
+    mm.multiply( alpha, C, accu, acc, approx );
 }
+
+}// namespace accu
+
+namespace accu2
+{
 
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     hpro::TMatrix &          /* REF */ )
+lu ( hpro::TMatrix &                          A,
+     hpro::TMatrix &                          L,
+     hpro::TMatrix &                          U,
+     const hpro::TTruncAcc &                  acc,
+     const approx_t &                         approx,
+     hlr::matrix::cluster_basis< value_t > &  rowcb_L,
+     hlr::matrix::cluster_basis< value_t > &  colcb_L,
+     hlr::matrix::cluster_basis< value_t > &  rowcb_U,
+     hlr::matrix::cluster_basis< value_t > &  colcb_U )
 {
-    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( A );
-    auto  inner_prod         = detail::inner_map_t();
-    auto  accu               = detail::accumulator( & inner_prod );
+    // auto  pi_mtx     = std::mutex();
+    // auto  prod_inner = detail::inner_map_t();
+    // auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
+    auto  accu       = hlr::tbb::uniform::accu::detail::accumulator( nullptr, nullptr );
+    auto  lu         = hlr::tbb::uniform::accu::detail::rec_lu_factorization( L, U );
 
-    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
+    lu.lu( A, L, U, accu, acc, approx, rowcb_L, colcb_L, rowcb_U, colcb_U );
 }
 
-}// namespace accu
+}// namespace accu2
 
 }}}// namespace hlr::tbb::uniform
 

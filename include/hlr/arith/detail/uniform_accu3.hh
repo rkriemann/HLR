@@ -617,7 +617,7 @@ solve_lower_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
                   const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
+                  const uniform_map_t &    colmap )
 {
     //
     // evaluate all computable updates to M
@@ -633,7 +633,6 @@ solve_lower_tri ( const eval_side_t        side,
     {
         auto  BL = cptrcast( &L, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
         
         //
         // first, split accumulated updates U and recursive updates upd_rec
@@ -654,7 +653,7 @@ solve_lower_tri ( const eval_side_t        side,
             
                 for ( uint j = 0; j < BM->nblock_cols(); ++j )
                     solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
-                                                sub_accu(i,j), acc, approx, rowmap, colmap ); // *BREF->block( i, j ) );
+                                                sub_accu(i,j), acc, approx, rowmap, colmap );
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
@@ -685,16 +684,6 @@ solve_lower_tri ( const eval_side_t        side,
         
         hlr::solve_lower_tri< value_t >( side, diag, L, *R, acc, approx );
 
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( R );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
-
         //
         // now replace M by R and update row/column bases
         //
@@ -714,32 +703,12 @@ solve_lower_tri ( const eval_side_t        side,
         hlr::uniform::detail::update_row_col_basis( *UM, W, T, X, acc, approx, rowmap, colmap );
 
         trace::region_end( "basis" );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
     }// if
     else
     {
         accu.apply( value_t(-1), M, acc, approx );
 
         hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
     }// else
 }
 
@@ -754,7 +723,7 @@ solve_upper_tri ( const eval_side_t        side,
                   const hpro::TTruncAcc &  acc,
                   const approx_t &         approx,
                   const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap ) //, hpro::TMatrix &          REF )
+                  const uniform_map_t &    colmap )
 {
     //
     // evaluate all computable updates to M
@@ -774,7 +743,6 @@ solve_upper_tri ( const eval_side_t        side,
 
         auto  BU = cptrcast( &U, hpro::TBlockMatrix );
         auto  BM =  ptrcast( &M, hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
         
         //
         // first, split accumulated updates U and recursive updates upd_rec
@@ -799,7 +767,7 @@ solve_upper_tri ( const eval_side_t        side,
             
                 for ( uint i = 0; i < BM->nblock_rows(); ++i )
                     solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
-                                                sub_accu(i,j), acc, approx, rowmap, colmap ); // *BREF->block( i, j ) );
+                                                sub_accu(i,j), acc, approx, rowmap, colmap );
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                     for ( uint  i = 0; i < BM->nblock_rows(); ++i )
@@ -850,16 +818,6 @@ solve_upper_tri ( const eval_side_t        side,
         accu.apply( value_t(-1), M, acc, approx );
 
         hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
-        
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( M );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-            
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
     }// else
 }
 
@@ -879,7 +837,6 @@ lu ( hpro::TMatrix &          A,
      const uniform_map_t &    colmap_L,
      const uniform_map_t &    rowmap_U,
      const uniform_map_t &    colmap_U )
-// hpro::TMatrix &          REF )
 {
     //
     // evaluate all computable updates to M
@@ -897,10 +854,9 @@ lu ( hpro::TMatrix &          A,
 
     if ( is_blocked( A ) )
     {
-        auto  BA   = ptrcast( &A, hpro::TBlockMatrix );
-        auto  BL   = ptrcast( &L, hpro::TBlockMatrix );
-        auto  BU   = ptrcast( &U, hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BL = ptrcast( &L, hpro::TBlockMatrix );
+        auto  BU = ptrcast( &U, hpro::TBlockMatrix );
 
         HLR_ASSERT( is_blocked_all( L, U ) );
         
@@ -927,7 +883,7 @@ lu ( hpro::TMatrix &          A,
             lu< value_t >( * BA->block( i, i ), * BL->block( i, i ), * BU->block( i, i ),
                            sub_accu(i,i), acc, approx,
                            rowmap_L, colmap_L,
-                           rowmap_U, colmap_U ); // , *BREF->block( i, i ) );
+                           rowmap_U, colmap_U );
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
@@ -935,7 +891,7 @@ lu ( hpro::TMatrix &          A,
                     solve_upper_tri< value_t >( from_right, general_diag,
                                                 *BU->block( i, i ), *BL->block( j, i ),
                                                 sub_accu(j,i), acc, approx,
-                                                rowmap_L, colmap_L ); // *BREF->block( j, i ) );
+                                                rowmap_L, colmap_L );
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
@@ -944,7 +900,7 @@ lu ( hpro::TMatrix &          A,
                     solve_lower_tri< value_t >( from_left, unit_diag,
                                                 *BL->block( i, i ), *BU->block( i, j ),
                                                 sub_accu(i,j), acc, approx,
-                                                rowmap_U, colmap_U ); // *BREF->block( i, j ) );
+                                                rowmap_U, colmap_U );
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
@@ -964,16 +920,6 @@ lu ( hpro::TMatrix &          A,
         blas::copy( blas::mat< value_t >( *DA ), blas::mat< value_t >( *DU ) );
         
         invert< value_t >( *DU );
-
-        // // DEBUG {
-        // {
-        //     auto  D1 = matrix::convert_to_dense< value_t >( A );
-        //     auto  D2 = matrix::convert_to_dense< value_t >( REF );
-
-        //     hlr::add( value_t(-1), *D2, *D1 );
-        //     std::cout << "ref error " << A.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
-        // }
-        // // DEBUG }
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() + ", " + L.typestr() + ", " + U.typestr() );

@@ -267,8 +267,8 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 
     detail::init_cluster_bases( bct, *rowcb, *colcb );
     
-    auto  basis_data = detail::rec_basis_data_t();
-    auto  M          = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data );
+    auto  constr = detail::rec_uniform_construction( basisapx );
+    auto  M      = constr.build( bct, coeff, lrapx, acc, *rowcb, *colcb );
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -301,8 +301,8 @@ build_uniform_rec ( const hpro::TMatrix &    A,
 
     detail::init_cluster_bases( A, *rowcb, *colcb );
     
-    auto  basis_data = detail::rec_basis_data_t();
-    auto  M          = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, basis_data );
+    auto  constr = detail::rec_uniform_construction( basisapx );
+    auto  M      = constr.build( A, acc, *rowcb, *colcb );
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -505,14 +505,13 @@ copy_ll ( const hpro::TMatrix &    M,
 
         B->copy_struct_from( BM );
         
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                            0, B->nblock_cols() ),
-            [B,BM,diag] ( const ::tbb::blocked_range2d< uint > &  r )
+        ::tbb::parallel_for< uint >(
+            0, B->nblock_rows(),
+            [B,BM,diag] ( const uint  i )
             {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                ::tbb::parallel_for< uint >(
+                    0, i+1,
+                    [B,BM,diag,i] ( const uint  j )
                     {
                         if ( BM->block( i, j ) != nullptr )
                         {
@@ -521,8 +520,7 @@ copy_ll ( const hpro::TMatrix &    M,
                             B_ij->set_parent( B );
                             B->set_block( i, j, B_ij.release() );
                         }// if
-                    }// for
-                }// for
+                    } );
             } );
         
         return N;
@@ -567,14 +565,13 @@ copy_ur ( const hpro::TMatrix &    M,
 
         B->copy_struct_from( BM );
         
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                            0, B->nblock_cols() ),
-            [B,BM,diag] ( const ::tbb::blocked_range2d< uint > &  r )
+        ::tbb::parallel_for< uint >(
+            0, B->nblock_cols(),
+            [B,BM,diag] ( const uint  j )
             {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                ::tbb::parallel_for< uint >(
+                    0, j+1,
+                    [B,BM,diag,j] ( const uint  i )
                     {
                         if ( BM->block( i, j ) != nullptr )
                         {
@@ -583,8 +580,7 @@ copy_ur ( const hpro::TMatrix &    M,
                             B_ij->set_parent( B );
                             B->set_block( i, j, B_ij.release() );
                         }// if
-                    }// for
-                }// for
+                    } );
             } );
         
         return N;

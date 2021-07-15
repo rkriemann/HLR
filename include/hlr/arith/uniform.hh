@@ -10,7 +10,7 @@
 
 #include <list>
 
-#include <hlr/arith/detail/uniform_bases.hh>
+#include <hlr/arith/detail/uniform_basis.hh>
 #include <hlr/arith/detail/uniform.hh>
 #include <hlr/arith/detail/uniform_tlr.hh>
 #include <hlr/arith/detail/uniform_accu.hh>
@@ -23,12 +23,12 @@ namespace hlr { namespace uniform {
 //
 // construct mappings of A_{t × s} to set of uniform leaves per t/s
 //
-std::pair< detail::uniform_map_t,
-           detail::uniform_map_t >
+std::pair< is_matrix_map_t,
+           is_matrix_map_t >
 construct_indexset_to_block_maps ( hpro::TMatrix &  A )
 {
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = is_matrix_map_t();
+    auto  colmap = is_matrix_map_t();
 
     auto  blocks = std::list< hpro::TMatrix * >{ &A };
 
@@ -116,8 +116,8 @@ multiply ( const value_t            alpha,
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
     //
 
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = is_matrix_map_t();
+    auto  colmap = is_matrix_map_t();
 
     auto  blocks = std::list< hpro::TMatrix * >{ &C };
 
@@ -168,8 +168,8 @@ lu ( hpro::TMatrix &          A,
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
     //
 
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = is_matrix_map_t();
+    auto  colmap = is_matrix_map_t();
 
     auto  blocks = std::list< hpro::TMatrix *>{ &A };
 
@@ -297,14 +297,13 @@ template < typename value_t,
 void
 lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     hpro::TMatrix &          /* REF */ )
+     const approx_t &         approx )
 {
     auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( A );
     // auto  inner_prod         = detail::inner_map_t();
     auto  accu               = detail::accumulator();
 
-    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
+    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap );
 }
 
 }// namespace accu
@@ -316,21 +315,20 @@ namespace accu2
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &             A,
-     hpro::TMatrix &             L,
-     hpro::TMatrix &             U,
-     const hpro::TTruncAcc &     acc,
-     const approx_t &            approx,
+lu ( hpro::TMatrix &                     A,
+     hpro::TMatrix &                     L,
+     hpro::TMatrix &                     U,
+     const hpro::TTruncAcc &             acc,
+     const approx_t &                    approx,
      matrix::cluster_basis< value_t > &  rowcb_L,
      matrix::cluster_basis< value_t > &  colcb_L,
      matrix::cluster_basis< value_t > &  rowcb_U,
-     matrix::cluster_basis< value_t > &  colcb_U,
-     hpro::TMatrix &          /* REF */ )
+     matrix::cluster_basis< value_t > &  colcb_U )
 {
-    auto  rowmap_L = detail::uniform_map_t();
-    auto  colmap_L = detail::uniform_map_t();
-    auto  rowmap_U = detail::uniform_map_t();
-    auto  colmap_U = detail::uniform_map_t();
+    auto  rowmap_L = is_matrix_map_t();
+    auto  colmap_L = is_matrix_map_t();
+    auto  rowmap_U = is_matrix_map_t();
+    auto  colmap_U = is_matrix_map_t();
     auto  accu     = detail::accumulator();
     
     detail::lu< value_t >( A, L, U, accu, acc, approx,
@@ -352,8 +350,7 @@ lu ( hpro::TMatrix &          A,
      hpro::TMatrix &          L,
      hpro::TMatrix &          U,
      const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     hpro::TMatrix &          /* REF */ )
+     const approx_t &         approx )
 {
     auto  [ rowmap_L, colmap_L ] = construct_indexset_to_block_maps( L );
     auto  [ rowmap_U, colmap_U ] = construct_indexset_to_block_maps( U );
@@ -372,15 +369,14 @@ namespace accu4
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &             A,
-     const hpro::TTruncAcc &     acc,
-     const approx_t &            approx,
+lu ( hpro::TMatrix &                     A,
+     const hpro::TTruncAcc &             acc,
+     const approx_t &                    approx,
      matrix::cluster_basis< value_t > &  rowcb,
-     matrix::cluster_basis< value_t > &  colcb,
-     hpro::TMatrix &          /* REF */ )
+     matrix::cluster_basis< value_t > &  colcb )
 {
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = is_matrix_map_t();
+    auto  colmap = is_matrix_map_t();
     auto  accu   = detail::accumulator();
     
     detail::lu< value_t >( A, accu, acc, approx, rowcb, colcb, rowmap, colmap );

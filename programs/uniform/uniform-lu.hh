@@ -24,6 +24,20 @@
 
 using namespace hlr;
 
+template < typename value_t >
+void
+print_cb ( const matrix::cluster_basis< value_t > &  cb,
+           const uint                                indent = 0 )
+{
+    for ( uint  i = 0; i < indent; ++i )
+        std::cout << ' ';
+    std::cout << cb.is().to_string() << " : " << cb.basis().ncols() << std::endl;
+
+    for ( uint i = 0; i < cb.nsons(); ++i )
+        if ( ! is_null( cb.son(i) ) )
+            print_cb( *cb.son(i), indent + 2 );
+}
+
 //
 // main function
 //
@@ -176,10 +190,12 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "sep. factors/bases" << term::reset << std::endl;
             
-            auto  L                  = impl::matrix::copy_ll( *LU, unit_diag );
-            auto  U                  = impl::matrix::copy_ur( *LU, general_diag );
+            auto  L                      = impl::matrix::copy_ll( *LU, unit_diag );
+            auto  U                      = impl::matrix::copy_ur( *LU, general_diag );
             auto  [ rowcbL, colcbL, L2 ] = impl::matrix::build_uniform_rec( *L, apx, acc );
             auto  [ rowcbU, colcbU, U2 ] = impl::matrix::build_uniform_rec( *U, apx, acc );
+
+            // print_cb( *rowcbL );
             
             std::cout << "      mem L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
             std::cout << "      mem U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
@@ -254,7 +270,7 @@ program_main ()
                 
         tic = timer::now();
                 
-        impl::uniform::lu< value_t >( *LU, acc, apx, *REF );
+        // impl::uniform::lu< value_t >( *LU, acc, apx, *REF );
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -267,7 +283,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulated v1" << term::reset << std::endl;
             
@@ -279,7 +295,7 @@ program_main ()
                 
         tic = timer::now();
                 
-        impl::uniform::accu::lu< value_t >( *LU, acc, apx, *REF );
+        // impl::uniform::accu::lu< value_t >( *LU, acc, apx );
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -305,12 +321,12 @@ program_main ()
         auto  colcbL = colcb->copy_struct();
         auto  rowcbU = rowcb->copy_struct();
         auto  colcbU = colcb->copy_struct();
-                
+
         matrix::replace_cluster_basis( *A3, *rowcbA, *colcbA );
         
         tic = timer::now();
                 
-        impl::uniform::accu2::lu< value_t >( *A3, *L, *U, acc, apx, *rowcbL, *colcbL, *rowcbU, *colcbU, *REF );
+        impl::uniform::accu2::lu< value_t >( *A3, *L, *U, acc, apx, *rowcbL, *colcbL, *rowcbU, *colcbU );
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -319,6 +335,8 @@ program_main ()
                                                     colcbL->byte_size() + colcbU->byte_size() ) << std::endl;
         std::cout << "        L  = " << format_mem( L->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
         std::cout << "        U  = " << format_mem( U->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
+
+        // print_cb( *rowcbL );
         
         auto  L_inv  = matrix::triinv_eval( *L, blas::lower_triangular, unit_diag );
         auto  U_inv  = matrix::triinv_eval( *U, blas::upper_triangular, general_diag );
@@ -327,7 +345,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, *LU_inv ) ) << std::endl;
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulated v3" << term::reset << std::endl;
             
@@ -347,7 +365,7 @@ program_main ()
                 
         tic = timer::now();
                 
-        impl::uniform::accu3::lu< value_t >( *A3, *L, *U, acc, apx, *REF );
+        // impl::uniform::accu3::lu< value_t >( *A3, *L, *U, acc, apx );
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -364,7 +382,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, *LU_inv ) ) << std::endl;
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulated v4" << term::reset << std::endl;
             
@@ -378,7 +396,7 @@ program_main ()
                 
         tic = timer::now();
                 
-        impl::uniform::accu4::lu< value_t >( *LU, acc, apx, *rowcbLU, *colcbLU, *REF );
+        // impl::uniform::accu4::lu< value_t >( *LU, acc, apx, *rowcbLU, *colcbLU );
                 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

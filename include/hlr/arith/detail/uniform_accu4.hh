@@ -665,7 +665,7 @@ solve_lower_tri ( const eval_side_t           side,
                     solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
                                                 sub_accu(i,j), acc, approx,
                                                 *rowcb.son(i), *colcb.son(j),
-                                                rowmap, colmap ); // *BREF->block( i, j ) );
+                                                rowmap, colmap );
                 }// for
 
                 for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
@@ -810,7 +810,7 @@ solve_upper_tri ( const eval_side_t           side,
                     solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
                                                 sub_accu(i,j), acc, approx,
                                                 *rowcb.son(i), *colcb.son(j),
-                                                rowmap, colmap ); // *BREF->block( i, j ) );
+                                                rowmap, colmap );
                 }// for
             
                 for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
@@ -902,7 +902,6 @@ lu ( hpro::TMatrix &             A,
      cluster_basis< value_t > &  colcb,
      uniform_map_t &             rowmap,
      uniform_map_t &             colmap )
-// hpro::TMatrix &          REF )
 {
     //
     // evaluate all computable updates to M

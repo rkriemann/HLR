@@ -10,13 +10,15 @@
 
 #include <unordered_map>
 
-#include <hlr/arith/detail/uniform_bases.hh>
+#include <hlr/arith/detail/uniform_basis.hh>
 
 namespace hlr { namespace seq { namespace matrix { namespace detail {
 
 namespace hpro = HLIB;
 
 using namespace hlr::matrix;
+
+using hlr::uniform::is_matrix_map_t;
 
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
@@ -607,8 +609,6 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
 //   shared bases are constructed on-the-fly
 //
 
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
-
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
@@ -620,8 +620,8 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                     const hpro::TTruncAcc &                       acc,
                     cluster_basis< typename coeff_t::value_t > &  rowcb,
                     cluster_basis< typename coeff_t::value_t > &  colcb,
-                    uniform_map_t &                               rowmap,
-                    uniform_map_t &                               colmap )
+                    is_matrix_map_t &                             rowmap,
+                    is_matrix_map_t &                             colmap )
 {
     using value_t = typename coeff_t::value_t;
 
@@ -765,8 +765,6 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
 //   shared bases are constructed on-the-fly
 //
 
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
-
 template < typename basisapx_t >
 std::unique_ptr< hpro::TMatrix >
 build_uniform_rec ( const hpro::TMatrix &                            A,
@@ -774,8 +772,8 @@ build_uniform_rec ( const hpro::TMatrix &                            A,
                     const hpro::TTruncAcc &                          acc,
                     cluster_basis< typename basisapx_t::value_t > &  rowcb,
                     cluster_basis< typename basisapx_t::value_t > &  colcb,
-                    uniform_map_t &                                  rowmap,
-                    uniform_map_t &                                  colmap )
+                    is_matrix_map_t &                                rowmap,
+                    is_matrix_map_t &                                colmap )
 {
     using value_t = typename basisapx_t::value_t;
 

@@ -244,8 +244,8 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     rowcb->set_nsons( bct->rowcl()->nsons() );
     colcb->set_nsons( bct->colcl()->nsons() );
     
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = detail::is_matrix_map_t();
+    auto  colmap = detail::is_matrix_map_t();
     
     auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
@@ -278,8 +278,8 @@ build_uniform_rec ( const hpro::TMatrix &        A,
         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
     }// if
     
-    auto  rowmap = detail::uniform_map_t();
-    auto  colmap = detail::uniform_map_t();
+    auto  rowmap = detail::is_matrix_map_t();
+    auto  colmap = detail::is_matrix_map_t();
     auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
