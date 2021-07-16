@@ -134,7 +134,7 @@ program_main ()
         if ( HLIB::CFG::Arith::use_dag )
             impl::dag::run( dag, acc );
         else
-            impl::gauss_elim( C.get(), T.get(), acc );
+            impl::gauss_elim( *C, *T, acc );
         
         toc = timer::since( tic );
 

@@ -67,7 +67,7 @@ build ( const hpro::TBlockCluster *  bct,
 
     if ( ! bct->procs().contains( pid ) )
     {
-        M = std::make_unique< hpro::TGhostMatrix >( bct->is(), bct->procs(), hpro::value_type< value_t >::value );
+        M = std::make_unique< hpro::TGhostMatrix >( bct->is(), bct->procs(), hpro::value_type_v< value_t > );
     }// if
     else if ( bct->is_leaf() )
     {

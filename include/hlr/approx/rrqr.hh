@@ -1,3 +1,4 @@
+#pragma once
 #ifndef __HLR_APPROX_RRQR_HH
 #define __HLR_APPROX_RRQR_HH
 //
@@ -70,11 +71,18 @@ rrqr ( blas::matrix< value_t > &  M,
 
     if ( ncols > nrows )
     {
+        //
+        // compute RRQR for M^H, e.g., M^H = U·V^H
+        // and return V·U^H
+        //
+        
         auto  MH = blas::matrix< value_t >( ncols, nrows );
 
         blas::copy( blas::adjoint( M ), MH );
 
-        return rrqr( MH, acc );
+        auto [ U, V ] = rrqr( MH, acc );
+
+        return { std::move( V ), std::move( U ) };
     }// if
     
     // for update statistics
@@ -97,17 +105,15 @@ rrqr ( blas::matrix< value_t > &  M,
 
     // U = Q_k
     auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
-    auto  U  = blas::matrix< value_t >( nrows, k );
-    
-    blas::copy( Qk, U );
+    auto  U  = blas::copy( Qk );
 
-    // copy first k columns of R^T to V, i.e., first k rows of R
+    // copy first k columns of R' to V, i.e., first k rows of R
     auto  Rk = blas::matrix< value_t >( R, blas::range( 0, k-1 ), blas::range::all );
     auto  TV = blas::matrix< value_t >( ncols, k );
     
     blas::copy( blas::adjoint( Rk ), TV );
     
-    // then permute rows of TV (do P·R^T) and copy to V
+    // then permute rows of TV (do P·R') and copy to V
     auto  V = blas::matrix< value_t >( ncols, k );
     
     for ( int i = 0; i < ncols; ++i )
@@ -174,7 +180,7 @@ rrqr ( const blas::matrix< T > &  U,
         auto  QV = blas::copy( V );
         auto  RV = blas::matrix< value_t >( in_rank, in_rank );
 
-        blas::qr_wrapper( QV, RV );
+        blas::qr( QV, RV );
 
         // compute column-pivoted QR of U·RV'
         auto  QU = blas::prod( value_t(1), U, adjoint(RV) );
@@ -187,10 +193,8 @@ rrqr ( const blas::matrix< T > &  U,
         
         // U = QU(:,1:k)
         auto  Qk = blas::matrix< value_t >( QU, blas::range::all, blas::range( 0, out_rank-1 ) );
-        auto  OU = blas::matrix< value_t >( nrows_U, out_rank );
+        auto  OU = blas::copy( Qk );
         
-        blas::copy( Qk, OU );
-
         // V = QV · P  (V' = P' · QV')
         auto  QV_P = blas::matrix< value_t >( nrows_V, in_rank );
         
@@ -382,6 +386,13 @@ struct RRQR
 {
     using  value_t = T_value;
     
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = false;
+    
+    //
+    // matrix approximation routines
+    //
+    
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
@@ -416,6 +427,32 @@ struct RRQR
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::rrqr( U, T, V, acc );
+    }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    blas::matrix< value_t >
+    column_basis ( blas::matrix< value_t > &  M,
+                   const hpro::TTruncAcc &    acc ) const
+    {
+        // see "rrqr" above for comments
+
+        const idx_t  ncols = idx_t( M.ncols() );
+
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
+    
+        auto  R = blas::matrix< value_t >( ncols, ncols );
+        auto  P = std::vector< int >( ncols, 0 );
+
+        blas::qrp( M, R, P );
+
+        auto  k  = detail::trunc_rank( R, acc );
+        auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+
+        return blas::copy( Qk );
     }
 };
 

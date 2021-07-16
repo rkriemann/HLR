@@ -33,18 +33,18 @@ namespace detail
 using  indexset = hpro::TIndexSet;
 
 // mapping of clusters/indexsets to corresponding matrix blocks
-using  matrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
+using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
 
 void
-build_matrix_map ( const cluster_tree &   ct,
-                   const hpro::TMatrix &  M,
-                   matrix_map_t &         mat_map,
-                   const bool             adjoint );
+build_lrmatrix_map ( const cluster_tree &   ct,
+                     const hpro::TMatrix &  M,
+                     lrmatrix_map_t &         mat_map,
+                     const bool             adjoint );
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
+                  lrmatrix_map_t &        mat_map,
                   const accuracy &      acc,
                   const bool            adjoint );
 
@@ -68,10 +68,10 @@ construct_from_H ( const cluster_tree &   rowct,
     // set of associated matrix blocks in H-matrix
     //
 
-    detail::matrix_map_t  row_map, col_map;
+    detail::lrmatrix_map_t  row_map, col_map;
     
-    detail::build_matrix_map( rowct, M, row_map, false );
-    detail::build_matrix_map( colct, M, col_map, true  );
+    detail::build_lrmatrix_map( rowct, M, row_map, false );
+    detail::build_lrmatrix_map( colct, M, col_map, true  );
 
     //
     // next, construct cluster basis for each cluster in cluster tree
@@ -111,10 +111,10 @@ V ( const hpro::TRkMatrix *  M,
 // construct map from index sets to matrix blocks for row clusters
 //
 void
-build_matrix_map ( const cluster_tree &   ct,
-                   const hpro::TMatrix &  M,
-                   matrix_map_t &         mat_map,
-                   const bool             adjoint )
+build_lrmatrix_map ( const cluster_tree &   ct,
+                     const hpro::TMatrix &  M,
+                     lrmatrix_map_t &       mat_map,
+                     const bool             adjoint )
 {
     HLR_ASSERT( ct == M.row_is( adjoint ? hpro::apply_transposed : hpro::apply_normal ) );
     
@@ -135,7 +135,7 @@ build_matrix_map ( const cluster_tree &   ct,
                     auto  B_ij = B->block( i, j );
                 
                     if ( ! is_null( B_ij ) )
-                        build_matrix_map( *ct_j, *B_ij, mat_map, adjoint );
+                        build_lrmatrix_map( *ct_j, *B_ij, mat_map, adjoint );
                 }// for
             }// for
         }// if
@@ -152,7 +152,7 @@ build_matrix_map ( const cluster_tree &   ct,
                     auto  B_ij = B->block( i, j );
                 
                     if ( ! is_null( B_ij ) )
-                        build_matrix_map( *ct_i, *B_ij, mat_map, adjoint );
+                        build_lrmatrix_map( *ct_i, *B_ij, mat_map, adjoint );
                 }// for
             }// for
         }// else
@@ -180,8 +180,7 @@ build_matrix_map ( const cluster_tree &   ct,
 //
 // Construct total cluster basis X_t:
 //
-//    X_t = [ X_1, X_2, ... ]
-//        = [ U_1 · C_1^H, U_2 · C_2^H, ... ]
+//    X_t = [ X₁, X₂, … ] = [ U₁·C₁', U₂·C₂',  … ]
 //
 // with C_i from  Q_i C_i = qr( V_i )
 //
@@ -194,7 +193,7 @@ build_matrix_map ( const cluster_tree &   ct,
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
+                  lrmatrix_map_t &      mat_map,
                   const accuracy &      acc,
                   const bool            adjoint )
 {
@@ -208,11 +207,11 @@ construct_basis ( const cluster_tree &  ct,
     {
         //
         // first, construct column basis for each block and store coefficients, e.g.,
-        // for M, compute M = U·V^H = U·(P·C)^H with orthogonal P and store C
+        // for M, compute M = U·V' = U·(P·C)' with orthogonal P and store C
         //
 
-        std::list< blas::matrix< value_t > >  condensed_mat;
-        uint                                  rank_sum = 0;
+        auto  condensed_mat = std::list< blas::matrix< value_t > >();
+        uint  rank_sum      = 0;
         
         for ( auto  M : mat_map[ ct ] )
         {
@@ -220,14 +219,6 @@ construct_basis ( const cluster_tree &  ct,
             {
                 auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
 
-                // {
-                //     auto  T = blas::prod( value_t(1), Q, C );
-
-                //     blas::add( value_t(-1), V< value_t >( M, adjoint ), T );
-
-                //     std::cout << blas::norm_F( T ) << std::endl;
-                // }
-                
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
             }// if
@@ -238,10 +229,10 @@ construct_basis ( const cluster_tree &  ct,
             //
             // build X_t, the total cluster basis
             //
-            //  X_t = [ U₀·C₀^H, U₁·C₁^H, ... ]
+            //  X_t = [ U₀·C₀', U₁·C₁', … ]
             //
             
-            blas::matrix< value_t >  Xt( ct.size(), rank_sum );
+            auto   Xt     = blas::matrix< value_t >( ct.size(), rank_sum );
 
             auto   iter_M = mat_map[ ct ].begin();
             auto   iter_C = condensed_mat.begin();
@@ -254,10 +245,11 @@ construct_basis ( const cluster_tree &  ct,
 
                 if ( M->rank() > 0 )
                 {
-                    auto  X_i    = blas::prod( value_t(1), U< value_t >( M, adjoint ), blas::adjoint( C ) );
-                    auto  cols_i = blas::range( pos, pos + X_i.ncols() - 1 );
-                    auto  X_sub  = blas::matrix< value_t >( Xt, blas::range::all, cols_i );
-
+                    auto  X_i   = blas::prod( U< value_t >( M, adjoint ), blas::adjoint( C ) );
+                    auto  X_sub = blas::matrix< value_t >( Xt,
+                                                           blas::range::all,
+                                                           blas::range( pos, pos + X_i.ncols() - 1 ) );
+                    
                     blas::copy( X_i, X_sub );
 
                     pos += X_i.ncols();
@@ -271,17 +263,7 @@ construct_basis ( const cluster_tree &  ct,
             // approximate basis up to given accuracy and update cluster basis
             //
 
-            // hpro::DBG::write( Xt, "Xt.mat", "Xt" );
-            
             auto  [ Q, R ] = blas::factorise_ortho( Xt, acc );
-
-            // {
-            //     auto  T = blas::prod( value_t(1), Q, R );
-
-            //     blas::add( value_t(-1), Xt, T );
-
-            //     std::cout << hpro::to_string( "%.6e", blas::norm_F( T ) / blas::norm_F( Xt ) ) << std::endl;
-            // }
                 
             cb->set_basis( std::move( Q ) );
         }// if

@@ -7,6 +7,7 @@
 #include "hlr/apps/matern_cov.hh"
 #include "hlr/apps/laplace.hh"
 #include "hlr/apps/helmholtz.hh"
+#include "hlr/apps/exp.hh"
 
 #include "hlr/utils/term.hh"
 
@@ -20,7 +21,7 @@ print_problem_desc ( const std::string &  name )
 {
     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << name
-              << ( gridfile == "" ? hpro::to_string( ", n = %d", n ) : ", grid = " + gridfile )
+              << ( appl == "logkernel" ? hpro::to_string( ", n = %d", n ) : ", grid = " + gridfile )
               << ", ntile = " << ntile
               << ( eps > 0 ? hpro::to_string( ", ε = %.2e", eps ) : hpro::to_string( ", k = %d", k ) )
               << std::endl;
@@ -48,10 +49,21 @@ gen_problem< hlr::apps::matern_cov > ()
 {
     print_problem_desc( "Matern Covariance" );
 
-    if ( gridfile != "" )
-        return std::make_unique< hlr::apps::matern_cov >( gridfile );
+    const auto  dashpos = gridfile.find( '-' );
+
+    if ( dashpos != std::string::npos )
+    {
+        const auto  basename = gridfile.substr( 0, dashpos );
+        const auto  size     = gridfile.substr( dashpos+1, gridfile.length() );
+        const auto  nsize    = std::atoi( size.c_str() );
+
+        if (( basename == "randsphere" ) || ( basename == "randcube" ))
+            return std::make_unique< hlr::apps::matern_cov >( basename, nsize );
+        else
+            return std::make_unique< hlr::apps::matern_cov >( gridfile );
+    }// if
     else
-        return std::make_unique< hlr::apps::matern_cov >( n );
+        return std::make_unique< hlr::apps::matern_cov >( gridfile );
 }
 
 template <>
@@ -74,6 +86,17 @@ gen_problem< hlr::apps::helmholtz_slp > ()
     assert( gridfile != "" );
     
     return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile );
+}
+
+template <>
+std::unique_ptr< hlr::apps::exp >
+gen_problem< hlr::apps::exp > ()
+{
+    print_problem_desc( "Exp" );
+
+    assert( gridfile != "" );
+    
+    return std::make_unique< hlr::apps::exp >( gridfile );
 }
 
 }// namespace hlr

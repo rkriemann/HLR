@@ -18,8 +18,6 @@ namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
 
-using namespace hpro;
-
 using  point        = hpro::T3Point;
 using  bounding_box = hpro::TBBox;
 

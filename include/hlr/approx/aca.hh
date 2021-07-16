@@ -13,7 +13,9 @@
 #include <deque>
 #include <utility>
 
+#include <hlr/utils/math.hh>
 #include <hlr/arith/blas.hh>
+//#include <hlr/arith/blas_rational.hh>
 #include <hlr/arith/operator_wrapper.hh>
 
 namespace hlr { namespace approx {
@@ -243,10 +245,11 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
     
     // precision defined by accuracy or by machine precision
     // (to be corrected by operator norm)
-    // real_t      sqeps    = math::square( real_t(1,1000000) );
-    real_t      sqeps    = ( acc.is_fixed_prec()
-                             ? real_t( math::square( acc.rel_eps() ) )
-                             : real_t( math::square( 10 * std::numeric_limits< real_t >::epsilon() ) ) );
+    real_t      sqeps    = real_t( math::square( acc.rel_eps() ) ); // for posit
+    // real_t      sqeps    = math::square( real_t(1,10000000) ); // for mpq_class
+    // real_t      sqeps    = ( acc.is_fixed_prec()
+    //                          ? real_t( math::square( acc.rel_eps() ) )
+    //                          : real_t( math::square( 10 * std::numeric_limits< real_t >::epsilon() ) ) );
     
     // approximation of |M|²
     real_t      sqnorm_M = real_t(0);
@@ -336,12 +339,28 @@ std::pair< blas::matrix< value_t >,
 aca ( blas::matrix< value_t > &  M,
       const hpro::TTruncAcc &    acc )
 {
-    auto  pivot_search = aca_pivot( M );
+    auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
 
     // for update statistics
     HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
     
     return std::move( aca( M, pivot_search, acc, nullptr ) );
+}
+
+template < typename value_t >
+std::list< std::pair< idx_t, idx_t > >
+aca_pivots ( blas::matrix< value_t > &  M,
+             const hpro::TTruncAcc &    acc )
+{
+    auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
+
+    // for update statistics
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+
+    auto  pivots   = std::list< std::pair< idx_t, idx_t > >();
+    auto  [ U, V ] = aca( M, pivot_search, acc, & pivots );
+
+    return pivots;
 }
 
 template < typename value_t >
@@ -391,7 +410,7 @@ aca ( const blas::matrix< value_t > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
     
         return aca( op, pivot_search, acc, nullptr );
     }// else
@@ -442,7 +461,7 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
         
         return aca( op, pivot_search, acc, nullptr );
     }// else
@@ -500,7 +519,7 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
 
         auto  op           = operator_wrapper( U, T, V );
-        auto  pivot_search = aca_pivot( op );
+        auto  pivot_search = aca_pivot< decltype(op) >( op );
         
         return aca( op, pivot_search, acc, nullptr );
     }// else
@@ -516,6 +535,9 @@ template < typename T_value >
 struct ACA
 {
     using  value_t = T_value;
+    
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
     
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
@@ -551,6 +573,17 @@ struct ACA
                   const hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::aca( U, T, V, acc );
+    }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const hpro::TTruncAcc &  acc ) const
+    {
+        auto  pivot_search = aca_pivot< operator_t >( op );
+
+        return std::move( aca( op, pivot_search, acc, nullptr ) );
     }
 };
 

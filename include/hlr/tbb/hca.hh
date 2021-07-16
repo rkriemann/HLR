@@ -8,8 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <tbb/parallel_invoke.h>
+
 #include <hlr/bem/hca.hh>
 #include <hlr/bem/tiled_hca.hh>
+
+#include <hlr/tbb/arith_tiled_v2.hh>
 
 namespace hlr { namespace tbb { namespace bem {
 
@@ -98,7 +102,7 @@ struct hca : public hlr::bem::hca< T_coeff, T_generator_fn >
 
         // auto  U = compute_U( rowcl, k, pivots, col_grid, G );
         // auto  V = compute_V( colcl, k, pivots, row_grid );
-        auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type< value_t >::value );
+        auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type_v< value_t > );
 
         // std::move not working above for TRkMatrix ???
         R->set_lrmat( U, V );

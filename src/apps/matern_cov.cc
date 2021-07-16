@@ -31,24 +31,45 @@ using  point_t = T3Point;
 //
 // ctor
 //
-matern_cov::matern_cov ( const size_t  n )
+matern_cov::matern_cov ( const std::string &  geometry,
+                         const size_t         n )
         : _n( n )
 {
-    //
-    // build vertices
-    //
-    
-    // std::random_device                rd{};
-    // std::mt19937                      generator{ rd() };
-    std::mt19937_64                   generator{ 1 };
-    std::uniform_real_distribution<>  distr{ 0, 1 };
+    if ( geometry == "randcube" )
+    {
+        std::mt19937_64                   generator{ 1 };
+        std::uniform_real_distribution<>  distr{ 0, 1 };
 
-    _vertices.reserve( n );
+        _vertices.reserve( n );
     
-    for ( size_t i = 0; i < n; i++ )
-        _vertices.push_back( spherical( 2.0 * M_PI * distr( generator ),
-                                        2.0 * M_PI * distr( generator ) - M_PI,
-                                        1.0 ) ); // point_t( distr( generator ), distr( generator ) );
+        for ( size_t i = 0; i < n; i++ )
+            _vertices.push_back( point_t( distr( generator ), distr( generator ), distr( generator ) ) );
+    }// if
+    else if ( geometry == "randsphere" )
+    {
+        std::mt19937_64                   generator{ 1 };
+        std::uniform_real_distribution<>  distr{ -1, 1 };
+
+        _vertices.reserve( n );
+    
+        for ( size_t i = 0; i < n; i++ )
+        {
+            // map cube to sphere
+            // - slightly more points along mapped cube edges!
+            auto  p = point_t( distr( generator ), distr( generator ), distr( generator ) );
+
+            p *= double(1) / p.norm2();
+                
+            _vertices.push_back( p );
+
+            // "spherical" produces too many points near poles
+            // _vertices.push_back( spherical( 2.0 * M_PI * distr( generator ),
+            //                                 2.0 * M_PI * distr( generator ) - M_PI,
+            //                                 1.0 ) );
+        }// for
+    }// if
+    else
+        throw std::runtime_error( "unknown geometry : " + geometry );
 }
 
 //
@@ -59,12 +80,12 @@ matern_cov::matern_cov ( const std::string &  gridfile )
     //
     // read grid and copy coordinates
     //
-
+        
     auto  grid = make_grid( gridfile );
-
+        
     _n = grid->n_vertices();
     _vertices.reserve( _n );
-
+        
     for ( size_t  i = 0; i < _n; ++i )
     {
         _vertices.push_back( grid->vertex( i ) );
@@ -86,7 +107,7 @@ matern_cov::coordinates () const
 std::unique_ptr< TCoeffFn< matern_cov::value_t > >
 matern_cov::coeff_func () const
 {
-    return std::make_unique< TMaternCovCoeffFn< point_t > >( 1.0, 1.29, 0.325, _vertices );
+    return std::make_unique< TMaternCovCoeffFn< point_t > >( 1.0, 1.0, 0.5, _vertices );
 }
     
 }// namespace apps

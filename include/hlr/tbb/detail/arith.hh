@@ -16,7 +16,7 @@ using indexset = hpro::TIndexSet;
 
 ///////////////////////////////////////////////////////////////////////
 //
-// general arithmetic functions
+// matrix-vector with chunk updates
 //
 ///////////////////////////////////////////////////////////////////////
 
@@ -191,6 +191,23 @@ mul_vec_chunk ( const value_t                    alpha,
 
         update( M.row_is( op_M ), yt, y_is, mtx_map );
     }// else
+}
+
+///////////////////////////////////////////////////////////////////////
+//
+// matrix-vector with reductions
+//
+///////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+void
+mul_vec_reduce ( const value_t                    alpha,
+                 const matop_t                    op_M,
+                 const hpro::TMatrix &            M,
+                 const blas::vector< value_t > &  x,
+                 blas::vector< value_t > &        y )
+{
+    
 }
 
 }}}// namespace hlr::tbb::detail

@@ -9,8 +9,6 @@
 #include <cassert>
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_inv.hh>
 
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/checks.hh"
@@ -452,7 +450,8 @@ template < storage_type_t  store_mode >
 void
 lu_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_mode, false ) );
+    HLR_ERROR( "todo" );
+    // HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_mode, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -514,7 +513,8 @@ template < storage_type_t  store_mode >
 void
 trsmu_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_mode ) );
+    HLR_ERROR( "todo" );
+    // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_mode ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -576,7 +576,8 @@ template < storage_type_t  store_mode >
 void
 trsml_node< store_mode >::run_ ( const TTruncAcc &  acc )
 {
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_mode ) );
+    HLR_ERROR( "todo" );
+    // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_mode ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -736,9 +737,11 @@ inv_ll_node::run_ ( const TTruncAcc &  acc )
 {
     HLR_ASSERT( is_dense( L ) );
     
-    const inv_options_t  opts{ diag, storage };
+    HLR_ERROR( "todo" );
+
+    // const inv_options_t  opts{ diag, storage };
     
-    invert_ll_rec( L, acc, opts );
+    // invert_ll_rec( L, acc, opts );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -811,7 +814,8 @@ mul_ll_right_node::refine_ ( const size_t  min_size )
 void
 mul_ll_right_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply_ll_right( alpha, A, L, acc, eval_option_t( block_wise, diag, store_normal ) );
+    HLR_ERROR( "todo" );
+    // multiply_ll_right( alpha, A, L, acc, eval_option_t( block_wise, diag, store_normal ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -884,7 +888,8 @@ mul_ll_left_node::refine_ ( const size_t  min_size )
 void
 mul_ll_left_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply_ll_left( alpha, L, A, acc, eval_option_t( block_wise, diag, store_normal ) );
+    HLR_ERROR( "todo" );
+    // multiply_ll_left( alpha, L, A, acc, eval_option_t( block_wise, diag, store_normal ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -981,10 +986,12 @@ void
 inv_ur_node::run_ ( const TTruncAcc &  acc )
 {
     HLR_ASSERT( is_dense( U ) );
+
+    HLR_ERROR( "todo" );
     
-    const inv_options_t  opts{ diag, storage };
+    // const inv_options_t  opts{ diag, storage };
     
-    invert_ur_rec( U, acc, opts );
+    // invert_ur_rec( U, acc, opts );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1056,7 +1063,8 @@ mul_ur_right_node::refine_ ( const size_t  min_size )
 void
 mul_ur_right_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply_ur_right( alpha, A, U, acc, eval_option_t( block_wise, diag, store_normal ) );
+    HLR_ERROR( "todo" );
+    // multiply_ur_right( alpha, A, U, acc, eval_option_t( block_wise, diag, store_normal ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1128,7 +1136,8 @@ mul_ur_left_node::refine_ ( const size_t  min_size )
 void
 mul_ur_left_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply_ur_left( alpha, U, A, acc, eval_option_t( block_wise, diag, store_normal ) );
+    HLR_ERROR( "todo" );
+    // multiply_ur_left( alpha, U, A, acc, eval_option_t( block_wise, diag, store_normal ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1175,11 +1184,12 @@ update_node::refine_ ( const size_t  min_size )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply( alpha,
-              apply_normal, A,
-              apply_normal, B,
-              real(1), C,
-              acc );
+    HLR_ERROR( "todo" );
+    // multiply( alpha,
+    //           apply_normal, A,
+    //           apply_normal, B,
+    //           real(1), C,
+    //           acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

@@ -11,12 +11,10 @@
 #include <hpro/matrix/TLinearOperator.hh>
 #include <hpro/vector/TScalarVector.hh>
 
+#include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 
 namespace hlr { namespace matrix {
-
-namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // map HLIB types to HLR 
 using  indexset       = hpro::TIndexSet;
@@ -32,16 +30,18 @@ class identity_operator : public hpro::TLinearOperator
 {
 private:
     // index set of identity
-    indexset  _is;
+    block_indexset  _bis;
     
 public:
     //
     // ctor
     //
 
-    identity_operator ( const indexset  is )
-            : _is( is )
-    {}
+    identity_operator ( const block_indexset  bis )
+            : _bis( bis )
+    {
+        HLR_ASSERT( bis.row_is() == bis.col_is() );
+    }
     
     //
     // linear operator properties
@@ -112,19 +112,35 @@ public:
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
     virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::Vector< hpro::real > &     x,
-                                blas::Vector< hpro::real > &           y,
+                                const blas::vector< hpro::real > &     x,
+                                blas::vector< hpro::real > &           y,
                                 const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
     {
         blas::add( alpha, x, y );
     }
     
     virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::Vector< hpro::complex > &  x,
-                                blas::Vector< hpro::complex > &        y,
+                                const blas::vector< hpro::complex > &  x,
+                                blas::vector< hpro::complex > &        y,
                                 const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
     {
         blas::add( alpha, x, y );
+    }
+
+    virtual void  apply_add   ( const hpro::real                       alpha,
+                                const blas::matrix< hpro::real > &     X,
+                                blas::matrix< hpro::real > &           Y,
+                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
+    {
+        blas::add( alpha, X, Y );
+    }
+    
+    virtual void  apply_add   ( const hpro::complex                    alpha,
+                                const blas::matrix< hpro::complex > &  X,
+                                blas::matrix< hpro::complex > &        Y,
+                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
+    {
+        blas::add( alpha, X, Y );
     }
 
     //
@@ -132,16 +148,16 @@ public:
     //
 
     // return dimension of domain
-    virtual size_t  domain_dim     () const { return _is.size(); }
+    virtual size_t  domain_dim     () const { return _bis.col_is().size(); }
     
     // return dimension of range
-    virtual size_t  range_dim      () const { return _is.size(); }
+    virtual size_t  range_dim      () const { return _bis.row_is().size(); }
     
     // return vector in domain space
-    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _is ); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.col_is() ); }
 
     // return vector in range space
-    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _is ); }
+    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.row_is() ); }
 
     //
     // misc.
@@ -156,9 +172,9 @@ public:
 //
 inline
 std::unique_ptr< identity_operator >
-identity ( const indexset &  is )
+identity ( const block_indexset &  bis )
 {
-    return std::make_unique< identity_operator >( is );
+    return std::make_unique< identity_operator >( bis );
 }
 
 }} // namespace hlr::matrix

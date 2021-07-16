@@ -18,14 +18,22 @@
 
 #include "hlr/utils/checks.hh"
 #include "hlr/arith/blas.hh"
+#include "hlr/arith/norm.hh"
+#include "hlr/approx/svd.hh" // DEBUG
 #include "hlr/matrix/cluster_basis.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
+#include "hlr/matrix/convert.hh"
+#include "hlr/matrix/restrict.hh"
+
+#include "hlr/seq/detail/matrix.hh"
 
 namespace hlr { namespace seq { namespace matrix {
 
 namespace hpro = HLIB;
-    
+
+using namespace hlr::matrix;
+
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -41,8 +49,7 @@ build ( const hpro::TBlockCluster *  bct,
         const hpro::TTruncAcc &      acc,
         const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    static_assert( std::is_same< typename coeff_t::value_t,
-                                 typename lrapx_t::value_t >::value,
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
     
     assert( bct != nullptr );
@@ -100,6 +107,712 @@ build ( const hpro::TBlockCluster *  bct,
     return M;
 }
 
+//
+// build representation of sparse matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <M>. If low rank blocks are not zero, they are
+// truncated to accuracy <acc> using approximation method <apx>
+//
+template < typename approx_t >
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
+        const hpro::TSparseMatrix &  S,
+        const hpro::TTruncAcc &      acc,
+        const approx_t &             apx,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using  value_t = typename approx_t::value_t;
+    
+    // static_assert( std::is_same< typename coeff_t::value_t,
+    //                              typename lrapx_t::value_t >::value,
+    //                "coefficient function and low-rank approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< hpro::TMatrix >  M;
+    
+    if ( bct->is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct->is() );
+        
+        if ( bct->is_adm() )
+        {
+            M = matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else
+        {
+            M = matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( bct->son( i, j ) != nullptr )
+                {
+                    auto  B_ij = build( bct->son( i, j ), S, acc, apx, nseq );
+
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
+    using lrmat_map_t   = std::unordered_map< indexset, std::list< hpro::TRkMatrix * >, indexset_hash >;
+    using bmat_map_t    = std::unordered_map< hpro::idx_t, hpro::TBlockMatrix * >;
+
+    //
+    // go BFS-style through block cluster tree and construct leaves per level
+    // then convert lowrank to uniform lowrank while constructing bases
+    //
+
+    // TODO: handle case of global lowrank matrix
+    HLR_ASSERT( ! bct->is_adm() );
+    
+    auto  rowcb_root = std::unique_ptr< cluster_basis >();
+    auto  colcb_root = std::unique_ptr< cluster_basis >();
+
+    auto  rowcb_map  = basis_map_t();
+    auto  colcb_map  = basis_map_t();
+
+    auto  M_root     = std::unique_ptr< hpro::TMatrix >();
+
+    auto  nodes      = std::list< const hpro::TBlockCluster * >{ bct };
+    auto  bmat_map   = bmat_map_t();
+
+    while ( ! nodes.empty() )
+    {
+        auto  children = decltype( nodes )();
+        auto  rowmap   = lrmat_map_t();
+        auto  colmap   = lrmat_map_t();
+        auto  lrmat    = std::list< hpro::TRkMatrix * >();
+        
+        for ( auto  node : nodes )
+        {
+            auto  M = std::unique_ptr< hpro::TMatrix >();
+
+            // std::cout << node->id() << std::endl;
+            
+            if ( node->is_leaf() )
+            {
+                if ( node->is_adm() )
+                {
+                    M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
+
+                    if ( is_lowrank( *M ) )
+                    {
+                        auto  R = ptrcast( M.get(), hpro::TRkMatrix );
+                        
+                        rowmap[ M->row_is() ].push_back( R );
+                        colmap[ M->col_is() ].push_back( R );
+                        lrmat.push_back( R );
+                    }// if
+                }// if
+                else
+                {
+                    M = coeff.build( node->is().row_is(), node->is().col_is() );
+                }// else
+            }// if
+            else
+            {
+                // collect children
+                for ( uint  i = 0; i < node->nrows(); ++i )
+                    for ( uint  j = 0; j < node->ncols(); ++j )
+                        if ( node->son( i, j ) != nullptr )
+                            children.push_back( node->son( i, j ) );
+
+                M = std::make_unique< hpro::TBlockMatrix >( node );
+        
+                auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+
+                // make sure, block structure is correct
+                if (( B->nblock_rows() != node->nrows() ) ||
+                    ( B->nblock_cols() != node->ncols() ))
+                    B->set_block_struct( node->nrows(), node->ncols() );
+
+                // make value type consistent in block matrix and sub blocks
+                B->adjust_value_type();
+
+                // remember all block matrices for setting up hierarchy
+                bmat_map[ node->id() ] = B;
+            }// else
+
+            M->set_id( node->id() );
+            M->set_procs( node->procs() );
+
+            //
+            // set up hierarchy (parent <-> M)
+            //
+
+            if ( is_null( node->parent() ) )
+            {
+                M_root = std::move( M );
+            }// if
+            else
+            {
+                auto  parent   = node->parent();
+                auto  M_parent = bmat_map.at( parent->id() );
+
+                for ( uint  i = 0; i < parent->nrows(); ++i ) 
+                {
+                    for ( uint  j = 0; j < parent->ncols(); ++j )
+                    {
+                        if ( parent->son( i, j ) == node )
+                        {
+                            M_parent->set_block( i, j, M.release() );
+                            break;
+                        }// if
+                    }// for
+                }// for
+            }// if
+
+            //
+            // build row/column cluster basis objects and set up
+            // cluster bases hierarchy
+            //
+
+            auto             rowcl = node->rowcl();
+            auto             colcl = node->colcl();
+            cluster_basis *  rowcb = nullptr;
+            cluster_basis *  colcb = nullptr;
+
+            if ( rowcb_map.find( *rowcl ) == rowcb_map.end() )
+            {
+                rowcb = new cluster_basis( *rowcl );
+                rowcb->set_nsons( rowcl->nsons() );
+                rowcb_map.emplace( *rowcl, rowcb );
+            }// if
+            else
+                rowcb = rowcb_map.at( *rowcl );
+                    
+            if ( colcb_map.find( *colcl ) == colcb_map.end() )
+            {
+                colcb = new cluster_basis( *colcl );
+                colcb->set_nsons( colcl->nsons() );
+                colcb_map.emplace( *colcl, colcb );
+            }// if
+            else
+                colcb = colcb_map.at( *colcl );
+
+            if ( is_null( node->parent() ) )
+            {
+                rowcb_root.reset( rowcb_map[ *rowcl ] );
+                colcb_root.reset( colcb_map[ *colcl ] );
+            }// if
+            else
+            {
+                auto  parent     = node->parent();
+                auto  row_parent = parent->rowcl();
+                auto  col_parent = parent->colcl();
+
+                for ( uint  i = 0; i < row_parent->nsons(); ++i )
+                {
+                    if ( row_parent->son( i ) == rowcl )
+                    {
+                        rowcb_map.at( *row_parent )->set_son( i, rowcb );
+                        break;
+                    }// if
+                }// for
+
+                for ( uint  i = 0; i < col_parent->nsons(); ++i )
+                {
+                    if ( col_parent->son( i ) == colcl )
+                    {
+                        colcb_map.at( *col_parent )->set_son( i, colcb );
+                        break;
+                    }// if
+                }// for
+            }// else
+        }// for
+
+        nodes = std::move( children );
+        
+        //
+        // construct row bases for all block rows constructed on this level
+        //
+
+        for ( auto  [ is, matrices ] : rowmap )
+        {
+            if ( matrices.size() == 0 )
+                continue;
+
+            #if 1
+
+            //
+            // compute column basis for
+            //
+            //   ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … ) =
+            //
+            //                  ⎛ V₀'        ⎞
+            //   ( U₀ U₁ U₂ … ) ⎜    V₁'     ⎟ =
+            //                  ⎜       V₂'  ⎟
+            //                  ⎝          … ⎠
+            //
+            //                  ⎛ Q₀·R₀             ⎞'
+            //   ( U₀ U₁ U₂ … ) ⎜      Q₁·R₁        ⎟ =
+            //                  ⎜           Q₂·R₂   ⎟
+            //                  ⎝                 … ⎠
+            //
+            //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
+            //   ( U₀ U₁ U₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
+            //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
+            //                  ⎝⎝      …⎠ ⎝      …⎠⎠
+            //
+            // Since diag(Q_i) is orthogonal, it can be omitted for row bases
+            // computation, leaving
+            //
+            //                  ⎛R₀     ⎞'                 
+            //   ( U₀ U₁ U₂ … ) ⎜  R₁   ⎟ = ( U₀·R₀' U₁·R₁' U₂·R₂' … )
+            //                  ⎜    R₂ ⎟                  
+            //                  ⎝      …⎠                  
+            //
+            // of which a column basis is computed.
+            //
+
+            //
+            // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
+            //
+            
+            size_t  nrows_U = is.size();
+            size_t  ncols_U = 0;
+
+            for ( auto &  R : matrices )
+                ncols_U += R->rank();
+
+            auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
+            size_t  pos = 0;
+
+            for ( auto &  R : matrices )
+            {
+                // R = U·V' = W·T·X'
+                auto  U_i = blas::mat_U< value_t >( R );
+                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  R_i = blas::matrix< value_t >();
+                auto  k   = R->rank();
+                
+                blas::qr( V_i, R_i );
+
+                auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+                auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( UR_i, U_sub );
+                
+                pos += k;
+            }// for
+
+            //
+            // QR of S and computation of row basis
+            //
+
+            auto  Un = basisapx.column_basis( U, acc );
+
+            #else
+            
+            //
+            // compute column basis for
+            //
+            //   ( U₀×V₀'               U₁×V₁'                U₂×V₂'               … ) =
+            //
+            //   ( Qu₀·Ru₀×(Qv₀·Rv₀)'   Qu₁·Ru₁×·(Qv₁·Rv₁)'   Qu₂·Ru₂×(Qv₂·Rv₂)'   … ) =
+            //
+            //   ( Qu₀·(Ru₀×Rv₀')·Qv₀'  Qu₁·(Ru₁×·Rv₁')·Qv₁'  Qu₂·(Ru₂×Rv₂')·Qv₂'  … ) =
+            //
+            //   ( Qu₀·S₀·Qv₀'          Qu₁·S₁·Qv₁'           Qu₂·S₂·Qv₂'          … ) =   with S_i = Ru_i × Rv_i'
+            //
+            //                     ⎛ Qv₀·S₀             ⎞'
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜      Qv₁·S₁        ⎟ =
+            //                     ⎜           Qv₂·S₂   ⎟
+            //                     ⎝                  … ⎠
+            //
+            //                     ⎛⎛Qv₀       ⎞ ⎛S₀     ⎞⎞'
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜⎜   Qv₁    ⎟·⎜  S₁   ⎟⎟ =
+            //                     ⎜⎜      Qv₂ ⎟ ⎜    S₂ ⎟⎟
+            //                     ⎝⎝         …⎠ ⎝      …⎠⎠
+            //
+            // Since diag(Qv_i) is orthogonal, it can be omitted for row bases
+            // computation, leaving
+            //
+            //                     ⎛S₀     ⎞'                 
+            //   ( Qu₀ Qu₁ Qu₂ … ) ⎜  S₁   ⎟ = ( Qu₀·S₀' Qu₁·S₁' Qu₂·S₂' … )
+            //                     ⎜    S₂ ⎟                  
+            //                     ⎝      …⎠                  
+            //
+            // of which a column basis is computed.
+            //
+            // Also: S_i is scaled with respect to spectral norm.
+            //
+
+            //
+            // form U = ( Qu₀·S₀' Qu₁·S₁' Qu₂·S₁' … )
+            //
+            
+            size_t  nrows_U = is.size();
+            size_t  ncols_U = 0;
+
+            for ( auto &  R : matrices )
+                ncols_U += R->rank();
+
+            auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
+            size_t  pos = 0;
+
+            for ( auto &  R : matrices )
+            {
+                // R = U·V' = Qu·Ru×Rv'·Qv'
+                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  Ru_i = blas::matrix< value_t >();
+                auto  Rv_i = blas::matrix< value_t >();
+                auto  k    = R->rank();
+                
+                blas::qr( U_i, Ru_i );
+                blas::qr( V_i, Rv_i );
+
+                auto  S_i    = blas::prod( Ru_i, blas::adjoint( Rv_i ) );
+                auto  norm_i = blas::norm_2( S_i );
+
+                blas::scale( value_t(1) / norm_i, S_i );
+
+                auto  US_i   = blas::prod( U_i, blas::adjoint( S_i ) );
+                auto  U_sub  = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( US_i, U_sub );
+                
+                pos += k;
+            }// for
+
+            auto  Un = basisapx.column_basis( U, acc );
+
+            #endif
+            
+            // finally assign to cluster basis object
+            rowcb_map.at( is )->set_basis( std::move( Un ) );
+        }// for
+
+        //
+        // construct column bases for all block columns constructed on this level
+        //
+
+        for ( auto  [ is, matrices ] : colmap )
+        {
+            if ( matrices.size() == 0 )
+                continue;
+
+            #if 1
+
+            //
+            // compute column basis for
+            //
+            //   ⎛U₀·V₀'⎞ 
+            //   ⎜U₁·V₁'⎟
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
+            //
+            // or row basis of
+            //
+            //   ⎛U₀·V₀'⎞' 
+            //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
+            //
+            //                  ⎛ U₀      ⎞'
+            //   ( V₀ V₁ V₂ … ) ⎜   U₁    ⎟ =
+            //                  ⎜     U₂  ⎟
+            //                  ⎝       … ⎠
+            //
+            //                  ⎛ Q₀·R₀               ⎞'
+            //   ( V₀ V₁ V₂ … ) ⎜       Q₁·R₁         ⎟ =
+            //                  ⎜             Q₂·R₂   ⎟
+            //                  ⎝                   … ⎠
+            //
+            //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
+            //   ( V₀ V₁ V₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
+            //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
+            //                  ⎝⎝      …⎠ ⎝      …⎠⎠
+            //
+            // Since diag(Q_i) is orthogonal, it can be omitted for column bases
+            // computation, leaving
+            //
+            //                  ⎛R₀     ⎞'                
+            //   ( V₀ V₁ V₂ … ) ⎜  R₁   ⎟ = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+            //                  ⎜    R₂ ⎟                
+            //                  ⎝      …⎠
+            //
+            // of which a column basis is computed.
+            //
+
+            //
+            // form matrix V = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+            //
+
+            size_t  nrows_V = is.size();
+            size_t  ncols_V = 0;
+
+            for ( auto &  R : matrices )
+                ncols_V += R->rank();
+
+            auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
+            size_t  pos = 0;
+
+            for ( auto &  R : matrices )
+            {
+                // R' = (U·V')' = V·U' = X·T'·W'
+                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  R_i = blas::matrix< value_t >();
+                auto  k   = R->rank();
+                
+                blas::qr( U_i, R_i );
+
+                auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
+                auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( VR_i, V_sub );
+                
+                pos += k;
+            }// for
+
+            auto  Vn = basisapx.column_basis( V, acc );
+
+            #else
+            
+            //
+            // compute column basis for
+            //
+            //   ⎛U₀·V₀'⎞ 
+            //   ⎜U₁·V₁'⎟
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
+            //
+            // or row basis of
+            //
+            //   ⎛U₀·V₀'⎞' 
+            //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
+            //   ⎜U₂·V₂'⎟
+            //   ⎝  …   ⎠
+            //
+            //   ( Qv₀·Rv₀×(Qu₀·Ru₀)'   Qv₁·Rv₁×(Qu₁·Ru₁)'   Qv₂·Rv₂×(Qu₂·Ru₂)'  … ) =
+            //
+            //   ( Qv₀·(Rv₀×Ru₀')·Qu₀'  Qv₁·(Rv₁×Ru₁')·Qu₁'  Qv₂·(Rv₂×Ru₂')·Qu₂' … ) =
+            //
+            //   ( Qv₀·S₀·Qu₀'          Qv₁·S₁·Qu₁'          Qv₂·S₂·Qu₂'         … ) =   with  S_i = Rv_i × Ru_i'
+            //
+            //                     ⎛ Qu₀·S₀'                ⎞'
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜        Qu₁·S₁'         ⎟ =
+            //                     ⎜               Qu₂·S₂'  ⎟
+            //                     ⎝                      … ⎠
+            //
+            //                     ⎛⎛Qu₀       ⎞ ⎛S₀'       ⎞⎞'
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜⎜   Qu₁    ⎟·⎜   S₁'    ⎟⎟ =
+            //                     ⎜⎜      Qu₂ ⎟ ⎜      S₂' ⎟⎟
+            //                     ⎝⎝         …⎠ ⎝         …⎠⎠
+            //
+            // Since diag(Qu_i) is orthogonal, it can be omitted for column bases
+            // computation, leaving
+            //
+            //                     ⎛S₀'       ⎞'                
+            //   ( Qv₀ Qv₁ Qv₂ … ) ⎜   S₁'    ⎟ = ( Qv₀·S₀ Qv₁·S₁ Qv₂·S₂ … )
+            //                     ⎜      S₂' ⎟                
+            //                     ⎝         …⎠
+            //
+            // of which a column basis is computed.
+            //
+            // Also: the matrices S_i are scaled with respect to their spectral norm.
+            //
+
+            //
+            // form matrix V = ( Qv₀·S₀ Qv₁·S₁ Qv₂·S₂ … )
+            //
+
+            size_t  nrows_V = is.size();
+            size_t  ncols_V = 0;
+
+            for ( auto &  R : matrices )
+                ncols_V += R->rank();
+
+            auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
+            size_t  pos = 0;
+
+            for ( auto &  R : matrices )
+            {
+                // R' = (U·V')' = V·U' = X·T'·W'
+                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  Rv_i = blas::matrix< value_t >();
+                auto  Ru_i = blas::matrix< value_t >();
+                auto  k    = R->rank();
+                
+                blas::qr( V_i, Rv_i );
+                blas::qr( U_i, Ru_i );
+
+                auto  S_i    = blas::prod( Rv_i, blas::adjoint( Ru_i ) );
+                auto  norm_i = blas::norm_2( S_i );
+
+                blas::scale( value_t(1) / norm_i, S_i );
+                
+                auto  VS_i   = blas::prod( V_i, S_i );
+                auto  V_sub  = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( VS_i, V_sub );
+                
+                pos += k;
+            }// for
+
+            auto  Vn = basisapx.column_basis( V, acc );
+
+            #endif
+            
+            // finally assign to cluster basis object
+            colcb_map.at( is )->set_basis( std::move( Vn ) );
+        }// for
+
+        //
+        // now convert all blocks on this level
+        //
+
+        for ( auto  R : lrmat )
+        {
+            auto  rowcb = rowcb_map.at( R->row_is() );
+            auto  colcb = colcb_map.at( R->col_is() );
+            auto  Un    = rowcb->basis();
+            auto  Vn    = colcb->basis();
+
+            //
+            // R = U·V' ≈ Un (Un' U V' Vn) Vn'
+            //          = Un S Vn'  with  S = Un' U V' Vn
+            //
+
+            auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
+            auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+            auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
+
+            auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
+                                                                                      R->col_is(),
+                                                                                      *rowcb,
+                                                                                      *colcb,
+                                                                                      std::move( S ) );
+
+            // {
+            //     auto  M1 = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
+            //     auto  T  = blas::prod( RU->row_basis(), RU->coeff() );
+            //     auto  M2 = blas::prod( T, blas::adjoint( RU->col_basis() ) );
+
+            //     blas::add( value_t(-1), M1, M2 );
+
+            //     std::cout << R->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
+            // }
+            
+            // replace standard lowrank block by uniform lowrank block
+            R->parent()->replace_block( R, RU.release() );
+            delete R;
+        }// for
+    }// while
+
+    return { std::move( rowcb_root ),
+             std::move( colcb_root ),
+             std::move( M_root ) };
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+    
+    auto  rowmap = detail::uniform_map_t();
+    auto  colmap = detail::uniform_map_t();
+    
+    auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+    
 //
 // assign block cluster to matrix
 //
@@ -210,11 +923,11 @@ copy_tiled ( const hpro::TMatrix &  M,
         //
 
         auto  RM = cptrcast( & M, hpro::TRkMatrix );
-        auto  R  = std::make_unique< hlr::matrix::tiled_lrmatrix< value_t > >( RM->row_is(),
-                                                                               RM->col_is(),
-                                                                               ntile,
-                                                                               blas::mat_U< value_t >( RM ),
-                                                                               blas::mat_V< value_t >( RM ) );
+        auto  R  = std::make_unique< tiled_lrmatrix< value_t > >( RM->row_is(),
+                                                                  RM->col_is(),
+                                                                  ntile,
+                                                                  blas::mat_U< value_t >( RM ),
+                                                                  blas::mat_V< value_t >( RM ) );
 
         R->set_id( RM->id() );
 
@@ -266,10 +979,10 @@ copy_nontiled ( const hpro::TMatrix &  M )
 
         assert( M.is_real() );
         
-        auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
+        auto  RM = cptrcast( & M, tiled_lrmatrix< real > );
         auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
-        auto  U  = hlr::matrix::to_dense( RM->U() );
-        auto  V  = hlr::matrix::to_dense( RM->V() );
+        auto  U  = to_dense( RM->U() );
+        auto  V  = to_dense( RM->V() );
 
         R->set_lrmat( U, V );
         R->set_id( RM->id() );
@@ -617,9 +1330,9 @@ clear ( hpro::TMatrix &  M )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &                          M,
-               const hlr::matrix::cluster_basis< value_t > &  rowcb,
-               const hlr::matrix::cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix &       M,
+               cluster_basis< value_t > &  rowcb,
+               cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -662,21 +1375,10 @@ copy_uniform ( const hpro::TMatrix &                          M,
 
         auto  UA = rowcb.transform_forward( blas::mat_U< value_t >( R ) );
         auto  VB = colcb.transform_forward( blas::mat_V< value_t >( R ) );
-        auto  S  = blas::prod( value_t(1), UA, blas::adjoint( VB ) );
-
-        // {
-        //     auto  M1 = blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
-        //     auto  T  = blas::prod( value_t(1), rowcb.basis(), S );
-        //     auto  M2 = blas::prod( value_t(1), T, blas::adjoint( colcb.basis() ) );
-            
-        //     blas::add( value_t(-1), M2, M1 );
-            
-        //     std::cout << hpro::to_string( "%.6e", blas::norm_F( M1 ) ) << std::endl;
-        // }
-
-        auto  UR = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                                 rowcb, colcb,
-                                                                                 std::move( S ) );
+        auto  S  = blas::prod( UA, blas::adjoint( VB ) );
+        auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                    rowcb, colcb,
+                                                                    std::move( S ) );
 
         UR->set_id( R->id() );
 
@@ -690,150 +1392,60 @@ copy_uniform ( const hpro::TMatrix &                          M,
 }
 
 //
-// convert given matrix into lowrank format
-//
-template < typename approx_t >
-std::unique_ptr< hpro::TRkMatrix >
-convert_to_lowrank ( const hpro::TMatrix &    M,
-                     const hpro::TTruncAcc &  acc,
-                     const approx_t &         approx )
-{
-    using  value_t = typename approx_t::value_t;
-    
-    if ( is_blocked( M ) )
-    {
-        //
-        // convert each sub block into low-rank format and 
-        // enlarge to size of M (pad with zeroes)
-        //
-
-        auto  B  = cptrcast( &M, hpro::TBlockMatrix );
-        auto  Us = std::list< blas::matrix< value_t > >();
-        auto  Vs = std::list< blas::matrix< value_t > >();
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto  B_ij = B->block( i, j );
-                
-                if ( is_null( B_ij ) )
-                    continue;
-
-                auto  R_ij = convert_to_lowrank( *B_ij, acc, approx );
-                auto  U    = blas::matrix< value_t >( M.nrows(), R_ij->rank() );
-                auto  V    = blas::matrix< value_t >( M.ncols(), R_ij->rank() );
-                auto  U_i  = blas::matrix< value_t >( U, R_ij->row_is() - M.row_ofs(), blas::range::all );
-                auto  V_j  = blas::matrix< value_t >( V, R_ij->col_is() - M.col_ofs(), blas::range::all );
-
-                blas::copy( blas::mat_U< value_t >( R_ij ), U_i );
-                blas::copy( blas::mat_V< value_t >( R_ij ), V_j );
-
-                Us.push_back( std::move( U ) );
-                Vs.push_back( std::move( V ) );
-            }// for
-        }// for
-
-        auto  [ U, V ] = approx( Us, Vs, acc );
-
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D        = cptrcast( &M, hpro::TDenseMatrix );
-        auto  T        = std::move( blas::copy( hpro::blas_mat< value_t >( D ) ) );
-        auto  [ U, V ] = approx( T, acc );
-
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R        = cptrcast( &M, hpro::TRkMatrix );
-        auto  [ U, V ] = approx( blas::mat_U< value_t >( R ),
-                                 blas::mat_V< value_t >( R ),
-                                 acc );
-        
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
-}
-
-//
-// convert given matrix into dense format
+// return copy of matrix with uniform low-rank matrices converted
+// to standard lowrank matrices
 //
 template < typename value_t >
-std::unique_ptr< hpro::TDenseMatrix >
-convert_to_dense ( const hpro::TMatrix &  M )
+std::unique_ptr< hpro::TMatrix >
+copy_nonuniform ( const hpro::TMatrix &  M )
 {
     if ( is_blocked( M ) )
     {
-        //
-        // convert each sub block and copy to dense version
-        //
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
 
-        auto  B  = cptrcast( &M, hpro::TBlockMatrix );
-        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
-        auto  DD = blas::mat< value_t >( *D );
+        B->copy_struct_from( BM );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
-                auto  B_ij = B->block( i, j );
-                
-                if ( is_null( B_ij ) )
-                    continue;
-
-                auto  D_ij  = convert_to_dense< value_t >( *B_ij );
-                auto  DD_ij = blas::mat< value_t >( *D_ij );
-                auto  TD    = blas::matrix( DD,
-                                            D_ij->row_is() - M.row_ofs(),
-                                            D_ij->col_is() - M.col_ofs() );
-
-                blas::copy( DD_ij, TD );
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_nonuniform< value_t >( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
             }// for
         }// for
-
-        return D;
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D   = cptrcast( &M, hpro::TDenseMatrix );
-        auto  DD  = blas::mat< value_t >( *D );
-        auto  DC  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
-        auto  DDC = blas::mat< value_t >( *DC );
-
-        blas::copy( DD, DDC );
-            
-        return DC;
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R  = cptrcast( &M, hpro::TRkMatrix );
-        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
-        auto  DD = blas::mat< value_t >( *D );
-
-        blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ),
-                    value_t(0), DD );
         
-        return D;
+        return N;
     }// if
-    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    else if ( is_uniform_lowrank( M ) )
     {
-        auto  R   = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        auto  D   = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type< value_t >::value );
-        auto  DD  = blas::mat< value_t >( *D );
-        auto  UxS = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
+        auto  R  = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  U  = blas::prod( R->row_cb().basis(), R->coeff() );
+        auto  V  = blas::copy( R->col_cb().basis() );
+        auto  SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
 
-        blas::prod( value_t(1), UxS, blas::adjoint( R->col_cb().basis() ),
-                    value_t(0), DD );
-        
-        return D;
+        SR->set_id( R->id() );
+
+        return SR;
     }// if
     else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+    {
+        // assuming dense block (no low-rank)
+        return M.copy();
+    }// else
 }
+
+//
+// import functions from matrix module
+//
+using hlr::matrix::convert_to_lowrank;
+using hlr::matrix::convert_to_dense;
 
 }}}// namespace hlr::seq::matrix
 

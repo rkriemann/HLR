@@ -56,6 +56,7 @@ struct accumulator : public hlr::matrix::accumulator_base
     //
     // return restriction of updates to block (i,j) of given block matrix
     //
+    template < typename value_t >
     accumulator
     restrict ( const uint                  i,
                const uint                  j,
@@ -69,6 +70,10 @@ struct accumulator : public hlr::matrix::accumulator_base
             HLR_ASSERT( ! is_null( M.block( i, j ) ) );
             
             U_ij = hlr::matrix::restrict( *matrix, M.block( i, j )->block_is() );
+
+            // prefer dense if destination is dense
+            if ( check_dense( *M.block( i, j ) ) && ! is_dense( *U_ij ) )
+                U_ij = std::move( hlr::matrix::convert_to_dense< value_t >( *U_ij ) );
         }// if
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
@@ -98,6 +103,7 @@ struct accumulator : public hlr::matrix::accumulator_base
     //
     // return restriction of updates to all sub blocks of given block matrix
     //
+    template < typename value_t >
     tensor2< accumulator >
     restrict ( const hpro::TBlockMatrix &  M ) const
     {
@@ -109,7 +115,7 @@ struct accumulator : public hlr::matrix::accumulator_base
             {
                 HLR_ASSERT( ! is_null( M.block( i, j ) ) );
 
-                sub_accu(i,j) = restrict( i, j, M );
+                sub_accu(i,j) = restrict< value_t >( i, j, M );
             }// for
         }// for
 
@@ -132,7 +138,20 @@ struct accumulator : public hlr::matrix::accumulator_base
         //
         // handle all, actually computable updates, i.e., one factor is a leaf block
         //
-    
+
+        bool  handle_dense = check_dense( M );
+
+        for ( auto  [ op_A, A, op_B, B ] : pending )
+        {
+            if ( is_dense_all( A, B ) ||
+                 ( is_blocked( A ) && is_dense(   B ) ) ||
+                 ( is_dense(   A ) && is_blocked( B ) ))
+            {
+                handle_dense = true;
+                break;
+            }// if
+        }// for
+        
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             if ( is_blocked_all( *A, *B, M ) )
@@ -163,10 +182,15 @@ struct accumulator : public hlr::matrix::accumulator_base
                     for ( uint  j = 0; j < BC->nblock_cols(); ++j )
                     {
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
-                        
-                        BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                  BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                  hpro::value_type< value_t >::value ) );
+
+                        if ( handle_dense )
+                            BC->set_block( i, j, new hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                         BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                         hpro::value_type_v< value_t > ) );
+                        else
+                            BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                      BB->block( 0, j, op_B )->col_is( op_B ),
+                                                                      hpro::value_type_v< value_t > ) );
                     }// for
                 }// for
             }// if
@@ -176,8 +200,11 @@ struct accumulator : public hlr::matrix::accumulator_base
                 // compute update (either A or B is a leaf)
                 //
 
-                auto  T = multiply< value_t >( alpha, op_A, A, op_B, B );
+                auto  T = hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B );
 
+                if ( handle_dense && ! is_dense( *T ) )
+                    T = matrix::convert_to_dense< value_t >( *T );
+                
                 //
                 // apply update to accumulator
                 //
@@ -189,7 +216,7 @@ struct accumulator : public hlr::matrix::accumulator_base
                 else if ( ! is_dense( *matrix ) && is_dense( *T ) )
                 {
                     // prefer dense format to avoid unnecessary truncations
-                    hlr::add( value_t(1), *matrix, *T, acc, approx );
+                    hlr::add( value_t(1), *matrix, *T );
                     matrix = std::move( T );
                 }// if
                 else
@@ -214,7 +241,7 @@ struct accumulator : public hlr::matrix::accumulator_base
             // (to release matrix before recursion)
             //
 
-            auto  sub_accu = restrict( *BC );
+            auto  sub_accu = restrict< value_t >( *BC );
 
             matrix.reset( nullptr );
         
@@ -226,7 +253,7 @@ struct accumulator : public hlr::matrix::accumulator_base
             {
                 for ( uint  j = 0; j < BC->nblock_cols(); ++j )
                 {
-                    sub_accu(i,j).eval< value_t >( alpha, *BC->block(i,j), acc, approx );
+                    sub_accu(i,j).eval( alpha, *BC->block(i,j), acc, approx );
 
                     // replace block in BC by accumulator matrix for agglomeration below
                     BC->delete_block( i, j );
@@ -238,8 +265,47 @@ struct accumulator : public hlr::matrix::accumulator_base
             // finally convert subblocks to single low-rank matrix for new accumulated updates
             //
 
-            matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
+            if ( handle_dense )
+                matrix = seq::matrix::convert_to_dense< value_t >( *BC );
+            else
+                matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
         }// if
+    }
+
+    //
+    // return true if given matrix is dense
+    //
+    bool
+    check_dense ( const hpro::TMatrix &  M ) const
+    {
+        // return false;
+        if ( is_dense( M ) )
+        {
+            return true;
+        }// if
+        else if ( is_blocked( M ) )
+        {
+            //
+            // test if all subblocks are dense
+            //
+
+            auto  B = cptrcast( &M, hpro::TBlockMatrix );
+
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( B->block( i, j ) ) && ! is_dense( B->block( i, j ) ) )
+                         return false;
+                }// for
+            }// for
+
+            return true;
+        }// if
+        else
+        {
+            return false;
+        }// else
     }
 };
 

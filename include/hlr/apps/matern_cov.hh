@@ -34,9 +34,10 @@ private:
 
 public:
     //
-    // ctor: generate random coordinates
+    // ctor: generate random coordinates with specific geometry
     //
-    matern_cov ( const size_t  n );
+    matern_cov ( const std::string &  geometry,
+                 const size_t         n );
 
     //
     // ctor: use coordinates from given grid

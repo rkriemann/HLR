@@ -34,10 +34,10 @@ syntax: regexp
 ^.*\.log
 
 ^hlrtest$
-^programs/(dag-(lu|inv|gauss|hodlr|hodlr2|waz)-(seq|omp|tbb|tf|hpx|mpi))$
-^programs/((hodlr|tiled-hodlr|tiled-h|tiled-hca|tlr|tileh|uniform|accu)-(seq|omp|tbb|tf|hpx|mpi))$
-^(tlr|tileh)-mpi-(bcast|ibcast|rdma)$
-^(tlr|tileh)-gaspi$
+^programs/(.*)-(seq|omp|tbb|tf|hpx|mpi)$
+^programs/(.*/.*)-(seq|omp|tbb|tf|hpx|mpi)$
+#^(tlr|tileh)-mpi-(bcast|ibcast|rdma)$
+#^(tlr|tileh)-gaspi$
 
 # gtags files
 ^(GPATH|GRTAGS|GSYMS|GTAGS)$

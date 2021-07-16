@@ -102,7 +102,7 @@ svd ( const blas::matrix< value_t > &  U,
     // truncate given low-rank matrix
     //
     
-    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) / 2 )
+    if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) )
     {
         //
         // since rank is too large, build U = U·V^T and do full-SVD
@@ -131,12 +131,12 @@ svd ( const blas::matrix< value_t > &  U,
         auto  QU = blas::copy( U );
         auto  RU = blas::matrix< value_t >( in_rank, in_rank );
         
-        blas::qr_wrapper( QU, RU );
+        blas::qr( QU, RU );
         
         auto  QV = blas::copy( V );
         auto  RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
         
-        blas::qr_wrapper( QV, RV );
+        blas::qr( QV, RV );
 
         //
         // R = R_U · upper_triangular(QV)^H = R_V^H
@@ -299,8 +299,19 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
     uint          in_rank = 0;
 
     for ( auto &  U_i : U )
+    {
         in_rank += U_i.ncols();
 
+        HLR_DBG_ASSERT( U_i.nrows() == nrows );
+    }// for
+
+    #if ! defined(NDEBUG)
+    for ( auto &  V_i : V )
+    {
+        HLR_DBG_ASSERT( V_i.nrows() == ncols );
+    }// for
+    #endif
+    
     if ( in_rank >= std::min( nrows, ncols ) )
     {
         //
@@ -449,6 +460,14 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
+    using  real_t  = typename hpro::real_type< value_t >::type_t;
+
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = false;
+    
+    //
+    // matrix approximation routines
+    //
     
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
@@ -485,12 +504,63 @@ struct SVD
     {
         return hlr::approx::svd( U, T, V, acc );
     }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    blas::matrix< value_t >
+    column_basis ( blas::matrix< value_t > &  M,
+                   const hpro::TTruncAcc &    acc ) const
+    {
+        if ( M.ncols() > M.nrows() / 2 )
+        {
+            //
+            // directly use first k column of U from M = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  S = blas::vector< real_t >();
+
+            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+        
+            blas::svd( M, S );
+
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+
+            return  blas::copy( Uk );
+        }// if
+        else
+        {
+            //
+            // M = Q·R = Q·U·S·V' with R = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  R = blas::matrix< value_t >();
+
+            blas::qr( M, R );
+
+            auto  S = blas::vector< real_t >();
+
+            blas::svd( R, S );
+            
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( R, blas::range::all, blas::range( 0, k-1 ) );
+
+            return  blas::prod( M, Uk );
+        }// else
+    }
 };
 
 template < typename T_value >
 struct PairSVD
 {
     using  value_t = T_value;
+    
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = false;
     
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >

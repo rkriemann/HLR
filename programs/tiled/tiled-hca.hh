@@ -24,7 +24,6 @@
 #include "hlr/bem/tiled_hca.hh"
 
 using namespace hlr;
-using namespace hpro;
 
 using function_space = hpro::TConstFnSpace;
 
@@ -113,7 +112,7 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( M_ref->byte_size() ) << std::endl;
 
-        norm_ref = hlr::seq::norm::norm_2( *M_ref );
+        norm_ref = hlr::norm::spectral( *M_ref );
 
         std::cout << "    norm   = " << format_norm( norm_ref ) << std::endl;
     }// if
@@ -160,12 +159,12 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         std::cout << "    mem    = " << format_mem( M_hca->byte_size() ) << std::endl;
-        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_hca ) ) << std::endl;
+        std::cout << "    norm   = " << format_norm( hlr::norm::spectral( *M_hca ) ) << std::endl;
     
         if ( build_ref )
         {
             auto  diff_hca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_hca.get() );
-            auto  error_HCA = hlr::seq::norm::norm_2( *diff_hca );
+            auto  error_HCA = hlr::norm::spectral( *diff_hca );
 
             std::cout << "    error  = " << format_error( error_HCA )
                       << " / "
@@ -235,12 +234,12 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         std::cout << "    mem    = " << format_mem( M_thca->byte_size() ) << std::endl;
-        std::cout << "    norm   = " << format_norm( hlr::seq::norm::norm_2( *M_thca ) ) << std::endl;
+        std::cout << "    norm   = " << format_norm( hlr::norm::spectral( *M_thca ) ) << std::endl;
 
         if ( build_ref )
         {
             auto  diff_thca  = hpro::matrix_sum( value_t(1), M_ref.get(), value_t(-1), M_thca.get() );
-            auto  error_tHCA = hlr::seq::norm::norm_2( *diff_thca );
+            auto  error_tHCA = hlr::norm::spectral( *diff_thca );
     
             std::cout << "    error  = " << format_error( error_tHCA )
                       << " / "

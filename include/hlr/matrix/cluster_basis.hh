@@ -18,6 +18,7 @@ namespace hlr
 
 namespace hpro = HLIB;
 
+using indexset     = hpro::TIndexSet;
 using cluster_tree = hpro::TCluster;
 using accuracy     = hpro::TTruncAcc;
 
@@ -43,8 +44,8 @@ public:
     using  value_t = T_value;
     
 private:
-    // associated cluster
-    const cluster_tree *                       _cluster;
+    // associated indexset
+    const indexset                             _is;
 
     // cluster basis of sub clusters
     std::vector< cluster_basis< value_t > * >  _sons;
@@ -52,24 +53,31 @@ private:
     // basis
     hlr::blas::matrix< value_t >               _V;
 
+    // mutex for synchronised changes
+    std::mutex                                 _mtx;
+    
+public:
+    // DEBUG
+    int                                        mtx_id;
+    
 public:
     
     // construct cluster basis corresponding to cluster <cl>
-    cluster_basis ( const cluster_tree &  cl )
-            : _cluster( &cl )
+    cluster_basis ( const indexset &  ais )
+            : _is( ais )
     {}
 
     // construct cluster basis corresponding to cluster <cl>
     // with basis defined by <V>
-    cluster_basis ( const cluster_tree &                   cl,
+    cluster_basis ( const indexset &                       ais,
                     const hlr::blas::matrix< value_t > &&  V )
-            : _cluster( &cl )
+            : _is( ais )
             , _V( V )
     {}
 
-    cluster_basis ( const cluster_tree &                   cl,
+    cluster_basis ( const indexset &                       ais,
                     hlr::blas::matrix< value_t > &&        V )
-            : _cluster( &cl )
+            : _is( ais )
             , _V( std::move( V ) )
     {}
 
@@ -101,8 +109,8 @@ public:
     // access basis
     //
 
-    // underlying cluster tree
-    const cluster_tree &                  cluster () const { return *_cluster; }
+    // underlying indexset
+    const indexset &                      is      () const { return _is; }
     
     // return rank of cluster basis
     uint                                  rank    () const { return _V.ncols(); }
@@ -120,6 +128,7 @@ public:
     void
     set_basis  ( hlr::blas::matrix< value_t > &&  aV )
     {
+        // TODO: test "copy" if dimensions are compatible
         _V = std::move( aV );
     }
     
@@ -136,13 +145,13 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        return blas::mulvec( value_t(1), hlr::blas::adjoint( _V ), v );
+        return blas::mulvec( hlr::blas::adjoint( _V ), v );
     }
     
     hlr::blas::matrix< value_t >
     transform_forward  ( const hlr::blas::matrix< value_t > &  M ) const
     {
-        return blas::prod( value_t(1), hlr::blas::adjoint( _V ), M );
+        return blas::prod( hlr::blas::adjoint( _V ), M );
     }
     
     //
@@ -153,13 +162,13 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        return hlr::blas::mulvec( value_t(1), _V, s );
+        return hlr::blas::mulvec( _V, s );
     }
     
     hlr::blas::matrix< value_t >
     transform_backward  ( const hlr::blas::matrix< value_t > &  S ) const
     {
-        return hlr::blas::prod( value_t(1), _V, S );
+        return hlr::blas::prod( _V, S );
     }
 
     ///////////////////////////////////////////////////////
@@ -171,7 +180,7 @@ public:
     std::unique_ptr< cluster_basis >
     copy () const
     {
-        auto  cb = std::make_unique< cluster_basis >( *_cluster, std::move( blas::copy( _V ) ) );
+        auto  cb = std::make_unique< cluster_basis >( _is, std::move( blas::copy( _V ) ) );
 
         cb->set_nsons( nsons() );
 
@@ -185,7 +194,7 @@ public:
     size_t
     byte_size () const
     {
-        size_t  n = ( sizeof(_cluster) +
+        size_t  n = ( sizeof(_is) +
                       sizeof(cluster_basis< value_t > *) * _sons.size() +
                       sizeof(_V) + sizeof(value_t) * _V.nrows() * _V.ncols() );
 
@@ -194,6 +203,24 @@ public:
 
         return  n;
     }
+
+    // return depth of cluster basis
+    size_t
+    depth () const
+    {
+        size_t  d = 0;
+
+        for ( auto  son : _sons )
+            d = std::max( d, son->depth() );
+
+        return d+1;
+    }
+
+    //
+    // access mutex
+    //
+
+    decltype(_mtx) &  mutex () { return _mtx; }
 };
 
 }} // namespace hlr::matrix

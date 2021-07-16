@@ -6,7 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include "hlr/arith/blas.hh"
 #include "hlr/seq/arith.hh"
 
 namespace          impl      = hlr::seq;

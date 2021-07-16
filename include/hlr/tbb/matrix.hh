@@ -10,9 +10,11 @@
 
 #include <cassert>
 #include <type_traits>
+#include <deque>
 
 #include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TBlockMatrix.hh>
@@ -20,18 +22,15 @@
 #include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/seq/matrix.hh"
+#include "hlr/matrix/restrict.hh"
+#include "hlr/matrix/convert.hh"
 
-namespace hlr
-{
+#include "hlr/tbb/detail/matrix.hh"
+
+namespace hlr { namespace tbb { namespace matrix {
 
 namespace hpro = HLIB;
     
-namespace tbb
-{
-
-namespace matrix
-{
-
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -121,6 +120,157 @@ build ( const hpro::TBlockCluster *  bct,
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// build representation of sparse matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <M>. If low rank blocks are not zero, they are
+// truncated to accuracy <acc> using approximation method <apx>
+//
+template < typename approx_t >
+std::unique_ptr< hpro::TMatrix >
+build ( const hpro::TBlockCluster *  bct,
+        const hpro::TSparseMatrix &  S,
+        const hpro::TTruncAcc &      acc,
+        const approx_t &             apx,
+        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using  value_t = typename approx_t::value_t;
+    
+    // static_assert( std::is_same< typename coeff_t::value_t,
+    //                              typename lrapx_t::value_t >::value,
+    //                "coefficient function and low-rank approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< hpro::TMatrix >  M;
+    
+    if ( bct->is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct->is() );
+        
+        if ( bct->is_adm() )
+        {
+            M = hlr::matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else
+        {
+            M = hlr::matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,B,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( bct->son( i, j ) != nullptr )
+                        {
+                            auto  B_ij = build( bct->son( i, j ), S, acc, apx, nseq );
+                            
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+    
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+
+    detail::init_cluster_bases( bct, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
 //
@@ -532,9 +682,9 @@ realloc ( hpro::TMatrix *  A )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &                          M,
-               const hlr::matrix::cluster_basis< value_t > &  rowcb,
-               const hlr::matrix::cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix &                    M,
+               hlr::matrix::cluster_basis< value_t > &  rowcb,
+               hlr::matrix::cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -682,10 +832,6 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
-}// namespace matrix
-
-}// namespace tbb
-
-}// namespace hlr
+}}}// namespace hlr::tbb::matrix
 
 #endif // __HLR_TBB_MATRIX_HH

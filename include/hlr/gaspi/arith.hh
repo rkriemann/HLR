@@ -538,7 +538,7 @@ lu ( hpro::TMatrix *          A,
                     }// if
                     
                     // DBG::printf( "solving %d", A_ji->id() );
-                    trsmuh< value_t >( ptrcast( H_ii, hpro::TDenseMatrix ), A_ji );
+                    trsmuh< value_t >( *ptrcast( H_ii, hpro::TDenseMatrix ), *A_ji );
                 }// if
             }// for
             

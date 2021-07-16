@@ -9,6 +9,7 @@
 //
 
 #include <cassert>
+#include <type_traits>
 
 #include <hpro/blas/Matrix.hh>
 #include <hpro/blas/Vector.hh>
@@ -37,6 +38,10 @@ using hpro::diag_type_t;
 using hpro::unit_diag;
 using hpro::general_diag;
 
+using hpro::tri_type_t;
+using hpro::lower_triangular;
+using hpro::upper_triangular;
+
 using hpro::matop_t;
 using hpro::apply_normal;
 using hpro::apply_conjugate;
@@ -63,9 +68,16 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 
 //////////////////////////////////////////////////////////////////////
 //
-// template wrappers for low-rank factors as U and V
+// template wrappers for vectors, matrices and
+// low-rank factors as U and V
 //
 //////////////////////////////////////////////////////////////////////
+
+template < typename value_t >       blas::vector< value_t > & vec ( hpro::TScalarVector *       v ) { assert( ! is_null( v ) ); return hpro::blas_vec< value_t >( v ); }
+template < typename value_t > const blas::vector< value_t > & vec ( const hpro::TScalarVector * v ) { assert( ! is_null( v ) ); return hpro::blas_vec< value_t >( v ); }
+template < typename value_t >       blas::vector< value_t > & vec ( hpro::TScalarVector &       v ) { return hpro::blas_vec< value_t >( v ); }
+template < typename value_t > const blas::vector< value_t > & vec ( const hpro::TScalarVector & v ) { return hpro::blas_vec< value_t >( v ); }
+template < typename value_t >       blas::vector< value_t > & vec ( std::unique_ptr< hpro::TScalarVector > & v ) { assert( ! is_null( v.get() ) ); return hpro::blas_vec< value_t >( *v ); }
 
 template < typename value_t >       blas::matrix< value_t > & mat ( hpro::TDenseMatrix *       A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
 template < typename value_t > const blas::matrix< value_t > & mat ( const hpro::TDenseMatrix * A ) { assert( ! is_null( A ) ); return hpro::blas_mat< value_t >( A ); }
@@ -218,6 +230,59 @@ mat_V ( const hpro::TRkMatrix &  A,
     return mat_V< value_t >( & A, op );
 }
 
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( std::unique_ptr< hpro::TRkMatrix > &  A )
+{
+    return mat_U< value_t >( *A );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( std::unique_ptr< hpro::TRkMatrix > &  A )
+{
+    return mat_V< value_t >( *A );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                   op )
+{
+    return mat_U< value_t >( *A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V (  std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                    op )
+{
+    return mat_V< value_t >( *A, op );
+}
+
+template < typename value_t >
+blas::matrix< value_t > &
+mat_U ( const std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                         op )
+{
+    return mat_U< value_t >( *A, op );
+}
+
+template < typename value_t >
+const blas::matrix< value_t > &
+mat_V ( const std::unique_ptr< hpro::TRkMatrix > &  A,
+        const hpro::matop_t                         op )
+{
+    return mat_V< value_t >( *A, op );
+}
+
+
+// }}// namespace hlr::blas
+
+// #include <hlr/utils/io.hh>
+
+// namespace hlr { namespace blas {
+
 //////////////////////////////////////////////////////////////////////
 //
 // general helpers
@@ -229,11 +294,12 @@ mat_V ( const hpro::TRkMatrix &  A,
 //
 template < typename value_t >
 matrix< value_t >
-identity ( const size_t  n )
+eye ( const size_t  nrows,
+      const size_t  ncols )
 {
-    auto  I = matrix< value_t >( n, n );
+    auto  I = matrix< value_t >( nrows, ncols );
 
-    for ( size_t  i = 0; i < n; ++i )
+    for ( size_t  i = 0; i < std::min( nrows, ncols ); ++i )
         I(i,i) = value_t(1);
 
     return I;
@@ -261,7 +327,7 @@ extend ( const matrix< value_t > &  M,
          const size_t               ncols )
 {
     auto  T  = matrix< value_t >( M.nrows() + nrows, M.ncols() + ncols );
-    auto  TM = matrix( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
+    auto  TM = matrix< value_t >( T, range( 0, M.nrows()-1 ), range( 0, M.ncols()-1 ) );
 
     copy( M, TM );
 
@@ -302,7 +368,7 @@ join_row ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M, range::all, range( pos, pos + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M, range::all, range( pos, pos + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos += ncols_i;
@@ -329,8 +395,8 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     {
         if ( ncols == 0 )
             ncols = M_i.ncols();
-        else
-            HLR_ASSERT( ncols == M_i.ncols() );
+        else if ( ncols != M_i.ncols() )
+            HLR_ERROR( "matrices have different column sizes" );
 
         nrows += M_i.nrows();
     }// for
@@ -345,7 +411,7 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
     for ( auto  M_i : matrices )
     {
         const auto  nrows_i = M_i.nrows();
-        auto        dest_i  = matrix( M, range( pos, pos + nrows_i - 1 ), range::all );
+        auto        dest_i  = matrix< value_t >( M, range( pos, pos + nrows_i - 1 ), range::all );
 
         copy( M_i, dest_i );
         pos += nrows_i;
@@ -386,9 +452,9 @@ diag ( const std::list< matrix< value_t > > &  matrices )
     {
         const auto  nrows_i = M_i.nrows();
         const auto  ncols_i = M_i.ncols();
-        auto        dest_i  = matrix( M,
-                                      range( pos_r, pos_r + nrows_i - 1 ),
-                                      range( pos_c, pos_c + ncols_i - 1 ) );
+        auto        dest_i  = matrix< value_t >( M,
+                                                 range( pos_r, pos_r + nrows_i - 1 ),
+                                                 range( pos_c, pos_c + ncols_i - 1 ) );
 
         copy( M_i, dest_i );
         pos_r += nrows_i;
@@ -405,8 +471,8 @@ diag ( const std::list< matrix< value_t > > &  matrices )
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector >
-typename hpro::enable_if_res< is_vector< T_vector >::value,
-                              vector< typename T_vector::value_t > >::result
+typename std::enable_if_t< is_vector< T_vector >::value,
+                           vector< typename T_vector::value_t > >
 copy ( const T_vector &  v )
 {
     using  value_t = typename T_vector::value_t;
@@ -419,8 +485,8 @@ copy ( const T_vector &  v )
 }
 
 template < typename T_matrix >
-typename hpro::enable_if_res< is_matrix< T_matrix >::value,
-                              matrix< typename T_matrix::value_t > >::result
+typename std::enable_if_t< is_matrix< T_matrix >::value,
+                           matrix< typename T_matrix::value_t > >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
@@ -455,22 +521,15 @@ using hpro::BLAS::copy;
 //////////////////////////////////////////////////////////////////////
 
 template < typename T_vector,
-           typename T_fill_fn >
+           typename T_value >
 void
-fill ( blas::VectorBase< T_vector > &   v,
-       T_fill_fn &                      fill_fn )
+fill ( blas::VectorBase< T_vector > &  v,
+       const T_value                   f )
 {
+    using value_v_t = typename T_vector::value_t;
+    
     for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = fill_fn();
-}
-       
-template < typename T_vector >
-void
-fill ( blas::VectorBase< T_vector > &    v,
-       const typename T_vector::value_t  f )
-{
-    for ( size_t  i = 0; i < v.length(); ++i )
-        v(i) = f;
+        v(i) = value_v_t(f);
 }
        
 template < typename T_matrix,
@@ -486,6 +545,16 @@ fill ( blas::MatrixBase< T_matrix > &    M,
             M(i,j) = value_M_t(f);
 }
 
+template < typename T_vector,
+           typename T_func >
+void
+fill_fn ( blas::VectorBase< T_vector > &   v,
+          T_func &&                        fill_fn )
+{
+    for ( size_t  i = 0; i < v.length(); ++i )
+        v(i) = fill_fn();
+}
+       
 template < typename T_matrix,
            typename T_func >
 void
@@ -560,25 +629,6 @@ HLR_BLAS_NORMM( std::complex< float >,  clange_ )
 HLR_BLAS_NORMM( std::complex< double >, zlange_ )
 #undef HLR_BLAS_NORMM
 
-#define  HLR_BLAS_NORMF( type, func )                                   \
-    inline                                                              \
-    typename hpro::real_type< type >::type_t                            \
-    norm_F ( const matrix< type > &  M )                                \
-    {                                                                   \
-        typename hpro::real_type< type >::type_t  work = 0;             \
-        const blas_int_t                          nrows = M.nrows();    \
-        const blas_int_t                          ncols = M.ncols();    \
-        const blas_int_t                          ldM   = M.col_stride(); \
-                                                                        \
-        return func( "F", & nrows, & ncols, M.data(), & ldM, & work );  \
-    }
-
-HLR_BLAS_NORMF( float,                  slange_ )
-HLR_BLAS_NORMF( double,                 dlange_ )
-HLR_BLAS_NORMF( std::complex< float >,  clange_ )
-HLR_BLAS_NORMF( std::complex< double >, zlange_ )
-#undef HLR_BLAS_NORMF
-
 template < typename value_t >
 typename hpro::real_type< value_t >::type_t
 sqnorm_2 ( const vector< value_t > &  v )
@@ -593,6 +643,158 @@ sqnorm_F ( const matrix< value_t > &  M )
     return math::square( norm_F( M ) );
 }
 
+//
+// Frobenius norm for lowrank matrices
+//
+template < typename value_t >
+typename hpro::real_type< value_t >::type_t
+norm_F ( const matrix< value_t > &  U,
+         const matrix< value_t > &  V )
+{
+    //
+    // ∑_ij (M_ij)² = ∑_ij (∑_k u_ik v_jk')²
+    //              = ∑_ij (∑_k u_ik v_jk') (∑_l u_il v_jl')'
+    //              = ∑_ij ∑_k ∑_l u_ik v_jk' u_il' v_jl
+    //              = ∑_k ∑_l ∑_i u_ik u_il' ∑_j v_jk' v_jl
+    //              = ∑_k ∑_l (u_l)^H · u_k  v_k^H · v_l
+    //
+    
+    auto  res = value_t(0);
+    
+    for ( size_t  k = 0; k < U.ncols(); k++ )
+    {
+        auto  u_k = U.column( k );
+        auto  v_k = V.column( k );
+                
+        for ( size_t  l = 0; l < V.ncols(); l++ )
+        {
+            auto  u_l = U.column( l );
+            auto  v_l = V.column( l );
+
+            res += dot( u_k, u_l ) * dot( v_k, v_l );
+        }// for
+    }// for
+
+    return math::abs( math::sqrt( res ) );
+}
+
+// make sure, standard norm_F is found
+using hpro::BLAS::norm_F;
+
+//////////////////////////////////////////////////////////////////////
+//
+// various simplified forms of matrix addition, multiplication
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename type_t > inline constexpr bool is_vector_v = is_vector< type_t >::value;
+template < typename type_t > inline constexpr bool is_matrix_v = is_matrix< type_t >::value;
+
+template < typename T_alpha,
+           typename T_vecX,
+           typename T_vecY >
+std::enable_if_t< is_vector_v< T_vecX > &&
+                  is_vector_v< T_vecY > &&
+                  std::is_same_v< typename T_vecX::value_t, typename T_vecY::value_t >,
+                  void >
+add ( const T_alpha   alpha,
+      const T_vecX &  x,
+      T_vecY &        y )
+{
+    return hlr::blas::add( typename T_vecX::value_t( alpha ), x, y );
+    // return hpro::BLAS::add( typename T_vecX::value_t( alpha ), x, y );
+}
+
+template < typename T_alpha,
+           typename T_matA,
+           typename T_matB >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
+                  void >
+add ( const T_alpha   alpha,
+      const T_matA &  A,
+      T_matB &        B )
+{
+    return hpro::BLAS::add( typename T_matA::value_t( alpha ), A, B );
+}
+
+template < typename T_matA,
+           typename T_vecX >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_vector_v< T_vecX > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t >,
+                  vector< typename T_matA::value_t > >
+mulvec ( const T_matA &  A,
+         const T_vecX &  x )
+{
+    HLR_DBG_ASSERT( A.ncols() == x.length() );
+    
+    return hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
+}
+
+template < typename T_beta,
+           typename T_matA,
+           typename T_matB,
+           typename T_matC >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  is_matrix_v< T_matC > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
+                  void >
+prod ( const T_matA &  A,
+       const T_matB &  B,
+       const T_beta    beta,
+       T_matC &        C )
+{
+    HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
+                   ( A.nrows() == C.nrows() ) &&
+                   ( B.ncols() == C.ncols() ));
+    
+    return hpro::BLAS::prod( typename T_matC::value_t(1), A, B, typename T_matC::value_t(beta), C );
+}
+
+template < typename T_alpha,
+           typename T_beta,
+           typename T_matA,
+           typename T_matB,
+           typename T_matC >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  is_matrix_v< T_matC > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
+                  void >
+prod ( const T_alpha   alpha,
+       const T_matA &  A,
+       const T_matB &  B,
+       const T_beta    beta,
+       T_matC &        C )
+{
+    HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
+                   ( A.nrows() == C.nrows() ) &&
+                   ( B.ncols() == C.ncols() ));
+    
+    return prod( typename T_matC::value_t(alpha), A, B, typename T_matC::value_t(beta), C );
+}
+
+template < typename T_matA,
+           typename T_matB >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_matrix_v< T_matB > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
+                  matrix< typename T_matA::value_t > >
+prod ( const T_matA &  A,
+       const T_matB &  B )
+{
+    HLR_DBG_ASSERT( A.ncols() == B.nrows() );
+    
+    return prod( typename T_matA::value_t(1), A, B );
+}
+
+using hpro::BLAS::mulvec;
+using hpro::BLAS::prod;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -614,26 +816,71 @@ qr2  ( matrix< value_t > &  M,
 {
     const auto              nrows = M.nrows();
     const auto              ncols = M.ncols();
+    const auto              minrc = std::min( nrows, ncols );
     std::vector< value_t >  tau( ncols );
     std::vector< value_t >  work( ncols );
 
-    HLR_ASSERT( ncols <= nrows );
-
+    // // DEBUG {
+    // auto  DM = copy( M );
+    // // DEBUG }
+    
     #if 1
     
     blas_int_t  info = 0;
 
     geqr2( nrows, ncols, M.data(), nrows, tau.data(), work.data(), info );
 
-    if (( R.nrows() != ncols ) || ( R.ncols() != ncols ))
-        R = std::move( blas::matrix< value_t >( ncols, ncols ) );
+    if (( R.nrows() != minrc ) || ( R.ncols() != ncols ))
+        R = std::move( blas::matrix< value_t >( minrc, ncols ) );
     
-    for ( size_t  i = 0; i < ncols; ++i )
-        for ( size_t  j = 0; j <= i; ++j )
-            R(j,i) = M(j,i);
-
     if ( comp_Q )
-        ung2r( nrows, ncols, ncols, M.data(), nrows, tau.data(), work.data(), info );
+    {
+        if ( ncols > nrows )
+        {
+            //
+            // copy M to R, resize M, copy M back and nullify R in
+            //
+
+            copy( M, R );
+            M = std::move( matrix< value_t >( nrows, nrows ) );
+
+            auto  RM = blas::matrix< value_t >( R, range::all, range( 0, nrows-1 ) );
+
+            copy( RM, M );
+
+            for ( size_t  j = 0; j < nrows; ++j )
+                for ( size_t  i = j+1; i < nrows; ++i )
+                    R(i,j) = value_t(0);
+
+            ung2r( nrows, nrows, nrows, M.data(), nrows, tau.data(), work.data(), info );
+        }// if
+        else
+        {
+            // just copy R from M
+            for ( size_t  j = 0; j < ncols; ++j )
+                for ( size_t  i = 0; i <= j; ++i )
+                    R(i,j) = M(i,j);
+
+            ung2r( nrows, ncols, ncols, M.data(), nrows, tau.data(), work.data(), info );
+        }// else
+    }// if
+    else
+    {
+        for ( size_t  j = 0; j < ncols; ++j )
+            for ( size_t  i = 0; i <= std::min( j, minrc-1 ); ++i )
+                R(i,j) = M(i,j);
+    }// else
+
+    // // DEBUG {
+    // auto  M1 = prod( M, R );
+
+    // hlr::blas::add( value_t(-1), DM, M1 );
+
+    // const auto  err = norm_2( M1 ) / norm_2( DM );
+
+    // if ( err > 1e-15 )
+    //     std::cout << "qr : " << err << std::endl;
+    // // DEBUG }
     
     #else
     
@@ -803,14 +1050,12 @@ qrts  ( matrix< value_t > &  M,
 //
 template < typename value_t >
 void
-qr_wrapper ( matrix< value_t > &  M,
-             matrix< value_t > &  R,
-             const bool           comp_Q = true )
+qr ( matrix< value_t > &  M,
+     matrix< value_t > &  R,
+     const bool           comp_Q = true )
 {
-    // if ( M.nrows() > 2*M.ncols() )
-    //     blas::qrts( M, R );
-    // else
     blas::qr2( M, R, comp_Q );
+    // HLIB::BLAS::qr( M, R );
 }
 
 //
@@ -840,7 +1085,7 @@ qr_impl  ( matrix< value_t > &       A,
 
     auto  work_query = value_t(0);
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to geqrf failed" );
@@ -851,7 +1096,7 @@ qr_impl  ( matrix< value_t > &       A,
     // compute QR
     //
 
-    geqrf< value_t >( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
+    geqrf( nrows, ncols, A.data(), blas_int_t( A.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "geqrf failed" );
@@ -998,7 +1243,7 @@ compute_Q ( const matrix< value_t > &       Q,
     blas_int_t  info  = 0;
     auto        work_query = value_t(0);
 
-    orgqr< value_t >( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
+    orgqr( nrows, ncols, minrc, Q.data(), blas_int_t( Q.col_stride() ), T.data(), & work_query, -1, info );
 
     if ( info < 0 )
         HLR_ERROR( "workspace query to orgqr failed" );
@@ -1011,7 +1256,7 @@ compute_Q ( const matrix< value_t > &       Q,
 
     auto  M = copy( Q );
     
-    orgqr< value_t >( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
+    orgqr( nrows, ncols, minrc, M.data(), blas_int_t( M.col_stride() ), T.data(), work.data(), work.size(), info );
     
     if ( info < 0 )
         HLR_ERROR( "orgqr failed" );
@@ -1178,6 +1423,47 @@ factorise_ortho ( const matrix< value_t > &  M,
 }
 
 //
+// compute QR with column pivoting, i.e., M·P = Q·R
+// - upon return M holds Q
+//
+template < typename value_t >
+void
+qrp ( matrix< value_t > &   M,
+      matrix< value_t > &   R,
+      std::vector< int > &  P )
+{
+    // // DEBUG {
+    // auto  CM = copy( M );
+    // // DEBUG }
+
+    HLIB::BLAS::qrp( M, R, P );
+    
+    // // DEBUG {
+    // auto  PR = copy( R );
+    
+    // for ( size_t  i = 0; i < P.size(); ++i )
+    // {
+    //     auto  j    = P[i];
+    //     auto  R_i  = R.column( i );
+    //     auto  PR_j = PR.column( j );
+
+    //     copy( R_i, PR_j );
+    // }// for
+
+    // HLIB::DBG::write( PR, "PR.mat", "PR" );
+    
+    // auto  TM = prod( M, PR );
+
+    // blas::add( value_t(-1), CM, TM );
+
+    // const auto  err = norm_2( TM ) / norm_2( CM );
+
+    // if ( err > 1e-15 )
+    //     std::cout << "qrp : " << err << std::endl;
+    // // DEBUG }
+}
+    
+//
 // construct SVD of bidiagonal matrix with diagonal D and off-diagonal E
 //
 template < typename value_t >
@@ -1250,7 +1536,9 @@ sv ( const matrix< value_t > &  U,
 
     return S;
 }
-    
+
+using HLIB::BLAS::sv;
+
 }}// namespace hlr::blas
 
 #endif // __HLR_ARITH_BLAS_HH

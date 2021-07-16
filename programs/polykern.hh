@@ -8,33 +8,38 @@
 
 #include <boost/rational.hpp>
 #include <gmpxx.h>
+#include <universal/number/posit/posit.hpp>
+
+using sw::universal::posit;
 
 #include <vector>
 #include <random>
 #include <limits>
 
 #include <hlr/arith/blas.hh>
-//#include <hlr/arith/blas_rational.hh>
-#include <hlr/approx/svd.hh>
-#include <hlr/approx/rrqr.hh>
-#include <hlr/approx/randsvd.hh>
+#include <hlr/arith/blas_rational.hh>
+//#include <hlr/approx/svd.hh>
+//#include <hlr/approx/rrqr.hh>
+//#include <hlr/approx/randsvd.hh>
 #include <hlr/approx/aca.hh>
-#include <hlr/approx/lanczos.hh>
+//#include <hlr/approx/lanczos.hh>
 
 #include "common.hh"
 #include "common-main.hh"
 
 using namespace hlr;
 
-using value_t   = double;
+// using value_t   = double;
+// using value_t   = float;
 // using value_t   = boost::rational< int64_t >;
-// using value_t   = mpq_class; // boost::rational< int64_t >;
+using value_t   = mpq_class;
+// using value_t   = posit< 64, 3 >;
 
 template < typename T >
 double
 to_double ( const T  f )
 {
-    return f;
+    return double(f);
 }
 
 template < typename integer_t >
@@ -64,8 +69,8 @@ ipow ( const value_t  t,
 }
 
 template < int N >
- value_t
- ipow ( const value_t  t )
+value_t
+ipow ( const value_t  t )
 {
     value_t  r = t;
     
@@ -187,7 +192,7 @@ program_main ()
                                                                  return value_t( uniform_distr( generator ), 1000000 );
                                                              };
     #else
-    std::uniform_real_distribution< value_t >   uniform_distr( -1.0, 1.0 );
+    std::uniform_real_distribution< double >   uniform_distr( -1.0, 1.0 );
     auto                                        random      = [&] () { return uniform_distr( generator ); };
     #endif
 

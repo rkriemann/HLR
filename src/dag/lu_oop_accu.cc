@@ -13,9 +13,6 @@
 #include <map>
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/solve_tri.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
@@ -307,7 +304,8 @@ lu_node::run_ ( const TTruncAcc & )
 void
 lu_leaf_node::run_ ( const TTruncAcc &  acc )
 {
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    HLR_ERROR( "todo" );
+    // HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -380,7 +378,8 @@ trsmu_node::run_ ( const TTruncAcc & )
 void
 trsmu_leaf_node::run_ ( const TTruncAcc &  acc )
 {
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    HLR_ERROR( "todo" );
+    // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -453,7 +452,8 @@ trsml_node::run_ ( const TTruncAcc & )
 void
 trsml_leaf_node::run_ ( const TTruncAcc &  acc )
 {
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    HLR_ERROR( "todo" );
+    // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -504,10 +504,11 @@ add_prod_node::refine_ ( const size_t  min_size )
 void
 add_prod_node::run_ ( const TTruncAcc &  acc )
 {
-    add_product( real(-1),
-                 apply_normal, A,
-                 apply_normal, B,
-                 C, acc );
+    HLR_ERROR( "todo" );
+    // add_product( real(-1),
+    //              apply_normal, A,
+    //              apply_normal, B,
+    //              C, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

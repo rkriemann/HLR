@@ -374,6 +374,9 @@ if likwid and LIKWID_DIR != None :
 env.ParseConfig( 'pkg-config --cflags gmpxx' )
 env.ParseConfig( 'pkg-config --libs   gmpxx' )
 
+# universal
+env.Append( CPPPATH = '/opt/local/universal/include' )
+
 ######################################################################
 #
 # target 'help'
@@ -474,7 +477,8 @@ env.Alias( 'options', options_cmd )
 #
 ######################################################################
 
-sources = [ 'src/apps/helmholtz.cc',
+sources = [ 'src/apps/exp.cc',
+            'src/apps/helmholtz.cc',
             'src/apps/laplace.cc',
             'src/apps/log_kernel.cc',
             'src/apps/matern_cov.cc',

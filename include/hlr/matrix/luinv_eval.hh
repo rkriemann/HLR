@@ -14,14 +14,11 @@
 
 #include <hpro/matrix/TLinearOperator.hh>
 
-#include <hlr/dag/graph.hh>
-#include <hlr/dag/solve.hh>
-#include <hlr/seq/dag.hh>
+#include <hlr/arith/blas.hh>
 
 namespace hlr { namespace matrix {
 
 namespace hpro = HLIB;
-namespace blas = HLIB::BLAS;
 
 // local matrix type
 DECLARE_TYPE( luinv_eval );
@@ -33,29 +30,16 @@ class luinv_eval : public hpro::TLinearOperator
 {
 private:
     // matrix containing LU data
-    std::shared_ptr< hpro::TMatrix >  _mat;
+    const hpro::TMatrix &  _mat;
 
-    // holds pointer to vector to solve
-    mutable hpro::TScalarVector *     _vec;
-    
-    // DAGs for solving with LU
-    mutable hlr::dag::graph           _dag_trsvl, _dag_trsvlt, _dag_trsvlh;
-    mutable hlr::dag::graph           _dag_trsvu, _dag_trsvut, _dag_trsvuh;
-
-    // mutex maps for updating vectors
-    hlr::dag::mutex_map_t             _map_rows, _map_cols;
-
-    // dag execution function
-    hlr::dag::exec_func_t             _exec_func;
-    
 public:
     //
     // ctor
     //
 
-    luinv_eval ( std::shared_ptr< hpro::TMatrix > &  M,
-                 hlr::dag::refine_func_t             refine_func = seq::dag::refine,
-                 hlr::dag::exec_func_t               exec_func   = seq::dag::run );
+    luinv_eval ( const hpro::TMatrix &  M )
+            : _mat( M )
+    {}
     
     //
     // linear operator properties
@@ -64,7 +48,7 @@ public:
     // return true, if field type is complex
     bool  is_complex      () const
     {
-        return _mat->is_complex();
+        return _mat.is_complex();
     }
     
     // return true, of operator is self adjoint
@@ -106,12 +90,21 @@ public:
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
     virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::Vector< hpro::real > &     x,
-                                blas::Vector< hpro::real > &           y,
+                                const blas::vector< hpro::real > &     x,
+                                blas::vector< hpro::real > &           y,
                                 const hpro::matop_t                    op = hpro::apply_normal ) const;
     virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::Vector< hpro::complex > &  x,
-                                blas::Vector< hpro::complex > &        y,
+                                const blas::vector< hpro::complex > &  x,
+                                blas::vector< hpro::complex > &        y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+
+    virtual void  apply_add   ( const hpro::real                       alpha,
+                                const blas::matrix< hpro::real > &     X,
+                                blas::matrix< hpro::real > &           Y,
+                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const hpro::complex                    alpha,
+                                const blas::matrix< hpro::complex > &  X,
+                                blas::matrix< hpro::complex > &        Y,
                                 const hpro::matop_t                    op = hpro::apply_normal ) const;
 
     //
@@ -119,16 +112,16 @@ public:
     //
 
     // return dimension of domain
-    virtual size_t  domain_dim     () const { return _mat->nrows(); }
+    virtual size_t  domain_dim     () const { return _mat.nrows(); }
     
     // return dimension of range
-    virtual size_t  range_dim      () const { return _mat->ncols(); }
+    virtual size_t  range_dim      () const { return _mat.ncols(); }
     
     // return vector in domain space
-    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return _mat->row_vector(); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return _mat.row_vector(); }
 
     // return vector in range space
-    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return _mat->col_vector(); }
+    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return _mat.col_vector(); }
 
     //
     // misc.

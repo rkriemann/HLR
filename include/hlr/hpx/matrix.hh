@@ -5,7 +5,7 @@
 // File        : matrix.hh
 // Description : matrix related functionality
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <cassert>
@@ -19,14 +19,9 @@
 
 #include "hlr/seq/matrix.hh"
 
-namespace hlr
-{
-    
-namespace hpx
-{
+#include "hlr/hpx/detail/matrix.hh"
 
-namespace matrix
-{
+namespace hlr { namespace hpx { namespace matrix {
     
 //
 // build representation of dense matrix with
@@ -118,6 +113,71 @@ build ( const HLIB::TBlockCluster *  bct,
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+}
+
+//
+// build representation of dense matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_rec ( const hpro::TBlockCluster *  bct,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    assert( bct != nullptr );
+
+    using value_t       = typename coeff_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+
+    rowcb->set_nsons( bct->rowcl()->nsons() );
+    colcb->set_nsons( bct->colcl()->nsons() );
+
+    detail::init_cluster_bases( bct, *rowcb, *colcb );
+    
+    auto  basis_data = detail::rec_basis_data_t();
+    auto  M          = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, basis_data );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
 //
@@ -272,10 +332,6 @@ realloc ( HLIB::TMatrix *  A )
     }// else
 }
 
-}// namespace matrix
-
-}// namespace hpx
-
-}// namespace hlr
+}}}// namespace hlr::hpx::matrix
 
 #endif // __HLR_HPX_MATRIX_HH

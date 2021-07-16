@@ -30,12 +30,19 @@ namespace math
 {
 
 template < typename integer_t > boost::rational< integer_t >  abs    ( const boost::rational< integer_t >  i ) { return boost::abs( i ); }
-template < typename integer_t > boost::rational< integer_t >  conj   ( const boost::rational< integer_t >  i ) { return i; }
-template < typename integer_t > boost::rational< integer_t >  square ( const boost::rational< integer_t >  i ) { return i*i; }
+// template < typename integer_t > boost::rational< integer_t >  conj   ( const boost::rational< integer_t >  i ) { return i; }
+// template < typename integer_t > boost::rational< integer_t >  square ( const boost::rational< integer_t >  i ) { return i*i; }
 
 inline mpq_class  abs    ( const mpq_class  i ) { return ::abs( i ); }
-inline mpq_class  conj   ( const mpq_class  i ) { return i; }
-inline mpq_class  square ( const mpq_class  i ) { return i*i; }
+// inline mpq_class  conj   ( const mpq_class  i ) { return i; }
+// inline mpq_class  square ( const mpq_class  i ) { return i*i; }
+
+template < size_t nbits, size_t es >
+sw::universal::posit< nbits, es >
+abs ( const sw::universal::posit< nbits, es >  i )
+{
+    return i.abs();
+}
 
 }// namespace math
 
@@ -270,11 +277,14 @@ copy ( const vector< mpq_class > &  vs,
         vd(i) = vs(i);
 }
 
-inline
-void
-add ( const mpq_class              alpha,
-      const vector< mpq_class > &  x,
-      vector< mpq_class > &        y )
+template <>
+std::enable_if_t< is_vector_v< vector< mpq_class > > &&
+                  is_vector_v< vector< mpq_class > > &&
+                  std::is_same_v< typename vector< mpq_class >::value_t, typename vector< mpq_class >::value_t >,
+                  void >
+add< mpq_class, vector< mpq_class >, vector< mpq_class > > ( const mpq_class              alpha,
+                                                             const vector< mpq_class > &  x,
+                                                             vector< mpq_class > &        y )
 {
     const auto  n = x.length();
 
@@ -327,6 +337,154 @@ prod ( const mpq_class        alpha,
         for ( size_t  j = 0; j < ncols_C; ++j )
         {
             auto  r = mpq_class( 0 );
+            
+            for ( size_t  k = 0; k < ncols_A; ++k )
+                r += A(i,k) * B(k,j);
+
+            C(i,j) = beta * C(i,j) + alpha * r;
+        }// for
+    }// for
+}
+
+//////////////////////////////////////////////////////////////////////
+//
+// for posit
+//
+//////////////////////////////////////////////////////////////////////
+
+template < size_t nbits, size_t es >
+idx_t
+max_idx ( const vector< sw::universal::posit< nbits, es > > &  v )
+{
+    const idx_t  n = v.length();
+    idx_t        p = 0;
+    auto         m = math::abs( v( 0 ) );
+
+    for ( idx_t  i = 0; i < n; ++i )
+    {
+        if ( math::abs( v(i) ) > m )
+        {
+            p = i;
+            m = math::abs( v(i) );
+        }// if
+    }// for
+
+    return p;
+}
+
+template < size_t nbits, size_t es >
+sw::universal::posit< nbits, es >
+sqnorm_2 ( const vector< sw::universal::posit< nbits, es > > &  v )
+{
+    const size_t  n = v.length();
+    auto          f = sw::universal::posit< nbits, es >( 0 );
+
+    for ( size_t  i = 0; i < n; ++i )
+        f += math::square( v(i) );
+
+    return f;
+}
+
+template < size_t nbits, size_t es >
+sw::universal::posit< nbits, es >
+sqnorm_F ( const matrix< sw::universal::posit< nbits, es > > &  M )
+{
+    const size_t  nrows = M.nrows();
+    const size_t  ncols = M.ncols();
+    auto          v     = sw::universal::posit< nbits, es >( 0 );
+
+    for ( size_t  j = 0; j < ncols; ++j )
+        for ( size_t  i = 0; i < nrows; ++i )
+            v += math::square( M(i,j) );
+
+    return v;
+}
+
+template < size_t nbits, size_t es >
+void
+scale ( const sw::universal::posit< nbits, es >        f,
+        vector< sw::universal::posit< nbits, es > > &  v )
+{
+    if ( f != sw::universal::posit< nbits, es >( 1 ) )
+    {
+        const auto  n = v.length();
+
+        for ( size_t  i = 0; i < n; ++i )
+            v(i) *= f;
+    }// if
+}
+
+template < size_t nbits, size_t es >
+void
+copy ( const vector< sw::universal::posit< nbits, es > > &  vs,
+       vector< sw::universal::posit< nbits, es > > &        vd )
+{
+    const auto  n = vs.length();
+
+    assert( n == vd.length() );
+
+    for ( size_t  i = 0; i < n; ++i )
+        vd(i) = vs(i);
+}
+
+template < size_t nbits, size_t es >
+void
+add ( const sw::universal::posit< nbits, es >              alpha,
+      const vector< sw::universal::posit< nbits, es > > &  x,
+      vector< sw::universal::posit< nbits, es > > &        y )
+{
+    const auto  n = x.length();
+
+    assert( n == y.length() );
+
+    for ( size_t  i = 0; i < n; ++i )
+        y(i) += alpha * x(i);
+}
+
+template < size_t nbits, size_t es >
+sw::universal::posit< nbits, es >
+dot ( const vector< sw::universal::posit< nbits, es > > &  v1,
+      const vector< sw::universal::posit< nbits, es > > &  v2 )
+{
+    const auto  n = v1.length();
+
+    assert( n == v2.length() );
+
+    auto  d = sw::universal::posit< nbits, es >( 0 );
+    
+    for ( size_t  i = 0; i < n; ++i )
+        d += v1(i) * v2(i);
+
+    return  d;
+}
+
+template < size_t nbits, size_t es,
+           typename matrix_A_t,
+           typename matrix_B_t >
+void
+prod ( const sw::universal::posit< nbits, es >        alpha,
+       const matrix_A_t &     A,
+       const matrix_B_t &     B,
+       const sw::universal::posit< nbits, es >        beta,
+       matrix< sw::universal::posit< nbits, es > > &  C )
+{
+    static_assert( is_matrix< matrix_A_t >::value && is_matrix< matrix_B_t >::value, "only matrix types supported for A/B" );
+    static_assert( std::is_same< typename matrix_A_t::value_t, sw::universal::posit< nbits, es > >::value, "need to have same value type" );
+    static_assert( std::is_same< typename matrix_B_t::value_t, sw::universal::posit< nbits, es > >::value, "need to have same value type" );
+    
+    assert( A.nrows() == C.nrows() );
+    assert( B.ncols() == C.ncols() );
+    assert( A.ncols() == B.nrows() );
+
+    const auto  nrows_C = C.nrows();
+    const auto  ncols_C = C.ncols();
+    const auto  ncols_A = A.ncols();
+
+    for ( size_t  i = 0; i < nrows_C; ++i )
+    {
+        for ( size_t  j = 0; j < ncols_C; ++j )
+        {
+            auto  r = sw::universal::posit< nbits, es >( 0 );
             
             for ( size_t  k = 0; k < ncols_A; ++k )
                 r += A(i,k) * B(k,j);

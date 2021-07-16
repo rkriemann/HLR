@@ -48,7 +48,7 @@ struct matrix_info
     const indexset  is;       // index set of associated data
     matrix_t        data;     // matrix data
 
-    matrix_info ( matrix_info< matrix_t > &  aM )
+    matrix_info ( const matrix_info< matrix_t > &  aM )
             : name( aM.name )
             , id( aM.id )
             , is( aM.is )

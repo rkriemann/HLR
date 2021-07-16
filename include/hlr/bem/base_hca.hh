@@ -19,11 +19,12 @@
 #include <hlr/bem/tensor_grid.hh>
 #include <hlr/bem/aca.hh>
 
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/aca.hh>
+
 namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
-
-using namespace hpro;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -107,9 +108,9 @@ public:
         // compute full tensor
         //
 
-        const size_t             nrows = row_grid.nvertices();
-        const size_t             ncols = col_grid.nvertices();
-        blas::matrix< value_t >  D( nrows, ncols );
+        const auto  nrows = row_grid.nvertices();
+        const auto  ncols = col_grid.nvertices();
+        auto        D     = blas::matrix< value_t >( nrows, ncols );
 
         for ( uint  i = 0; i < nrows; ++i )
         {
@@ -122,8 +123,48 @@ public:
                 D( i, j ) = _generator_fn.eval( x, y );
             }// for
         }// for
-    
+
+        //
+        // ACA-Full
+        //
+
         return aca_full_pivots( D, eps );
+
+        //
+        // standard ACA
+        //
+        
+        // auto  pivots = approx::aca_pivots( D, fixed_prec( eps ) );
+
+        // return pivot_arr_t( pivots.begin(), pivots.end() );
+
+        //
+        // RRQR
+        //
+        
+        // // determine row pivots
+        // auto  DT    = blas::copy( blas::adjoint( D ) );
+        // auto  R     = blas::matrix< value_t >();
+        // auto  P_row = std::vector< int >();
+
+        // HLIB::BLAS::qrp( DT, R, P_row );
+
+        // const auto  k_row = approx::detail::trunc_rank( R, fixed_prec( eps ) );
+
+        // // determine column pivots
+        // auto  P_col = std::vector< int >();
+
+        // HLIB::BLAS::qrp( D, R, P_col );
+
+        // const auto  k_col = approx::detail::trunc_rank( R, fixed_prec( eps ) );
+
+        // // set up set of selected rows/columns
+        // auto  pivots = pivot_arr_t( std::min( k_row, k_col ) );
+
+        // for ( int  i = 0; i < std::min( k_row, k_col ); ++i )
+        //     pivots[i] = { P_row[i], P_col[i] };
+
+        // return pivots;
     }
     
     //

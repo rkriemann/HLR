@@ -13,9 +13,6 @@
 #include <map>
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/solve_tri.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/tools.hh"
@@ -233,8 +230,9 @@ lu_node::run_ ( const TTruncAcc &  acc )
 {
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
-    
-    HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+
+    HLR_ERROR( "todo" );
+    // HLIB::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -293,7 +291,8 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
     
-    solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
+    HLR_ERROR( "todo" );
+    // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -352,7 +351,8 @@ trsml_node::run_ ( const TTruncAcc &  acc )
     if ( CFG::Arith::use_accu )
         A->apply_updates( acc, recursive );
     
-    solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
+    HLR_ERROR( "todo" );
+    // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -411,13 +411,15 @@ update_node::refine_ ( const size_t  min_size )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        add_product( real(-1),
-                     apply_normal, A,
-                     apply_normal, B,
-                     C, acc );
-    else
-        multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    HLR_ERROR( "todo" );
+    
+    // if ( CFG::Arith::use_accu )
+    //     add_product( real(-1),
+    //                  apply_normal, A,
+    //                  apply_normal, B,
+    //                  C, acc );
+    // else
+    //     multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

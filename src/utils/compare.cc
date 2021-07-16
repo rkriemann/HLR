@@ -8,40 +8,32 @@
 
 #include <iostream>
 
-// #include <experimental/filesystem>
-
-// namespace fs = std::experimental::filesystem;
-
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
 
-#include <hpro/algebra/mat_norm.hh>
-#include <hpro/matrix/TBlockMatrix.hh>
-#include <hpro/matrix/structure.hh>
 #include <hpro/io/TMatrixIO.hh>
 
+#include "hlr/arith/norm.hh"
+#include "hlr/utils/checks.hh"
 #include "hlr/utils/term.hh"
 #include "hlr/utils/compare.hh"
-#include "hlr/seq/norm.hh"
 
 namespace hlr
 {
-
-using namespace HLIB;
 
 namespace
 {
 
 bool
-compare ( const TMatrix &  A,
-          const TMatrix &  B,
-          const double     error )
+compare ( const hpro::TMatrix &  A,
+          const hpro::TMatrix &  B,
+          const double           error )
 {
     if ( is_blocked_all( A, B ) )
     {
-        auto  BA = cptrcast( &A, TBlockMatrix );
-        auto  BB = cptrcast( &B, TBlockMatrix );
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
 
         if (( BA->block_is()    == BB->block_is() ) &&
             ( BA->nblock_rows() == BB->nblock_rows() ) &&
@@ -77,8 +69,8 @@ compare ( const TMatrix &  A,
     }// if
     else
     {
-        const auto  norm_diff = hlr::seq::norm::norm_F( 1.0, B, -1.0, A );
-        const auto  norm_B    = hlr::seq::norm::norm_F( B );
+        const auto  norm_diff = hlr::norm::frobenius( 1.0, B, -1.0, A );
+        const auto  norm_B    = hlr::norm::frobenius( B );
 
         if ( norm_diff / norm_B > error )
         {
@@ -97,13 +89,13 @@ compare ( const TMatrix &  A,
 // compare <A> with reference read from file <filename>
 //
 void
-compare_ref_file ( TMatrix *            A,
+compare_ref_file ( hpro::TMatrix *      A,
                    const std::string &  filename,
                    const double         error )
 {
     if ( fs::exists( filename ) )
     {
-        auto  D  = read_matrix( filename );
+        auto  D = hpro::read_matrix( filename );
 
         if ( compare( *A, *D, error ) )
             std::cout << term::ltgreen << "no error" << term::reset << std::endl;

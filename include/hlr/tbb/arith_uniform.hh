@@ -9,11 +9,14 @@
 //
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/uniform.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
+#include <hlr/arith/uniform.hh>
+#include <hlr/tbb/detail/uniform_accu.hh>
 
 namespace hlr { namespace tbb { namespace uniform {
 
@@ -127,11 +130,11 @@ std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
                     const scalar_vector< value_t > &  v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.rank() > 0 )
     {
-        auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.cluster() - v.ofs() );
+        auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.is() - v.ofs() );
         auto  s    = cb.transform_forward( v_cb );
 
         u->set_coeffs( std::move( s ) );
@@ -156,7 +159,7 @@ template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 make_uniform ( const cluster_basis< value_t > &  cb )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.nsons() > 0 )
     {
@@ -206,7 +209,7 @@ build_mutex_map ( const cluster_basis< value_t > &  cb,
 {
     if ( cb.nsons() == 0 )
     {
-        mtx_map[ cb.cluster() ] = std::make_unique< std::mutex >();
+        mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
     }// if
     else
     {
@@ -247,6 +250,90 @@ mul_vec ( const value_t                             alpha,
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
     detail::add_uniform_to_scalar( *uy, y );
 }
+
+//
+// matrix multiplication (eager version)
+//
+template < typename value_t >
+void
+multiply ( const value_t            alpha,
+           const hpro::matop_t      op_A,
+           const hpro::TMatrix &    A,
+           const hpro::matop_t      op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc )
+{
+    hlr::uniform::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc );
+}
+
+//////////////////////////////////////////////////////////////////////
+//
+// accumulator version
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace accu
+{
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t            alpha,
+           const matop_t            op_A,
+           const hpro::TMatrix &    A,
+           const matop_t            op_B,
+           const hpro::TMatrix &    B,
+           hpro::TMatrix &          C,
+           const hpro::TTruncAcc &  acc,
+           const approx_t &         approx )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
+    auto  inner_prod         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( nullptr );
+
+    accu.add_update( op_A, A, op_B, B );
+    
+    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+multiply_cached ( const value_t            alpha,
+                  const matop_t            op_A,
+                  const hpro::TMatrix &    A,
+                  const matop_t            op_B,
+                  const hpro::TMatrix &    B,
+                  hpro::TMatrix &          C,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( C );
+    auto  prod_inner         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( & prod_inner );
+
+    accu.add_update( op_A, A, op_B, B );
+    
+    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+lu ( hpro::TMatrix &          A,
+     const hpro::TTruncAcc &  acc,
+     const approx_t &         approx,
+     hpro::TMatrix &          /* REF */ )
+{
+    auto  [ rowmap, colmap ] = hlr::uniform::construct_indexset_to_block_maps( A );
+    auto  inner_prod         = detail::inner_map_t();
+    auto  accu               = detail::accumulator( & inner_prod );
+
+    detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap ); //, REF );
+}
+
+}// namespace accu
 
 }}}// namespace hlr::tbb::uniform
 

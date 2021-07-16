@@ -24,7 +24,7 @@ namespace hlr { namespace bem {
 namespace hpro = HLIB;
 
 // represents array of pivot elements
-using  pivot_arr_t    = std::vector< std::pair< idx_t, idx_t > >;
+using  pivot_arr_t    = std::vector< std::pair< hpro::idx_t, hpro::idx_t > >;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -66,7 +66,7 @@ public:
                                     const hpro::TTruncAcc &       acc ) const
     {
         const auto  op           = coefffn_operator( bis, _coeff_fn );
-        auto        pivot_search = approx::aca_pivot( op );
+        auto        pivot_search = approx::aca_pivot< decltype(op) >( op );
         
 
         auto [ U, V ] = approx::aca( op, pivot_search, acc, nullptr );
@@ -131,7 +131,7 @@ aca_full_pivots  ( blas::matrix< value_t > &                          M,
         // look for maximal element
         //
 
-        idx_t  pivot_row, pivot_col;
+        hpro::idx_t  pivot_row, pivot_col;
 
         blas::max_idx( M, pivot_row, pivot_col );
 

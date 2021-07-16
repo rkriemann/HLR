@@ -7,9 +7,6 @@
 //
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/solve_tri.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
@@ -150,7 +147,7 @@ lu_node::run_ ( const TTruncAcc &  acc )
 void
 trsml_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = std::move( hlr::dag::gen_dag_solve_lower( L, A, 128, refine ) );
+    auto  dag = std::move( hlr::dag::gen_dag_solve_lower( *L, *A, 128, refine ) );
     
     exec( dag, acc );
 }
@@ -164,7 +161,7 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 void
 trsmu_node::run_ ( const TTruncAcc &  acc )
 {
-    auto  dag = std::move( hlr::dag::gen_dag_solve_upper( U, A, 128, refine ) );
+    auto  dag = std::move( hlr::dag::gen_dag_solve_upper( *U, *A, 128, refine ) );
     
     exec( dag, acc );
 }
@@ -178,7 +175,8 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 void
 update_node::run_ ( const TTruncAcc &  acc )
 {
-    multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    HLR_ERROR( "todo" );
+    // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
