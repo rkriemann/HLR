@@ -13,18 +13,18 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
-#include "hlr/utils/checks.hh"
-#include "hlr/utils/log.hh"
-#include "hlr/arith/blas.hh"
-#include "hlr/arith/multiply.hh"
-#include "hlr/arith/mulvec.hh"
-#include "hlr/arith/lu.hh"
-#include "hlr/arith/solve.hh"
-#include "hlr/arith/invert.hh"
-#include "hlr/approx/svd.hh"
-#include "hlr/matrix/uniform_lrmatrix.hh"
-#include "hlr/vector/scalar_vector.hh"
-#include "hlr/seq/matrix.hh"
+#include <hlr/arith/blas.hh>
+#include <hlr/arith/multiply.hh>
+#include <hlr/arith/mulvec.hh>
+#include <hlr/arith/lu.hh>
+#include <hlr/arith/solve.hh>
+#include <hlr/arith/invert.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/vector/scalar_vector.hh>
+#include <hlr/seq/matrix.hh>
+#include <hlr/utils/checks.hh>
+#include <hlr/utils/log.hh>
 
 namespace hlr { namespace seq {
 
@@ -59,9 +59,10 @@ using hlr::multiply_apx;
 using hlr::multiply_hadamard;
 
 //
-// LU factorization
+// matrix factorizations
 //
-using hlr::lu;     
+using hlr::lu;
+using hlr::ldu;
 
 //
 // LU factorization for nested dissection type matrices

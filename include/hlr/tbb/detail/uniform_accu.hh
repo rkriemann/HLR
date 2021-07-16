@@ -13,6 +13,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 #include <tbb/blocked_range2d.h>
+#include <tbb/task_arena.h>
 
 #include <boost/format.hpp>
 
@@ -29,18 +30,18 @@
 #include <hlr/utils/hash.hh>
 #include <hlr/utils/tensor.hh>
 
-namespace hlr { namespace tbb { namespace uniform { namespace accu {
-
-namespace timer = HLIB::Time::Wall;
-
-namespace detail
-{
+namespace hlr { namespace tbb { namespace uniform { namespace accu { namespace detail {
 
 // maps index set to set of blocks sharing it
 using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 // maps index set to product U×V' of inner matrix product
 using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
+
+using  hlr::matrix::cluster_basis;
+using  hlr::matrix::is_uniform_lowrank;
+using  hlr::matrix::is_uniform_lowrank_all;
+using  hlr::matrix::uniform_lrmatrix;
 
 struct accumulator
 {
@@ -66,22 +67,33 @@ struct accumulator
 
     // cached products
     inner_map_t *                      prod_inner;
+    std::mutex *                       prod_inner_mtx;
     
     //
     // ctors
     //
 
-    accumulator ( inner_map_t *                        aprod_inner = nullptr )
+    accumulator ( inner_map_t *                        aprod_inner     = nullptr,
+                  std::mutex *                         aprod_inner_mtx = nullptr )
             : prod_inner( aprod_inner )
-    {}
+            , prod_inner_mtx( aprod_inner_mtx )
+    {
+        if ( ! is_null( prod_inner ) )
+            HLR_ASSERT( ! is_null( prod_inner_mtx ) );
+    }
     
     accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
                   update_list &&                       apending,
-                  inner_map_t *                        aprod_inner = nullptr )
+                  inner_map_t *                        aprod_inner     = nullptr,
+                  std::mutex *                         aprod_inner_mtx = nullptr )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
             , prod_inner( aprod_inner )
-    {}
+            , prod_inner_mtx( aprod_inner_mtx )
+    {
+        if ( ! is_null( prod_inner ) )
+            HLR_ASSERT( ! is_null( prod_inner_mtx ) );
+    }
     
     //
     // remove update matrix
@@ -181,7 +193,7 @@ struct accumulator
             }// for
         }// for
 
-        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner };
+        return accumulator{ std::move( U_ij ), std::move( P_ij ), prod_inner, prod_inner_mtx };
     }
 
     //
@@ -246,7 +258,7 @@ struct accumulator
         
             for ( auto  it = pending.begin(); it != pending.end(); )
             {
-                if ( hlr::matrix::is_uniform_lowrank_all( (*it).A, (*it).B ) )
+                if ( is_uniform_lowrank_all( (*it).A, (*it).B ) )
                 {
                     pending_uniAB.push_back( *it );
                     it = pending.erase( it );
@@ -257,7 +269,7 @@ struct accumulator
             
             for ( auto  it = pending.begin(); it != pending.end(); )
             {
-                if ( hlr::matrix::is_uniform_lowrank( (*it).A ) )
+                if ( is_uniform_lowrank( (*it).A ) )
                 {
                     pending_uniA.push_back( *it );
                     it = pending.erase( it );
@@ -268,7 +280,7 @@ struct accumulator
 
             for ( auto  it = pending.begin(); it != pending.end(); )
             {
-                if ( hlr::matrix::is_uniform_lowrank( (*it).B ) )
+                if ( is_uniform_lowrank( (*it).B ) )
                 {
                     pending_uniB.push_back( *it );
                     it = pending.erase( it );
@@ -292,8 +304,8 @@ struct accumulator
             {
                 auto  [ op_A, A, op_B, B ] = pending_uniAB.front();
                 
-                U = cptrcast( A, hlr::matrix::uniform_lrmatrix< value_t > )->row_basis( op_A );
-                V = cptrcast( B, hlr::matrix::uniform_lrmatrix< value_t > )->col_basis( op_B );
+                U = cptrcast( A, uniform_lrmatrix< value_t > )->row_basis( op_A );
+                V = cptrcast( B, uniform_lrmatrix< value_t > )->col_basis( op_B );
             }// if
             
             if ( ! pending_uniA.empty() )
@@ -301,7 +313,7 @@ struct accumulator
                 auto  [ op_A, A, op_B, B ] = pending_uniA.front();
                 
                 if ( U.ncols() == 0 )
-                    U = cptrcast( A, hlr::matrix::uniform_lrmatrix< value_t > )->row_basis( op_A );
+                    U = cptrcast( A, uniform_lrmatrix< value_t > )->row_basis( op_A );
                 
                 Z = std::move( blas::matrix< value_t >( M.ncols(), U.ncols() ) );
             }// if
@@ -320,11 +332,9 @@ struct accumulator
             // handle different uniform product variants in parallel
             //
 
-            std::mutex  mtx_pi;
-
             ::tbb::parallel_invoke(
 
-                [this,&pending_uniAB,&R,&mtx_pi] ()
+                [&,this] ()
                 {
                     if ( ! pending_uniAB.empty() )
                     {
@@ -332,11 +342,11 @@ struct accumulator
 
                         vpending.reserve( pending_uniAB.size() );
                         std::copy( std::begin( pending_uniAB ), std::end( pending_uniAB ), std::back_inserter( vpending ) );
-                        R = std::move( sum_uni_uni< value_t >( 0, vpending.size(), vpending, mtx_pi ) );
+                        R = std::move( sum_uni_uni< value_t >( 0, vpending.size(), vpending ) );
                     }// if
                 },
 
-                [this,&pending_uniA,&Z] ()
+                [&,this] ()
                 {
                     if ( ! pending_uniA.empty() )
                     {
@@ -348,7 +358,7 @@ struct accumulator
                     }// if
                 },
 
-                [this,&pending_uniB,&Y] ()
+                [&,this] ()
                 {
                     if ( ! pending_uniB.empty() )
                     {
@@ -492,7 +502,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                if ( ! ( is_lowrank( M ) || hlr::matrix::is_lowrankS( M ) || hlr::matrix::is_uniform_lowrank( M ) ) )
+                if ( ! ( is_lowrank( M ) || hlr::matrix::is_lowrankS( M ) || is_uniform_lowrank( M ) ) )
                     HLR_ERROR( "unsupported matrix type: " + M.typestr() );
                 
                 auto  BA = cptrcast( A, hpro::TBlockMatrix );
@@ -545,7 +555,6 @@ struct accumulator
             ::tbb::parallel_for(
                 ::tbb::blocked_range2d< uint >( 0, BC->nblock_rows(),
                                                 0, BC->nblock_cols() ),
-
                 [&,alpha] ( const auto &  r )
                 {
                     for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
@@ -579,8 +588,7 @@ struct accumulator
     blas::matrix< value_t >
     sum_uni_uni ( const int                lb,
                   const int                ub,
-                  std::vector< update > &  updates,
-                  std::mutex &             mtx_pi )
+                  std::vector< update > &  updates )
     {
         if ( ub - lb <= 1 )
         {
@@ -593,8 +601,8 @@ struct accumulator
 
             auto  [ op_A, A, op_B, B ] = updates[ lb ];
 
-            auto  RA = cptrcast( A, hlr::matrix::uniform_lrmatrix< value_t > );
-            auto  RB = cptrcast( B, hlr::matrix::uniform_lrmatrix< value_t > );
+            auto  RA = cptrcast( A, uniform_lrmatrix< value_t > );
+            auto  RB = cptrcast( B, uniform_lrmatrix< value_t > );
 
             auto  S  = RA->coeff();
             auto  X  = RA->col_basis( op_A );
@@ -604,18 +612,12 @@ struct accumulator
 
             if ( ! is_null( prod_inner ) )
             {
-                {
-                    std::scoped_lock  lock( mtx_pi );
+                std::scoped_lock  lock( * prod_inner_mtx );
                                                        
-                    if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
-                        prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
-                }// if
-                                                   
-                {
-                    std::scoped_lock  lock( mtx_pi );
+                if ( prod_inner->find( RA->col_is( op_A ) ) == prod_inner->end() )
+                    prod_inner->emplace( RA->col_is( op_A ), std::move( blas::prod( blas::adjoint( X ), W ) ) );
                                                        
-                    XW = prod_inner->at( RA->col_is( op_A ) );
-                }// else
+                XW = prod_inner->at( RA->col_is( op_A ) );
             }// if
             else
                 XW = std::move( blas::prod( blas::adjoint( X ), W ) );
@@ -630,8 +632,8 @@ struct accumulator
             auto       R1  = blas::matrix< value_t >();
             auto       R2  = blas::matrix< value_t >();
 
-            ::tbb::parallel_invoke( [&,lb,mid] () { R1 = sum_uni_uni< value_t >( lb, mid, updates, mtx_pi ); },
-                                    [&,mid,ub] () { R2 = sum_uni_uni< value_t >( mid, ub, updates, mtx_pi ); } );
+            ::tbb::parallel_invoke( [&,lb,mid] () { R1 = sum_uni_uni< value_t >( lb, mid, updates ); },
+                                    [&,mid,ub] () { R2 = sum_uni_uni< value_t >( mid, ub, updates ); } );
             
             blas::add( value_t(1), R1, R2 );
 
@@ -834,143 +836,260 @@ struct accumulator
 };
 
 //
-// replace U·S·V' of M by W·T·X' and update row/column bases
-// - ASSUMPTION: W and X are orthogonal
+// structure for handling basis updates
 //
-template < typename value_t,
-           typename approx_t >
-void
-update_row_col_basis ( hlr::matrix::uniform_lrmatrix< value_t > &  M,
-                       const blas::matrix< value_t > &             W,
-                       const blas::matrix< value_t > &             T,
-                       const blas::matrix< value_t > &             X,
-                       const hpro::TTruncAcc &                     acc,
-                       const approx_t &                            approx,
-                       const uniform_map_t &                       rowmap,
-                       const uniform_map_t &                       colmap )
+
+using  matrix_list_t = std::vector< hpro::TMatrix * >;
+using  matrix_map_t  = std::unordered_map< indexset, matrix_list_t, indexset_hash >;
+
+struct rec_basis_data_t
 {
+    // maps indexsets to set of uniform matrices sharing corresponding cluster basis
+    matrix_map_t   rowmap, colmap;
+
     //
-    // lock bases and all blocks in block column/row
+    // ctor
     //
-
-    auto  lock   = std::scoped_lock( M.mutex(),
-                                     M.col_cb().mutex(),
-                                     M.row_cb().mutex() );
-    auto  locked = std::list< hpro::TMatrix * >();
-
-    // TODO: fix deadlock for  ( 00 | 01 )
-    //                         ( 10 | 11 )
-    // Step1 (columns):
-    //   p0: locks 10
-    //   p1: locks 01
-    // Step2 (rows):
-    //   p0: locks 01
-    //   p1: locks 11
-
-    for ( auto  M_kj : colmap.at( M.col_is() ) )
+    rec_basis_data_t ( hpro::TMatrix &  A )
     {
-        if ( hlr::matrix::is_uniform_lowrank( M_kj ) && ( M_kj != &M ))
+        auto  blocks = std::list< hpro::TMatrix * >{ &A };
+
+        while ( ! blocks.empty() )
         {
-            M_kj->lock();
-            locked.push_back( M_kj );
-        }// if
-    }// for
+            auto  subblocks = decltype( blocks )();
+
+            for ( auto  M : blocks )
+            {
+                if ( is_blocked( M ) )
+                {
+                    auto  BM = ptrcast( M, hpro::TBlockMatrix );
+
+                    for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                        for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                            if ( ! is_null( BM->block( i, j ) ) )
+                                subblocks.push_back( BM->block( i, j ) );
+                }// if
+                else if ( is_uniform_lowrank( M ) )
+                {
+                    rowmap[ M->row_is() ].push_back( M );
+                    colmap[ M->col_is() ].push_back( M );
+                }// if
+            }// for
+
+            blocks = std::move( subblocks );
+        }// while
+    }
+
+    //
+    // extend row basis <cb> by block W·T·X' (X is not needed for computation)
+    //
+    // - identical to implementation in "arith/detail/uniform.hh" but thread-safe,
+    //   hence, for details look into original code
+    //
+    template < typename value_t,
+               typename basisapx_t >
+    blas::matrix< value_t >
+    compute_extended_basis ( uniform_lrmatrix< value_t > &     M,
+                             const cluster_basis< value_t > &  cb,
+                             const blas::matrix< value_t > &   W,
+                             const blas::matrix< value_t > &   T,
+                             const hpro::TTruncAcc &           acc,
+                             const basisapx_t &                basisapx,
+                             matrix_map_t &                    matmap,
+                             const matop_t                     op )
+    {
+        using  real_t = hpro::real_type_t< value_t >;
+
+        // zero basis implies empty matrix list
+        if ( cb.basis().ncols() == 0 )
+            return std::move( blas::copy( W ) );
+            
+        //
+        // collect scaled coupling matrices and filter out zero couplings
+        //
+
+        HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
+
+        auto    uni_mats  = matmap.at( cb.is() );
+        auto    couplings = std::list< blas::matrix< value_t > >();
+        size_t  nrows_S   = T.ncols();
+        auto    cmtx      = std::mutex();
+
+        ::tbb::parallel_for_each(
+            uni_mats,
+            [&] ( auto  M_i )
+            {
+                if ( M_i == &M )
+                    return;
+            
+                const auto  R_i = cptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto        S_i = blas::matrix< value_t >();
+                        
+                {
+                    auto  lock = std::scoped_lock( M_i->mutex() );
+
+                    S_i = std::move( blas::copy( blas::mat_view( op, R_i->coeff() ) ) );
+                }
+                        
+                HLR_ASSERT( S_i.ncols() == cb.basis().ncols() );
+            
+                const auto  norm = norm::spectral( S_i );
+                        
+                if ( norm != real_t(0) )
+                {
+                    blas::scale( value_t(1) / norm, S_i );
+
+                    {
+                        auto  lock = std::scoped_lock( cmtx );
+                    
+                        nrows_S += S_i.nrows();
+                        couplings.push_back( std::move( S_i ) );
+                    }
+                }// if
+            } );
+
+        //
+        // assemble all scaled coupling matrices into joined matrix
+        //
+
+        auto    U   = cb.basis();
+        auto    Ue  = blas::join_row< value_t >( { U, W } );
+        auto    S   = blas::matrix< value_t >( nrows_S, Ue.ncols() );
+        size_t  pos = 0;
+            
+        for ( auto  S_i : couplings )
+        {
+            HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+            HLR_ASSERT( S_i.ncols() == U.ncols() );
+            
+            auto  S_sub = blas::matrix< value_t >( S,
+                                                   blas::range( pos, pos + S_i.nrows()-1 ),
+                                                   blas::range( 0, U.ncols() - 1 ) );
+                        
+            blas::copy( S_i, S_sub );
+            pos += S_i.nrows();
+        }// for
+
+        //
+        // add part from W·T·X'
+        //
         
-    for ( auto  M_ik : rowmap.at( M.row_is() ) )
+        auto  S_i  = blas::copy( blas::mat_view( op, T ) );
+        auto  norm = norm::spectral( T );
+            
+        if ( norm != real_t(0) )
+            blas::scale( value_t(1) / norm, S_i );
+            
+        HLR_ASSERT( pos + S_i.nrows() <= S.nrows() );
+        HLR_ASSERT( S_i.ncols() == Ue.ncols() - U.ncols() );
+        
+        auto  S_sub = blas::matrix< value_t >( S,
+                                               blas::range( pos, pos + S_i.nrows()-1 ),
+                                               blas::range( U.ncols(), Ue.ncols() - 1 ) );
+            
+        blas::copy( S_i, S_sub );
+        
+        //
+        // form product Ue·S and compute column basis
+        //
+            
+        auto  R = blas::matrix< value_t >();
+        
+        blas::qr( S, R, false );
+
+        auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
+        auto  Un  = basisapx.column_basis( UeR, acc );
+
+        return  Un;
+    }
+
+    template < typename value_t,
+               typename basisapx_t >
+    blas::matrix< value_t >
+    compute_extended_row_basis ( uniform_lrmatrix< value_t > &     M,
+                                 const cluster_basis< value_t > &  cb,
+                                 const blas::matrix< value_t > &   W,
+                                 const blas::matrix< value_t > &   T,
+                                 const hpro::TTruncAcc &           acc,
+                                 const basisapx_t &                basisapx )
     {
-        if ( hlr::matrix::is_uniform_lowrank( M_ik ) && ( M_ik != &M ))
-        {
-            M_ik->lock();
-            locked.push_back( M_ik );
-        }// if
-    }// for
+        return compute_extended_basis( M, cb, W, T, acc, basisapx, rowmap, apply_adjoint );
+    }
 
     //
-    // compute new bases
+    // extend column basis <cb> by block W·T·X' (W is not needed for computation)
     //
+    // - identical to implementation in "arith/detail/uniform.hh" but thread-safe,
+    //   hence, for details look into original code
+    //
+    template < typename value_t,
+               typename basisapx_t >
+    blas::matrix< value_t >
+    compute_extended_col_basis ( uniform_lrmatrix< value_t > &     M,
+                                 const cluster_basis< value_t > &  cb,
+                                 const blas::matrix< value_t > &   X,
+                                 const blas::matrix< value_t > &   T,
+                                 const hpro::TTruncAcc &           acc,
+                                 const basisapx_t &                basisapx )
+    {
+        return compute_extended_basis( M, cb, X, T, acc, basisapx, colmap, apply_normal );
+    }
+
+    //
+    // update coupling matrices for all blocks sharing basis <cb> to new basis <Un>
+    //
+    template < typename value_t >
+    void
+    update_coupling ( uniform_lrmatrix< value_t > &     M,
+                      const cluster_basis< value_t > &  cb,
+                      const blas::matrix< value_t > &   Un,
+                      matrix_map_t &                    matmap,
+                      const bool                        cols )
+    {
+        if ( cb.basis().ncols() == 0 )
+            return;
+            
+        HLR_ASSERT( matmap.find( cb.is() ) != matmap.end() );
+            
+        auto  uni_mats = matmap.at( cb.is() );
+        auto  U        = cb.basis();
+        auto  TU       = blas::prod( blas::adjoint( Un ), U );
+
+        ::tbb::parallel_for_each(
+            uni_mats,
+            [&] ( auto  M_i )
+            {
+                if ( M_i == &M )
+                    return;
+            
+                auto  lock = std::scoped_lock( M_i->mutex() );
+                auto  R_i  = ptrcast( M_i, uniform_lrmatrix< value_t > );
+                auto  S_i  = ( cols
+                               ? blas::prod( R_i->coeff(), blas::adjoint( TU ) )
+                               : blas::prod( TU, R_i->coeff() ) );
+
+                R_i->set_coeff_unsafe( std::move( S_i ) );
+            } );
+    }
+
+    template < typename value_t >
+    void
+    update_row_coupling ( uniform_lrmatrix< value_t > &     M,
+                          const cluster_basis< value_t > &  cb,
+                          const blas::matrix< value_t > &   Un )
+    {
+        update_coupling( M, cb, Un, rowmap, false );
+    }
     
-    auto  Vn = blas::matrix< value_t >();
-    auto  Un = blas::matrix< value_t >();
-
-    ::tbb::parallel_invoke(
-        [&] ()
-        {
-            //
-            // compute new basis and transform coupling matrix for
-            // blocks in current block column as
-            //
-            //   S_kj V' Vn = S_kj·TV' with TV = Vn'·V
-            //
-
-            Vn = std::move( hlr::uniform::detail::compute_updated_col_basis( M, T, X, acc, approx, colmap ) );
-        
-            auto  V  = M.col_cb().basis();
-            auto  TV = blas::prod( blas::adjoint( Vn ), V );
-
-            for ( auto  M_kj : colmap.at( M.col_is() ) )
-            {
-                if ( hlr::matrix::is_uniform_lowrank( M_kj ) && ( M_kj != &M ))
-                {
-                    auto  R_kj  = ptrcast( M_kj, hlr::matrix::uniform_lrmatrix< value_t > );
-                    auto  Sn_kj = blas::prod( R_kj->coeff(), blas::adjoint( TV ) );
-
-                    R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
-                }// if
-            }// for
-        },
-
-        [&] () 
-        {
-            //
-            // compute new basis and transform coupling matrix for blocks
-            // in current block column as
-            //
-            //   Un'·U·S_i = TU·S_i  with TU = Un'·U
-            //
-
-            Un = std::move( hlr::uniform::detail::compute_updated_row_basis( M, W, T, acc, approx, rowmap ) );
-        
-            auto  U  = M.row_cb().basis();
-            auto  TU = blas::prod( blas::adjoint( Un ), U );
-
-            for ( auto  M_ik : rowmap.at( M.row_is() ) )
-            {
-                if ( hlr::matrix::is_uniform_lowrank( M_ik ) && ( M_ik != &M ))
-                {
-                    auto  R_ik  = ptrcast( M_ik, hlr::matrix::uniform_lrmatrix< value_t > );
-                    auto  Sn_ik = blas::prod( TU, R_ik->coeff() );
-
-                    R_ik->set_coeff_unsafe( std::move( Sn_ik ) );
-                }// if
-            }// for
-        }
-    );
-
-    //
-    // compute coupling of M_ij as Un' W T X' Vn
-    //
-
-    auto  TW = blas::prod( blas::adjoint( Un ), W );
-    auto  TX = blas::prod( blas::adjoint( Vn ), X );
-    auto  S1 = blas::prod( TW, T );
-    auto  Sn = blas::prod( S1, blas::adjoint( TX ) );
-
-    M.set_coeff_unsafe( std::move( Sn ) );
-
-    //
-    // finally adjust cluster bases
-    //
-
-    const_cast< hlr::matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
-    const_cast< hlr::matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
-
-    //
-    // and unlock all
-    //
-
-    for ( auto  mat : locked )
-        mat->unlock();
-}
+    template < typename value_t >
+    void
+    update_col_coupling ( uniform_lrmatrix< value_t > &     M,
+                          const cluster_basis< value_t > &  cb,
+                          const blas::matrix< value_t > &   Vn )
+    {
+        update_coupling( M, cb, Vn, colmap, true );
+    }
+};
 
 //
 // recursive LU factorization
@@ -983,8 +1102,7 @@ multiply ( const value_t            alpha,
            accumulator &            accu,
            const hpro::TTruncAcc &  acc,
            const approx_t &         approx,
-           const uniform_map_t &    rowmap,
-           const uniform_map_t &    colmap )
+           rec_basis_data_t &       basis_data )
 {
     //
     // evaluate all computable updates to M
@@ -1016,8 +1134,7 @@ multiply ( const value_t            alpha,
                         if ( is_null( BM->block( i, j ) ) )
                             continue;
 
-                        multiply( alpha, * BM->block( i, j ), sub_accu( i, j ),
-                                  acc, approx, rowmap, colmap );
+                        multiply( alpha, * BM->block( i, j ), sub_accu( i, j ), acc, approx, basis_data );
                     }// for
                 }// for
             } );
@@ -1028,13 +1145,13 @@ multiply ( const value_t            alpha,
         // update local matrix as standard low-rank matrix
         //
 
-        auto  U = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-        auto  R = hpro::TRkMatrix( U->row_is(), U->col_is(), hpro::value_type_v< value_t > );
+        auto    U = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
+        auto &  rowcb = U->row_cb();
+        auto &  colcb = U->col_cb();
+        auto    R = hpro::TRkMatrix( U->row_is(), U->col_is(), hpro::value_type_v< value_t > );
 
         {
-            std::scoped_lock  lock( U->mutex(),
-                                    U->row_cb().mutex(),
-                                    U->col_cb().mutex() );
+            std::scoped_lock  lock( U->mutex(), rowcb.mutex(), colcb.mutex() );
 
             R.set_lrmat( std::move( blas::prod( U->row_basis(), U->coeff() ) ),
                          std::move( blas::copy( U->col_basis() ) ) );
@@ -1047,17 +1164,49 @@ multiply ( const value_t            alpha,
         // now replace M by R and update row/column bases
         //
 
-        auto  W  = blas::mat_U< value_t >( R );
-        auto  X  = blas::mat_V< value_t >( R );
+        auto  W  = std::move( blas::mat_U< value_t >( R ) );
+        auto  X  = std::move( blas::mat_V< value_t >( R ) );
         auto  RW = blas::matrix< value_t >();
         auto  RX = blas::matrix< value_t >();
 
         ::tbb::parallel_invoke( [&] () { blas::qr( W, RW ); },
                                 [&] () { blas::qr( X, RX ); } );
 
-        auto  T = blas::prod( RW, blas::adjoint( RX ) );
-                    
-        update_row_col_basis( *U, W, T, X, acc, approx, rowmap, colmap );
+        auto  T  = blas::prod( RW, blas::adjoint( RX ) );
+
+        ::tbb::this_task_arena::isolate( [&] ()
+        {
+            auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+                
+            ::tbb::parallel_invoke(
+                [&] ()
+                {
+                    auto  Un = basis_data.compute_extended_row_basis( *U, rowcb, W, T, acc, approx );
+                        
+                    basis_data.update_row_coupling( *U, rowcb, Un );
+                    rowcb.set_basis( std::move( Un ) );
+                },
+                
+                [&] ()
+                {
+                    auto  Vn = basis_data.compute_extended_col_basis( *U, colcb, X, T, acc, approx );
+                        
+                    basis_data.update_col_coupling( *U, colcb, Vn );
+                    colcb.set_basis( std::move( Vn ) );
+                }
+            );
+
+            //
+            // transform M into new bases
+            //
+
+            auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
+            auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
+            auto  TS = blas::prod( TU, T );
+            auto  S  = blas::prod( TS, blas::adjoint( TV ) );
+
+            U->set_coeff( std::move( S ) );
+        } );
     }// if
     else
     {
@@ -1388,8 +1537,6 @@ lu ( hpro::TMatrix &          A,
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
 
-}// namespace detail
-
-}}}}// namespace hlr::tbb::uniform::accu
+}}}}}// namespace hlr::tbb::uniform::accu::detail
 
 #endif // __HLR_TBB_DETAIL_UNIFORM_ACCU_HH

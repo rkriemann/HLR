@@ -20,13 +20,13 @@
 
 namespace hlr { namespace hpx { namespace matrix { namespace detail {
 
-namespace hpro = HLIB;
-
-using namespace hlr::matrix;
-
 using ::hpx::parallel::v2::define_task_block;
 using ::hpx::for_each;
 using ::hpx::execution::par;
+
+namespace hpro = HLIB;
+
+using namespace hlr::matrix;
 
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
@@ -862,8 +862,6 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
 
             if ( is_lowrank( *M ) )
             {
-                // std::cout << bct->id() << '{' << std::endl;
-                
                 //
                 // compute LRS representation W·T·X' = U·V' = M
                 //
@@ -884,20 +882,7 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 HLR_ASSERT( Rx.ncols() != 0 );
                 
                 auto  T       = blas::prod( Rw, blas::adjoint( Rx ) );
-                // auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
-                // char  buf[32];
-
-                auto  id       = bct->id();
-                auto  lock_rcb = std::scoped_lock( rowcb.mutex() );
-                
-                rowcb.mtx_id = bct->id();
-
-                auto  lock_ccb = std::scoped_lock( colcb.mutex() );
-
-                colcb.mtx_id = bct->id();
-
-                // snprintf( buf, 32, "%d{", bct->id() );
-                // std::cout << buf << std::endl;
+                auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
                 
                 // define_task_block( [&] ( auto &  tb )
                 {
@@ -927,23 +912,14 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 auto  TS = blas::prod( TU, T );
                 auto  S  = blas::prod( TS, blas::adjoint( TV ) );
 
-                auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( M->row_is(), M->col_is(), rowcb, colcb, std::move( S ) );
+                M = std::make_unique< uniform_lrmatrix< value_t > >( M->row_is(), M->col_is(), rowcb, colcb, std::move( S ) );
 
                 {
-                    auto  lock_is = std::scoped_lock( basis_data.rowmapmtx,
-                                                      basis_data.colmapmtx );
+                    auto  lock_is = std::scoped_lock( basis_data.rowmapmtx, basis_data.colmapmtx );
 
-                    basis_data.rowmap[ rowcb.is() ].push_back( RU.get() );
-                    basis_data.colmap[ colcb.is() ].push_back( RU.get() );
+                    basis_data.rowmap[ rowcb.is() ].push_back( M.get() );
+                    basis_data.colmap[ colcb.is() ].push_back( M.get() );
                 }
-
-                rowcb.mtx_id = -1;
-                colcb.mtx_id = -1;
-                
-                // snprintf( buf, 32, "%d}", bct->id() );
-                // std::cout << buf << std::endl;
-                
-                M = std::move( RU );
             }// if
         }// if
         else
@@ -973,7 +949,7 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                             auto  rowcb_i = rowcb.son( i );
                             auto  colcb_j = colcb.son( j );
                             
-                            HLR_ASSERT( ! is_null_all( rowcb_i, colcb_j ) );
+                            HLR_ASSERT( ! is_null_any( rowcb_i, colcb_j ) );
                             
                             auto  B_ij = build_uniform_rec( bct->son( i, j ), coeff, lrapx, basisapx, acc, *rowcb_i, *colcb_j, basis_data );
                             
@@ -990,6 +966,132 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
 
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
+    
+    return M;
+}
+
+template < typename basisapx_t >
+std::unique_ptr< hpro::TMatrix >
+build_uniform_rec ( const hpro::TMatrix &                            A,
+                    const basisapx_t &                               basisapx,
+                    const hpro::TTruncAcc &                          acc,
+                    cluster_basis< typename basisapx_t::value_t > &  rowcb,
+                    cluster_basis< typename basisapx_t::value_t > &  colcb,
+                    rec_basis_data_t &                               basis_data )
+{
+    using value_t = typename basisapx_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto  M = std::unique_ptr< hpro::TMatrix >();
+    
+    if ( is_lowrank( A ) )
+    {
+        //
+        // compute LRS representation W·T·X' = U·V' = M
+        //
+
+        auto  R  = cptrcast( &A, hpro::TRkMatrix );
+        auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
+        auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
+        auto  Rw = blas::matrix< value_t >();
+        auto  Rx = blas::matrix< value_t >();
+
+        define_task_block( [&] ( auto &  tb )
+        {
+            tb.run( [&] () { blas::qr( W, Rw ); } );
+            tb.run( [&] () { blas::qr( X, Rx ); } );
+        } );
+
+        HLR_ASSERT( Rw.ncols() != 0 );
+        HLR_ASSERT( Rx.ncols() != 0 );
+                
+        auto  T       = blas::prod( Rw, blas::adjoint( Rx ) );
+        auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+        
+        // define_task_block( [&] ( auto &  tb )
+        {
+            // tb.run( [&] ()
+            {
+                auto  Un = basis_data.compute_extended_row_basis( rowcb, W, T, acc, basisapx );
+                
+                basis_data.update_row_coupling( rowcb, Un );
+                rowcb.set_basis( std::move( Un ) );
+            } // );
+            
+            // tb.run( [&] ()
+            {
+                auto  Vn = basis_data.compute_extended_col_basis( colcb, X, T, acc, basisapx );
+                
+                basis_data.update_col_coupling( colcb, Vn );
+                colcb.set_basis( std::move( Vn ) );
+            } // );
+        } // );
+
+        //
+        // transform T into new bases
+        //
+        
+        auto  TU = blas::prod( blas::adjoint( rowcb.basis() ), W );
+        auto  TV = blas::prod( blas::adjoint( colcb.basis() ), X );
+        auto  TS = blas::prod( TU, T );
+        auto  S  = blas::prod( TS, blas::adjoint( TV ) );
+        
+        M = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+        
+        {
+            auto  lock_map = std::scoped_lock( basis_data.rowmapmtx, basis_data.colmapmtx );
+            
+            basis_data.rowmap[ rowcb.is() ].push_back( M.get() );
+            basis_data.colmap[ colcb.is() ].push_back( M.get() );
+        }
+    }// if
+    else if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        
+        M = std::make_unique< hpro::TBlockMatrix >();
+
+        auto  BM = ptrcast( M.get(), hpro::TBlockMatrix );
+
+        BM->copy_struct_from( BA );
+
+        define_task_block( [&,BA,BM] ( auto &  tb )
+        {
+            for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( BA->block( i, j ) ) )
+                    {
+                        tb.run( [&,BA,BM,i,j] ()
+                        {
+                            auto  rowcb_i = rowcb.son( i );
+                            auto  colcb_j = colcb.son( j );
+                            
+                            HLR_ASSERT( ! is_null_any( rowcb_i, colcb_j ) );
+                            
+                            auto  B_ij = build_uniform_rec( *BA->block( i, j ), basisapx, acc, *rowcb_i, *colcb_j, basis_data );
+
+                            BM->set_block( i, j, B_ij.release() );
+                        } );
+                    }// if
+                }// for
+            }// for
+        } );
+
+        // make value type consistent in block matrix and sub blocks
+        BM->adjust_value_type();
+    }// if
+    else
+    {
+        M = A.copy();
+    }// else
+
+    M->set_id( A.id() );
+    M->set_procs( A.procs() );
     
     return M;
 }
@@ -1057,6 +1159,72 @@ init_cluster_bases ( const hpro::TBlockCluster *  bct,
                 
                 if ( ! is_null( bct->son( i, j ) ) )
                     init_cluster_bases( bct->son( i, j ), *rowcb_i, *colcb_j );
+            }// for
+        }// for
+    }// if
+}
+
+
+template < typename value_t >
+void
+init_cluster_bases ( const hpro::TMatrix &       M,
+                     cluster_basis< value_t > &  rowcb,
+                     cluster_basis< value_t > &  colcb )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        
+        {
+            auto  lock = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
+            
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                auto  rowcb_i = rowcb.son( i );
+            
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    auto  colcb_j = colcb.son( j );
+                    auto  M_ij    = B->block( i, j );
+                
+                    if ( ! is_null( M_ij ) )
+                    {
+                        if ( is_null( rowcb_i ) )
+                        {
+                            rowcb_i = new cluster_basis< value_t >( M_ij->row_is() );
+                            rowcb.set_son( i, rowcb_i );
+                        }// if
+            
+                        if ( is_blocked( M_ij ) && ( rowcb_i->nsons() == 0 ))
+                            rowcb_i->set_nsons( cptrcast( M_ij, hpro::TBlockMatrix )->nblock_rows() );
+                        
+                        if ( is_null( colcb_j ) )
+                        {
+                            colcb_j = new cluster_basis< value_t >( M_ij->col_is() );
+                            colcb.set_son( j, colcb_j );
+                        }// if
+            
+                        if ( is_blocked( M_ij ) && ( colcb_j->nsons() == 0 ))
+                            colcb_j->set_nsons( cptrcast( M_ij, hpro::TBlockMatrix )->nblock_cols() );
+                    }// if
+                }// for
+            }// for
+        }
+
+        //
+        // recurse
+        //
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            auto  rowcb_i = rowcb.son( i );
+            
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
+                
+                if ( ! is_null( B->block( i, j ) ) )
+                    init_cluster_bases( *B->block( i, j ), *rowcb_i, *colcb_j );
             }// for
         }// for
     }// if

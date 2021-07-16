@@ -4,6 +4,9 @@
 from __future__ import print_function
 
 import os, sys
+import re
+
+from datetime import datetime
 
 ######################################################################
 #
@@ -21,7 +24,7 @@ color        = True
 # cache file storing SCons settings
 opts_file    = '.scons.options'
 
-CXX          = 'g++-10'
+CXX          = 'g++'
 CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
@@ -42,25 +45,13 @@ JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
-LIKWID_DIR   = '/opt/local/likwid'
 likwid       = False
+LIKWID_DIR   = '/opt/local/likwid'
 
-# set of programs to build: dag-*, tlr, hodlr, tileh (or 'all')
-PROGRAMS     = [ 'tlr',
-                 'hodlr',
-                 'tileh',
-                 'tiled-h',
-                 'tiled-hca',
-                 'tiled-hodlr',
-                 'dag-lu',
-                 'dag-gauss',
-                 'dag-inv',
-                 'dag-waz',
-                 'dag-hodlr',
-                 'uniform',
-                 'accu',
-                 'dpt',
-                 'polykern' ]
+scorep       = False
+SCOREP_DIR   = '/opt/local/scorep/7.0'
+
+CUDA_DIR     = '/'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -69,15 +60,17 @@ FRAMEWORKS   = [ 'seq',
                  'tf',
                  'hpx',
                  'mpi',
-                 'gpi2' ]
+                 'gpi2',
+                 'cuda' ]
 
 # supported lapack libraries
-LAPACKLIBS   = [ 'default',   # default system implementation, e.g., -llapack -lblas
-                 'none',      # do not use any LAPACK library
-                 'mkl',       # use parallel Intel MKL (should be OpenMP version)
-                 'mklomp',    # use OpenMP based Intel MKL
-                 'mkltbb',    # use TBB based Intel MKL
-                 'mklseq' ]   # use sequential Intel MKL
+LAPACKLIBS   = [ 'default',     # default system implementation, e.g., -llapack -lblas
+                 'none',        # do not use any LAPACK library
+                 'mkl',         # use parallel Intel MKL (should be OpenMP version)
+                 'mklomp',      # use OpenMP based Intel MKL
+                 'mkltbb',      # use TBB based Intel MKL
+                 'mklseq',      # use sequential Intel MKL
+                 'accelerate' ] # Accelerate framework on MacOS
                  
 # malloc libraries (also depends on directories above)
 MALLOCS      = [ 'default',
@@ -86,23 +79,6 @@ MALLOCS      = [ 'default',
                  'mimalloc',
                  'tbbmalloc',
                  'tcmalloc' ]
-
-# mapping of programs to subdirs
-SUBDIRS      = { 'tlr'         : 'tlr',
-                 'hodlr'       : 'hodlr',
-                 'tileh'       : 'tileh',
-                 'tiled-h'     : 'tiled',
-                 'tiled-hca'   : 'tiled',
-                 'tiled-hodlr' : 'tiled',
-                 'dag-lu'      : 'dag',
-                 'dag-gauss'   : 'dag',
-                 'dag-inv'     : 'dag',
-                 'dag-waz'     : 'dag',
-                 'dag-hodlr'   : 'dag',
-                 'uniform'     : '',
-                 'accu'        : '',
-                 'dpt'         : '',
-                 'polykern'    : '' }
 
 ######################################################################
 #
@@ -148,6 +124,44 @@ def path ( program, source ) :
 
 ######################################################################
 #
+# collect all programs from "programs" sub directory
+#
+######################################################################
+
+def scan_programs () :
+    cc_file = re.compile( '.*\.(cc|CC|cpp|c\+\+)\Z' )
+
+    scanned_programs = []
+    scanned_subdirs  = {}
+
+    for root, dirs, files in os.walk( "programs", topdown = False ) :
+        for filename in files :
+            if cc_file.search( filename ) != None :
+                # look for any framework
+                for fwork in FRAMEWORKS :
+                    fstr = '-' + fwork
+                    pos  = filename.find( fstr )
+                    if pos != -1 :
+                        prog = filename[:pos]
+                        if not prog in scanned_programs :
+                            scanned_programs.append( prog )
+                            if root == 'programs' : scanned_subdirs[prog] = ''
+                            else :                  scanned_subdirs[prog] = root.replace( 'programs/', '' )
+
+                        # print( root, filename[:pos], fwork )
+
+    return scanned_programs, scanned_subdirs
+
+tic = datetime.now()
+
+PROGRAMS, SUBDIRS = scan_programs()
+
+toc = datetime.now()
+
+# print( "scanned programs in %.3es" % ( toc - tic ).total_seconds() )
+
+######################################################################
+#
 # eval options
 #
 ######################################################################
@@ -171,8 +185,8 @@ opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,   
 opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
-
 opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda',     'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
 opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
@@ -181,10 +195,11 @@ opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DI
 opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
 opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
+opts.Add( BoolVariable( 'scorep',   'use Score-P library',           scorep ) )
 
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
-opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
+# opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
 opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
 opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
@@ -225,6 +240,7 @@ HPX_DIR      = opt_env['hpx']
 GPI2_DIR     = opt_env['gpi2']
 
 MKL_DIR      = opt_env['mkl']
+CUDA_DIR     = opt_env['cuda']
 
 JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
@@ -233,10 +249,11 @@ TCMALLOC_DIR = opt_env['tcmalloc']
 lapack       = opt_env['lapack']
 malloc       = opt_env['malloc']
 likwid       = opt_env['likwid']
+scorep       = opt_env['scorep']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
-profile      = opt_env['profile']
+# profile      = opt_env['profile']
 optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
@@ -262,12 +279,22 @@ if MKL_DIR == None or MKL_DIR == '/' :
     else :
         MKL_DIR = '/' # to prevent error below due to invalid path
     
+# CUDA should define CUDA_ROOT or CUDA_HOME
+if CUDA_DIR == None or CUDA_DIR == '/' :
+    if 'CUDA_ROOT' in os.environ :
+        CUDA_DIR = os.environ['CUDA_ROOT']
+    elif 'CUDA_HOME' in os.environ :
+        CUDA_DIR = os.environ['CUDA_HOME']
+    else :
+        CUDA_DIR = '/' # to prevent error below due to invalid path
+    
 ######################################################################
 #
 # colorization
 #
 ######################################################################
 
+# default color codes
 colors = { 'reset'  : '\033[0m',
            'bold'   : '\033[1m',
            'italic' : '\033[3m',
@@ -283,7 +310,15 @@ colors = { 'reset'  : '\033[0m',
 if not color or not sys.stdout.isatty() or os.environ['TERM'] == 'dumb' :
     for key in colors.keys() :
         colors[key] = ''
-      
+else :
+    # try to handle above codes on non-supported systems
+    try:
+        import colorama
+
+        colorama.init()
+    except :
+        pass
+        
 ######################################################################
 #
 # set up compilation environment
@@ -349,6 +384,8 @@ elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
+elif lapack == 'accelerate' :
+    env.MergeFlags( '-Wl,-framework,Accelerate' )
 
 # include malloc library
 if JEMALLOC_DIR != None and malloc == 'jemalloc' :
@@ -370,11 +407,23 @@ if likwid and LIKWID_DIR != None :
     env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
     env.Append( LIBS       = 'likwid' )
 
+# include Score-P tracing library
+if scorep and SCOREP_DIR != None :
+    env.Replace( CXX = os.path.join( SCOREP_DIR, 'bin', 'scorep' ) + ' --user --thread=pthread --mpp=none ' + CXX )
+    env.Append( LIBPATH    = os.path.join( SCOREP_DIR, 'lib' ) )
+    env.Append( CPPDEFINES = 'HAS_SCOREP' )
+
+# add CUDA
+if 'cuda' in frameworks :
+    env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
+    env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64' ) )
+    env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
+
 # add GMP
 env.ParseConfig( 'pkg-config --cflags gmpxx' )
 env.ParseConfig( 'pkg-config --libs   gmpxx' )
 
-# universal
+# add universal
 env.Append( CPPPATH = '/opt/local/universal/include' )
 
 ######################################################################
@@ -382,6 +431,25 @@ env.Append( CPPPATH = '/opt/local/universal/include' )
 # target 'help'
 #
 ######################################################################
+
+#
+# split array of strings for pretty printing in table
+#
+def split_str_array ( arr, n ) :
+    parts = []
+    line  = ''
+    for i in range( len( arr ) ) :
+        if i == len(arr)-1 : line = line + arr[i]
+        else :               line = line + arr[i] + ', '
+
+        if len( line ) > 40 :
+            parts.append( line )
+            line = ''
+
+    if line != '' :
+        parts.append( line )
+
+    return parts
 
 def show_help ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
@@ -392,27 +460,34 @@ def show_help ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( PROGRAMS ) )
+
+    parts = split_str_array( PROGRAMS, 40 )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    for i in range( 1, len(parts) ) :
+        print( '             │                               │', parts[i] )
+    
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mkl{1}        │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print() 
     print( 'The parameters {0}programs{1} and {0}frameworks{1} can get comma separated values:'.format( colors['bold'], colors['reset'] ) ) 
     print() 
@@ -444,27 +519,35 @@ def show_options ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), ', '.join( programs ) )
+
+    # split "programs" into smaller pieces
+    parts = split_str_array( programs, 40 )
+    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    for i in range( 1, len(parts) ) :
+        print( '             │                               │', parts[i] )
+        
     print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
-    print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
     print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
     print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
     print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
+    print( '  {0}mkl{1}        │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
+    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
     print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
+    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
+    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
+    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
+    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
+    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )
@@ -505,7 +588,9 @@ sources = [ 'src/apps/exp.cc',
             'src/dag/node.cc',
             'src/dag/solve.cc',
             'src/matrix/level_matrix.cc',
+            'src/matrix/lduinv_eval.cc',
             'src/matrix/luinv_eval.cc',
+            'src/matrix/triinv_eval.cc',
             'src/matrix/print.cc',
             'src/seq/dag.cc',
             'src/seq/solve.cc',
@@ -558,6 +643,7 @@ if 'tbb' in frameworks :
     tbb = env.Clone()
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
+    tbb.Append( LIBS    = [ 'tbb' ] )
 
     for program in programs :
         name   = program + '-tbb'
@@ -576,17 +662,19 @@ if 'tf' in frameworks :
     tf.Append( LIBS = [ 'pthread' ] )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --cflags magma' )
     # tf.ParseConfig( 'PKG_CONFIG_PATH=/opt/local/magma-2.5.3/lib/pkgconfig pkg-config --libs   magma' )
-    # tf.Append( LIBS = [ 'cudart', 'cublas', 'cusolver' ] )
     
     for program in programs :
         name   = program + '-tf'
         source = path( program, name + '.cc' )
 
+        # special case TF+CUDA
+        if program == 'cuda' and not 'cuda' in frameworks :
+            continue
+        
         if os.path.exists( source ) and os.path.isfile( source ) :
             Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
     # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
-    # Default( tf.Program( 'programs/cuda',  [ 'programs/cuda.cc'  ] ) )
 
 #
 # HPX

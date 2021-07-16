@@ -10,9 +10,11 @@
 
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>
-#include "hlr/arith/invert.hh"
-#include "hlr/matrix/level_matrix.hh"
-#include "hlr/utils/checks.hh"
+#include <hlr/arith/invert.hh>
+#include <hlr/matrix/level_matrix.hh>
+#include <hlr/seq/matrix.hh>
+#include <hlr/utils/checks.hh>
+#include <hlr/utils/io.hh> // DEBUG
 
 namespace hlr {
 
@@ -227,6 +229,105 @@ lu ( matrix::level_matrix &   A,
     }// for
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// general H-LDU factorization
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace detail
+{
+
+template < typename value_t,
+           typename approx_t >
+void
+ldu ( hpro::TMatrix &          A,
+      hpro::TMatrix &          D,
+      const hpro::TTruncAcc &  acc,
+      const approx_t &         approx )
+{
+    if ( is_blocked( A ) )
+    {
+        HLR_ASSERT( is_blocked( D ) );
+        
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BD = ptrcast( &D, hpro::TBlockMatrix );
+
+        HLR_ASSERT(( BA->nblock_rows() == BD->nblock_rows() ) &&
+                   ( BA->nblock_cols() == BD->nblock_cols() ));
+        
+        for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
+        {
+            HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
+            HLR_ASSERT( ! is_null( BD->block( i, i ) ) );
+            
+            ldu< value_t >( * BA->block( i, i ), *BD->block( i, i ), acc, approx );
+
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+            {
+                if ( ! is_null( BA->block( j, i ) ) )
+                {
+                    solve_upper_tri< value_t >( from_right, unit_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
+                    solve_diag< value_t >(      from_right, general_diag, apply_normal, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
+                }// if
+            }// for
+
+            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
+            {
+                if ( ! is_null( BA->block( i, j ) ) )
+                {
+                    solve_lower_tri< value_t >( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
+                    solve_diag< value_t >(      from_left, general_diag, apply_normal, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
+                }// if
+            }// for
+
+            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
+            {
+                for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
+                {
+                    if ( ! is_null_any( BA->block( j, i ), BA->block( i, l ) ) )
+                    {
+                        HLR_ASSERT( ! is_null( BA->block( j, l ) ) );
+                    
+                        multiply_diag( value_t(-1),
+                                       apply_normal, *BA->block( j, i ),
+                                       apply_normal, *BD->block( i, i ),
+                                       apply_normal, *BA->block( i, l ),
+                                       *BA->block( j, l ), acc, approx );
+
+                        auto  T = matrix::convert_to_dense< value_t >( *BA->block( j, l ) );
+
+                        io::matlab::write( *T, "T" );
+                    }// if
+                }// for
+            }// for
+        }// for
+    }// if
+    else if ( is_dense( A ) )
+    {
+        auto  DA = ptrcast( &A, hpro::TDenseMatrix );
+
+        A.copy_to( &D );
+        invert< value_t >( *DA );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+}
+
+}// namespace detail
+
+template < typename value_t,
+           typename approx_t >
+void
+ldu ( hpro::TMatrix &          A,
+      const hpro::TTruncAcc &  acc,
+      const approx_t &         approx )
+{
+    auto  D = seq::matrix::copy_diag( A );
+
+    detail::ldu< value_t, approx_t >( A, *D, acc, approx );
+}
+    
 }// namespace hlr
 
 #endif // __HLR_ARITH_LU_HH

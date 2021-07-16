@@ -84,29 +84,30 @@ program_main ()
 
     auto  apx = approx::SVD< value_t >();
     
-    std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
+    // std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     
-    tic = timer::now();
+    // tic = timer::now();
     
-    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+    // auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, lrapx, apx, acc, nseq );
 
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+    // toc = timer::since( tic );
+    // std::cout << "    done in  " << format_time( toc ) << std::endl;
+    // std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
         
-    {
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+    // {
+    //     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+    //     auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-    }
+    //     std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+    // }
 
     {
         std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
     
         tic = timer::now();
     
-        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+        // auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( bct->root(), pcoeff, lrapx, apx, acc, nseq );
+        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

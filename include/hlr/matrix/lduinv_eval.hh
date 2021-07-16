@@ -1,9 +1,9 @@
-#ifndef __HLR_MATRIX_LUINV_EVAL_HH
-#define __HLR_MATRIX_LUINV_EVAL_HH
+#ifndef __HLR_MATRIX_LDUINV_EVAL_HH
+#define __HLR_MATRIX_LDUINV_EVAL_HH
 //
 // Project     : HLR
-// File        : luinv_eval.hh
-// Description : evaluation operator for the inverse of LU factorizations
+// File        : lduinv_eval.hh
+// Description : evaluation operator for the inverse of LDU factorizations
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
@@ -21,15 +21,15 @@ namespace hlr { namespace matrix {
 namespace hpro = HLIB;
 
 // local matrix type
-DECLARE_TYPE( luinv_eval );
+DECLARE_TYPE( lduinv_eval );
 
 //
-// implements vector solving for LU factored matrices
+// implements vector solving for LDU factored matrices
 //
-class luinv_eval : public hpro::TLinearOperator
+class lduinv_eval : public hpro::TLinearOperator
 {
 private:
-    // matrix containing LU data
+    // matrix containing LDU data
     const hpro::TMatrix &  _mat;
 
 public:
@@ -37,7 +37,7 @@ public:
     // ctor
     //
 
-    luinv_eval ( const hpro::TMatrix &  M )
+    lduinv_eval ( const hpro::TMatrix &  M )
             : _mat( M )
     {}
     
@@ -128,7 +128,7 @@ public:
     //
 
     // RTTI
-    HLIB_RTTI_DERIVED( luinv_eval, hpro::TLinearOperator )
+    HLIB_RTTI_DERIVED( lduinv_eval, hpro::TLinearOperator )
 };
 
 

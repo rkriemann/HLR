@@ -15,6 +15,365 @@ namespace hlr
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// matrix solving with diagonal D
+//
+// solve D·X = M (from_left) or X·D = M (from_right)
+// - on exit, M contains X
+//
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// forward for general version
+//
+template < typename value_t,
+           typename approx_t >
+void
+solve_diag ( const eval_side_t        side,
+             const diag_type_t        diag,
+             const matop_t            op_D,
+             const hpro::TMatrix &    D,
+             hpro::TMatrix &          M,
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx );
+
+//
+// forward for general version without (!) approximation
+//
+template < typename value_t >
+void
+solve_diag ( const eval_side_t        side,
+             const diag_type_t        diag,
+             const matop_t            op_D,
+             const hpro::TMatrix &    D,
+             hpro::TMatrix &          M );
+
+//
+// specializations
+//
+template < typename value_t,
+           typename approx_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               op_D,
+             const hpro::TBlockMatrix &  D,
+             hpro::TBlockMatrix &        M,
+             const hpro::TTruncAcc &     acc,
+             const approx_t &            approx )
+{
+    if ( side == from_left )
+    {
+        //
+        // ⎛D₀₀       ⎞   ⎛X₀₀ X₀₁ X₀₂ …⎞   ⎛M₀₀ M₀₁ M₀₂ …⎞
+        // ⎜   D₁₁    ⎟ × ⎜X₁₀ X₁₁ X₁₂ …⎟ = ⎜M₁₀ M₁₁ M₁₂ …⎟
+        // ⎜      D₂₂ ⎟   ⎜X₂₀ X₂₁ X₂₂ …⎟   ⎜M₂₀ M₂₁ M₂₂ …⎟
+        // ⎝         …⎠   ⎝ …   …   …  …⎠   ⎝ …   …   …  …⎠
+        //
+        //
+        // ⇒ (D₀₀) × (X₀₀ X₀₁ X₀₂ …) = (M₀₀ M₀₁ M₀₂ …)
+        //
+        
+        auto  nbr = M.nblock_rows();
+        auto  nbc = M.nblock_cols();
+
+        HLR_ASSERT( ( D.nblock_rows( op_D ) == nbr ) && ( D.nblock_cols( op_D ) == nbr ) );
+            
+        for ( auto  i = 0; i < int(nbr); ++i )
+        {
+            auto  D_ii = D.block( i, i, op_D );
+            
+            HLR_ASSERT( ! is_null( D_ii ) );
+                
+            for ( auto  j = 0; j < int(nbc); ++j )
+            {
+                auto  M_ij = M.block( i, j );
+                
+                if ( ! is_null( M_ij ) )
+                    solve_diag< value_t >( side, diag, op_D, *D_ii, *M_ij, acc, approx );
+            }// for
+        }// for
+    }// if
+    else
+    {
+        //
+        // ⎛X₀₀ X₀₁ X₀₂ …⎞   ⎛D₀₀       ⎞   ⎛M₀₀ M₀₁ M₀₂ …⎞
+        // ⎜X₁₀ X₁₁ X₁₂ …⎟ × ⎜   D₁₁    ⎟ = ⎜M₁₀ M₁₁ M₁₂ …⎟
+        // ⎜X₂₀ X₂₁ X₂₂ …⎟   ⎜      D₂₂ ⎟   ⎜M₂₀ M₂₁ M₂₂ …⎟
+        // ⎝ …   …   …  …⎠   ⎝         …⎠   ⎝ …   …   …  …⎠
+        //
+        // ⇒
+        //
+        // ⎛X₀₀⎞           ⎛M₀₀⎞
+        // ⎜X₁₀⎟ × (D₀₀) = ⎜M₁₀⎟
+        // ⎜X₂₀⎟           ⎜M₂₀⎟
+        // ⎝ … ⎠           ⎝ … ⎠
+        //
+
+        auto  nbr = M.nblock_rows();
+        auto  nbc = M.nblock_cols();
+
+        HLR_ASSERT( ( D.nblock_rows( op_D ) == nbc ) && ( D.nblock_cols( op_D ) == nbc ) );
+            
+        for ( auto  j = 0; j < int(nbc); ++j )
+        {
+            auto  D_jj = D.block( j, j, op_D );
+            
+            HLR_ASSERT( ! is_null( D_jj ) );
+                
+            for ( auto  i = 0; i < int(nbr); ++i )
+            {
+                auto  M_ij = M.block( i, j );
+                
+                if ( ! is_null( M_ij ) )
+                    solve_diag< value_t >( side, diag, op_D, *D_jj, *M_ij, acc, approx );
+            }// for
+        }// for
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               op_D,
+             const hpro::TBlockMatrix &  D,
+             hpro::TDenseMatrix &        M )
+{
+    if ( side == from_left )
+    {
+        //
+        // ⎛D₀₀       ⎞   ⎛X₀₀ X₀₁ X₀₂ …⎞   ⎛M₀₀ M₀₁ M₀₂ …⎞
+        // ⎜   D₁₁    ⎟ × ⎜X₁₀ X₁₁ X₁₂ …⎟ = ⎜M₁₀ M₁₁ M₁₂ …⎟
+        // ⎜      D₂₂ ⎟   ⎜X₂₀ X₂₁ X₂₂ …⎟   ⎜M₂₀ M₂₁ M₂₂ …⎟
+        // ⎝         …⎠   ⎝ …   …   …  …⎠   ⎝ …   …   …  …⎠
+        //
+        // ⇒ (D₀₀) × (X₀₀ X₀₁ X₀₂ …) = (M₀₀ M₀₁ M₀₂ …)
+        //
+        
+        for ( uint j = 0; j < D.nblock_cols( op_D ); ++j )
+        {
+            const auto  D_jj = D.block( j, j, op_D );
+
+            HLR_ASSERT( ! is_null( D_jj ) );
+
+            auto  M_j = blas::matrix< value_t >( blas::mat< value_t >( M ),
+                                                 D_jj->col_is( op_D ) - D.col_ofs( op_D ),
+                                                 blas::range::all );
+            auto  D_j = hpro::TDenseMatrix( D_jj->col_is( op_D ), M.col_is(), M_j );
+
+            solve_diag< value_t >( side, diag, op_D, *D_jj, D_j );
+        }// for
+    }// if
+    else
+    {
+        //
+        // ⎛X₀₀ X₀₁ X₀₂ …⎞   ⎛D₀₀       ⎞   ⎛M₀₀ M₀₁ M₀₂ …⎞
+        // ⎜X₁₀ X₁₁ X₁₂ …⎟ × ⎜   D₁₁    ⎟ = ⎜M₁₀ M₁₁ M₁₂ …⎟
+        // ⎜X₂₀ X₂₁ X₂₂ …⎟   ⎜      D₂₂ ⎟   ⎜M₂₀ M₂₁ M₂₂ …⎟
+        // ⎝ …   …   …  …⎠   ⎝         …⎠   ⎝ …   …   …  …⎠
+        //
+        // ⇒
+        //
+        // ⎛X₀₀⎞           ⎛M₀₀⎞
+        // ⎜X₁₀⎟ × (D₀₀) = ⎜M₁₀⎟
+        // ⎜X₂₀⎟           ⎜M₂₀⎟
+        // ⎝ … ⎠           ⎝ … ⎠
+        //
+        
+        for ( uint i = 0; i < D.nblock_rows( op_D ); ++i )
+        {
+            const auto  D_ii = D.block( i, i, op_D );
+
+            HLR_ASSERT( ! is_null( D_ii ) );
+
+            auto  M_i = blas::matrix< value_t >( blas::mat< value_t >( M ),
+                                                 blas::range::all,
+                                                 D_ii->row_is( op_D ) - D.row_ofs( op_D ) );
+            auto  D_i = hpro::TDenseMatrix( M.row_is(), D_ii->row_is( op_D ), M_i );
+
+            solve_diag< value_t >( side, diag, op_D, *D_ii, D_i );
+        }// for
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               op_D,
+             const hpro::TBlockMatrix &  D,
+             hpro::TRkMatrix &           M )
+{
+    if ( side == from_left )
+    {
+        //
+        // solve D M = D W X' = U V'
+        // as D W = U
+        //
+        
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), blas::mat_U< value_t >( M ) );
+
+        solve_diag< value_t >( side, diag, op_D, D, U );
+    }// if
+    else
+    {
+        //
+        // solve M D = W X' D = U V'
+        // as X' D = V'
+        // as D' X = V
+        //
+        
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), blas::mat_V< value_t >( M ) );
+
+        solve_diag< value_t >( from_left, diag, blas::adjoint( op_D ), D, V );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t               side,
+             const diag_type_t               diag,
+             const matop_t                   op_D,
+             const hpro::TBlockMatrix &      D,
+             matrix::lrsmatrix< value_t > &  M )
+{
+    if ( side == from_left )
+    {
+        //
+        // solve D M = D W T X' = U S V'
+        // as D W = U
+        //
+        
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), M.U() );
+
+        solve_diag< value_t >( side, diag, op_D, D, U );
+    }// if
+    else
+    {
+        //
+        // solve M D = W T X' D = U S V'
+        // as X' D = V'
+        // as L' X = V
+        //
+        
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), M.V() );
+
+        solve_diag< value_t >( side, diag, blas::adjoint( op_D ), D, V );
+    }// else
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               /* op_D */,
+             const hpro::TDenseMatrix &  /* D */,
+             hpro::TBlockMatrix &        /* M */,
+             const hpro::TTruncAcc &     /* acc */,
+             const approx_t &            /* approx */ )
+{
+    if ( diag == unit_diag )
+        return;
+    
+    if ( side == from_left )
+    {
+        HLR_ERROR( "todo" );
+    }// if
+    else
+    {
+        HLR_ERROR( "todo" );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               op_D,
+             const hpro::TDenseMatrix &  D,
+             hpro::TDenseMatrix &        M )
+{
+    if ( diag == unit_diag )
+        return;
+    
+    //
+    // blockwise evaluation and D is assumed to hold D^-1
+    // TODO: option argument?
+    //
+
+    auto  Mc = blas::copy( blas::mat< value_t >( M ) );
+
+    if ( side == from_left )
+    {
+        blas::prod( value_t(1), blas::mat_view( op_D, blas::mat< value_t >( D ) ), Mc, value_t(0), blas::mat< value_t >( M ) );
+    }// if
+    else
+    {
+        blas::prod( value_t(1), Mc, blas::mat_view( op_D, blas::mat< value_t >( D ) ), value_t(0), blas::mat< value_t >( M ) );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t           side,
+             const diag_type_t           diag,
+             const matop_t               op_D,
+             const hpro::TDenseMatrix &  D,
+             hpro::TRkMatrix &           M )
+{
+    if ( diag == unit_diag )
+        return;
+
+    //
+    // see blocked D version above
+    //
+    
+    if ( side == from_left )
+    {
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), blas::mat_U< value_t >( M ) );
+
+        solve_diag< value_t >( side, diag, op_D, D, U );
+    }// if
+    else
+    {
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), blas::mat_V< value_t >( M ) );
+
+        solve_diag< value_t >( from_left, diag, blas::adjoint( op_D ), D, V );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_diag ( const eval_side_t               side,
+             const diag_type_t               diag,
+             const matop_t                   op_D,
+             const hpro::TDenseMatrix &      D,
+             matrix::lrsmatrix< value_t > &  M )
+{
+    if ( diag == unit_diag )
+        return;
+    
+    //
+    // see blocked D version above
+    //
+    
+    if ( side == from_left )
+    {
+        auto  U = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, M.rank()-1 ), M.U() );
+
+        solve_diag< value_t >( side, diag, op_D, D, U );
+    }// if
+    else
+    {
+        auto  V = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, M.rank()-1 ), M.V() );
+
+        solve_diag< value_t >( from_left, diag, blas::adjoint( op_D ), D, V );
+    }// else
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // matrix solving with lower triangular matrix L
 //
 // solve L·X = M (from_left) or X·L = M (from_right)
@@ -180,7 +539,7 @@ solve_lower_tri ( const eval_side_t           side,
 
             HLR_ASSERT( ! is_null( L_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+            auto  M_j = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                  L_jj->col_is() - L.col_ofs(),
                                                  blas::range::all );
             auto  D_j = hpro::TDenseMatrix( L_jj->col_is(), M.col_is(), M_j );
@@ -193,7 +552,7 @@ solve_lower_tri ( const eval_side_t           side,
                 
                 if ( ! is_null( L_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+                    auto  M_k = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                          L_kj->row_is() - L.row_ofs(),
                                                          blas::range::all );
                     auto  D_k = hpro::TDenseMatrix( L_kj->row_is(), M.col_is(), M_k );
@@ -311,9 +670,9 @@ solve_lower_tri ( const eval_side_t           side,
         // TODO: option argument?
         //
 
-        auto  Mc = blas::copy( hpro::blas_mat< value_t >( M ) );
+        auto  Mc = blas::copy( blas::mat< value_t >( M ) );
 
-        blas::prod( value_t(1), hpro::blas_mat< value_t >( L ), Mc, value_t(0), hpro::blas_mat< value_t >( M ) );
+        blas::prod( value_t(1), blas::mat< value_t >( L ), Mc, value_t(0), blas::mat< value_t >( M ) );
     }// if
     else
     {
@@ -487,7 +846,7 @@ solve_upper_tri ( const eval_side_t           side,
 
             HLR_ASSERT( ! is_null( U_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+            auto  M_j = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                  U_jj->col_is( op_U ) - U.col_ofs( op_U ),
                                                  blas::range::all );
             auto  D_j = hpro::TDenseMatrix( U_jj->col_is( op_U ), M.col_is(), M_j );
@@ -500,7 +859,7 @@ solve_upper_tri ( const eval_side_t           side,
                     
                 if ( ! is_null( U_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+                    auto  M_k = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                          U_kj->row_is( op_U ) - U.row_ofs( op_U ),
                                                          blas::range::all );
                     auto  D_k = hpro::TDenseMatrix( U_kj->row_is( op_U ), M.col_is(), M_k );
@@ -518,7 +877,7 @@ solve_upper_tri ( const eval_side_t           side,
 
             HLR_ASSERT( ! is_null( U_ii ) );
 
-            auto  M_i = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+            auto  M_i = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                  blas::range::all,
                                                  U_ii->row_is() - U.row_ofs() );
             auto  D_i = hpro::TDenseMatrix( M.row_is(), U_ii->row_is(), M_i );
@@ -531,7 +890,7 @@ solve_upper_tri ( const eval_side_t           side,
                     
                 if ( ! is_null( U_ik ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( hpro::blas_mat< value_t >( M ),
+                    auto  M_k = blas::matrix< value_t >( blas::mat< value_t >( M ),
                                                          blas::range::all,
                                                          U_ik->col_is() - U.col_ofs() );
                     auto  D_k = hpro::TDenseMatrix( M.row_is(), U_ik->col_is(), M_k );
@@ -643,15 +1002,15 @@ solve_upper_tri ( const eval_side_t           side,
     {
         // assuming U' X = M
         const matop_t  op_U = apply_adjoint;
-        auto           Mc   = blas::copy( hpro::blas_mat< value_t >( M ) );
+        auto           Mc   = blas::copy( blas::mat< value_t >( M ) );
 
-        blas::prod( value_t(1), blas::mat_view( op_U, hpro::blas_mat< value_t >( U ) ), Mc, value_t(0), hpro::blas_mat< value_t >( M ) );
+        blas::prod( value_t(1), blas::mat_view( op_U, blas::mat< value_t >( U ) ), Mc, value_t(0), blas::mat< value_t >( M ) );
     }// if
     else
     {
-        auto  Mc = blas::copy( hpro::blas_mat< value_t >( M ) );
+        auto  Mc = blas::copy( blas::mat< value_t >( M ) );
 
-        blas::prod( value_t(1), Mc, hpro::blas_mat< value_t >( U ), value_t(0), hpro::blas_mat< value_t >( M ) );
+        blas::prod( value_t(1), Mc, blas::mat< value_t >( U ), value_t(0), blas::mat< value_t >( M ) );
     }// else
 }
 

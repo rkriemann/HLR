@@ -25,12 +25,9 @@ using hlr::uniform::accu::lu;
 
 }// namespace accu
 
-namespace accu3
-{
-
-using hlr::uniform::accu3::lu;
-
-}// namespace accu
+namespace accu2 { using hlr::uniform::accu2::lu; }// namespace accu2
+namespace accu3 { using hlr::uniform::accu3::lu; }// namespace accu3
+namespace accu4 { using hlr::uniform::accu4::lu; }// namespace accu4
 
 namespace tlr
 {
