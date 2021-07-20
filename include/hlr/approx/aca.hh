@@ -94,6 +94,9 @@ struct aca_pivot_next
         
         auto  row = get_row( M, pivot_row );
         
+        // stored as column, hence conjugate
+        blas::conj( row );
+        
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
 
@@ -172,6 +175,9 @@ struct aca_pivot_max
         used_rows[ pivot_row ] = true;
         
         auto  row = get_row( M, pivot_row );
+
+        // stored as column, hence conjugate
+        blas::conj( row );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );

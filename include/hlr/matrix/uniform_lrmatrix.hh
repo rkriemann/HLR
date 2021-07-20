@@ -218,11 +218,18 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec ( const real             alpha,
-                           const hpro::TVector *  x,
-                           const real             beta,
-                           hpro::TVector       *  y,
-                           const hpro::matop_t    op = hpro::apply_normal ) const;
+    virtual void mul_vec  ( const real             alpha,
+                            const hpro::TVector *  x,
+                            const real             beta,
+                            hpro::TVector       *  y,
+                            const hpro::matop_t    op = hpro::apply_normal ) const;
+    
+    // compute y ≔ β·y + α·op(M)·x, with M = this
+    virtual void cmul_vec ( const complex          alpha,
+                            const hpro::TVector *  x,
+                            const complex          beta,
+                            hpro::TVector       *  y,
+                            const hpro::matop_t    op = hpro::apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const hpro::TTruncAcc & acc );
@@ -283,14 +290,14 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
                                        hpro::TVector *        vy,
                                        const hpro::matop_t    op ) const
 {
-    assert( vx->is_complex() == this->is_complex() );
-    assert( vy->is_complex() == this->is_complex() );
-    assert( vx->is() == this->col_is( op ) );
-    assert( vy->is() == this->row_is( op ) );
-    assert( is_scalar_all( vx, vy ) );
+    HLR_ASSERT( vx->is_complex() == this->is_complex() );
+    HLR_ASSERT( vy->is_complex() == this->is_complex() );
+    HLR_ASSERT( vx->is() == this->col_is( op ) );
+    HLR_ASSERT( vy->is() == this->row_is( op ) );
+    HLR_ASSERT( is_scalar_all( vx, vy ) );
 
     // exclude complex value and transposed operation for now
-    assert( (  op == hpro::apply_normal     ) ||
+    HLR_ASSERT( (  op == hpro::apply_normal     ) ||
             (  op == hpro::apply_adjoint    ) ||
             (( op == hpro::apply_transposed ) && ! hpro::is_complex_type< value_t >::value ) );
 
@@ -308,13 +315,13 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         //
         
         // t := V^H x
-        auto  t = _col_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
+        auto  t = blas::mulvec( blas::adjoint( col_basis() ), hpro::blas_vec< value_t >( x ) );
 
         // s := S t
-        auto  s = blas::mulvec( value_t(1), _S, t );
+        auto  s = blas::mulvec( _S, t );
         
         // r := U s
-        auto  r = _row_cb->transform_backward( s );
+        auto  r = blas::mulvec( row_basis(), s );
 
         // y = y + r
         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
@@ -326,20 +333,18 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         //   = y + conj(V)·S^T·U^T x
         //
         
-        // t := U^T x = conj( conj(U^T) conj(x) ) = conj( U^H conj(x) )
-        auto  cx = blas::copy( hpro::blas_vec< value_t >( x ) );
-
-        blas::conj( cx );
-        
-        auto  t  = _row_cb->transform_forward( cx );
-
-        blas::conj( t );
+        // t := U^T x
+        auto  t = blas::mulvec( blas::transposed( row_basis() ), hpro::blas_vec< value_t >( x ) );
         
         // s := S^T t
-        auto  s = blas::mulvec( value_t(1), blas::transposed(_S), t );
+        auto  s = blas::mulvec( blas::transposed(_S), t );
         
         // r := conj(V) s
-        auto  r = _col_cb->transform_backward( s );
+        blas::conj( s );
+            
+        auto  r = blas::mulvec( col_basis(), s );
+
+        blas::conj( r );
 
         // y = y + r
         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
@@ -352,17 +357,105 @@ uniform_lrmatrix< value_t >::mul_vec ( const real             alpha,
         //
         
         // t := U^H x
-        auto  t = _row_cb->transform_forward( hpro::blas_vec< value_t >( x ) );
+        auto  t = blas::mulvec( blas::adjoint( row_basis() ), hpro::blas_vec< value_t >( x ) );
 
         // s := S t
-        auto  s = blas::mulvec( value_t(1), blas::adjoint(_S), t );
+        auto  s = blas::mulvec( blas::adjoint(_S), t );
         
         // r := V s
-        auto  r = _col_cb->transform_backward( s );
+        auto  r = blas::mulvec( col_basis(), s );
 
         // y = y + r
         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
     }// if
+}
+
+template < typename value_t >
+void
+uniform_lrmatrix< value_t >::cmul_vec ( const complex          alpha,
+                                        const hpro::TVector *  vx,
+                                        const complex          beta,
+                                        hpro::TVector *        vy,
+                                        const hpro::matop_t    op ) const
+{
+    HLR_ASSERT( vx->is_complex() == this->is_complex() );
+    HLR_ASSERT( vy->is_complex() == this->is_complex() );
+    HLR_ASSERT( vx->is() == this->col_is( op ) );
+    HLR_ASSERT( vy->is() == this->row_is( op ) );
+    HLR_ASSERT( is_scalar_all( vx, vy ) );
+
+    if constexpr( std::is_same_v< value_t, complex > )
+    {
+        const auto  x = cptrcast( vx, hpro::TScalarVector );
+        const auto  y = ptrcast(  vy, hpro::TScalarVector );
+        
+        // y := β·y
+        if ( beta != complex(1) )
+            blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
+                     
+        if ( op == hpro::apply_normal )
+        {
+            //
+            // y = y + U·S·V^H x
+            //
+            
+            // t := V^H x
+            auto  t = blas::mulvec( blas::adjoint( col_basis() ), hpro::blas_vec< value_t >( x ) );
+
+            // s := S t
+            auto  s = blas::mulvec( _S, t );
+        
+            // r := U s
+            auto  r = blas::mulvec( row_basis(), s );
+
+            // y = y + r
+            blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+        }// if
+        else if ( op == hpro::apply_transposed )
+        {
+            //
+            // y = y + (U·S·V^H)^T x
+            //   = y + conj(V)·S^T·U^T x
+            //
+        
+            // t := U^T x
+            auto  t = blas::mulvec( blas::transposed( row_basis() ), hpro::blas_vec< value_t >( x ) );
+        
+            // s := S^T t
+            auto  s = blas::mulvec( blas::transposed(_S), t );
+
+            // r := conj(V) s
+            blas::conj( s );
+            
+            auto  r = blas::mulvec( col_basis(), s );
+
+            blas::conj( r );
+
+            // y = y + r
+            blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+        }// if
+        else if ( op == hpro::apply_adjoint )
+        {
+            //
+            // y = y + (U·S·V^H)^H x
+            //   = y + V·S^H·U^H x
+            //
+        
+            // t := U^H x
+            auto  t = blas::mulvec( blas::adjoint( row_basis() ), hpro::blas_vec< value_t >( x ) );
+
+            // s := S t
+            auto  s = blas::mulvec( blas::adjoint(_S), t );
+        
+            // r := V s
+            auto  r = blas::mulvec( col_basis(), s );
+
+            // y = y + r
+            blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+        }// if
+    }// if
+    else
+        HLR_ERROR( "todo" );
 }
 
 
@@ -419,7 +512,7 @@ uniform_lrmatrix< value_t >::copy_to ( hpro::TMatrix *  A ) const
 {
     hpro::TMatrix::copy_to( A );
     
-    assert( IS_TYPE( A, uniform_lrmatrix ) );
+    HLR_ASSERT( IS_TYPE( A, uniform_lrmatrix ) );
 
     auto  R = ptrcast( A, uniform_lrmatrix );
 

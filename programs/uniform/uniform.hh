@@ -7,6 +7,7 @@
 //
 
 // #define USE_H2
+#include <hpro/algebra/TLowRankApx.hh>
 
 #if defined( USE_H2 )
 #include <hpro/cluster/TClusterBasisBuilder.hh>
@@ -54,6 +55,7 @@ program_main ()
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    // auto  lrapx  = hpro::TACA< value_t >( & pcoeff ); // bem::aca_lrapx( pcoeff );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     // auto  A      = io::hpro::read( "A.hm" );
@@ -119,7 +121,27 @@ program_main ()
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
-    
+
+        {
+            std::cout << "    " << term::bullet << term::bold << "single precision" << term::reset << std::endl;
+
+            auto  rowcb4 = matrix::copy< math::decrease_precision_t< value_t > >( *rowcb3 );
+            auto  colcb4 = matrix::copy< math::decrease_precision_t< value_t > >( *colcb3 );
+            
+            auto  rowcb5 = matrix::copy< value_t >( *rowcb4 );
+            auto  colcb5 = matrix::copy< value_t >( *colcb4 );
+
+            std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
+            
+            matrix::replace_cluster_basis( *A3, *rowcb5, *colcb5 );
+            
+            {
+                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+                auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        
+                std::cout << "      error  = " << format_error( error / normA ) << std::endl;
+            }
+        }
     }
 
     return;

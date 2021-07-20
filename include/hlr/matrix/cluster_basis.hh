@@ -233,6 +233,28 @@ public:
     decltype(_mtx) &  mutex () { return _mtx; }
 };
 
+//
+// copy given cluster basis between different value types
+//
+template < typename T_value_dest,
+           typename T_value_src >
+std::unique_ptr< cluster_basis< T_value_dest > >
+copy ( const cluster_basis< T_value_src > &  src )
+{
+    auto  V_dest = blas::copy< T_value_dest >( src.basis() );
+    auto  dest   = std::make_unique< cluster_basis< T_value_dest > >( src.is(), std::move( V_dest ) );
+
+    dest->set_nsons( src.nsons() );
+        
+    for ( uint  i = 0; i < dest->nsons(); ++i )
+    {
+        if ( ! is_null( src.son( i ) ) )
+            dest->set_son( i, copy< T_value_dest >( * src.son(i) ).release() );
+    }// for
+
+    return dest;
+}
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_CLUSTER_BASIS_HH
