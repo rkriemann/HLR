@@ -47,6 +47,9 @@ frobenius ( const hpro::TMatrix &  A )
         {
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
+                if ( is_null( B->block( i, j ) ) )
+                    continue;
+                
                 const auto  val_ij = frobenius( * B->block( i, j ) );
 
                 val += val_ij * val_ij;
@@ -204,10 +207,21 @@ frobenius ( const double           alpha,
         {
             for ( uint  j = 0; j < BA->nblock_cols(); ++j )
             {
-                const auto  val_ij = frobenius( alpha, * BA->block( i, j ),
-                                                beta,  * BB->block( i, j ) );
-
-                val += val_ij * val_ij;
+                if ( is_null( BA->block( i, j ) ) )
+                {
+                    if ( is_null( BB->block( i, j ) ) )
+                        continue;
+                    else
+                        val += math::square( beta * frobenius( * BB->block( i, j ) ) );
+                }// if
+                else
+                {
+                    if ( is_null( BB->block( i, j ) ) )
+                        val += math::square( alpha * frobenius( * BA->block( i, j ) ) );
+                    else
+                        val += math::square( frobenius( alpha, * BA->block( i, j ),
+                                                        beta,  * BB->block( i, j ) ) );
+                }// else
             }// for
         }// for
 

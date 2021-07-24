@@ -231,8 +231,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                         M->set_id( node->id() );
                         M->set_procs( node->procs() );
 
-                        insert_hier( node, M );
-                        create_cb( node );
+                        // insert_hier( node, M );
+                        // create_cb( node );
                     }// if
                     else
                         M = coeff.build( node->is().row_is(), node->is().col_is() );
@@ -513,6 +513,345 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     return { std::move( rowcb_root ),
              std::move( colcb_root ),
              std::move( M_root ) };
+}
+
+//
+// level-wise construction of uniform-H matrix from given H-matrix
+//
+template < typename basisapx_t >
+std::unique_ptr< hpro::TMatrix >
+build_uniform_lvl ( const hpro::TMatrix &                            A,
+                    const basisapx_t &                               basisapx,
+                    const hpro::TTruncAcc &                          acc,
+                    cluster_basis< typename basisapx_t::value_t > &  rowcb_root,
+                    cluster_basis< typename basisapx_t::value_t > &  colcb_root )
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
+    using lrmat_map_t   = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
+    using bmat_map_t    = std::unordered_map< hpro::idx_t, hpro::TBlockMatrix * >;
+
+    //
+    // go BFS-style through matrix and construct leaves per level
+    // then convert lowrank to uniform lowrank while constructing bases
+    //
+
+    // TODO: handle case of global lowrank matrix
+    HLR_ASSERT( ! is_lowrank( A ) );
+    
+    auto  rowcb_map = basis_map_t();
+    auto  colcb_map = basis_map_t();
+
+    auto  M_root    = std::unique_ptr< hpro::TMatrix >();
+
+    auto  matrices  = std::list< const hpro::TMatrix * >{ &A };
+    auto  bmat_map  = bmat_map_t();
+
+    auto  bmtx      = std::mutex(); // for bmat_map
+    auto  cmtx      = std::mutex(); // for children list
+    auto  lmtx      = std::mutex(); // for row/col map lists
+    auto  cbmtx     = std::mutex(); // for rowcb/colcb map lists
+
+    //
+    // level-wise iteration for matrix construction
+    //
+    
+    rowcb_map[ A.row_is() ] = & rowcb_root;
+    colcb_map[ A.col_is() ] = & colcb_root;
+    
+    while ( ! matrices.empty() )
+    {
+        auto  children = decltype( matrices )();
+        auto  rowmap   = lrmat_map_t();
+        auto  colmap   = lrmat_map_t();
+        auto  lrmat    = std::deque< const hpro::TRkMatrix * >();
+        
+        ::tbb::parallel_for_each(
+            matrices,
+            [&] ( auto  mat )
+            {
+                auto  M = std::unique_ptr< hpro::TMatrix >();
+
+                if ( is_lowrank( mat ) )
+                {
+                    auto  R    = cptrcast( mat, hpro::TRkMatrix );
+                    auto  lock = std::scoped_lock( lmtx );
+                        
+                    rowmap[ R->row_is() ].push_back( R );
+                    colmap[ R->col_is() ].push_back( R );
+                    lrmat.push_back( R );
+                }// if
+                else if ( is_dense( mat ) )
+                {
+                    M = mat->copy();
+                }// if
+                else if ( is_blocked( mat ) )
+                {
+                    auto  B = cptrcast( mat, hpro::TBlockMatrix );
+                
+                    // collect sub-blocks
+                    {
+                        auto  lock = std::scoped_lock( cmtx );
+
+                        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                                if ( ! is_null( B->block( i, j ) ) )
+                                    children.push_back( B->block( i, j ) );
+                    }
+
+                    M = B->copy_struct();
+
+                    // remember all block matrices for setting up hierarchy
+                    {
+                        auto  lock = std::scoped_lock( bmtx );
+                        
+                        bmat_map[ mat->id() ] = ptrcast( M.get(), hpro::TBlockMatrix );
+                    }
+                }// else
+
+                //
+                // set up hierarchy (parent <-> M)
+                //
+
+                if ( ! is_null( M ) )
+                {
+                    if ( mat == &A )
+                    {
+                        M_root = std::move( M );
+                    }// if
+                    else
+                    {
+                        auto                  mat_parent = mat->parent();
+                        hpro::TBlockMatrix *  M_parent   = nullptr;
+
+                        {
+                            auto  lock_bmap = std::scoped_lock( bmtx );
+                            
+                            M_parent = bmat_map.at( mat_parent->id() );
+                        }
+                        
+                        for ( uint  i = 0; i < mat_parent->nblock_rows(); ++i )
+                        {
+                            for ( uint  j = 0; j < mat_parent->nblock_cols(); ++j )
+                            {
+                                if ( mat_parent->block( i, j ) == mat )
+                                {
+                                    M_parent->set_block( i, j, M.release() );
+                                    break;
+                                }// if
+                            }// for
+                        }// for
+                    }// if
+                }// if
+
+                //
+                // fill mapping for row/column cluster basis
+                //
+
+                {
+                    auto  lock_cb = std::scoped_lock( cbmtx );
+                    
+                    HLR_ASSERT( rowcb_map.find( mat->row_is() ) != rowcb_map.end() );
+            
+                    auto  rowcb = rowcb_map[ mat->row_is() ];
+
+                    for ( uint  i = 0; i < rowcb->nsons(); ++i )
+                    {
+                        auto  son_i = rowcb->son(i);
+                
+                        if ( ! is_null( son_i ) )
+                            rowcb_map[ son_i->is() ] = son_i;
+                    }// for
+            
+                    HLR_ASSERT( colcb_map.find( mat->col_is() ) != colcb_map.end() );
+            
+                    auto  colcb = colcb_map[ mat->col_is() ];
+
+                    for ( uint  i = 0; i < colcb->nsons(); ++i )
+                    {
+                        auto  son_i = colcb->son(i);
+                
+                        if ( ! is_null( son_i ) )
+                            colcb_map[ son_i->is() ] = son_i;
+                    }// for
+                }
+            } );
+
+        matrices = std::move( children );
+        
+        ::tbb::parallel_invoke(
+
+            [&] ()
+            {
+                //
+                // construct row bases for all block rows constructed on this level
+                //
+
+                auto  rowiss = std::deque< indexset >();
+
+                for ( auto  [ is, matrices ] : rowmap )
+                    rowiss.push_back( is );
+
+                ::tbb::parallel_for_each(
+                    rowiss,
+                    [&] ( auto  is )                           
+                    {
+                        auto  matrices = rowmap.at( is );
+                    
+                        if ( matrices.size() == 0 )
+                            return;
+
+                        //
+                        // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
+                        //
+            
+                        size_t  nrows_U = is.size();
+                        size_t  ncols_U = 0;
+
+                        for ( auto &  R : matrices )
+                            ncols_U += R->rank();
+
+                        auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
+                        size_t  pos = 0;
+
+                        for ( auto &  R : matrices )
+                        {
+                            // R = U·V' = W·T·X'
+                            auto  U_i = blas::mat_U< value_t >( R );
+                            auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                            auto  R_i = blas::matrix< value_t >();
+                            auto  k   = R->rank();
+                
+                            blas::qr( V_i, R_i );
+
+                            auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+                            auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                            blas::copy( UR_i, U_sub );
+                
+                            pos += k;
+                        }// for
+
+                        //
+                        // QR of S and computation of row basis
+                        //
+
+                        auto  Un = basisapx.column_basis( U, acc );
+            
+                        // finally assign to cluster basis object
+                        // (no change to "rowcb_map", therefore no lock)
+                        rowcb_map.at( is )->set_basis( std::move( Un ) );
+                    } );
+            },
+
+            [&] ()
+            {
+                //
+                // construct column bases for all block columns constructed on this level
+                //
+
+                auto  coliss = std::deque< indexset >();
+            
+                for ( auto  [ is, matrices ] : colmap )
+                    coliss.push_back( is );
+
+                ::tbb::parallel_for_each(
+                    coliss,
+                    [&] ( auto  is )                           
+                    {
+                        auto  matrices = colmap.at( is );
+
+                        if ( matrices.size() == 0 )
+                            return;
+
+                        //
+                        // form matrix V = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+                        //
+
+                        size_t  nrows_V = is.size();
+                        size_t  ncols_V = 0;
+
+                        for ( auto &  R : matrices )
+                            ncols_V += R->rank();
+
+                        auto    V   = blas::matrix< value_t >( nrows_V, ncols_V );
+                        size_t  pos = 0;
+
+                        for ( auto &  R : matrices )
+                        {
+                            // R' = (U·V')' = V·U' = X·T'·W'
+                            auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                            auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
+                            auto  R_i = blas::matrix< value_t >();
+                            auto  k   = R->rank();
+                
+                            blas::qr( U_i, R_i );
+
+                            auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
+                            auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                            blas::copy( VR_i, V_sub );
+                
+                            pos += k;
+                        }// for
+
+                        auto  Vn = basisapx.column_basis( V, acc );
+
+                        // finally assign to cluster basis object
+                        // (no change to "colcb_map", therefore no lock)
+                        colcb_map.at( is )->set_basis( std::move( Vn ) );
+                    } );
+            }
+        );
+
+        //
+        // now convert all blocks on this level
+        //
+
+        ::tbb::parallel_for_each(
+            lrmat,
+            [&] ( auto  R )
+            {
+                auto  rowcb = rowcb_map.at( R->row_is() );
+                auto  colcb = colcb_map.at( R->col_is() );
+                auto  Un    = rowcb->basis();
+                auto  Vn    = colcb->basis();
+
+                //
+                // R = U·V' ≈ Un (Un' U V' Vn) Vn'
+                //          = Un S Vn'  with  S = Un' U V' Vn
+                //
+
+                auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
+                auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+                auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
+
+                auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
+                                                                                          R->col_is(),
+                                                                                          *rowcb,
+                                                                                          *colcb,
+                                                                                          std::move( S ) );
+            
+                // replace standard lowrank block by uniform lowrank block
+                auto  R_parent = R->parent();
+                auto  U_parent = bmat_map.at( R_parent->id() );
+
+                for ( uint  i = 0; i < R_parent->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < R_parent->nblock_cols(); ++j )
+                    {
+                        if ( R_parent->block( i, j ) == R )
+                        {
+                            U_parent->set_block( i, j, RU.release() );
+                            break;
+                        }// if
+                    }// for
+                }// for
+            } );
+    }// while
+    
+    return M_root;
 }
 
 //

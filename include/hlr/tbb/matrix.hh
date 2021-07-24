@@ -8,7 +8,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
 //
 
-#include <cassert>
 #include <type_traits>
 #include <deque>
 
@@ -50,7 +49,7 @@ build ( const hpro::TBlockCluster *  bct,
                    typename lrapx_t::value_t >::value,
                    "coefficient function and low-rank approximation must have equal value type" );
 
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
 
     //
     // decide upon cluster type, how to construct matrix
@@ -100,11 +99,93 @@ build ( const hpro::TBlockCluster *  bct,
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( bct->son( i, j ) != nullptr )
+                        if ( ! is_null( bct->son( i, j ) ) )
                         {
                             auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        // make value type consistent in block matrix and sub blocks
+        B->adjust_value_type();
+    }// else
+
+    // copy properties from the cluster
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// build representation of nearfield of dense matrix with
+// matrix structure defined by <bct>, matrix coefficients
+// defined by <coeff>
+//
+template < typename coeff_t >
+std::unique_ptr< hpro::TMatrix >
+build_nearfield ( const hpro::TBlockCluster *  bct,
+                  const coeff_t &              coeff,
+                  const size_t                 nseq = hpro::CFG::Arith::max_seq_size )
+{
+    HLR_ASSERT( bct != nullptr );
+
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto        M     = std::unique_ptr< hpro::TMatrix >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    // parallel handling too inefficient for small matrices
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return seq::matrix::build_nearfield( bct, coeff );
+        
+    if ( bct->is_leaf() )
+    {
+        if ( bct->is_adm() )
+            return nullptr;
+        else
+        {
+            M = coeff.build( rowis, colis );
+        }// else
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build_nearfield( bct, coeff, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        
+        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,B,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( ! is_null( bct->son( i, j ) ) )
+                        {
+                            auto  B_ij = build_nearfield( bct->son( i, j ), coeff, nseq );
+
+                            if ( ! is_null( B_ij.get() ) )
+                                 B->set_block( i, j, B_ij.release() );
                         }// if
                     }// for
                 }// for
@@ -187,7 +268,7 @@ build ( const hpro::TBlockCluster *  bct,
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( bct->son( i, j ) != nullptr )
+                        if ( ! is_null( bct->son( i, j ) ) )
                         {
                             auto  B_ij = build( bct->son( i, j ), S, acc, apx, nseq );
                             
@@ -230,6 +311,34 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
 }
 
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hpro::TMatrix > >
+build_uniform_lvl ( const hpro::TMatrix &    A,
+                    const basisapx_t &       basisapx,
+                    const hpro::TTruncAcc &  acc,
+                    const size_t             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+
+    auto  rowcb = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
+    }// if
+
+    detail::init_cluster_bases( A, *rowcb, *colcb );
+
+    auto  M = detail::build_uniform_lvl( A, basisapx, acc, *rowcb, *colcb );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
 // matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
@@ -254,7 +363,7 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
                    "coefficient function and basis approximation must have equal value type" );
     
-    assert( bct != nullptr );
+    HLR_ASSERT( bct != nullptr );
 
     using value_t       = typename coeff_t::value_t;
     using cluster_basis = hlr::matrix::cluster_basis< value_t >;
@@ -343,7 +452,7 @@ copy ( const hpro::TMatrix &  M )
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = copy( * BM->block( i, j ) );
                             
@@ -361,6 +470,56 @@ copy ( const hpro::TMatrix &  M )
         // assuming non-structured block and hence no parallel copy needed
         return M.copy();
     }// else
+}
+
+//
+// return copy of matrix
+// - copy operation is performed in parallel for sub blocks
+//
+inline
+std::unique_ptr< hpro::TMatrix >
+copy_nearfield ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( ! is_null( BM->block( i, j ) ) )
+                        {
+                            auto  B_ij = copy_nearfield( * BM->block( i, j ) );
+                            
+                            if ( ! is_null( B_ij.get() ) )
+                            {
+                                B_ij->set_parent( B );
+                                B->set_block( i, j, B_ij.release() );
+                            }// if
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        return N;
+    }// if
+    else if ( is_dense( M ) )
+    {
+        // assuming non-structured block
+        return M.copy();
+    }// else
+    else
+        return nullptr;
 }
 
 //
@@ -389,7 +548,7 @@ copy_tiled ( const hpro::TMatrix &  M,
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = copy_tiled< value_t >( * BM->block( i, j ), ntile );
                             
@@ -451,7 +610,7 @@ copy_nontiled ( const hpro::TMatrix &  M )
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = copy_nontiled< value_t >( * BM->block( i, j ) );
                             
@@ -470,7 +629,7 @@ copy_nontiled ( const hpro::TMatrix &  M )
         // copy low-rank data into tiled form
         //
 
-        assert( M.is_real() );
+        HLR_ASSERT( M.is_real() );
         
         auto  RM = cptrcast( & M, hlr::matrix::tiled_lrmatrix< real > );
         auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
@@ -513,7 +672,7 @@ copy_ll ( const hpro::TMatrix &    M,
                     0, i+1,
                     [B,BM,diag,i] ( const uint  j )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
                             
@@ -534,7 +693,7 @@ copy_ll ( const hpro::TMatrix &    M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                assert( is_dense( T.get() ) );
+                HLR_ASSERT( is_dense( T.get() ) );
 
                 auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
@@ -573,7 +732,7 @@ copy_ur ( const hpro::TMatrix &    M,
                     0, j+1,
                     [B,BM,diag,j] ( const uint  i )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
                     
@@ -594,7 +753,7 @@ copy_ur ( const hpro::TMatrix &    M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                assert( is_dense( T.get() ) );
+                HLR_ASSERT( is_dense( T.get() ) );
 
                 auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
 
@@ -618,16 +777,16 @@ void
 copy_to ( const hpro::TMatrix &  A,
           hpro::TMatrix &        B )
 {
-    assert( A.type()     == B.type() );
-    assert( A.block_is() == B.block_is() );
+    HLR_ASSERT( A.type()     == B.type() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, hpro::TBlockMatrix );
         auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
 
-        assert( BA->nblock_rows() == BB->nblock_rows() );
-        assert( BA->nblock_cols() == BB->nblock_cols() );
+        HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
+        HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
         
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, BA->nblock_rows(),
@@ -638,9 +797,9 @@ copy_to ( const hpro::TMatrix &  A,
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( BA->block( i, j ) != nullptr )
+                        if ( ! is_null( BA->block( i, j ) ) )
                         {
-                            assert( ! is_null( BB->block( i, j ) ) );
+                            HLR_ASSERT( ! is_null( BB->block( i, j ) ) );
                             
                             copy_to( * BA->block( i, j ), * BB->block( i, j ) );
                         }// if
@@ -736,7 +895,7 @@ copy_uniform ( const hpro::TMatrix &                    M,
                 {
                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                     {
-                        if ( BM->block( i, j ) != nullptr )
+                        if ( ! is_null( BM->block( i, j ) ) )
                         {
                             auto  B_ij = copy_uniform( * BM->block( i, j ), * rowcb.son(i), * colcb.son(j) );
                             

@@ -12,7 +12,6 @@
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/algebra/mat_conv.hh>
-#include <hpro/io/TClusterBasisVis.hh>
 #endif
 
 #include <hlr/seq/norm.hh>
@@ -39,6 +38,8 @@ program_main ()
 
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
+    auto  toc     = timer::since( tic );
+    
     auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -47,19 +48,40 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        hpro::TPSBlockClusterVis  bc_vis;
-        
-        print_ps( ct->root(), "ct" );
-        bc_vis.id( false ).print( bct->root(), "bct" );
+        io::eps::print( *ct->root(), "ct" );
+        io::eps::print( *bct->root(), "bct" );
     }// if
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
-    auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A      = io::hpro::read( "A.hm" );
-    auto  toc    = timer::since( tic );
 
+    // {
+    //     std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
+    
+    //     tic = timer::now();
+    
+    //     auto  A_nf   = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
+
+    //     toc = timer::since( tic );
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+    //     auto  norm_nf = norm::frobenius( *A_nf );
+
+    //     std::cout << "    |nf| =   " << format_norm( norm_nf ) << std::endl;
+
+    //     auto  acc_build = hpro::absolute_prec( norm_nf * hlr::cmdline::eps );
+        
+    //     std::cout << "  " << term::bullet << term::bold << "full matrix, ε = " << norm_nf * hlr::cmdline::eps << term::reset << std::endl;
+    // }
+    
+    tic = timer::now();
+
+    auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+
+    toc = timer::since( tic );
+    
+    // auto  A      = io::hpro::read( "A.hm" );
     // io::hpro::write( *A, "A.hm" );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -76,7 +98,7 @@ program_main ()
     }// if
 
     const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
-    
+
     //////////////////////////////////////////////////////////////////////
     //
     // directly build uniform matrix
@@ -84,23 +106,25 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     auto  apx = approx::SVD< value_t >();
-    
-    // std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
-    
-    // tic = timer::now();
-    
-    // auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, lrapx, apx, acc, nseq );
 
-    // toc = timer::since( tic );
-    // std::cout << "    done in  " << format_time( toc ) << std::endl;
-    // std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+    {
+        std::cout << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( *A, apx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
         
-    // {
-    //     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-    //     auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        {
+            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+            auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-    //     std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-    // }
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+    }
 
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
@@ -244,11 +268,7 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
 
         if ( verbose( 3 ) )
-        {
-            hpro::TPSClusterBasisVis< value_t >  cbvis;
-
-            cbvis.print( rowcb3.get(), "rowcb.eps" );
-        }// if
+            io::eps::print( *rowcb3, "rowcb" );
 
         std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
 
