@@ -16,6 +16,7 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
+#include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/eps_printer.hh>
@@ -605,5 +606,27 @@ template void print_eps< cluster_basis< std::complex< float > > >  ( const clust
 template void print_eps< cluster_basis< std::complex< double > > > ( const cluster_basis< std::complex< double > > & ,
                                                                      const std::string &,
                                                                      const std::string & );
+
+template <>
+void
+print_eps< hpro::TClusterBasis< hpro::real > > ( const hpro::TClusterBasis< hpro::real > &  cb,
+                                                 const std::string &                        filename,
+                                                 const std::string &                        /* options */ )
+{
+    hpro::TPSClusterBasisVis< hpro::real >  cbvis;
+
+    cbvis.print( &cb, filename );
+}
+
+template <>
+void
+print_eps< hpro::TClusterBasis< hpro::complex > > ( const hpro::TClusterBasis< hpro::complex > &  cb,
+                                                    const std::string &                           filename,
+                                                    const std::string &                           /* options */ )
+{
+    hpro::TPSClusterBasisVis< hpro::complex >  cbvis;
+
+    cbvis.print( &cb, filename );
+}
 
 }}// namespace hlr::matrix
