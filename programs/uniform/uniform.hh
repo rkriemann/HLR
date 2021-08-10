@@ -77,11 +77,11 @@ program_main ()
     
     tic = timer::now();
 
-    auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+    // auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
 
     toc = timer::since( tic );
     
-    // auto  A      = io::hpro::read( "A.hm" );
+    auto  A      = io::hpro::read( "A.hm" );
     // io::hpro::write( *A, "A.hm" );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;

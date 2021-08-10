@@ -280,7 +280,7 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
-                blas::qr( V_i, R_i );
+                blas::qr( V_i, R_i, false );
 
                 auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
                 auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
@@ -354,8 +354,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                 auto  Rv_i = blas::matrix< value_t >();
                 auto  k    = R->rank();
                 
-                blas::qr( U_i, Ru_i );
-                blas::qr( V_i, Rv_i );
+                blas::qr( U_i, Ru_i, false );
+                blas::qr( V_i, Rv_i, false );
 
                 auto  S_i    = blas::prod( Ru_i, blas::adjoint( Rv_i ) );
                 auto  norm_i = blas::norm_2( S_i );
@@ -451,7 +451,7 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
-                blas::qr( U_i, R_i );
+                blas::qr( U_i, R_i, false );
 
                 auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
                 auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
@@ -531,8 +531,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                 auto  Ru_i = blas::matrix< value_t >();
                 auto  k    = R->rank();
                 
-                blas::qr( V_i, Rv_i );
-                blas::qr( U_i, Ru_i );
+                blas::qr( V_i, Rv_i, false );
+                blas::qr( U_i, Ru_i, false );
 
                 auto  S_i    = blas::prod( Rv_i, blas::adjoint( Ru_i ) );
                 auto  norm_i = blas::norm_2( S_i );
@@ -637,7 +637,7 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
 
     rowcb_map[ A.row_is() ] = & rowcb_root;
     colcb_map[ A.col_is() ] = & colcb_root;
-    
+
     while ( ! matrices.empty() )
     {
         auto  children = decltype( matrices )();
@@ -767,7 +767,7 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
-                blas::qr( V_i, R_i );
+                blas::qr( V_i, R_i, false );
 
                 auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
                 auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
@@ -781,8 +781,10 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
             // QR of S and computation of row basis
             //
 
-            auto  Un = basisapx.column_basis( U, acc );
+            // std::cout << U.nrows() << " x " << U.ncols() << std::endl;
             
+            auto  Un = basisapx.column_basis( U, acc );
+
             // finally assign to cluster basis object
             rowcb_map.at( is )->set_basis( std::move( Un ) );
         }// for
@@ -817,7 +819,7 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
-                blas::qr( U_i, R_i );
+                blas::qr( U_i, R_i, false );
 
                 auto  VR_i  = blas::prod( V_i, blas::adjoint( R_i ) );
                 auto  V_sub = blas::matrix< value_t >( V, blas::range::all, blas::range( pos, pos + k - 1 ) );
@@ -827,8 +829,10 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
                 pos += k;
             }// for
 
+            // std::cout << V.nrows() << " x " << V.ncols() << std::endl;
+            
             auto  Vn = basisapx.column_basis( V, acc );
-
+            
             // finally assign to cluster basis object
             colcb_map.at( is )->set_basis( std::move( Vn ) );
         }// for
