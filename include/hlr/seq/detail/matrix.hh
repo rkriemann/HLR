@@ -781,7 +781,7 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
             // QR of S and computation of row basis
             //
 
-            // std::cout << U.nrows() << " x " << U.ncols() << std::endl;
+            // std::cout << is.to_string() << " : " << U.nrows() << " x " << U.ncols() << std::endl;
             
             auto  Un = basisapx.column_basis( U, acc );
 
@@ -829,7 +829,7 @@ build_uniform_lvl ( const hpro::TMatrix &                            A,
                 pos += k;
             }// for
 
-            // std::cout << V.nrows() << " x " << V.ncols() << std::endl;
+            // std::cout << is.to_string() << " : " << V.nrows() << " x " << V.ncols() << std::endl;
             
             auto  Vn = basisapx.column_basis( V, acc );
             

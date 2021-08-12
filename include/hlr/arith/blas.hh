@@ -1008,17 +1008,37 @@ qrts  ( matrix< value_t > &  M,
     const blas_int_t        ncols = M.ncols();
     const blas_int_t        nbrow = 2*ncols;
     const blas_int_t        nbcol = ncols;
-    std::vector< value_t >  T( ncols * nrows * ( ( nrows - ncols ) / ncols + 1 ) );
-    std::vector< value_t >  work( ( nrows + nbcol ) * ncols );
+    std::vector< value_t >  T( nbcol * ncols * ( 1 + ( nrows - ncols ) / ( nbrow - ncols ) ) );
 
     HLR_ASSERT( 2*ncols < nrows );
 
-    blas_int_t  info = 0;
+    //
+    // work size query
+    //
+
+    auto  wquery = value_t(0);
+    auto  wsize  = blas_int_t(0);
+    auto  info   = blas_int_t(0);
+    
+    latsqr( nrows, ncols, nbrow, nbcol, M.data(), nrows, T.data(), nbcol, & wquery, -1, info );
+
+    wsize = blas_int_t( std::real( wquery ) );
+    
+    if ( comp_Q )
+    {
+        ungtsqr( nrows, ncols, nbrow, nbcol, M.data(), nrows, T.data(), nbcol, & wquery, -1, info );
+        wsize = std::max( wsize, blas_int_t( std::real( wquery ) ) );
+    }// if
+        
+    auto  work = std::vector< value_t >( wsize );
 
     // compute QR with H = I - V·T·V'
     latsqr( nrows, ncols, nbrow, nbcol, M.data(), nrows, T.data(), nbcol, work.data(), work.size(), info );
 
     // copy R
+    if (( blas_int_t( R.nrows() ) != ncols ) || ( blas_int_t( R.ncols() ) != ncols ))
+        R = std::move( blas::matrix< value_t >( ncols, ncols ) );
+    
     for ( blas_int_t  i = 0; i < ncols; ++i )
         for ( blas_int_t  j = 0; j <= i; ++j )
             R(j,i) = M(j,i);
@@ -1039,8 +1059,10 @@ qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
      const bool           comp_Q = true )
 {
-    blas::qr2( M, R, comp_Q );
-    // HLIB::BLAS::qr( M, R );
+    // if ( M.nrows() > 2*M.ncols() ) // not efficient in general
+    //    blas::qrts( M, R, comp_Q );
+    // else
+        blas::qr2( M, R, comp_Q );
 }
 
 //

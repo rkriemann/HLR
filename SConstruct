@@ -420,8 +420,8 @@ if 'cuda' in frameworks :
     env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
 
 # support for half precision
-env.Append( CPPDEFINES = 'HAS_HALF' )
-env.Append( CPPPATH    = '/opt/local/half/include' )
+#env.Append( CPPDEFINES = 'HAS_HALF' )
+#env.Append( CPPPATH    = '/opt/local/half/include' )
         
 ######################################################################
 #
