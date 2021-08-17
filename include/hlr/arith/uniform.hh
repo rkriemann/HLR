@@ -227,27 +227,6 @@ multiply ( const value_t            alpha,
            const approx_t &         approx )
 {
     auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( C );
-    auto  inner_prod         = detail::inner_map_t();
-    auto  accu               = detail::accumulator( nullptr );
-
-    accu.add_update( op_A, A, op_B, B );
-    
-    detail::multiply( alpha, C, accu, acc, approx, rowmap, colmap ); //, REF );
-}
-
-template < typename value_t,
-           typename approx_t >
-void
-multiply_cached ( const value_t            alpha,
-                  const matop_t            op_A,
-                  const hpro::TMatrix &    A,
-                  const matop_t            op_B,
-                  const hpro::TMatrix &    B,
-                  hpro::TMatrix &          C,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx )
-{
-    auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( C );
     auto  prod_inner         = detail::inner_map_t();
     auto  accu               = detail::accumulator( & prod_inner );
 
@@ -266,30 +245,21 @@ multiply_cached ( const value_t            alpha,
     // }// for
 
     // std::cout << "inner  : " << mem << ", " << nmat << std::endl;
-    
-    // mem  = 0;
-    // nmat = 0;
+}
 
-    // for( const auto & [ is, mat ] : prod_A )
-    // {
-    //     mem += mat.byte_size();
-    //     nmat++;
-    //     // std::cout << std::max( mat.nrows(), mat.ncols() ) << std::endl;
-    // }// for
-
-    // std::cout << "prod_A : " << mem << ", " << nmat << std::endl;
-    
-    // mem  = 0;
-    // nmat = 0;
-
-    // for( const auto & [ is, mat ] : prod_B )
-    // {
-    //     mem += mat.byte_size();
-    //     nmat++;
-    //     // std::cout << std::max( mat.nrows(), mat.ncols() ) << std::endl;
-    // }// for
-
-    // std::cout << "prod_B : " << mem << ", " << nmat << std::endl;
+template < typename value_t,
+           typename approx_t >
+void
+multiply_cached ( const value_t            alpha,
+                  const matop_t            op_A,
+                  const hpro::TMatrix &    A,
+                  const matop_t            op_B,
+                  const hpro::TMatrix &    B,
+                  hpro::TMatrix &          C,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
+{
+    multiply< value_t, approx_t >( alpha, op_A, A, op_B, B, C, acc, approx );
 }
 
 template < typename value_t,

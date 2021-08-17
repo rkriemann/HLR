@@ -38,13 +38,13 @@ using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRk
 void
 build_lrmatrix_map ( const cluster_tree &   ct,
                      const hpro::TMatrix &  M,
-                     lrmatrix_map_t &         mat_map,
+                     lrmatrix_map_t &       mat_map,
                      const bool             adjoint );
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
 construct_basis ( const cluster_tree &  ct,
-                  lrmatrix_map_t &        mat_map,
+                  lrmatrix_map_t &      mat_map,
                   const accuracy &      acc,
                   const bool            adjoint );
 

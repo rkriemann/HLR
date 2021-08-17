@@ -168,8 +168,19 @@ program_main ()
             std::cout << "    " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
 
             auto  B2    = impl::matrix::copy_uniform< value_t >( *B, *rowcb, *colcb );
-            auto  diff2 = matrix::sum( 1.0, *AxA, -1.0, *B2 );
+            auto  diff2 = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
                     
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+        }// if
+
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "converting to uniform-H" << term::reset << std::endl;
+    
+            auto  [ rowcb, colcb, B2 ] = impl::matrix::build_uniform_rec( *B, apx, acc, nseq );
+            auto  diff2                = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
+        
+            std::cout << "      mem    = " << format_mem( B2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
             std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
 

@@ -25,7 +25,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17'
+CXXFLAGS     = '-std=c++17 -fsanitize=thread -fno-omit-frame-pointer'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
@@ -337,7 +337,9 @@ if profile :
 
 if warn :
     WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
-    
+
+LINKFLAGS = LINKFLAGS + ' -fsanitize=thread'
+
 env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,

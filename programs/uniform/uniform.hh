@@ -56,25 +56,6 @@ program_main ()
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-    // {
-    //     std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
-    
-    //     tic = timer::now();
-    
-    //     auto  A_nf   = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
-
-    //     toc = timer::since( tic );
-    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
-
-    //     auto  norm_nf = norm::frobenius( *A_nf );
-
-    //     std::cout << "    |nf| =   " << format_norm( norm_nf ) << std::endl;
-
-    //     auto  acc_build = hpro::absolute_prec( norm_nf * hlr::cmdline::eps );
-        
-    //     std::cout << "  " << term::bullet << term::bold << "full matrix, ε = " << norm_nf * hlr::cmdline::eps << term::reset << std::endl;
-    // }
-
     auto  A = std::unique_ptr< hpro::TMatrix >();
     
     tic = timer::now();
@@ -86,7 +67,8 @@ program_main ()
     else
     {
         A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-        io::hpro::write( *A, "A.hm" );
+
+        // io::hpro::write( *A, "A.hm" );
     }// else
     
     toc = timer::since( tic );
@@ -133,78 +115,78 @@ program_main ()
         }
     }
 
-    // {
-    //     std::cout << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
+    {
+        std::cout << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
     
-    //     tic = timer::now();
+        tic = timer::now();
     
-    //     auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
-    //     toc = timer::since( tic );
-    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    //     std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
         
-    //     {
-    //         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
-    //         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        {
+            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+            auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-    //         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-    //     }
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
 
-    //     if ( true )
-    //     {
-    //         std::cout << "    " << term::bullet << term::bold << "single precision" << term::reset << std::endl;
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "single precision" << term::reset << std::endl;
 
-    //         using single_t = math::decrease_precision_t< value_t >;
+            using single_t = math::decrease_precision_t< value_t >;
 
-    //         auto  rowcb4 = matrix::copy< single_t >( *rowcb3 );
-    //         auto  colcb4 = matrix::copy< single_t >( *colcb3 );
+            auto  rowcb4 = matrix::copy< single_t >( *rowcb3 );
+            auto  colcb4 = matrix::copy< single_t >( *colcb3 );
             
-    //         auto  rowcb5 = matrix::copy< value_t >( *rowcb4 );
-    //         auto  colcb5 = matrix::copy< value_t >( *colcb4 );
+            auto  rowcb5 = matrix::copy< value_t >( *rowcb4 );
+            auto  colcb5 = matrix::copy< value_t >( *colcb4 );
 
-    //         std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
             
-    //         matrix::replace_cluster_basis( *A3, *rowcb5, *colcb5 );
+            matrix::replace_cluster_basis( *A3, *rowcb5, *colcb5 );
             
-    //         {
-    //             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
-    //             auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+            {
+                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+                auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-    //             std::cout << "      error  = " << format_error( error / normA ) << std::endl;
-    //         }
-    //     }
+                std::cout << "      error  = " << format_error( error / normA ) << std::endl;
+            }
+        }
 
-    //     #if defined(HAS_HALF)
-    //     if ( true )
-    //     {
-    //         std::cout << "    " << term::bullet << term::bold << "half precision" << term::reset << std::endl;
+        #if defined(HAS_HALF)
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "half precision" << term::reset << std::endl;
 
-    //         using single_t = math::decrease_precision_t< value_t >;
-    //         using half_t   = math::decrease_precision_t< single_t >;
+            using single_t = math::decrease_precision_t< value_t >;
+            using half_t   = math::decrease_precision_t< single_t >;
             
-    //         auto  rowcb4 = matrix::copy< half_t >( *rowcb3 );
-    //         auto  colcb4 = matrix::copy< half_t >( *colcb3 );
+            auto  rowcb4 = matrix::copy< half_t >( *rowcb3 );
+            auto  colcb4 = matrix::copy< half_t >( *colcb3 );
             
-    //         auto  rowcb5 = matrix::copy< single_t >( *rowcb4 );
-    //         auto  colcb5 = matrix::copy< single_t >( *colcb4 );
+            auto  rowcb5 = matrix::copy< single_t >( *rowcb4 );
+            auto  colcb5 = matrix::copy< single_t >( *colcb4 );
 
-    //         auto  rowcb6 = matrix::copy< value_t >( *rowcb5 );
-    //         auto  colcb6 = matrix::copy< value_t >( *colcb5 );
+            auto  rowcb6 = matrix::copy< value_t >( *rowcb5 );
+            auto  colcb6 = matrix::copy< value_t >( *colcb5 );
 
-    //         std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
             
-    //         matrix::replace_cluster_basis( *A3, *rowcb6, *colcb6 );
+            matrix::replace_cluster_basis( *A3, *rowcb6, *colcb6 );
             
-    //         {
-    //             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
-    //             auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+            {
+                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+                auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
-    //             std::cout << "      error  = " << format_error( error / normA ) << std::endl;
-    //         }
-    //     }
-    //     #endif
-    // }
+                std::cout << "      error  = " << format_error( error / normA ) << std::endl;
+            }
+        }
+        #endif
+    }
 
     //////////////////////////////////////////////////////////////////////
     //
