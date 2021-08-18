@@ -650,12 +650,10 @@ struct accumulator
         if ( ub - lb <= 1 )
         {
             //
-            // now handle all uniform x non-uniform
-            //
-            //   U ( Σ_i S_i X_i' ) × B_i = U ( Σ_i S_i ( X_i' × B_i ) )
-            //                            = U ( Σ_i S_i Z_i' )   with Z_i = B_i' × X_i
-            //                            = U ( Σ_i (Z_i B_i'))'
-            //                            = U Z'                 with Z   = Σ_i (Z_i S_i')
+            // U ( Σ_i S_i X_i' ) × B_i = U ( Σ_i S_i ( X_i' × B_i ) )
+            //                          = U ( Σ_i S_i Z_i' )   with Z_i = B_i' × X_i
+            //                          = U ( Σ_i (Z_i B_i'))'
+            //                          = U Z'                 with Z   = Σ_i (Z_i S_i')
             //
             
             auto  [ op_A, A, op_B, B ] = updates[ lb ];
@@ -696,12 +694,10 @@ struct accumulator
         if ( ub - lb <= 1 )
         {
             //
-            // now handle all non-uniform x uniform
-            //
-            //   A_i × ( Σ_i W_i S_i ) V' = ( Σ_i ( A_i × W_i ) S_i ) V'
-            //                            = ( Σ_i Y_i S_i ) V' with Y_i = A_i × W_i
-            //                            = ( Σ_i (Y_i S_i) ) V'
-            //                            = Y V'
+            // A_i × ( Σ_i W_i S_i ) V' = ( Σ_i ( A_i × W_i ) S_i ) V'
+            //                          = ( Σ_i Y_i S_i ) V' with Y_i = A_i × W_i
+            //                          = ( Σ_i (Y_i S_i) ) V'
+            //                          = Y V'
             //
 
             auto  [ op_A, A, op_B, B ] = updates[ lb ];
@@ -831,7 +827,6 @@ struct accumulator
         }// else
     }
 };
-
 
 //
 // build block mappings (indexset to matrix block)
@@ -1073,17 +1068,18 @@ struct rec_lu_factorization
                     const auto  L_ii = BL->block( i, i );
             
                     HLR_ASSERT( ! is_null( rowcb.son(i) ) );
+
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                    // ::tbb::parallel_for< uint >(
+                    //     0, BM->nblock_cols(),
+                    //     [&,side,diag,L_ii,BM,i] ( const uint  j )
+                    {
+                        HLR_ASSERT( ! is_null( colcb.son(j) ) );
                     
-                    ::tbb::parallel_for< uint >(
-                        0, BM->nblock_cols(),
-                        [&,side,diag,L_ii,BM,i] ( const uint  j )
-                        {
-                            HLR_ASSERT( ! is_null( colcb.son(j) ) );
-                    
-                            solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
-                                                        sub_accu(i,j), acc, approx,
-                                                        *rowcb.son(i), *colcb.son(j) );
-                        } );
+                        solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
+                                                    sub_accu(i,j), acc, approx,
+                                                    *rowcb.son(i), *colcb.son(j) );
+                    }// );
 
                     for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
                         for ( uint  j = 0; j < BM->nblock_cols(); ++j )
@@ -1097,7 +1093,7 @@ struct rec_lu_factorization
         }// if
         else if ( hlr::matrix::is_uniform_lowrank( M ) )
         {
-            std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
+            // std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
             
             //
             // update and solve local matrix
@@ -1241,17 +1237,18 @@ struct rec_lu_factorization
                     const auto  U_jj = BU->block( j, j );
                     
                     HLR_ASSERT( ! is_null_any( U_jj, colcb.son(j) ) );
+
+                    for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    // ::tbb::parallel_for< uint >(
+                    //     0, BM->nblock_rows(),
+                    //     [&,side,diag,U_jj,BM,j] ( const uint  i )
+                    {
+                        HLR_ASSERT( ! is_null( rowcb.son(i) ) );
                     
-                    ::tbb::parallel_for< uint >(
-                        0, BM->nblock_rows(),
-                        [&,side,diag,U_jj,BM,j] ( const uint  i )
-                        {
-                            HLR_ASSERT( ! is_null( rowcb.son(i) ) );
-                    
-                            solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
-                                                        sub_accu(i,j), acc, approx, 
-                                                        *rowcb.son(i), *colcb.son(j) );
-                        } );
+                        solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
+                                                    sub_accu(i,j), acc, approx, 
+                                                    *rowcb.son(i), *colcb.son(j) );
+                    }//  );
             
                     for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
                         for ( uint  i = 0; i < BM->nblock_rows(); ++i )
@@ -1261,7 +1258,7 @@ struct rec_lu_factorization
         }// if
         else if ( hlr::matrix::is_uniform_lowrank( M ) )
         {
-            std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
+            // std::cout << M.id() << "  " << M.block_is().to_string() << std::endl;
             
             //
             // update and solve local matrix
@@ -1417,35 +1414,37 @@ struct rec_lu_factorization
                                *rowcb_L.son(i), *colcb_L.son(i),
                                *rowcb_U.son(i), *colcb_U.son(i) );
 
-                ::tbb::parallel_invoke( 
-                    [&,i,BA,BU,BL] ()
-                    {
-                        ::tbb::parallel_for< uint >(
-                            i+1, BA->nblock_rows(),
-                            [&,i,BA,BU,BL] ( const uint  j )
+                // ::tbb::parallel_invoke( 
+                //     [&,i,BA,BU,BL] ()
+                //     {
+                //         ::tbb::parallel_for< uint >(
+                //             i+1, BA->nblock_rows(),
+                //             [&,i,BA,BU,BL] ( const uint  j )
+                            for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
                             {
                                 if ( ! is_null( BA->block( j, i ) ) )
                                     solve_upper_tri< value_t >( from_right, general_diag,
                                                                 *BU->block( i, i ), *BL->block( j, i ),
                                                                 sub_accu(j,i), acc, approx,
                                                                 *rowcb_L.son(j), *colcb_L.son(i) );
-                            } );
-                    },
+                            }// );
+                    // },
                     
-                    [&,i,BA,BU,BL] ()
-                    {
-                        ::tbb::parallel_for< uint >(
-                            i+1, BA->nblock_cols(),
-                            [&,i,BA,BU,BL] ( const uint  j )
+                    // [&,i,BA,BU,BL] ()
+                    // {
+                    //     ::tbb::parallel_for< uint >(
+                    //         i+1, BA->nblock_cols(),
+                    //         [&,i,BA,BU,BL] ( const uint  j )
+                            for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
                             {
                                 if ( ! is_null( BA->block( i, j ) ) )
                                     solve_lower_tri< value_t >( from_left, unit_diag,
                                                                 *BL->block( i, i ), *BU->block( i, j ),
                                                                 sub_accu(i,j), acc, approx,
                                                                 *rowcb_U.son(i), *colcb_U.son(j) );
-                            } );
-                    }
-                );
+                            }// );
+                //     }
+                // );
 
                 for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
                     for ( uint  l = i+1; l < BA->nblock_cols(); ++l )
