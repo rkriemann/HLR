@@ -17,6 +17,7 @@
 #include <hlr/utils/hash.hh>
 #include <hlr/arith/uniform.hh>
 #include <hlr/tbb/detail/uniform_accu.hh>
+#include <hlr/tbb/detail/uniform_accu_lu.hh>
 
 namespace hlr { namespace tbb { namespace uniform {
 
@@ -338,11 +339,8 @@ lu ( hpro::TMatrix &                          A,
      hlr::matrix::cluster_basis< value_t > &  rowcb_U,
      hlr::matrix::cluster_basis< value_t > &  colcb_U )
 {
-    // auto  pi_mtx     = std::mutex();
-    // auto  prod_inner = detail::inner_map_t();
-    // auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
-    auto  accu       = hlr::tbb::uniform::accu::detail::accumulator( nullptr, nullptr );
-    auto  lu         = hlr::tbb::uniform::accu::detail::rec_lu_factorization( L, U );
+    auto  accu = hlr::tbb::uniform::accu::detail2::accumulator();
+    auto  lu   = hlr::tbb::uniform::accu::detail2::rec_lu_factorization( L, U );
 
     lu.lu( A, L, U, accu, acc, approx, rowcb_L, colcb_L, rowcb_U, colcb_U );
 }
