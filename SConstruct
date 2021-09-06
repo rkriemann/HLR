@@ -424,8 +424,8 @@ if 'cuda' in frameworks :
     env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
 
 # support for half precision
-#env.Append( CPPDEFINES = 'HAS_HALF' )
-#env.Append( CPPPATH    = '/opt/local/half/include' )
+env.Append( CPPDEFINES = 'HAS_HALF' )
+env.Append( CPPPATH    = '/opt/local/half/2.2.0/include' )
         
 # support for ZFP compression
 env.Append( CPPDEFINES = 'HAS_ZFP' )
@@ -596,6 +596,7 @@ sources = [ 'src/apps/exp.cc',
             'src/dag/solve.cc',
             'src/matrix/level_matrix.cc',
             'src/matrix/lduinv_eval.cc',
+            'src/matrix/lrmatrix.cc',
             'src/matrix/luinv_eval.cc',
             'src/matrix/triinv_eval.cc',
             'src/matrix/print.cc',

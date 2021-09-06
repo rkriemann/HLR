@@ -76,6 +76,11 @@ using  generic_matrix = std::variant< blas::matrix< float >,
                                       blas::matrix< double >,
                                       blas::matrix< std::complex< double > > >;
 
+using  generic_vector = std::variant< blas::vector< float >,
+                                      blas::vector< std::complex< float > >,
+                                      blas::vector< double >,
+                                      blas::vector< std::complex< double > > >;
+
 //
 // enumerates the different matrix value types
 // - also index position in std::variant
@@ -88,6 +93,7 @@ enum class value_type {
     undefined
 };
 
+inline
 std::ostream &
 operator << ( std::ostream &    os,
               const value_type  v )
@@ -537,6 +543,20 @@ copy ( const T_vector &  v )
     return w;
 }
 
+template < typename value_dest_t,
+           typename value_src_t >
+vector< value_dest_t >
+copy ( const vector< value_src_t > &  v )
+{
+    const size_t            n = v.length();
+    vector< value_dest_t >  x( n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        x(i) = value_dest_t( v(i) );
+
+    return x;
+}
+
 template < typename T_matrix >
 typename std::enable_if_t< is_matrix< T_matrix >::value,
                            matrix< typename T_matrix::value_t > >
@@ -783,6 +803,24 @@ mulvec ( const T_matA &  A,
     HLR_DBG_ASSERT( A.ncols() == x.length() );
     
     return hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
+}
+
+template < typename T_matA,
+           typename T_vecX,
+           typename T_vecY >
+std::enable_if_t< is_matrix_v< T_matA > &&
+                  is_vector_v< T_vecX > &&
+                  is_vector_v< T_vecY > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t > &&
+                  std::is_same_v< typename T_matA::value_t, typename T_vecY::value_t > >
+mulvec ( const T_matA &  A,
+         const T_vecX &  x,
+         T_vecY &        y )
+{
+    HLR_DBG_ASSERT( A.ncols() == x.length() );
+    HLR_DBG_ASSERT( A.nrows() == y.length() );
+    
+    return hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
 }
 
 template < typename T_beta,
