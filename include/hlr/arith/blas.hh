@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <variant>
 
 #include <hpro/blas/Matrix.hh>
 #include <hpro/blas/Vector.hh>
@@ -65,6 +66,58 @@ using range = HLIB::BLAS::Range;
 
 template < typename value_t > using vector = HLIB::BLAS::Vector< value_t >;
 template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
+
+//
+// generic matrix type holding all different floating types
+// - just for storage, not for direct arithmetic!
+//
+using  generic_matrix = std::variant< blas::matrix< float >,
+                                      blas::matrix< std::complex< float > >,
+                                      blas::matrix< double >,
+                                      blas::matrix< std::complex< double > > >;
+
+//
+// enumerates the different matrix value types
+// - also index position in std::variant
+//
+enum class value_type {
+    rfp32 = 0,
+    cfp32 = 1,
+    rfp64 = 2,
+    cfp64 = 3,
+    undefined
+};
+
+std::ostream &
+operator << ( std::ostream &    os,
+              const value_type  v )
+{
+    switch ( v )
+    {
+        case value_type::rfp32 : return os << "float";                  break;
+        case value_type::cfp32 : return os << "std::complex< float >";  break;
+        case value_type::rfp64 : return os << "double";                 break;
+        case value_type::cfp64 : return os << "std::complex< double >"; break;
+        default                : return os << "undefined";              break;
+    }// switch
+}
+
+template <typename value_t> struct value_type_s                           { static constexpr value_type  value = value_type::undefined; };
+template <>                 struct value_type_s< float >                  { static constexpr value_type  value = value_type::rfp32; };
+template <>                 struct value_type_s< std::complex< float > >  { static constexpr value_type  value = value_type::cfp32; };
+template <>                 struct value_type_s< double >                 { static constexpr value_type  value = value_type::rfp64; };
+template <>                 struct value_type_s< std::complex< double > > { static constexpr value_type  value = value_type::cfp64; };
+
+template <typename value_t> inline constexpr value_type  value_type_v = value_type_s< value_t >::value;
+
+
+template < value_type v > struct value_type_t2                      { using type_t = void; };
+template <>               struct value_type_t2< value_type::rfp32 > { using type_t = float; };
+template <>               struct value_type_t2< value_type::cfp32 > { using type_t = std::complex< float >; };
+template <>               struct value_type_t2< value_type::rfp64 > { using type_t = double; };
+template <>               struct value_type_t2< value_type::cfp64 > { using type_t = std::complex< double >; };
+
+template < value_type v > using  value_type_t = typename value_type_t2< v >::type_t;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -510,6 +563,20 @@ copy ( const matrix< value_src_t > &  A )
         M.data()[i] = value_dest_t( A.data()[i] );
 
     return M;
+}
+
+template < typename value_src_t,
+           typename value_dest_t >
+void
+copy ( const matrix< value_src_t > &   A,
+       const matrix< value_dest_t > &  B )
+{
+    HLR_ASSERT(( A.nrows() == B.nrows() ) && ( A.ncols() == B.ncols() ));
+    
+    const size_t  n = A.nrows() * A.ncols();
+
+    for ( size_t  i = 0; i < n; ++i )
+        B.data()[i] = value_dest_t( A.data()[i] );
 }
 
 using hpro::BLAS::copy;

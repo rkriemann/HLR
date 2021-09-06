@@ -67,7 +67,7 @@ build ( const hpro::TBlockCluster *  bct,
     {
         if ( bct->is_adm() )
         {
-            M.reset( lrapx.build( bct, acc ) );
+            M.reset( lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) ) );
         }// if
         else
         {

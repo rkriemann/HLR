@@ -427,6 +427,12 @@ if 'cuda' in frameworks :
 #env.Append( CPPDEFINES = 'HAS_HALF' )
 #env.Append( CPPPATH    = '/opt/local/half/include' )
         
+# support for ZFP compression
+env.Append( CPPDEFINES = 'HAS_ZFP' )
+env.Append( CPPPATH    = '/opt/local/zfp/0.5.5/include' )
+env.Append( LIBPATH    = '/opt/local/zfp/0.5.5/lib' )
+env.Append( LIBS       = [ 'zfp' ] )
+        
 ######################################################################
 #
 # target 'help'
