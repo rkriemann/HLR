@@ -23,13 +23,16 @@
 #include "hlr/seq/matrix.hh"
 #include "hlr/matrix/restrict.hh"
 #include "hlr/matrix/convert.hh"
+#include "hlr/matrix/lrmatrix.hh"
 
 #include "hlr/tbb/detail/matrix.hh"
 
 namespace hlr { namespace tbb { namespace matrix {
 
 namespace hpro = HLIB;
-    
+
+using namespace hlr::matrix;
+
 //
 // build representation of dense matrix with
 // matrix structure defined by <bct>,
@@ -67,7 +70,26 @@ build ( const hpro::TBlockCluster *  bct,
     {
         if ( bct->is_adm() )
         {
-            M.reset( lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) ) );
+            auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
+
+            if ( is_lowrank( *T ) )
+            {
+                auto  RT = ptrcast( T.get(), hpro::TRkMatrix );
+                auto  R  = std::make_unique< matrix::lrmatrix >( T->row_is(), T->col_is() );
+
+                if ( T->is_complex() )
+                    R->set_lrmat( std::move( blas::mat_U< hpro::complex >( *RT ) ),
+                                  std::move( blas::mat_V< hpro::complex >( *RT ) ) );
+                else
+                    R->set_lrmat( std::move( blas::mat_U< hpro::real >( *RT ) ),
+                                  std::move( blas::mat_V< hpro::real >( *RT ) ) );
+
+                M = std::move( R );
+            }// if
+            else
+            {
+                M = std::move( T );
+            }// else
         }// if
         else
         {

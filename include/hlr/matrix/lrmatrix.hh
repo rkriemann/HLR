@@ -269,22 +269,22 @@ public:
 //
 // type test
 //
-// inline
-// bool
-// is_lowrank ( const hpro::TMatrix &  M )
-// {
-//     return IS_TYPE( &M, lrmatrix );
-// }
+inline
+bool
+is_lowrank2 ( const hpro::TMatrix &  M )
+{
+    return IS_TYPE( &M, lrmatrix );
+}
 
-// inline
-// bool
-// is_lowrank ( const hpro::TMatrix *  M )
-// {
-//     return ! is_null( M ) && IS_TYPE( M, lrmatrix );
-// }
+inline
+bool
+is_lowrank2 ( const hpro::TMatrix *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, lrmatrix );
+}
 
-// HLR_TEST_ALL( is_lowrank, hpro::TMatrix )
-// HLR_TEST_ANY( is_lowrank, hpro::TMatrix )
+HLR_TEST_ALL( is_lowrank2, hpro::TMatrix )
+HLR_TEST_ANY( is_lowrank2, hpro::TMatrix )
 
 }} // namespace hlr::matrix
 

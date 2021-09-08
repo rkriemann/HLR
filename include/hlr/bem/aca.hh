@@ -56,14 +56,18 @@ public:
     //
 
     // build low rank matrix for block cluster bct with rank defined by accuracy acc
-    virtual hpro::TMatrix * build ( const hpro::TBlockCluster *   bc,
-                                    const hpro::TTruncAcc &       acc ) const
+    virtual
+    std::unique_ptr< hpro::TMatrix >
+    build ( const hpro::TBlockCluster *   bc,
+            const hpro::TTruncAcc &       acc ) const
     {
         return build( bc->is(), acc );
     }
 
-    virtual hpro::TMatrix * build ( const hpro::TBlockIndexSet &  bis,
-                                    const hpro::TTruncAcc &       acc ) const
+    virtual
+    std::unique_ptr< hpro::TMatrix >
+    build ( const hpro::TBlockIndexSet &  bis,
+            const hpro::TTruncAcc &       acc ) const
     {
         const auto  op           = coefffn_operator( bis, _coeff_fn );
         auto        pivot_search = approx::aca_pivot< decltype(op) >( op );
@@ -89,7 +93,7 @@ public:
 
         R->truncate( acc );
 
-        return R.release();
+        return R;
     }
 };
 

@@ -290,11 +290,20 @@ lrmatrix::truncate ( const hpro::TTruncAcc & )
 std::unique_ptr< hpro::TMatrix >
 lrmatrix::copy () const
 {
-    // auto  M = std::make_unique< lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
+    auto  M = std::make_unique< lrmatrix >( _row_is, _col_is );
 
-    // M->copy_struct_from( this );
+    M->copy_struct_from( this );
     
-    // return M;
+    std::visit(
+        [&M,this] ( auto &&  U )
+        {
+            using  value_t  = typename std::decay_t< decltype(U) >::value_t;
+            
+            M->set_lrmat( std::move( blas::copy( U ) ),
+                          std::move( blas::copy( V< value_t >() ) ) ); },
+        _U );
+    
+    return M;
 }
 
 //
@@ -311,7 +320,7 @@ lrmatrix::copy ( const hpro::TTruncAcc &,
 // return structural copy of matrix
 //
 std::unique_ptr< hpro::TMatrix >
-lrmatrix::copy_struct  () const
+lrmatrix::copy_struct () const
 {
     return std::make_unique< lrmatrix >( _row_is, _col_is );
 }
@@ -322,17 +331,23 @@ lrmatrix::copy_struct  () const
 void
 lrmatrix::copy_to ( hpro::TMatrix *  A ) const
 {
-    // hpro::TMatrix::copy_to( A );
+    hpro::TMatrix::copy_to( A );
     
-    // HLR_ASSERT( IS_TYPE( A, lrmatrix ) );
+    HLR_ASSERT( IS_TYPE( A, lrmatrix ) );
 
-    // auto  R = ptrcast( A, lrmatrix );
+    auto  R = ptrcast( A, lrmatrix );
 
-    // R->_row_is = _row_is;
-    // R->_col_is = _col_is;
-    // R->_row_cb = _row_cb;
-    // R->_col_cb = _col_cb;
-    // R->_S      = std::move( blas::copy( _S ) );
+    R->_row_is = _row_is;
+    R->_col_is = _col_is;
+    
+    std::visit(
+        [&R,this] ( auto &&  U )
+        {
+            using  value_t  = typename std::decay_t< decltype(U) >::value_t;
+            
+            R->set_lrmat( std::move( blas::copy( U ) ),
+                          std::move( blas::copy( V< value_t >() ) ) ); },
+        _U );
 }
 
 //
@@ -354,9 +369,10 @@ lrmatrix::byte_size () const
 {
     size_t  size = hpro::TMatrix::byte_size();
 
-    size += sizeof(_row_is) + sizeof(_col_is);
-    // size += sizeof(_row_cb) + sizeof(_col_cb);
-    // size += sizeof(_S) + sizeof(value_t) * _S.nrows() * _S.ncols();
+    size += sizeof(_row_is) + sizeof(_col_is) + sizeof(_vtype);
+
+    std::visit( [&size] ( auto &&  U ) { size += U.byte_size(); }, _U );
+    std::visit( [&size] ( auto &&  V ) { size += V.byte_size(); }, _V );
 
     return size;
 }
