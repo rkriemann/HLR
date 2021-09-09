@@ -71,10 +71,22 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 // generic matrix type holding all different floating types
 // - just for storage, not for direct arithmetic!
 //
-using  generic_matrix = std::variant< blas::matrix< float >,
-                                      blas::matrix< std::complex< float > >,
-                                      blas::matrix< double >,
-                                      blas::matrix< std::complex< double > > >;
+
+#if defined (HAS_HALF)
+using hlr::math::half;
+#endif
+
+using  generic_matrix =
+    std::variant<
+    #if defined (HAS_HALF)
+    blas::matrix< half >,
+    blas::matrix< std::complex< half > >,
+    #endif
+    blas::matrix< float >,
+    blas::matrix< std::complex< float > >,
+    blas::matrix< double >,
+    blas::matrix< std::complex< double > >
+    >;
 
 using  generic_vector = std::variant< blas::vector< float >,
                                       blas::vector< std::complex< float > >,
@@ -86,10 +98,19 @@ using  generic_vector = std::variant< blas::vector< float >,
 // - also index position in std::variant
 //
 enum class value_type {
+    #if defined (HAS_HALF)
+    rfp16 = 0,
+    cfp16 = 1,
+    rfp32 = 2,
+    cfp32 = 3,
+    rfp64 = 4,
+    cfp64 = 5,
+    #else
     rfp32 = 0,
     cfp32 = 1,
     rfp64 = 2,
     cfp64 = 3,
+    #endif
     undefined
 };
 
@@ -100,6 +121,10 @@ operator << ( std::ostream &    os,
 {
     switch ( v )
     {
+        #if defined (HAS_HALF)
+        case value_type::rfp16 : return os << "half";                  break;
+        case value_type::cfp16 : return os << "std::complex< half >";  break;
+        #endif
         case value_type::rfp32 : return os << "float";                  break;
         case value_type::cfp32 : return os << "std::complex< float >";  break;
         case value_type::rfp64 : return os << "double";                 break;
@@ -109,6 +134,10 @@ operator << ( std::ostream &    os,
 }
 
 template <typename value_t> struct value_type_s                           { static constexpr value_type  value = value_type::undefined; };
+#if defined (HAS_HALF)
+template <>                 struct value_type_s< half >                   { static constexpr value_type  value = value_type::rfp16; };
+template <>                 struct value_type_s< std::complex< half > >   { static constexpr value_type  value = value_type::cfp16; };
+#endif
 template <>                 struct value_type_s< float >                  { static constexpr value_type  value = value_type::rfp32; };
 template <>                 struct value_type_s< std::complex< float > >  { static constexpr value_type  value = value_type::cfp32; };
 template <>                 struct value_type_s< double >                 { static constexpr value_type  value = value_type::rfp64; };
@@ -118,6 +147,10 @@ template <typename value_t> inline constexpr value_type  value_type_v = value_ty
 
 
 template < value_type v > struct value_type_t2                      { using type_t = void; };
+#if defined (HAS_HALF)
+template <>               struct value_type_t2< value_type::rfp16 > { using type_t = half; };
+template <>               struct value_type_t2< value_type::cfp16 > { using type_t = std::complex< half >; };
+#endif
 template <>               struct value_type_t2< value_type::rfp32 > { using type_t = float; };
 template <>               struct value_type_t2< value_type::cfp32 > { using type_t = std::complex< float >; };
 template <>               struct value_type_t2< value_type::rfp64 > { using type_t = double; };

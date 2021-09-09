@@ -14,6 +14,8 @@
 
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/operator_wrapper.hh"
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include <hlr/matrix/identity.hh>
@@ -97,6 +99,55 @@ frobenius ( const hpro::TMatrix &  A )
             return std::sqrt( std::abs( val ) );
         }// else
     }// if
+    else if ( matrix::is_generic_lowrank( A ) )
+    {
+        auto  R = cptrcast( &A, matrix::lrmatrix );
+        
+        //
+        // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
+        //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
+        //              = ∑_ij ∑_k ∑_l U_ik V_jk' U_il' V_jl
+        //              = ∑_k ∑_l ∑_i U_ik U_il' ∑_j V_jk' V_jl
+        //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
+        //
+
+        if ( R->is_complex() )
+        {
+            assert( false );
+        }// if
+        else
+        {
+            const auto  UV  = R->factors();
+
+            return std::visit(
+                [rank=R->rank()] ( auto &&  UV ) -> double
+                {
+                    using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+                    
+                    const auto  U    = UV.U;
+                    const auto  V    = UV.V;
+                    value_t     norm = value_t(0);
+                    
+                    for ( size_t  l = 0; l < rank; l++ )
+                    {
+                        const auto  U_l = U.column( l );
+                        const auto  V_l = V.column( l );
+                        
+                        for ( size_t  k = 0; k < rank; k++ )
+                        {
+                            const auto  U_k = U.column( k );
+                            const auto  V_k = V.column( k );
+                            
+                            norm += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
+                        }// for
+                    }// for
+                    
+                    return std::real( std::sqrt( std::abs( norm ) ) );
+                },
+                R->factors()
+            );
+        }// else
+    }// if
     else if ( hlr::matrix::is_tiled_lowrank( A ) )
     {
         //
@@ -172,6 +223,11 @@ frobenius ( const hpro::TMatrix &  A )
             return blas::normF( hpro::blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
         else
             return blas::normF( hpro::blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
+    }// if
+    else if ( matrix::is_generic_dense( A ) )
+    {
+        return std::visit( [] ( auto &&  M ) -> double { return blas::normF( M ); },
+                           cptrcast( &A, matrix::dense_matrix )->matrix() ); 
     }// if
     else
     {

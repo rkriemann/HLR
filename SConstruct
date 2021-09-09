@@ -40,6 +40,7 @@ TBB_DIR      = '/'
 TASKFLOW_DIR = '/'
 HPX_DIR      = '/'
 GPI2_DIR     = '/'
+CUDA_DIR     = '/'
 
 JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
@@ -47,11 +48,12 @@ TCMALLOC_DIR = '/'
 
 likwid       = False
 LIKWID_DIR   = '/opt/local/likwid'
-
 scorep       = False
 SCOREP_DIR   = '/opt/local/scorep/7.0'
-
-CUDA_DIR     = '/'
+half         = False
+HALF_DIR     = '/opt/local/half/2.2.0'
+zfp          = False
+ZFP_DIR      = '/opt/local/zfp/0.5.5'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -196,6 +198,8 @@ opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', 
 opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
 opts.Add( BoolVariable( 'scorep',   'use Score-P library',           scorep ) )
+opts.Add( BoolVariable( 'half',     'use half precision library',    half ) )
+opts.Add( BoolVariable( 'zfp',      'use ZFP compression library',   zfp ) )
 
 opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
@@ -250,6 +254,8 @@ lapack       = opt_env['lapack']
 malloc       = opt_env['malloc']
 likwid       = opt_env['likwid']
 scorep       = opt_env['scorep']
+half         = opt_env['half']
+zfp          = opt_env['zfp']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
@@ -424,14 +430,16 @@ if 'cuda' in frameworks :
     env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
 
 # support for half precision
-env.Append( CPPDEFINES = 'HAS_HALF' )
-env.Append( CPPPATH    = '/opt/local/half/2.2.0/include' )
+if half :
+    env.Append( CPPDEFINES = 'HAS_HALF' )
+    env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
         
 # support for ZFP compression
-env.Append( CPPDEFINES = 'HAS_ZFP' )
-env.Append( CPPPATH    = '/opt/local/zfp/0.5.5/include' )
-env.Append( LIBPATH    = '/opt/local/zfp/0.5.5/lib' )
-env.Append( LIBS       = [ 'zfp' ] )
+if zfp :
+    env.Append( CPPDEFINES = 'HAS_ZFP' )
+    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zfp' ] )
         
 ######################################################################
 #
@@ -594,6 +602,7 @@ sources = [ 'src/apps/exp.cc',
             'src/dag/lu_tileh.cc',
             'src/dag/node.cc',
             'src/dag/solve.cc',
+            'src/matrix/dense_matrix.cc',
             'src/matrix/level_matrix.cc',
             'src/matrix/lduinv_eval.cc',
             'src/matrix/lrmatrix.cc',

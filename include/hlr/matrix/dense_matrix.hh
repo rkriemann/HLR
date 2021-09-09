@@ -1,9 +1,9 @@
-#ifndef __HLR_MATRIX_LRMATRIX_HH
-#define __HLR_MATRIX_LRMATRIX_HH
+#ifndef __HLR_MATRIX_DENSE_MATRIX_HH
+#define __HLR_MATRIX_DENSE_MATRIX_HH
 //
 // Project     : HLR
-// Module      : lrmatrix
-// Description : low-rank matrix with dynamic value type
+// Module      : dense_matrix
+// Description : dense matrix with dynamic value type
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
@@ -22,7 +22,7 @@ namespace hpro = HLIB;
 using indexset = hpro::TIndexSet;
 
 // local matrix type
-DECLARE_TYPE( lrmatrix );
+DECLARE_TYPE( dense_matrix );
 
 namespace matrix
 {
@@ -32,36 +32,16 @@ namespace matrix
 // with U and V represented as row/column cluster bases for
 // corresponding matrix block (maybe joined by more matrices).
 //
-class lrmatrix : public hpro::TMatrix
+class dense_matrix : public hpro::TMatrix
 {
-public:
-    template < typename T_value >
-    struct lrfactors
-    {
-        using value_t = T_value;
-        
-        blas::matrix< value_t >  U, V;
-    };
-
-    using  generic_lrfactors = std::variant<
-        #if defined HAS_HALF
-        lrfactors< math::half >,
-        lrfactors< std::complex< math::half > >,
-        #endif
-        lrfactors< float >,
-        lrfactors< std::complex< float > >,
-        lrfactors< double >,
-        lrfactors< std::complex< double > >
-        >;
-    
 private:
     // local index set of matrix
     indexset              _row_is, _col_is;
     
-    // lowrank factors
-    generic_lrfactors     _UV;
+    // matrix coefficients
+    blas::generic_matrix  _M;
 
-    // indicates internal value type
+    // indicates internal value type (TODO: replace by std::variant::index)
     blas::value_type      _vtype;
     
 public:
@@ -69,7 +49,7 @@ public:
     // ctors
     //
 
-    lrmatrix ()
+    dense_matrix ()
             : TMatrix()
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
@@ -77,8 +57,8 @@ public:
     {
     }
     
-    lrmatrix ( const indexset                arow_is,
-               const indexset                acol_is )
+    dense_matrix ( const indexset                arow_is,
+                   const indexset                acol_is )
             : TMatrix()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -88,98 +68,80 @@ public:
     }
 
     template < typename value_t >
-    lrmatrix ( const indexset                   arow_is,
-               const indexset                   acol_is,
-               hlr::blas::matrix< value_t > &   aU,
-               hlr::blas::matrix< value_t > &   aV )
+    dense_matrix ( const indexset                   arow_is,
+                   const indexset                   acol_is,
+                   hlr::blas::matrix< value_t > &   aM )
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _UV( blas::copy( aU ), blas::copy( aV ) )
+            , _M( blas::copy( aM ) )
             , _vtype( blas::value_type_v< value_t > )
     {
-        HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
-                   ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-                   ( std::get< blas::matrix< value_t > >( _UV ).U.ncols() == std::get< blas::matrix< value_t > >( _UV ).V.ncols() ));
+        HLR_ASSERT(( _row_is.size() == std::get< blas::matrix< value_t > >( _M ).nrows() ) &&
+                   ( _col_is.size() == std::get< blas::matrix< value_t > >( _M ).ncols() ));
 
         set_ofs( _row_is.first(), _col_is.first() );
     }
 
     template < typename value_t >
-    lrmatrix ( const indexset                   arow_is,
-               const indexset                   acol_is,
-               hlr::blas::matrix< value_t > &&  aU,
-               hlr::blas::matrix< value_t > &&  aV )
+    dense_matrix ( const indexset                   arow_is,
+                   const indexset                   acol_is,
+                   hlr::blas::matrix< value_t > &&  aM )
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _UV( std::move( aU ), std::move( aV ) )
+            , _M( std::move( aM ) )
             , _vtype( blas::value_type_v< value_t > )
     {
-        HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
-                   ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-                   ( std::get< blas::matrix< value_t > >( _UV ).U.ncols() == std::get< blas::matrix< value_t > >( _UV ).V.ncols() ));
+        HLR_ASSERT(( _row_is.size() == std::get< blas::matrix< value_t > >( _M ).nrows() ) &&
+                   ( _col_is.size() == std::get< blas::matrix< value_t > >( _M ).ncols() ));
 
         set_ofs( _row_is.first(), _col_is.first() );
     }
 
     // dtor
-    virtual ~lrmatrix ()
+    virtual ~dense_matrix ()
     {}
     
     //
     // access internal data
     //
 
-    uint
-    rank () const
-    {
-        return std::visit( [] ( auto &&  M ) { return M.U.ncols(); }, _UV );
-    }
-
     // return value type of matrix
     blas::value_type  value_type () const { return _vtype; }
 
-    generic_lrfactors        factors ()       { return _UV; }
-    const generic_lrfactors  factors () const { return _UV; }
+    blas::generic_matrix        matrix ()       { return _M; }
+    const blas::generic_matrix  matrix () const { return _M; }
     
-    template < typename value_t > blas::matrix< value_t > &        U ()       { return std::get< lrfactors< value_t > >( _UV ).U; }
-    template < typename value_t > blas::matrix< value_t > &        V ()       { return std::get< lrfactors< value_t > >( _UV ).V; }
-    
-    template < typename value_t > const blas::matrix< value_t > &  U () const { return std::get< lrfactors< value_t > >( _UV ).U; }
-    template < typename value_t > const blas::matrix< value_t > &  V () const { return std::get< lrfactors< value_t > >( _UV ).V; }
+    template < typename value_t > blas::matrix< value_t > &        M ()       { return std::get< blas::matrix< value_t > >( _M ); }
+    template < typename value_t > const blas::matrix< value_t > &  M () const { return std::get< blas::matrix< value_t > >( _M ); }
     
     template < typename value_t >
     void
-    set_lrmat ( const blas::matrix< value_t > &  aU,
-                const blas::matrix< value_t > &  aV )
+    set_matrix ( const blas::matrix< value_t > &  aM )
     {
-        HLR_ASSERT(( nrows()    == aU.nrows() ) &&
-                   ( ncols()    == aV.nrows() ) &&
-                   ( aU.ncols() == aV.ncols() ));
+        HLR_ASSERT(( nrows()    == aM.nrows() ) &&
+                   ( ncols()    == aM.ncols() ));
 
-        if (( blas::value_type_v< value_t > == _vtype ) && ( aU.ncols() == U< value_t >().ncols() ))
+        if ( blas::value_type_v< value_t > == _vtype )
         {
-            blas::copy( aU, U< value_t >() );
-            blas::copy( aV, V< value_t >() );
+            blas::copy( aM, M< value_t >() );
         }// if
         else
         {
-            _UV    = lrfactors< value_t >{ blas::copy( aU ), blas::copy( aV ) };
+            _M     = std::move( blas::copy( aM ) );
             _vtype = blas::value_type_v< value_t >;
         }// else
     }
     
     template < typename value_t >
     void
-    set_lrmat ( blas::matrix< value_t > &&  aU,
-                blas::matrix< value_t > &&  aV )
+    set_lrmat ( blas::matrix< value_t > &&  aM )
     {
-        HLR_ASSERT(( nrows()    == aU.nrows() ) &&
-                   ( ncols()    == aV.nrows() ) &&
-                   ( aU.ncols() == aV.ncols() ));
+        HLR_ASSERT(( nrows()    == aM.nrows() ) &&
+                   ( ncols()    == aM.ncols() ));
 
-        _UV    = lrfactors< value_t >{ std::move( aU ), std::move( aV ) };
+        _M     = std::move( aM );
         _vtype = blas::value_type_v< value_t >;
     }
 
@@ -198,7 +160,7 @@ public:
     using TMatrix::ncols;
     
     // return true, if matrix is zero
-    virtual bool    is_zero   () const { return ( rank() == 0 ); }
+    virtual bool    is_zero   () const { return false; } // full test too expensive
     
     virtual void    set_size  ( const size_t  ,
                                 const size_t   ) {} // ignored
@@ -218,7 +180,7 @@ public:
     virtual void mul_vec  ( const hpro::real       alpha,
                             const hpro::TVector *  x,
                             const hpro::real       beta,
-                            hpro::TVector *        y,
+                            hpro::TVector       *  y,
                             const hpro::matop_t    op = hpro::apply_normal ) const;
     using hpro::TMatrix::mul_vec;
     
@@ -226,11 +188,11 @@ public:
     virtual void cmul_vec ( const hpro::complex    alpha,
                             const hpro::TVector *  x,
                             const hpro::complex    beta,
-                            hpro::TVector *        y,
+                            hpro::TVector       *  y,
                             const hpro::matop_t    op = hpro::apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
-    virtual void truncate ( const hpro::TTruncAcc & acc );
+    virtual void truncate ( const hpro::TTruncAcc & ) {}
 
     // scale matrix by alpha
     virtual void scale    ( const hpro::real  alpha )
@@ -240,26 +202,23 @@ public:
             {
                 using  value_t  = typename std::decay_t< decltype(M) >::value_t;
 
-                if ( M.U.nrows() < M.V.ncols() )
-                    blas::scale( value_t(alpha), M.U );
-                else
-                    blas::scale( value_t(alpha), M.V );
+                blas::scale( value_t(alpha), M );
             },
-            _UV );
+            _M );
     }
 
     //
     // RTTI
     //
 
-    HLIB_RTTI_DERIVED( lrmatrix, TMatrix )
+    HLIB_RTTI_DERIVED( dense_matrix, TMatrix )
 
     //
     // virtual constructor
     //
 
     // return matrix of same class (but no content)
-    virtual auto   create       () const -> std::unique_ptr< hpro::TMatrix > { return std::make_unique< lrmatrix >(); }
+    virtual auto   create       () const -> std::unique_ptr< hpro::TMatrix > { return std::make_unique< dense_matrix >(); }
 
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< hpro::TMatrix >;
@@ -292,21 +251,21 @@ public:
 //
 inline
 bool
-is_generic_lowrank ( const hpro::TMatrix &  M )
+is_generic_dense ( const hpro::TMatrix &  M )
 {
-    return IS_TYPE( &M, lrmatrix );
+    return IS_TYPE( &M, dense_matrix );
 }
 
 inline
 bool
-is_generic_lowrank ( const hpro::TMatrix *  M )
+is_generic_dense ( const hpro::TMatrix *  M )
 {
-    return ! is_null( M ) && IS_TYPE( M, lrmatrix );
+    return ! is_null( M ) && IS_TYPE( M, dense_matrix );
 }
 
-HLR_TEST_ALL( is_generic_lowrank, hpro::TMatrix )
-HLR_TEST_ANY( is_generic_lowrank, hpro::TMatrix )
+HLR_TEST_ALL( is_generic_dense, hpro::TMatrix )
+HLR_TEST_ANY( is_generic_dense, hpro::TMatrix )
 
 }} // namespace hlr::matrix
 
-#endif // __HLR_MATRIX_LRMATRIX_HH
+#endif // __HLR_MATRIX_DENSE_MATRIX_HH
