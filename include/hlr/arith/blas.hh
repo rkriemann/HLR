@@ -76,8 +76,7 @@ template < typename value_t > using matrix = HLIB::BLAS::Matrix< value_t >;
 using hlr::math::half;
 #endif
 
-using  generic_matrix =
-    std::variant<
+using  generic_matrix = std::variant<
     #if defined (HAS_HALF)
     blas::matrix< half >,
     blas::matrix< std::complex< half > >,
@@ -85,8 +84,7 @@ using  generic_matrix =
     blas::matrix< float >,
     blas::matrix< std::complex< float > >,
     blas::matrix< double >,
-    blas::matrix< std::complex< double > >
-    >;
+    blas::matrix< std::complex< double > > >;
 
 using  generic_vector = std::variant< blas::vector< float >,
                                       blas::vector< std::complex< float > >,
@@ -157,6 +155,88 @@ template <>               struct value_type_t2< value_type::rfp64 > { using type
 template <>               struct value_type_t2< value_type::cfp64 > { using type_t = std::complex< double >; };
 
 template < value_type v > using  value_type_t = typename value_type_t2< v >::type_t;
+
+
+template < value_type T1,
+           value_type T2 >
+struct promote_value_type_s
+{
+    static constexpr value_type  value = value_type::undefined;
+};
+
+#define PROMOTE_VALUE_TYPE( T1, T2, T3 )                                \
+    template <> struct promote_value_type_s< T1, T2 > { static constexpr value_type value = T3; };
+
+PROMOTE_VALUE_TYPE( value_type::rfp32, value_type::rfp32, value_type::rfp32 )
+PROMOTE_VALUE_TYPE( value_type::rfp32, value_type::cfp32, value_type::cfp32 )
+PROMOTE_VALUE_TYPE( value_type::rfp32, value_type::rfp64, value_type::rfp64 )
+PROMOTE_VALUE_TYPE( value_type::rfp32, value_type::cfp64, value_type::cfp64 )
+PROMOTE_VALUE_TYPE( value_type::rfp64, value_type::rfp32, value_type::rfp64 )
+PROMOTE_VALUE_TYPE( value_type::rfp64, value_type::cfp32, value_type::cfp64 )
+PROMOTE_VALUE_TYPE( value_type::rfp64, value_type::rfp64, value_type::rfp64 )
+PROMOTE_VALUE_TYPE( value_type::rfp64, value_type::cfp64, value_type::cfp64 )
+
+template < value_type T1, value_type T2> inline constexpr value_type promote_value_type_v = promote_value_type_s< T1, T2 >::value;
+
+inline
+value_type
+promote_value_type ( const value_type  t1,
+                     const value_type  t2 )
+{
+    switch ( t1 )
+    {
+        case value_type::rfp32 :
+        {
+            switch ( t2 )
+            {
+                case value_type::rfp32 : return promote_value_type_v< value_type::rfp32, value_type::rfp32 >;
+                case value_type::cfp32 : return promote_value_type_v< value_type::rfp32, value_type::cfp32 >;
+                case value_type::rfp64 : return promote_value_type_v< value_type::rfp32, value_type::rfp64 >;
+                case value_type::cfp64 : return promote_value_type_v< value_type::rfp32, value_type::cfp64 >;
+                default                : return value_type::undefined;
+            }// switch
+        }
+        
+        case value_type::cfp32 :
+        {
+            switch ( t2 )
+            {
+                case value_type::rfp32 : return promote_value_type_v< value_type::cfp32, value_type::rfp32 >;
+                case value_type::cfp32 : return promote_value_type_v< value_type::cfp32, value_type::cfp32 >;
+                case value_type::rfp64 : return promote_value_type_v< value_type::cfp32, value_type::rfp64 >;
+                case value_type::cfp64 : return promote_value_type_v< value_type::cfp32, value_type::cfp64 >;
+                default                : return value_type::undefined;
+            }// switch
+        }
+        
+        case value_type::rfp64 :
+        {
+            switch ( t2 )
+            {
+                case value_type::rfp32 : return promote_value_type_v< value_type::rfp64, value_type::rfp32 >;
+                case value_type::cfp32 : return promote_value_type_v< value_type::rfp64, value_type::cfp32 >;
+                case value_type::rfp64 : return promote_value_type_v< value_type::rfp64, value_type::rfp64 >;
+                case value_type::cfp64 : return promote_value_type_v< value_type::rfp64, value_type::cfp64 >;
+                default                : return value_type::undefined;
+            }// switch
+        }
+        
+        case value_type::cfp64 :
+        {
+            switch ( t2 )
+            {
+                case value_type::rfp32 : return promote_value_type_v< value_type::cfp64, value_type::rfp32 >;
+                case value_type::cfp32 : return promote_value_type_v< value_type::cfp64, value_type::cfp32 >;
+                case value_type::rfp64 : return promote_value_type_v< value_type::cfp64, value_type::rfp64 >;
+                case value_type::cfp64 : return promote_value_type_v< value_type::cfp64, value_type::cfp64 >;
+                default                : return value_type::undefined;
+            }// switch
+        }
+        
+        default :
+            return value_type::undefined;
+    }// switch
+}
 
 //////////////////////////////////////////////////////////////////////
 //

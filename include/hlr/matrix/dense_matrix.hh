@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <variant>
+
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
@@ -41,7 +43,8 @@ private:
     // matrix coefficients
     blas::generic_matrix  _M;
 
-    // indicates internal value type (TODO: replace by std::variant::index)
+    // indicates internal value type
+    // - after initialization identical to _M.index()
     blas::value_type      _vtype;
     
 public:
@@ -120,8 +123,7 @@ public:
     void
     set_matrix ( const blas::matrix< value_t > &  aM )
     {
-        HLR_ASSERT(( nrows()    == aM.nrows() ) &&
-                   ( ncols()    == aM.ncols() ));
+        HLR_ASSERT(( nrows() == aM.nrows() ) && ( ncols() == aM.ncols() ));
 
         if ( blas::value_type_v< value_t > == _vtype )
         {
@@ -138,8 +140,7 @@ public:
     void
     set_lrmat ( blas::matrix< value_t > &&  aM )
     {
-        HLR_ASSERT(( nrows()    == aM.nrows() ) &&
-                   ( ncols()    == aM.ncols() ));
+        HLR_ASSERT(( nrows() == aM.nrows() ) && ( ncols() == aM.ncols() ));
 
         _M     = std::move( aM );
         _vtype = blas::value_type_v< value_t >;

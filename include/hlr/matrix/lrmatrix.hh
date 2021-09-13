@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <variant>
+
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
@@ -62,6 +64,7 @@ private:
     generic_lrfactors     _UV;
 
     // indicates internal value type
+    // - after initialization identical to _M.index()
     blas::value_type      _vtype;
     
 public:
@@ -95,12 +98,12 @@ public:
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _UV( blas::copy( aU ), blas::copy( aV ) )
+            , _UV( lrfactors< value_t >{ blas::copy( aU ), blas::copy( aV ) } )
             , _vtype( blas::value_type_v< value_t > )
     {
         HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
                    ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-                   ( std::get< blas::matrix< value_t > >( _UV ).U.ncols() == std::get< blas::matrix< value_t > >( _UV ).V.ncols() ));
+                   ( std::get< lrfactors< value_t > >( _UV ).U.ncols() == std::get< lrfactors< value_t > >( _UV ).V.ncols() ));
 
         set_ofs( _row_is.first(), _col_is.first() );
     }
@@ -113,12 +116,12 @@ public:
             : TMatrix( hpro::value_type_v< value_t > )
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _UV( std::move( aU ), std::move( aV ) )
+            , _UV( lrfactors< value_t >{ std::move( aU ), std::move( aV ) } )
             , _vtype( blas::value_type_v< value_t > )
     {
         HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
                    ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-                   ( std::get< blas::matrix< value_t > >( _UV ).U.ncols() == std::get< blas::matrix< value_t > >( _UV ).V.ncols() ));
+                   ( std::get< lrfactors< value_t > >( _UV ).U.ncols() == std::get< lrfactors< value_t > >( _UV ).V.ncols() ));
 
         set_ofs( _row_is.first(), _col_is.first() );
     }

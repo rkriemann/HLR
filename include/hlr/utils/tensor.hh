@@ -24,13 +24,19 @@ public:
 
 private:
     std::vector< value_type >  data;
-    const size_type      dim0;
+    const size_type            dim0, dim1;
 
 public:
+    tensor2 ()
+            : dim0( 0 )
+            , dim1( 0 )
+    {}
+    
     tensor2 ( const size_type  adim0,
               const size_type  adim1 )
             : data( adim0 * adim1 )
             , dim0( adim0 )
+            , dim1( adim1 )
     {}
 
     tensor2 ( const size_type  adim0,
@@ -38,16 +44,19 @@ public:
               const value_type       adefault )
             : data( adim0 * adim1, adefault )
             , dim0( adim0 )
+            , dim1( adim1 )
     {}
 
     tensor2 ( const tensor2 &  t )
             : data( t.data )
             , dim0( t.dim0 )
+            , dim1( t.dim1 )
     {}
 
     tensor2 ( tensor2 &&  t )
             : data( std::move( t.data ) )
             , dim0( t.dim0 )
+            , dim1( t.dim1 )
     {}
 
     tensor2 &
@@ -55,12 +64,27 @@ public:
     {
         data = std::move( t.data );
         dim0 = t.dim0;
+        dim1 = t.dim1;
 
         return *this;
     }
     
     const value_type  operator ()  ( const size_type  i, const size_type  j ) const { return data[ j*dim0 + i ]; }
     value_type &      operator ()  ( const size_type  i, const size_type  j )       { return data[ j*dim0 + i ]; }
+
+    size_t  nrows () const { return dim0; }
+    size_t  ncols () const { return dim1; }
+
+    void resize ( const size_t  adim0,
+                  const size_t  adim1 )
+    {
+        if (( dim0 == adim0 ) && ( dim1 == adim1 ))
+            return;
+
+        dim0 = adim0;
+        dim1 = adim1;
+        data.resize( dim0 * dim1 ); 
+    }
 };
          
 template < typename T >
@@ -77,8 +101,7 @@ public:
 
 private:
     std::vector< value_type >  data;
-    const size_type            dim0;
-    const size_type            dim1;
+    const size_type            dim0, dim1, dim2;
 
 public:
     tensor3 ( const size_type  adim0,
@@ -87,6 +110,7 @@ public:
             : data( adim0 * adim1 * adim2 )
             , dim0( adim0 )
             , dim1( adim1 )
+            , dim2( adim2 )
     {}
 
     tensor3 ( const size_type   adim0,
@@ -96,18 +120,21 @@ public:
             : data( adim0 * adim1 * adim2, adefault )
             , dim0( adim0 )
             , dim1( adim1 )
+            , dim2( adim2 )
     {}
 
     tensor3 ( const tensor3 &  t )
             : data( t.data )
             , dim0( t.dim0 )
             , dim1( t.dim1 )
+            , dim2( t.dim2 )
     {}
 
     tensor3 ( tensor3 &&  t )
             : data( std::move( t.data ) )
             , dim0( t.dim0 )
             , dim1( t.dim1 )
+            , dim2( t.dim2 )
     {}
 
     tensor3 &
@@ -116,12 +143,17 @@ public:
         data = std::move( t.data );
         dim0 = t.dim0;
         dim1 = t.dim1;
+        dim2 = t.dim2;
 
         return *this;
     }
     
-    const value_type  operator ()  ( const size_type  i, const size_type  j, const size_type  k ) const { return data[ (k*dim1 + j)*dim0 + i ]; }
-    value_type &      operator ()  ( const size_type  i, const size_type  j, const size_type  k )       { return data[ (k*dim1 + j)*dim0 + i ]; }
+    const value_type  operator ()  ( const size_type  i, const size_type  j, const size_type  k ) const { return data[ (dim2*i + j)*dim1 + k ]; }
+    value_type &      operator ()  ( const size_type  i, const size_type  j, const size_type  k )       { return data[ (dim2*i + j)*dim1 + k ]; }
+
+    size_t  npages () const { return dim0; }
+    size_t  nrows  () const { return dim1; }
+    size_t  ncols  () const { return dim2; }
 };
 
 #endif   // __HLIB_TENSOR_HH

@@ -247,6 +247,7 @@ dense_matrix::copy_to ( hpro::TMatrix *  A ) const
 
     D->_row_is = _row_is;
     D->_col_is = _col_is;
+    D->_vtype  = _vtype;
     
     std::visit( [&D] ( auto &&  M ) { D->set_matrix( M ); }, _M );
 }
