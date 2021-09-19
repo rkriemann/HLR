@@ -62,13 +62,16 @@ build ( const hpro::TBlockCluster *  bct,
     
     if ( bct->is_leaf() )
     {
+        auto  rowis = bct->is().row_is();
+        auto  colis = bct->is().col_is();
+        
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< hpro::TMatrix >( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< hpro::TMatrix >( lrapx.build( bct, acc( rowis, colis ) ) );
         }// if
         else
         {
-            M = coeff.build( bct->is().row_is(), bct->is().col_is() );
+            M = coeff.build( rowis, colis );
         }// else
     }// if
     else

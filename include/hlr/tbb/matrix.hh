@@ -70,7 +70,8 @@ build ( const hpro::TBlockCluster *  bct,
     {
         if ( bct->is_adm() )
         {
-            auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
+            // auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
+            auto  T = lrapx.build( bct, acc( rowis, colis ) );
 
             // if ( is_lowrank( *T ) )
             // {
