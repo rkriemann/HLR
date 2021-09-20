@@ -25,7 +25,7 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17 -fno-omit-frame-pointer'
+CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
@@ -46,14 +46,16 @@ JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
-likwid       = False
-LIKWID_DIR   = '/opt/local/likwid'
-scorep       = False
-SCOREP_DIR   = '/opt/local/scorep/7.0'
-half         = False
-HALF_DIR     = '/opt/local/half/2.2.0'
-zfp          = False
-ZFP_DIR      = '/opt/local/zfp/0.5.5'
+likwid        = False
+LIKWID_DIR    = '/opt/local/likwid'
+scorep        = False
+SCOREP_DIR    = '/opt/local/scorep/7.0'
+half          = False
+HALF_DIR      = '/opt/local/half/2.2.0'
+zfp           = False
+ZFP_DIR       = '/opt/local/zfp/0.5.5'
+universal     = False
+UNIVERSAL_DIR = '/opt/local/universal'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -177,36 +179,36 @@ opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'a
 opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
 opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
-opts.Add(               'cxx',      'C++ compiler to use',           CXX )
-opts.Add(               'cxxflags', 'C++ compiler flags',            CXXFLAGS )
-opts.Add(               'cpuflags', 'path to cpuflags',              CPUFLAGS )
-opts.Add(               'defines',  'preprocessor defines',          DEFINES )
+opts.Add(               'cxx',       'C++ compiler to use',           CXX )
+opts.Add(               'cxxflags',  'C++ compiler flags',            CXXFLAGS )
+opts.Add(               'cpuflags',  'path to cpuflags',              CPUFLAGS )
+opts.Add(               'defines',   'preprocessor defines',          DEFINES )
 
-opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'cuda',     'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpro',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tbb',       'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tf',        'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpx',       'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'gpi2',      'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mkl',       'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda',      'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
-opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'jemalloc',  'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mimalloc',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
-opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
-opts.Add( BoolVariable( 'scorep',   'use Score-P library',           scorep ) )
-opts.Add( BoolVariable( 'half',     'use half precision library',    half ) )
-opts.Add( BoolVariable( 'zfp',      'use ZFP compression library',   zfp ) )
+opts.Add( EnumVariable( 'lapack',    'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
+opts.Add( EnumVariable( 'malloc',    'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',    'use likwid library',            likwid ) )
+opts.Add( BoolVariable( 'scorep',    'use Score-P library',           scorep ) )
+opts.Add( BoolVariable( 'half',      'use half precision library',    half ) )
+opts.Add( BoolVariable( 'zfp',       'use ZFP compression library',   zfp ) )
+opts.Add( BoolVariable( 'universal', 'use universal number library',  universal ) )
 
-opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
-opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
-# opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
-opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
-opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
-opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
+opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
+opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
+opts.Add( BoolVariable( 'optimise',  'enable building with optimisation',         optimise ) )
+opts.Add( BoolVariable( 'warn',      'enable building with compiler warnings',    warn ) )
+opts.Add( BoolVariable( 'color',     'use colored output during compilation',     color ) )
 
 # read options from options file
 opt_env = Environment( options = opts )
@@ -256,10 +258,10 @@ likwid       = opt_env['likwid']
 scorep       = opt_env['scorep']
 half         = opt_env['half']
 zfp          = opt_env['zfp']
+universal    = opt_env['universal']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
-# profile      = opt_env['profile']
 optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
@@ -334,11 +336,6 @@ else :
 if debug :
     OPTFLAGS  = '-g -march=native'
     LINKFLAGS = '-g'
-    DEFINES   = ''
-
-if profile :
-    OPTFLAGS  = '-g -pg -O3 -march=native'
-    LINKFLAGS = '-g -pg'
     DEFINES   = ''
 
 if warn :
@@ -441,6 +438,11 @@ if zfp :
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zfp' ] )
         
+# support for universal number library
+if universal :
+    env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+        
 ######################################################################
 #
 # target 'help'
@@ -496,10 +498,11 @@ def show_help ( target, source, env ):
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -556,10 +559,11 @@ def show_options ( target, source, env ):
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), bool_str[ zfp ] )
+    print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), bool_str[ universal ] )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
-    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )

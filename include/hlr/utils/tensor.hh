@@ -9,6 +9,7 @@
 //
 
 #include <vector>
+#include <cstddef>
 
 template < typename T >
 struct tensor2

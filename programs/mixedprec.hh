@@ -14,6 +14,10 @@
 #include <zfpcarray3.h>
 #endif
 
+#if defined(HAS_UNIVERSAL)
+#include <universal/number/posit/posit.hpp>
+#endif
+
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
@@ -32,6 +36,34 @@ size_t
 convert_zfp ( hpro::TMatrix &  A,
               zfp_config &     config,
               uint             cache_size );
+#endif
+
+#if defined(HAS_UNIVERSAL)
+using sw::universal::posit;
+
+template < uint  bitsize,
+           uint  expsize >
+size_t
+convert_posit ( hpro::TMatrix &  A );
+
+template < uint  bitsize,
+           uint  expsize >
+void
+run_posit ( hpro::TMatrix &  A,
+            hpro::TMatrix &  A_full,
+            const double     norm_A )
+{
+    auto  A_posit   = impl::matrix::copy( A );
+    auto  mem_posit = convert_posit< bitsize, expsize >( *A_posit );
+    auto  diff      = matrix::sum( hpro::real(1), A_full, hpro::real(-1), *A_posit );
+    auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+    std::cout << "      " << bitsize << "/" << expsize << " : "
+              << format_error( error ) << " / "
+              << format_error( error / norm_A ) << " / "
+              << format_mem( mem_posit ) << std::endl;
+}
+
 #endif
 
 //
@@ -194,36 +226,6 @@ program_main ()
     }
     #endif
 
-    // {
-    //     auto  A2 = impl::matrix::copy( *A );
-
-    //     convert_generic( *A2 );
-
-    //     std::cout << "    |A|   = " << format_norm( hlr::norm::spectral( *A2, true, 1e-4 ) ) << std::endl;
-    //     std::cout << "    |A|   = " << format_norm( hlr::norm::frobenius( *A2 ) ) << std::endl;
-    //     std::cout << "    mem   = " << format_mem( A2->byte_size() ) << std::endl;
-        
-    //     auto  x = A2->col_vector();
-    //     auto  y = A2->row_vector();
-
-    //     x->fill_rand( 0 );
-    //     x->scale( 1.0 / x->norm2() );
-
-    //     A->mul_vec( 1.0, *x, 0.0, *y, apply_normal );
-    //     io::matlab::write( *y, "x1" );
-        
-    //     A2->mul_vec( 1.0, *x, 0.0, *y, apply_normal );
-    //     io::matlab::write( *y, "x2" );
-
-    //     A->mul_vec( 1.0, *x, 0.0, *y, apply_adjoint );
-    //     io::matlab::write( *y, "y1" );
-        
-    //     A2->mul_vec( 1.0, *x, 0.0, *y, apply_adjoint );
-    //     io::matlab::write( *y, "y2" );
-
-    //     return;
-    // }
-
     //
     // ZFP compression
     //
@@ -251,6 +253,26 @@ program_main ()
                   << format_error( error / norm_A ) << " / "
                   << format_mem( mem_zfp ) << std::endl;
     }// for
+    
+    #endif
+
+    //
+    // posit number format
+    //
+
+    #if defined(HAS_UNIVERSAL)
+    
+    std::cout << "    " << term::bullet << term::bold << "Posit format" << term::reset << std::endl;
+
+    run_posit< 64, 3 >( *A, *A_full, norm_A );
+    run_posit< 48, 3 >( *A, *A_full, norm_A );
+    run_posit< 40, 2 >( *A, *A_full, norm_A );
+    run_posit< 36, 2 >( *A, *A_full, norm_A );
+    run_posit< 32, 2 >( *A, *A_full, norm_A );
+    run_posit< 28, 2 >( *A, *A_full, norm_A );
+    run_posit< 24, 2 >( *A, *A_full, norm_A );
+    run_posit< 20, 2 >( *A, *A_full, norm_A );
+    run_posit< 16, 1 >( *A, *A_full, norm_A );
     
     #endif
 }
@@ -505,6 +527,115 @@ convert_zfp ( hpro::TMatrix &  A,
     //     size_t  s = A.byte_size() - sizeof(value_t) * U->row_rank() * U->col_rank();
 
     // }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+
+    return 0;
+}
+#endif
+
+#if defined(HAS_UNIVERSAL)
+//
+// compress data using ZFP and return memory consumption
+//
+template < uint  bitsize,
+           uint  expsize >
+size_t
+convert_posit ( hpro::TMatrix &  A )
+{
+    using  posit_t = posit< bitsize, expsize >;
+    
+    if ( is_blocked( A ) )
+    {
+        auto    B = ptrcast( &A, hpro::TBlockMatrix );
+        size_t  s = sizeof(hpro::TBlockMatrix);
+
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(hpro::TMatrix *);
+        
+        for ( uint i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint j = 0; j < B->nblock_cols(); ++j )
+            {
+                s += convert_posit< bitsize, expsize >( * B->block(i,j) );
+            }// for
+        }// for
+
+        return s;
+    }// if
+    else if ( matrix::is_generic_dense( A ) )
+    {
+        auto    D = ptrcast( &A, matrix::dense_matrix );
+        size_t  s = 0;
+
+        std::visit(
+            [&s,D] ( auto &&  M )
+            {
+                using  value_t = typename std::decay_t< decltype(M) >::value_t;
+
+                if constexpr( ! hpro::is_complex_type_v< value_t > )
+                {
+                    s  = D->byte_size();
+                    s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
+                    s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
+
+                    for ( uint  j = 0; j < M.ncols(); ++j )
+                    {
+                        for ( uint  i = 0; i < M.nrows(); ++i )
+                        {
+                            auto  p_ij = posit_t( M(i,j) );
+                            
+                            M(i,j) = double(p_ij);
+                        }// for
+                    }// for
+                }// if
+            },
+            D->matrix()
+        );
+        
+        return s;
+    }// if
+    else if ( hlr::matrix::is_generic_lowrank( A ) )
+    {
+        auto    R = ptrcast( &A, matrix::lrmatrix );
+        size_t  s = 0;
+
+        std::visit(
+            [R,&s] ( auto &&  UV )
+            {
+                using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+                
+                if constexpr( ! hpro::is_complex_type_v< value_t > )
+                {
+                    s  = R->byte_size();
+                    s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
+                    s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
+                
+                    for ( uint  k = 0; k < UV.U.ncols(); ++k )
+                    {
+                        for ( uint  i = 0; i < UV.U.nrows(); ++i )
+                        {
+                            auto  p_ij = posit_t( UV.U(i,k) );
+                            
+                            UV.U(i,k) = double(p_ij);
+                        }// for
+                    }// for
+
+                    for ( uint  k = 0; k < UV.V.ncols(); ++k )
+                    {
+                        for ( uint  i = 0; i < UV.V.nrows(); ++i )
+                        {
+                            auto  p_ij = posit_t( UV.V(i,k) );
+                            
+                            UV.V(i,k) = double(p_ij);
+                        }// for
+                    }// for
+                }// if
+            },
+            R->factors()
+        );
+
+        return s;
+    }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
