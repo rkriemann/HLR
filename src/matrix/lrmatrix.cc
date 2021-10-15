@@ -348,6 +348,69 @@ lrmatrix::copy_to ( hpro::TMatrix *          A,
 }
 
 //
+// compress internal data
+//
+void
+lrmatrix::compress ( const uint  rate )
+{
+    if ( is_compressed() )
+        return;
+    
+    std::visit(
+        [this,rate] ( auto &&  UV )
+        {
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
+            using  real_t  = typename hpro::real_type_t< value_t >;
+
+            auto          config    = zfp_config_rate( rate, false );
+            uint          factor    = sizeof(value_t) / sizeof(real_t);
+            const size_t  mem_dense = sizeof(value_t) * UV.U.ncols() * ( UV.U.nrows() + UV.V.nrows() );
+            
+            if constexpr( std::is_same_v< value_t, real_t > )
+            {
+                auto  zUV = std::make_unique< compressed_factors< value_t > >( UV.U.nrows(), UV.U.ncols(), config ); 
+                auto  zU = std::make_unique< zfp::const_array2< value_t > >( UV.U.nrows(), UV.U.ncols(), config );
+                auto  zV = std::make_unique< zfp::const_array2< value_t > >( UV.V.nrows(), UV.V.ncols(), config );
+                
+                zU->set( UV.U.data() );
+                zV->set( UV.V.data() );
+
+                const size_t  mem_zfp = zU->compressed_size() + zV->compressed_size();
+
+                if ( mem_zfp < mem_dense )
+                {
+                    _zdata = std::move( u );
+                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                }// if
+            }// if
+            else
+            {
+                auto  u = std::make_unique< zfp::const_array2< real_t > >( M.nrows() * factor, M.ncols(), config );
+                
+                u->set( (real_t*) M.data() );
+                
+                const size_t  mem_zfp = u->compressed_size();
+                
+                if ( mem_zfp < mem_dense )
+                {
+                    _zdata = std::move( u );
+                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                }// if
+            }// else
+        },
+        _M
+    );
+}
+
+//
+// uncompress internal data
+//
+void
+lrmatrix::uncompress ()
+{
+}
+
+//
 // return size in bytes used by this object
 //
 size_t

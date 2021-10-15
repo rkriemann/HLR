@@ -8,7 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <vector>
 #include <variant>
+
+#if defined(HAS_ZFP)
+#include <zfpcarray2.h>
+#endif
 
 #include <hpro/matrix/TMatrix.hh>
 
@@ -37,6 +42,13 @@ namespace matrix
 class dense_matrix : public hpro::TMatrix
 {
 private:
+    //
+    // compressed storage based on underlying floating point type
+    //
+    using  compressed_storage = std::variant< std::unique_ptr< zfp::const_array2< float > >,
+                                              std::unique_ptr< zfp::const_array2< double > > >;
+
+private:
     // local index set of matrix
     indexset              _row_is, _col_is;
     
@@ -46,6 +58,9 @@ private:
     // indicates internal value type
     // - after initialization identical to _M.index()
     blas::value_type      _vtype;
+
+    // optional: stores compressed data
+    compressed_storage    _zdata;
     
 public:
     //
@@ -125,6 +140,9 @@ public:
     {
         HLR_ASSERT(( nrows() == aM.nrows() ) && ( ncols() == aM.ncols() ));
 
+        if ( is_compressed() )
+            remove_compressed();
+        
         if ( blas::value_type_v< value_t > == _vtype )
         {
             blas::copy( aM, M< value_t >() );
@@ -142,6 +160,9 @@ public:
     {
         HLR_ASSERT(( nrows() == aM.nrows() ) && ( ncols() == aM.ncols() ));
 
+        if ( is_compressed() )
+            remove_compressed();
+        
         _M     = std::move( aM );
         _vtype = blas::value_type_v< value_t >;
     }
@@ -198,14 +219,21 @@ public:
     // scale matrix by alpha
     virtual void scale    ( const hpro::real  alpha )
     {
-        std::visit(
-            [alpha] ( auto &&  M )
-            {
-                using  value_t  = typename std::decay_t< decltype(M) >::value_t;
-
-                blas::scale( value_t(alpha), M );
-            },
-            _M );
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "to do" );
+        }// if
+        else
+        {
+            std::visit(
+                [alpha] ( auto &&  M )
+                {
+                    using  value_t  = typename std::decay_t< decltype(M) >::value_t;
+                    
+                    blas::scale( value_t(alpha), M );
+                },
+                _M );
+        }// else
     }
 
     //
@@ -243,8 +271,29 @@ public:
     // misc.
     //
 
+    // compress internal data
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const uint  rate );
+
+    // uncompress internal data
+    virtual void   uncompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        return ! std::visit( [] ( auto && d ) { return is_null( d ); }, _zdata );
+    }
+    
     // return size in bytes used by this object
-    virtual size_t byte_size  () const;
+    virtual size_t byte_size     () const;
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        std::visit( [] ( auto && d ) { d.reset( nullptr ); }, _zdata );
+    }
+    
 };
 
 //

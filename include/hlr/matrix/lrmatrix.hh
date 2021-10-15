@@ -10,6 +10,10 @@
 
 #include <variant>
 
+#if defined(HAS_ZFP)
+#include <zfpcarray2.h>
+#endif
+
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
@@ -36,6 +40,21 @@ namespace matrix
 //
 class lrmatrix : public hpro::TMatrix
 {
+private:
+    //
+    // compressed storage based on underlying floating point type
+    //
+    template < typename T_value >
+    struct compressed_factors
+    {
+        using value_t = T_value;
+
+        zfp::const_array2< value_t >  zU, zV;
+    };
+
+    using  compressed_storage = std::variant< std::unique_ptr< compressed_factors< float > >,
+                                              std::unique_ptr< compressed_factors< double > > >;
+
 public:
     template < typename T_value >
     struct lrfactors
@@ -46,10 +65,6 @@ public:
     };
 
     using  generic_lrfactors = std::variant<
-        #if defined HAS_HALF
-        lrfactors< math::half >,
-        lrfactors< std::complex< math::half > >,
-        #endif
         lrfactors< float >,
         lrfactors< std::complex< float > >,
         lrfactors< double >,
@@ -67,6 +82,9 @@ private:
     // - after initialization identical to _M.index()
     blas::value_type      _vtype;
     
+    // optional: stores compressed data
+    compressed_storage    _zdata;
+
 public:
     //
     // ctors
@@ -161,6 +179,9 @@ public:
                    ( ncols()    == aV.nrows() ) &&
                    ( aU.ncols() == aV.ncols() ));
 
+        if ( is_compressed() )
+            remove_compressed();
+        
         if (( blas::value_type_v< value_t > == _vtype ) && ( aU.ncols() == U< value_t >().ncols() ))
         {
             blas::copy( aU, U< value_t >() );
@@ -182,6 +203,9 @@ public:
                    ( ncols()    == aV.nrows() ) &&
                    ( aU.ncols() == aV.ncols() ));
 
+        if ( is_compressed() )
+            remove_compressed();
+        
         _UV    = lrfactors< value_t >{ std::move( aU ), std::move( aV ) };
         _vtype = blas::value_type_v< value_t >;
     }
@@ -232,23 +256,30 @@ public:
                             hpro::TVector *        y,
                             const hpro::matop_t    op = hpro::apply_normal ) const;
     
-    // truncate matrix to accuracy \a acc
+    // truncate matrix to accuracy acc
     virtual void truncate ( const hpro::TTruncAcc & acc );
 
     // scale matrix by alpha
     virtual void scale    ( const hpro::real  alpha )
     {
-        std::visit(
-            [alpha] ( auto &&  M )
-            {
-                using  value_t  = typename std::decay_t< decltype(M) >::value_t;
-
-                if ( M.U.nrows() < M.V.ncols() )
-                    blas::scale( value_t(alpha), M.U );
-                else
-                    blas::scale( value_t(alpha), M.V );
-            },
-            _UV );
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "todo" );
+        }// if
+        else
+        {
+            std::visit(
+                [alpha] ( auto &&  M )
+                {
+                    using  value_t  = typename std::decay_t< decltype(M) >::value_t;
+                    
+                    if ( M.U.nrows() < M.V.ncols() )
+                        blas::scale( value_t(alpha), M.U );
+                    else
+                        blas::scale( value_t(alpha), M.V );
+                },
+                _UV );
+        }// else
     }
 
     //
@@ -267,17 +298,17 @@ public:
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< hpro::TMatrix >;
 
-    // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
+    // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
     virtual auto   copy         ( const hpro::TTruncAcc &  acc,
                                   const bool               do_coarsen = false ) const -> std::unique_ptr< hpro::TMatrix >;
 
     // return structural copy of matrix
     virtual auto   copy_struct  () const -> std::unique_ptr< hpro::TMatrix >;
 
-    // copy matrix data to \a A
+    // copy matrix data to A
     virtual void   copy_to      ( hpro::TMatrix *          A ) const;
 
-    // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
+    // copy matrix data to A and truncate w.r.t. acc with optional coarsening
     virtual void   copy_to      ( hpro::TMatrix *          A,
                                   const hpro::TTruncAcc &  acc,
                                   const bool               do_coarsen = false ) const;
@@ -286,6 +317,19 @@ public:
     // misc.
     //
 
+    // compress internal data
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const uint  rate );
+
+    // uncompress internal data
+    virtual void   uncompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        return ! std::visit( [] ( auto && d ) { return is_null( d.zU ); }, _zdata );
+    }
+    
     // return size in bytes used by this object
     virtual size_t byte_size  () const;
 };

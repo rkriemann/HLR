@@ -101,14 +101,14 @@ program_main ()
 
     std::cout << "    |A_nf| = " << format_norm( norm_nf ) << std::endl;
 
-    auto  delta   = 10.0 * norm_nf * hlr::cmdline::eps / A_nf->nrows();
+    auto  delta   = norm_nf * hlr::cmdline::eps / A_nf->nrows();
     // auto  acc2    = hpro::absolute_prec( delta );
     auto  acc2    = local_accuracy( delta );
 
     std::cout << "  " << term::bullet << term::bold << "H-matrix, ε = " << delta << term::reset << std::endl;
     
-    // auto  lrapx   = bem::aca_lrapx< hpro::TPermCoeffFn< value_t > >( pcoeff );
-    auto  lrapx   = hpro::TDenseLRApx< value_t >( & pcoeff );
+    auto  lrapx   = bem::aca_lrapx< hpro::TPermCoeffFn< value_t > >( pcoeff );
+    // auto  lrapx   = hpro::TDenseLRApx< value_t >( & pcoeff );
 
     tic = timer::now();
     
@@ -119,17 +119,21 @@ program_main ()
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
+
+    if ( hpro::verbose( 3 ) )
+        io::eps::print( *A, "A", "noid" );
     
     print_prec( *A, acc2.abs_eps() );
 
     std::cout << "  " << term::bullet << term::bold << "exact matrix" << term::reset << std::endl;
 
     auto  acc3    = hpro::fixed_prec( 1e-12 );
-    auto  dense   = std::make_unique< hpro::TSVDLRApx< value_t > >( & pcoeff );
+    // auto  exact   = std::make_unique< hpro::TSVDLRApx< value_t > >( & pcoeff );
+    auto  exact   = std::make_unique< hpro::TDenseLRApx< value_t > >( & pcoeff );
 
     tic = timer::now();
     
-    auto  A_full  = impl::matrix::build( bct->root(), pcoeff, *dense, acc3, nseq );
+    auto  A_full  = impl::matrix::build( bct->root(), pcoeff, *exact, acc3, nseq );
 
     toc = timer::since( tic );
     

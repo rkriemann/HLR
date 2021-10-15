@@ -74,6 +74,23 @@ vec_add ( const blas::vector< value_t > &  t,
     }// else
 }
 
+//
+// return uncompressed matrix
+//
+template < typename mat_value_t,
+           typename zfp_value_t >
+blas::matrix< mat_value_t >
+zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
+                 const size_t                        nrows,
+                 const size_t                        ncols )
+{
+    auto  M = blas::matrix< mat_value_t >( nrows, ncols );
+    
+    z.get( (zfp_value_t*) M.data() );
+
+    return M;
+}
+
 }// namespace anonymous
 
 //
@@ -100,16 +117,33 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
     std::visit(
         [=] ( auto &&  M )
         {
-            using  value_t  = typename std::decay_t< decltype(M) >::value_t;
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
             
             auto  x = convert< value_t >( *sx );
             auto  y = blas::vector< value_t >( sy->size() );
+            
+            if ( is_compressed() )
+            {
+                auto  cM = std::visit( 
+                    [this,&M] ( auto && d )
+                    {
+                        using  value_t     = typename std::decay_t< decltype(M) >::value_t;
+                        using  zfp_value_t = typename std::decay_t< decltype(*d) >::value_type;
+                        
+                        return zfp_uncompress< value_t, zfp_value_t >( *d, nrows(), ncols() );
+                    },
+                    _zdata );
 
-            blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(0), y );
+                blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
+            }// if
+            else
+            {
+                blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(0), y );
+            }// else
+
             vec_add< value_t >( y, *sy );
         },
         _M );
-    
 }
 
 void
@@ -264,6 +298,66 @@ dense_matrix::copy_to ( hpro::TMatrix *          A,
 }
 
 //
+// compress internal data
+//
+void
+dense_matrix::compress ( const uint  rate )
+{
+    if ( is_compressed() )
+        return;
+    
+    std::visit(
+        [this,rate] ( auto &&  M )
+        {
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
+            using  real_t  = typename hpro::real_type_t< value_t >;
+
+            auto          config    = zfp_config_rate( rate, false );
+            uint          factor    = sizeof(value_t) / sizeof(real_t);
+            const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
+            
+            if constexpr( std::is_same_v< value_t, real_t > )
+            {
+                auto  u = std::make_unique< zfp::const_array2< value_t > >( M.nrows(), M.ncols(), config );
+                
+                u->set( M.data() );
+
+                const size_t  mem_zfp = u->compressed_size();
+
+                if ( mem_zfp < mem_dense )
+                {
+                    _zdata = std::move( u );
+                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                }// if
+            }// if
+            else
+            {
+                auto  u = std::make_unique< zfp::const_array2< real_t > >( M.nrows() * factor, M.ncols(), config );
+                
+                u->set( (real_t*) M.data() );
+                
+                const size_t  mem_zfp = u->compressed_size();
+                
+                if ( mem_zfp < mem_dense )
+                {
+                    _zdata = std::move( u );
+                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                }// if
+            }// else
+        },
+        _M
+    );
+}
+
+//
+// uncompress internal data
+//
+void
+dense_matrix::uncompress ()
+{
+}
+
+//
 // return size in bytes used by this object
 //
 size_t
@@ -275,6 +369,10 @@ dense_matrix::byte_size () const
 
     std::visit( [&size] ( auto &&  M ) { size += M.byte_size(); }, _M );
 
+    size += sizeof(_zdata);
+
+    std::visit( [&size] ( auto &&  d ) { if ( ! is_null(d) ) size += d->compressed_size(); }, _zdata );
+        
     return size;
 }
 
