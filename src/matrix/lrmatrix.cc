@@ -145,6 +145,7 @@ vec_add ( const blas::vector< value_t > &  t,
 //
 // return uncompressed matrix
 //
+#if defined(HAS_ZFP)
 template < typename mat_value_t,
            typename zfp_value_t >
 blas::matrix< mat_value_t >
@@ -158,6 +159,7 @@ zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
 
     return M;
 }
+#endif
 
 }// namespace anonymous
 
@@ -198,6 +200,7 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
             {
                 auto  y = blas::vector< value_t >( sy->size() );
 
+                #if defined(HAS_ZFP)
                 if ( is_compressed() )
                 {
                     auto  cUV = std::visit( 
@@ -217,6 +220,7 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
                     lr_mul_vec< value_t >( alpha, cUV.U, cUV.V, op, x, y );
                 }// if
                 else
+                #endif
                 {
                     lr_mul_vec< value_t >( alpha, M.U, M.V, op, x, y );
                 }// else
@@ -391,20 +395,21 @@ lrmatrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-lrmatrix::compress ( const uint  rate )
+lrmatrix::compress ( const zfp_config &  config )
 {
+    #if defined(HAS_ZFP)
     if ( is_compressed() )
         return;
     
     std::visit(
-        [this,rate] ( auto &&  UV )
+        [this,&config] ( auto &&  UV )
         {
             using  value_t    = typename std::decay_t< decltype(UV) >::value_t;
             using  real_t     = typename hpro::real_type_t< value_t >;
             using  real_ptr_t = real_t *;
 
             const auto    rank_UV   = UV.U.ncols();
-            auto          config    = zfp_config_rate( rate, false );
+            // auto          config    = zfp_config_rate( rate, false );
             uint          factor    = sizeof(value_t) / sizeof(real_t);
             const size_t  mem_dense = sizeof(value_t) * rank_UV * ( UV.U.nrows() + UV.V.nrows() );
 
@@ -455,6 +460,7 @@ lrmatrix::compress ( const uint  rate )
         },
         _UV
     );
+    #endif
 }
 
 //
@@ -479,7 +485,14 @@ lrmatrix::byte_size () const
 
     size += sizeof(_zdata);
 
-    std::visit( [&size] ( auto &&  zM ) { if ( ! is_null(zM) ) size += zM->U.compressed_size() + zM->V.compressed_size(); }, _zdata );
+    std::visit( [&size] ( auto &&  zM )
+    {
+        if ( ! is_null(zM) )
+        {
+            size += sizeof(zM->U) + zM->U.compressed_size();
+            size += sizeof(zM->V) + zM->V.compressed_size();
+        }// if
+    }, _zdata );
     
     return size;
 }

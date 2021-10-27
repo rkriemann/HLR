@@ -13,6 +13,9 @@
 
 #if defined(HAS_ZFP)
 #include <zfpcarray2.h>
+#else
+// dummy type
+struct zfp_config {};
 #endif
 
 #include <hpro/matrix/TMatrix.hh>
@@ -273,7 +276,7 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const uint  rate );
+    virtual void   compress      ( const zfp_config &  config );
 
     // uncompress internal data
     virtual void   uncompress    ();

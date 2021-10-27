@@ -77,6 +77,7 @@ vec_add ( const blas::vector< value_t > &  t,
 //
 // return uncompressed matrix
 //
+#if defined(HAS_ZFP)
 template < typename mat_value_t,
            typename zfp_value_t >
 blas::matrix< mat_value_t >
@@ -90,6 +91,7 @@ zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
 
     return M;
 }
+#endif
 
 }// namespace anonymous
 
@@ -121,7 +123,8 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
             
             auto  x = convert< value_t >( *sx );
             auto  y = blas::vector< value_t >( sy->size() );
-            
+
+            #if defined(HAS_ZFP)
             if ( is_compressed() )
             {
                 auto  cM = std::visit( 
@@ -137,6 +140,7 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
                 blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
             }// if
             else
+            #endif
             {
                 blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(0), y );
             }// else
@@ -301,18 +305,19 @@ dense_matrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-dense_matrix::compress ( const uint  rate )
+dense_matrix::compress ( const zfp_config &  config )
 {
+    #if defined(HAS_ZFP)
     if ( is_compressed() )
         return;
     
     std::visit(
-        [this,rate] ( auto &&  M )
+        [this,&config] ( auto &&  M )
         {
             using  value_t = typename std::decay_t< decltype(M) >::value_t;
             using  real_t  = typename hpro::real_type_t< value_t >;
 
-            auto          config    = zfp_config_rate( rate, false );
+            // auto          config    = zfp_config_rate( rate, false );
             uint          factor    = sizeof(value_t) / sizeof(real_t);
             const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
             
@@ -347,6 +352,7 @@ dense_matrix::compress ( const uint  rate )
         },
         _M
     );
+    #endif
 }
 
 //
@@ -371,7 +377,7 @@ dense_matrix::byte_size () const
 
     size += sizeof(_zdata);
 
-    std::visit( [&size] ( auto &&  d ) { if ( ! is_null(d) ) size += d->compressed_size(); }, _zdata );
+    std::visit( [&size] ( auto &&  d ) { if ( ! is_null(d) ) size += sizeof(*d) + d->compressed_size(); }, _zdata );
         
     return size;
 }

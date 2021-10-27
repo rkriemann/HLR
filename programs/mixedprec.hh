@@ -216,7 +216,7 @@ program_main ()
     
     std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
 
-    for ( uint  rate = 64; rate >= 8; rate -= 4 )
+    for ( uint  rate = 32; rate >= 8; rate -= 4 )
     // for ( double  rate = 1e-20; rate <= 1e-2; rate *= 10 )
     {
         auto  A_zfp   = impl::matrix::copy( *A );
@@ -244,9 +244,28 @@ program_main ()
         compress( *A_zfp, config );
         
         auto  mem_zfp = A_zfp->byte_size();
+        auto  diff    = matrix::sum( value_t(1), *A_full, value_t(-1), *A_zfp );
+        auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
     
         std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+                  << format_error( error ) << " / "
+                  << format_error( error / norm_A ) << " / "
                   << format_mem( mem_zfp ) << std::endl;
+
+        // std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+        //           << format_mem( mem_zfp ) << std::endl;
+
+        // auto  x  = A_zfp->col_vector();
+        // auto  y1 = A_zfp->row_vector();
+        // auto  y2 = A_zfp->row_vector();
+
+        // x->fill( 1.0 );
+
+        // A_zfp->apply( x.get(), y1.get() );
+        // A->apply( x.get(), y2.get() );
+
+        // y1->axpy( -1.0, y2.get() );
+        // std::cout << format_error( y1->norm2() ) << std::endl;
     }// for
     
     #endif
@@ -257,23 +276,23 @@ program_main ()
 
     #if defined(HAS_UNIVERSAL)
     
-    std::cout << "    " << term::bullet << term::bold << "Posit format" << term::reset << std::endl;
+    // std::cout << "    " << term::bullet << term::bold << "Posit format" << term::reset << std::endl;
 
-    run_posit< 64, 3 >( *A, *A_full, norm_A );
-    run_posit< 60, 3 >( *A, *A_full, norm_A );
-    run_posit< 56, 3 >( *A, *A_full, norm_A );
-    run_posit< 52, 3 >( *A, *A_full, norm_A );
-    run_posit< 48, 3 >( *A, *A_full, norm_A );
-    run_posit< 44, 3 >( *A, *A_full, norm_A );
-    run_posit< 40, 2 >( *A, *A_full, norm_A );
-    run_posit< 36, 2 >( *A, *A_full, norm_A );
-    run_posit< 32, 2 >( *A, *A_full, norm_A );
-    run_posit< 28, 2 >( *A, *A_full, norm_A );
-    run_posit< 24, 2 >( *A, *A_full, norm_A );
-    run_posit< 20, 2 >( *A, *A_full, norm_A );
-    run_posit< 16, 1 >( *A, *A_full, norm_A );
-    run_posit< 12, 1 >( *A, *A_full, norm_A );
-    run_posit<  8, 0 >( *A, *A_full, norm_A );
+    // run_posit< 64, 3 >( *A, *A_full, norm_A );
+    // run_posit< 60, 3 >( *A, *A_full, norm_A );
+    // run_posit< 56, 3 >( *A, *A_full, norm_A );
+    // run_posit< 52, 3 >( *A, *A_full, norm_A );
+    // run_posit< 48, 3 >( *A, *A_full, norm_A );
+    // run_posit< 44, 3 >( *A, *A_full, norm_A );
+    // run_posit< 40, 2 >( *A, *A_full, norm_A );
+    // run_posit< 36, 2 >( *A, *A_full, norm_A );
+    // run_posit< 32, 2 >( *A, *A_full, norm_A );
+    // run_posit< 28, 2 >( *A, *A_full, norm_A );
+    // run_posit< 24, 2 >( *A, *A_full, norm_A );
+    // run_posit< 20, 2 >( *A, *A_full, norm_A );
+    // run_posit< 16, 1 >( *A, *A_full, norm_A );
+    // run_posit< 12, 1 >( *A, *A_full, norm_A );
+    // run_posit<  8, 0 >( *A, *A_full, norm_A );
     
     #endif
 }
