@@ -21,7 +21,8 @@ template < typename T_alpha,
            typename T_value >
 void
 lr_mul_vec ( const T_alpha                    alpha,
-             const lrmatrix &                 M,
+             const blas::matrix< T_value > &  U,
+             const blas::matrix< T_value > &  V,
              const matop_t                    op,
              const blas::vector< T_value > &  x,
              blas::vector< T_value > &        y )
@@ -35,13 +36,13 @@ lr_mul_vec ( const T_alpha                    alpha,
         //
         
         // t := V^H x
-        auto  t = blas::mulvec( blas::adjoint( M.V< value_t >() ), x );
+        auto  t = blas::mulvec( blas::adjoint( V ), x );
 
         // t := α·t
         blas::scale( value_t(alpha), t );
         
         // y := y + U t
-        blas::mulvec( M.U< value_t >(), t, y );
+        blas::mulvec( U, t, y );
     }// if
     else if ( op == hpro::apply_transposed )
     {
@@ -51,7 +52,7 @@ lr_mul_vec ( const T_alpha                    alpha,
         //
         
         // t := U^T x
-        auto  t = blas::mulvec( blas::transposed( M.U< value_t >() ), x );
+        auto  t = blas::mulvec( blas::transposed( U ), x );
 
         // t := α·t
         blas::scale( value_t(alpha), t );
@@ -59,7 +60,7 @@ lr_mul_vec ( const T_alpha                    alpha,
         // r := conj(V) t = conj( V · conj(t) )
         blas::conj( t );
             
-        auto  r = blas::mulvec( M.V< value_t >(), t );
+        auto  r = blas::mulvec( V, t );
 
         blas::conj( r );
 
@@ -74,13 +75,13 @@ lr_mul_vec ( const T_alpha                    alpha,
         //
         
         // t := U^H x
-        auto  t = blas::mulvec( blas::adjoint( M.U< value_t >() ), x );
+        auto  t = blas::mulvec( blas::adjoint( U ), x );
 
         // t := α·t
         blas::scale( value_t(alpha), t );
         
         // y := t + V t
-        blas::mulvec( M.V< value_t >(), t, y );
+        blas::mulvec( V, t, y );
     }// if
 }
 
@@ -141,6 +142,23 @@ vec_add ( const blas::vector< value_t > &  t,
     }// else
 }
 
+//
+// return uncompressed matrix
+//
+template < typename mat_value_t,
+           typename zfp_value_t >
+blas::matrix< mat_value_t >
+zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
+                 const size_t                        nrows,
+                 const size_t                        ncols )
+{
+    auto  M = blas::matrix< mat_value_t >( nrows, ncols );
+    
+    z.get( (zfp_value_t*) M.data() );
+
+    return M;
+}
+
 }// namespace anonymous
 
 //
@@ -177,10 +195,32 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
             //     lr_mul_vec< value_t >( alpha, *this, op, x, blas::vec< value_t >( sy ) );
             // }// if
             // else
-            { 
+            {
                 auto  y = blas::vector< value_t >( sy->size() );
 
-                lr_mul_vec< value_t >( alpha, *this, op, x, y );
+                if ( is_compressed() )
+                {
+                    auto  cUV = std::visit( 
+                        [this,&M] ( auto &&  zM )
+                        {
+                            using  value_t     = typename std::decay_t< decltype(M) >::value_t;
+                            using  zfp_value_t = typename std::decay_t< decltype(zM->U) >::value_type;
+                        
+                            auto cU  = zfp_uncompress< value_t, zfp_value_t >( zM->U, nrows(), rank() );
+                            auto cV  = zfp_uncompress< value_t, zfp_value_t >( zM->V, ncols(), rank() );
+                            auto cUV = lrfactors< value_t >{ std::move(cU), std::move(cV) };
+
+                            return cUV;
+                        },
+                        _zdata );
+
+                    lr_mul_vec< value_t >( alpha, cUV.U, cUV.V, op, x, y );
+                }// if
+                else
+                {
+                    lr_mul_vec< value_t >( alpha, M.U, M.V, op, x, y );
+                }// else
+                
                 vec_add< value_t >( y, *sy );
             }// else
         },
@@ -359,46 +399,61 @@ lrmatrix::compress ( const uint  rate )
     std::visit(
         [this,rate] ( auto &&  UV )
         {
-            using  value_t = typename std::decay_t< decltype(M) >::value_t;
-            using  real_t  = typename hpro::real_type_t< value_t >;
+            using  value_t    = typename std::decay_t< decltype(UV) >::value_t;
+            using  real_t     = typename hpro::real_type_t< value_t >;
+            using  real_ptr_t = real_t *;
 
+            const auto    rank_UV   = UV.U.ncols();
             auto          config    = zfp_config_rate( rate, false );
             uint          factor    = sizeof(value_t) / sizeof(real_t);
-            const size_t  mem_dense = sizeof(value_t) * UV.U.ncols() * ( UV.U.nrows() + UV.V.nrows() );
-            
+            const size_t  mem_dense = sizeof(value_t) * rank_UV * ( UV.U.nrows() + UV.V.nrows() );
+
             if constexpr( std::is_same_v< value_t, real_t > )
             {
-                auto  zUV = std::make_unique< compressed_factors< value_t > >( UV.U.nrows(), UV.U.ncols(), config ); 
-                auto  zU = std::make_unique< zfp::const_array2< value_t > >( UV.U.nrows(), UV.U.ncols(), config );
-                auto  zV = std::make_unique< zfp::const_array2< value_t > >( UV.V.nrows(), UV.V.ncols(), config );
-                
-                zU->set( UV.U.data() );
-                zV->set( UV.V.data() );
+                auto  zM = std::make_unique< compressed_factors< value_t > >();
 
-                const size_t  mem_zfp = zU->compressed_size() + zV->compressed_size();
+                zM->U.set_config( config );
+                zM->V.set_config( config );
+                
+                zM->U.resize( UV.U.nrows(), UV.U.ncols() );
+                zM->V.resize( UV.V.nrows(), UV.V.ncols() );
+                
+                zM->U.set( UV.U.data() );
+                zM->V.set( UV.V.data() );
+
+                const auto  mem_zfp = zM->U.compressed_size() + zM->V.compressed_size();
 
                 if ( mem_zfp < mem_dense )
                 {
-                    _zdata = std::move( u );
-                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                    _zdata = std::move( zM );
+                    UV.U   = std::move( blas::matrix< value_t >( 0, rank_UV ) ); // remember rank !!!
+                    UV.V   = std::move( blas::matrix< value_t >( 0, rank_UV ) );
                 }// if
             }// if
             else
             {
-                auto  u = std::make_unique< zfp::const_array2< real_t > >( M.nrows() * factor, M.ncols(), config );
+                auto  zM = std::make_unique< compressed_factors< real_t > >();
+
+                zM->U.set_config( config );
+                zM->V.set_config( config );
                 
-                u->set( (real_t*) M.data() );
+                zM->U.resize( factor * UV.U.nrows(), UV.U.ncols() );
+                zM->V.resize( factor * UV.V.nrows(), UV.V.ncols() );
                 
-                const size_t  mem_zfp = u->compressed_size();
-                
+                zM->U.set( real_ptr_t(UV.U.data()) );
+                zM->V.set( real_ptr_t(UV.V.data()) );
+
+                const auto  mem_zfp = zM->U.compressed_size() + zM->V.compressed_size();
+
                 if ( mem_zfp < mem_dense )
                 {
-                    _zdata = std::move( u );
-                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+                    _zdata = std::move( zM );
+                    UV.U   = std::move( blas::matrix< value_t >( 0, 0 ) );
+                    UV.V   = std::move( blas::matrix< value_t >( 0, 0 ) );
                 }// if
             }// else
         },
-        _M
+        _UV
     );
 }
 
@@ -422,6 +477,10 @@ lrmatrix::byte_size () const
 
     std::visit( [&size] ( auto &&  M ) { size += M.U.byte_size() + M.V.byte_size(); }, _UV );
 
+    size += sizeof(_zdata);
+
+    std::visit( [&size] ( auto &&  zM ) { if ( ! is_null(zM) ) size += zM->U.compressed_size() + zM->V.compressed_size(); }, _zdata );
+    
     return size;
 }
 

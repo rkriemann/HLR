@@ -82,7 +82,7 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        io::eps::print( *A, "A", "noinnerid" );
+        io::eps::print( *A, "A", "noid" );
         io::eps::print_lvl( *A, "L" );
     }// if
 
@@ -96,6 +96,7 @@ program_main ()
 
     auto  apx = approx::SVD< value_t >();
 
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     
@@ -125,6 +126,9 @@ program_main ()
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
+        
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *A3, "A2", "noid" );
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
@@ -223,9 +227,6 @@ program_main ()
         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *A3, "A3", "noid" );
     }// if
     
     //////////////////////////////////////////////////////////////////////
@@ -276,7 +277,7 @@ program_main ()
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         
         if ( hpro::verbose( 3 ) )
-            io::eps::print( *A3, "noinnerid" );
+            io::eps::print( *A3, "A3", "noid" );
     }// if
 
     #endif

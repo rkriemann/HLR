@@ -18,6 +18,10 @@
 #include <hpro/matrix/TRkMatrix.hh>
 #include <hpro/io/TClusterBasisVis.hh>
 
+#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
+#include <hpro/matrix/TUniformMatrix.hh>
+#endif
+
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/eps_printer.hh>
 #include <hlr/utils/tools.hh>
@@ -128,6 +132,32 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.restore();
             }// if
         }// if
+        #if defined(USE_LIC_CHECK)
+        else if ( hpro::is_uniform( &M ) )
+        {
+            auto  R = cptrcast( &M, hpro::TUniformMatrix );
+
+            // background
+            prn.set_rgb( 219, 231, 243 ); // SkyBlue1!25!White
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                
+                prn.set_gray( 0 );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        #endif
         else if ( is_sparse( M ) )
         {
             auto  S = cptrcast( &M, hpro::TSparseMatrix );

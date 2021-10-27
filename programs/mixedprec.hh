@@ -47,6 +47,15 @@ run_posit ( hpro::TMatrix &  A,
 void
 convert_generic ( hpro::TMatrix &  M );
 
+#if defined(HAS_ZFP)
+//
+// compress data in generic matrices
+//
+void
+compress ( hpro::TMatrix &     M,
+           const zfp_config &  config );
+#endif
+
 //
 // print matrix <M> to file <filename>
 //
@@ -227,6 +236,19 @@ program_main ()
                   << format_mem( mem_zfp ) << std::endl;
     }// for
 
+    for ( uint  rate = 32; rate >= 8; rate -= 4 )
+    {
+        auto  A_zfp   = impl::matrix::copy( *A );
+        auto  config  = zfp_config_rate( rate, false );
+
+        compress( *A_zfp, config );
+        
+        auto  mem_zfp = A_zfp->byte_size();
+    
+        std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+                  << format_mem( mem_zfp ) << std::endl;
+    }// for
+    
     #endif
 
     //
@@ -302,6 +324,42 @@ convert_generic ( hpro::TMatrix &  M )
         RM->parent()->replace_block( RM, R.release() );
     }// if
 }
+
+#if defined(HAS_ZFP)
+//
+// compress data in generic matrices
+//
+void
+compress ( hpro::TMatrix &     M,
+           const zfp_config &  config )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                    compress( *B->block( i, j ), config );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_generic_dense( M ) )
+    {
+        auto  D = ptrcast( &M, matrix::dense_matrix );
+
+        D->compress( config );
+    }// if
+    else if ( matrix::is_generic_lowrank( M ) )
+    {
+        auto  R = ptrcast( &M, matrix::lrmatrix );
+
+        R->compress( config );
+    }// if
+}
+#endif
 
 //
 // actual print function

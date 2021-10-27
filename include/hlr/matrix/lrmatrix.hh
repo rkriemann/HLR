@@ -49,7 +49,7 @@ private:
     {
         using value_t = T_value;
 
-        zfp::const_array2< value_t >  zU, zV;
+        zfp::const_array2< value_t >  U, V;
     };
 
     using  compressed_storage = std::variant< std::unique_ptr< compressed_factors< float > >,
@@ -327,11 +327,18 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return ! std::visit( [] ( auto && d ) { return is_null( d.zU ); }, _zdata );
+        return ! std::visit( [] ( auto && d ) { return is_null( d ); }, _zdata );
     }
     
     // return size in bytes used by this object
     virtual size_t byte_size  () const;
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        std::visit( [] ( auto && d ) { d.reset( nullptr ); }, _zdata );
+    }
 };
 
 //
