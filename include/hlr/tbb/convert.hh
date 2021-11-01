@@ -26,7 +26,17 @@
 
 namespace hlr { namespace tbb { namespace matrix {
 
-using hlr::matrix::convert_to_dense;
+using namespace hlr::matrix;
+
+//
+// convert given matrix into dense format
+//
+template < typename value_t >
+std::unique_ptr< hpro::TDenseMatrix >
+convert_to_dense ( const hpro::TMatrix &  M )
+{
+    return hlr::matrix::convert_to_dense< value_t >( M );
+}
 
 //
 // convert given matrix into lowrank format

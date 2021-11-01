@@ -52,6 +52,9 @@ struct eps_printer
     void translate    ( const double  x,
                         const double  y );
     
+    // rotate output
+    void rotate       ( const double  angle );
+    
     //
     // 2D - drawing
     //

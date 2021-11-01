@@ -162,7 +162,7 @@ eps_printer::restore ()
 //
 void
 eps_printer::scale ( const double  x,
-                    const double  y )
+                     const double  y )
 {
     _output << x << " " << y << " scale" << std::endl;
 }
@@ -171,9 +171,19 @@ eps_printer::scale ( const double  x,
 // translate output
 //
 void
-eps_printer::translate ( const double x, const double y )
+eps_printer::translate ( const double  x,
+                         const double  y )
 {
     _output << x << " " << y << " translate" << std::endl;
+}
+
+//
+// rotate output
+//
+void
+eps_printer::rotate ( const double  angle )
+{
+    _output << angle << " rotate" << std::endl;
 }
 
 //

@@ -191,8 +191,35 @@ print_eps ( const hpro::TMatrix &               M,
                 }// for
             }// if
         }// else
-        
+
+        //
+        // draw index set data 
+        //
+
+        if ( contains( options, "indexset" ) )
+        {
+            const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 16.0 );
+            
+            prn.save();
+            prn.set_font( "Helvetica", fn_size );
+                
+            prn.set_rgb( 92, 53, 102 );
+            prn.draw_text( double(M.col_ofs()) + double(M.ncols()) / 2.0,
+                           double(M.row_ofs()) + fn_size,
+                           hpro::to_string( "%d ... %d", M.col_ofs(), M.col_ofs() + M.ncols() - 1 ), 'c' );
+
+            prn.save();
+            prn.translate( double(M.col_ofs()) + fn_size, double(M.row_ofs()) + double(M.nrows()) / 2.0 );
+            prn.rotate( -90 );
+            prn.draw_text( 0, 0, hpro::to_string( "%d ... %d", M.row_ofs(), M.row_ofs() + M.nrows() - 1 ), 'c' );
+            prn.restore();
+            
+            prn.restore();
+        }// if
+
+        //
         // draw frame
+        //
         prn.set_gray( 0 );
         prn.draw_rect( M.col_ofs(),
                        M.row_ofs(),

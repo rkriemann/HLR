@@ -12,6 +12,8 @@
 #include <hpro/matrix/structure.hh>
 
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 
 namespace hlr { namespace matrix {
@@ -213,14 +215,40 @@ convert_to_dense ( const hpro::TMatrix &  M )
             
         return DC;
     }// if
+    else if ( is_generic_dense( M ) )
+    {
+        auto  D   = cptrcast( &M, dense_matrix );
+
+        HLR_ASSERT( blas::value_type_v< value_t > == D->value_type() );
+
+        auto  DD  = D->M< value_t >();
+        auto  DC  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+        auto  DDC = blas::mat< value_t >( *DC );
+
+        blas::copy( DD, DDC );
+            
+        return DC;
+    }// if
     else if ( is_lowrank( M ) )
     {
         auto  R  = cptrcast( &M, hpro::TRkMatrix );
         auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
         auto  DD = blas::mat< value_t >( *D );
 
-        blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ),
-                    value_t(0), DD );
+        blas::prod( value_t(1), blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ), value_t(0), DD );
+        
+        return D;
+    }// if
+    else if ( is_generic_lowrank( M ) )
+    {
+        auto  R  = cptrcast( &M, lrmatrix );
+
+        HLR_ASSERT( blas::value_type_v< value_t > == R->value_type() );
+
+        auto  D  = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+        auto  DD = blas::mat< value_t >( *D );
+
+        blas::prod( value_t(1), R->U< value_t >(), blas::adjoint( R->V< value_t >() ), value_t(0), DD );
         
         return D;
     }// if
