@@ -22,6 +22,8 @@
 #include <hpro/matrix/TUniformMatrix.hh>
 #endif
 
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/eps_printer.hh>
 #include <hlr/utils/tools.hh>
@@ -57,7 +59,7 @@ print_eps ( const hpro::TMatrix &               M,
     }// if
     else
     {
-        if ( is_dense( M ) )
+        if ( is_dense( M ) || is_generic_dense( M ) )
         {
             // background
             prn.set_rgb( 243, 94, 94 ); // ScarletRed1!75!White
@@ -84,9 +86,14 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.restore();
             }// if
         }// if
-        else if ( is_lowrank( M ) )
+        else if ( is_lowrank( M ) || is_generic_lowrank( M ) )
         {
-            auto  R = cptrcast( &M, hpro::TRkMatrix );
+            uint  rank = 0;
+
+            if ( is_lowrank( M ) )
+                rank = cptrcast( &M, hpro::TRkMatrix )->rank();
+            else
+                rank = cptrcast( &M, lrmatrix )->rank();
 
             // background
             prn.set_rgb( 225, 247, 204 ); // Chameleon1!25!White
@@ -103,7 +110,7 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.set_gray( 0 );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               hpro::to_string( "%d", R->rank() ) );
+                               hpro::to_string( "%d", rank ) );
                 
                 prn.restore();
             }// if
