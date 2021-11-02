@@ -6,7 +6,11 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <hlib-config.h>
+
+#if defined(USE_LIC_CHECK)
 #define USE_H2
+#endif
 
 #if defined( USE_H2 )
 #include <hpro/cluster/TClusterBasisBuilder.hh>
@@ -94,7 +98,10 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  apx = approx::SVD< value_t >();
+    auto  rowcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
+    auto  colcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
+    auto  A_uni     = std::unique_ptr< hpro::TMatrix >();
+    auto  apx       = approx::SVD< value_t >();
 
     if ( false )
     {
@@ -102,11 +109,11 @@ program_main ()
     
         tic = timer::now();
     
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( *A, apx, acc, nseq );
+        auto  [ rowcb2, colcb, A2 ] = impl::matrix::build_uniform_lvl( *A, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb2->byte_size(), colcb->byte_size() ) << std::endl;
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
@@ -190,6 +197,14 @@ program_main ()
             }
         }
         #endif
+
+        //
+        // preserve for MVM
+        //
+
+        A_uni     = std::move( A3 );
+        rowcb_uni = std::move( rowcb3 );
+        colcb_uni = std::move( colcb3 );
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -237,9 +252,9 @@ program_main ()
 
     #if defined( USE_H2 )
     
-    auto  rowcb3 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
-    auto  colcb3 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
-    auto  A3     = std::unique_ptr< hpro::TMatrix >();
+    auto  rowcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
+    auto  colcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
+    auto  A_h2     = std::unique_ptr< hpro::TMatrix >();
     
     if ( true )
     {
@@ -251,7 +266,7 @@ program_main ()
 
         tic = timer::now();
     
-        std::tie( rowcb3, colcb3 ) = bbuilder.build( ct->root(), ct->root(), A.get(), acc );
+        auto [ rowcb3, colcb3 ] = bbuilder.build( ct->root(), ct->root(), A.get(), acc );
 
         toc = timer::since( tic );
 
@@ -264,7 +279,7 @@ program_main ()
 
         tic = timer::now();
     
-        A3 = std::move( to_h2( A.get(), rowcb3.get(), colcb3.get() ) );
+        auto  A3 = std::move( to_h2( A.get(), rowcb3.get(), colcb3.get() ) );
     
         toc = timer::since( tic );
 
@@ -278,11 +293,19 @@ program_main ()
         
         if ( hpro::verbose( 3 ) )
             io::eps::print( *A3, "A3", "noid" );
+
+        //
+        // preserve for MVM
+        //
+
+        A_h2     = std::move( A3 );
+        rowcb_h2 = std::move( rowcb3 );
+        colcb_h2 = std::move( colcb3 );
     }// if
 
     #endif
     
-    #if 0
+    #if 1
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -345,16 +368,16 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
 
         {
-            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-            impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A2, *x_ref, *y, *rowcb, *colcb );
+            impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
         }
             
-        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A2->col_is() );
-        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A2->row_is() );
+        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_uni->col_is() );
+        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
         x->fill( 1 );
             
@@ -363,7 +386,7 @@ program_main ()
             tic = timer::now();
             
             for ( int j = 0; j < 50; ++j )
-                impl::uniform::mul_vec( value_t(1), hpro::apply_normal, *A2, *x, *y, *rowcb, *colcb );
+                impl::uniform::mul_vec( value_t(1), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -397,14 +420,14 @@ program_main ()
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
             
-            A3->mul_vec( 1.0, x_ref.get(), 1.0, y.get(), hpro::apply_normal );
+            A_h2->mul_vec( 1.0, x_ref.get(), 1.0, y.get(), hpro::apply_normal );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
         }
             
-        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A3->col_is() );
-        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A3->row_is() );
+        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_h2->col_is() );
+        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_h2->row_is() );
 
         x->fill( 1 );
             
@@ -413,7 +436,7 @@ program_main ()
             tic = timer::now();
     
             for ( int j = 0; j < 50; ++j )
-                A3->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+                A_h2->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
