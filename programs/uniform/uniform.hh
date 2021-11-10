@@ -9,10 +9,10 @@
 #include <hlib-config.h>
 
 #if defined(USE_LIC_CHECK)
-#define USE_H2
+#define HAS_H2
 #endif
 
-#if defined( USE_H2 )
+#if defined( HAS_H2 )
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/algebra/mat_conv.hh>
@@ -250,7 +250,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined( USE_H2 )
+    #if defined( HAS_H2 )
     
     auto  rowcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
     auto  colcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
@@ -319,17 +319,22 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "H-matrices" << term::reset << std::endl;
         
-        blas::vector< value_t >  x( A->ncols() );
-        blas::vector< value_t >  y( A->nrows() );
+        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_uni->col_is() );
+        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-        blas::fill( x, value_t(1) );
+        x->fill( 1 );
+
+        // blas::vector< value_t >  x( A->ncols() );
+        // blas::vector< value_t >  y( A->nrows() );
+
+        // blas::fill( x, value_t(1) );
             
         for ( int i = 0; i < nbench; ++i )
         {
             tic = timer::now();
     
             for ( int j = 0; j < 50; ++j )
-                impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A, x, y );
+                impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -337,7 +342,7 @@ program_main ()
             std::cout << "    mvm in   " << format_time( toc ) << std::endl;
 
             if ( i < nbench-1 )
-                blas::fill( y, value_t(0) );
+                y->fill( 1 );
         }// for
         
         if ( nbench > 1 )
@@ -355,7 +360,7 @@ program_main ()
     auto  y_ref = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
 
     x_ref->fill( 1 );
-    impl::mul_vec< value_t >( 1.0, hpro::apply_normal, *A, *x_ref, *y_ref );
+    impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x_ref, *y_ref );
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -370,7 +375,7 @@ program_main ()
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-            impl::uniform::mul_vec( value_t(1), hpro::apply_adjoint, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
+            impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
@@ -386,7 +391,7 @@ program_main ()
             tic = timer::now();
             
             for ( int j = 0; j < 50; ++j )
-                impl::uniform::mul_vec( value_t(1), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
+                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -401,7 +406,7 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        
+
         runtime.clear();
     }// if
     
@@ -411,16 +416,16 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined( USE_H2 )
+    #if defined( HAS_H2 )
     
     if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
-        
+
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
             
-            A_h2->mul_vec( 1.0, x_ref.get(), 1.0, y.get(), hpro::apply_normal );
+            impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x_ref, *y, *rowcb_h2, *colcb_h2 );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
@@ -436,13 +441,14 @@ program_main ()
             tic = timer::now();
     
             for ( int j = 0; j < 50; ++j )
-                A_h2->mul_vec( 1.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+                // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+                impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x, *y, *rowcb_h2, *colcb_h2 );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
         
             std::cout << "    mvm in   " << format_time( toc ) << std::endl;
-
+            
             if ( i < nbench-1 )
                 y->fill( 1 );
         }// for

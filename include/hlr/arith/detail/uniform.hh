@@ -88,7 +88,13 @@ mul_vec ( const value_t                                       alpha,
         
         if ( op_M == hpro::apply_normal )
         {
-            blas::mulvec( value_t(1), R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+        }// if
+        else if ( op_M == hpro::apply_conjugate )
+        {
+            std::scoped_lock  lock( y.mutex() );
+
+            HLR_ASSERT( false );
         }// if
         else if ( op_M == hpro::apply_transposed )
         {
@@ -96,7 +102,7 @@ mul_vec ( const value_t                                       alpha,
         }// if
         else if ( op_M == hpro::apply_adjoint )
         {
-            blas::mulvec( value_t(1), blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
         }// if
     }// if
     else

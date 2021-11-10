@@ -7,6 +7,7 @@
 #include "hlr/tbb/matrix.hh"
 #include "hlr/tbb/arith.hh"
 #include "hlr/tbb/arith_uniform.hh"
+#include "hlr/tbb/arith_h2.hh"
 #include "hlr/tbb/cluster_basis.hh"
 
 namespace          impl      = hlr::tbb;
