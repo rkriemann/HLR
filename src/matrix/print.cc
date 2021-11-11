@@ -679,6 +679,7 @@ print_eps< hpro::TClusterBasis< hpro::real > > ( const hpro::TClusterBasis< hpro
 {
     hpro::TPSClusterBasisVis< hpro::real >  cbvis;
 
+    cbvis.colourise( false );
     cbvis.print( &cb, filename );
 }
 
@@ -690,6 +691,7 @@ print_eps< hpro::TClusterBasis< hpro::complex > > ( const hpro::TClusterBasis< h
 {
     hpro::TPSClusterBasisVis< hpro::complex >  cbvis;
 
+    cbvis.colourise( false );
     cbvis.print( &cb, filename );
 }
 

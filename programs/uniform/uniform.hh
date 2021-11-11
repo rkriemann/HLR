@@ -32,6 +32,13 @@
 using namespace hlr;
 
 //
+// return min/avg/max rank of given cluster basis
+//
+template < typename cluster_basis_t >
+std::tuple< uint, uint, uint >
+rank_info ( const cluster_basis_t &  cb );
+
+//
 // main function
 //
 template < typename problem_t >
@@ -103,17 +110,24 @@ program_main ()
     auto  A_uni     = std::unique_ptr< hpro::TMatrix >();
     auto  apx       = approx::SVD< value_t >();
 
-    if ( false )
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     
         tic = timer::now();
     
-        auto  [ rowcb2, colcb, A2 ] = impl::matrix::build_uniform_lvl( *A, apx, acc, nseq );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_lvl( *A, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb2->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        
+        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+
+        std::cout << "    ranks  " << std::endl
+                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
+                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
@@ -128,40 +142,51 @@ program_main ()
     
         tic = timer::now();
     
-        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+
+        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+
+        std::cout << "    ranks  " << std::endl
+                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
+                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
         
         if ( hpro::verbose( 3 ) )
-            io::eps::print( *A3, "A2", "noid" );
+        {
+            io::eps::print( *A2, "A2", "noid" );
+            io::eps::print( *rowcb, "rowcb2" );
+            io::eps::print( *colcb, "colcb2" );
+        }// if
         
         {
-            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
             auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             std::cout << "    " << term::bullet << term::bold << "single precision" << term::reset << std::endl;
 
             using single_t = math::decrease_precision_t< value_t >;
 
-            auto  rowcb4 = matrix::copy< single_t >( *rowcb3 );
-            auto  colcb4 = matrix::copy< single_t >( *colcb3 );
+            auto  rowcbs = matrix::copy< single_t >( *rowcb );
+            auto  colcbs = matrix::copy< single_t >( *colcb );
             
-            auto  rowcb5 = matrix::copy< value_t >( *rowcb4 );
-            auto  colcb5 = matrix::copy< value_t >( *colcb4 );
+            auto  rowcbv = matrix::copy< value_t >( *rowcbs );
+            auto  colcbv = matrix::copy< value_t >( *colcbs );
 
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A2->byte_size(), rowcbs->byte_size(), colcbs->byte_size() ) << std::endl;
             
-            matrix::replace_cluster_basis( *A3, *rowcb5, *colcb5 );
+            matrix::replace_cluster_basis( *A2, *rowcbv, *colcbv );
             
             {
-                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
                 auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
                 std::cout << "      error  = " << format_error( error / normA ) << std::endl;
@@ -176,21 +201,21 @@ program_main ()
             using single_t = math::decrease_precision_t< value_t >;
             using half_t   = math::decrease_precision_t< single_t >;
             
-            auto  rowcb4 = matrix::copy< half_t >( *rowcb3 );
-            auto  colcb4 = matrix::copy< half_t >( *colcb3 );
+            auto  rowcbh = matrix::copy< half_t >( *rowcb );
+            auto  colcbh = matrix::copy< half_t >( *colcb );
             
-            auto  rowcb5 = matrix::copy< single_t >( *rowcb4 );
-            auto  colcb5 = matrix::copy< single_t >( *colcb4 );
+            auto  rowcbs = matrix::copy< single_t >( *rowcbh );
+            auto  colcbs = matrix::copy< single_t >( *colcbh );
 
-            auto  rowcb6 = matrix::copy< value_t >( *rowcb5 );
-            auto  colcb6 = matrix::copy< value_t >( *colcb5 );
+            auto  rowcbv = matrix::copy< value_t >( *rowcbs );
+            auto  colcbv = matrix::copy< value_t >( *colcbs );
 
-            std::cout << "      mem    = " << format_mem( A3->byte_size(), rowcb4->byte_size(), colcb4->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( A2->byte_size(), rowcbh->byte_size(), colcbh->byte_size() ) << std::endl;
             
-            matrix::replace_cluster_basis( *A3, *rowcb6, *colcb6 );
+            matrix::replace_cluster_basis( *A2, *rowcbv, *colcbv );
             
             {
-                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+                auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
                 auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
                 std::cout << "      error  = " << format_error( error / normA ) << std::endl;
@@ -202,9 +227,9 @@ program_main ()
         // preserve for MVM
         //
 
-        A_uni     = std::move( A3 );
-        rowcb_uni = std::move( rowcb3 );
-        colcb_uni = std::move( colcb3 );
+        A_uni     = std::move( A2 );
+        rowcb_uni = std::move( rowcb );
+        colcb_uni = std::move( colcb );
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -231,14 +256,14 @@ program_main ()
 
         tic = timer::now();
     
-        auto  A3 = impl::matrix::copy_uniform< value_t >( *A, *rowcb2, *colcb2 );
+        auto  A2 = impl::matrix::copy_uniform< value_t >( *A, *rowcb2, *colcb2 );
     
         toc = timer::since( tic );
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A3->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
@@ -266,41 +291,51 @@ program_main ()
 
         tic = timer::now();
     
-        auto [ rowcb3, colcb3 ] = bbuilder.build( ct->root(), ct->root(), A.get(), acc );
+        auto [ rowcb, colcb ] = bbuilder.build( ct->root(), ct->root(), A.get(), acc );
 
         toc = timer::since( tic );
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
 
+        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+
+        std::cout << "    ranks  " << std::endl
+                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
+                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
+        
         if ( verbose( 3 ) )
-            io::eps::print( *rowcb3, "rowcb" );
+        {
+            io::eps::print( *rowcb, "rowcb" );
+            io::eps::print( *colcb, "colcb" );
+        }// if
 
         std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
 
         tic = timer::now();
     
-        auto  A3 = std::move( to_h2( A.get(), rowcb3.get(), colcb3.get() ) );
+        auto  A2 = std::move( to_h2( A.get(), rowcb.get(), colcb.get() ) );
     
         toc = timer::since( tic );
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A3->byte_size(), rowcb3->byte_size(), colcb3->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A3 );
+        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
         auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         
         if ( hpro::verbose( 3 ) )
-            io::eps::print( *A3, "A3", "noid" );
+            io::eps::print( *A2, "A2", "noid" );
 
         //
         // preserve for MVM
         //
 
-        A_h2     = std::move( A3 );
-        rowcb_h2 = std::move( rowcb3 );
-        colcb_h2 = std::move( colcb3 );
+        A_h2     = std::move( A2 );
+        rowcb_h2 = std::move( rowcb );
+        colcb_h2 = std::move( colcb );
     }// if
 
     #endif
@@ -463,4 +498,43 @@ program_main ()
 
     #endif
     #endif
+}
+
+//
+// return min/avg/max rank of given cluster basis
+//
+template < typename cluster_basis_t >
+std::tuple< uint, size_t, uint, size_t >
+rank_info_helper ( const cluster_basis_t &  cb )
+{
+    uint    min_rank = cb.rank();
+    uint    max_rank = cb.rank();
+    size_t  sum_rank = cb.rank();
+    size_t  nnodes   = 1;
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            auto [ min_i, sum_i, max_i, n_i ] = rank_info_helper( *cb.son(i) );
+
+            if      ( min_rank == 0 ) min_rank = min_i;
+            else if ( min_i    != 0 ) min_rank = std::min( min_rank, min_i );
+            
+            max_rank  = std::max( max_rank, max_i );
+            sum_rank += sum_i;
+            nnodes   += n_i;
+        }// for
+    }// if
+
+    return { min_rank, sum_rank, max_rank, nnodes };
+}
+
+template < typename cluster_basis_t >
+std::tuple< uint, uint, uint >
+rank_info ( const cluster_basis_t &  cb )
+{
+    auto [ min_rank, sum_rank, max_rank, nnodes ] = rank_info_helper( cb );
+
+    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
