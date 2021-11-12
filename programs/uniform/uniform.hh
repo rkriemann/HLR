@@ -38,6 +38,9 @@ template < typename cluster_basis_t >
 std::tuple< uint, uint, uint >
 rank_info ( const cluster_basis_t &  cb );
 
+std::tuple< uint, uint, uint >
+rank_info ( const hpro::TMatrix &  M );
+
 //
 // main function
 //
@@ -99,6 +102,12 @@ program_main ()
 
     const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
 
+    {
+        auto  [ kmin, kavg, kmax ] = rank_info( *A );
+    
+        std::cout << "    ranks  : " << kmin << " / " << kavg << " / " << kmax << std::endl;
+    }
+    
     //////////////////////////////////////////////////////////////////////
     //
     // directly build uniform matrix
@@ -510,7 +519,7 @@ rank_info_helper ( const cluster_basis_t &  cb )
     uint    min_rank = cb.rank();
     uint    max_rank = cb.rank();
     size_t  sum_rank = cb.rank();
-    size_t  nnodes   = 1;
+    size_t  nnodes   = cb.rank() > 0 ? 1 : 0;
 
     if ( cb.nsons() > 0 )
     {
@@ -535,6 +544,55 @@ std::tuple< uint, uint, uint >
 rank_info ( const cluster_basis_t &  cb )
 {
     auto [ min_rank, sum_rank, max_rank, nnodes ] = rank_info_helper( cb );
+
+    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
+//
+// return min/avg/max rank of given matrix
+//
+std::tuple< uint, size_t, uint, size_t >
+rank_info_helper ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto    B        = cptrcast( &M, hpro::TBlockMatrix );
+        uint    min_rank = 0;
+        uint    max_rank = 0;
+        size_t  sum_rank = 0;
+        size_t  nnodes   = 0;
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto [ min_ij, sum_ij, max_ij, n_ij ] = rank_info_helper( *B->block( i, j ) );
+                
+                if      ( min_rank == 0 ) min_rank = min_ij;
+                else if ( min_ij   != 0 ) min_rank = std::min( min_rank, min_ij );
+                
+                max_rank  = std::max( max_rank, max_ij );
+                sum_rank += sum_ij;
+                nnodes   += n_ij;
+            }// for
+        }// for
+
+        return { min_rank, sum_rank, max_rank, nnodes };
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, hpro::TRkMatrix );
+
+        return { R->rank(), R->rank(), R->rank(), R->rank() > 1 ? 1 : 0 };
+    }// if
+
+    return { 0, 0, 0, 0 };
+}
+
+std::tuple< uint, uint, uint >
+rank_info ( const hpro::TMatrix & M )
+{
+    auto [ min_rank, sum_rank, max_rank, nnodes ] = rank_info_helper( M );
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
