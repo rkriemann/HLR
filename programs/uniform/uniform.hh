@@ -62,6 +62,7 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
+        io::vtk::print( *coord, "coord" );
         io::eps::print( *ct->root(), "ct" );
         io::eps::print( *bct->root(), "bct" );
     }// if
@@ -102,6 +103,8 @@ program_main ()
 
     const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
 
+    std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
+    
     {
         auto  [ kmin, kavg, kmax ] = rank_info( *A );
     

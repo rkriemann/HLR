@@ -305,10 +305,17 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) || ( appl == "exp" ) ) )
+    if ( ! ( ( appl == "logkernel" )    ||
+             ( appl == "laplaceslp" )   ||
+             ( appl == "helmholtzslp" ) ||
+             ( appl == "exp" )          ||
+             ( appl == "materncov" )    ||  
+             ( appl == "gaussian" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
-    if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )
+    if ( ! ( ( distr == "cyclic2d" ) ||
+             ( distr == "cyclic1d" ) ||
+             ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
     if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||

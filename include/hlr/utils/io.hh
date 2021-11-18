@@ -12,6 +12,7 @@
 
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
+#include <hpro/io/TCoordVis.hh>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
@@ -284,6 +285,30 @@ print ( const cluster_basis_t &  cb,
 }
 
 }// namespace eps
+
+//////////////////////////////////////////////////////////////////////
+//
+// VTK format
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace vtk
+{
+
+//
+// print coordinates
+//
+inline
+void
+print ( const HLIB::TCoordinate &  coord,
+        const std::string &        filename )
+{
+    HLIB::TVTKCoordVis  vis;
+
+    vis.print( & coord, filename );
+}
+
+}// namespace vtk
 
 }}// namespace hlr::io
 
