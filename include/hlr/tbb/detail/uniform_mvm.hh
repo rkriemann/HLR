@@ -122,22 +122,29 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
 {
     auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
-    if ( cb.rank() > 0 )
-    {
-        auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.is() - v.ofs() );
-        auto  s    = cb.transform_forward( v_cb );
+    ::tbb::parallel_invoke(
+        [&] ()
+        {                    
+            if ( cb.rank() > 0 )
+            {
+                auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.is() - v.ofs() );
+                auto  s    = cb.transform_forward( v_cb );
+                
+                u->set_coeffs( std::move( s ) );
+            }// if
+        },
 
-        u->set_coeffs( std::move( s ) );
-    }// if
-
-    if ( cb.nsons() > 0 )
-    {
-        ::tbb::parallel_for( uint(0), cb.nsons(),
-                             [&] ( const uint  i )
-                             {
-                                 u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
-                             } );
-    }// if
+        [&] ()
+        {
+            if ( cb.nsons() > 0 )
+            {
+                ::tbb::parallel_for( uint(0), cb.nsons(),
+                                     [&] ( const uint  i )
+                                     {
+                                         u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
+                                     } );
+            }// if
+        } );
 
     return u;
 }

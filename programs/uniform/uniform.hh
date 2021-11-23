@@ -425,7 +425,7 @@ program_main ()
             impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
             
             y->axpy( -1.0, y_ref.get() );
-            std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
+            std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
         }
             
         auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_uni->col_is() );
@@ -475,7 +475,7 @@ program_main ()
             impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x_ref, *y, *rowcb_h2, *colcb_h2 );
             
             y->axpy( -1.0, y_ref.get() );
-            std::cout << "    error  = " << format_error( y->norm2() ) << std::endl;
+            std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
         }
             
         auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_h2->col_is() );

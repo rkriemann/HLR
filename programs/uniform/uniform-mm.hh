@@ -173,7 +173,7 @@ program_main ()
             std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
 
-        if ( true )
+        if ( false )
         {
             std::cout << "    " << term::bullet << term::bold << "converting to uniform-H" << term::reset << std::endl;
     
@@ -184,7 +184,8 @@ program_main ()
             std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
 
-        io::eps::print( *B, "B", prnopt );
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *B, "B", prnopt );
     }// if
 
     //////////////////////////////////////////////////////////////////////
@@ -195,34 +196,6 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "Uniform H-Multiplication" << term::reset << std::endl;
     
-    // if ( cmdline::cluster == "tlr" )
-    // {
-    //     if ( true )
-    //     {
-    //         std::cout << "  " << term::bullet << "eager" << term::reset << std::endl;
-            
-    //         auto  B      = impl::matrix::copy( *A2 );
-    //         auto  rowcb2 = rowcb->copy();
-    //         auto  colcb2 = colcb->copy();
-
-    //         matrix::replace_cluster_basis( *B, *rowcb2, *colcb2 );
-            
-    //         B->scale( 0 );
-
-    //         tic = timer::now();
-                
-    //         impl::uniform::tlr::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
-            
-    //         toc = timer::since( tic );
-    //         std::cout << "    done in  " << format_time( toc ) << std::endl;
-    //         std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
-
-    //         auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
-
-    //         std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
-    //     }// if
-    // }// if
-    // else
     {
         // if ( false )
         // {
@@ -269,14 +242,15 @@ program_main ()
             std::cout << "    done in  " << format_time( toc ) << std::endl;
             std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
+            auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
 
             std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
             if ( hpro::verbose( 3 ) )
             {
-                io::eps::print( *rowcb2, "rowcb", "mem" );
-                io::eps::print( *colcb2, "colcb", "mem" );
+                io::eps::print( *B, "B2", prnopt );
+                io::eps::print( *rowcb2, "rowcb2", "mem" );
+                io::eps::print( *colcb2, "colcb2", "mem" );
             }// if
         }// if
 
@@ -300,11 +274,16 @@ program_main ()
             std::cout << "    done in  " << format_time( toc ) << std::endl;
             std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
+            auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
 
             std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
-            io::eps::print( *B, "B2", prnopt );
+            if ( hpro::verbose( 3 ) )
+            {
+                io::eps::print( *B, "B3", prnopt );
+                io::eps::print( *rowcb2, "rowcb3", "mem" );
+                io::eps::print( *colcb2, "colcb3", "mem" );
+            }// if
         }// if
     }// else
 }

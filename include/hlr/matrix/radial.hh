@@ -157,7 +157,29 @@ struct multiquadric_function
 
     value_t  operator () ( const value_t  r ) const
     {
-        return std::sqrt( 1 + math::square( epsilon * r ) );
+        return std::sqrt( value_t(1) + math::square( epsilon * r ) );
+    }
+};
+
+//
+// inverse multiquadric function
+//      ___________
+// 1 / √ 1 + (εr)²
+//
+template < typename T_value = double >
+struct inverse_multiquadric_function
+{
+    using  value_t = T_value;
+
+    value_t  epsilon;
+
+    inverse_multiquadric_function ( const value_t  eps )
+            : epsilon( eps )
+    {}
+
+    value_t  operator () ( const value_t  r ) const
+    {
+        return value_t(1) / std::sqrt( value_t(1) + math::square( epsilon * r ) );
     }
 };
 

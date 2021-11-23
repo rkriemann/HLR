@@ -49,12 +49,13 @@ int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
-auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  arith      = "std";        // which kind of arithmetic to use
 int     zfp_rate   = 0;            // apply additional ZFP compression with given rate (0 = off)
+auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
+double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 
 void
 read_config ( const std::string &  filename )
@@ -75,6 +76,7 @@ read_config ( const std::string &  filename )
     cluster    = cfg.get( "app.cluster", cluster );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
+    sigma      = cfg.get( "app.sigma",   sigma );
     matrixfile = cfg.get( "app.matrix",  matrixfile );
     sparsefile = cfg.get( "app.sparse",  sparsefile );
         
@@ -124,6 +126,7 @@ parse ( int argc, char ** argv )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
+        ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
@@ -222,6 +225,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
+    if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "compress"   ) ) zfp_rate   = std::max< int >( 0, vm["compress"].as<int>() );

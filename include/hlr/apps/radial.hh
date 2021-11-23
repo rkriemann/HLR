@@ -61,8 +61,9 @@ struct matern_covariance : public radial< matrix::matern_covariance_function< hp
 {
     using  value_t = hpro::real;
 
-    matern_covariance ( const std::string &  grid )
-            : radial( matrix::matern_covariance_function< hpro::real >( 1.0, 0.5, 1.0 ),
+    matern_covariance ( const hpro::real     sigma,
+                        const std::string &  grid )
+            : radial( matrix::matern_covariance_function< hpro::real >( sigma, 0.5, 1.0 ),
                       grid )
     {}
 };
@@ -71,8 +72,9 @@ struct gaussian : public radial< matrix::gaussian_function< hpro::real > >
 {
     using  value_t = hpro::real;
 
-    gaussian ( const std::string &  grid )
-            : radial( matrix::gaussian_function< hpro::real >( 1.0 ), grid )
+    gaussian ( const hpro::real     sigma,
+               const std::string &  grid )
+            : radial( matrix::gaussian_function< hpro::real >( sigma * sigma ), grid )
     {}
 };
 

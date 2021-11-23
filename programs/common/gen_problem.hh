@@ -51,7 +51,7 @@ gen_problem< hlr::apps::matern_covariance > ()
 
     HLR_ASSERT( gridfile != "" );
 
-    return std::make_unique< hlr::apps::matern_covariance >( gridfile );
+    return std::make_unique< hlr::apps::matern_covariance >( sigma, gridfile );
 }
 
 template <>
@@ -95,7 +95,7 @@ gen_problem< hlr::apps::gaussian > ()
 
     HLR_ASSERT( gridfile != "" );
 
-    return std::make_unique< hlr::apps::gaussian >( gridfile );
+    return std::make_unique< hlr::apps::gaussian >( sigma, gridfile );
 }
 
 }// namespace hlr
