@@ -13,6 +13,9 @@
 #include <hlr/matrix/product.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/randsvd.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -111,6 +114,7 @@ program_main ()
 
     auto  AxA      = hpro::matrix_product( A.get(), A.get() );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
+    auto  mmapx    = approx::SVD< value_t >();
     
     if ( false )
     {
@@ -122,7 +126,7 @@ program_main ()
 
         tic = timer::now();
                 
-        impl::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, apx );
+        impl::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
             
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -153,7 +157,7 @@ program_main ()
 
         tic = timer::now();
                 
-        impl::accu::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, apx );
+        impl::accu::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
             
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -177,7 +181,7 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "converting to uniform-H" << term::reset << std::endl;
     
-            auto  [ rowcb, colcb, B2 ] = impl::matrix::build_uniform_rec( *B, apx, acc, nseq );
+            auto  [ rowcb, colcb, B2 ] = impl::matrix::build_uniform_rec( *B, mmapx, acc, nseq );
             auto  diff2                = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
         
             std::cout << "      mem    = " << format_mem( B2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
@@ -211,7 +215,7 @@ program_main ()
             
         //     tic = timer::now();
                 
-        //     impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+        //     impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
             
         //     toc = timer::since( tic );
         //     std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -236,7 +240,7 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::accu::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+            impl::uniform::accu::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
             
             toc = timer::since( tic );
             std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -268,7 +272,7 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+            impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
             
             toc = timer::since( tic );
             std::cout << "    done in  " << format_time( toc ) << std::endl;

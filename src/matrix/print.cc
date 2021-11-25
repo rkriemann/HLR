@@ -13,12 +13,13 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include <hlib-config.h>
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
-#include <hpro/io/TClusterBasisVis.hh>
 
 #if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
+#include <hpro/io/TClusterBasisVis.hh>
 #include <hpro/matrix/TUniformMatrix.hh>
 #endif
 
@@ -671,6 +672,8 @@ template void print_eps< cluster_basis< std::complex< double > > > ( const clust
                                                                      const std::string &,
                                                                      const std::string & );
 
+#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
+
 template <>
 void
 print_eps< hpro::TClusterBasis< hpro::real > > ( const hpro::TClusterBasis< hpro::real > &  cb,
@@ -694,5 +697,7 @@ print_eps< hpro::TClusterBasis< hpro::complex > > ( const hpro::TClusterBasis< h
     cbvis.colourise( false );
     cbvis.print( &cb, filename );
 }
+
+#endif
 
 }}// namespace hlr::matrix

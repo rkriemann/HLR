@@ -73,11 +73,21 @@ build ( const indexset &                 rowis,
         
         if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
         {
-            return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+            auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+
+            if ( zfp_rate > 0 )
+                M->compress( zfp_config_rate( zfp_rate, false ) );
+            
+            return M;
         }// if
         else
         {
-            return std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
+            auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
+
+            if ( zfp_rate > 0 )
+                M->compress( zfp_config_rate( zfp_rate, false ) );
+
+            return M;
         }// else
     }// if
     else
@@ -165,12 +175,16 @@ build ( const indexset &                 rowis,
 
             if ( W.byte_size() + X.byte_size() < smem )
             {
+                //
+                // large low-rank more memory efficient: keep it
+                //
+                
                 return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
 
         //
-        // either not all low-rank or memory gets larger: construct block matrix
+        // not all low-rank or memory gets larger: construct block matrix
         //
 
         auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
@@ -179,20 +193,7 @@ build ( const indexset &                 rowis,
         
         for ( uint  i = 0; i < 2; ++i )
             for ( uint  j = 0; j < 2; ++j )
-            {
-                // optional compression
-                if ( zfp_rate > 0 )
-                {
-                    const zfp_config  zconf = zfp_config_rate( zfp_rate, false );
-                    
-                    if ( is_generic_lowrank( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), lrmatrix )->compress( zconf );
-                    else if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( zconf );
-                }// if
-                        
                 B->set_block( i, j, sub_D(i,j).release() );
-            }// for
 
         return B;
     }// else

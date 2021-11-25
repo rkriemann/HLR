@@ -184,6 +184,30 @@ struct inverse_multiquadric_function
 };
 
 //
+// thin plate spline
+// 
+// (εr)² log(εr)
+//
+template < typename T_value = double >
+struct thin_plate_spline_function
+{
+    using  value_t = T_value;
+
+    value_t  epsilon;
+
+    thin_plate_spline_function ( const value_t  eps )
+            : epsilon( eps )
+    {}
+
+    value_t  operator () ( const value_t  r ) const
+    {
+        const auto  er = epsilon * r;
+        
+        return math::square( er ) * math::log( er );
+    }
+};
+
+//
 // Rational Quadratic Function
 //
 //           -α
