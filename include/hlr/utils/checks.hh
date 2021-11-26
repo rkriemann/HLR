@@ -291,14 +291,25 @@ HLR_TEST_ANY( is_nd, hpro::TMatrix )
 // return true if given vector is a scalar vector
 //
 
-// inline
-// bool is_scalar      ( const hpro::TVector &  v )     noexcept { return hpro::is_scalar( v ); }
+inline
+bool is_scalar      ( const hpro::TVector &  v )     noexcept { return hpro::is_scalar( v ); }
 
-// inline
-// bool is_scalar      ( const hpro::TVector *  v )     noexcept { return hpro::is_scalar( v ); }
+inline
+bool is_scalar      ( const hpro::TVector *  v )     noexcept { return hpro::is_scalar( v ); }
 
-HLR_TEST_ALL( is_scalar, hpro::TVector )
-HLR_TEST_ANY( is_scalar, hpro::TVector )
+inline bool is_scalar_all  ( const hpro::TVector *  p ) noexcept { return hlr::is_scalar( p ); } 
+
+template < typename... T >
+bool is_scalar_all  ( const hpro::TVector *  p, T&&...  args ) noexcept { return hlr::is_scalar( p ) && hlr::is_scalar_all( std::forward< T >( args )... ); }
+
+inline
+bool is_scalar_all  ( const hpro::TVector &  p ) noexcept { return hlr::is_scalar( p ); }
+
+template < typename... T >
+bool is_scalar_all  ( const hpro::TVector &  p, T&&...  args ) noexcept { return hlr::is_scalar( p ) && hlr::is_scalar_all( std::forward< T >( args )... ); }
+
+// HLR_TEST_ALL( is_scalar, hpro::TVector )
+// HLR_TEST_ANY( is_scalar, hpro::TVector )
 
 }// namespace hlr
 
