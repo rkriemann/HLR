@@ -2,7 +2,7 @@
 #define __HLR_SEQ_CONVERT_HH
 //
 // Project     : HLib
-// Module      : convert
+// Module      : matrix/convert
 // Description : matrix conversion functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.

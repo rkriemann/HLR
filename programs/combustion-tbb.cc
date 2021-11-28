@@ -11,6 +11,7 @@
 #include <hlr/utils/io.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/compress.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
@@ -221,6 +222,28 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    // {
+    //     auto  t = tensor3< value_t >( 2, 2, 2 );
+
+    //     for ( uint k = 0; k < 2; ++k )
+    //         for ( uint i = 0; i < 2; ++i )
+    //             for ( uint j = 0; j < 2; ++j )
+    //                 t(i,j,k) = k*2*2 + i*2 + j;
+
+    //     for ( uint k = 0; k < 2; ++k )
+    //     {
+    //         for ( uint i = 0; i < 2; ++i )
+    //         {
+    //             for ( uint j = 0; j < 2; ++j )
+    //                 std::cout << t(i,j,k) << " ";
+    //             std::cout << std::endl;
+    //         }// for
+    //         std::cout << std::endl;
+    //     }// for
+
+    //     return;
+    // }
+    
     //
     // read dataset
     //
@@ -233,7 +256,40 @@ program_main ()
     std::cout << "    size   = " << D.nrows() << " × " << D.ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( mem_D ) << std::endl;
     
-    auto  norm_D  = norm::spectral( D );
+    auto  norm_D  = blas::norm_F( D );
+
+    //
+    // compress data and replace content
+    //
+
+    {
+        auto  delta = norm_D * hlr::cmdline::eps / D.nrows();
+    
+        std::cout << "  " << term::bullet << term::bold << "compression, ε = " << delta << term::reset << std::endl;
+        
+        auto    T     = blas::copy( D );
+        auto    acc   = local_accuracy( delta );
+        auto    apx   = approx::SVD< value_t >();
+        size_t  csize = 0;
+
+        matrix::compress_replace( indexset( 0, D.nrows()-1 ),
+                                  indexset( 0, D.ncols()-1 ),
+                                  T, acc, apx,
+                                  cmdline::ntile,
+                                  cmdline::zfp_rate,
+                                  csize );
+            
+        std::cout << "    mem    = " << format_mem( csize ) << std::endl;
+        std::cout << "     %full = " << format( "%.2f %%" ) % ( 100.0 * ( double( csize ) / double( mem_D ) )) << std::endl;
+
+        io::matlab::write( T, "T" );
+        
+        blas::add( value_t(-1), D, T );
+
+        const auto  error = blas::norm_F( T );
+        
+        std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_D ) << std::endl;
+    }
     
     //
     // convert matrix to H-matrix
