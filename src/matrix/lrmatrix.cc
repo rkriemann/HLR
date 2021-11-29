@@ -485,6 +485,7 @@ lrmatrix::byte_size () const
 
     size += sizeof(_zdata);
 
+    #if defined(HAS_ZFP)
     std::visit( [&size] ( auto &&  zM )
     {
         if ( ! is_null(zM) )
@@ -493,6 +494,7 @@ lrmatrix::byte_size () const
             size += sizeof(zM->V) + zM->V.compressed_size();
         }// if
     }, _zdata );
+    #endif
     
     return size;
 }

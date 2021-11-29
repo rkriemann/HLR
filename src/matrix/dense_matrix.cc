@@ -377,7 +377,9 @@ dense_matrix::byte_size () const
 
     size += sizeof(_zdata);
 
+    #if defined(HAS_ZFP)
     std::visit( [&size] ( auto &&  d ) { if ( ! is_null(d) ) size += sizeof(*d) + d->compressed_size(); }, _zdata );
+    #endif
         
     return size;
 }

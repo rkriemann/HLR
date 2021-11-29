@@ -75,7 +75,9 @@ compress_replace ( const indexset &           rowis,
             {
                 M->uncompress();
 
-                // blas::copy( M->mat< value_t >(), D );
+                auto  T = M->matrix();
+                
+                blas::copy( std::get< blas::matrix< value_t > >( T ), D );
             }// if
             
             // and discard matrix

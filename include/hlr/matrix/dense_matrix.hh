@@ -45,11 +45,13 @@ namespace matrix
 class dense_matrix : public hpro::TMatrix
 {
 private:
+    #if defined(HAS_ZFP)
     //
     // compressed storage based on underlying floating point type
     //
     using  compressed_storage = std::variant< std::unique_ptr< zfp::const_array2< float > >,
                                               std::unique_ptr< zfp::const_array2< double > > >;
+    #endif
 
 private:
     // local index set of matrix
@@ -62,8 +64,10 @@ private:
     // - after initialization identical to _M.index()
     blas::value_type      _vtype;
 
+    #if defined(HAS_ZFP)
     // optional: stores compressed data
     compressed_storage    _zdata;
+    #endif
     
 public:
     //
@@ -284,7 +288,11 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
+        #if defined(HAS_ZFP)
         return ! std::visit( [] ( auto && d ) { return is_null( d ); }, _zdata );
+        #else
+        return false;
+        #endif
     }
     
     // return size in bytes used by this object
@@ -294,7 +302,9 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
+        #if defined(HAS_ZFP)
         std::visit( [] ( auto && d ) { d.reset( nullptr ); }, _zdata );
+        #endif
     }
     
 };

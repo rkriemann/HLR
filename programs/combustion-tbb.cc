@@ -248,7 +248,7 @@ program_main ()
     // read dataset
     //
     
-    std::cout << "  " << term::bullet << term::bold << "reading data" << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "reading data (" << cmdline::matrixfile << ")" << term::reset << std::endl;
     
     auto  D     = io::matlab::read< value_t >( cmdline::matrixfile );
     auto  mem_D = D.byte_size();
@@ -290,6 +290,8 @@ program_main ()
         
         std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_D ) << std::endl;
     }
+
+    return;
     
     //
     // convert matrix to H-matrix
