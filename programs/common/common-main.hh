@@ -38,6 +38,7 @@ hlr_main ( int argc, char ** argv )
         //     hpro::CFG::set_nthreads( hlr::nthreads );
 
         if      ( hlr::appl == "logkernel"    ) framework_main< hlr::apps::log_kernel >();
+        else if ( hlr::appl == "log"          ) framework_main< hlr::apps::log_kernel >();
         else if ( hlr::appl == "materncov"    ) framework_main< hlr::apps::matern_covariance >();
         else if ( hlr::appl == "laplaceslp"   ) framework_main< hlr::apps::laplace_slp >();
         // else if ( hlr::appl == "helmholtzslp" ) framework_main< hlr::apps::helmholtz_slp >();

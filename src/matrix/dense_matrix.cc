@@ -128,9 +128,8 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
             if ( is_compressed() )
             {
                 auto  cM = std::visit( 
-                    [this,&M] ( auto && d )
+                    [this] ( auto && d )
                     {
-                        using  value_t     = typename std::decay_t< decltype(M) >::value_t;
                         using  zfp_value_t = typename std::decay_t< decltype(*d) >::value_type;
                         
                         return zfp_uncompress< value_t, zfp_value_t >( *d, nrows(), ncols() );
@@ -361,6 +360,30 @@ dense_matrix::compress ( const zfp_config &  config )
 void
 dense_matrix::uncompress ()
 {
+    #if defined(HAS_ZFP)
+    
+    if ( ! is_compressed() )
+        return;
+
+    std::visit( 
+        [this] ( auto &&  M )
+        {
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
+
+            auto  cM = std::visit(
+                [this] ( auto && zM )
+                {
+                    using  zfp_value_t = typename std::decay_t< decltype(*zM) >::value_type;
+                    
+                    return zfp_uncompress< value_t, zfp_value_t >( *zM, nrows(), ncols() );
+                },
+                _zdata );
+
+            M = std::move( cM );
+        },
+        _M );
+    
+    #endif
 }
 
 //

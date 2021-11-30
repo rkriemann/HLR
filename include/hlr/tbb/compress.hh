@@ -1,8 +1,8 @@
-#ifndef __HLR_MATRIX_COMPRESS_HH
-#define __HLR_MATRIX_COMPRESS_HH
+#ifndef __HLR_TBB_MATRIX_COMPRESS_HH
+#define __HLR_TBB_MATRIX_COMPRESS_HH
 //
 // Project     : HLib
-// Module      : matrix/compress
+// Module      : tbb/compress
 // Description : matrix compression functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
@@ -12,7 +12,7 @@
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/utils/tensor.hh>
 
-namespace hlr { namespace matrix {
+namespace hlr { namespace tbb { namespace matrix {
 
 namespace detail
 {
@@ -105,26 +105,39 @@ compress_replace ( const indexset &           rowis,
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
         auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
-        bool        all_lowrank  = true;
         size_t      sub_size     = 0;
+        auto        mtx          = std::mutex();
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
+            [&,ntile] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  D_sub = D( sub_rowis[i] - rowis.first(),
+                                         sub_colis[j] - colis.first() );
+                        
+                        sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zfp_rate, compressed_size );
+                        
+                        if ( ! is_null( sub_D(i,j) ) )
+                        {
+                            auto  lock = std::scoped_lock( mtx );
+                            
+                            sub_size += sub_D(i,j)->byte_size();
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        bool  all_lowrank = true;
 
         for ( uint  i = 0; i < 2; ++i )
-        {
             for ( uint  j = 0; j < 2; ++j )
-            {
-                auto  D_sub = D( sub_rowis[i] - rowis.first(),
-                                 sub_colis[j] - colis.first() );
-                
-                sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zfp_rate, compressed_size );
-
-                if ( ! is_null( sub_D(i,j) ) )
-                    sub_size += sub_D(i,j)->byte_size();
-                
                 if ( is_null( sub_D(i,j) ) || ! is_generic_lowrank( *sub_D(i,j) ) )
                     all_lowrank = false;
-            }// for
-        }// for
-
+        
         if ( all_lowrank )
         {
             //
@@ -258,6 +271,6 @@ compress_replace ( const indexset &           rowis,
     }// if
 }
     
-}}// namespace hlr::matrix
+}}}// namespace hlr::tbb::matrix
 
-#endif // __HLR_MATRIX_COMPRESS_HH
+#endif // __HLR_TBB_MATRIX_COMPRESS_HH

@@ -2,7 +2,7 @@
 #define __HLR_SEQ_MATRIX_HH
 //
 // Project     : HLib
-// File        : matrix.hh
+// Module      : seq/matrix
 // Description : matrix related functionality
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.

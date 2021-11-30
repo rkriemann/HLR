@@ -130,7 +130,7 @@ parse ( int argc, char ** argv )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "compress",    value<int>(),    ": apply additional ZFP compression with rate <n> (default: 0 = off)" )
+        ( "zfp",         value<int>(),    ": apply additional ZFP compression with rate <n> (default: 0 = off)" )
         ;
 
     ari_opts.add_options()
@@ -228,7 +228,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
-    if ( vm.count( "compress"   ) ) zfp_rate   = std::max< int >( 0, vm["compress"].as<int>() );
+    if ( vm.count( "zfp"        ) ) zfp_rate   = std::max< int >( 0, vm["zfp"].as<int>() );
 
     if ( appl == "help" )
     {
@@ -310,6 +310,7 @@ parse ( int argc, char ** argv )
     }// if
     
     if ( ! ( ( appl == "logkernel" )    ||
+             ( appl == "log" )          ||
              ( appl == "laplaceslp" )   ||
              ( appl == "helmholtzslp" ) ||
              ( appl == "exp" )          ||

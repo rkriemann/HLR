@@ -204,9 +204,8 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
                 if ( is_compressed() )
                 {
                     auto  cUV = std::visit( 
-                        [this,&M] ( auto &&  zM )
+                        [this] ( auto &&  zM )
                         {
-                            using  value_t     = typename std::decay_t< decltype(M) >::value_t;
                             using  zfp_value_t = typename std::decay_t< decltype(zM->U) >::value_type;
                         
                             auto cU  = zfp_uncompress< value_t, zfp_value_t >( zM->U, nrows(), rank() );
@@ -469,6 +468,35 @@ lrmatrix::compress ( const zfp_config &  config )
 void
 lrmatrix::uncompress ()
 {
+    #if defined(HAS_ZFP)
+    
+    if ( ! is_compressed() )
+        return;
+
+    std::visit( 
+        [this] ( auto &&  UV )
+        {
+            using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+
+            auto  cUV = std::visit(
+                [this] ( auto && zM )
+                {
+                    using  zfp_value_t = typename std::decay_t< decltype(zM->U) >::value_type;
+                    
+                    auto   cU = zfp_uncompress< value_t, zfp_value_t >( zM->U, nrows(), rank() );
+                    auto   cV = zfp_uncompress< value_t, zfp_value_t >( zM->V, ncols(), rank() );
+                    auto  cUV = lrfactors< value_t >{ std::move(cU), std::move(cV) };
+
+                    return cUV;
+                },
+                _zdata );
+
+            UV.U = std::move( cUV.U );
+            UV.V = std::move( cUV.V );
+        },
+        _UV );
+    
+    #endif
 }
 
 //
