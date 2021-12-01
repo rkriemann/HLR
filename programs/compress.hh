@@ -248,8 +248,9 @@ gen_matrix_exp ( const size_t  n )
         for ( uint  j = 0; j < n; ++j )
         {
             const double  y = j*h - 2.0 * math::pi< value_t >();
-
-            M(i,j) = std::real( math::exp( 3.0 * std::complex< value_t >( 0, 1 ) * math::sqrt( math::abs( x * x - y * y ) ) ) );
+            
+            // M(i,j) = std::real( math::exp( 3.0 * std::complex< value_t >( 0, 1 ) * math::sqrt( math::abs( x * x - y * y ) ) ) );
+            M(i,j) = std::real( math::exp( 3.0 * std::complex< value_t >( 0, 1 ) * math::sqrt( math::abs( x*x - 4*y ) ) ) );
         }// for
     }// for
 

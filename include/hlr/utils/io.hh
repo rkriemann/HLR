@@ -199,6 +199,22 @@ write ( const HLIB::TMatrix *  M,
     write( *M, matname, filename );
 }
 
+//
+// read matrix with given matrix name from given Matlab file
+// - if matrix name is empty, first matrix in file is returned
+//
+template < typename value_t >
+blas::matrix< value_t >
+read ( const std::string &  filename )
+{
+    HLIB::THDF5MatrixIO  mio;
+    auto                 D = mio.read( filename );
+
+    HLR_ASSERT( is_dense( *D ) );
+    
+    return std::move( blas::mat< value_t >( ptrcast( D.get(), HLIB::TDenseMatrix ) ) );
+}
+
 }// namespace hdf5
 
 //////////////////////////////////////////////////////////////////////

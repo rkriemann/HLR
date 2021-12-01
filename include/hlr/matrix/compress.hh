@@ -59,6 +59,7 @@ compress_replace ( const indexset &           rowis,
                 M->compress( zfp_config_rate( zfp_rate, false ) );
             
             // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+            // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
             return M;
         }// if
@@ -83,6 +84,7 @@ compress_replace ( const indexset &           rowis,
             }// if
             
             // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+            // std::cout << "dense " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
             // and discard matrix
             return std::unique_ptr< hpro::TMatrix >();
@@ -181,6 +183,7 @@ compress_replace ( const indexset &           rowis,
                     M->compress( zfp_config_rate( zfp_rate, false ) );
                 
                 // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+                // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
                 return M;
             }// if
