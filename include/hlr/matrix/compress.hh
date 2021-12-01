@@ -55,8 +55,9 @@ compress_replace ( const indexset &           rowis,
         {
             auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
 
-            if ( zfp_rate > 0 )
-                M->compress( zfp_config_rate( zfp_rate, false ) );
+            // do not(!) compress here to avoid numerical stability problems with coarsening
+            // if ( zfp_rate > 0 )
+            //     M->compress( zfp_config_rate( zfp_rate, false ) );
             
             // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
@@ -174,13 +175,14 @@ compress_replace ( const indexset &           rowis,
             if ( W.byte_size() + X.byte_size() < smem )
             {
                 //
-                // larger low-rank block more memory efficient than sum of sub-blocks: keep it
+                // larger low-rank block is more memory efficient than sum of sub-blocks: keep it
                 //
 
                 auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
-                
-                if ( zfp_rate > 0 )
-                    M->compress( zfp_config_rate( zfp_rate, false ) );
+
+                // see above
+                // if ( zfp_rate > 0 )
+                //     M->compress( zfp_config_rate( zfp_rate, false ) );
                 
                 // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
                 // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
@@ -204,8 +206,19 @@ compress_replace ( const indexset &           rowis,
                 {
                     auto  Rij = ptrcast( sub_D(i,j).get(), lrmatrix );
 
+                    //
+                    // now we can safely compress (and uncompress)
+                    //
+
+                    
                     if ( zfp_rate > 0 )
+                    {
+                        Rij->compress( zfp_config_rate( zfp_rate, false ) );
+                        compressed_size += Rij->byte_size();
                         Rij->uncompress();
+                    }// if
+                    else
+                        compressed_size += Rij->byte_size();
 
                     auto  DR  = blas::prod( Rij->U< value_t >(), blas::adjoint( Rij->V< value_t >() ) );
 
@@ -216,9 +229,6 @@ compress_replace ( const indexset &           rowis,
             }// for
         }// for
 
-        // use size of compressed data below
-        compressed_size += sub_size;
-        
         // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
         return std::unique_ptr< hpro::TMatrix >();

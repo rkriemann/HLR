@@ -55,9 +55,6 @@ compress_replace ( const indexset &           rowis,
         {
             auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
 
-            if ( zfp_rate > 0 )
-                M->compress( zfp_config_rate( zfp_rate, false ) );
-            
             // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
             return M;
@@ -188,14 +185,9 @@ compress_replace ( const indexset &           rowis,
                 // larger low-rank block more memory efficient than sum of sub-blocks: keep it
                 //
 
-                auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
-                
-                if ( zfp_rate > 0 )
-                    M->compress( zfp_config_rate( zfp_rate, false ) );
-                
                 // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
-            
-                return M;
+                
+                return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
 
@@ -215,7 +207,13 @@ compress_replace ( const indexset &           rowis,
                     auto  Rij = ptrcast( sub_D(i,j).get(), lrmatrix );
 
                     if ( zfp_rate > 0 )
+                    {
+                        Rij->compress( zfp_config_rate( zfp_rate, false ) );
+                        compressed_size += Rij->byte_size();
                         Rij->uncompress();
+                    }// if
+                    else
+                        compressed_size += Rij->byte_size();
 
                     auto  DR  = blas::prod( Rij->U< value_t >(), blas::adjoint( Rij->V< value_t >() ) );
 
@@ -226,9 +224,6 @@ compress_replace ( const indexset &           rowis,
             }// for
         }// for
 
-        // use size of compressed data below
-        compressed_size += sub_size;
-        
         // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
         return std::unique_ptr< hpro::TMatrix >();
