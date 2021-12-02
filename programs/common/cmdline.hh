@@ -53,7 +53,7 @@ string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  arith      = "std";        // which kind of arithmetic to use
-int     zfp_rate   = 0;            // apply additional ZFP compression with given rate (0 = off)
+double  zfp        = 0;            // apply ZFP compression with rate (1…) or accuracy (0,1] (0 = off)
 auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 
@@ -130,7 +130,7 @@ parse ( int argc, char ** argv )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "zfp",         value<int>(),    ": apply additional ZFP compression with rate <n> (default: 0 = off)" )
+        ( "zfp",         value<double>(), ": apply ZFP compression with rate [1,…) or accuracy (0,1) (default: 0 = off)" )
         ;
 
     ari_opts.add_options()
@@ -228,7 +228,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
-    if ( vm.count( "zfp"        ) ) zfp_rate   = std::max< int >( 0, vm["zfp"].as<int>() );
+    if ( vm.count( "zfp"        ) ) zfp        = std::max< double >( 0, vm["zfp"].as<double>() );
 
     if ( appl == "help" )
     {

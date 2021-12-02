@@ -27,11 +27,11 @@ std::unique_ptr< hpro::TMatrix >
 compress_replace ( const indexset &           rowis,
                    const indexset &           colis,
                    blas::matrix< value_t > &  D,
+                   size_t &                   compressed_size,
                    const hpro::TTruncAcc &    acc,
                    const approx_t &           approx,
                    const size_t               ntile,
-                   const int                  zfp_rate,
-                   size_t &                   compressed_size )
+                   const zfp_config *         zfp_conf = nullptr )
 {
     using namespace hlr::matrix;
 
@@ -49,7 +49,7 @@ compress_replace ( const indexset &           rowis,
         //
 
         auto  Dc       = blas::copy( D );  // do not modify D directly
-        auto  [ U, V ] = approx( Dc, acc );
+        auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
 
         if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
         {
@@ -68,8 +68,8 @@ compress_replace ( const indexset &           rowis,
         {
             auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
 
-            if ( zfp_rate > 0 )
-                M->compress( zfp_config_rate( zfp_rate, false ) );
+            if ( ! is_null( zfp_conf ) )
+                M->compress( *zfp_conf );
 
             // remember compressed size (with or without ZFP compression)
             compressed_size += M->byte_size();
@@ -118,7 +118,7 @@ compress_replace ( const indexset &           rowis,
                 auto  D_sub = D( sub_rowis[i] - rowis.first(),
                                  sub_colis[j] - colis.first() );
                 
-                sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zfp_rate, compressed_size );
+                sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, compressed_size, acc, approx, ntile, zfp_conf );
 
                 if ( ! is_null( sub_D(i,j) ) )
                     sub_size += sub_D(i,j)->byte_size();
@@ -152,11 +152,6 @@ compress_replace ( const indexset &           rowis,
                 for ( uint  j = 0; j < 2; ++j )
                 {
                     auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix );
-
-                    // uncompress data before further handling
-                    if ( Rij->is_compressed() )
-                        Rij->uncompress();
-
                     auto  Uij   = Rij->U< value_t >();
                     auto  Vij   = Rij->V< value_t >();
                     auto  U_sub = U( sub_rowis[i] - rowis.first(), blas::range( pos, pos + Uij.ncols() ) );
@@ -170,7 +165,7 @@ compress_replace ( const indexset &           rowis,
                 }// for
             }// for
             
-            auto  [ W, X ] = approx( U, V, acc );
+            auto  [ W, X ] = approx( U, V, acc( rowis, colis ) );
 
             if ( W.byte_size() + X.byte_size() < smem )
             {
@@ -210,10 +205,9 @@ compress_replace ( const indexset &           rowis,
                     // now we can safely compress (and uncompress)
                     //
 
-                    
-                    if ( zfp_rate > 0 )
+                    if ( ! is_null( zfp_conf ) )
                     {
-                        Rij->compress( zfp_config_rate( zfp_rate, false ) );
+                        Rij->compress( *zfp_conf );
                         compressed_size += Rij->byte_size();
                         Rij->uncompress();
                     }// if
@@ -245,13 +239,13 @@ void
 compress_replace ( const indexset &           rowis,
                    const indexset &           colis,
                    blas::matrix< value_t > &  D,
+                   size_t &                   compressed_size,
                    const hpro::TTruncAcc &    acc,
                    const approx_t &           approx,
                    const size_t               ntile,
-                   const int                  zfp_rate,
-                   size_t &                   compressed_size )
+                   const zfp_config *         zfp_conf = nullptr )
 {
-    auto  M = detail::compress_replace( rowis, colis, D, acc, approx, ntile, zfp_rate, compressed_size );
+    auto  M = detail::compress_replace( rowis, colis, D, compressed_size, acc, approx, ntile, zfp_conf );
 
     if ( ! is_null( M ) )
     {
@@ -261,8 +255,14 @@ compress_replace ( const indexset &           rowis,
         {
             auto  R = ptrcast( M.get(), lrmatrix );
 
-            if ( zfp_rate > 0 )
+            if ( ! is_null( zfp_conf ) )
+            {
+                R->compress( *zfp_conf );
+                compressed_size += R->byte_size();
                 R->uncompress();
+            }// if
+            else
+                compressed_size += R->byte_size();
 
             auto  DR  = blas::prod( R->U< value_t >(), blas::adjoint( R->V< value_t >() ) );
 
