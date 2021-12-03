@@ -19,6 +19,9 @@ using hlr::matrix::compress_replace;
 // starting lowrank approximation at blocks of size ntile × ntile and
 // then trying to agglomorate low-rank blocks up to the root
 //
+namespace detail
+{
+
 template < typename value_t,
            typename approx_t >
 std::unique_ptr< hpro::TMatrix >
@@ -43,22 +46,17 @@ compress ( const indexset &                 rowis,
         // Otherwise a dense representation is used.
         //
 
-        auto  Dc       = blas::copy( D );  // do not modify D (!)
-        auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
-
-        if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
         {
-            return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
-        }// if
-        else
-        {
-            auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
-
-            if ( ! is_null( zfp_conf ) )
-                M->compress( *zfp_conf );
+            auto  Dc       = blas::copy( D );  // do not modify D (!)
+            auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
             
-            return M;
-        }// else
+            if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
+            {
+                return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+            }// if
+        }
+
+        return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if
     else
     {
@@ -78,6 +76,7 @@ compress ( const indexset &                 rowis,
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
         auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
         bool        all_lowrank  = true;
+        bool        all_dense    = true;
 
         for ( uint  i = 0; i < 2; ++i )
         {
@@ -92,6 +91,9 @@ compress ( const indexset &                 rowis,
 
                 if ( ! is_generic_lowrank( *sub_D(i,j) ) )
                     all_lowrank = false;
+
+                if ( ! is_generic_dense( *sub_D(i,j) ) )
+                    all_dense = false;
             }// for
         }// for
 
@@ -146,6 +148,15 @@ compress ( const indexset &                 rowis,
         }// if
 
         //
+        // always join dense blocks
+        //
+        
+        if ( all_dense )
+        {
+            return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+        }// if
+
+        //
         // either not all low-rank or memory gets larger: construct block matrix
         //
 
@@ -157,8 +168,14 @@ compress ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_null( zfp_conf ) && is_generic_lowrank( *sub_D(i,j) ) )
-                    ptrcast( sub_D(i,j).get(), lrmatrix )->compress( *zfp_conf );
+                if ( ! is_null( zfp_conf ) )
+                {
+                    if ( is_generic_lowrank( *sub_D(i,j) ) )
+                        ptrcast( sub_D(i,j).get(), lrmatrix )->compress( *zfp_conf );
+                
+                    if ( is_generic_dense( *sub_D(i,j) ) )
+                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zfp_conf );
+                }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
             }// for
@@ -166,6 +183,41 @@ compress ( const indexset &                 rowis,
 
         return B;
     }// else
+}
+
+}// namespace detail
+
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< hpro::TMatrix >
+compress ( const indexset &                 rowis,
+           const indexset &                 colis,
+           const blas::matrix< value_t > &  D,
+           const hpro::TTruncAcc &          acc,
+           const approx_t &                 approx,
+           const size_t                     ntile,
+           const zfp_config *               zfp_conf = nullptr )
+{
+    using namespace hlr::matrix;
+
+    auto  M = detail::compress( rowis, colis, D, acc, approx, ntile, zfp_conf );
+
+    HLR_ASSERT( ! is_null( M ) );
+
+    //
+    // handle ZFP compression for global lowrank/dense case
+    //
+    
+    if ( ! is_null( zfp_conf ) )
+    {
+        if ( is_generic_lowrank( *M ) )
+            ptrcast( M.get(), lrmatrix )->compress( *zfp_conf );
+                
+        if ( is_generic_dense( *M ) )
+            ptrcast( M.get(), dense_matrix )->compress( *zfp_conf );
+    }// if
+
+    return M;
 }
 
 }}}// namespace hlr::seq::matrix

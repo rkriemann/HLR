@@ -427,7 +427,7 @@ if scorep and SCOREP_DIR != None :
 if 'cuda' in frameworks :
     env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
     env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64' ) )
-    env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
+    env.Append( LIBS = [ 'cudart', 'cublasLt', 'cublas', 'cusolver' ] )
 
 # support for half precision
 if half :
