@@ -11,16 +11,10 @@
 #include <vector>
 #include <variant>
 
-#if defined(HAS_ZFP)
-#include <zfpcarray2.h>
-#else
-// dummy type
-struct zfp_config {};
-#endif
-
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/zfp.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 

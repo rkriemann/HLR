@@ -247,9 +247,10 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
     
     // precision defined by accuracy or by machine precision
     // (to be corrected by operator norm)
-    real_t      eps      = ( acc.is_fixed_prec()
+    real_t      rel_eps  = ( acc.is_fixed_prec()
                              ? acc.rel_eps()
                              : real_t(10 * std::numeric_limits< real_t >::epsilon() ));
+    real_t      abs_eps  = acc.abs_eps();
     
     // approximation of |M|
     real_t      norm_M   = real_t(0);
@@ -272,7 +273,7 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
         
         const auto  norm_i = blas::norm2( column ) * blas::norm2( row );
 
-        if ( norm_i < eps * norm_M )
+        if (( norm_i < rel_eps * norm_M ) || ( norm_i < abs_eps ))
         {
             U.push_back( std::move( column ) );
             V.push_back( std::move( row ) );

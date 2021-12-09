@@ -1,6 +1,8 @@
 #include <hlib-config.h>
 
+#if USE_TBB == 1
 #include <tbb/global_control.h>
+#endif
 
 template < typename problem_t >
 void

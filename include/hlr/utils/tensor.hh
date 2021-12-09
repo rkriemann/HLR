@@ -25,7 +25,7 @@ public:
 
 private:
     std::vector< value_type >  data;
-    const size_type            dim0, dim1;
+    size_type                  dim0, dim1;
 
 public:
     tensor2 ()

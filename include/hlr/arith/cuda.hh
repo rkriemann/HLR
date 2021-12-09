@@ -45,7 +45,8 @@ template < typename T > struct cuda_type_ptr                        { using  typ
 #define HLR_CUSOLVER_CHECK( func, args )                 \
     {                                                    \
         auto  result = func args ;                       \
-        HLR_ASSERT( result == CUSOLVER_STATUS_SUCCESS ); \
+        if ( result != CUSOLVER_STATUS_SUCCESS )         \
+            HLR_ERROR( "cusolver result = " + HLIB::to_string( int(result) ) ); \
     }
 
 //

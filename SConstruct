@@ -665,11 +665,11 @@ if 'omp' in frameworks :
 
 if 'tbb' in frameworks :
     tbb = env.Clone()
-    tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
-    tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
-    # tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
-    # tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
-    # tbb.Append( LIBS    = [ 'tbb' ] )
+    # tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
+    # tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
+    tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
+    tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
+    tbb.Append( LIBS    = [ 'tbb' ] )
 
     for program in programs :
         name   = program + '-tbb'

@@ -22,7 +22,6 @@
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_tiled_v2.hh"
-#include "hlr/tbb/arith_tiled_v2.hh"
 
 namespace hlr { namespace dag {
 
