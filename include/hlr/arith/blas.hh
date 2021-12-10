@@ -1661,7 +1661,14 @@ qrp ( matrix< value_t > &   M,
     // auto  CM = copy( M );
     // // DEBUG }
 
-    HLIB::BLAS::qrp( M, R, P );
+    std::vector< hpro::blas_int_t >  P2;
+        
+    HLIB::BLAS::qrp( M, R, P2 );
+
+    P.resize( P2.size() );
+    
+    for ( size_t  i = 0; i < P2.size(); ++i )
+        P[i] = int(P2[i]);
     
     // // DEBUG {
     // auto  PR = copy( R );

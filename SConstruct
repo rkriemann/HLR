@@ -393,7 +393,7 @@ elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
-    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
+    env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_sequential', 'mkl_core' ] )
 elif lapack == 'accelerate' :
     env.MergeFlags( '-Wl,-framework,Accelerate' )
 

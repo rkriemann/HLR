@@ -6,6 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range2d.h>
+
 #include <hlr/utils/io.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
@@ -45,21 +48,42 @@ gen_matrix_log ( const size_t  n )
     double  h = 2 * math::pi< value_t >() / value_t(n);
     auto    M = blas::matrix< value_t >( n, n );
 
-    for ( uint  i = 0; i < n; ++i )
-    {
-        const double  x1[2] = { sin(i*h), cos(i*h) };
-        
-        for ( uint  j = 0; j < n; ++j )
+    ::tbb::parallel_for(
+        ::tbb::blocked_range2d< size_t >( 0, n, 1024, 0, n, 1024 ),
+        [&,h] ( const auto &  r )
         {
-            const double  x2[2] = { sin(j*h), cos(j*h) };
-            const double  dist2 = math::square( x1[0] - x2[0] ) + math::square( x1[1] - x2[1] );
+            for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+            {
+                const double  x1[2] = { std::sin(i*h), std::cos(i*h) };
+        
+                for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                {
+                    const double  x2[2] = { std::sin(j*h), std::cos(j*h) };
+                    const double  dist2 = math::square( x1[0] - x2[0] ) + math::square( x1[1] - x2[1] );
 
-            if ( dist2 < 1e-12 )
-                M(i,j) = 0.0;
-            else
-                M(i,j) = math::log( math::sqrt(dist2) );
-        }// for
-    }// for
+                    if ( dist2 < 1e-12 )
+                        M(i,j) = 0.0;
+                    else
+                        M(i,j) = math::log( math::sqrt(dist2) );
+                }// for
+            }// for
+        } );
+    
+    // for ( size_t  i = 0; i < n; ++i )
+    // {
+    //     const double  x1[2] = { std::sin(i*h), std::cos(i*h) };
+        
+    //     for ( size_t  j = 0; j < n; ++j )
+    //     {
+    //         const double  x2[2] = { std::sin(j*h), std::cos(j*h) };
+    //         const double  dist2 = math::square( x1[0] - x2[0] ) + math::square( x1[1] - x2[1] );
+
+    //         if ( dist2 < 1e-12 )
+    //             M(i,j) = 0.0;
+    //         else
+    //             M(i,j) = math::log( math::sqrt(dist2) );
+    //     }// for
+    // }// for
 
     return M;
 }
@@ -71,14 +95,11 @@ gen_matrix_exp ( const size_t  n )
     double  h = 4 * math::pi< value_t >() / value_t(n+1);
     auto    M = blas::matrix< value_t >( n, n );
 
-    // auto  generator = std::mt19937_64{ 1 };
-    // auto  distr     = std::uniform_real_distribution<>{ -1, 1 };
-
-    for ( uint  i = 0; i < n; ++i )
+    for ( size_t  i = 0; i < n; ++i )
     {
         const double  x = i*h - 2.0 * math::pi< value_t >();
         
-        for ( uint  j = 0; j < n; ++j )
+        for ( size_t  j = 0; j < n; ++j )
         {
             const double  y = j*h - 2.0 * math::pi< value_t >();
 
@@ -158,19 +179,26 @@ do_H ( blas::matrix< value_t > &  D,
         else                    *zconf = zfp_config_accuracy( cmdline::zfp );
     }// if
 
-    auto  tic   = timer::now();
-    // auto  A     = impl::matrix::compress_topdown( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
-    auto  A     = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
-    auto  toc   = timer::since( tic );
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  A   = std::unique_ptr< hpro::TMatrix >();
+
+    for ( int i = 0; i < cmdline::nbench; ++i )
+    {
+        tic = timer::now();
+        // A     = impl::matrix::compress_topdown( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
+        A   = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
+        toc = timer::since( tic );
         
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-        
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+    }// for
+    
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid,nosize,rank" );
         
     auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
     auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
-    auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
+    auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
     auto  mem_A   = A->byte_size();
         
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
@@ -654,7 +682,7 @@ program_main ()
     auto  delta = norm_D * hlr::cmdline::eps / D.nrows();
     
     std::cout << "  " << term::bullet << term::bold << "compression, "
-              << cmdline::approx << " ε = " << delta << ", "
+              << cmdline::approx << ", ε = " << cmdline::eps << ", δ = " << delta << ", "
               << "zfp = " << cmdline::zfp
               << term::reset << std::endl;
 
@@ -679,7 +707,7 @@ program_main ()
         
     //     auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
     //     auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
-    //     auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
+    //     auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
     //     auto  mem_A   = A->byte_size();
         
     //     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;

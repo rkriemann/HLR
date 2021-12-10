@@ -48,36 +48,37 @@ compress_replace ( const indexset &           rowis,
         // Otherwise a dense representation is used.
         //
 
-        auto  Dc       = blas::copy( D );  // do not modify D directly
-        auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
-
-        if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
+        if ( ! acc.is_exact() )
         {
-            return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
-        }// if
-        else
-        {
-            auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
-
-            if ( ! is_null( zfp_conf ) )
-                M->compress( *zfp_conf );
-
-            // remember compressed size (with or without ZFP compression)
-            compressed_size += M->byte_size();
-
-            // uncompress and replace
-            if ( M->is_compressed() )
-            {
-                M->uncompress();
-
-                auto  T = M->matrix();
-                
-                blas::copy( std::get< blas::matrix< value_t > >( T ), D );
-            }// if
+            auto  Dc       = blas::copy( D );  // do not modify D directly
+            auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
             
-            // and discard matrix
-            return std::unique_ptr< hpro::TMatrix >();
-        }// else
+            if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
+            {
+                return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+            }// if
+        }// if
+        
+        auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
+
+        if ( ! is_null( zfp_conf ) )
+            M->compress( *zfp_conf );
+
+        // remember compressed size (with or without ZFP compression)
+        compressed_size += M->byte_size();
+
+        // uncompress and replace
+        if ( M->is_compressed() )
+        {
+            M->uncompress();
+            
+            auto  T = M->matrix();
+            
+            blas::copy( std::get< blas::matrix< value_t > >( T ), D );
+        }// if
+        
+        // and discard matrix
+        return std::unique_ptr< hpro::TMatrix >();
     }// if
     else
     {
@@ -289,6 +290,7 @@ compress ( const indexset &                 rowis,
         // Otherwise a dense representation is used.
         //
 
+        if ( ! acc.is_exact() )
         {
             auto  Dc       = blas::copy( D );  // do not modify D (!)
             auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
@@ -297,7 +299,7 @@ compress ( const indexset &                 rowis,
             {
                 return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
             }// if
-        }
+        }// if
 
         return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if

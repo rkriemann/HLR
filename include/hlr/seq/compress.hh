@@ -46,6 +46,7 @@ compress ( const indexset &                 rowis,
         // Otherwise a dense representation is used.
         //
 
+        if ( ! acc.is_exact() )
         {
             auto  Dc       = blas::copy( D );  // do not modify D (!)
             auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
@@ -54,7 +55,7 @@ compress ( const indexset &                 rowis,
             {
                 return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
             }// if
-        }
+        }// if
 
         return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if

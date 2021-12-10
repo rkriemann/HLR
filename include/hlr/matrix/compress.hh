@@ -48,48 +48,49 @@ compress_replace ( const indexset &           rowis,
         // Otherwise a dense representation is used.
         //
 
-        auto  Dc       = blas::copy( D );  // do not modify D directly
-        auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
-
-        if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
+        if ( ! acc.is_exact() )
         {
-            auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+            auto  Dc       = blas::copy( D );  // do not modify D directly
+            auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
 
-            // do not(!) compress here to avoid numerical stability problems with coarsening
-            // if ( zfp_rate > 0 )
-            //     M->compress( zfp_config_rate( zfp_rate, false ) );
-            
-            // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
-            // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
-            
-            return M;
-        }// if
-        else
-        {
-            auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
-
-            if ( ! is_null( zfp_conf ) )
-                M->compress( *zfp_conf );
-
-            // remember compressed size (with or without ZFP compression)
-            compressed_size += M->byte_size();
-
-            // uncompress and replace
-            if ( M->is_compressed() )
+            if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
             {
-                M->uncompress();
-
-                auto  T = M->matrix();
+                auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
                 
-                blas::copy( std::get< blas::matrix< value_t > >( T ), D );
+                // do not(!) compress here to avoid numerical stability problems with coarsening
+                // if ( zfp_rate > 0 )
+                //     M->compress( zfp_config_rate( zfp_rate, false ) );
+                
+                // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+                // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+                
+                return M;
             }// if
+        }// if
+        
+        auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
+
+        if ( ! is_null( zfp_conf ) )
+            M->compress( *zfp_conf );
+
+        // remember compressed size (with or without ZFP compression)
+        compressed_size += M->byte_size();
+
+        // uncompress and replace
+        if ( M->is_compressed() )
+        {
+            M->uncompress();
+
+            auto  T = M->matrix();
+                
+            blas::copy( std::get< blas::matrix< value_t > >( T ), D );
+        }// if
             
-            // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
-            // std::cout << "dense " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+        // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
+        // std::cout << "dense " << rowis.to_string() << " × " << colis.to_string() << std::endl;
             
-            // and discard matrix
-            return std::unique_ptr< hpro::TMatrix >();
-        }// else
+        // and discard matrix
+        return std::unique_ptr< hpro::TMatrix >();
     }// if
     else
     {
