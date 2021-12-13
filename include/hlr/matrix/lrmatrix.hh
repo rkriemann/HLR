@@ -13,6 +13,7 @@
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/sz.hh>
 #include <hlr/utils/zfp.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
@@ -38,10 +39,21 @@ namespace matrix
 class lrmatrix : public hpro::TMatrix
 {
 private:
-    #if defined(HAS_ZFP)
     //
     // compressed storage based on underlying floating point type
     //
+    #if defined(HAS_SZ)
+    
+    struct compressed_factors
+    {
+        sz::carray_view  U, V;
+    };
+
+    using  compressed_storage = compressed_factors;
+    using  zconfig            = hlr::sz::sz_config;
+    
+    #elif defined(HAS_ZFP)
+
     template < typename T_value >
     struct compressed_factors
     {
@@ -52,6 +64,12 @@ private:
 
     using  compressed_storage = std::variant< std::unique_ptr< compressed_factors< float > >,
                                               std::unique_ptr< compressed_factors< double > > >;
+    using  zconfig            = zfp_config;
+
+    #else
+
+    using  zconfig            = void;
+    
     #endif
 
 public:
@@ -81,7 +99,7 @@ private:
     // - after initialization identical to _M.index()
     blas::value_type      _vtype;
     
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ) || defined(HAS_ZFP)
     // optional: stores compressed data
     compressed_storage    _zdata;
     #endif
@@ -320,7 +338,7 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const zfp_config &  config );
+    virtual void   compress      ( const zconfig &  config );
 
     // uncompress internal data
     virtual void   uncompress    ();
@@ -328,7 +346,9 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if defined(HAS_ZFP)
+        #if defined(HAS_SZ)
+        return ! is_null( _zdata.U.data() );
+        #elif defined(HAS_ZFP)
         return ! std::visit( [] ( auto && d ) { return is_null( d ); }, _zdata );
         #else
         return false;
@@ -342,7 +362,10 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if defined(HAS_ZFP)
+        #if defined(HAS_SZ)
+        _zdata.U.free();
+        _zdata.V.free();
+        #elif defined(HAS_ZFP)
         std::visit( [] ( auto && d ) { d.reset( nullptr ); }, _zdata );
         #endif
     }

@@ -22,7 +22,9 @@ namespace detail
 // replace original data by approximate data
 // - store total size of compressed data in <compressed_size>
 //
-template < typename value_t, typename approx_t >
+template < typename value_t,
+           typename approx_t,
+           typename zconfig_t >
 std::unique_ptr< hpro::TMatrix >
 compress_replace ( const indexset &           rowis,
                    const indexset &           colis,
@@ -31,7 +33,7 @@ compress_replace ( const indexset &           rowis,
                    const hpro::TTruncAcc &    acc,
                    const approx_t &           approx,
                    const size_t               ntile,
-                   const zfp_config *         zfp_conf = nullptr )
+                   const zconfig_t *          zconf = nullptr )
 {
     using namespace hlr::matrix;
 
@@ -58,8 +60,6 @@ compress_replace ( const indexset &           rowis,
                 auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
                 
                 // do not(!) compress here to avoid numerical stability problems with coarsening
-                // if ( zfp_rate > 0 )
-                //     M->compress( zfp_config_rate( zfp_rate, false ) );
                 
                 // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
                 // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
@@ -70,10 +70,10 @@ compress_replace ( const indexset &           rowis,
         
         auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
 
-        if ( ! is_null( zfp_conf ) )
-            M->compress( *zfp_conf );
+        if ( ! is_null( zconf ) )
+            M->compress( *zconf );
 
-        // remember compressed size (with or without ZFP compression)
+        // remember compressed size (with or without SZ/ZFP compression)
         compressed_size += M->byte_size();
 
         // uncompress and replace
@@ -119,7 +119,7 @@ compress_replace ( const indexset &           rowis,
                 auto  D_sub = D( sub_rowis[i] - rowis.first(),
                                  sub_colis[j] - colis.first() );
                 
-                sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, compressed_size, acc, approx, ntile, zfp_conf );
+                sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, compressed_size, acc, approx, ntile, zconf );
 
                 if ( ! is_null( sub_D(i,j) ) )
                     sub_size += sub_D(i,j)->byte_size();
@@ -176,9 +176,7 @@ compress_replace ( const indexset &           rowis,
 
                 auto  M = std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
 
-                // see above
-                // if ( zfp_rate > 0 )
-                //     M->compress( zfp_config_rate( zfp_rate, false ) );
+                // again, no compression here (see above)
                 
                 // std::cout << "END " << rowis.to_string() << " × " << colis.to_string() << std::endl;
                 // std::cout << "lowrank " << rowis.to_string() << " × " << colis.to_string() << std::endl;
@@ -206,9 +204,9 @@ compress_replace ( const indexset &           rowis,
                     // now we can safely compress (and uncompress)
                     //
 
-                    if ( ! is_null( zfp_conf ) )
+                    if ( ! is_null( zconf ) )
                     {
-                        Rij->compress( *zfp_conf );
+                        Rij->compress( *zconf );
                         compressed_size += Rij->byte_size();
                         Rij->uncompress();
                     }// if
@@ -235,7 +233,9 @@ compress_replace ( const indexset &           rowis,
 //
 // wrapper function handling global low-rank case
 //
-template < typename value_t, typename approx_t >
+template < typename value_t,
+           typename approx_t,
+           typename zconfig_t >
 void
 compress_replace ( const indexset &           rowis,
                    const indexset &           colis,
@@ -244,9 +244,9 @@ compress_replace ( const indexset &           rowis,
                    const hpro::TTruncAcc &    acc,
                    const approx_t &           approx,
                    const size_t               ntile,
-                   const zfp_config *         zfp_conf = nullptr )
+                   const zconfig_t *          zconf = nullptr )
 {
-    auto  M = detail::compress_replace( rowis, colis, D, compressed_size, acc, approx, ntile, zfp_conf );
+    auto  M = detail::compress_replace( rowis, colis, D, compressed_size, acc, approx, ntile, zconf );
 
     if ( ! is_null( M ) )
     {
@@ -256,9 +256,9 @@ compress_replace ( const indexset &           rowis,
         {
             auto  R = ptrcast( M.get(), lrmatrix );
 
-            if ( ! is_null( zfp_conf ) )
+            if ( ! is_null( zconf ) )
             {
-                R->compress( *zfp_conf );
+                R->compress( *zconf );
                 compressed_size += R->byte_size();
                 R->uncompress();
             }// if

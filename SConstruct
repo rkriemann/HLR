@@ -54,6 +54,8 @@ half          = False
 HALF_DIR      = '/opt/local/half/2.2.0'
 zfp           = False
 ZFP_DIR       = '/opt/local/zfp/0.5.5'
+sz            = False
+SZ_DIR        = '/opt/local/sz'
 universal     = False
 UNIVERSAL_DIR = '/opt/local/universal'
 
@@ -202,6 +204,7 @@ opts.Add( BoolVariable( 'likwid',    'use likwid library',            likwid ) )
 opts.Add( BoolVariable( 'scorep',    'use Score-P library',           scorep ) )
 opts.Add( BoolVariable( 'half',      'use half precision library',    half ) )
 opts.Add( BoolVariable( 'zfp',       'use ZFP compression library',   zfp ) )
+opts.Add( BoolVariable( 'sz',        'use SZ compression library',    sz ) )
 opts.Add( BoolVariable( 'universal', 'use universal number library',  universal ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
@@ -258,6 +261,7 @@ likwid       = opt_env['likwid']
 scorep       = opt_env['scorep']
 half         = opt_env['half']
 zfp          = opt_env['zfp']
+sz           = opt_env['sz']
 universal    = opt_env['universal']
 
 fullmsg      = opt_env['fullmsg']
@@ -441,6 +445,13 @@ if zfp :
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zfp' ] )
         
+# support for SZ compression
+if sz :
+    env.Append( CPPDEFINES = 'HAS_SZ' )
+    env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'SZ' ] )
+        
 # support for universal number library
 if universal :
     env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
@@ -502,6 +513,7 @@ def show_help ( target, source, env ):
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -563,6 +575,7 @@ def show_options ( target, source, env ):
     print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
     print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), bool_str[ zfp ] )
+    print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), bool_str[ sz ] )
     print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), bool_str[ universal ] )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )

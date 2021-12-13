@@ -23,7 +23,8 @@ namespace detail
 {
 
 template < typename value_t,
-           typename approx_t >
+           typename approx_t,
+           typename zconfig_t >
 std::unique_ptr< hpro::TMatrix >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
@@ -31,7 +32,7 @@ compress ( const indexset &                 rowis,
            const hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
-           const zfp_config *               zfp_conf = nullptr )
+           const zconfig_t *                zconf = nullptr )
 {
     using namespace hlr::matrix;
     
@@ -86,7 +87,7 @@ compress ( const indexset &                 rowis,
                 const auto  D_sub = D( sub_rowis[i] - rowis.first(),
                                        sub_colis[j] - colis.first() );
                 
-                sub_D(i,j) = compress( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zfp_conf );
+                sub_D(i,j) = compress( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zconf );
                 
                 HLR_ASSERT( ! is_null( sub_D(i,j).get() ) );
 
@@ -169,13 +170,13 @@ compress ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_null( zfp_conf ) )
+                if ( ! is_null( zconf ) )
                 {
                     if ( is_generic_lowrank( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), lrmatrix )->compress( *zfp_conf );
+                        ptrcast( sub_D(i,j).get(), lrmatrix )->compress( *zconf );
                 
                     if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zfp_conf );
+                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zconf );
                 }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
@@ -187,7 +188,8 @@ compress ( const indexset &                 rowis,
 }
 
 template < typename value_t,
-           typename approx_t >
+           typename approx_t,
+           typename zconfig_t >
 std::unique_ptr< hpro::TMatrix >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
@@ -195,7 +197,7 @@ compress_topdown ( const indexset &                 rowis,
                    const hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
-                   const zfp_config *               zfp_conf = nullptr )
+                   const zconfig_t *                zconf = nullptr )
 {
     using namespace hlr::matrix;
 
@@ -216,8 +218,8 @@ compress_topdown ( const indexset &                 rowis,
         {
             auto  R = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
 
-            if ( ! is_null( zfp_conf ) )
-                ptrcast( R.get(), lrmatrix )->compress( *zfp_conf );
+            if ( ! is_null( zconf ) )
+                ptrcast( R.get(), lrmatrix )->compress( *zconf );
 
             return R;
         }// if
@@ -253,7 +255,7 @@ compress_topdown ( const indexset &                 rowis,
                 const auto  D_sub = D( sub_rowis[i] - rowis.first(),
                                        sub_colis[j] - colis.first() );
                 
-                sub_D(i,j) = compress_topdown( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zfp_conf );
+                sub_D(i,j) = compress_topdown( sub_rowis[i], sub_colis[j], D_sub, acc, approx, ntile, zconf );
                 
                 HLR_ASSERT( ! is_null( sub_D(i,j).get() ) );
 
@@ -283,10 +285,10 @@ compress_topdown ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_null( zfp_conf ) )
+                if ( ! is_null( zconf ) )
                 {
                     if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zfp_conf );
+                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zconf );
                 }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
@@ -300,7 +302,8 @@ compress_topdown ( const indexset &                 rowis,
 }// namespace detail
 
 template < typename value_t,
-           typename approx_t >
+           typename approx_t,
+           typename zconfig_t >
 std::unique_ptr< hpro::TMatrix >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
@@ -308,32 +311,33 @@ compress ( const indexset &                 rowis,
            const hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
-           const zfp_config *               zfp_conf = nullptr )
+           const zconfig_t *                zconf = nullptr )
 {
     using namespace hlr::matrix;
 
-    auto  M = detail::compress( rowis, colis, D, acc, approx, ntile, zfp_conf );
+    auto  M = detail::compress( rowis, colis, D, acc, approx, ntile, zconf );
 
     HLR_ASSERT( ! is_null( M ) );
 
     //
-    // handle ZFP compression for global lowrank/dense case
+    // handle SZ/ZFP compression for global lowrank/dense case
     //
     
-    if ( ! is_null( zfp_conf ) )
+    if ( ! is_null( zconf ) )
     {
         if ( is_generic_lowrank( *M ) )
-            ptrcast( M.get(), lrmatrix )->compress( *zfp_conf );
+            ptrcast( M.get(), lrmatrix )->compress( *zconf );
                 
         if ( is_generic_dense( *M ) )
-            ptrcast( M.get(), dense_matrix )->compress( *zfp_conf );
+            ptrcast( M.get(), dense_matrix )->compress( *zconf );
     }// if
 
     return M;
 }
 
 template < typename value_t,
-           typename approx_t >
+           typename approx_t,
+           typename zconfig_t >
 std::unique_ptr< hpro::TMatrix >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
@@ -341,22 +345,22 @@ compress_topdown ( const indexset &                 rowis,
                    const hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
-                   const zfp_config *               zfp_conf = nullptr )
+                   const zconfig_t *                zconf = nullptr )
 {
     using namespace hlr::matrix;
 
-    auto  M = detail::compress_topdown( rowis, colis, D, acc, approx, ntile, zfp_conf );
+    auto  M = detail::compress_topdown( rowis, colis, D, acc, approx, ntile, zconf );
 
     HLR_ASSERT( ! is_null( M ) );
 
     //
-    // handle ZFP compression for global dense case
+    // handle SZ/ZFP compression for global dense case
     //
     
-    if ( ! is_null( zfp_conf ) )
+    if ( ! is_null( zconf ) )
     {
         if ( is_generic_dense( *M ) )
-            ptrcast( M.get(), dense_matrix )->compress( *zfp_conf );
+            ptrcast( M.get(), dense_matrix )->compress( *zconf );
     }// if
 
     return M;

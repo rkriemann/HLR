@@ -5,7 +5,7 @@
 // Module      : utils/zfp
 // Description : ZFP compression related functions and types
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #if defined(HAS_ZFP)

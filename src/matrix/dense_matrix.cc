@@ -77,7 +77,23 @@ vec_add ( const blas::vector< value_t > &  t,
 //
 // return uncompressed matrix
 //
-#if defined(HAS_ZFP)
+#if defined(HAS_SZ)
+
+template < typename value_t >
+blas::matrix< value_t >
+sz_uncompress ( const sz::carray_view &  v,
+                const size_t             nrows,
+                const size_t             ncols )
+{
+    auto  M = blas::matrix< value_t >( nrows, ncols );
+    
+    sz::uncompress< value_t >( v, M.data(), nrows, ncols );
+
+    return M;
+}
+
+#elif defined(HAS_ZFP)
+
 template < typename mat_value_t,
            typename zfp_value_t >
 blas::matrix< mat_value_t >
@@ -124,9 +140,16 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
             auto  x = convert< value_t >( *sx );
             auto  y = blas::vector< value_t >( sy->size() );
 
-            #if defined(HAS_ZFP)
             if ( is_compressed() )
             {
+                #if defined(HAS_SZ)
+                
+                auto  cM = sz_uncompress< value_t >( _zdata, nrows(), ncols() );
+
+                blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
+
+                #elif defined(HAS_ZFP)
+                
                 auto  cM = std::visit( 
                     [this] ( auto && d )
                     {
@@ -137,9 +160,10 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
                     _zdata );
 
                 blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
+                
+                #endif
             }// if
             else
-            #endif
             {
                 blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(0), y );
             }// else
@@ -304,9 +328,32 @@ dense_matrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-dense_matrix::compress ( const zfp_config &  config )
+dense_matrix::compress ( const zconfig &  config )
 {
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+
+    if ( is_compressed() )
+        return;
+    
+    std::visit(
+        [this,&config] ( auto &&  M )
+        {
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
+
+            const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
+            auto          v         = sz::compress( config, M.data(), M.nrows(), M.ncols() );
+
+            if ( v.size() < mem_dense )
+            {
+                _zdata = std::move( v );
+                M      = std::move( blas::matrix< value_t >( 0, 0 ) );
+            }// if
+        },
+        _M
+    );
+
+    #elif defined(HAS_ZFP)
+    
     if ( is_compressed() )
         return;
     
@@ -351,7 +398,9 @@ dense_matrix::compress ( const zfp_config &  config )
         },
         _M
     );
+
     #endif
+    
 }
 
 //
@@ -360,7 +409,21 @@ dense_matrix::compress ( const zfp_config &  config )
 void
 dense_matrix::uncompress ()
 {
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+    
+    if ( ! is_compressed() )
+        return;
+
+    std::visit( 
+        [this] ( auto &&  M )
+        {
+            using  value_t = typename std::decay_t< decltype(M) >::value_t;
+
+            M = std::move( sz_uncompress< value_t >( _zdata, nrows(), ncols() ) );
+        },
+        _M );
+
+    #elif defined(HAS_ZFP)
     
     if ( ! is_compressed() )
         return;
@@ -374,8 +437,12 @@ dense_matrix::uncompress ()
                 [this] ( auto && zM )
                 {
                     using  zfp_value_t = typename std::decay_t< decltype(*zM) >::value_type;
-                    
-                    return zfp_uncompress< value_t, zfp_value_t >( *zM, nrows(), ncols() );
+
+                    auto  cM = zfp_uncompress< value_t, zfp_value_t >( *zM, nrows(), ncols() );
+
+                    zM.reset( nullptr );
+
+                    return cM;
                 },
                 _zdata );
 
@@ -398,7 +465,11 @@ dense_matrix::byte_size () const
 
     std::visit( [&size] ( auto &&  M ) { size += M.byte_size(); }, _M );
 
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+
+    size += sizeof(_zdata) + _zdata.size();
+    
+    #elif defined(HAS_ZFP)
 
     size += sizeof(_zdata);
 

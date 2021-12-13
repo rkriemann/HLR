@@ -145,7 +145,23 @@ vec_add ( const blas::vector< value_t > &  t,
 //
 // return uncompressed matrix
 //
-#if defined(HAS_ZFP)
+#if defined(HAS_SZ)
+
+template < typename value_t >
+blas::matrix< value_t >
+sz_uncompress ( const sz::carray_view &  v,
+                const size_t             nrows,
+                const size_t             ncols )
+{
+    auto  M = blas::matrix< value_t >( nrows, ncols );
+    
+    sz::uncompress< value_t >( v, M.data(), nrows, ncols );
+
+    return M;
+}
+
+#elif defined(HAS_ZFP)
+
 template < typename mat_value_t,
            typename zfp_value_t >
 blas::matrix< mat_value_t >
@@ -159,6 +175,7 @@ zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
 
     return M;
 }
+
 #endif
 
 }// namespace anonymous
@@ -200,9 +217,17 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
             {
                 auto  y = blas::vector< value_t >( sy->size() );
 
-                #if defined(HAS_ZFP)
                 if ( is_compressed() )
                 {
+                    #if defined(HAS_SZ)
+                
+                    auto cU = sz_uncompress< value_t >( _zdata.U, nrows(), rank() );
+                    auto cV = sz_uncompress< value_t >( _zdata.V, ncols(), rank() );
+
+                    lr_mul_vec< value_t >( alpha, cU, cV, op, x, y );
+
+                    #elif defined(HAS_ZFP)
+                
                     auto  cUV = std::visit( 
                         [this] ( auto &&  zM )
                         {
@@ -217,9 +242,10 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
                         _zdata );
 
                     lr_mul_vec< value_t >( alpha, cUV.U, cUV.V, op, x, y );
+
+                    #endif
                 }// if
                 else
-                #endif
                 {
                     lr_mul_vec< value_t >( alpha, M.U, M.V, op, x, y );
                 }// else
@@ -394,9 +420,37 @@ lrmatrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-lrmatrix::compress ( const zfp_config &  config )
+lrmatrix::compress ( const zconfig &  config )
 {
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+
+    if ( is_compressed() )
+        return;
+    
+    std::visit(
+        [this,&config] ( auto &&  UV )
+        {
+            using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+
+            const auto    rank_UV   = UV.U.ncols();
+            const size_t  mem_dense = sizeof(value_t) * rank_UV * ( UV.U.nrows() + UV.V.nrows() );
+            auto          vU        = sz::compress( config, UV.U.data(), UV.U.nrows(), UV.U.ncols() );
+            auto          vV        = sz::compress( config, UV.V.data(), UV.V.nrows(), UV.V.ncols() );
+            const auto    mem_zfp   = vU.size() + vV.size();
+
+            if ( mem_zfp < mem_dense )
+            {
+                _zdata.U = std::move( vU );
+                _zdata.V = std::move( vV );
+                UV.U     = std::move( blas::matrix< value_t >( 0, rank_UV ) ); // remember rank !!!
+                UV.V     = std::move( blas::matrix< value_t >( 0, rank_UV ) );
+            }// if
+        },
+        _UV
+    );
+
+    #elif defined(HAS_ZFP)
+
     if ( is_compressed() )
         return;
     
@@ -459,6 +513,7 @@ lrmatrix::compress ( const zfp_config &  config )
         },
         _UV
     );
+
     #endif
 }
 
@@ -468,7 +523,28 @@ lrmatrix::compress ( const zfp_config &  config )
 void
 lrmatrix::uncompress ()
 {
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+    
+    if ( ! is_compressed() )
+        return;
+
+    std::visit( 
+        [this] ( auto &&  UV )
+        {
+            using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+
+            auto  cU = sz_uncompress< value_t >( _zdata.U, nrows(), rank() );
+            auto  cV = sz_uncompress< value_t >( _zdata.V, ncols(), rank() );
+
+            UV.U = std::move( cU );
+            UV.V = std::move( cV );
+
+            _zdata.U.free();
+            _zdata.V.free();
+        },
+        _UV );
+    
+    #elif defined(HAS_ZFP)
     
     if ( ! is_compressed() )
         return;
@@ -487,6 +563,8 @@ lrmatrix::uncompress ()
                     auto   cV = zfp_uncompress< value_t, zfp_value_t >( zM->V, ncols(), rank() );
                     auto  cUV = lrfactors< value_t >{ std::move(cU), std::move(cV) };
 
+                    zM.reset( nullptr );
+                    
                     return cUV;
                 },
                 _zdata );
@@ -511,7 +589,12 @@ lrmatrix::byte_size () const
 
     std::visit( [&size] ( auto &&  M ) { size += M.U.byte_size() + M.V.byte_size(); }, _UV );
 
-    #if defined(HAS_ZFP)
+    #if defined(HAS_SZ)
+    
+    size += sizeof(_zdata) + _zdata.U.size() + _zdata.V.size();
+    
+    #elif defined(HAS_ZFP)
+    
     size += sizeof(_zdata);
 
     std::visit( [&size] ( auto &&  zM )
