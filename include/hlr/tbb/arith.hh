@@ -94,6 +94,46 @@ mul_vec_reduce ( const value_t                             alpha,
 }
 
 //
+// compute C := C + α A with different types of A/C
+//
+template < typename value_t,
+           typename approx_t >
+void
+add ( const value_t            alpha,
+      const hpro::TMatrix &    A,
+      hpro::TMatrix &          C,
+      const hpro::TTruncAcc &  acc,
+      const approx_t &         approx )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked_all( A, C ) )
+    {
+        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BC =  ptrcast( &C, hpro::TBlockMatrix );
+        
+        HLR_ASSERT(( BA->block_rows() == BC->nblock_rows() ) &&
+                   ( BA->block_cols() == BC->nblock_cols() ));
+
+        for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+            {
+                if ( is_null( BA->block( i, j ) ) )
+                    continue;
+                
+                HLR_ASSERT( ! is_null( BC->block( i, j ) ) );
+                
+                add( alpha, * BA->block( i, j ), * BC->block( i, j ), acc, approx );
+            }// for
+        }// for
+    }// if
+    else
+        hlr::add( alpha, A, C, acc, approx );
+}
+
+//
 // compute C = C + α op( A ) op( B )
 //
 template < typename value_t,

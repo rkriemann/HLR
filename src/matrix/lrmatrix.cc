@@ -364,6 +364,15 @@ lrmatrix::copy () const
     M->copy_struct_from( this );
     
     std::visit( [&M] ( auto &&  UV ) { M->set_lrmat( UV.U, UV.V ); }, _UV );
+
+    #if defined( HAS_ZFP )
+
+    if ( is_compressed() )
+    {
+        HLR_ERROR( "TODO" );
+    }// if
+
+    #endif
     
     return M;
 }
@@ -605,6 +614,7 @@ lrmatrix::byte_size () const
             size += sizeof(zM->V) + zM->V.compressed_size();
         }// if
     }, _zdata );
+    
     #endif
     
     return size;

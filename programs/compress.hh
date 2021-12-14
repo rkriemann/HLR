@@ -183,7 +183,7 @@ do_compress ( blas::matrix< value_t > &  D,
         
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    mem    = " << format_mem( csize ) << std::endl;
-    std::cout << "     %full = " << format( "%.2f %%" ) % ( 100.0 * ( double( csize ) / double( mem_D ) )) << std::endl;
+    std::cout << "     %full = " << format( "%.4e %%" ) % ( 100.0 * ( double( csize ) / double( mem_D ) )) << std::endl;
 
     if ( hpro::verbose( 3 ) )
         io::matlab::write( T, "T" );
@@ -221,8 +221,10 @@ do_H ( blas::matrix< value_t > &  D,
 
     if ( cmdline::compress > 0 )
     {
-        if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                    *zconf = zfp_config_accuracy( cmdline::compress );
+        if ( cmdline::compress > 1 )
+            *zconf = zfp_config_rate( int( cmdline::compress ), false );
+        else
+            *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
 
     #else
@@ -248,14 +250,41 @@ do_H ( blas::matrix< value_t > &  D,
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid,nosize,rank" );
         
+    auto  mem_A   = A->byte_size();
+
+    std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
+    std::cout << "     %full = " << format( "%.4e %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
+
     auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
     auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
     auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
-    auto  mem_A   = A->byte_size();
         
-    std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
-    std::cout << "     %full = " << format( "%.2f %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
     std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_D ) << std::endl;
+
+    auto  TA   = impl::matrix::copy_nongeneric( *A );
+    auto  B    = impl::matrix::copy( *TA );
+    auto  acc2 = hpro::fixed_prec( 1e-6 );
+    
+    for ( int i = 0; i < cmdline::nbench; ++i )
+    {
+        impl::matrix::copy_to( *TA, *B );
+        
+        tic = timer::now();
+        
+        impl::add< value_t, approx_t >( value_t(1), *TA, *B, acc2, apx );
+        
+        toc = timer::since( tic );
+        
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+    }// for
+
+    std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
+
+    auto  norm_B  = norm::frobenius( *B );
+    auto  diff2   = matrix::sum( value_t(1), *TA, value_t(1), *TA, value_t(-1), *B );
+    auto  error2  = hlr::norm::spectral( *diff2, true, 1e-4, 20 );
+        
+    std::cout << "    error  = " << format_error( error2 ) << " / " << format_error( error2 / norm_B ) << std::endl;
 }
 
 #if 0
@@ -991,13 +1020,15 @@ program_main ()
             io::matlab::write( *DA, "T" );
         }// if
         
-        auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
-        auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
-        auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
         auto  mem_A   = A->byte_size();
         
         std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
-        std::cout << "     %full = " << format( "%.2f %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
+        std::cout << "     %full = " << format( "%.4e %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
+
+        auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
+        auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
+        auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
+        
         std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_D ) << std::endl;
     
         return;

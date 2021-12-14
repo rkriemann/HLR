@@ -37,7 +37,6 @@ add ( const value_t            alpha,
 //
 // compute C := C + α A with different types of A/C
 //
-
 template < typename value_t,
            typename approx_t >
 void

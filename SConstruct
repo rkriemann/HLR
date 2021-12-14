@@ -198,14 +198,20 @@ opts.Add( PathVariable( 'jemalloc',  'base directory of jemalloc',    JEMALLOC_D
 opts.Add( PathVariable( 'mimalloc',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'lapack',    'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
-opts.Add( EnumVariable( 'malloc',    'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',    'use likwid library',            likwid ) )
-opts.Add( BoolVariable( 'scorep',    'use Score-P library',           scorep ) )
-opts.Add( BoolVariable( 'half',      'use half precision library',    half ) )
-opts.Add( BoolVariable( 'zfp',       'use ZFP compression library',   zfp ) )
-opts.Add( BoolVariable( 'sz',        'use SZ compression library',    sz ) )
-opts.Add( BoolVariable( 'universal', 'use universal number library',  universal ) )
+opts.Add( EnumVariable( 'lapack',        'lapack library to use',            'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
+opts.Add( EnumVariable( 'malloc',        'malloc library to use',            'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',        'use likwid library',               likwid ) )
+opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',    LIKWID_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'scorep',        'use Score-P library',              scorep ) )
+opts.Add( PathVariable( 'scorep_dir',    'Score-P installation directory',   SCOREP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'half',          'use half precision library',       half ) )
+opts.Add( PathVariable( 'half_dir',      'half installation directory',      HALF_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',      zfp ) )
+opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',       ZFP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'sz',            'use SZ compression library',       sz ) )
+opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',        SZ_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'universal',     'use universal number library',     universal ) )
+opts.Add( PathVariable( 'universal_dir', 'universal installation directory', UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
@@ -255,14 +261,20 @@ JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
 TCMALLOC_DIR = opt_env['tcmalloc']
 
-lapack       = opt_env['lapack']
-malloc       = opt_env['malloc']
-likwid       = opt_env['likwid']
-scorep       = opt_env['scorep']
-half         = opt_env['half']
-zfp          = opt_env['zfp']
-sz           = opt_env['sz']
-universal    = opt_env['universal']
+lapack        = opt_env['lapack']
+malloc        = opt_env['malloc']
+likwid        = opt_env['likwid']
+LIKWID_DIR    = opt_env['likwid_dir']
+scorep        = opt_env['scorep']
+SCOREP_DIR    = opt_env['scorep_dir']
+half          = opt_env['half']
+HALF_DIR      = opt_env['half_dir']
+zfp           = opt_env['zfp']
+ZFP_DIR       = opt_env['zfp_dir']
+sz            = opt_env['sz']
+SZ_DIR        = opt_env['sz_dir']
+universal     = opt_env['universal']
+UNIVERSAL_DIR = opt_env['universal_dir']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
@@ -482,6 +494,16 @@ def split_str_array ( arr, n ) :
 
     return parts
 
+#
+# helper for printing paths
+#
+def pathstr ( path ) :
+    if path != '' : return '(' + path + ')'
+    else          : return ''
+
+#
+# show output of "scons help"
+#
 def show_help ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
                  True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
@@ -506,15 +528,17 @@ def show_help ( target, source, env ):
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mkl{1}        │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
+    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( LAPACKLIBS ) )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
+    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -568,15 +592,14 @@ def show_options ( target, source, env ):
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
     print( '  {0}mkl{1}        │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
-    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
-    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
-    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
-    print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), bool_str[ zfp ] )
-    print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), bool_str[ sz ] )
-    print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), bool_str[ universal ] )
+    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), lapack )
+    print( '  {0}malloc{1}     │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
+           pathstr( JEMALLOC_DIR if malloc == 'jemalloc' else MIMALLOC_DIR if malloc == 'mimalloc' else TCMALLOC_DIR if malloc == 'tcmalloc' else '' ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),    pathstr( LIKWID_DIR    if likwid    else '' ) )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),       pathstr( ZFP_DIR       if zfp       else '' ) )
+    print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),        pathstr( SZ_DIR        if sz        else '' ) )
+    print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ), pathstr( UNIVERSAL_DIR if universal else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )

@@ -965,6 +965,125 @@ copy_uniform ( const hpro::TMatrix &                    M,
     }// else
 }
 
-}}}// namespace hlr::tbb::matrix
+//
+// return copy of matrix with uniform low-rank matrices converted
+// to standard lowrank matrices
+//
+std::unique_ptr< hpro::TMatrix >
+copy_nongeneric ( const hpro::TMatrix &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( ! is_null( BM->block( i, j ) ) )
+                        {
+                            auto  B_ij = copy_nongeneric( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+        
+        return N;
+    }// if
+    else if ( is_generic_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, lrmatrix );
+
+        if ( R->is_compressed() )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+
+        auto  SR = std::unique_ptr< hpro::TRkMatrix >();
+        
+        if ( R->value_type() == blas::value_type::rfp32 )
+        {
+            auto  U = blas::copy< hpro::real, float >( R->U< float >() );
+            auto  V = blas::copy< hpro::real, float >( R->V< float >() );
+
+            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// if
+        else if ( R->value_type() == blas::value_type::rfp64 )
+        {
+            auto  U = blas::copy< hpro::real, double >( R->U< double >() );
+            auto  V = blas::copy< hpro::real, double >( R->V< double >() );
+
+            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// if
+        else if ( R->value_type() == blas::value_type::cfp32 )
+        {
+            auto  U = blas::copy< hpro::complex, std::complex< float > >( R->U< std::complex< float > >() );
+            auto  V = blas::copy< hpro::complex, std::complex< float > >( R->V< std::complex< float > >() );
+
+            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// if
+        else if ( R->value_type() == blas::value_type::cfp64 )
+        {
+            auto  U = blas::copy< hpro::complex, std::complex< double > >( R->U< std::complex< double > >() );
+            auto  V = blas::copy< hpro::complex, std::complex< double > >( R->V< std::complex< double > >() );
+
+            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// if
+        
+        SR->set_id( R->id() );
+
+        return SR;
+    }// if
+    else if ( is_generic_dense( M ) )
+    {
+        auto  D  = cptrcast( &M, dense_matrix );
+
+        if ( D->is_compressed() )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+
+        auto  SD = std::unique_ptr< hpro::TDenseMatrix >();
+
+        if ( D->value_type() == blas::value_type::rfp32 )
+        {
+            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::real, float >( D->M< float >() ) ) );
+        }// if
+        else if ( D->value_type() == blas::value_type::rfp64 )
+        {
+            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::real, double >( D->M< double >() ) ) );
+        }// if
+        else if ( D->value_type() == blas::value_type::cfp32 )
+        {
+            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::complex, std::complex< float > >( D->M< std::complex< float > >() ) ) );
+        }// if
+        else if ( D->value_type() == blas::value_type::cfp64 )
+        {
+            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::complex, std::complex< double > >( D->M< std::complex< double > >() ) ) );
+        }// if
+
+        SD->set_id( D->id() );
+
+        return SD;
+    }// if
+    else
+    {
+        return M.copy();
+    }// else
+}
+
+    }}}// namespace hlr::tbb::matrix
 
 #endif // __HLR_TBB_MATRIX_HH

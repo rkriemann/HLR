@@ -14,6 +14,7 @@
 #include <hpro/matrix/structure.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/add.hh>
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/mulvec.hh>
 #include <hlr/arith/lu.hh>
@@ -40,6 +41,11 @@ namespace hpro = HLIB;
 // compute y = y + α · op( M ) · x
 //
 using hlr::mul_vec;
+
+//
+// compute C = C + α · A
+//
+using hlr::add;
 
 //
 // compute C = C + α · op( A ) · op( B ) 

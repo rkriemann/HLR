@@ -6,6 +6,7 @@
 
 #include "hlr/tbb/matrix.hh"
 #include "hlr/tbb/compress.hh"
+#include "hlr/tbb/arith.hh"
 
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
