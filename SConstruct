@@ -47,17 +47,17 @@ MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
 likwid        = False
-LIKWID_DIR    = '/opt/local/likwid'
+LIKWID_DIR    = '/'
 scorep        = False
-SCOREP_DIR    = '/opt/local/scorep/7.0'
+SCOREP_DIR    = '/'
 half          = False
-HALF_DIR      = '/opt/local/half/2.2.0'
+HALF_DIR      = '/'
 zfp           = False
-ZFP_DIR       = '/opt/local/zfp/0.5.5'
+ZFP_DIR       = '/'
 sz            = False
-SZ_DIR        = '/opt/local/sz'
+SZ_DIR        = '/'
 universal     = False
-UNIVERSAL_DIR = '/opt/local/universal'
+UNIVERSAL_DIR = '/'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',

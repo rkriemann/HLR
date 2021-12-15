@@ -6,6 +6,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <filesystem>
+
 // #include <tbb/parallel_for.h>
 // #include <tbb/blocked_range2d.h>
 
@@ -19,7 +21,7 @@
 #include <hlr/arith/norm.hh>
 #include <hlr/utils/tensor.hh>
 
-#include <hlr/arith/cuda.hh>
+//#include <hlr/arith/cuda.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -49,6 +51,7 @@ gen_matrix_log ( const size_t  n )
     auto    M = blas::matrix< value_t >( n, n );
 
     #if 0
+    
     ::tbb::parallel_for(
         ::tbb::blocked_range2d< size_t >( 0, n, 1024, 0, n, 1024 ),
         [&,h] ( const auto &  r )
@@ -85,12 +88,13 @@ gen_matrix_log ( const size_t  n )
             blas::copy( T, M_ij );
         } );
     #else
+
+    #pragma omp parallel for collapse(2) schedule(static,1024)
     for ( size_t  i = 0; i < n; ++i )
     {
-        const double  x1[2] = { std::sin(i*h), std::cos(i*h) };
-        
         for ( size_t  j = 0; j < n; ++j )
         {
+            const double  x1[2] = { std::sin(i*h), std::cos(i*h) };
             const double  x2[2] = { std::sin(j*h), std::cos(j*h) };
             const double  dist2 = math::square( x1[0] - x2[0] ) + math::square( x1[1] - x2[1] );
 
@@ -100,6 +104,7 @@ gen_matrix_log ( const size_t  n )
                 M(i,j) = math::log( math::sqrt(dist2) );
         }// for
     }// for
+    
     #endif
 
     return M;
@@ -172,12 +177,12 @@ do_compress ( blas::matrix< value_t > &  D,
     // auto  zconf  = zfp_config_accuracy( rate );
     auto    tic   = timer::now();
 
-    impl::matrix::compress_replace( indexset( 0, D.nrows()-1 ),
-                                    indexset( 0, D.ncols()-1 ),
-                                    T, csize,
-                                    acc, apx,
-                                    cmdline::ntile,
-                                    zconf.get() );
+    impl::matrix::compress_replace< value_t, approx_t >( indexset( 0, D.nrows()-1 ),
+                                                         indexset( 0, D.ncols()-1 ),
+                                                         T, csize,
+                                                         acc, apx,
+                                                         cmdline::ntile,
+                                                         zconf.get() );
             
     auto    toc   = timer::since( tic );
         
@@ -261,30 +266,30 @@ do_H ( blas::matrix< value_t > &  D,
         
     std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_D ) << std::endl;
 
-    auto  TA   = impl::matrix::copy_nongeneric( *A );
-    auto  B    = impl::matrix::copy( *TA );
-    auto  acc2 = hpro::fixed_prec( 1e-6 );
+    // auto  TA   = impl::matrix::copy_nongeneric( *A );
+    // auto  B    = impl::matrix::copy( *TA );
+    // auto  acc2 = hpro::fixed_prec( 1e-6 );
     
-    for ( int i = 0; i < cmdline::nbench; ++i )
-    {
-        impl::matrix::copy_to( *TA, *B );
+    // for ( int i = 0; i < cmdline::nbench; ++i )
+    // {
+    //     impl::matrix::copy_to( *TA, *B );
         
-        tic = timer::now();
+    //     tic = timer::now();
         
-        impl::add< value_t, approx_t >( value_t(1), *TA, *B, acc2, apx );
+    //     impl::add< value_t, approx_t >( value_t(1), *TA, *B, acc2, apx );
         
-        toc = timer::since( tic );
+    //     toc = timer::since( tic );
         
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-    }// for
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+    // }// for
 
-    std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
+    // std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
 
-    auto  norm_B  = norm::frobenius( *B );
-    auto  diff2   = matrix::sum( value_t(1), *TA, value_t(1), *TA, value_t(-1), *B );
-    auto  error2  = hlr::norm::spectral( *diff2, true, 1e-4, 20 );
+    // auto  norm_B  = norm::frobenius( *B );
+    // auto  diff2   = matrix::sum( value_t(1), *TA, value_t(1), *TA, value_t(-1), *B );
+    // auto  error2  = hlr::norm::spectral( *diff2, true, 1e-4, 20 );
         
-    std::cout << "    error  = " << format_error( error2 ) << " / " << format_error( error2 / norm_B ) << std::endl;
+    // std::cout << "    error  = " << format_error( error2 ) << " / " << format_error( error2 / norm_B ) << std::endl;
 }
 
 #if 0
@@ -967,7 +972,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "reading data (" << cmdline::matrixfile << ")" << term::reset << std::endl;
         
-        D = io::matlab::read< value_t >( cmdline::matrixfile );
+        if ( std::filesystem::path( cmdline::matrixfile ).extension() == ".mat" ) 
+            D = io::matlab::read< value_t >( cmdline::matrixfile );
+        else if ( std::filesystem::path( cmdline::matrixfile ).extension() == ".h5" ) 
+            D = io::hdf5::read< value_t >( cmdline::matrixfile );
+        else
+            HLR_ERROR( "unsupported file type" );
     }// if
     else
     {
