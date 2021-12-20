@@ -646,7 +646,160 @@ compress_topdown ( const indexset &                 rowis,
 
     return M;
 }
+
+//
+// multi-level compression with contributions from all levels
+//
+namespace detail
+{
+
+template < typename value_t,
+           typename approx_t,
+           typename zconfig_t >
+void
+compress_ml ( const indexset &           rowis,
+              const indexset &           colis,
+              blas::matrix< value_t > &  D,
+              const size_t               lvl_rank,
+              const hpro::TTruncAcc &    acc,
+              const approx_t &           approx,
+              const size_t               ntile,
+              const zconfig_t *          zconf = nullptr )
+{
+    using namespace hlr::matrix;
     
+    //
+    // compute lowrank approximation
+    //
+
+    if ( std::min( D.nrows(), D.ncols() ) <= ntile )
+    {
+        auto  Dc       = blas::copy( D );  // do not modify D (!)
+        auto  acc_loc  = acc( rowis, colis );
+        
+        auto  [ U, V ] = approx( Dc, acc_loc );
+
+        if ( U.ncols() < std::min( D.nrows(), D.ncols() ) / 2 )
+        {
+            // std::cout << rowis.to_string() << " × " << colis.to_string() << " : leaf" << std::endl;
+            blas::prod( value_t(1), U, blas::adjoint( V ), value_t(0), D );
+            csize += U.ncols() * ( U.nrows() + V.nrows() );
+        }// if
+        else
+            csize += D.nrows() * D.ncols();
+    }// if
+    else
+    {
+        auto  Dc       = blas::copy( D );  // do not modify D (!)
+        auto  acc_loc  = acc( rowis, colis );
+        auto  aca      = approx::ACA< value_t >();
+
+        acc_loc.set_max_rank( lvl_rank );
+        
+        auto  [ U, V ] = aca( Dc, acc_loc );
+
+        csize += U.ncols() * ( U.nrows() + V.nrows() );
+        
+        blas::prod( value_t(-1), U, blas::adjoint(V), value_t(1), D );
+
+        const auto  norm_rest = blas::norm_F( D );
+
+        if ( norm_rest <= acc_loc.abs_eps() )
+        {
+            // std::cout << rowis.to_string() << " × " << colis.to_string() << " : " << norm_rest << " / " << acc_loc.abs_eps() << std::endl;
+            blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), D );
+            return;
+        }// if
+
+        //
+        // Recursion
+        //
+        // If all sub blocks are low-rank, an agglomorated low-rank matrix of all sub-blocks
+        // is constructed. If the memory of this low-rank matrix is smaller compared to the
+        // combined memory of the sub-block, it is kept. Otherwise a block matrix with the
+        // already constructed sub-blocks is created.
+        //
+
+        const auto  mid_row = ( rowis.first() + rowis.last() + 1 ) / 2;
+        const auto  mid_col = ( colis.first() + colis.last() + 1 ) / 2;
+
+        indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
+        indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
+
+        for ( uint  i = 0; i < 2; ++i )
+        {
+            for ( uint  j = 0; j < 2; ++j )
+            {
+                auto  D_sub = D( sub_rowis[i] - rowis.first(),
+                                 sub_colis[j] - colis.first() );
+                
+                compress_ml( sub_rowis[i], sub_colis[j], D_sub, csize, lvl_rank, acc, approx, ntile, zconf );
+            }// for
+        }// for
+
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), D );
+    }// else
+}
+
+}// namespace detail
+
+template < typename value_t,
+           typename approx_t,
+           typename zconfig_t >
+void
+compress_ml ( const indexset &           rowis,
+              const indexset &           colis,
+              blas::matrix< value_t > &  D,
+              const size_t               lvl_rank,
+              const hpro::TTruncAcc &    acc,
+              const approx_t &           approx,
+              const size_t               ntile,
+              const zconfig_t *          zconf = nullptr )
+{
+    using namespace hlr::matrix;
+
+    detail::compress_ml< value_t, approx_t, zconfig_t >( rowis, colis, D, lvl_rank, acc, approx, ntile, zconf );
+}
+
+//
+// uncompress matrix
+//
+void
+uncompress ( hpro::TMatrix &  A )
+{
+    using namespace hlr::matrix;
+
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
+                                              0, BA->nblock_cols() ),
+            [=] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( is_null( BA->block( i, j ) ) )
+                            continue;
+                
+                        uncompress( *BA->block( i, j ) );
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( is_generic_lowrank( A ) )
+    {
+        ptrcast( &A, lrmatrix )->uncompress();
+    }// if
+    else if ( is_generic_dense( A ) )
+    {
+        ptrcast( &A, dense_matrix )->uncompress();
+    }// if
+}
+
 }}}// namespace hlr::tbb::matrix
 
 #endif // __HLR_TBB_MATRIX_COMPRESS_HH

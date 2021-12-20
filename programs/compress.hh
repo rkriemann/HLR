@@ -177,12 +177,18 @@ do_compress ( blas::matrix< value_t > &  D,
     // auto  zconf  = zfp_config_accuracy( rate );
     auto    tic   = timer::now();
 
-    impl::matrix::compress_replace< value_t, approx_t >( indexset( 0, D.nrows()-1 ),
-                                                         indexset( 0, D.ncols()-1 ),
-                                                         T, csize,
-                                                         acc, apx,
-                                                         cmdline::ntile,
-                                                         zconf.get() );
+    // impl::matrix::compress_replace< value_t, approx_t >( indexset( 0, D.nrows()-1 ),
+    //                                                      indexset( 0, D.ncols()-1 ),
+    //                                                      T, csize,
+    //                                                      acc, apx,
+    //                                                      cmdline::ntile,
+    //                                                      zconf.get() );
+    impl::matrix::compress_ml< value_t, approx_t >( indexset( 0, D.nrows()-1 ),
+                                                    indexset( 0, D.ncols()-1 ),
+                                                    T, csize,
+                                                    4, acc, apx,
+                                                    cmdline::ntile,
+                                                    zconf.get() );
             
     auto    toc   = timer::since( tic );
         
@@ -260,6 +266,8 @@ do_H ( blas::matrix< value_t > &  D,
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
     std::cout << "     %full = " << format( "%.4e %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
 
+    impl::matrix::uncompress( *A );
+    
     auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
     auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
     auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );

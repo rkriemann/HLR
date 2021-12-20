@@ -487,6 +487,57 @@ compress ( const indexset &                 rowis,
     return M;
 }
     
+//
+// uncompress matrix
+//
+namespace detail
+{
+
+void
+uncompress ( hpro::TMatrix &  A )
+{
+    using namespace hlr::matrix;
+
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+                {
+                    if ( is_null( BA->block( i, j ) ) )
+                        continue;
+                    
+                    uncompress( *BA->block( i, j ) );
+                }// for
+            }// for
+        }// omp taskgroup
+    }// if
+    else if ( is_generic_lowrank( A ) )
+    {
+        ptrcast( &A, lrmatrix )->uncompress();
+    }// if
+    else if ( is_generic_dense( A ) )
+    {
+        ptrcast( &A, dense_matrix )->uncompress();
+    }// if
+}
+
+}// namespace detail
+
+void
+uncompress ( hpro::TMatrix &  A )
+{
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::uncompress( A );
+}
+
 }}}// namespace hlr::omp::matrix
 
 #endif // __HLR_OMP_MATRIX_COMPRESS_HH
