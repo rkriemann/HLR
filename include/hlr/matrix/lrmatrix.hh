@@ -13,8 +13,7 @@
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/sz.hh>
-#include <hlr/utils/zfp.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -50,7 +49,6 @@ private:
     };
 
     using  compressed_storage = compressed_factors;
-    using  zconfig            = hlr::sz::sz_config;
     
     #elif defined(HAS_ZFP)
 
@@ -64,11 +62,6 @@ private:
 
     using  compressed_storage = std::variant< std::unique_ptr< compressed_factors< float > >,
                                               std::unique_ptr< compressed_factors< double > > >;
-    using  zconfig            = zfp_config;
-
-    #else
-
-    using  zconfig            = void;
     
     #endif
 
@@ -338,7 +331,7 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const zconfig &  config );
+    virtual void   compress      ( const zconfig_t &  config );
 
     // uncompress internal data
     virtual void   uncompress    ();

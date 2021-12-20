@@ -328,7 +328,7 @@ dense_matrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-dense_matrix::compress ( const zconfig &  config )
+dense_matrix::compress ( const zconfig_t &  config )
 {
     #if defined(HAS_SZ)
 

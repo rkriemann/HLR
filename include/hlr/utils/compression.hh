@@ -1,12 +1,32 @@
-#ifndef __HLR_UTILS_SZ_HH
-#define __HLR_UTILS_SZ_HH
+#ifndef __HLR_UTILS_COMPRESSION_HH
+#define __HLR_UTILS_COMPRESSION_HH
 //
 // Project     : HLR
-// Module      : utils/sz
-// Description : SZ compression related functions and types
+// Module      : utils/compression
+// Description : compression related functions and types
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
+
+////////////////////////////////////////////////////////////
+//
+// ZFP related functions
+//
+////////////////////////////////////////////////////////////
+
+#if defined(HAS_ZFP)
+
+#include <zfpcarray2.h>
+
+#endif
+
+////////////////////////////////////////////////////////////
+//
+// SZ related functions and types
+//
+////////////////////////////////////////////////////////////
+
+#if defined(HAS_SZ)
 
 #include <string.h>
 
@@ -18,8 +38,6 @@
 #include <hlr/utils/log.hh>
 
 namespace hlr { namespace sz {
-
-#if defined(HAS_SZ)
 
 //
 // holds compression parameters
@@ -250,36 +268,32 @@ uncompress< std::complex< double > > ( const carray_view &       v,
 
 }}// namespace hlr::sz
 
-#else
+#endif // HAS_SZ
 
+
+////////////////////////////////////////////////////////////
 //
-// handles arrays allocated within SZ
+// compression configuration type
 //
-struct carray_view
-{
-    using value_t = unsigned char;
-    using byte_t  = unsigned char;
-    
-    byte_t *  data () const { return nullptr; }
-    size_t    size () const { return 0; }
+////////////////////////////////////////////////////////////
 
-    void free () {}
-};
-    
-template < typename value_t >
-carray_view
-compress ( const value_t *  /* data */,
-           const size_t     /* dim0 */,
-           const size_t     /* dim1 */ = 0,
-           const size_t     /* dim2 */ = 0,
-           const size_t     /* dim3 */ = 0,
-           const size_t     /* dim4 */ = 0 )
+namespace hlr
 {
-    return carray_view();
-}
 
-}}// namespace hlr::sz
+#if defined(HAS_SZ)
+
+using  zconfig_t = hlr::sz::sz_config;
+
+#elif defined(HAS_ZFP)
+
+using  zconfig_t = zfp_config;
+
+#else 
+
+struct zconfig_t {};
 
 #endif
 
-#endif // __HLR_UTILS_SZ_HH
+}// namespace hlr
+
+#endif // __HLR_UTILS_ZFP_HH

@@ -145,11 +145,10 @@ do_compress ( blas::matrix< value_t > &  D,
     auto    acc   = local_accuracy( delta );
     auto    apx   = approx_t();
     size_t  csize = 0;
+    auto    zconf = std::unique_ptr< zconfig_t >();
 
     #if defined(HAS_SZ)
 
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< sz::sz_config >() : std::make_unique< sz::sz_config >() );
-    
     if ( cmdline::compress > 0 )
     {
         *zconf = sz::sz_config_rel( cmdline::compress );
@@ -157,18 +156,12 @@ do_compress ( blas::matrix< value_t > &  D,
     
     #elif defined(HAS_ZFP)
     
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< zfp_config >() : std::make_unique< zfp_config >() );
-
     if ( cmdline::compress > 0 )
     {
         if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                    *zconf = zfp_config_accuracy( cmdline::compress );
+        else                         *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
 
-    #else
-
-    auto  zconf = std::unique_ptr< void >();
-    
     #endif
             
     // auto  zconf  = zfp_config_reversible();
@@ -216,11 +209,10 @@ do_H ( blas::matrix< value_t > &  D,
 {
     auto  acc   = local_accuracy( delta );
     auto  apx   = approx_t();
-    
+    auto  zconf = std::unique_ptr< zconfig_t >();
+
     #if defined(HAS_SZ)
 
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< sz::sz_config >() : std::make_unique< sz::sz_config >() );
-    
     if ( cmdline::compress > 0 )
     {
         *zconf = sz::sz_config_rel( cmdline::compress );
@@ -228,20 +220,12 @@ do_H ( blas::matrix< value_t > &  D,
     
     #elif defined(HAS_ZFP)
     
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< zfp_config >() : std::make_unique< zfp_config >() );
-
     if ( cmdline::compress > 0 )
     {
-        if ( cmdline::compress > 1 )
-            *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else
-            *zconf = zfp_config_accuracy( cmdline::compress );
+        if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
+        else                         *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
 
-    #else
-
-    auto  zconf = std::unique_ptr< void >();
-    
     #endif
 
     auto  tic = timer::now();
@@ -318,11 +302,10 @@ compress_cuda< double > ( blas::matrix< double > &  D,
     using namespace hlr::matrix;
     
     auto  acc   = local_accuracy( delta );
+    auto  zconf = std::unique_ptr< zconfig_t >();
 
     #if defined(HAS_SZ)
 
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< sz::sz_config >() : std::make_unique< sz::sz_config >() );
-    
     if ( cmdline::compress > 0 )
     {
         *zconf = sz::sz_config_rel( cmdline::compress );
@@ -330,18 +313,12 @@ compress_cuda< double > ( blas::matrix< double > &  D,
     
     #elif defined(HAS_ZFP)
     
-    auto    zconf = ( cmdline::compress == 0 ? std::unique_ptr< zfp_config >() : std::make_unique< zfp_config >() );
-
     if ( cmdline::compress > 0 )
     {
         if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                    *zconf = zfp_config_accuracy( cmdline::compress );
+        else                         *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
 
-    #else
-
-    auto  zconf = std::unique_ptr< void >();
-    
     #endif
 
     //

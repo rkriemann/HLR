@@ -429,7 +429,7 @@ lrmatrix::copy_to ( hpro::TMatrix *          A,
 // compress internal data
 //
 void
-lrmatrix::compress ( const zconfig &  config )
+lrmatrix::compress ( const zconfig_t &  config )
 {
     #if defined(HAS_SZ)
 
