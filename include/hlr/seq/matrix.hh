@@ -1097,6 +1097,7 @@ using hlr::matrix::convert_to_dense;
 // return copy of matrix with uniform low-rank matrices converted
 // to standard lowrank matrices
 //
+inline
 std::unique_ptr< hpro::TMatrix >
 copy_nongeneric ( const hpro::TMatrix &  M )
 {
