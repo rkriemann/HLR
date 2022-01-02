@@ -20,6 +20,8 @@ namespace hlr { namespace vector {
 
 namespace hpro = HLIB;
 
+using indexset = hpro::TIndexSet;
+
 // local vector type
 DECLARE_TYPE( uniform_vector );
 
@@ -158,7 +160,7 @@ public:
     //
 
     // fill with constant
-    virtual void fill ( const real  a )
+    virtual void fill ( const hpro::real  a )
     {
         assert( false );
 
@@ -178,7 +180,7 @@ public:
     }
 
     // scale vector by constant factor
-    virtual void scale ( const real  alpha )
+    virtual void scale ( const hpro::real  alpha )
     {
         blas::scale( value_t(alpha), _coeffs );
 
@@ -188,7 +190,7 @@ public:
     }
 
     // this ≔ a · vector
-    virtual void assign ( const real             alpha,
+    virtual void assign ( const hpro::real       alpha,
                           const hpro::TVector *  v )
     {
         if ( IS_TYPE( v, uniform_vector ) )
@@ -199,7 +201,7 @@ public:
             _basis  = u->_basis;
             _coeffs = std::move( blas::copy( u->_coeffs ) );
 
-            if ( alpha != real(1) )
+            if ( alpha != hpro::real(1) )
                 blas::scale( value_t(alpha), _coeffs );
                 
             HLR_ASSERT( nblocks() == u->nblocks() );
@@ -222,12 +224,12 @@ public:
     hpro::TVector &
     operator = ( const hpro::TVector &  v )
     {
-        assign( real(1), & v );
+        assign( hpro::real(1), & v );
         return *this;
     }
     
     // return euclidean norm
-    virtual real norm2 () const
+    virtual hpro::real norm2 () const
     {
         // assuming orthonormal basis
         auto  square = [] ( const auto  f ) { return f*f; };
@@ -242,14 +244,14 @@ public:
     }
 
     // return infimum norm
-    virtual real norm_inf () const
+    virtual hpro::real norm_inf () const
     {
         HLR_ASSERT( false );
-        return real(0);
+        return hpro::real(0);
     }
     
     // this ≔ this + α·x
-    virtual void axpy ( const real             alpha,
+    virtual void axpy ( const hpro::real       alpha,
                         const hpro::TVector *  v )
     {
         if ( ! IS_TYPE( v, uniform_vector ) )
@@ -290,23 +292,23 @@ public:
     }
         
     // fill with constant
-    virtual void    cfill   ( const complex & )       { HLR_ASSERT( false ); }
+    virtual void    cfill   ( const hpro::complex & )       { HLR_ASSERT( false ); }
 
     // scale vector by constant factor
-    virtual void    cscale  ( const complex & )       { HLR_ASSERT( false ); }
+    virtual void    cscale  ( const hpro::complex & ) { HLR_ASSERT( false ); }
 
     // this ≔ f · vector
-    virtual void    cassign ( const complex &,
+    virtual void    cassign ( const hpro::complex &,
                               const TVector * )       { HLR_ASSERT( false ); }
 
     // return dot-product, <x,y> = x^H · y, where x = this
-    virtual complex dot     ( const TVector * ) const { HLR_ASSERT( false ); return complex(0); }
+    virtual hpro::complex dot     ( const TVector * ) const { HLR_ASSERT( false ); return hpro::complex(0); }
 
     // return dot-product, <x,y> = x^T · y, where x = this
-    virtual complex dotu    ( const TVector * ) const { HLR_ASSERT( false ); return complex(0); }
+    virtual hpro::complex dotu    ( const TVector * ) const { HLR_ASSERT( false ); return hpro::complex(0); }
 
     // this ≔ this + α·x
-    virtual void    caxpy   ( const complex &,
+    virtual void    caxpy   ( const hpro::complex &,
                               const TVector * )       { HLR_ASSERT( false ); } 
 
     //

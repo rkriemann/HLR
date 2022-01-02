@@ -10,6 +10,7 @@
 
 #include "hlr/utils/log.hh"
 #include "hlr/arith/blas.hh"
+#include "hlr/arith/h2.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
 
@@ -193,6 +194,73 @@ mul_vec ( const value_t                                alpha,
     }// switch
 }
 
+#if defined(HAS_H2)
+
+template < typename value_t >
+void
+mul_vec ( const value_t                    alpha,
+          const hpro::matop_t              op_M,
+          const hpro::TUniformMatrix &     M,
+          const blas::vector< value_t > &  x,
+          blas::vector< value_t > &        y )
+{
+    switch ( op_M )
+    {
+        case apply_normal :
+        {
+            //
+            // y = y + U·S·V^H x
+            //
+        
+            // U·S·V' x + y
+            auto  tx = blas::vector< value_t >( hpro::col_basis< value_t >( &M )->rank() );
+            auto  ty = blas::vector< value_t >( y.length() );
+                                                 
+            hpro::col_basis< value_t >( &M )->transform_forward( x, tx );
+            auto  tt = blas::mulvec( value_t(1), hpro::coeff< value_t >( &M ), tx );
+            hpro::row_basis< value_t >( &M )->transform_backward( tt, ty );
+
+            blas::add( alpha, ty, y );
+        }
+        break;
+        
+        case apply_conjugate :
+        {
+            assert( ! hpro::is_complex_type< value_t >::value );
+
+            HLR_ERROR( "todo" );
+        }
+        break;
+        
+        case apply_transposed :
+        {
+            //
+            // y = y + (U·S·V^H)^T x
+            //   = y + conj(V)·S^T·U^T x
+            //
+        
+            HLR_ERROR( "todo" );
+        }
+        break;
+
+        case apply_adjoint :
+        {
+            // (U·S·V')' x + y = V·S'·U' x + y
+            auto  tx = blas::vector< value_t >( hpro::row_basis< value_t >( &M )->rank() );
+            auto  ty = blas::vector< value_t >( y.length() );
+                                                 
+            hpro::row_basis< value_t >( &M )->transform_forward( x, tx );
+            auto  tt = blas::mulvec( value_t(1), blas::adjoint( hpro::coeff< value_t >( &M ) ), tx );
+            hpro::col_basis< value_t >( &M )->transform_backward( tt, ty );
+
+            blas::add( alpha, ty, y );
+        }
+        break;
+    }// switch
+}
+
+#endif
+
 template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
@@ -210,6 +278,10 @@ mul_vec ( const value_t                    alpha,
         mul_vec( alpha, op_M, * cptrcast( &M, hpro::TRkMatrix ), x, y );
     else if ( matrix::is_uniform_lowrank( M ) )
         mul_vec( alpha, op_M, * cptrcast( &M, matrix::uniform_lrmatrix< value_t > ), x, y );
+    #if defined(HAS_H2)
+    else if ( is_uniform( &M ) )
+        mul_vec( alpha, op_M, * cptrcast( &M, hpro::TUniformMatrix ), x, y );
+    #endif
     else if ( is_dense( M ) )
         mul_vec( alpha, op_M, * cptrcast( &M, hpro::TDenseMatrix ), x, y );
     else

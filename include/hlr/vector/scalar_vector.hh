@@ -65,12 +65,12 @@ public:
     // copy/assign methods with additional type checking
     //
     
-    virtual void set_vector ( const blas::vector< real > &     vec,
-                              const idx_t                      offset ) { HLR_ASSERT( ! this->is_complex() ); TScalarVector::set_vector( vec, offset ); }
+    virtual void set_vector ( const blas::vector< hpro::real > &     vec,
+                              const hpro::idx_t                      offset ) { HLR_ASSERT( ! this->is_complex() ); TScalarVector::set_vector( vec, offset ); }
 
     //! set internal data directly (complex valued)
-    virtual void set_vector ( const blas::vector< complex > &  vec,
-                              const idx_t                      offset ) { HLR_ASSERT(   this->is_complex() ); TScalarVector::set_vector( vec, offset ); }
+    virtual void set_vector ( const blas::vector< hpro::complex > &  vec,
+                              const hpro::idx_t                      offset ) { HLR_ASSERT(   this->is_complex() ); TScalarVector::set_vector( vec, offset ); }
 
     //! copy from vector \a v
     virtual void copy_from  ( const TScalarVector *            v )

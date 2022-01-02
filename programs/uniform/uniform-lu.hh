@@ -6,6 +6,18 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <hlib-config.h>
+
+#if defined(USE_LIC_CHECK)
+#define HAS_H2
+#endif
+
+#if defined( HAS_H2 )
+#include <hpro/cluster/TClusterBasisBuilder.hh>
+#include <hpro/matrix/TMatrixSum.hh>
+#include <hpro/algebra/mat_conv.hh>
+#endif
+
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith.hh>
 #include <hlr/seq/arith_accu.hh>
@@ -188,7 +200,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
 
         {
-            std::cout << "    " << term::bullet << term::bold << "sep. factors/bases" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "uniform H with sep. factors/bases" << term::reset << std::endl;
             
             auto  L                      = impl::matrix::copy_ll( *LU, unit_diag );
             auto  U                      = impl::matrix::copy_ur( *LU, general_diag );
@@ -197,8 +209,11 @@ program_main ()
 
             // print_cb( *rowcbL );
             
-            std::cout << "      mem L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
-            std::cout << "      mem U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
+            std::cout << "      mem    = " << format_mem( L2->byte_size() + U2->byte_size(),
+                                                          rowcbL->byte_size() + rowcbU->byte_size(),
+                                                          colcbL->byte_size() + colcbU->byte_size() ) << std::endl;
+            std::cout << "          L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
+            std::cout << "          U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
 
             auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
             auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
@@ -209,17 +224,50 @@ program_main ()
             std::cout << "      error  = " << format_error( norm::spectral( *inv_err2 ) ) << std::endl;
         }
         
-        {
-            std::cout << "    " << term::bullet << term::bold << "joined bases" << term::reset << std::endl;
+        // {
+        //     std::cout << "    " << term::bullet << term::bold << "joined bases" << term::reset << std::endl;
             
-            auto  [ rowcb2, colcb2, LU2 ] = impl::matrix::build_uniform_rec( *LU, apx, acc );
+        //     auto  [ rowcb2, colcb2, LU2 ] = impl::matrix::build_uniform_rec( *LU, apx, acc );
                 
-            std::cout << "      mem    = " << format_mem( LU2->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
+        //     std::cout << "      mem    = " << format_mem( LU2->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            auto  A2_inv = matrix::luinv_eval( *LU2 );
+        //     auto  A2_inv = matrix::luinv_eval( *LU2 );
                     
-            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A2_inv ) ) << std::endl;
+        //     std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A2_inv ) ) << std::endl;
+        // }
+
+        #if defined( HAS_H2 )
+        {
+            std::cout << "    " << term::bullet << term::bold << "H² with sep. factors/bases" << term::reset << std::endl;
+
+            auto  bbuilder = hpro::THClusterBasisBuilder< value_t >();
+            auto  L                      = impl::matrix::copy_ll( *LU, unit_diag );
+            auto  U                      = impl::matrix::copy_ur( *LU, general_diag );
+
+            seq::matrix::assign_cluster( *L, *bct->root() );
+            seq::matrix::assign_cluster( *U, *bct->root() );
+            
+            auto [ rowcbL, colcbL ] = bbuilder.build( ct->root(), ct->root(), L.get(), acc );
+            auto [ rowcbU, colcbU ] = bbuilder.build( ct->root(), ct->root(), U.get(), acc );
+
+            auto  L2 = std::move( to_h2( L.get(), rowcbL.get(), colcbL.get() ) );
+            auto  U2 = std::move( to_h2( U.get(), rowcbU.get(), colcbU.get() ) );
+            
+            std::cout << "      mem    = " << format_mem( L2->byte_size() + U2->byte_size(),
+                                                          rowcbL->byte_size() + rowcbU->byte_size(),
+                                                          colcbL->byte_size() + colcbU->byte_size() ) << std::endl;
+            std::cout << "          L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
+            std::cout << "          U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
+
+            auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
+            auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
+            auto  AxLU2    = matrix::product( *M1, U2_inv, L2_inv );
+            auto  I        = matrix::identity( M1->block_is() );
+            auto  inv_err2 = matrix::sum( 1.0, *I, -1.0, *AxLU2 );
+
+            std::cout << "      error  = " << format_error( norm::spectral( *inv_err2 ) ) << std::endl;
         }
+        #endif
     }// if
 
     // if ( true )
