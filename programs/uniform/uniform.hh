@@ -23,6 +23,7 @@
 #include <hlr/seq/arith_uniform.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/sum.hh>
+#include <hlr/matrix/info.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/approx/randsvd.hh>
 
@@ -30,16 +31,6 @@
 #include "common-main.hh"
 
 using namespace hlr;
-
-//
-// return min/avg/max rank of given cluster basis
-//
-template < typename cluster_basis_t >
-std::tuple< uint, uint, uint >
-rank_info ( const cluster_basis_t &  cb );
-
-std::tuple< uint, uint, uint >
-rank_info ( const hpro::TMatrix &  M );
 
 //
 // main function
@@ -106,7 +97,7 @@ program_main ()
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
     
     {
-        auto  [ kmin, kavg, kmax ] = rank_info( *A );
+        auto  [ kmin, kavg, kmax ] = matrix::rank_info( *A );
     
         std::cout << "    ranks  : " << kmin << " / " << kavg << " / " << kmax << std::endl;
     }
@@ -134,8 +125,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
         
-        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
-        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
         std::cout << "    ranks  " << std::endl
                   << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
@@ -160,8 +151,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
-        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
-        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
         std::cout << "    ranks  " << std::endl
                   << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
@@ -309,8 +300,8 @@ program_main ()
 
         std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-        auto  [ row_min, row_avg, row_max ] = rank_info( *rowcb );
-        auto  [ col_min, col_avg, col_max ] = rank_info( *colcb );
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
         std::cout << "    ranks  " << std::endl
                   << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
@@ -510,92 +501,4 @@ program_main ()
 
     #endif
     #endif
-}
-
-//
-// return min/avg/max rank of given cluster basis
-//
-template < typename cluster_basis_t >
-std::tuple< uint, size_t, uint, size_t >
-rank_info_helper ( const cluster_basis_t &  cb )
-{
-    uint    min_rank = cb.rank();
-    uint    max_rank = cb.rank();
-    size_t  sum_rank = cb.rank();
-    size_t  nnodes   = cb.rank() > 0 ? 1 : 0;
-
-    if ( cb.nsons() > 0 )
-    {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-        {
-            auto [ min_i, sum_i, max_i, n_i ] = rank_info_helper( *cb.son(i) );
-
-            if      ( min_rank == 0 ) min_rank = min_i;
-            else if ( min_i    != 0 ) min_rank = std::min( min_rank, min_i );
-            
-            max_rank  = std::max( max_rank, max_i );
-            sum_rank += sum_i;
-            nnodes   += n_i;
-        }// for
-    }// if
-
-    return { min_rank, sum_rank, max_rank, nnodes };
-}
-
-template < typename cluster_basis_t >
-std::tuple< uint, uint, uint >
-rank_info ( const cluster_basis_t &  cb )
-{
-    auto [ min_rank, sum_rank, max_rank, nnodes ] = rank_info_helper( cb );
-
-    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
-}
-
-//
-// return min/avg/max rank of given matrix
-//
-std::tuple< uint, size_t, uint, size_t >
-rank_info_helper ( const hpro::TMatrix &  M )
-{
-    if ( is_blocked( M ) )
-    {
-        auto    B        = cptrcast( &M, hpro::TBlockMatrix );
-        uint    min_rank = 0;
-        uint    max_rank = 0;
-        size_t  sum_rank = 0;
-        size_t  nnodes   = 0;
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto [ min_ij, sum_ij, max_ij, n_ij ] = rank_info_helper( *B->block( i, j ) );
-                
-                if      ( min_rank == 0 ) min_rank = min_ij;
-                else if ( min_ij   != 0 ) min_rank = std::min( min_rank, min_ij );
-                
-                max_rank  = std::max( max_rank, max_ij );
-                sum_rank += sum_ij;
-                nnodes   += n_ij;
-            }// for
-        }// for
-
-        return { min_rank, sum_rank, max_rank, nnodes };
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, hpro::TRkMatrix );
-
-        return { R->rank(), R->rank(), R->rank(), R->rank() > 1 ? 1 : 0 };
-    }// if
-
-    return { 0, 0, 0, 0 };
-}
-
-std::tuple< uint, uint, uint >
-rank_info ( const hpro::TMatrix & M )
-{
-    auto [ min_rank, sum_rank, max_rank, nnodes ] = rank_info_helper( M );
-
-    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }

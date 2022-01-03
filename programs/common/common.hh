@@ -55,7 +55,7 @@ inline
 std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + mem_usage();
+    return hlr::term::black( hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >

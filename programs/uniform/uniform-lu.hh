@@ -28,6 +28,7 @@
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/matrix/lduinv_eval.hh>
 #include <hlr/matrix/identity.hh>
+#include <hlr/matrix/info.hh>
 #include <hlr/utils/io.hh>
 #include <hlr/bem/aca.hh>
 
@@ -155,8 +156,9 @@ program_main ()
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
-                
-        io::eps::print( *LU, "HLU", prnopt );
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
@@ -192,8 +194,13 @@ program_main ()
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
-                
-        io::eps::print( *LU, "HLU", prnopt );
+
+        auto  [ kmin, kavg, kmax ] = matrix::rank_info( *LU );
+    
+        std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
+        
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
@@ -204,8 +211,8 @@ program_main ()
             
             auto  L                      = impl::matrix::copy_ll( *LU, unit_diag );
             auto  U                      = impl::matrix::copy_ur( *LU, general_diag );
-            auto  [ rowcbL, colcbL, L2 ] = impl::matrix::build_uniform_rec( *L, apx, acc );
-            auto  [ rowcbU, colcbU, U2 ] = impl::matrix::build_uniform_rec( *U, apx, acc );
+            auto  [ rowcbL, colcbL, L2 ] = impl::matrix::build_uniform_lvl( *L, apx, acc );
+            auto  [ rowcbU, colcbU, U2 ] = impl::matrix::build_uniform_lvl( *U, apx, acc );
 
             // print_cb( *rowcbL );
             
@@ -215,6 +222,17 @@ program_main ()
             std::cout << "          L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
             std::cout << "          U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
 
+            auto  [ rowL_min, rowL_avg, rowL_max ] = matrix::rank_info( *rowcbL );
+            auto  [ colL_min, colL_avg, colL_max ] = matrix::rank_info( *colcbL );
+            auto  [ rowU_min, rowU_avg, rowU_max ] = matrix::rank_info( *rowcbU );
+            auto  [ colU_min, colU_avg, colU_max ] = matrix::rank_info( *colcbU );
+
+            std::cout << "      ranks  " << std::endl
+                      << "          L  = " << rowL_min << " … " << rowL_avg << " … " << rowL_max << " / "
+                      <<                      colL_min << " … " << colL_avg << " … " << colL_max << std::endl
+                      << "          U  = " << rowU_min << " … " << rowU_avg << " … " << rowU_max << " / "
+                      <<                      colU_min << " … " << colU_avg << " … " << colU_max << std::endl;
+            
             auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
             auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
             auto  AxLU2    = matrix::product( *M1, U2_inv, L2_inv );
@@ -259,6 +277,17 @@ program_main ()
             std::cout << "          L  = " << format_mem( L2->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
             std::cout << "          U  = " << format_mem( U2->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
 
+            auto  [ rowL_min, rowL_avg, rowL_max ] = matrix::rank_info( *rowcbL );
+            auto  [ colL_min, colL_avg, colL_max ] = matrix::rank_info( *colcbL );
+            auto  [ rowU_min, rowU_avg, rowU_max ] = matrix::rank_info( *rowcbU );
+            auto  [ colU_min, colU_avg, colU_max ] = matrix::rank_info( *colcbU );
+
+            std::cout << "      ranks  " << std::endl
+                      << "          L  = " << rowL_min << " … " << rowL_avg << " … " << rowL_max << " / "
+                      <<                      colL_min << " … " << colL_avg << " … " << colL_max << std::endl
+                      << "          U  = " << rowU_min << " … " << rowU_avg << " … " << rowU_max << " / "
+                      <<                      colU_min << " … " << colU_avg << " … " << colU_max << std::endl;
+            
             auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
             auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
             auto  AxLU2    = matrix::product( *M1, U2_inv, L2_inv );
@@ -324,7 +353,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
                 
-        io::eps::print( *LU, "H2LU", prnopt );
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "H2LU", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
@@ -349,7 +379,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( LU->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
                 
-        io::eps::print( *LU, "H2LUa", prnopt );
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "H2LUa", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
@@ -384,6 +415,17 @@ program_main ()
         std::cout << "        L  = " << format_mem( L->byte_size(), rowcbL->byte_size(), colcbL->byte_size() ) << std::endl;
         std::cout << "        U  = " << format_mem( U->byte_size(), rowcbU->byte_size(), colcbU->byte_size() ) << std::endl;
 
+        auto  [ rowL_min, rowL_avg, rowL_max ] = matrix::rank_info( *rowcbL );
+        auto  [ colL_min, colL_avg, colL_max ] = matrix::rank_info( *colcbL );
+        auto  [ rowU_min, rowU_avg, rowU_max ] = matrix::rank_info( *rowcbU );
+        auto  [ colU_min, colU_avg, colU_max ] = matrix::rank_info( *colcbU );
+
+        std::cout << "    ranks  " << std::endl
+                  << "        L  = " << rowL_min << " … " << rowL_avg << " … " << rowL_max << " / "
+                  <<                    colL_min << " … " << colL_avg << " … " << colL_max << std::endl
+                  << "        U  = " << rowU_min << " … " << rowU_avg << " … " << rowU_max << " / "
+                  <<                    colU_min << " … " << colU_avg << " … " << colU_max << std::endl;
+            
         // print_cb( *rowcbL );
         
         auto  L_inv  = matrix::triinv_eval( *L, blas::lower_triangular, unit_diag );

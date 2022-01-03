@@ -5,10 +5,19 @@
 // Module      : matrix/cluster_basis
 // Description : (non-nested) cluster basis
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
+#include <hlib-config.h>
+
+#if defined(USE_LIC_CHECK)
+#define HAS_H2
+#endif
+
 #include <hpro/cluster/TCluster.hh>
+#if defined(HAS_H2)
+#include <hpro/cluster/TClusterBasis.hh>
+#endif
 
 #include <hlr/utils/checks.hh>
 #include <hlr/arith/blas.hh>
@@ -255,6 +264,63 @@ copy ( const cluster_basis< T_value_src > &  src )
     return dest;
 }
 
+//
+// return min/avg/max rank of given cluster basis
+//
+namespace detail
+{
+
+template < typename cluster_basis_t >
+std::tuple< uint, size_t, uint, size_t >
+rank_info_helper_cb ( const cluster_basis_t &  cb )
+{
+    uint    min_rank = cb.rank();
+    uint    max_rank = cb.rank();
+    size_t  sum_rank = cb.rank();
+    size_t  nnodes   = cb.rank() > 0 ? 1 : 0;
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            auto [ min_i, sum_i, max_i, n_i ] = rank_info_helper_cb( *cb.son(i) );
+
+            if      ( min_rank == 0 ) min_rank = min_i;
+            else if ( min_i    != 0 ) min_rank = std::min( min_rank, min_i );
+            
+            max_rank  = std::max( max_rank, max_i );
+            sum_rank += sum_i;
+            nnodes   += n_i;
+        }// for
+    }// if
+
+    return { min_rank, sum_rank, max_rank, nnodes };
+}
+
+}// namespace detail
+
+template < typename value_t >
+std::tuple< uint, uint, uint >
+rank_info ( const cluster_basis< value_t > &  cb )
+{
+    auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_cb( cb );
+
+    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
+#if defined(HAS_H2)
+
+template < typename value_t >
+std::tuple< uint, uint, uint >
+rank_info ( const hpro::TClusterBasis< value_t > &  cb )
+{
+    auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_cb( cb );
+
+    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
+#endif
+    
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_CLUSTER_BASIS_HH
