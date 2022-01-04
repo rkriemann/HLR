@@ -122,6 +122,8 @@ public:
     // access internal data
     //
 
+    blas::value_type                  value_type () const { return blas::value_type_v< value_t >; }
+    
     uint                              rank     () const { return std::min( _S.nrows(), _S.ncols() ); }
 
     uint                              row_rank () const { return _S.nrows(); }

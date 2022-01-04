@@ -32,6 +32,27 @@
 
 using namespace hlr;
 
+#if defined(HAS_UNIVERSAL)
+template < uint  bitsize,
+           uint  expsize >
+void
+run_posit ( hpro::TMatrix &  A,
+            hpro::TMatrix &  B,
+            const double     norm_A )
+{
+    auto  B_posit   = impl::matrix::copy( B );
+    auto  mem_posit = impl::matrix::convert_posit< bitsize, expsize >( *B_posit );
+    auto  diff      = matrix::sum( hpro::real(1), A, hpro::real(-1), *B_posit );
+    auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+    std::cout << "      "
+              << boost::format( "%2d" ) % bitsize << "/" << expsize << " : "
+              << format_error( error ) << " / "
+              << format_error( error / norm_A ) << " / "
+              << format_mem( mem_posit ) << std::endl;
+}
+#endif
+
 //
 // main function
 //
@@ -80,7 +101,7 @@ program_main ()
     toc = timer::since( tic );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
+    std::cout << "    dims   = " << term::bold << A->nrows() << " × " << A->ncols() << term::reset << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
 
     // assign clusters since needed for cluster bases
@@ -99,7 +120,7 @@ program_main ()
     {
         auto  [ kmin, kavg, kmax ] = matrix::rank_info( *A );
     
-        std::cout << "    ranks  : " << kmin << " / " << kavg << " / " << kmax << std::endl;
+        std::cout << "    ranks  : " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
     
     //////////////////////////////////////////////////////////////////////
@@ -128,9 +149,9 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  " << std::endl
-                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
-                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
+        std::cout << "    ranks  "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
@@ -154,9 +175,9 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  " << std::endl
-                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
-                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
+        std::cout << "    ranks  "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
         if ( hpro::verbose( 3 ) )
         {
@@ -226,6 +247,59 @@ program_main ()
         }
         #endif
 
+        #if defined(HAS_ZFP)
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
+
+            for ( uint  rate = 48; rate >= 8; rate -= 4 )
+            {
+                auto  A2_zfp    = impl::matrix::copy( *A2 );
+                auto  rowcb_zfp = matrix::copy< value_t >( *rowcb );
+                auto  colcb_zfp = matrix::copy< value_t >( *colcb );
+                auto  config    = zfp_config_rate( rate, false );
+                auto  mem_zfp   = 0;
+
+                matrix::replace_cluster_basis( *A2_zfp, *rowcb_zfp, *colcb_zfp );
+                
+                mem_zfp += impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
+                mem_zfp += impl::matrix::convert_zfp< value_t >( *rowcb_zfp, config );
+                mem_zfp += impl::matrix::convert_zfp< value_t >( *colcb_zfp, config );
+                
+                auto  diff      = matrix::sum( value_t(1), *A, value_t(-1), *A2_zfp );
+                auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+                std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+                          << format_error( error ) << " / "
+                          << format_error( error / normA ) << " / "
+                          << format_mem( mem_zfp ) << std::endl;
+            }// for
+        }// if
+        #endif
+        
+        #if defined(HAS_UNIVERSAL)
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
+
+            // run_posit< 64, 3 >( *A, *A2, normA );
+            // run_posit< 60, 3 >( *A, *A2, normA );
+            // run_posit< 56, 3 >( *A, *A2, normA );
+            // run_posit< 52, 3 >( *A, *A2, normA );
+            run_posit< 48, 3 >( *A, *A2, normA );
+            run_posit< 44, 3 >( *A, *A2, normA );
+            run_posit< 40, 2 >( *A, *A2, normA );
+            run_posit< 36, 2 >( *A, *A2, normA );
+            run_posit< 32, 2 >( *A, *A2, normA );
+            run_posit< 28, 2 >( *A, *A2, normA );
+            run_posit< 24, 2 >( *A, *A2, normA );
+            run_posit< 20, 2 >( *A, *A2, normA );
+            run_posit< 16, 1 >( *A, *A2, normA );
+            run_posit< 12, 1 >( *A, *A2, normA );
+            run_posit<  8, 1 >( *A, *A2, normA );
+        }// if
+        #endif
+        
         //
         // preserve for MVM
         //
@@ -303,9 +377,9 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  " << std::endl
-                  << "      row  : " << row_min << " / " << row_avg << " / " << row_max << std::endl
-                  << "      col  : " << col_min << " / " << col_avg << " / " << col_max << std::endl;
+        std::cout << "    ranks  "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
         if ( verbose( 3 ) )
         {
@@ -317,7 +391,7 @@ program_main ()
 
         tic = timer::now();
     
-        auto  A2 = std::move( to_h2( A.get(), rowcb.get(), colcb.get() ) );
+        auto  A2 = to_h2( A.get(), rowcb.get(), colcb.get() );
     
         toc = timer::since( tic );
 
@@ -331,6 +405,67 @@ program_main ()
         
         if ( hpro::verbose( 3 ) )
             io::eps::print( *A2, "A2", "noid" );
+
+        //
+        // try lower precisions
+        //
+        
+        #if defined(HAS_ZFP)
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
+
+            for ( uint  rate = 48; rate >= 8; rate -= 4 )
+            {
+                auto  A2_zfp  = impl::matrix::copy( *A2 );
+                auto  config  = zfp_config_rate( rate, false );
+                auto  mem_zfp = impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
+                auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), *A2_zfp );
+                auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+                std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+                          << format_error( error ) << " / "
+                          << format_error( error / normA ) << " / "
+                          << format_mem( mem_zfp ) << std::endl;
+            }// for
+        }// if
+        #endif
+        
+        #if defined(HAS_UNIVERSAL)
+        if ( true )
+        {
+            std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
+
+            {
+                auto  A2_posit  = impl::matrix::copy( *A2 );
+                auto  mem_posit = impl::matrix::convert_posit< 48, 3 >( *A2_posit );
+                auto  diff      = matrix::sum( hpro::real(1), *A, hpro::real(-1), *A2_posit );
+                auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+                std::cout << "      "
+                          << boost::format( "%2d" ) % 48 << "/" << 3 << " : "
+                          << format_error( error ) << " / "
+                          << format_error( error / normA ) << " / "
+                          << format_mem( mem_posit ) << std::endl;
+            }
+            
+            // run_posit< 64, 3 >( *A, *A2, normA );
+            // run_posit< 60, 3 >( *A, *A2, normA );
+            // run_posit< 56, 3 >( *A, *A2, normA );
+            // run_posit< 52, 3 >( *A, *A2, normA );
+            run_posit< 48, 3 >( *A, *A2, normA );
+            run_posit< 44, 3 >( *A, *A2, normA );
+            run_posit< 40, 2 >( *A, *A2, normA );
+            run_posit< 36, 2 >( *A, *A2, normA );
+            run_posit< 32, 2 >( *A, *A2, normA );
+            run_posit< 28, 2 >( *A, *A2, normA );
+            run_posit< 24, 2 >( *A, *A2, normA );
+            run_posit< 20, 2 >( *A, *A2, normA );
+            run_posit< 16, 1 >( *A, *A2, normA );
+            run_posit< 12, 1 >( *A, *A2, normA );
+            run_posit<  8, 1 >( *A, *A2, normA );
+        }// if
+        #endif
 
         //
         // preserve for MVM

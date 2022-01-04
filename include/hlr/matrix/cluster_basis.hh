@@ -245,20 +245,20 @@ public:
 //
 // copy given cluster basis between different value types
 //
-template < typename T_value_dest,
-           typename T_value_src >
-std::unique_ptr< cluster_basis< T_value_dest > >
-copy ( const cluster_basis< T_value_src > &  src )
+template < typename value_dest_t,
+           typename value_src_t = value_dest_t >
+std::unique_ptr< cluster_basis< value_dest_t > >
+copy ( const cluster_basis< value_src_t > &  src )
 {
-    auto  V_dest = blas::copy< T_value_dest >( src.basis() );
-    auto  dest   = std::make_unique< cluster_basis< T_value_dest > >( src.is(), std::move( V_dest ) );
+    auto  V_dest = blas::copy< value_dest_t, value_src_t >( src.basis() );
+    auto  dest   = std::make_unique< cluster_basis< value_dest_t > >( src.is(), std::move( V_dest ) );
 
     dest->set_nsons( src.nsons() );
         
     for ( uint  i = 0; i < dest->nsons(); ++i )
     {
         if ( ! is_null( src.son( i ) ) )
-            dest->set_son( i, copy< T_value_dest >( * src.son(i) ).release() );
+            dest->set_son( i, copy< value_dest_t >( * src.son(i) ).release() );
     }// for
 
     return dest;

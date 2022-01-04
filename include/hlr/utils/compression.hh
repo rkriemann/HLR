@@ -17,6 +17,7 @@
 #if defined(HAS_ZFP)
 
 #include <zfpcarray2.h>
+#include <zfpcarray3.h>
 
 #endif
 
