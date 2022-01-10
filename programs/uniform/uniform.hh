@@ -33,15 +33,28 @@
 using namespace hlr;
 
 #if defined(HAS_UNIVERSAL)
-template < uint  bitsize,
-           uint  expsize >
+template < uint bitsize,
+           uint expsize,
+           typename value_t >
 void
-run_posit ( hpro::TMatrix &  A,
-            hpro::TMatrix &  B,
-            const double     norm_A )
+run_posit ( hpro::TMatrix &                     A,
+            hpro::TMatrix &                     B,
+            matrix::cluster_basis< value_t > &  rowcb,
+            matrix::cluster_basis< value_t > &  colcb,
+            const double                        norm_A )
 {
-    auto  B_posit   = impl::matrix::copy( B );
-    auto  mem_posit = impl::matrix::convert_posit< bitsize, expsize >( *B_posit );
+    auto  B_posit     = impl::matrix::copy( B );
+    auto  rowcb_posit = matrix::copy< value_t >( rowcb );
+    auto  colcb_posit = matrix::copy< value_t >( colcb );
+
+    matrix::replace_cluster_basis( *B_posit, *rowcb_posit, *colcb_posit );
+    
+    auto  mem_B     = impl::matrix::convert_posit< bitsize, expsize >( *B_posit );
+    auto  mem_rowcb = impl::matrix::convert_posit< bitsize, expsize, value_t >( *rowcb_posit );
+    auto  mem_colcb = impl::matrix::convert_posit< bitsize, expsize, value_t >( *colcb_posit );
+    // auto  mem_rowcb = rowcb_posit->byte_size();
+    // auto  mem_colcb = colcb_posit->byte_size();
+    
     auto  diff      = matrix::sum( hpro::real(1), A, hpro::real(-1), *B_posit );
     auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
     
@@ -49,7 +62,39 @@ run_posit ( hpro::TMatrix &  A,
               << boost::format( "%2d" ) % bitsize << "/" << expsize << " : "
               << format_error( error ) << " / "
               << format_error( error / norm_A ) << " / "
-              << format_mem( mem_posit ) << std::endl;
+              << format_mem( mem_B, mem_rowcb, mem_colcb ) << std::endl;
+}
+
+template < uint bitsize,
+           uint expsize,
+           typename value_t >
+void
+run_posit ( hpro::TMatrix &                   A,
+            hpro::TMatrix &                   B,
+            hpro::TClusterBasis< value_t > &  rowcb,
+            hpro::TClusterBasis< value_t > &  colcb,
+            const double                      norm_A )
+{
+    auto  B_posit     = impl::matrix::copy( B );
+    auto  rowcb_posit = rowcb.copy();
+    auto  colcb_posit = colcb.copy();
+    
+    hpro::replace_cluster_basis( *B_posit, *rowcb_posit, *colcb_posit );
+    
+    auto  mem_B       = impl::matrix::convert_posit< bitsize, expsize >( *B_posit );
+    auto  mem_rowcb   = impl::matrix::convert_posit< bitsize, expsize, value_t >( *rowcb_posit );
+    auto  mem_colcb   = impl::matrix::convert_posit< bitsize, expsize, value_t >( *colcb_posit );
+    // auto  mem_rowcb = rowcb_posit->byte_size();
+    // auto  mem_colcb = colcb_posit->byte_size();
+    
+    auto  diff        = matrix::sum( hpro::real(1), A, hpro::real(-1), *B_posit );
+    auto  error       = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+    std::cout << "      "
+              << boost::format( "%2d" ) % bitsize << "/" << expsize << " : "
+              << format_error( error ) << " / "
+              << format_error( error / norm_A ) << " / "
+              << format_mem( mem_B, mem_rowcb, mem_colcb ) << std::endl;
 }
 #endif
 
@@ -258,13 +303,12 @@ program_main ()
                 auto  rowcb_zfp = matrix::copy< value_t >( *rowcb );
                 auto  colcb_zfp = matrix::copy< value_t >( *colcb );
                 auto  config    = zfp_config_rate( rate, false );
-                auto  mem_zfp   = 0;
 
                 matrix::replace_cluster_basis( *A2_zfp, *rowcb_zfp, *colcb_zfp );
                 
-                mem_zfp += impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
-                mem_zfp += impl::matrix::convert_zfp< value_t >( *rowcb_zfp, config );
-                mem_zfp += impl::matrix::convert_zfp< value_t >( *colcb_zfp, config );
+                auto  mem_A     = impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
+                auto  mem_rowcb = impl::matrix::convert_zfp< value_t >( *rowcb_zfp, config );
+                auto  mem_colcb = impl::matrix::convert_zfp< value_t >( *colcb_zfp, config );
                 
                 auto  diff      = matrix::sum( value_t(1), *A, value_t(-1), *A2_zfp );
                 auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
@@ -272,7 +316,7 @@ program_main ()
                 std::cout << "      " << boost::format( "%2d" ) % rate << " / "
                           << format_error( error ) << " / "
                           << format_error( error / normA ) << " / "
-                          << format_mem( mem_zfp ) << std::endl;
+                          << format_mem( mem_A, mem_rowcb, mem_colcb ) << std::endl;
             }// for
         }// if
         #endif
@@ -282,21 +326,21 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
 
-            // run_posit< 64, 3 >( *A, *A2, normA );
-            // run_posit< 60, 3 >( *A, *A2, normA );
-            // run_posit< 56, 3 >( *A, *A2, normA );
-            // run_posit< 52, 3 >( *A, *A2, normA );
-            run_posit< 48, 3 >( *A, *A2, normA );
-            run_posit< 44, 3 >( *A, *A2, normA );
-            run_posit< 40, 2 >( *A, *A2, normA );
-            run_posit< 36, 2 >( *A, *A2, normA );
-            run_posit< 32, 2 >( *A, *A2, normA );
-            run_posit< 28, 2 >( *A, *A2, normA );
-            run_posit< 24, 2 >( *A, *A2, normA );
-            run_posit< 20, 2 >( *A, *A2, normA );
-            run_posit< 16, 1 >( *A, *A2, normA );
-            run_posit< 12, 1 >( *A, *A2, normA );
-            run_posit<  8, 1 >( *A, *A2, normA );
+            // run_posit< 64, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 60, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 56, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 52, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 32, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 28, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 24, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 20, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
         }// if
         #endif
         
@@ -417,16 +461,24 @@ program_main ()
 
             for ( uint  rate = 48; rate >= 8; rate -= 4 )
             {
-                auto  A2_zfp  = impl::matrix::copy( *A2 );
-                auto  config  = zfp_config_rate( rate, false );
-                auto  mem_zfp = impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
-                auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), *A2_zfp );
-                auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
+                auto  A2_zfp    = impl::matrix::copy( *A2 );
+                auto  rowcb_zfp = rowcb->copy();
+                auto  colcb_zfp = colcb->copy();
+                auto  config    = zfp_config_rate( rate, false );
+
+                hpro::replace_cluster_basis( *A2_zfp, *rowcb_zfp, *colcb_zfp );
+                
+                auto  mem_A     = impl::matrix::convert_zfp< value_t >( *A2_zfp, config );
+                auto  mem_rowcb = impl::matrix::convert_zfp< value_t >( *rowcb_zfp, config );
+                auto  mem_colcb = impl::matrix::convert_zfp< value_t >( *colcb_zfp, config );
+                
+                auto  diff      = matrix::sum( value_t(1), *A, value_t(-1), *A2_zfp );
+                auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
     
                 std::cout << "      " << boost::format( "%2d" ) % rate << " / "
                           << format_error( error ) << " / "
                           << format_error( error / normA ) << " / "
-                          << format_mem( mem_zfp ) << std::endl;
+                          << format_mem( mem_A, mem_rowcb, mem_colcb ) << std::endl;
             }// for
         }// if
         #endif
@@ -436,34 +488,21 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
 
-            {
-                auto  A2_posit  = impl::matrix::copy( *A2 );
-                auto  mem_posit = impl::matrix::convert_posit< 48, 3 >( *A2_posit );
-                auto  diff      = matrix::sum( hpro::real(1), *A, hpro::real(-1), *A2_posit );
-                auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
-    
-                std::cout << "      "
-                          << boost::format( "%2d" ) % 48 << "/" << 3 << " : "
-                          << format_error( error ) << " / "
-                          << format_error( error / normA ) << " / "
-                          << format_mem( mem_posit ) << std::endl;
-            }
-            
-            // run_posit< 64, 3 >( *A, *A2, normA );
-            // run_posit< 60, 3 >( *A, *A2, normA );
-            // run_posit< 56, 3 >( *A, *A2, normA );
-            // run_posit< 52, 3 >( *A, *A2, normA );
-            run_posit< 48, 3 >( *A, *A2, normA );
-            run_posit< 44, 3 >( *A, *A2, normA );
-            run_posit< 40, 2 >( *A, *A2, normA );
-            run_posit< 36, 2 >( *A, *A2, normA );
-            run_posit< 32, 2 >( *A, *A2, normA );
-            run_posit< 28, 2 >( *A, *A2, normA );
-            run_posit< 24, 2 >( *A, *A2, normA );
-            run_posit< 20, 2 >( *A, *A2, normA );
-            run_posit< 16, 1 >( *A, *A2, normA );
-            run_posit< 12, 1 >( *A, *A2, normA );
-            run_posit<  8, 1 >( *A, *A2, normA );
+            // run_posit< 64, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 60, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 56, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 52, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 32, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 28, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 24, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 20, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
         }// if
         #endif
 

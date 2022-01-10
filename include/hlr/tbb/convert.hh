@@ -589,6 +589,100 @@ convert_zfp ( cluster_basis< value_t > &  cb,
 
     return s;
 }
+
+#if defined(HAS_H2)
+template < typename value_t >
+size_t
+convert_zfp ( hpro::TClusterBasis< value_t > &  cb,
+              zfp_config &                      config )
+{
+    //
+    // convert local basis
+    //
+
+    size_t  s = sizeof( cluster_basis< value_t > );
+    
+    if ( cb.nsons() == 0 )
+    {
+        auto  C  = cb.basis();
+        auto  zC = zfp::const_array2< value_t >( C.nrows(), C.ncols(), config, 0, 0 );
+        
+        zC.set( C.data() );
+
+        const size_t  mem_dense = sizeof(value_t) * C.nrows() * C.ncols();
+        const size_t  mem_zfp   = zC.compressed_size();
+
+        if ( mem_zfp < mem_dense )
+        {
+            s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
+            
+            // write back compressed data
+            zC.get( C.data() );
+        }// if
+        else
+        {
+            s += mem_dense;
+        }// else
+    }// if
+    else 
+    {
+        auto  mtx = std::mutex();
+
+        //
+        // recurse
+        //
+        
+        ::tbb::parallel_for< uint >(
+            0, cb.nsons(),
+            [&] ( auto  i )
+            {
+                if ( ! is_null( cb.son( i ) ) )
+                {
+                    auto  s_i = convert_zfp< value_t >( * cb.son(i), config );
+                    
+                    {
+                        auto  lock = std::scoped_lock( mtx );
+                        
+                        s += s_i;
+                    }
+                }// if
+            } );
+
+        //
+        // compress transfer matrices
+        //
+
+        if ( cb.rank() > 0 )
+        {
+            for ( uint  i = 0; i < cb.nsons(); ++i )
+            {
+                auto  T  = cb.transfer_mat( i );
+                auto  zT = zfp::const_array2< value_t >( T.nrows(), T.ncols(), config, 0, 0 );
+        
+                zT.set( T.data() );
+
+                const size_t  mem_dense = sizeof(value_t) * T.nrows() * T.ncols();
+                const size_t  mem_zfp   = zT.compressed_size();
+
+                if ( mem_zfp < mem_dense )
+                {
+                    s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
+            
+                    // write back compressed data
+                    zT.get( T.data() );
+                }// if
+                else
+                {
+                    s += mem_dense;
+                }// else
+            }// for
+        }// if
+    }// if
+
+    return s;
+}
+#endif
+
 #endif
 
 #if defined(HAS_UNIVERSAL)
@@ -936,6 +1030,148 @@ convert_posit ( hpro::TMatrix &  A )
 
     return 0;
 }
+
+template < uint bitsize,
+           uint expsize,
+           typename value_t >
+size_t
+convert_posit ( cluster_basis< value_t > &  cb )
+{
+    using  posit_t = sw::universal::posit< bitsize, expsize >;
+
+    //
+    // convert local basis
+    //
+
+    size_t  s = sizeof( cluster_basis< value_t > );
+    
+    if ( cb.rank() > 0 )
+    {
+        auto  C = cb.basis();
+
+        s += size_t( std::ceil( ( bitsize * C.nrows() * C.ncols() ) / 8.0 ) );
+
+        for ( uint  j = 0; j < C.ncols(); ++j )
+        {
+            for ( uint  i = 0; i < C.nrows(); ++i )
+            {
+                auto  p_ij = posit_t( C(i,j) );
+                    
+                C(i,j) = value_t(p_ij);
+            }// for
+        }// for
+    }// if
+    
+    if ( cb.nsons() > 0 )
+    {
+        auto  mtx = std::mutex();
+        
+        ::tbb::parallel_for< uint >(
+            0, cb.nsons(),
+            [&] ( auto  i )
+            {
+                if ( ! is_null( cb.son( i ) ) )
+                {
+                    auto  s_i = convert_posit< bitsize, expsize >( * cb.son(i) );
+                    
+                    {
+                        auto  lock = std::scoped_lock( mtx );
+                        
+                        s += s_i;
+                    }
+                }// if
+            } );
+    }// if
+
+    return s;
+}
+
+#if defined(HAS_H2)
+template < uint bitsize,
+           uint expsize,
+           typename value_t >
+size_t
+convert_posit ( hpro::TClusterBasis< value_t > &  cb )
+{
+    using  posit_t = sw::universal::posit< bitsize, expsize >;
+
+    //
+    // convert local basis
+    //
+
+    size_t  s = sizeof( cluster_basis< value_t > );
+    
+    if ( cb.nsons() == 0 )
+    {
+        auto  C  = cb.basis();
+
+        s += size_t( std::ceil( ( bitsize * C.nrows() * C.ncols() ) / 8.0 ) );
+
+        for ( uint  j = 0; j < C.ncols(); ++j )
+        {
+            for ( uint  i = 0; i < C.nrows(); ++i )
+            {
+                auto  p_ij = posit_t( C(i,j) );
+                    
+                C(i,j) = value_t(p_ij);
+            }// for
+        }// for
+    }// if
+    else 
+    {
+        //
+        // recurse
+        //
+        
+        auto  mtx = std::mutex();
+        
+        ::tbb::parallel_for< uint >(
+            0, cb.nsons(),
+            [&] ( auto  i )
+            {
+                if ( ! is_null( cb.son( i ) ) )
+                {
+                    auto  s_i = convert_posit< bitsize, expsize >( * cb.son(i) );
+                    
+                    {
+                        auto  lock = std::scoped_lock( mtx );
+                        
+                        s += s_i;
+                    }
+                }// if
+            } );
+
+        //
+        // compress transfer matrices
+        //
+
+        if ( cb.rank() > 0 )
+        {
+            auto  mtx = std::mutex();
+            
+            for ( uint  i = 0; i < cb.nsons(); ++i )
+            {
+                auto  T = cb.transfer_mat( i );
+
+                s += sizeof( T );
+                s += size_t( std::ceil( ( bitsize * T.nrows() * T.ncols() ) / 8.0 ) );
+
+                for ( uint  j = 0; j < T.ncols(); ++j )
+                {
+                    for ( uint  i = 0; i < T.nrows(); ++i )
+                    {
+                        auto  p_ij = posit_t( T(i,j) );
+                        
+                        T(i,j) = value_t(p_ij);
+                    }// for
+                }// for
+            }// for
+        }// if
+    }// if
+
+    return s;
+}
+#endif
 #endif
 
 }}}// namespace hlr::tbb::matrix

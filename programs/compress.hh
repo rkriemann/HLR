@@ -20,6 +20,7 @@
 #include <hlr/approx/aca.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/utils/tensor.hh>
+#include <hlr/bem/aca.hh>
 
 //#include <hlr/arith/cuda.hh>
 
@@ -215,13 +216,15 @@ do_H ( blas::matrix< value_t > &  D,
 
     if ( cmdline::compress > 0 )
     {
-        *zconf = sz::sz_config_rel( cmdline::compress );
+        zconf = std::make_unique< zconfig_t >( sz::sz_config_rel( cmdline::compress ) );
     }// if
     
     #elif defined(HAS_ZFP)
     
     if ( cmdline::compress > 0 )
     {
+        zconf = std::make_unique< zconfig_t >();
+        
         if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
         else                         *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
@@ -236,7 +239,7 @@ do_H ( blas::matrix< value_t > &  D,
     {
         tic = timer::now();
         // A     = impl::matrix::compress_topdown( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
-        A   = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
+        A   = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, D.nrows() / 4, zconf.get() ); // cmdline::ntile, zconf.get() );
         toc = timer::since( tic );
         
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -970,6 +973,22 @@ program_main ()
 
         if      ( cmdline::appl == "log" ) D = std::move( gen_matrix_log< value_t >( cmdline::n ) );
         else if ( cmdline::appl == "exp" ) D = std::move( gen_matrix_exp< value_t >( cmdline::n ) );
+        else if ( cmdline::appl == "laplaceslp" )
+        {
+            auto  acc     = hpro::fixed_prec( 1e-6 );
+            auto  grid    = hpro::make_grid( gridfile );
+            auto  problem = hlr::apps::laplace_slp( gridfile );
+            auto  coord   = problem.coordinates();
+            auto  ct      = gen_ct( *coord );
+            auto  bct     = gen_bct( *ct, *ct );
+            auto  coeff   = problem.coeff_func();
+            auto  pcoeff  = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+            auto  lrapx   = bem::aca_lrapx( pcoeff );
+            auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+            auto  C       = impl::matrix::convert_to_dense< value_t >( *A );
+            
+            D = std::move( blas::mat< value_t >( C ) );
+        }// if
         else
             HLR_ERROR( "unknown matrix : " + cmdline::appl );
         

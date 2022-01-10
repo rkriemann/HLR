@@ -11,6 +11,7 @@
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/utils/tensor.hh>
+#include <hlr/approx/aca.hh>
 
 namespace hlr { namespace tbb { namespace matrix {
 
@@ -660,6 +661,7 @@ void
 compress_ml ( const indexset &           rowis,
               const indexset &           colis,
               blas::matrix< value_t > &  D,
+              size_t &                   csize,
               const size_t               lvl_rank,
               const hpro::TTruncAcc &    acc,
               const approx_t &           approx,
@@ -750,6 +752,7 @@ void
 compress_ml ( const indexset &           rowis,
               const indexset &           colis,
               blas::matrix< value_t > &  D,
+              size_t &                   csize,
               const size_t               lvl_rank,
               const hpro::TTruncAcc &    acc,
               const approx_t &           approx,
@@ -758,7 +761,7 @@ compress_ml ( const indexset &           rowis,
 {
     using namespace hlr::matrix;
 
-    detail::compress_ml< value_t, approx_t, zconfig_t >( rowis, colis, D, lvl_rank, acc, approx, ntile, zconf );
+    detail::compress_ml< value_t, approx_t, zconfig_t >( rowis, colis, D, csize, lvl_rank, acc, approx, ntile, zconf );
 }
 
 //

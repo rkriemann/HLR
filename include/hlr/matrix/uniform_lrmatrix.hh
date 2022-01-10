@@ -574,8 +574,8 @@ HLR_TEST_ALL( is_uniform_lowrank, hpro::TMatrix )
 HLR_TEST_ANY( is_uniform_lowrank, hpro::TMatrix )
 
 //
-// replace current cluster basis by given cluster basis
-// ASSUMPTION: basis is identical
+// replace current cluster basis by given cluster bases
+// ASSUMPTION: bases have identical tree structure
 //
 template < typename value_t >
 void
