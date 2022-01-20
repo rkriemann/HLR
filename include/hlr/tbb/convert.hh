@@ -25,6 +25,7 @@
 #include <hlr/matrix/convert.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/compression.hh>
 
 namespace hlr { namespace tbb { namespace matrix {
@@ -219,6 +220,15 @@ convert_prec ( hpro::TMatrix &  M )
             R->factors() );
 
         return R->byte_size(); 
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
+        auto  S = blas::copy< T_value_dest >( U->coeff() );
+
+        blas::copy< T_value_dest, T_value_src >( S, U->coeff() );
+
+        return U->byte_size() - sizeof(T_value_src) * S.nrows() * S.ncols() + sizeof(T_value_dest) * S.nrows() * S.ncols(); 
     }// if
     else if ( is_dense( M ) )
     {

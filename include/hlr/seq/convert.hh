@@ -87,6 +87,15 @@ convert_prec ( hpro::TMatrix &  M )
 
         return R->byte_size(); 
     }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
+        auto  S = blas::copy< T_value_dest >( U->coeff() );
+
+        blas::copy< T_value_dest, T_value_src >( S, U->coeff() );
+
+        return U->byte_size() - sizeof(T_value_src) * S.nrows() * S.ncols() + sizeof(T_value_dest) * S.nrows() * S.ncols(); 
+    }// if
     else if ( is_dense( M ) )
     {
         auto  D  = ptrcast( &M, hpro::TDenseMatrix );

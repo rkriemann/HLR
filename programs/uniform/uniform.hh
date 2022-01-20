@@ -34,6 +34,24 @@ using namespace hlr;
 
 #if defined(HAS_UNIVERSAL)
 template < uint bitsize,
+           uint expsize >
+void
+run_posit ( hpro::TMatrix &  A,
+            const double     norm_A )
+{
+    auto  A_posit = impl::matrix::copy( A );
+    auto  mem_A   = impl::matrix::convert_posit< bitsize, expsize >( *A_posit );
+    auto  diff    = matrix::sum( hpro::real(1), A, hpro::real(-1), *A_posit );
+    auto  error   = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+    std::cout << "      "
+              << boost::format( "%2d" ) % bitsize << "/" << expsize << " : "
+              << format_error( error ) << " / "
+              << format_error( error / norm_A ) << " / "
+              << format_mem( mem_A ) << std::endl;
+}
+
+template < uint bitsize,
            uint expsize,
            typename value_t >
 void
@@ -165,8 +183,56 @@ program_main ()
     {
         auto  [ kmin, kavg, kmax ] = matrix::rank_info( *A );
     
-        std::cout << "    ranks  : " << kmin << " … " << kavg << " … " << kmax << std::endl;
+        std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
+
+    #if defined(HAS_ZFP)
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
+
+        for ( uint  rate = 32; rate >= 20; rate -= 2 )
+        {
+            auto  A_zfp  = impl::matrix::copy( *A );
+            auto  config = zfp_config_rate( rate, false );
+            auto  mem_A  = impl::matrix::convert_zfp< value_t >( *A_zfp, config );
+                
+            auto  diff      = matrix::sum( value_t(1), *A, value_t(-1), *A_zfp );
+            auto  error     = hlr::norm::spectral( *diff, true, 1e-4 );
+    
+            std::cout << "      " << boost::format( "%2d" ) % rate << " / "
+                      << format_error( error ) << " / "
+                      << format_error( error / normA ) << " / "
+                      << format_mem( mem_A ) << std::endl;
+        }// for
+    }// if
+    #endif
+        
+    #if defined(HAS_UNIVERSAL)
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
+
+        // run_posit< 64, 3 >( *A, *A2, *rowcb, *colcb, normA );
+        // run_posit< 60, 3 >( *A, *A2, *rowcb, *colcb, normA );
+        // run_posit< 56, 3 >( *A, *A2, *rowcb, *colcb, normA );
+        // run_posit< 52, 3 >( *A, *A2, *rowcb, *colcb, normA );
+        // run_posit< 48, 3 >( *A, normA );
+        // run_posit< 44, 3 >( *A, normA );
+        // run_posit< 40, 2 >( *A, normA );
+        // run_posit< 36, 2 >( *A, normA );
+        run_posit< 32, 2 >( *A, normA );
+        run_posit< 30, 2 >( *A, normA );
+        run_posit< 28, 2 >( *A, normA );
+        run_posit< 26, 2 >( *A, normA );
+        run_posit< 24, 2 >( *A, normA );
+        run_posit< 22, 2 >( *A, normA );
+        run_posit< 20, 2 >( *A, normA );
+        // run_posit< 16, 1 >( *A, normA );
+        // run_posit< 12, 1 >( *A, normA );
+        // run_posit<  8, 1 >( *A, normA );
+    }// if
+    #endif
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -194,7 +260,7 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  "
+        std::cout << "    ranks  = "
                   << row_min << " … " << row_avg << " … " << row_max << " / "
                   << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
@@ -220,7 +286,7 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  "
+        std::cout << "    ranks  = "
                   << row_min << " … " << row_avg << " … " << row_max << " / "
                   << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
@@ -238,7 +304,7 @@ program_main ()
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
 
-        if ( false )
+        if ( true )
         {
             std::cout << "    " << term::bullet << term::bold << "single precision" << term::reset << std::endl;
 
@@ -250,9 +316,12 @@ program_main ()
             auto  rowcbv = matrix::copy< value_t >( *rowcbs );
             auto  colcbv = matrix::copy< value_t >( *colcbs );
 
-            std::cout << "      mem    = " << format_mem( A2->byte_size(), rowcbs->byte_size(), colcbs->byte_size() ) << std::endl;
+            auto  A3     = impl::matrix::copy( *A2 );
+            auto  mem_A  = impl::matrix::convert_prec< single_t, value_t >( *A3 );
             
-            matrix::replace_cluster_basis( *A2, *rowcbv, *colcbv );
+            std::cout << "      mem    = " << format_mem( mem_A, rowcbs->byte_size(), colcbs->byte_size() ) << std::endl;
+            
+            matrix::replace_cluster_basis( *A3, *rowcbv, *colcbv );
             
             {
                 auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
@@ -297,7 +366,7 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
 
-            for ( uint  rate = 48; rate >= 8; rate -= 4 )
+            for ( uint  rate = 32; rate >= 20; rate -= 2 )
             {
                 auto  A2_zfp    = impl::matrix::copy( *A2 );
                 auto  rowcb_zfp = matrix::copy< value_t >( *rowcb );
@@ -330,17 +399,20 @@ program_main ()
             // run_posit< 60, 3 >( *A, *A2, *rowcb, *colcb, normA );
             // run_posit< 56, 3 >( *A, *A2, *rowcb, *colcb, normA );
             // run_posit< 52, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 32, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 30, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 28, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 26, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 24, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 22, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 20, 2 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
         }// if
         #endif
         
@@ -421,7 +493,7 @@ program_main ()
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
-        std::cout << "    ranks  "
+        std::cout << "    ranks  = "
                   << row_min << " … " << row_avg << " … " << row_max << " / "
                   << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
@@ -459,7 +531,7 @@ program_main ()
         {
             std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
 
-            for ( uint  rate = 48; rate >= 8; rate -= 4 )
+            for ( uint  rate = 32; rate >= 20; rate -= 2 )
             {
                 auto  A2_zfp    = impl::matrix::copy( *A2 );
                 auto  rowcb_zfp = rowcb->copy();
@@ -492,17 +564,20 @@ program_main ()
             // run_posit< 60, 3 >( *A, *A2, *rowcb, *colcb, normA );
             // run_posit< 56, 3 >( *A, *A2, *rowcb, *colcb, normA );
             // run_posit< 52, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 48, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 44, 3 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 40, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 36, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 32, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 30, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 28, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 26, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 24, 2 >( *A, *A2, *rowcb, *colcb, normA );
+            run_posit< 22, 2 >( *A, *A2, *rowcb, *colcb, normA );
             run_posit< 20, 2 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
-            run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 16, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit< 12, 1 >( *A, *A2, *rowcb, *colcb, normA );
+            // run_posit<  8, 1 >( *A, *A2, *rowcb, *colcb, normA );
         }// if
         #endif
 
