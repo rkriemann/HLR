@@ -40,7 +40,7 @@ struct aca_pivot_next
     using  vector_list_t = std::deque< blas::vector< value_t > >;
 
     // value considered zero to avoid division by small values
-    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon() * std::numeric_limits< real_t >::epsilon();
         
     
     int                  next_col = 0;
@@ -122,7 +122,7 @@ struct aca_pivot_max
     using  vector_list_t = std::deque< blas::vector< value_t > >;
 
     // value considered zero to avoid division by small values
-    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon() * std::numeric_limits< real_t >::epsilon();
         
     
     int                  next_col = 0;

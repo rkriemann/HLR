@@ -208,19 +208,70 @@ do_H ( blas::matrix< value_t > &  D,
        const double               norm_D,
        const size_t               mem_D )
 {
-    auto  acc   = local_accuracy( delta );
-    auto  apx   = approx_t();
-    auto  zconf = std::unique_ptr< zconfig_t >();
+    auto  tic   = timer::now();
+    auto  toc   = timer::since( tic );
+    auto  A     = std::unique_ptr< hpro::TMatrix >();
+    auto  mem_A = size_t(0);
 
     #if defined(HAS_SZ)
 
-    if ( cmdline::compress > 0 )
+    // if ( cmdline::compress > 0 )
+    // {
+    //     auto  zconf = sz::sz_config_rel( cmdline::compress );
+    //     auto  Dc    = blas::copy( D );
+
+    //     tic = timer::now();
+        
+    //     auto  zdata = sz::compress( zconf, Dc.data(), Dc.nrows(), Dc.ncols() );
+
+    //     toc = timer::since( tic );
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+    //     mem_A = zdata.size();
+
+    //     sz::uncompress< value_t >( zdata, Dc.data(), Dc.nrows(), Dc.ncols() );
+
+    //     A = std::move( std::make_unique< matrix::dense_matrix >( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), std::move( Dc ) ) );
+    // }// if
+
+    for ( double  eps = 1e-10; eps < 1.0 ; eps *= 10 )
     {
-        zconf = std::make_unique< zconfig_t >( sz::sz_config_rel( cmdline::compress ) );
+        auto  zconf = sz::sz_config_rel( eps );
+        auto  Dc    = blas::copy( D );
+
+        tic = timer::now();
+        
+        auto  zdata = sz::compress( zconf, Dc.data(), Dc.nrows(), Dc.ncols() );
+
+        toc = timer::since( tic );
+
+        mem_A = zdata.size();
+
+        sz::uncompress< value_t >( zdata, Dc.data(), Dc.nrows(), Dc.ncols() );
+
+        A = std::move( std::make_unique< matrix::dense_matrix >( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), std::move( Dc ) ) );
+
+        auto  DM      = hpro::TDenseMatrix( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D );
+        auto  diff    = matrix::sum( value_t(1), *A, value_t(-1), DM );
+        auto  error   = hlr::norm::spectral( *diff, true, 1e-4, 20 );
+
+        std::cout << "    " << boost::format( "%.2e" ) % eps << " / "
+                  << format_time( toc ) << " / "
+                  << format_error( error ) << " / " << format_error( error / norm_D ) << " / "
+                  << format( "%.4e %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) ))  << " / "
+                  << format_mem( mem_A )  << std::endl;
     }// if
+
+    return;
     
-    #elif defined(HAS_ZFP)
+    #else
+
+    auto  acc   = local_accuracy( delta );
+    auto  apx   = approx_t();
+    auto  zconf = std::unique_ptr< zconfig_t >();
     
+    # if defined(HAS_ZFP)
+
     if ( cmdline::compress > 0 )
     {
         zconf = std::make_unique< zconfig_t >();
@@ -229,17 +280,14 @@ do_H ( blas::matrix< value_t > &  D,
         else                         *zconf = zfp_config_accuracy( cmdline::compress );
     }// if
 
-    #endif
-
-    auto  tic = timer::now();
-    auto  toc = timer::since( tic );
-    auto  A   = std::unique_ptr< hpro::TMatrix >();
+    #  endif
 
     for ( int i = 0; i < cmdline::nbench; ++i )
     {
         tic = timer::now();
-        // A     = impl::matrix::compress_topdown( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
-        A   = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, D.nrows() / 4, zconf.get() ); // cmdline::ntile, zconf.get() );
+        // A     = impl::matrix::compress_topdown( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, 50, zconf.get() );
+        // A     = impl::matrix::compress_topdown_orig( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, 50, zconf.get() );
+        A   = impl::matrix::compress( indexset( 0, D.nrows()-1 ), indexset( 0, D.ncols()-1 ), D, acc, apx, cmdline::ntile, zconf.get() );
         toc = timer::since( tic );
         
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -248,8 +296,10 @@ do_H ( blas::matrix< value_t > &  D,
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid,nosize,rank" );
         
-    auto  mem_A   = A->byte_size();
+    mem_A   = A->byte_size();
 
+    #endif
+    
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
     std::cout << "     %full = " << format( "%.4e %%" ) % ( 100.0 * ( double( mem_A ) / double( mem_D ) )) << std::endl;
 
