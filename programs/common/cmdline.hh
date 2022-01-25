@@ -51,6 +51,7 @@ double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
+double  eta        = 2.0;          // admissibility parameter
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  arith      = "std";        // which kind of arithmetic to use
 double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
@@ -73,6 +74,7 @@ read_config ( const std::string &  filename )
     appl       = cfg.get( "app.appl",    appl );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
+    eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
@@ -124,6 +126,7 @@ parse ( int argc, char ** argv )
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
         ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
@@ -228,6 +231,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
+    if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
     if ( vm.count( "compress"   ) ) compress   = std::max< double >( 0, vm["compress"].as<double>() );
 
     if ( appl == "help" )

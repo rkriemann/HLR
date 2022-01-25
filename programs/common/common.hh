@@ -204,7 +204,7 @@ gen_bct ( hpro::TClusterTree &  rowct,
 
     if ( hlr::cmdline::adm == "std" )
     {
-        hpro::TStdGeomAdmCond  adm_cond( 2.0, hpro::use_min_diam );
+        hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if

@@ -1037,6 +1037,9 @@ program_main ()
             auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
             auto  C       = impl::matrix::convert_to_dense< value_t >( *A );
             
+            if ( hpro::verbose( 3 ) )
+                io::eps::print( *A, "A0", "noid,nosize,rank" );
+            
             D = std::move( blas::mat< value_t >( C ) );
         }// if
         else
