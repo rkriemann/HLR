@@ -95,6 +95,13 @@ format_error ( const double  e )
     return hlr::term::red( str( boost::format( "%.4e" ) % e ) );
 }
 
+template < typename... T >
+std::string
+format_error ( const double  e, const T... es )
+{
+    return hlr::term::red( str( boost::format( "%.4e s" ) % e ) ) + " / " + format_error( es... );
+}
+
 // return default formated norm string
 inline
 std::string

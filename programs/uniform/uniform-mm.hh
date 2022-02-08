@@ -155,12 +155,26 @@ program_main ()
 
         B->scale( 0 );
 
-        tic = timer::now();
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
                 
-        impl::accu::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
+            impl::accu::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
             
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                B->scale( 0 );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
         std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
 
         auto  diff = matrix::sum( 1.0, *AxA, -1.0, *B );
@@ -190,6 +204,8 @@ program_main ()
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *B, "B", prnopt );
+
+        runtime.clear();
     }// if
 
     //////////////////////////////////////////////////////////////////////
@@ -270,12 +286,25 @@ program_main ()
             
             B->scale( 0 );
             
-            tic = timer::now();
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
                 
-            impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
+                impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
             
-            toc = timer::since( tic );
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+                
+                std::cout << "    done in  " << format_time( toc ) << std::endl;
+                if ( i < nbench-1 )
+                    B->scale( 0 );
+            }// for
+            
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+            
             std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
             auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
@@ -288,6 +317,8 @@ program_main ()
                 io::eps::print( *rowcb2, "rowcb3", "mem" );
                 io::eps::print( *colcb2, "colcb3", "mem" );
             }// if
+
+            runtime.clear();
         }// if
     }// else
 }

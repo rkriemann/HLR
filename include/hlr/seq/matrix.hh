@@ -454,6 +454,49 @@ copy ( const hpro::TMatrix &  M )
 }
 
 //
+// return truncated copy of matrix
+//
+inline
+std::unique_ptr< hpro::TMatrix >
+copy ( const hpro::TMatrix &    M,
+       const hpro::TTruncAcc &  acc )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
+        auto  N  = std::make_unique< hpro::TBlockMatrix >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy( * BM->block( i, j ), acc );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        auto  Mc = M.copy();
+
+        Mc->truncate( acc( M.row_is(), M.col_is() ) );
+
+        return Mc;
+    }// else
+}
+
+//
 // return copy of matrix
 //
 inline
