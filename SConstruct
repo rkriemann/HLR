@@ -72,11 +72,15 @@ FRAMEWORKS   = [ 'seq',
 # supported lapack libraries
 LAPACKLIBS   = [ 'default',     # default system implementation, e.g., -llapack -lblas
                  'none',        # do not use any LAPACK library
+                 'user',        # use user defined LAPACK library (see "--lapack-flags")
                  'mkl',         # use parallel Intel MKL (should be OpenMP version)
                  'mklomp',      # use OpenMP based Intel MKL
                  'mkltbb',      # use TBB based Intel MKL
                  'mklseq',      # use sequential Intel MKL
                  'accelerate' ] # Accelerate framework on MacOS
+
+# user defined linking flags for LAPACK
+LAPACK_FLAGS = '-llapack -lblas'
                  
 # malloc libraries (also depends on directories above)
 MALLOCS      = [ 'default',
@@ -198,20 +202,21 @@ opts.Add( PathVariable( 'jemalloc',  'base directory of jemalloc',    JEMALLOC_D
 opts.Add( PathVariable( 'mimalloc',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'lapack',        'lapack library to use',            'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
-opts.Add( EnumVariable( 'malloc',        'malloc library to use',            'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',        'use likwid library',               likwid ) )
-opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',    LIKWID_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'scorep',        'use Score-P library',              scorep ) )
-opts.Add( PathVariable( 'scorep_dir',    'Score-P installation directory',   SCOREP_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'half',          'use half precision library',       half ) )
-opts.Add( PathVariable( 'half_dir',      'half installation directory',      HALF_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',      zfp ) )
-opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',       ZFP_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'sz',            'use SZ compression library',       sz ) )
-opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',        SZ_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'universal',     'use universal number library',     universal ) )
-opts.Add( PathVariable( 'universal_dir', 'universal installation directory', UNIVERSAL_DIR, PathVariable.PathIsDir ) )
+opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
+opts.Add(               'lapackflags',   'user defined link flags for lapack', default = LAPACK_FLAGS )
+opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',        'use likwid library',                 likwid ) )
+opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',      LIKWID_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'scorep',        'use Score-P library',                scorep ) )
+opts.Add( PathVariable( 'scorep_dir',    'Score-P installation directory',     SCOREP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'half',          'use half precision library',         half ) )
+opts.Add( PathVariable( 'half_dir',      'half installation directory',        HALF_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',        zfp ) )
+opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',         ZFP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'sz',            'use SZ compression library',         sz ) )
+opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',          SZ_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
+opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
@@ -262,6 +267,7 @@ MIMALLOC_DIR = opt_env['mimalloc']
 TCMALLOC_DIR = opt_env['tcmalloc']
 
 lapack        = opt_env['lapack']
+LAPACK_FLAGS  = opt_env['lapackflags']
 malloc        = opt_env['malloc']
 likwid        = opt_env['likwid']
 LIKWID_DIR    = opt_env['likwid_dir']
@@ -392,6 +398,8 @@ env.Prepend( LIBPATH = [ '.' ] )
 # add LAPACK library
 if lapack == 'default' :
     env.Append( LIBS = [ 'lapack', 'blas' ] )
+elif lapack == 'user' :
+    env.MergeFlags( LAPACK_FLAGS )
 elif lapack == 'mkl' or lapack == 'mklomp' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
@@ -409,7 +417,7 @@ elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
-    env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_sequential', 'mkl_core' ] )
+    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
 elif lapack == 'accelerate' :
     env.MergeFlags( '-Wl,-framework,Accelerate' )
 
@@ -530,6 +538,7 @@ def show_help ( target, source, env ):
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( LAPACKLIBS ) )
+    print( '  {0}lapackflags{1}│ user provided link flags      │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -594,6 +603,8 @@ def show_options ( target, source, env ):
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), lapack )
+    if lapack == 'user' :
+        print( '  {0}lapackflags{1}│ user provided link flags      │ {2}'.format( colors['bold'], colors['reset'], LAPACK_FLAGS ) )
     print( '  {0}malloc{1}     │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
            pathstr( JEMALLOC_DIR if malloc == 'jemalloc' else MIMALLOC_DIR if malloc == 'mimalloc' else TCMALLOC_DIR if malloc == 'tcmalloc' else '' ) )
     print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),    pathstr( LIKWID_DIR    if likwid    else '' ) )

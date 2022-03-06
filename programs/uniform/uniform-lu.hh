@@ -143,18 +143,32 @@ program_main ()
             
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
     
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "eager" << term::reset << std::endl;
                 
-        auto  LU = seq::matrix::copy( *M1 );
+        auto  LU = impl::matrix::copy( *M1 );
                 
-        tic = timer::now();
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
                 
-        impl::lu< value_t >( *LU, acc, apx );
+            impl::lu< value_t >( *LU, acc, apx );
                 
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *M1, *LU );
+        }// for
+            
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
         std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
@@ -166,19 +180,21 @@ program_main ()
 
         REF = std::move( LU );
 
-        {
-            //
-            // try to represent L/U factors as uniform matrices with given shared bases
-            //
+        // {
+        //     //
+        //     // try to represent L/U factors as uniform matrices with given shared bases
+        //     //
 
-            std::cout << "    " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
+        //     std::cout << "    " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
 
-            auto  LU2     = impl::matrix::copy_uniform< value_t >( *REF, *rowcb, *colcb );
-            auto  LU2_inv = matrix::luinv_eval( *LU2 );
+        //     auto  LU2     = impl::matrix::copy_uniform< value_t >( *REF, *rowcb, *colcb );
+        //     auto  LU2_inv = matrix::luinv_eval( *LU2 );
                     
-            std::cout << "      mem    = " << format_mem( LU2->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, LU2_inv ) ) << std::endl;
-        }
+        //     std::cout << "      mem    = " << format_mem( LU2->byte_size() ) << std::endl;
+        //     std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, LU2_inv ) ) << std::endl;
+        // }
+
+        runtime.clear();
     }// if
 
     if ( true )
@@ -187,12 +203,26 @@ program_main ()
                 
         auto  LU = seq::matrix::copy( *M1 );
                 
-        tic = timer::now();
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
                 
-        impl::accu::lu< value_t >( *LU, acc, apx );
+            impl::accu::lu< value_t >( *LU, acc, apx );
                 
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *M1, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
         std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
         auto  [ kmin, kavg, kmax ] = matrix::rank_info( *LU );
@@ -206,6 +236,7 @@ program_main ()
                     
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
 
+        if ( false )
         {
             std::cout << "    " << term::bullet << term::bold << "uniform H with sep. factors/bases" << term::reset << std::endl;
             
@@ -255,6 +286,7 @@ program_main ()
         // }
 
         #if defined( HAS_H2 )
+        if ( false )
         {
             std::cout << "    " << term::bullet << term::bold << "H² with sep. factors/bases" << term::reset << std::endl;
 
@@ -297,6 +329,8 @@ program_main ()
             std::cout << "      error  = " << format_error( norm::spectral( *inv_err2 ) ) << std::endl;
         }
         #endif
+
+        runtime.clear();
     }// if
 
     // if ( true )
@@ -402,13 +436,38 @@ program_main ()
         auto  colcbU = colcb->copy_struct();
 
         matrix::replace_cluster_basis( *A3, *rowcbA, *colcbA );
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::uniform::accu2::lu< value_t >( *A3, *L, *U, acc, apx, *rowcbL, *colcbL, *rowcbU, *colcbU );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+            {
+                A3     = std::move( impl::matrix::copy( *A2 ) );
+                L      = std::move( impl::matrix::copy_ll( *A2 ) );
+                U      = std::move( impl::matrix::copy_ur( *A2 ) );
+                rowcbA = std::move( rowcb->copy() );
+                colcbA = std::move( colcb->copy() );
+                rowcbL = std::move( rowcb->copy_struct() );
+                colcbL = std::move( colcb->copy_struct() );
+                rowcbU = std::move( rowcb->copy_struct() );
+                colcbU = std::move( colcb->copy_struct() );
+                matrix::replace_cluster_basis( *A3, *rowcbA, *colcbA );
+            }// if
+        }// for
         
-        tic = timer::now();
-                
-        impl::uniform::accu2::lu< value_t >( *A3, *L, *U, acc, apx, *rowcbL, *colcbL, *rowcbU, *colcbU );
-                
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
         std::cout << "    mem    = " << format_mem( L->byte_size() + U->byte_size(),
                                                     rowcbL->byte_size() + rowcbU->byte_size(),
                                                     colcbL->byte_size() + colcbU->byte_size() ) << std::endl;
