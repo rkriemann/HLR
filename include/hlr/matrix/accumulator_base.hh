@@ -12,6 +12,7 @@
 
 namespace hlr { namespace matrix {
 
+template < typename value_t >
 struct accumulator_base
 {
     //
@@ -19,20 +20,20 @@ struct accumulator_base
     //
     struct update
     {
-        const matop_t          op_A;
-        const hpro::TMatrix *  A;
-        const matop_t          op_B;
-        const hpro::TMatrix *  B;
+        const matop_t                     op_A;
+        const Hpro::TMatrix< value_t > *  A;
+        const matop_t                     op_B;
+        const Hpro::TMatrix< value_t > *  B;
     };
     
     // represents set of updates
     using  update_list = std::list< update >;
 
     // accumulated computed updates
-    std::unique_ptr< hpro::TMatrix >   matrix;
+    std::unique_ptr< Hpro::TMatrix< value_t > >   matrix;
 
     // accumulated pending (recursive) updates
-    update_list                        pending;
+    update_list                                   pending;
 
     //
     // ctors
@@ -41,8 +42,8 @@ struct accumulator_base
     accumulator_base ()
     {}
     
-    accumulator_base ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
-                       update_list &&                       apending )
+    accumulator_base ( std::unique_ptr< Hpro::TMatrix< value_t > > &&  amatrix,
+                       update_list &&                                  apending )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
     {}
@@ -59,7 +60,7 @@ struct accumulator_base
     //
     // release matrix
     //
-    hpro::TMatrix *
+    Hpro::TMatrix< value_t > *
     release_matrix ()
     {
         return matrix.release();

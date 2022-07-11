@@ -375,7 +375,7 @@ env = Environment( options    = opts, # TODO: <- check without
                    CPPDEFINES = Split( DEFINES ) )
 
 # include HLIBpro library
-env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
+env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hpro-config' ) + ' --cflags --lflags' )
 
 # decative full compiler/linker output
 if not fullmsg :
@@ -656,10 +656,10 @@ sources = [ 'src/apps/exp.cc',
             'src/dag/lu_tileh.cc',
             'src/dag/node.cc',
             'src/dag/solve.cc',
-            'src/matrix/dense_matrix.cc',
+            # 'src/matrix/dense_matrix.cc',
             'src/matrix/level_matrix.cc',
             'src/matrix/lduinv_eval.cc',
-            'src/matrix/lrmatrix.cc',
+            # 'src/matrix/lrmatrix.cc',
             'src/matrix/luinv_eval.cc',
             'src/matrix/triinv_eval.cc',
             'src/matrix/print.cc',

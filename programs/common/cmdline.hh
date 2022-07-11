@@ -55,7 +55,7 @@ double  eta        = 2.0;          // admissibility parameter
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  arith      = "std";        // which kind of arithmetic to use
 double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
-auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
+auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 
 void
@@ -232,7 +232,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
-    if ( vm.count( "compress"   ) ) compress   = std::max< double >( 0, vm["compress"].as<double>() );
+    if ( vm.count( "compress"   ) ) compress   = vm["compress"].as<double>();
 
     if ( appl == "help" )
     {

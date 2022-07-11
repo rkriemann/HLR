@@ -17,11 +17,6 @@
 
 namespace hlr { namespace tbb { namespace bem {
 
-namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
-
-using namespace hpro;
-
 using hlr::bem::pivot_arr_t;
 using hlr::bem::tensor_grid;
 using hlr::matrix::tile_storage;

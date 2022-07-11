@@ -27,11 +27,11 @@ namespace detail
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
            const blas::matrix< value_t > &  D,
-           const hpro::TTruncAcc &          acc,
+           const Hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
            const zconfig_t *                zconf = nullptr )
@@ -78,7 +78,7 @@ compress ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
         bool        all_lowrank  = true;
         bool        all_dense    = true;
 
@@ -164,7 +164,7 @@ compress ( const indexset &                 rowis,
         // either not all low-rank or memory gets larger: construct block matrix
         //
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -192,11 +192,11 @@ compress ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
                    const blas::matrix< value_t > &  D,
-                   const hpro::TTruncAcc &          acc,
+                   const Hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
                    const size_t                     max_rank,
@@ -277,7 +277,7 @@ compress_topdown ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
         bool        all_lowrank  = true;
         bool        all_dense    = true;
 
@@ -363,7 +363,7 @@ compress_topdown ( const indexset &                 rowis,
         // either not all low-rank or memory gets larger: construct block matrix
         //
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -388,11 +388,11 @@ compress_topdown ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown_orig ( const indexset &                 rowis,
                         const indexset &                 colis,
                         const blas::matrix< value_t > &  D,
-                        const hpro::TTruncAcc &          acc,
+                        const Hpro::TTruncAcc &          acc,
                         const approx_t &                 approx,
                         const size_t                     ntile,
                         const size_t                     max_rank,
@@ -469,7 +469,7 @@ compress_topdown_orig ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
         bool        all_lowrank  = true;
         bool        all_dense    = true;
 
@@ -560,7 +560,7 @@ compress_topdown_orig ( const indexset &                 rowis,
         // either not all low-rank or memory gets larger: construct block matrix
         //
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -587,11 +587,11 @@ compress_topdown_orig ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
            const blas::matrix< value_t > &  D,
-           const hpro::TTruncAcc &          acc,
+           const Hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
            const zconfig_t *                zconf = nullptr )
@@ -621,11 +621,11 @@ compress ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
                    const blas::matrix< value_t > &  D,
-                   const hpro::TTruncAcc &          acc,
+                   const Hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
                    const size_t                     max_rank,
@@ -653,11 +653,11 @@ compress_topdown ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown_orig ( const indexset &                 rowis,
                         const indexset &                 colis,
                         const blas::matrix< value_t > &  D,
-                        const hpro::TTruncAcc &          acc,
+                        const Hpro::TTruncAcc &          acc,
                         const approx_t &                 approx,
                         const size_t                     ntile,
                         const size_t                     max_rank,
@@ -697,7 +697,7 @@ compress_ml ( const indexset &           rowis,
               blas::matrix< value_t > &  D,
               size_t &                   csize,
               const size_t               lvl_rank,
-              const hpro::TTruncAcc &    acc,
+              const Hpro::TTruncAcc &    acc,
               const approx_t &           approx,
               const size_t               ntile,
               const zconfig_t *          zconf = nullptr )
@@ -786,7 +786,7 @@ compress_ml ( const indexset &           rowis,
               blas::matrix< value_t > &  D,
               size_t &                   csize,
               const size_t               lvl_rank,
-              const hpro::TTruncAcc &    acc,
+              const Hpro::TTruncAcc &    acc,
               const approx_t &           approx,
               const size_t               ntile,
               const zconfig_t *          zconf = nullptr )
@@ -801,13 +801,13 @@ compress_ml ( const indexset &           rowis,
 // uncompress matrix
 //
 void
-uncompress ( hpro::TMatrix &  A )
+uncompress ( Hpro::TMatrix< value_t > &  A )
 {
     using namespace hlr::matrix;
 
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {

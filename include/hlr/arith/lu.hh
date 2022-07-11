@@ -2,10 +2,10 @@
 #define __HLR_ARITH_LU_HH
 //
 // Project     : HLib
-// File        : lu.hh
+// Module      : arith/lu
 // Description : LU factorization functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
 #include <hlr/arith/multiply.hh>
@@ -18,8 +18,6 @@
 
 namespace hlr {
 
-namespace hpro = HLIB;
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // general H-LU factorization
@@ -29,13 +27,13 @@ namespace hpro = HLIB;
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( Hpro::TMatrix< value_t > &  A,
+     const Hpro::TTruncAcc &     acc,
+     const approx_t &            approx )
 {
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
         {
@@ -74,7 +72,7 @@ lu ( hpro::TMatrix &          A,
     }// if
     else if ( is_dense( A ) )
     {
-        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+        auto  D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
 
         invert< value_t >( *D );
     }// if
@@ -94,10 +92,10 @@ lu ( hpro::TMatrix &          A,
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &          A,
-     matrix::level_matrix &   L,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( Hpro::TMatrix< value_t > &         A,
+     matrix::level_matrix< value_t > &  L,
+     const Hpro::TTruncAcc &            acc,
+     const approx_t &                   approx )
 {
     // DBG::printf( "lu( %d )", A.id() );
 
@@ -116,7 +114,7 @@ lu ( hpro::TMatrix &          A,
     }// if
     else
     {
-        auto        B      = ptrcast( & A, hpro::TBlockMatrix );
+        auto        B      = ptrcast( & A, Hpro::TBlockMatrix< value_t > );
         const uint  nbrows = B->nblock_rows();
         const uint  nbcols = B->nblock_cols();
 
@@ -196,7 +194,7 @@ lu ( hpro::TMatrix &          A,
             {
                 // DBG::printf( "update( %d, %d, %d )", L_ji->id(), L_il->id(), L_jl->id() );
                 
-                multiply( real(-1),
+                multiply( value_t(-1),
                           apply_normal, *L_ji,
                           apply_normal, *L_il,
                           *L_jl, acc, approx );
@@ -212,9 +210,9 @@ lu ( hpro::TMatrix &          A,
 template < typename value_t,
            typename approx_t >
 void
-lu ( matrix::level_matrix &   A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( matrix::level_matrix< value_t > &  A,
+     const Hpro::TTruncAcc &            acc,
+     const approx_t &                   approx )
 {
     const uint  nbrows = A.nblock_rows();
     const uint  nbcols = A.nblock_cols();
@@ -241,17 +239,17 @@ namespace detail
 template < typename value_t,
            typename approx_t >
 void
-ldu ( hpro::TMatrix &          A,
-      hpro::TMatrix &          D,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+ldu ( Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &  D,
+      const Hpro::TTruncAcc &     acc,
+      const approx_t &            approx )
 {
     if ( is_blocked( A ) )
     {
         HLR_ASSERT( is_blocked( D ) );
         
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
-        auto  BD = ptrcast( &D, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  BD = ptrcast( &D, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT(( BA->nblock_rows() == BD->nblock_rows() ) &&
                    ( BA->nblock_cols() == BD->nblock_cols() ));
@@ -305,7 +303,7 @@ ldu ( hpro::TMatrix &          A,
     }// if
     else if ( is_dense( A ) )
     {
-        auto  DA = ptrcast( &A, hpro::TDenseMatrix );
+        auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
 
         A.copy_to( &D );
         invert< value_t >( *DA );
@@ -319,9 +317,9 @@ ldu ( hpro::TMatrix &          A,
 template < typename value_t,
            typename approx_t >
 void
-ldu ( hpro::TMatrix &          A,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+ldu ( Hpro::TMatrix< value_t > &  A,
+      const Hpro::TTruncAcc &     acc,
+      const approx_t &            approx )
 {
     auto  D = seq::matrix::copy_diag( A );
 

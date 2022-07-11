@@ -16,12 +16,10 @@
 
 namespace hlr { namespace apps {
 
-namespace hpro = HLIB;
-
 //
 // return vertices of given grid
 //
-std::vector< hpro::T3Point >
+std::vector< Hpro::T3Point >
 make_vertices ( const std::string &  gridname );
 
 //
@@ -30,10 +28,10 @@ make_vertices ( const std::string &  gridname );
 template < typename kernel_t >
 struct radial : public application< typename kernel_t::value_t >
 {
-    using  value_t = hpro::real;
+    using  value_t = double;
 
     const kernel_t                kernel;
-    std::vector< hpro::T3Point >  vertices;
+    std::vector< Hpro::T3Point >  vertices;
     
     // ctor: use coordinates from given grid
     radial ( const kernel_t &     akernel,
@@ -43,38 +41,38 @@ struct radial : public application< typename kernel_t::value_t >
     {}
 
     // set up coordinates
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const
     {
-        return std::make_unique< hpro::TCoordinate >( vertices );
+        return std::make_unique< Hpro::TCoordinate >( vertices );
     }
     
     // return coefficient function to evaluate matrix entries
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func () const
     {
-        return std::make_unique< matrix::radial_function< kernel_t, std::vector< hpro::T3Point > > >( kernel, vertices, vertices );
+        return std::make_unique< matrix::radial_function< kernel_t, std::vector< Hpro::T3Point > > >( kernel, vertices, vertices );
     }
 };
     
-struct matern_covariance : public radial< matrix::matern_covariance_function< hpro::real > >
+struct matern_covariance : public radial< matrix::matern_covariance_function< double > >
 {
-    using  value_t = hpro::real;
+    using  value_t = double;
 
-    matern_covariance ( const hpro::real     sigma,
+    matern_covariance ( const double     sigma,
                         const std::string &  grid )
-            : radial( matrix::matern_covariance_function< hpro::real >( sigma, 0.5, 1.0 ),
+            : radial( matrix::matern_covariance_function< double >( sigma, 0.5, 1.0 ),
                       grid )
     {}
 };
 
-struct gaussian : public radial< matrix::gaussian_function< hpro::real > >
+struct gaussian : public radial< matrix::gaussian_function< double > >
 {
-    using  value_t = hpro::real;
+    using  value_t = double;
 
-    gaussian ( const hpro::real     sigma,
+    gaussian ( const double     sigma,
                const std::string &  grid )
-            : radial( matrix::gaussian_function< hpro::real >( sigma * sigma ), grid )
+            : radial( matrix::gaussian_function< double >( sigma * sigma ), grid )
     {}
 };
 

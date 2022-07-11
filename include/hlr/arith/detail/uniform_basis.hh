@@ -20,7 +20,8 @@ namespace hlr { namespace uniform {
 //
 // maps index set to set of all matrices in block row (or column)
 //
-using  is_matrix_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
+template < typename value_t >
+using  is_matrix_map_t = std::unordered_map< indexset, std::list< Hpro::TMatrix< value_t > * >, indexset_hash >;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -48,12 +49,12 @@ blas::matrix< value_t >
 compute_extended_row_basis ( const cluster_basis< value_t > &     cb,
                              const blas::matrix< value_t > &      W,
                              const blas::matrix< value_t > &      T,
-                             const hpro::TTruncAcc &              acc,
+                             const Hpro::TTruncAcc &              acc,
                              const approx_t &                     approx,
-                             const is_matrix_map_t &              matmap,
+                             const is_matrix_map_t< value_t > &   matmap,
                              const uniform_lrmatrix< value_t > *  M = nullptr )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     //
     // compute new row basis of
@@ -187,9 +188,9 @@ blas::matrix< value_t >
 compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
                             const blas::matrix< value_t > &      W,
                             const blas::matrix< value_t > &      T,
-                            const hpro::TTruncAcc &              acc,
+                            const Hpro::TTruncAcc &              acc,
                             const approx_t &                     approx,
-                            const is_matrix_map_t &              matmap )
+                            const is_matrix_map_t< value_t > &   matmap )
 {
     return compute_extended_row_basis( M.row_cb(), W, T, acc, approx, matmap, &M );
 }
@@ -207,12 +208,12 @@ blas::matrix< value_t >
 compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
                              const blas::matrix< value_t > &      T,
                              const blas::matrix< value_t > &      X,
-                             const hpro::TTruncAcc &              acc,
+                             const Hpro::TTruncAcc &              acc,
                              const approx_t &                     approx,
-                             const is_matrix_map_t &              matmap,
+                             const is_matrix_map_t< value_t > &   matmap,
                              const uniform_lrmatrix< value_t > *  M = nullptr )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     //
     // compute new column basis
@@ -344,9 +345,9 @@ blas::matrix< value_t >
 compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
                             const blas::matrix< value_t > &      T,
                             const blas::matrix< value_t > &      X,
-                            const hpro::TTruncAcc &              acc,
+                            const Hpro::TTruncAcc &              acc,
                             const approx_t &                     approx,
-                            const is_matrix_map_t &              matmap )
+                            const is_matrix_map_t< value_t > &   matmap )
 {
     return compute_extended_col_basis( M.col_cb(), T, X, acc, approx, matmap, &M );
 }
@@ -361,7 +362,7 @@ template < typename value_t >
 void
 update_col_coupling ( const cluster_basis< value_t > &     cb,
                       const blas::matrix< value_t > &      Vn,
-                      const is_matrix_map_t &              matmap,
+                      const is_matrix_map_t< value_t > &   matmap,
                       const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     //
@@ -408,7 +409,7 @@ template < typename value_t >
 void
 update_row_coupling ( const cluster_basis< value_t > &     cb,
                       const blas::matrix< value_t > &      Un,
-                      const is_matrix_map_t &              matmap,
+                      const is_matrix_map_t< value_t > &   matmap,
                       const uniform_lrmatrix< value_t > *  M = nullptr )
 {
     //
@@ -452,14 +453,14 @@ update_row_coupling ( const cluster_basis< value_t > &     cb,
 template < typename value_t,
            typename approx_t >
 void
-update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
-                       const blas::matrix< value_t > &  W,
-                       const blas::matrix< value_t > &  T,
-                       const blas::matrix< value_t > &  X,
-                       const hpro::TTruncAcc &          acc,
-                       const approx_t &                 approx,
-                       const is_matrix_map_t &          rowmap,
-                       const is_matrix_map_t &          colmap )
+update_row_col_basis ( uniform_lrmatrix< value_t > &       M,
+                       const blas::matrix< value_t > &     W,
+                       const blas::matrix< value_t > &     T,
+                       const blas::matrix< value_t > &     X,
+                       const Hpro::TTruncAcc &             acc,
+                       const approx_t &                    approx,
+                       const is_matrix_map_t< value_t > &  rowmap,
+                       const is_matrix_map_t< value_t > &  colmap )
 {
     // io::matlab::write( W, "W" );
     // io::matlab::write( T, "T" );
@@ -588,12 +589,12 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
 template < typename value_t,
            typename approx_t >
 void
-update_row_basis ( uniform_lrmatrix< value_t > &    M,
-                   const blas::matrix< value_t > &  W,
-                   const blas::matrix< value_t > &  T,
-                   const hpro::TTruncAcc &          acc,
-                   const approx_t &                 approx,
-                   const is_matrix_map_t &          rowmap )
+update_row_basis ( uniform_lrmatrix< value_t > &       M,
+                   const blas::matrix< value_t > &     W,
+                   const blas::matrix< value_t > &     T,
+                   const Hpro::TTruncAcc &             acc,
+                   const approx_t &                    approx,
+                   const is_matrix_map_t< value_t > &  rowmap )
 {
     auto  Un = compute_updated_row_basis( M, W, T, acc, approx, rowmap );
 
@@ -675,12 +676,12 @@ update_row_basis ( uniform_lrmatrix< value_t > &    M,
 template < typename value_t,
            typename approx_t >
 void
-update_col_basis ( uniform_lrmatrix< value_t > &    M,
-                   const blas::matrix< value_t > &  T,
-                   const blas::matrix< value_t > &  X,
-                   const hpro::TTruncAcc &          acc,
-                   const approx_t &                 approx,
-                   const is_matrix_map_t &          colmap )
+update_col_basis ( uniform_lrmatrix< value_t > &       M,
+                   const blas::matrix< value_t > &     T,
+                   const blas::matrix< value_t > &     X,
+                   const Hpro::TTruncAcc &             acc,
+                   const approx_t &                    approx,
+                   const is_matrix_map_t< value_t > &  colmap )
 {
     auto  Vn = compute_updated_col_basis( M, T, X, acc, approx, colmap );
 
@@ -774,12 +775,12 @@ namespace detail
 template < typename value_t,
            typename approx_t >
 void
-extend_col_basis ( hpro::TBlockMatrix &                   M,
+extend_col_basis ( Hpro::TBlockMatrix< value_t > &        M,
                    matrix::uniform_lrmatrix< value_t > &  M_ij,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        X,
-                   const hpro::TTruncAcc &                acc,
+                   const Hpro::TTruncAcc &                acc,
                    const approx_t &                       approx )
 {
     //
@@ -968,14 +969,14 @@ extend_col_basis ( hpro::TBlockMatrix &                   M,
 //
 template < typename value_t >
 void
-extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
+extend_col_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
                        matrix::uniform_lrmatrix< value_t > &  M_ij,
                        const uint                             i,
                        const uint                             j,
                        const blas::matrix< value_t > &        X,
-                       const hpro::TTruncAcc &                acc )
+                       const Hpro::TTruncAcc &                acc )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     //
     // construct full block column Xt, perform SVD and
@@ -1121,14 +1122,14 @@ extend_col_basis_ref ( hpro::TBlockMatrix &                   M,
 //
 template < typename value_t >
 void
-extend_row_basis ( hpro::TBlockMatrix &                   M,
+extend_row_basis ( Hpro::TBlockMatrix< value_t > &        M,
                    matrix::uniform_lrmatrix< value_t > &  M_ij,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        W,
-                   const hpro::TTruncAcc &                acc )
+                   const Hpro::TTruncAcc &                acc )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     //
     // compute QR of W for norm computation later
@@ -1320,14 +1321,14 @@ extend_row_basis ( hpro::TBlockMatrix &                   M,
 //
 template < typename value_t >
 void
-extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
+extend_row_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
                        matrix::uniform_lrmatrix< value_t > &  M_ij,
                        const uint                             i,
                        const uint                             j,
                        const blas::matrix< value_t > &        W,
-                       const hpro::TTruncAcc &                acc )
+                       const Hpro::TTruncAcc &                acc )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     //
     // compute full block row, perform SVD and use
@@ -1475,15 +1476,15 @@ extend_row_basis_ref ( hpro::TBlockMatrix &                   M,
 //
 template < typename value_t >
 void
-replace_row_col_basis ( hpro::TBlockMatrix &       M,
-                        const uint                 i,
-                        const uint                 j,
-                        blas::matrix< value_t > &  W,
-                        blas::matrix< value_t > &  T,
-                        blas::matrix< value_t > &  X,
-                        const hpro::TTruncAcc &    acc )
+replace_row_col_basis ( Hpro::TBlockMatrix< value_t > &  M,
+                        const uint                       i,
+                        const uint                       j,
+                        blas::matrix< value_t > &        W,
+                        blas::matrix< value_t > &        T,
+                        blas::matrix< value_t > &        X,
+                        const Hpro::TTruncAcc &          acc )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     // io::matlab::write( W, "W" );
     // io::matlab::write( T, "T" );
@@ -1853,15 +1854,15 @@ replace_row_col_basis ( hpro::TBlockMatrix &       M,
 
 template < typename value_t >
 void
-replace_row_col_basis_ref ( hpro::TBlockMatrix &       M,
-                            const uint                 i,
-                            const uint                 j,
-                            blas::matrix< value_t > &  W,
-                            blas::matrix< value_t > &  T,
-                            blas::matrix< value_t > &  X,
-                            const hpro::TTruncAcc &    acc )
+replace_row_col_basis_ref ( Hpro::TBlockMatrix< value_t > &  M,
+                            const uint                       i,
+                            const uint                       j,
+                            blas::matrix< value_t > &        W,
+                            blas::matrix< value_t > &        T,
+                            blas::matrix< value_t > &        X,
+                            const Hpro::TTruncAcc &          acc )
 {
-    using  real_t = hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     auto  M_ij = M.block( i, j );
     auto  R_ij = ptrcast( M_ij, matrix::uniform_lrmatrix< value_t > );

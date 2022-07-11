@@ -17,40 +17,41 @@ namespace matrix
 namespace
 {
 
-template < typename dest_value_t >
+template < typename dest_value_t,
+           typename src_value_t >
 blas::vector< dest_value_t >
-convert ( const hpro::TScalarVector &  v )
+convert ( const Hpro::TScalarVector< value_t > &  v )
 {
     if ( v.is_complex() )
     {
-        if constexpr( std::is_same_v< hpro::complex, dest_value_t > )
-            return blas::vec< hpro::complex >( v );
-        if constexpr( hpro::is_complex_type_v< dest_value_t > )
-            return blas::copy< dest_value_t, hpro::complex >( blas::vec< hpro::complex >( v ) );
+        if constexpr( std::is_same_v< Hpro::complex, dest_value_t > )
+            return blas::vec< Hpro::complex >( v );
+        if constexpr( Hpro::is_complex_type_v< dest_value_t > )
+            return blas::copy< dest_value_t, Hpro::complex >( blas::vec< Hpro::complex >( v ) );
         else
             HLR_ERROR( "real <- complex" );
     }// if
     else
     {
-        if constexpr( std::is_same_v< hpro::real, dest_value_t > )
-            return blas::vec< hpro::real >( v );
+        if constexpr( std::is_same_v< Hpro::real, dest_value_t > )
+            return blas::vec< Hpro::real >( v );
         else
-            return blas::copy< dest_value_t >( blas::vec< hpro::real >( v ) );
+            return blas::copy< dest_value_t >( blas::vec< Hpro::real >( v ) );
     }// else
 }
 
 template < typename value_t >
 void
 vec_add ( const blas::vector< value_t > &  t,
-          hpro::TScalarVector &            v )
+          Hpro::TScalarVector &            v )
 {
     if ( v.is_complex() )
     {
-        if constexpr( std::is_same_v< hpro::complex, value_t > )
-            blas::add( value_t(1), t, blas::vec< hpro::complex >( v ) );
+        if constexpr( std::is_same_v< Hpro::complex, value_t > )
+            blas::add( value_t(1), t, blas::vec< Hpro::complex >( v ) );
         else
         {
-            auto  bv = blas::vec< hpro::complex >( v );
+            auto  bv = blas::vec< Hpro::complex >( v );
             
             for ( size_t  i = 0; i < t.length(); ++i )
                 bv( i ) += t( i );
@@ -58,13 +59,13 @@ vec_add ( const blas::vector< value_t > &  t,
     }// if
     else
     {
-        if constexpr( std::is_same_v< value_t, hpro::real > )
+        if constexpr( std::is_same_v< value_t, Hpro::real > )
         {
-            blas::add( value_t(1), t, blas::vec< hpro::real >( v ) );
+            blas::add( value_t(1), t, blas::vec< Hpro::real >( v ) );
         }// if
-        else if constexpr( ! hpro::is_complex_type_v< value_t > )
+        else if constexpr( ! Hpro::is_complex_type_v< value_t > )
         {
-            auto  bv = blas::vec< hpro::real >( v );
+            auto  bv = blas::vec< Hpro::real >( v );
             
             for ( size_t  i = 0; i < t.length(); ++i )
                 bv( i ) += t( i );
@@ -94,16 +95,15 @@ sz_uncompress ( const sz::carray_view &  v,
 
 #elif defined(HAS_ZFP)
 
-template < typename mat_value_t,
-           typename zfp_value_t >
-blas::matrix< mat_value_t >
-zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
-                 const size_t                        nrows,
-                 const size_t                        ncols )
+template < typename value_t >
+blas::matrix< value_t >
+zfp_uncompress ( const zfp::carray &  v,
+                 const size_t         nrows,
+                 const size_t         ncols )
 {
-    auto  M = blas::matrix< mat_value_t >( nrows, ncols );
+    auto  M = blas::matrix< value_t >( nrows, ncols );
     
-    z.get( (zfp_value_t*) M.data() );
+    zfp::uncompress< value_t >( v, M.data(), nrows, ncols );
 
     return M;
 }
@@ -115,21 +115,21 @@ zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
 // matrix vector multiplication
 //
 void
-dense_matrix::mul_vec ( const hpro::real       alpha,
-                        const hpro::TVector *  vx,
-                        const hpro::real       beta,
-                        hpro::TVector *        vy,
-                        const hpro::matop_t    op ) const
+dense_matrix::mul_vec ( const Hpro::real       alpha,
+                        const Hpro::TVector *  vx,
+                        const Hpro::real       beta,
+                        Hpro::TVector *        vy,
+                        const Hpro::matop_t    op ) const
 {
     HLR_ASSERT( vx->is() == this->col_is( op ) );
     HLR_ASSERT( vy->is() == this->row_is( op ) );
     HLR_ASSERT( is_scalar_all( vx, vy ) );
 
-    const auto  sx = cptrcast( vx, hpro::TScalarVector );
-    const auto  sy = ptrcast(  vy, hpro::TScalarVector );
+    const auto  sx = cptrcast( vx, Hpro::TScalarVector );
+    const auto  sy = ptrcast(  vy, Hpro::TScalarVector );
 
     // y := β·y
-    if ( beta != hpro::real(1) )
+    if ( beta != Hpro::real(1) )
         vy->scale( beta );
 
     std::visit(
@@ -149,15 +149,8 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
                 blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
 
                 #elif defined(HAS_ZFP)
-                
-                auto  cM = std::visit( 
-                    [this] ( auto && d )
-                    {
-                        using  zfp_value_t = typename std::decay_t< decltype(*d) >::value_type;
-                        
-                        return zfp_uncompress< value_t, zfp_value_t >( *d, nrows(), ncols() );
-                    },
-                    _zdata );
+
+                auto  cM = zfp_uncompress< value_t >( _zdata, nrows(), ncols() );
 
                 blas::mulvec( value_t(alpha), blas::mat_view( op, cM ), x, value_t(0), y );
                 
@@ -174,11 +167,11 @@ dense_matrix::mul_vec ( const hpro::real       alpha,
 }
 
 void
-dense_matrix::cmul_vec ( const hpro::complex    alpha,
-                         const hpro::TVector *  vx,
-                         const hpro::complex    beta,
-                         hpro::TVector *        vy,
-                         const hpro::matop_t    op ) const
+dense_matrix::cmul_vec ( const Hpro::complex    alpha,
+                         const Hpro::TVector *  vx,
+                         const Hpro::complex    beta,
+                         Hpro::TVector *        vy,
+                         const Hpro::matop_t    op ) const
 {
     // HLR_ASSERT( vx->is_complex() == this->is_complex() );
     // HLR_ASSERT( vy->is_complex() == this->is_complex() );
@@ -188,21 +181,21 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
 
     // if constexpr( std::is_same_v< value_t, complex > )
     // {
-    //     const auto  x = cptrcast( vx, hpro::TScalarVector );
-    //     const auto  y = ptrcast(  vy, hpro::TScalarVector );
+    //     const auto  x = cptrcast( vx, Hpro::TScalarVector );
+    //     const auto  y = ptrcast(  vy, Hpro::TScalarVector );
         
     //     // y := β·y
     //     if ( beta != complex(1) )
-    //         blas::scale( value_t(beta), hpro::blas_vec< value_t >( y ) );
+    //         blas::scale( value_t(beta), Hpro::blas_vec< value_t >( y ) );
                      
-    //     if ( op == hpro::apply_normal )
+    //     if ( op == Hpro::apply_normal )
     //     {
     //         //
     //         // y = y + U·S·V^H x
     //         //
             
     //         // t := V^H x
-    //         auto  t = blas::mulvec( blas::adjoint( col_basis() ), hpro::blas_vec< value_t >( x ) );
+    //         auto  t = blas::mulvec( blas::adjoint( col_basis() ), Hpro::blas_vec< value_t >( x ) );
 
     //         // s := S t
     //         auto  s = blas::mulvec( _S, t );
@@ -211,9 +204,9 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
     //         auto  r = blas::mulvec( row_basis(), s );
 
     //         // y = y + r
-    //         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+    //         blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
     //     }// if
-    //     else if ( op == hpro::apply_transposed )
+    //     else if ( op == Hpro::apply_transposed )
     //     {
     //         //
     //         // y = y + (U·S·V^H)^T x
@@ -221,7 +214,7 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
     //         //
         
     //         // t := U^T x
-    //         auto  t = blas::mulvec( blas::transposed( row_basis() ), hpro::blas_vec< value_t >( x ) );
+    //         auto  t = blas::mulvec( blas::transposed( row_basis() ), Hpro::blas_vec< value_t >( x ) );
         
     //         // s := S^T t
     //         auto  s = blas::mulvec( blas::transposed(_S), t );
@@ -234,9 +227,9 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
     //         blas::conj( r );
 
     //         // y = y + r
-    //         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+    //         blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
     //     }// if
-    //     else if ( op == hpro::apply_adjoint )
+    //     else if ( op == Hpro::apply_adjoint )
     //     {
     //         //
     //         // y = y + (U·S·V^H)^H x
@@ -244,7 +237,7 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
     //         //
         
     //         // t := U^H x
-    //         auto  t = blas::mulvec( blas::adjoint( row_basis() ), hpro::blas_vec< value_t >( x ) );
+    //         auto  t = blas::mulvec( blas::adjoint( row_basis() ), Hpro::blas_vec< value_t >( x ) );
 
     //         // s := S t
     //         auto  s = blas::mulvec( blas::adjoint(_S), t );
@@ -253,7 +246,7 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
     //         auto  r = blas::mulvec( col_basis(), s );
 
     //         // y = y + r
-    //         blas::add( value_t(alpha), r, hpro::blas_vec< value_t >( y ) );
+    //         blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
     //     }// if
     // }// if
     // else
@@ -263,7 +256,7 @@ dense_matrix::cmul_vec ( const hpro::complex    alpha,
 //
 // return copy of matrix
 //
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix >
 dense_matrix::copy () const
 {
     auto  M = std::make_unique< dense_matrix >( _row_is, _col_is );
@@ -278,8 +271,8 @@ dense_matrix::copy () const
 //
 // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
 //
-std::unique_ptr< hpro::TMatrix >
-dense_matrix::copy ( const hpro::TTruncAcc &,
+std::unique_ptr< Hpro::TMatrix >
+dense_matrix::copy ( const Hpro::TTruncAcc &,
                      const bool       ) const
 {
     return copy();
@@ -288,7 +281,7 @@ dense_matrix::copy ( const hpro::TTruncAcc &,
 //
 // return structural copy of matrix
 //
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix >
 dense_matrix::copy_struct () const
 {
     return std::make_unique< dense_matrix >( _row_is, _col_is );
@@ -298,9 +291,9 @@ dense_matrix::copy_struct () const
 // copy matrix data to \a A
 //
 void
-dense_matrix::copy_to ( hpro::TMatrix *  A ) const
+dense_matrix::copy_to ( Hpro::TMatrix *  A ) const
 {
-    hpro::TMatrix::copy_to( A );
+    Hpro::TMatrix::copy_to( A );
     
     HLR_ASSERT( IS_TYPE( A, dense_matrix ) );
 
@@ -317,8 +310,8 @@ dense_matrix::copy_to ( hpro::TMatrix *  A ) const
 // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
 //
 void
-dense_matrix::copy_to ( hpro::TMatrix *          A,
-                        const hpro::TTruncAcc &,
+dense_matrix::copy_to ( Hpro::TMatrix *          A,
+                        const Hpro::TTruncAcc &,
                         const bool          ) const
 {
     return copy_to( A );
@@ -361,40 +354,15 @@ dense_matrix::compress ( const zconfig_t &  config )
         [this,&config] ( auto &&  M )
         {
             using  value_t = typename std::decay_t< decltype(M) >::value_t;
-            using  real_t  = typename hpro::real_type_t< value_t >;
 
-            // auto          config    = zfp_config_rate( rate, false );
-            uint          factor    = sizeof(value_t) / sizeof(real_t);
             const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
-            
-            if constexpr( std::is_same_v< value_t, real_t > )
+            auto          v         = zfp::compress< value_t >( config, M.data(), M.nrows(), M.ncols() );
+
+            if ( v.size() < mem_dense )
             {
-                auto  u = std::make_unique< zfp::const_array2< value_t > >( M.nrows(), M.ncols(), config );
-                
-                u->set( M.data() );
-
-                const size_t  mem_zfp = u->compressed_size();
-
-                if ( mem_zfp < mem_dense )
-                {
-                    _zdata = std::move( u );
-                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
-                }// if
+                _zdata = std::move( v );
+                M      = std::move( blas::matrix< value_t >( 0, 0 ) );
             }// if
-            else
-            {
-                auto  u = std::make_unique< zfp::const_array2< real_t > >( M.nrows() * factor, M.ncols(), config );
-                
-                u->set( (real_t*) M.data() );
-                
-                const size_t  mem_zfp = u->compressed_size();
-                
-                if ( mem_zfp < mem_dense )
-                {
-                    _zdata = std::move( u );
-                    M      = std::move( blas::matrix< value_t >( 0, 0 ) );
-                }// if
-            }// else
         },
         _M
     );
@@ -433,20 +401,7 @@ dense_matrix::uncompress ()
         {
             using  value_t = typename std::decay_t< decltype(M) >::value_t;
 
-            auto  cM = std::visit(
-                [this] ( auto && zM )
-                {
-                    using  zfp_value_t = typename std::decay_t< decltype(*zM) >::value_type;
-
-                    auto  cM = zfp_uncompress< value_t, zfp_value_t >( *zM, nrows(), ncols() );
-
-                    zM.reset( nullptr );
-
-                    return cM;
-                },
-                _zdata );
-
-            M = std::move( cM );
+            M = std::move( zfp_uncompress< value_t >( _zdata, nrows(), ncols() ) );
         },
         _M );
     
@@ -459,7 +414,7 @@ dense_matrix::uncompress ()
 size_t
 dense_matrix::byte_size () const
 {
-    size_t  size = hpro::TMatrix::byte_size();
+    size_t  size = Hpro::TMatrix::byte_size();
 
     size += sizeof(_row_is) + sizeof(_col_is) + sizeof(_vtype);
 
@@ -471,9 +426,7 @@ dense_matrix::byte_size () const
     
     #elif defined(HAS_ZFP)
 
-    size += sizeof(_zdata);
-
-    std::visit( [&size] ( auto &&  d ) { if ( ! is_null(d) ) size += sizeof(*d) + d->compressed_size(); }, _zdata );
+    size += sizeof(_zdata) + _zdata.size();
     
     #endif
         

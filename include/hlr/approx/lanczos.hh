@@ -17,7 +17,7 @@ namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
-using hpro::idx_t;
+using Hpro::idx_t;
 
 namespace detail
 {
@@ -29,11 +29,11 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 lanczos ( const operator_t &       M,
-          const hpro::TTruncAcc &  acc,
+          const Hpro::TTruncAcc &  acc,
           const bool               with_svd = false )
 {
     using  value_t = typename operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     const auto  nrowsM = nrows( M );
     const auto  ncolsM = ncols( M );
@@ -55,7 +55,7 @@ lanczos ( const operator_t &       M,
     // v = M'·u / |M'·u|
     auto  v = blas::vector< value_t >( ncolsM );
 
-    prod( value_t(1), hpro::apply_adjoint, M, u, v );
+    prod( value_t(1), Hpro::apply_adjoint, M, u, v );
     alpha.push_back( blas::norm2(v) );
     blas::scale( value_t(1) / alpha[0], v );
 
@@ -87,7 +87,7 @@ lanczos ( const operator_t &       M,
         //
         
         u = std::move( blas::vector< value_t >( nrowsM ) );
-        prod( value_t(1), hpro::apply_normal, M, V[step-1], u );
+        prod( value_t(1), Hpro::apply_normal, M, V[step-1], u );
         blas::add( - value_t(alpha[step-1]), U[step-1], u );
 
         // normalize
@@ -103,7 +103,7 @@ lanczos ( const operator_t &       M,
         //
 
         v = std::move( blas::vector< value_t >( ncolsM ) );
-        prod( value_t(1), hpro::apply_adjoint, M, u, v );
+        prod( value_t(1), Hpro::apply_adjoint, M, u, v );
         blas::add( - value_t(beta[step-1]), V[step-1], v );
 
         // normalize
@@ -220,7 +220,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( blas::matrix< value_t > &  M,
-          const hpro::TTruncAcc &    acc,
+          const Hpro::TTruncAcc &    acc,
           const bool                 with_svd = false )
 {
     // for update statistics
@@ -237,7 +237,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const blas::matrix< value_t > &  U,
           const blas::matrix< value_t > &  V,
-          const hpro::TTruncAcc &          acc,
+          const Hpro::TTruncAcc &          acc,
           const bool                       with_svd = false )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
@@ -290,7 +290,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc,
+          const Hpro::TTruncAcc &                       acc,
           const bool                                    with_svd = false )
 {
     assert( U.size() == V.size() );
@@ -342,7 +342,7 @@ std::pair< blas::matrix< value_t >,
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  T,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc,
+          const Hpro::TTruncAcc &                       acc,
           const bool                                    with_svd = false )
 {
     HLR_ASSERT( U.size() == T.size() );
@@ -418,7 +418,7 @@ struct Lanczos
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::lanczos( M, acc, with_svd );
     }
@@ -427,7 +427,7 @@ struct Lanczos
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::lanczos( U, V, acc, with_svd );
     }
@@ -436,7 +436,7 @@ struct Lanczos
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::lanczos( U, V, acc, with_svd );
     }
@@ -446,7 +446,7 @@ struct Lanczos
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::lanczos( U, T, V, acc, with_svd );
     }
@@ -455,7 +455,7 @@ struct Lanczos
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const hpro::TTruncAcc &  acc ) const
+                  const Hpro::TTruncAcc &  acc ) const
     {
         return detail::lanczos< operator_t >( op, acc );
     }

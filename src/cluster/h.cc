@@ -15,8 +15,6 @@
 
 namespace hlr { namespace cluster { namespace h {
 
-using namespace hpro;
-
 //
 // cluster set of coordinates with minimal block size <ntile>
 //
@@ -24,8 +22,8 @@ std::unique_ptr< cluster_tree >
 cluster ( coordinates &  coords,
           const size_t   ntile )
 {
-    TCardBSPPartStrat  part_strat( adaptive_split_axis );
-    TBSPCTBuilder      ct_builder( & part_strat, ntile );
+    Hpro::TCardBSPPartStrat  part_strat( Hpro::adaptive_split_axis );
+    Hpro::TBSPCTBuilder      ct_builder( & part_strat, ntile );
 
     return ct_builder.build( & coords );
 }
@@ -37,8 +35,8 @@ std::unique_ptr< blockcluster_tree >
 blockcluster ( cluster_tree &  rowct,
                cluster_tree &  colct )
 {
-    TStdGeomAdmCond  adm_cond( 2.0, use_min_diam );
-    TBCBuilder       bct_builder;
+    Hpro::TStdGeomAdmCond  adm_cond( 2.0, Hpro::use_min_diam );
+    Hpro::TBCBuilder       bct_builder;
 
     return bct_builder.build( & rowct, & colct, & adm_cond );
 }
@@ -51,7 +49,7 @@ blockcluster ( cluster_tree &         rowct,
                cluster_tree &         colct,
                const admissibility &  adm )
 {
-    TBCBuilder  bct_builder;
+    Hpro::TBCBuilder  bct_builder;
 
     return bct_builder.build( & rowct, & colct, & adm );
 }

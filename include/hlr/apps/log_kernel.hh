@@ -12,11 +12,11 @@
 
 namespace hlr { namespace apps {
 
-class log_kernel : public application< hpro::real >
+class log_kernel : public application< double >
 {
 public:
     // public types
-    using  value_t = hpro::real;
+    using  value_t = double;
 
 private:
     // problem size
@@ -33,11 +33,11 @@ public:
     virtual ~log_kernel () {}
     
     // return coordinates for problem indices
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const;
     
     // return coefficient function to evaluate matrix entries
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func  () const;
 };
 

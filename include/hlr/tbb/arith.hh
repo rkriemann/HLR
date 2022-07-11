@@ -30,10 +30,6 @@
 
 namespace hlr { namespace tbb {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 ///////////////////////////////////////////////////////////////////////
 //
 // general arithmetic functions

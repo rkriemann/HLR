@@ -14,33 +14,34 @@
 
 namespace hlr { namespace matrix {
 
-namespace hpro = HLIB;
-
 //
 // print matrix <M> to file <filename>
 //
+template < typename value_t >
 void
-print_eps ( const hpro::TMatrix &  M,
-            const std::string &    filename,
-            const std::string &    options = "default" );
+print_eps ( const Hpro::TMatrix< value_t > &  M,
+            const std::string &               filename,
+            const std::string &               options = "default" );
 
 //
 // print matrix <M> level wise to the files
 // <basename><lvl>.eps, e.g., each level (excluding root)
 // will be written to a separate file
 //
+template < typename value_t >
 void
-print_lvl_eps ( const hpro::TMatrix &  M,
-                const std::string &    basename,
-                const std::string &    options = "default" );
+print_lvl_eps ( const Hpro::TMatrix< value_t > &  M,
+                const std::string &               basename,
+                const std::string &               options = "default" );
 
 //
 // colorize matrix blocks in <M> according to rank
 //
+template < typename value_t >
 void
-print_mem_eps ( const hpro::TMatrix &  M,
-                const std::string &    filename,
-                const std::string &    options = "default" );
+print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
+                const std::string &               filename,
+                const std::string &               options = "default" );
 
 //
 // print cluster basis <cl> to file <filename>

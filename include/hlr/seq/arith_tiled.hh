@@ -23,8 +23,6 @@
 
 namespace hlr { namespace seq { namespace tiled {
 
-namespace hpro = HLIB;
-
 //
 // split given range into <n> subsets
 //
@@ -57,7 +55,7 @@ dot ( const blas::matrix< value_t > &  A,
 {
     assert( A.nrows() == B.nrows() );
 
-    HLR_LOG( 4, hpro::to_string( "dot( %d )", B.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "dot( %d )", B.nrows() ) );
     
     if ( A.nrows() > ntile )
     {
@@ -96,7 +94,7 @@ tprod ( const value_t                    alpha,
     assert( A.ncols() == T.nrows() );
     assert( T.ncols() == B.ncols() );
 
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", B.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tprod( %d )", B.nrows() ) );
     
     if ( A.ncols() > ntile )
     {
@@ -124,7 +122,7 @@ tprod ( const value_t                    alpha,
 {
     assert( A.ncols() == T.nrows() );
 
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", A.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tprod( %d )", A.nrows() ) );
     
     if ( A.ncols() > ntile )
     {
@@ -137,7 +135,7 @@ tprod ( const value_t                    alpha,
     }// if
     else
     {
-        blas::matrix< value_t >  Ac( A, hpro::copy_value );
+        blas::matrix< value_t >  Ac( A, Hpro::copy_value );
         
         blas::prod( alpha, Ac, T, value_t(0), A );
     }// else
@@ -158,7 +156,7 @@ tsqr ( const value_t                 alpha,
     assert( X.nrows() == U.nrows() );
     assert( X.ncols() == T.nrows() );
     
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", X.nrows() ) );
     
     if ( X.nrows() > ntile )
     {
@@ -228,7 +226,7 @@ tsqr ( const value_t                 alpha,
     assert( X.nrows() == U.nrows() );
     assert( X.ncols() == T.nrows() );
     
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", X.nrows() ) );
     
     if ( X.nrows() > ntile )
     {
@@ -284,7 +282,7 @@ tsqr ( const value_t                 alpha,
 {
     assert( X.nrows() == U.nrows() );
     
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", X.nrows() ) );
     
     if ( X.nrows() > ntile )
     {
@@ -351,7 +349,7 @@ tsqr ( const value_t                 alpha,
 {
     assert( X.nrows() == U.nrows() );
     
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", X.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", X.nrows() ) );
     
     if ( X.nrows() > ntile )
     {
@@ -405,7 +403,7 @@ truncate ( const value_t                 alpha,
            const blas::matrix< real > &  Y,
            const blas::matrix< real > &  U,
            const blas::matrix< real > &  V,
-           const hpro::TTruncAcc &       acc,
+           const Hpro::TTruncAcc &       acc,
            const size_t                  ntile )
 {
     assert( X.nrows() == U.nrows() );
@@ -414,7 +412,7 @@ truncate ( const value_t                 alpha,
     assert( T.ncols() == Y.ncols() );
     assert( U.ncols() == V.ncols() );
     
-    HLR_LOG( 4, hpro::to_string( "truncate( %d )", X.nrows() ) );
+    HLR_LOG( 4, Hpro::to_string( "truncate( %d )", X.nrows() ) );
     
     if ( Y.ncols() + V.ncols() > X.nrows() / 2 )
     {
@@ -474,17 +472,17 @@ truncate ( const value_t                 alpha,
 namespace hodlr
 {
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix *        A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( Hpro::TRkMatrix< value_t > *        A ) { assert( ! is_null( A ) ); return Hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( Hpro::TRkMatrix< value_t > *        A ) { assert( ! is_null( A ) ); return Hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_A< value_t >( A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix *  A ) { assert( ! is_null( A ) ); return hpro::blas_mat_B< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const Hpro::TRkMatrix< value_t > *  A ) { assert( ! is_null( A ) ); return Hpro::blas_mat_A< value_t >( A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const Hpro::TRkMatrix< value_t > *  A ) { assert( ! is_null( A ) ); return Hpro::blas_mat_B< value_t >( A ); }
 
-template < typename value_t >       blas::matrix< value_t > &  mat_U ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t >       blas::matrix< value_t > &  mat_V ( hpro::TRkMatrix &        A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_U ( Hpro::TRkMatrix< value_t > &        A ) { return Hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t >       blas::matrix< value_t > &  mat_V ( Hpro::TRkMatrix< value_t > &        A ) { return Hpro::blas_mat_B< value_t >( & A ); }
 
-template < typename value_t > const blas::matrix< value_t > &  mat_U ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_A< value_t >( & A ); }
-template < typename value_t > const blas::matrix< value_t > &  mat_V ( const hpro::TRkMatrix &  A ) { return hpro::blas_mat_B< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_U ( const Hpro::TRkMatrix< value_t > &  A ) { return Hpro::blas_mat_A< value_t >( & A ); }
+template < typename value_t > const blas::matrix< value_t > &  mat_V ( const Hpro::TRkMatrix< value_t > &  A ) { return Hpro::blas_mat_B< value_t >( & A ); }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -500,18 +498,18 @@ void
 addlr ( const blas::matrix< value_t > &  U,
         const blas::matrix< value_t > &  T,
         const blas::matrix< value_t > &  V,
-        hpro::TMatrix *                  A,
-        const hpro::TTruncAcc &          acc,
+        Hpro::TMatrix< value_t > *                  A,
+        const Hpro::TTruncAcc &          acc,
         const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), hpro::TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
         blas::matrix< value_t >  U0( U, A00->row_is() - A->row_ofs(), blas::range::all );
@@ -533,10 +531,10 @@ addlr ( const blas::matrix< value_t > &  U,
     }// if
     else
     {
-        auto        D = ptrcast( A, hpro::TDenseMatrix );
+        auto        D = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         const auto  W = blas::prod( value_t(1), U, T );
 
-        blas::prod( value_t(-1), W, blas::adjoint( V ), value_t(1), hpro::blas_mat< value_t >( D ) );
+        blas::prod( value_t(-1), W, blas::adjoint( V ), value_t(1), Hpro::blas_mat< value_t >( D ) );
     }// else
 }
 
@@ -546,17 +544,17 @@ addlr ( const blas::matrix< value_t > &  U,
 //
 template < typename value_t >
 void
-trsmuh ( const hpro::TMatrix *      U,
+trsmuh ( const Hpro::TMatrix< value_t > *      U,
          blas::matrix< value_t > &  X,
          const size_t               ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "trsmuh( %d )", U->id() ) );
     
     if ( is_blocked( U ) )
     {
-        auto  BU  = cptrcast( U, hpro::TBlockMatrix );
+        auto  BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
         auto  U00 = BU->block( 0, 0 );
-        auto  U01 = cptrcast( BU->block( 0, 1 ), hpro::TRkMatrix );
+        auto  U01 = cptrcast( BU->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
         auto  U11 = BU->block( 1, 1 );
 
         blas::matrix< value_t >  X0( X, U00->col_is() - U->col_ofs(), blas::range::all );
@@ -572,11 +570,11 @@ trsmuh ( const hpro::TMatrix *      U,
     }// if
     else
     {
-        auto  DU = cptrcast( U, hpro::TDenseMatrix );
+        auto  DU = cptrcast( U, Hpro::TDenseMatrix< value_t > );
         
-        blas::matrix< value_t >  Y( X, hpro::copy_value );
+        blas::matrix< value_t >  Y( X, Hpro::copy_value );
 
-        blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+        blas::prod( value_t(1), blas::adjoint( Hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X );
 
         // std::cout << "trsmu " << X.nrows() << " : " << blas::norm_F( X ) << std::endl;
     }// else
@@ -588,17 +586,17 @@ trsmuh ( const hpro::TMatrix *      U,
 //
 template < typename value_t >
 void
-trsml ( const hpro::TMatrix *      L,
+trsml ( const Hpro::TMatrix< value_t > *      L,
         blas::matrix< value_t > &  X,
         const size_t               ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "trsml( %d )", L->id() ) );
     
     if ( is_blocked( L ) )
     {
-        auto  BL  = cptrcast( L, hpro::TBlockMatrix );
+        auto  BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
         auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), hpro::TRkMatrix );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
         auto  L11 = BL->block( 1, 1 );
 
         blas::matrix< value_t >  X0( X, L00->row_is() - L->row_ofs(), blas::range::all );
@@ -626,18 +624,18 @@ trsml ( const hpro::TMatrix *      L,
 //
 template < typename value_t >
 void
-lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc,
+lu ( Hpro::TMatrix< value_t > *          A,
+     const Hpro::TTruncAcc &  acc,
      const size_t             ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), hpro::TRkMatrix );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), hpro::TRkMatrix );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
         lu< value_t >( A00, acc, ntile );
@@ -656,9 +654,9 @@ lu ( hpro::TMatrix *          A,
     }// if
     else
     {
-        auto  DA = ptrcast( A, hpro::TDenseMatrix );
+        auto  DA = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         
-        blas::invert( hpro::blas_mat< value_t >( DA ) );
+        blas::invert( Hpro::blas_mat< value_t >( DA ) );
 
         // std::cout << "lu : " << norm_F( A ) << std::endl;
     }// else

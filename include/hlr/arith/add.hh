@@ -14,25 +14,23 @@
 namespace hlr
 {
 
-namespace hpro = HLIB;
-
 //
 // forward decl.
 //
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t            alpha,
-      const hpro::TMatrix &    A,
-      hpro::TMatrix &          C,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx );
+add ( const value_t                     alpha,
+      const Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &        C,
+      const Hpro::TTruncAcc &           acc,
+      const approx_t &                  approx );
 
 template < typename value_t >
 void
-add ( const value_t            alpha,
-      const hpro::TMatrix &    A,
-      hpro::TMatrix &          C );
+add ( const value_t                     alpha,
+      const Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &        C );
 
 //
 // compute C := C + α A with different types of A/C
@@ -40,13 +38,13 @@ add ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t               alpha,
-      const hpro::TBlockMatrix &  A,
-      hpro::TBlockMatrix &        C,
-      const hpro::TTruncAcc &     acc,
-      const approx_t &            approx )
+add ( const value_t                          alpha,
+      const Hpro::TBlockMatrix< value_t > &  A,
+      Hpro::TBlockMatrix< value_t > &        C,
+      const Hpro::TTruncAcc &                acc,
+      const approx_t &                       approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     HLR_ASSERT(( A.block_rows() == C.nblock_rows() ) &&
                ( A.block_cols() == C.nblock_cols() ));
@@ -71,13 +69,13 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t               alpha,
-      const hpro::TBlockMatrix &  A,
-      hpro::TRkMatrix &           C,
-      const hpro::TTruncAcc &     acc,
-      const approx_t &            approx )
+add ( const value_t                          alpha,
+      const Hpro::TBlockMatrix< value_t > &  A,
+      Hpro::TRkMatrix< value_t > &           C,
+      const Hpro::TTruncAcc &                acc,
+      const approx_t &                       approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -87,8 +85,8 @@ add ( const value_t               alpha,
     // into low-rank format
     //
 
-    std::list< const hpro::TRkMatrix * >             lr_blocks;
-    std::list< std::unique_ptr< hpro::TRkMatrix > >  created;
+    std::list< const Hpro::TRkMatrix< value_t > * >             lr_blocks;
+    std::list< std::unique_ptr< Hpro::TRkMatrix< value_t > > >  created;
     size_t                                           rank_A = 0;
 
     for ( uint  i = 0; i < A.nblock_rows(); ++i )
@@ -101,7 +99,7 @@ add ( const value_t               alpha,
             {
                 if ( is_lowrank( A_ij ) )
                 {
-                    const auto  R_ij = cptrcast( A_ij, hpro::TRkMatrix );
+                    const auto  R_ij = cptrcast( A_ij, Hpro::TRkMatrix< value_t > );
 
                     if ( R_ij->rank() > 0 )
                     {
@@ -111,13 +109,13 @@ add ( const value_t               alpha,
                 }// if
                 else if ( is_dense( A_ij ) )
                 {
-                    auto  D_ij     = cptrcast( A_ij, hpro::TDenseMatrix );
-                    auto  M        = blas::copy( blas::mat< value_t >( D_ij ) );
+                    auto  D_ij     = cptrcast( A_ij, Hpro::TDenseMatrix< value_t > );
+                    auto  M        = blas::copy( blas::mat( D_ij ) );
                     auto  [ U, V ] = approx( M, acc );
 
                     if ( U.ncols() > 0 )
                     {
-                        auto  R_ij = std::make_unique< hpro::TRkMatrix >( A_ij->row_is(), A_ij->col_is(),
+                        auto  R_ij = std::make_unique< Hpro::TRkMatrix< value_t > >( A_ij->row_is(), A_ij->col_is(),
                                                                           std::move( U ), std::move( V ) );
                         
                         rank_A += R_ij->rank();
@@ -162,8 +160,8 @@ add ( const value_t               alpha,
         auto  U_i = blas::matrix< value_t >( U, R_i->row_is() - C.row_ofs(), blas::range( pos, pos + R_i->rank() - 1 ) );
         auto  V_i = blas::matrix< value_t >( V, R_i->col_is() - C.col_ofs(), blas::range( pos, pos + R_i->rank() - 1 ) );
 
-        blas::copy( blas::mat_U< value_t >( R_i ), U_i );
-        blas::copy( blas::mat_V< value_t >( R_i ), V_i );
+        blas::copy( blas::mat_U( R_i ), U_i );
+        blas::copy( blas::mat_V( R_i ), V_i );
 
         pos += R_i->rank();
     }// for
@@ -176,13 +174,13 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t            alpha,
-      const hpro::TRkMatrix &  A,
-      hpro::TBlockMatrix &     C,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+add ( const value_t                       alpha,
+      const Hpro::TRkMatrix< value_t > &  A,
+      Hpro::TBlockMatrix< value_t > &     C,
+      const Hpro::TTruncAcc &             acc,
+      const approx_t &                    approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if (( alpha == value_t(0) ) || ( A.rank() == 0 ))
         return;
@@ -199,9 +197,9 @@ add ( const value_t            alpha,
 
             HLR_ASSERT( ! is_null( C_ij ) );
 
-            const auto  U_i  = blas::matrix< value_t >( blas::mat_U< value_t >( A ), C_ij->row_is() - C.row_ofs(), blas::range::all );
-            const auto  V_j  = blas::matrix< value_t >( blas::mat_V< value_t >( A ), C_ij->col_is() - C.col_ofs(), blas::range::all );
-            const auto  A_ij = hpro::TRkMatrix( C_ij->row_is(), C_ij->col_is(), U_i, V_j );
+            const auto  U_i  = blas::matrix< value_t >( blas::mat_U( A ), C_ij->row_is() - C.row_ofs(), blas::range::all );
+            const auto  V_j  = blas::matrix< value_t >( blas::mat_V( A ), C_ij->col_is() - C.col_ofs(), blas::range::all );
+            const auto  A_ij = Hpro::TRkMatrix( C_ij->row_is(), C_ij->col_is(), U_i, V_j );
 
             add( alpha, A_ij, *C_ij, acc, approx );
         }// for
@@ -210,11 +208,11 @@ add ( const value_t            alpha,
 
 template < typename value_t >
 void
-add ( const value_t               alpha,
-      const hpro::TBlockMatrix &  A,
-      hpro::TDenseMatrix &        C )
+add ( const value_t                          alpha,
+      const Hpro::TBlockMatrix< value_t > &  A,
+      Hpro::TDenseMatrix< value_t > &        C )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -234,10 +232,10 @@ add ( const value_t               alpha,
             if ( is_null( A_ij ) )
                 continue;
 
-            auto  D_ij = blas::matrix< value_t >( blas::mat< value_t >( C ),
+            auto  D_ij = blas::matrix< value_t >( blas::mat( C ),
                                                   A_ij->row_is() - C.row_ofs(), 
                                                   A_ij->col_is() - C.col_ofs() );
-            auto  C_ij = hpro::TDenseMatrix( A_ij->row_is(), A_ij->col_is(), D_ij );
+            auto  C_ij = Hpro::TDenseMatrix( A_ij->row_is(), A_ij->col_is(), D_ij );
 
             add< value_t >( alpha, *A_ij, C_ij );
         }// for
@@ -247,13 +245,13 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t               alpha,
-      const hpro::TDenseMatrix &  A,
-      hpro::TBlockMatrix &        C,
-      const hpro::TTruncAcc &     acc,
-      const approx_t &            approx )
+add ( const value_t                          alpha,
+      const Hpro::TDenseMatrix< value_t > &  A,
+      Hpro::TBlockMatrix< value_t > &        C,
+      const Hpro::TTruncAcc &                acc,
+      const approx_t &                       approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -270,10 +268,10 @@ add ( const value_t               alpha,
 
             HLR_ASSERT( ! is_null( C_ij ) );
 
-            auto  D_ij = blas::matrix< value_t >( blas::mat< value_t >( A ),
+            auto  D_ij = blas::matrix< value_t >( blas::mat( A ),
                                                   C_ij->row_is() - C.row_ofs(), 
                                                   C_ij->col_is() - C.col_ofs() );
-            auto  A_ij = hpro::TDenseMatrix( C_ij->row_is(), C_ij->col_is(), D_ij );
+            auto  A_ij = Hpro::TDenseMatrix( C_ij->row_is(), C_ij->col_is(), D_ij );
 
             add< value_t >( alpha, A_ij, *C_ij, acc, approx );
         }// for
@@ -283,13 +281,13 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t            alpha,
-      const hpro::TRkMatrix &  A,
-      hpro::TRkMatrix &        C,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+add ( const value_t                       alpha,
+      const Hpro::TRkMatrix< value_t > &  A,
+      Hpro::TRkMatrix< value_t > &        C,
+      const Hpro::TTruncAcc &             acc,
+      const approx_t &                    approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -299,19 +297,19 @@ add ( const value_t            alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
     if ( alpha != value_t(1) )
     {
-        auto  UA = blas::copy( blas::mat_U< value_t >( A ) );
+        auto  UA = blas::copy( blas::mat_U( A ) );
 
         blas::scale( alpha, UA );
 
-        auto [ U, V ] = approx( {                          UA, blas::mat_U< value_t >( C ) },
-                                { blas::mat_V< value_t >( A ), blas::mat_V< value_t >( C ) },
+        auto [ U, V ] = approx( {                          UA, blas::mat_U( C ) },
+                                { blas::mat_V( A ), blas::mat_V( C ) },
                                 acc );
         C.set_lrmat( std::move( U ), std::move( V ) );
     }// if
     else
     {
-        auto [ U, V ] = approx( { blas::mat_U< value_t >( A ), blas::mat_U< value_t >( C ) },
-                                { blas::mat_V< value_t >( A ), blas::mat_V< value_t >( C ) },
+        auto [ U, V ] = approx( { blas::mat_U( A ), blas::mat_U( C ) },
+                                { blas::mat_V( A ), blas::mat_V( C ) },
                                 acc );
         
         C.set_lrmat( std::move( U ), std::move( V ) );
@@ -323,11 +321,11 @@ template < typename value_t,
 void
 add ( const value_t                         alpha,
       const matrix::lrsmatrix< value_t > &  A,
-      hpro::TRkMatrix &                     C,
-      const hpro::TTruncAcc &               acc,
+      Hpro::TRkMatrix< value_t > &          C,
+      const Hpro::TTruncAcc &               acc,
       const approx_t &                      approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -339,8 +337,8 @@ add ( const value_t                         alpha,
 
     blas::scale( alpha, US );
 
-    auto [ U, V ] = approx( {    US, blas::mat_U< value_t >( C ) },
-                            { A.V(), blas::mat_V< value_t >( C ) },
+    auto [ U, V ] = approx( {    US, blas::mat_U( C ) },
+                            { A.V(), blas::mat_V( C ) },
                             acc );
 
     C.set_lrmat( std::move( U ), std::move( V ) );
@@ -349,24 +347,24 @@ add ( const value_t                         alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t               alpha,
-      const hpro::TDenseMatrix &  A,
-      hpro::TRkMatrix &           C,
-      const hpro::TTruncAcc &     acc,
-      const approx_t &            approx )
+add ( const value_t                          alpha,
+      const Hpro::TDenseMatrix< value_t > &  A,
+      Hpro::TRkMatrix< value_t > &           C,
+      const Hpro::TTruncAcc &                acc,
+      const approx_t &                       approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
     
     std::scoped_lock  lock( C.mutex() );
     
-    auto  TA = blas::copy( blas::mat< value_t >( A ) );
+    auto  TA = blas::copy( blas::mat( A ) );
 
     blas::prod( value_t(1),
-                blas::mat_U< value_t >( C ),
-                blas::adjoint( blas::mat_V< value_t >( C ) ),
+                blas::mat_U( C ),
+                blas::adjoint( blas::mat_V( C ) ),
                 alpha, TA );
 
     auto [ U, V ] = approx( TA, acc );
@@ -377,13 +375,13 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t                   alpha,
-      const hpro::TRkMatrix &         A,
-      matrix::lrsmatrix< value_t > &  C,
-      const hpro::TTruncAcc &         acc,
-      const approx_t &                approx )
+add ( const value_t                       alpha,
+      const Hpro::TRkMatrix< value_t > &  A,
+      matrix::lrsmatrix< value_t > &      C,
+      const Hpro::TTruncAcc &             acc,
+      const approx_t &                    approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -395,12 +393,12 @@ add ( const value_t                   alpha,
     
     if ( alpha != value_t(1) )
     {
-        auto  UA = blas::copy( blas::mat_U< value_t >( A ) );
+        auto  UA = blas::copy( blas::mat_U( A ) );
 
         blas::scale( alpha, UA );
 
         auto  [ U, V ] = approx( {                          UA, WT },
-                                 { blas::mat_V< value_t >( A ), C.V() },
+                                 { blas::mat_V( A ), C.V() },
                                  acc );
         auto  I        = blas::eye< value_t >( U.ncols(), V.ncols() );
         
@@ -408,8 +406,8 @@ add ( const value_t                   alpha,
     }// if
     else
     {
-        auto [ U, V ] = approx( { blas::mat_U< value_t >( A ), WT },
-                                { blas::mat_V< value_t >( A ), C.V() },
+        auto [ U, V ] = approx( { blas::mat_U( A ), WT },
+                                { blas::mat_V( A ), C.V() },
                                 acc );
         auto  I        = blas::eye< value_t >( U.ncols(), V.ncols() );
         
@@ -420,20 +418,20 @@ add ( const value_t                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t                   alpha,
-      const hpro::TDenseMatrix &      A,
-      matrix::lrsmatrix< value_t > &  C,
-      const hpro::TTruncAcc &         acc,
-      const approx_t &                approx )
+add ( const value_t                          alpha,
+      const Hpro::TDenseMatrix< value_t > &  A,
+      matrix::lrsmatrix< value_t > &         C,
+      const Hpro::TTruncAcc &                acc,
+      const approx_t &                       approx )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
     
     std::scoped_lock  lock( C.mutex() );
     
-    auto  TA = blas::copy( blas::mat< value_t >( A ) );
+    auto  TA = blas::copy( blas::mat( A ) );
     auto  US = blas::prod( C.U(), C.S() );
 
     blas::prod( value_t(1), US, blas::adjoint( C.V() ), alpha, TA );
@@ -446,30 +444,30 @@ add ( const value_t                   alpha,
 
 template < typename value_t >
 void
-add ( const value_t            alpha,
-      const hpro::TRkMatrix &  A,
-      hpro::TDenseMatrix &     C )
+add ( const value_t                       alpha,
+      const Hpro::TRkMatrix< value_t > &  A,
+      Hpro::TDenseMatrix< value_t > &     C )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
-    blas::prod(      alpha, blas::mat_U< value_t >( A ), blas::adjoint( blas::mat_V< value_t >( A ) ),
-                value_t(1), blas::mat< value_t >( C ) );
+    blas::prod(      alpha, blas::mat_U( A ), blas::adjoint( blas::mat_V( A ) ),
+                value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >
 void
-add ( const value_t               alpha,
-      const hpro::TDenseMatrix &  A,
-      hpro::TDenseMatrix &        C )
+add ( const value_t                          alpha,
+      const Hpro::TDenseMatrix< value_t > &  A,
+      Hpro::TDenseMatrix< value_t > &        C )
 {
-    HLR_LOG( 4, hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
     // C = C + α A
-    blas::add( alpha, blas::mat< value_t >( A ), blas::mat< value_t >( C ) );
+    blas::add( alpha, blas::mat( A ), blas::mat( C ) );
 }
 
 //
@@ -478,38 +476,38 @@ add ( const value_t               alpha,
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t            alpha,
-      const hpro::TMatrix &    A,
-      hpro::TMatrix &          C,
-      const hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+add ( const value_t                     alpha,
+      const Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &        C,
+      const Hpro::TTruncAcc &           acc,
+      const approx_t &                  approx )
 {
     using  matrix::is_lowrankS;
     using  matrix::lrsmatrix;
     
     if ( is_blocked( A ) )
     {
-        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TBlockMatrix ), *ptrcast( &C, hpro::TBlockMatrix ), acc, approx );
-        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TBlockMatrix ), *ptrcast( &C, hpro::TRkMatrix ),    acc, approx );
-        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, hpro::TBlockMatrix ), *ptrcast( &C, hpro::TDenseMatrix ) );
+        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),    acc, approx );
+        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
     else if ( is_dense( A ) )
     {
-        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TDenseMatrix ), *ptrcast( &C, hpro::TBlockMatrix ),   acc, approx );
-        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TDenseMatrix ), *ptrcast( &C, hpro::TRkMatrix ),      acc, approx );
-        else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TDenseMatrix ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
-        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, hpro::TDenseMatrix ), *ptrcast( &C, hpro::TDenseMatrix ) );
+        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
+        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
+        else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
+        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
     else if ( is_lowrank( A ) )
     {
-        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TRkMatrix ), *ptrcast( &C, hpro::TBlockMatrix ),   acc, approx );
-        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TRkMatrix ), *ptrcast( &C, hpro::TRkMatrix ),      acc, approx );
-        else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, hpro::TRkMatrix ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
-        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, hpro::TRkMatrix ), *ptrcast( &C, hpro::TDenseMatrix ) );
+        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
+        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
+        else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
+        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
@@ -522,15 +520,15 @@ add ( const value_t            alpha,
 //
 template < typename value_t >
 void
-add ( const value_t            alpha,
-      const hpro::TMatrix &    A,
-      hpro::TMatrix &          C )
+add ( const value_t                     alpha,
+      const Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &        C )
 {
     HLR_ASSERT( is_dense( C ) );
     
-    if      ( is_blocked( A ) ) add< value_t >( alpha, *cptrcast( &A, hpro::TBlockMatrix ), *ptrcast( &C, hpro::TDenseMatrix ) );
-    else if ( is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, hpro::TDenseMatrix ), *ptrcast( &C, hpro::TDenseMatrix ) );
-    else if ( is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, hpro::TRkMatrix ),    *ptrcast( &C, hpro::TDenseMatrix ) );
+    if      ( is_blocked( A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+    else if ( is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+    else if ( is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ),    *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }

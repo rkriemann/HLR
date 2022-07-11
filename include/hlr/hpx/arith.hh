@@ -25,10 +25,6 @@
 
 namespace hlr { namespace hpx {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 ///////////////////////////////////////////////////////////////////////
 //
 // general arithmetic functions

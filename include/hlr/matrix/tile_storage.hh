@@ -19,11 +19,9 @@
 
 namespace hlr { namespace matrix {
 
-namespace hpro = HLIB;
-
 // map HLIB types to HLR 
-using  indexset       = hpro::TIndexSet;
-using  block_indexset = hpro::TBlockIndexSet;
+using  indexset       = Hpro::TIndexSet;
+using  block_indexset = Hpro::TBlockIndexSet;
 
 // tile type
 template < typename value_t >

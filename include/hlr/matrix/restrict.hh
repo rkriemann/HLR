@@ -16,87 +16,53 @@
 
 namespace hlr { namespace matrix {
 
-namespace hpro = HLIB;
-
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 restrict ( matrix::lrsmatrix< value_t > &  M,
-           const hpro::TBlockIndexSet &    bis );
+           const Hpro::TBlockIndexSet &    bis );
 
 //
 // return matrix restricted to subblock
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-restrict ( const hpro::TMatrix &         M,
-           const hpro::TBlockIndexSet &  bis )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+restrict ( const Hpro::TMatrix< value_t > &  M,
+           const Hpro::TBlockIndexSet &      bis )
 {
     HLR_ASSERT( bis.is_subset_of( M.block_is() ) );
     
     if ( is_lowrank( M ) )
     {
-        auto  RM = cptrcast( &M, hpro::TRkMatrix );
-        auto  R  = std::make_unique< hpro::TRkMatrix >( bis.row_is(), bis.col_is(), M.value_type() );
-
-        if ( M.is_complex() )
-        {
-            auto  MU = RM->blas_cmat_A();
-            auto  MV = RM->blas_cmat_B();
-            auto  RU = blas::matrix< hpro::complex >( MU,
-                                                      bis.row_is() - M.row_ofs(),
-                                                      blas::range::all,
-                                                      hpro::copy_value );
-            auto  RV = blas::matrix< hpro::complex >( MV,
-                                                      bis.col_is() - M.col_ofs(),
-                                                      blas::range::all,
-                                                      hpro::copy_value );
-
-            R->set_lrmat( std::move( RU ), std::move( RV ) );
-        }// if
-        else
-        {
-            auto  MU = RM->blas_rmat_A();
-            auto  MV = RM->blas_rmat_B();
-            auto  RU = blas::matrix< hpro::real >( MU,
-                                                   bis.row_is() - M.row_ofs(),
-                                                   blas::range::all,
-                                                   hpro::copy_value );
-            auto  RV = blas::matrix< hpro::real >( MV,
-                                                   bis.col_is() - M.col_ofs(),
-                                                   blas::range::all,
-                                                   hpro::copy_value );
-
-            R->set_lrmat( std::move( RU ), std::move( RV ) );
-        }// else
+        auto  RM = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( bis.row_is(), bis.col_is() );
+        auto  MU = RM->blas_mat_A();
+        auto  MV = RM->blas_mat_B();
+        auto  RU = blas::matrix< value_t >( MU,
+                                            bis.row_is() - M.row_ofs(),
+                                            blas::range::all,
+                                            Hpro::copy_value );
+        auto  RV = blas::matrix< value_t >( MV,
+                                            bis.col_is() - M.col_ofs(),
+                                            blas::range::all,
+                                            Hpro::copy_value );
+        
+        R->set_lrmat( std::move( RU ), std::move( RV ) );
 
         return R;
     }// if
     else if ( is_dense( M ) )
     {
-        auto  DM = cptrcast( &M, hpro::TDenseMatrix );
-
-        if ( M.is_complex() )
-        {
-            auto  D = blas::matrix< hpro::complex >( DM->blas_cmat(),
-                                                     bis.row_is() - M.row_ofs(),
-                                                     bis.col_is() - M.col_ofs(),
-                                                     hpro::copy_value );
+        auto  DM = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  D  = blas::matrix< value_t >( DM->blas_mat(),
+                                            bis.row_is() - M.row_ofs(),
+                                            bis.col_is() - M.col_ofs(),
+                                            Hpro::copy_value );
                                                
-            return std::make_unique< hpro::TDenseMatrix >( bis.row_is(), bis.col_is(), std::move( D ) );
-        }// if
-        else
-        {
-            auto  D = blas::matrix< hpro::real >( DM->blas_rmat(),
-                                                  bis.row_is() - M.row_ofs(),
-                                                  bis.col_is() - M.col_ofs(),
-                                                  hpro::copy_value );
-                                               
-            return std::make_unique< hpro::TDenseMatrix >( bis.row_is(), bis.col_is(), std::move( D ) );
-        }// else
+        return std::make_unique< Hpro::TDenseMatrix< value_t > >( bis.row_is(), bis.col_is(), std::move( D ) );
     }// if
     else if ( is_sparse( M ) )
     {
-        auto  SM = cptrcast( &M, hpro::TSparseMatrix );
+        auto  SM = cptrcast( &M, Hpro::TSparseMatrix< value_t > );
 
         return SM->restrict( bis.row_is(), bis.col_is() );
     }// if
@@ -105,18 +71,18 @@ restrict ( const hpro::TMatrix &         M,
 }
 
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 restrict ( matrix::lrsmatrix< value_t > &  M,
-           const hpro::TBlockIndexSet &    bis )
+           const Hpro::TBlockIndexSet &    bis )
 {
-    auto  RU = blas::matrix< hpro::complex >( M.U(),
-                                              bis.row_is() - M.row_ofs(),
-                                              blas::range::all,
-                                              hpro::copy_value );
-    auto  RV = blas::matrix< hpro::complex >( M.V(),
-                                              bis.col_is() - M.col_ofs(),
-                                              blas::range::all,
-                                              hpro::copy_value );
+    auto  RU = blas::matrix< value_t >( M.U(),
+                                        bis.row_is() - M.row_ofs(),
+                                        blas::range::all,
+                                        Hpro::copy_value );
+    auto  RV = blas::matrix< value_t >( M.V(),
+                                        bis.col_is() - M.col_ofs(),
+                                        blas::range::all,
+                                        Hpro::copy_value );
 
     return std::make_unique< matrix::lrsmatrix< value_t > >( bis.row_is(), bis.col_is(),
                                                              std::move( RU ),

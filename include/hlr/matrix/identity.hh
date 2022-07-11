@@ -17,8 +17,8 @@
 namespace hlr { namespace matrix {
 
 // map HLIB types to HLR 
-using  indexset       = hpro::TIndexSet;
-using  block_indexset = hpro::TBlockIndexSet;
+using  indexset       = Hpro::TIndexSet;
+using  block_indexset = Hpro::TBlockIndexSet;
 
 // local matrix type
 DECLARE_TYPE( identity_operator );
@@ -26,8 +26,16 @@ DECLARE_TYPE( identity_operator );
 //
 // implements vector solving for LU using DAGs
 //
-class identity_operator : public hpro::TLinearOperator
+template < typename T_value >
+class identity_operator : public Hpro::TLinearOperator< T_value >
 {
+public:
+    //
+    // value type
+    //
+
+    using  value_t = T_value;
+    
 private:
     // index set of identity
     block_indexset  _bis;
@@ -47,12 +55,6 @@ public:
     // linear operator properties
     //
 
-    // return true, if field type is complex
-    bool  is_complex      () const
-    {
-        return false;
-    }
-    
     // return true, of operator is self adjoint
     bool  is_self_adjoint () const
     {
@@ -67,9 +69,9 @@ public:
     // mapping function of linear operator A, e.g. y ≔ A(x).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply       ( const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    /* op */ = hpro::apply_normal ) const
+    virtual void  apply       ( const Hpro::TVector< value_t > *  x,
+                                Hpro::TVector< value_t > *        y,
+                                const Hpro::matop_t               /* op */ = Hpro::apply_normal ) const
     {
         HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
@@ -80,65 +82,40 @@ public:
     // mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply_add   ( const hpro::real       alpha,
-                                const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    /* op */ = hpro::apply_normal ) const
+    virtual void  apply_add   ( const value_t                     alpha,
+                                const Hpro::TVector< value_t > *  x,
+                                Hpro::TVector< value_t > *        y,
+                                const Hpro::matop_t               /* op */ = Hpro::apply_normal ) const
     {
         HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
         y->axpy( alpha, x );
     }
-    virtual void  capply_add  ( const hpro::complex    alpha,
-                                const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    /* op */ = hpro::apply_normal ) const
-    {
-        HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
-        y->caxpy( alpha, x );
-    }
-
-    virtual void  apply_add   ( const hpro::real       /* alpha */,
-                                const hpro::TMatrix *  X,
-                                hpro::TMatrix *        Y,
-                                const hpro::matop_t    /* op */ = hpro::apply_normal ) const
+    virtual void  apply_add   ( const value_t                     /* alpha */,
+                                const Hpro::TMatrix< value_t > *  X,
+                                Hpro::TMatrix< value_t > *        Y,
+                                const Hpro::matop_t               /* op */ = Hpro::apply_normal ) const
     {
         HLR_ASSERT( ! is_null( X ) && ! is_null( Y ) );
-
-        throw "TO BE DONE";
+        
+        HLR_ERROR( "TO BE DONE" );
     }
     
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
-    virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::vector< hpro::real > &     x,
-                                blas::vector< hpro::real > &           y,
-                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
-    {
-        blas::add( alpha, x, y );
-    }
-    
-    virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::vector< hpro::complex > &  x,
-                                blas::vector< hpro::complex > &        y,
-                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
+    virtual void  apply_add   ( const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                const Hpro::matop_t              /* op */ = Hpro::apply_normal ) const
     {
         blas::add( alpha, x, y );
     }
 
-    virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::matrix< hpro::real > &     X,
-                                blas::matrix< hpro::real > &           Y,
-                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
-    {
-        blas::add( alpha, X, Y );
-    }
-    
-    virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::matrix< hpro::complex > &  X,
-                                blas::matrix< hpro::complex > &        Y,
-                                const hpro::matop_t                    /* op */ = hpro::apply_normal ) const
+    virtual void  apply_add   ( const value_t                    alpha,
+                                const blas::matrix< value_t > &  X,
+                                blas::matrix< value_t > &        Y,
+                                const Hpro::matop_t              /* op */ = Hpro::apply_normal ) const
     {
         blas::add( alpha, X, Y );
     }
@@ -154,27 +131,33 @@ public:
     virtual size_t  range_dim      () const { return _bis.row_is().size(); }
     
     // return vector in domain space
-    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.col_is() ); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< Hpro::TVector< value_t > >
+    {
+        return std::make_unique< Hpro::TScalarVector< value_t > >( _bis.col_is() );
+    }
 
     // return vector in range space
-    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< hpro::TScalarVector >( _bis.row_is() ); }
+    virtual auto    range_vector   () const -> std::unique_ptr< Hpro::TVector< value_t > >
+    {
+        return std::make_unique< Hpro::TScalarVector< value_t > >( _bis.row_is() );
+    }
 
     //
     // misc.
     //
 
     // RTTI
-    HLIB_RTTI_DERIVED( identity_operator, hpro::TLinearOperator )
+    HPRO_RTTI_DERIVED( identity_operator, Hpro::TLinearOperator< value_t > )
 };
 
 //
 // return operator representing identity
 //
-inline
-std::unique_ptr< identity_operator >
+template < typename value_t >
+std::unique_ptr< identity_operator< value_t > >
 identity ( const block_indexset &  bis )
 {
-    return std::make_unique< identity_operator >( bis );
+    return std::make_unique< identity_operator< value_t > >( bis );
 }
 
 }} // namespace hlr::matrix

@@ -18,17 +18,17 @@ namespace hlr { namespace cluster { namespace mblr {
 // cluster set of coordinates with minimal block size <ntile>
 // and hierarchy of depth <nlvl> 
 //
-std::unique_ptr< HLIB::TClusterTree >
-cluster      ( HLIB::TCoordinate &   coords,
+std::unique_ptr< Hpro::TClusterTree >
+cluster      ( Hpro::TCoordinate &   coords,
                const size_t          ntile,
                const size_t          nlvl );
 
 //
 // build block cluster tree based on given row/column cluster trees
 //
-std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree &  rowct,
-               HLIB::TClusterTree &  colct );
+std::unique_ptr< Hpro::TBlockClusterTree >
+blockcluster ( Hpro::TClusterTree &  rowct,
+               Hpro::TClusterTree &  colct );
 
 }}}// namespace hlr::cluster::mblr
 

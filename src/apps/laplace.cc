@@ -17,27 +17,19 @@
 
 #include "hlr/apps/laplace.hh"
 
-namespace hpro = HLIB;
-
-namespace hlr
-{
-
-namespace apps
-{
-
-using namespace hpro;
+namespace hlr { namespace apps {
 
 //
 // ctor
 //
 laplace_slp::laplace_slp ( const std::string &  grid )
 {
-    _grid = make_grid( grid );
+    _grid = Hpro::make_grid( grid );
         
-    auto  fnspace = std::make_unique< TConstFnSpace >( _grid.get() );
-    auto  bf      = std::make_unique< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > >( fnspace.get(), fnspace.get(), 5 );
+    auto  fnspace = std::make_unique< Hpro::TConstFnSpace< double > >( _grid.get() );
+    auto  bf      = std::make_unique< Hpro::TLaplaceSLPBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double > > >( fnspace.get(), fnspace.get(), 5 );
 
-    log( 1, to_string( "    no. of indices = %d", fnspace->n_indices() ) );
+    log( 1, Hpro::to_string( "    no. of indices = %d", fnspace->n_indices() ) );
     
     _fnspace = std::move( fnspace );
     _bf      = std::move( bf );
@@ -46,7 +38,7 @@ laplace_slp::laplace_slp ( const std::string &  grid )
 //
 // set up coordinates
 //
-std::unique_ptr< TCoordinate >
+std::unique_ptr< Hpro::TCoordinate >
 laplace_slp::coordinates () const
 {
     return _fnspace->build_coord();
@@ -55,13 +47,12 @@ laplace_slp::coordinates () const
 //
 // return coefficient function to evaluate matrix entries
 //
-std::unique_ptr< TCoeffFn< laplace_slp::value_t > >
+std::unique_ptr< Hpro::TCoeffFn< laplace_slp::value_t > >
 laplace_slp::coeff_func () const
 {
-    return std::make_unique< TBFCoeffFn< TLaplaceSLPBF< TConstFnSpace,
-                                                        TConstFnSpace > > >( static_cast< TLaplaceSLPBF< TConstFnSpace, TConstFnSpace > * >( _bf.get() ) );
+    using  bf_t = Hpro::TLaplaceSLPBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double >, value_t >;
+    
+    return std::make_unique< Hpro::TBFCoeffFn< bf_t > >( static_cast< bf_t * >( _bf.get() ) );
 }
     
-}// namespace Laplace
-
-}// namespace HLR
+}}// namespace hlr::apps

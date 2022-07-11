@@ -16,10 +16,8 @@
 
 namespace hlr { namespace bem {
 
-namespace hpro = HLIB;
-
-using  point        = hpro::T3Point;
-using  bounding_box = hpro::TBBox;
+using  point        = Hpro::T3Point;
+using  bounding_box = Hpro::TBBox;
 
 //
 // multi-index of dimension three

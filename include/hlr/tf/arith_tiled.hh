@@ -22,8 +22,6 @@
 
 namespace hlr { namespace tf { namespace tiled {
 
-using namespace HLIB;
-
 namespace hodlr
 {
 

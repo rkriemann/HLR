@@ -2,13 +2,13 @@
 #define __HLR_ARITH_H2_HH
 //
 // Project     : HLib
-// Module      : arith/uniform.hh
+// Module      : arith/h2
 // Description : arithmetic functions for uniform matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -19,7 +19,7 @@
 #include <hpro/cluster/TClusterBasis.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TUniformMatrix.hh>
-#include <hpro/vector/vec_conv.hh>
+#include <hpro/vector/convert.hh>
 
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/vector/scalar_vector.hh>
@@ -27,7 +27,7 @@
 namespace hlr { namespace h2 {
 
 template < typename value_t >
-using nested_cluster_basis = hpro::TClusterBasis< value_t >;
+using nested_cluster_basis = Hpro::TClusterBasis< value_t >;
 
 namespace detail
 {
@@ -42,8 +42,8 @@ using hlr::vector::scalar_vector;
 template < typename value_t >
 void
 mul_vec ( const value_t                                              alpha,
-          const hpro::matop_t                                        op_M,
-          const hpro::TMatrix &                                      M,
+          const Hpro::matop_t                                        op_M,
+          const Hpro::TMatrix< value_t > &                           M,
           const uniform_vector< nested_cluster_basis< value_t > > &  x,
           uniform_vector< nested_cluster_basis< value_t > > &        y,
           const scalar_vector< value_t > &                           sx,
@@ -51,7 +51,7 @@ mul_vec ( const value_t                                              alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         if ( ! (( B->nblock_rows( op_M ) == y.nblocks() ) &&
                 ( B->nblock_cols( op_M ) == x.nblocks() )) )
@@ -75,31 +75,31 @@ mul_vec ( const value_t                                              alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D   = cptrcast( &M, hpro::TDenseMatrix );
-        auto  x_i = blas::vector< value_t >( blas::vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas::vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D   = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         
         blas::mulvec( alpha, blas::mat_view( op_M, blas::mat< value_t >( D ) ), x_i, value_t(1), y_j );
     }// if
-    else if ( hpro::is_uniform( &M ) )
+    else if ( Hpro::is_uniform( &M ) )
     {
-        auto  R = cptrcast( &M, hpro::TUniformMatrix );
+        auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
         
-        if ( op_M == hpro::apply_normal )
+        if ( op_M == Hpro::apply_normal )
         {
-            blas::mulvec( alpha, hpro::coeff< value_t >( R ), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, Hpro::coeff< value_t >( R ), x.coeffs(), value_t(1), y.coeffs() );
         }// if
-        else if ( op_M == hpro::apply_conjugate )
+        else if ( op_M == Hpro::apply_conjugate )
         {
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_transposed )
+        else if ( op_M == Hpro::apply_transposed )
         {
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_adjoint )
+        else if ( op_M == Hpro::apply_adjoint )
         {
-            blas::mulvec( alpha, blas::adjoint( hpro::coeff< value_t >( R ) ), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, blas::adjoint( Hpro::coeff< value_t >( R ) ), x.coeffs(), value_t(1), y.coeffs() );
         }// if
     }// if
     else
@@ -122,7 +122,7 @@ scalar_to_uniform ( const nested_cluster_basis< value_t > &  cb,
         // s ≔ V'·v
         //
         
-        auto  v_cb = blas::vector< value_t >( blas::vec< value_t >( v ), cb - v.ofs() );
+        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb - v.ofs() );
         auto  s    = blas::mulvec( blas::adjoint( cb.basis() ), v_cb );
 
         u->set_coeffs( std::move( s ) );
@@ -185,7 +185,7 @@ add_uniform_to_scalar ( const uniform_vector< nested_cluster_basis< value_t > > 
 
     if ( u.basis().nsons() == 0 )
     {
-        auto  v_loc = blas::vector( blas::vec< value_t >( v ), u.basis() - v.ofs() );
+        auto  v_loc = blas::vector( blas::vec( v ), u.basis() - v.ofs() );
 
         blas::mulvec( value_t(1), u.basis().basis(), s, value_t(1), v_loc );
     }// if
@@ -210,8 +210,8 @@ add_uniform_to_scalar ( const uniform_vector< nested_cluster_basis< value_t > > 
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
-          const hpro::matop_t                       op_M,
-          const hpro::TMatrix &                     M,
+          const Hpro::matop_t                       op_M,
+          const Hpro::TMatrix< value_t > &          M,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y,
           nested_cluster_basis< value_t > &         rowcb,
@@ -220,16 +220,16 @@ mul_vec ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
 
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
     
     //
     // construct uniform representation of x and y
     //
 
-    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
-    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
+    auto  ux = detail::scalar_to_uniform( op_M == Hpro::apply_normal ? colcb : rowcb, x );
+    auto  uy = detail::make_uniform(      op_M == Hpro::apply_normal ? rowcb : colcb );
     auto  s  = blas::vector< value_t >();
 
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );

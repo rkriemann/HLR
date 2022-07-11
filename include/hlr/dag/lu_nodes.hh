@@ -21,8 +21,6 @@
 
 namespace hlr { namespace dag { namespace lu {
 
-namespace hpro = HLIB;
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // immediate update version
@@ -30,28 +28,28 @@ namespace hpro = HLIB;
 ////////////////////////////////////////////////////////////////////////////////
 
 // identifiers for memory blocks
-constexpr hpro::id_t  ID_A = 'A';
-constexpr hpro::id_t  ID_L = 'L';
-constexpr hpro::id_t  ID_U = 'U';
+constexpr Hpro::id_t  ID_A = 'A';
+constexpr Hpro::id_t  ID_L = 'L';
+constexpr Hpro::id_t  ID_U = 'U';
 
 template < typename value_t,
            typename approx_t >
 struct lu_node : public node
 {
-    hpro::TMatrix *  A;
+    Hpro::TMatrix< value_t > *  A;
     
-    lu_node ( hpro::TMatrix *  aA )
+    lu_node ( Hpro::TMatrix< value_t > *  aA )
             : A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
     
@@ -65,23 +63,23 @@ template < typename value_t,
            typename approx_t >
 struct solve_upper_node : public node
 {
-    const hpro::TMatrix *  U;
-    hpro::TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  U;
+    Hpro::TMatrix< value_t > *        A;
     
-    solve_upper_node ( const hpro::TMatrix *  aU,
-                       hpro::TMatrix *        aA )
+    solve_upper_node ( const Hpro::TMatrix< value_t > *  aU,
+                       Hpro::TMatrix< value_t > *        aA )
             : U( aU )
             , A( aA )
     { init(); }
     
-    virtual std::string  to_string () const { return hpro::to_string( "L%d = solve_upper( U%d, A%d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "L%d = solve_upper( U%d, A%d )", A->id(), U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
     
@@ -95,23 +93,23 @@ template < typename value_t,
            typename approx_t >
 struct solve_lower_node : public node
 {
-    const hpro::TMatrix *  L;
-    hpro::TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  L;
+    Hpro::TMatrix< value_t > *        A;
 
-    solve_lower_node ( const hpro::TMatrix *  aL,
-                       hpro::TMatrix *        aA )
+    solve_lower_node ( const Hpro::TMatrix< value_t > *  aL,
+                       Hpro::TMatrix< value_t > *        aA )
             : L( aL )
             , A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "U%d = solve_lower( L%d, A%d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "U%d = solve_lower( L%d, A%d )", A->id(), L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
         
@@ -125,26 +123,26 @@ template < typename value_t,
            typename approx_t >
 struct update_node : public node
 {
-    const hpro::TMatrix *  A;
-    const hpro::TMatrix *  B;
-    hpro::TMatrix *        C;
+    const Hpro::TMatrix< value_t > *  A;
+    const Hpro::TMatrix< value_t > *  B;
+    Hpro::TMatrix< value_t > *        C;
 
-    update_node ( const hpro::TMatrix *  aA,
-                  const hpro::TMatrix *  aB,
-                  hpro::TMatrix *        aC )
+    update_node ( const Hpro::TMatrix< value_t > *  aA,
+                  const Hpro::TMatrix< value_t > *  aB,
+                  Hpro::TMatrix< value_t > *        aC )
             : A( aA )
             , B( aB )
             , C( aC )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "A%d = mul( L%d, U%d )", C->id(), A->id(), B->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "A%d = mul( L%d, U%d )", C->id(), A->id(), B->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_A,    C->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
     
@@ -169,7 +167,7 @@ lu_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 
     if ( is_nd( A ) && ! is_small( min_size, A ) )
     {
-        auto        BA       = ptrcast( A, hpro::TBlockMatrix );
+        auto        BA       = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto        BU       = BA;
         auto        BL       = BA;
         const auto  nbr      = BA->block_rows();
@@ -217,7 +215,7 @@ lu_node< value_t, approx_t >::refine_ ( const size_t  min_size )
     }// if
     else if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto        BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto        BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto        BL  = BA;
         auto        BU  = BA;
         const auto  nbr = BA->nblock_rows();
@@ -290,8 +288,8 @@ solve_upper_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 
     if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
-        auto        BU  = cptrcast( U, hpro::TBlockMatrix );
-        auto        BA  = ptrcast(  A, hpro::TBlockMatrix );
+        auto        BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
+        auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
@@ -364,8 +362,8 @@ solve_lower_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 
     if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
-        auto        BL  = cptrcast( L, hpro::TBlockMatrix );
-        auto        BA  = ptrcast(  A, hpro::TBlockMatrix );
+        auto        BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
+        auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
@@ -442,9 +440,9 @@ update_node< value_t, approx_t >::refine_ ( const size_t  min_size )
         // generate sub nodes assuming 2x2 block structure
         //
 
-        auto  BA = cptrcast( A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( B, hpro::TBlockMatrix );
-        auto  BC = ptrcast(  C, hpro::TBlockMatrix );
+        auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
+        auto  BC = ptrcast(  C, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
@@ -478,37 +476,38 @@ update_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 namespace accu {
 
 // identifiers for memory blocks
-constexpr hpro::id_t  ID_ACCU = 'X';
+constexpr Hpro::id_t  ID_ACCU = 'X';
 
 //
 // local version of accumulator per matrix
 // - handles direct updates and shifted down updates
 //
+template < typename value_t >
 struct accumulator
 {
-    using  accumulator_map_t  = std::unordered_map< hpro::id_t, accumulator >;
+    using  accumulator_map_t  = std::unordered_map< Hpro::id_t, accumulator >;
 
     //
     // represents an update, i.e., matrix product
     //
     struct update
     {
-        const matop_t          op_A;
-        const hpro::TMatrix *  A;
-        const matop_t          op_B;
-        const hpro::TMatrix *  B;
+        const matop_t                     op_A;
+        const Hpro::TMatrix< value_t > *  A;
+        const matop_t                     op_B;
+        const Hpro::TMatrix< value_t > *  B;
     };
     
     // represents set of updates
     using  update_list = std::list< update >;
 
     // computed updates
-    std::unique_ptr< hpro::TMatrix >   matrix;
-    std::mutex                         mtx_matrix;
+    std::unique_ptr< Hpro::TMatrix< value_t > >   matrix;
+    std::mutex                                    mtx_matrix;
 
     // pending (recursive) updates
-    update_list                        pending;
-    std::mutex                         mtx_pending;
+    update_list                                   pending;
+    std::mutex                                    mtx_pending;
 
     //
     // ctors
@@ -522,8 +521,8 @@ struct accumulator
             , pending( std::move( aaccu.pending ) )
     {}
     
-    accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
-                  update_list &&                       apending )
+    accumulator ( std::unique_ptr< Hpro::TMatrix< value_t > > &&  amatrix,
+                  update_list &&                                  apending )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
     {}
@@ -531,14 +530,13 @@ struct accumulator
     //
     // add given product A × B to the accumulator
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    add ( const matop_t            op_A,
-          const hpro::TMatrix &    A,
-          const matop_t            op_B,
-          const hpro::TMatrix &    B,
-          const hpro::TTruncAcc &  acc )
+    add ( const matop_t                     op_A,
+          const Hpro::TMatrix< value_t > &  A,
+          const matop_t                     op_B,
+          const Hpro::TMatrix< value_t > &  B,
+          const Hpro::TTruncAcc &           acc )
     {
         if ( is_blocked_all( A, B ) )
         {
@@ -595,13 +593,12 @@ struct accumulator
     //
     // shift down accumulated updates to sub blocks
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    shift ( hpro::TBlockMatrix &     M,
-            accumulator_map_t &      accu_map,
-            const hpro::TTruncAcc &  acc,
-            const approx_t &         approx )
+    shift ( Hpro::TBlockMatrix< value_t > &  M,
+            accumulator_map_t &              accu_map,
+            const Hpro::TTruncAcc &          acc,
+            const approx_t &                 approx )
     {
         //
         // restrict local data and shift to accumulators of subblocks
@@ -633,7 +630,7 @@ struct accumulator
                     }// else
 
                     for ( auto  [ op_A, A, op_B, B ] : accu_ij.pending )
-                        sub_accu.add< value_t, approx_t >( op_A, *A, op_B, *B, acc );
+                        sub_accu.template add< approx_t >( op_A, *A, op_B, *B, acc );
                 }// else
             }// for
         }// for
@@ -642,13 +639,12 @@ struct accumulator
     //
     // apply accumulated updates and free accumulator matrix
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    apply ( const value_t            alpha,
-            hpro::TMatrix &          M,
-            const hpro::TTruncAcc &  acc,
-            const approx_t &         approx )
+    apply ( const value_t               alpha,
+            Hpro::TMatrix< value_t > &  M,
+            const Hpro::TTruncAcc &     acc,
+            const approx_t &            approx )
     {
         if ( ! is_null( matrix ) )
             hlr::add( alpha, *matrix, M, acc, approx );
@@ -660,11 +656,11 @@ struct accumulator
     // return restriction of updates to block (i,j) of given block matrix
     //
     accumulator
-    restrict ( const uint                  i,
-               const uint                  j,
-               const hpro::TBlockMatrix &  M ) const
+    restrict ( const uint                             i,
+               const uint                             j,
+               const Hpro::TBlockMatrix< value_t > &  M ) const
     {
-        auto  U_ij = std::unique_ptr< hpro::TMatrix >();
+        auto  U_ij = std::unique_ptr< Hpro::TMatrix< value_t > >();
         auto  P_ij = update_list();
         
         if ( ! is_null( matrix ) )
@@ -680,8 +676,8 @@ struct accumulator
             if ( ! is_blocked_all( A, B ) )
                 continue;
                                             
-            auto  BA = cptrcast( A, hpro::TBlockMatrix );
-            auto  BB = cptrcast( B, hpro::TBlockMatrix );
+            auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
+            auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
                                             
             for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
             {
@@ -705,12 +701,13 @@ template < typename value_t,
 struct apply_node;
 
 // maps matrices to accumulators
-using  accumulator_map_t  = accumulator::accumulator_map_t;
+template < typename value_t >
+using  accumulator_map_t  = typename accumulator< value_t >::accumulator_map_t;
 
 // maps matrices to apply_nodes
 template < typename value_t,
            typename approx_t >
-using  apply_map_t        = std::unordered_map< hpro::id_t, apply_node< value_t, approx_t > * >;
+using  apply_map_t        = std::unordered_map< Hpro::id_t, apply_node< value_t, approx_t > * >;
 
 // set of DAG nodes
 using  nodes_list_t       = std::list< node * >;
@@ -725,23 +722,23 @@ template < typename value_t,
            typename approx_t >
 struct lu_node : public node
 {
-    hpro::TMatrix *                     A;
+    Hpro::TMatrix< value_t > *          A;
     apply_map_t< value_t, approx_t > &  apply_map;
     
-    lu_node ( hpro::TMatrix *                     aA,
+    lu_node ( Hpro::TMatrix< value_t > *          aA,
               apply_map_t< value_t, approx_t > &  aapply_map )
             : A( aA )
             , apply_map( aapply_map )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
     
@@ -761,26 +758,26 @@ template < typename value_t,
            typename approx_t >
 struct solve_upper_node : public node
 {
-    const hpro::TMatrix *               U;
-    hpro::TMatrix *                     A;
+    const Hpro::TMatrix< value_t > *    U;
+    Hpro::TMatrix< value_t > *          A;
     apply_map_t< value_t, approx_t > &  apply_map;
     
-    solve_upper_node ( const hpro::TMatrix *               aU,
-                       hpro::TMatrix *                     aA,
+    solve_upper_node ( const Hpro::TMatrix< value_t > *    aU,
+                       Hpro::TMatrix< value_t > *          aA,
                        apply_map_t< value_t, approx_t > &  aapply_map )
             : U( aU )
             , A( aA )
             , apply_map( aapply_map )
     { init(); }
     
-    virtual std::string  to_string () const { return hpro::to_string( "L%d = solve_upper( U%d, A%d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "L%d = solve_upper( U%d, A%d )", A->id(), U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
         
@@ -800,26 +797,26 @@ template < typename value_t,
            typename approx_t >
 struct solve_lower_node : public node
 {
-    const hpro::TMatrix *               L;
-    hpro::TMatrix *                     A;
+    const Hpro::TMatrix< value_t > *    L;
+    Hpro::TMatrix< value_t > *          A;
     apply_map_t< value_t, approx_t > &  apply_map;
 
-    solve_lower_node ( const hpro::TMatrix *               aL,
-                       hpro::TMatrix *                     aA,
+    solve_lower_node ( const Hpro::TMatrix< value_t > *    aL,
+                       Hpro::TMatrix< value_t > *          aA,
                        apply_map_t< value_t, approx_t > &  aapply_map )
             : L( aL )
             , A( aA )
             , apply_map( aapply_map )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "U%d = solve_lower( L%d, A%d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "U%d = solve_lower( L%d, A%d )", A->id(), L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
         
@@ -839,14 +836,14 @@ template < typename value_t,
            typename approx_t >
 struct update_node : public node
 {
-    const hpro::TMatrix *               A;
-    const hpro::TMatrix *               B;
-    hpro::TMatrix *                     C;
+    const Hpro::TMatrix< value_t > *    A;
+    const Hpro::TMatrix< value_t > *    B;
+    Hpro::TMatrix< value_t > *          C;
     apply_map_t< value_t, approx_t > &  apply_map;
 
-    update_node ( const hpro::TMatrix *               aA,
-                  const hpro::TMatrix *               aB,
-                  hpro::TMatrix *                     aC,
+    update_node ( const Hpro::TMatrix< value_t > *    aA,
+                  const Hpro::TMatrix< value_t > *    aB,
+                  Hpro::TMatrix< value_t > *          aC,
                   apply_map_t< value_t, approx_t > &  aapply_map )
             : A( aA )
             , B( aB )
@@ -854,14 +851,14 @@ struct update_node : public node
             , apply_map( aapply_map )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "A%d = mul( L%d, U%d )", C->id(), A->id(), B->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "A%d = mul( L%d, U%d )", C->id(), A->id(), B->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_ACCU, C->block_is() } }; }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         apply_map[ C->id() ]->add( apply_normal, *A,
                                    apply_normal, *B,
@@ -881,29 +878,29 @@ template < typename value_t,
            typename approx_t >
 struct apply_node : public node
 {
-    hpro::TMatrix *      M;
-    accumulator_map_t &  accu_map;
+    Hpro::TMatrix< value_t > *       M;
+    accumulator_map_t< value_t > &   accu_map;
     
-    apply_node ( hpro::TMatrix *      aM,
-                 accumulator_map_t &  aaccu_map )
+    apply_node ( Hpro::TMatrix< value_t > *      aM,
+                 accumulator_map_t< value_t > &  aaccu_map )
             : M( aM )
             , accu_map( aaccu_map )
     { init(); }
 
     // wrapper for adding updates
     void  add ( const matop_t            op_A,
-                const hpro::TMatrix &    A,
+                const Hpro::TMatrix< value_t > &    A,
                 const matop_t            op_B,
-                const hpro::TMatrix &    B,
-                const hpro::TTruncAcc &  acc )
+                const Hpro::TMatrix< value_t > &    B,
+                const Hpro::TTruncAcc &  acc )
     {
         if ( accu_map.find( M->id() ) == accu_map.end() )
-            accu_map.emplace( std::make_pair( M->id(), accumulator() ) );
+            accu_map.emplace( std::make_pair( M->id(), accumulator< value_t >() ) );
 
-        accu_map[ M->id() ].add< value_t, approx_t >( op_A, A, op_B, B, acc );
+        accu_map[ M->id() ].template add< approx_t >( op_A, A, op_B, B, acc );
     }
     
-    virtual std::string  to_string () const { return hpro::to_string( "apply( %d )", M->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "apply( %d )", M->id() ); }
     virtual std::string  color     () const { return "edd400"; }
     
 private:
@@ -914,19 +911,19 @@ private:
         else                return { { ID_ACCU, M->block_is() } };
     }
 
-    virtual void  run_  ( const hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
     {
         const approx_t  apx;
         
-        if ( is_blocked( M ) && ! hpro::is_small( M ) )
+        if ( is_blocked( M ) && ! Hpro::is_small( M ) )
         {
             if ( accu_map.find( M->id() ) != accu_map.end() )
-                accu_map.at( M->id() ).shift< value_t, approx_t >( * ptrcast( M, hpro::TBlockMatrix ), accu_map, acc, apx );
+                accu_map.at( M->id() ).template shift< approx_t >( * ptrcast( M, Hpro::TBlockMatrix< value_t > ), accu_map, acc, apx );
         }// if
         else
         {
             if ( accu_map.find( M->id() ) != accu_map.end() )
-                accu_map.at( M->id() ).apply< value_t, approx_t >( value_t(-1), *M, acc, apx );
+                accu_map.at( M->id() ).template apply< approx_t >( value_t(-1), *M, acc, apx );
         }// else
     }
 
@@ -945,8 +942,8 @@ private:
 template < typename value_t,
            typename approx_t >
 void
-build_apply_dag ( hpro::TMatrix *                     A,
-                  accumulator_map_t &                 accu_map,
+build_apply_dag ( Hpro::TMatrix< value_t > *          A,
+                  accumulator_map_t< value_t > &      accu_map,
                   node *                              parent,
                   apply_map_t< value_t, approx_t > &  apply_map,
                   node_list_t &                       apply_nodes,
@@ -964,7 +961,7 @@ build_apply_dag ( hpro::TMatrix *                     A,
     
     if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto  BA = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA = ptrcast( A, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -982,9 +979,9 @@ template < typename value_t,
            typename approx_t >
 std::pair< apply_map_t< value_t, approx_t >,
            node_list_t >
-build_apply_dag ( hpro::TMatrix *      A,
-                  accumulator_map_t &  accu_map,
-                  const size_t         min_size )
+build_apply_dag ( Hpro::TMatrix< value_t > *      A,
+                  accumulator_map_t< value_t > &  accu_map,
+                  const size_t                    min_size )
 {
     apply_map_t< value_t, approx_t >  apply_map;
     node_list_t                       apply_nodes;
@@ -1007,7 +1004,7 @@ lu_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 
     if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto        BA       = ptrcast( A, hpro::TBlockMatrix );
+        auto        BA       = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto        BU       = BA;
         auto        BL       = BA;
         const auto  nbr      = BA->block_rows();
@@ -1134,8 +1131,8 @@ solve_upper_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 
     if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
-        auto        BU  = cptrcast( U, hpro::TBlockMatrix );
-        auto        BA  = ptrcast(  A, hpro::TBlockMatrix );
+        auto        BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
+        auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
@@ -1229,8 +1226,8 @@ solve_lower_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 
     if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
-        auto        BL  = cptrcast( L, hpro::TBlockMatrix );
-        auto        BA  = ptrcast(  A, hpro::TBlockMatrix );
+        auto        BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
+        auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
         auto        BX  = BA;
         const auto  nbr = BA->nblock_rows();
         const auto  nbc = BA->nblock_cols();
@@ -1291,9 +1288,9 @@ update_node< value_t, approx_t >::refine_  ( const size_t  min_size )
         // generate sub nodes assuming 2x2 block structure
         //
 
-        auto  BA = cptrcast( A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( B, hpro::TBlockMatrix );
-        auto  BC = ptrcast(  C, hpro::TBlockMatrix );
+        auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
+        auto  BC = ptrcast(  C, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {

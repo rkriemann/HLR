@@ -31,8 +31,6 @@
 
 namespace hlr { namespace seq { namespace matrix {
 
-namespace hpro = HLIB;
-
 using namespace hlr::matrix;
 
 //
@@ -43,23 +41,25 @@ using namespace hlr::matrix;
 //
 template < typename coeff_t,
            typename lrapx_t >
-std::unique_ptr< hpro::TMatrix >
-build ( const hpro::TBlockCluster *  bct,
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build ( const Hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const hpro::TTruncAcc &      acc,
-        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+        const Hpro::TTruncAcc &      acc,
+        const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
     
     HLR_ASSERT( bct != nullptr );
+
+    using value_t = typename coeff_t::value_t;
     
     //
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< hpro::TMatrix >  M;
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
     if ( bct->is_leaf() )
     {
@@ -68,7 +68,7 @@ build ( const hpro::TBlockCluster *  bct,
         
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< hpro::TMatrix >( lrapx.build( bct, acc( rowis, colis ) ) );
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
         }// if
         else
         {
@@ -77,9 +77,9 @@ build ( const hpro::TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
         
-        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -99,9 +99,6 @@ build ( const hpro::TBlockCluster *  bct,
                 }// if
             }// for
         }// for
-
-        // make value type consistent in block matrix and sub blocks
-        B->adjust_value_type();
     }// else
 
     // M->set_cluster_force( bct );
@@ -117,18 +114,20 @@ build ( const hpro::TBlockCluster *  bct,
 // defined by <coeff>
 //
 template < typename coeff_t >
-std::unique_ptr< hpro::TMatrix >
-build_nearfield ( const hpro::TBlockCluster *  bct,
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_nearfield ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
-                  const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+                  const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
+    using  value_t = typename coeff_t::value_t;
+    
     HLR_ASSERT( bct != nullptr );
     
     //
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< hpro::TMatrix >  M;
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
     if ( bct->is_leaf() )
     {
@@ -141,9 +140,9 @@ build_nearfield ( const hpro::TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
         
-        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -181,16 +180,15 @@ build_nearfield ( const hpro::TBlockCluster *  bct,
 // matrix coefficients defined by <M>. If low rank blocks are not zero, they are
 // truncated to accuracy <acc> using approximation method <apx>
 //
-template < typename approx_t >
-std::unique_ptr< hpro::TMatrix >
-build ( const hpro::TBlockCluster *  bct,
-        const hpro::TSparseMatrix &  S,
-        const hpro::TTruncAcc &      acc,
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build ( const Hpro::TBlockCluster *  bct,
+        const Hpro::TSparseMatrix< value_t > &  S,
+        const Hpro::TTruncAcc &      acc,
         const approx_t &             apx,
-        const size_t                 nseq = hpro::CFG::Arith::max_seq_size ) // ignored
+        const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    using  value_t = typename approx_t::value_t;
-    
     // static_assert( std::is_same< typename coeff_t::value_t,
     //                              typename lrapx_t::value_t >::value,
     //                "coefficient function and low-rank approximation must have equal value type" );
@@ -201,7 +199,7 @@ build ( const hpro::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< hpro::TMatrix >  M;
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
     if ( bct->is_leaf() )
     {
@@ -222,9 +220,9 @@ build ( const hpro::TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
         
-        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         // make sure, block structure is correct
         if (( B->nblock_rows() != bct->nrows() ) ||
@@ -267,13 +265,13 @@ template < typename coeff_t,
            typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hpro::TMatrix > >
-build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const hpro::TTruncAcc &      acc,
-                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+                    const Hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
 }
@@ -281,11 +279,11 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hpro::TMatrix > >
-build_uniform_lvl ( const hpro::TMatrix &    A,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &       basisapx,
-                    const hpro::TTruncAcc &  acc,
-                    const size_t             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+                    const Hpro::TTruncAcc &  acc,
+                    const size_t             /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::cluster_basis< value_t >;
@@ -295,8 +293,8 @@ build_uniform_lvl ( const hpro::TMatrix &    A,
 
     if ( is_blocked( A ) )
     {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
+        rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
 
     detail::init_cluster_bases( A, *rowcb, *colcb );
@@ -317,13 +315,13 @@ template < typename coeff_t,
            typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hpro::TMatrix > >
-build_uniform_rec ( const hpro::TBlockCluster *  bct,
+            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+build_uniform_rec ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const hpro::TTruncAcc &      acc,
-                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+                    const Hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -341,8 +339,8 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     rowcb->set_nsons( bct->rowcl()->nsons() );
     colcb->set_nsons( bct->colcl()->nsons() );
     
-    auto  rowmap = detail::is_matrix_map_t();
-    auto  colmap = detail::is_matrix_map_t();
+    auto  rowmap = detail::is_matrix_map_t< value_t >();
+    auto  colmap = detail::is_matrix_map_t< value_t >();
     
     auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
@@ -357,11 +355,11 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hpro::TMatrix > >
-build_uniform_rec ( const hpro::TMatrix &        A,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                     const basisapx_t &           basisapx,
-                    const hpro::TTruncAcc &      acc,
-                    const size_t                 /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
+                    const Hpro::TTruncAcc &      acc,
+                    const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::cluster_basis< value_t >;
@@ -371,12 +369,12 @@ build_uniform_rec ( const hpro::TMatrix &        A,
 
     if ( is_blocked( A ) )
     {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix )->nblock_cols() );
+        rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
     
-    auto  rowmap = detail::is_matrix_map_t();
-    auto  colmap = detail::is_matrix_map_t();
+    auto  rowmap = detail::is_matrix_map_t< value_t >();
+    auto  colmap = detail::is_matrix_map_t< value_t >();
     auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
@@ -385,16 +383,16 @@ build_uniform_rec ( const hpro::TMatrix &        A,
 //
 // assign block cluster to matrix
 //
-inline
+template < typename value_t >
 void
-assign_cluster ( hpro::TMatrix &              M,
-                 const hpro::TBlockCluster &  bc )
+assign_cluster ( Hpro::TMatrix< value_t > &   M,
+                 const Hpro::TBlockCluster &  bc )
 {
     M.set_cluster_force( & bc );
     
     if ( is_blocked( M ) )
     {
-        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT( ( B->nblock_rows() == bc.nrows() ) &&
                     ( B->nblock_cols() == bc.ncols() ) );
@@ -418,15 +416,15 @@ assign_cluster ( hpro::TMatrix &              M,
 //
 // return copy of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy ( const hpro::TMatrix &  M )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -436,7 +434,7 @@ copy ( const hpro::TMatrix &  M )
             {
                 if ( BM->block( i, j ) != nullptr )
                 {
-                    auto  B_ij = copy( * BM->block( i, j ) );
+                    auto  B_ij = hlr::seq::matrix::copy( * BM->block( i, j ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );
@@ -456,16 +454,16 @@ copy ( const hpro::TMatrix &  M )
 //
 // return truncated copy of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy ( const hpro::TMatrix &    M,
-       const hpro::TTruncAcc &  acc )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy ( const Hpro::TMatrix< value_t > &    M,
+       const Hpro::TTruncAcc &  acc )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -499,15 +497,15 @@ copy ( const hpro::TMatrix &    M,
 //
 // return copy of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy_nearfield ( const hpro::TMatrix &  M )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_nearfield ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -540,18 +538,18 @@ copy_nearfield ( const hpro::TMatrix &  M )
 }
 
 //
-// return copy of matrix with TRkMatrix replaced by tiled_lrmatrix
+// return copy of matrix with TRkMatrix< value_t > replaced by tiled_lrmatrix
 //
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
-copy_tiled ( const hpro::TMatrix &  M,
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_tiled ( const Hpro::TMatrix< value_t > &  M,
              const size_t           ntile )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -577,7 +575,7 @@ copy_tiled ( const hpro::TMatrix &  M,
         // copy low-rank data into tiled form
         //
 
-        auto  RM = cptrcast( & M, hpro::TRkMatrix );
+        auto  RM = cptrcast( & M, Hpro::TRkMatrix< value_t > );
         auto  R  = std::make_unique< tiled_lrmatrix< value_t > >( RM->row_is(),
                                                                   RM->col_is(),
                                                                   ntile,
@@ -599,14 +597,14 @@ copy_tiled ( const hpro::TMatrix &  M,
 // return copy of matrix with tiled_lrmatrix replaced by TRkMatrix
 //
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
-copy_nontiled ( const hpro::TMatrix &  M )
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_nontiled ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -634,8 +632,8 @@ copy_nontiled ( const hpro::TMatrix &  M )
 
         HLR_ASSERT( M.is_real() );
         
-        auto  RM = cptrcast( & M, tiled_lrmatrix< real > );
-        auto  R  = std::make_unique< hpro::TRkMatrix >( RM->row_is(), RM->col_is() );
+        auto  RM = cptrcast( & M, tiled_lrmatrix< value_t > );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is() );
         auto  U  = to_dense( RM->U() );
         auto  V  = to_dense( RM->V() );
 
@@ -654,15 +652,15 @@ copy_nontiled ( const hpro::TMatrix &  M )
 //
 // return copy of (block-wise) diagonal part of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy_diag ( const hpro::TMatrix &  M )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_diag ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -688,16 +686,16 @@ copy_diag ( const hpro::TMatrix &  M )
 //
 // return copy of (block-wise) lower-left part of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy_ll ( const hpro::TMatrix &    M,
-          const hpro::diag_type_t  diag = hpro::general_diag )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_ll ( const Hpro::TMatrix< value_t > &    M,
+          const Hpro::diag_type_t  diag = Hpro::general_diag )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -722,18 +720,15 @@ copy_ll ( const hpro::TMatrix &    M,
         // assuming non-structured block
         auto  T = M.copy();
 
-        if ( diag == hpro::unit_diag )
+        if ( diag == Hpro::unit_diag )
         {
             if ( T->row_is() == T->col_is() )
             {
                 HLR_ASSERT( is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
+                auto  D = ptrcast( T.get(), Hpro::TDenseMatrix< value_t > );
 
-                if ( D->is_complex() )
-                    D->blas_cmat() = blas::identity< hpro::complex >( D->nrows() );
-                else
-                    D->blas_rmat() = blas::identity< hpro::real >( D->nrows() );
+                D->blas_mat() = blas::identity< value_t >( D->nrows() );
             }// if
         }// if
 
@@ -744,16 +739,16 @@ copy_ll ( const hpro::TMatrix &    M,
 //
 // return copy of (block-wise) upper-right part of matrix
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-copy_ur ( const hpro::TMatrix &    M,
-          const hpro::diag_type_t  diag = hpro::general_diag )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_ur ( const Hpro::TMatrix< value_t > &    M,
+          const Hpro::diag_type_t  diag = Hpro::general_diag )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
         
@@ -778,18 +773,15 @@ copy_ur ( const hpro::TMatrix &    M,
         // assuming non-structured block
         auto  T = M.copy();
 
-        if ( diag == hpro::unit_diag )
+        if ( diag == Hpro::unit_diag )
         {
             if ( T->row_is() == T->col_is() )
             {
                 HLR_ASSERT( is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), hpro::TDenseMatrix );
+                auto  D = ptrcast( T.get(), Hpro::TDenseMatrix< value_t > );
 
-                if ( D->is_complex() )
-                    D->blas_cmat() = blas::identity< hpro::complex >( D->nrows() );
-                else
-                    D->blas_rmat() = blas::identity< hpro::real >( D->nrows() );
+                D->blas_mat() = blas::identity< value_t >( D->nrows() );
             }// if
         }// if
 
@@ -801,18 +793,18 @@ copy_ur ( const hpro::TMatrix &    M,
 // copy data of A to matrix B
 // - ASSUMPTION: identical matrix structure
 //
-inline
+template < typename value_t >
 void
-copy_to ( const hpro::TMatrix &  A,
-          hpro::TMatrix &        B )
+copy_to ( const Hpro::TMatrix< value_t > &  A,
+          Hpro::TMatrix< value_t > &        B )
 {
     HLR_ASSERT( A.type()     == B.type() );
     HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = ptrcast(  &B, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
         HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
@@ -842,18 +834,18 @@ copy_to ( const hpro::TMatrix &  A,
 // copy lower-left data of A to matrix B
 // - ASSUMPTION: identical matrix structure in lower-left part
 //
-inline
+template < typename value_t >
 void
-copy_to_ll ( const hpro::TMatrix &  A,
-             hpro::TMatrix &        B )
+copy_to_ll ( const Hpro::TMatrix< value_t > &  A,
+             Hpro::TMatrix< value_t > &        B )
 {
     HLR_ASSERT( A.type()     == B.type() );
     HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = ptrcast(  &B, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
         HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
@@ -886,18 +878,18 @@ copy_to_ll ( const hpro::TMatrix &  A,
 // copy upper-right data of A to matrix B
 // - ASSUMPTION: identical matrix structure in upper-right part
 //
-inline
+template < typename value_t >
 void
-copy_to_ur ( const hpro::TMatrix &  A,
-             hpro::TMatrix &        B )
+copy_to_ur ( const Hpro::TMatrix< value_t > &  A,
+             Hpro::TMatrix< value_t > &        B )
 {
     HLR_ASSERT( A.type()     == B.type() );
     HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = ptrcast(  &B, hpro::TBlockMatrix );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = ptrcast(  &B, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT( BA->nblock_rows() == BB->nblock_rows() );
         HLR_ASSERT( BA->nblock_cols() == BB->nblock_cols() );
@@ -931,18 +923,18 @@ copy_to_ur ( const hpro::TMatrix &  A,
 // - frees old data
 // - local operation thereby limiting extra memory usage
 //
-inline
-std::unique_ptr< hpro::TMatrix >
-realloc ( hpro::TMatrix *  A )
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+realloc ( Hpro::TMatrix< value_t > *  A )
 {
     if ( is_null( A ) )
         return nullptr;
     
     if ( is_blocked( A ) )
     {
-        auto  B  = ptrcast( A, hpro::TBlockMatrix );
-        auto  C  = std::make_unique< hpro::TBlockMatrix >();
-        auto  BC = ptrcast( C.get(), hpro::TBlockMatrix );
+        auto  B  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
+        auto  C  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  BC = ptrcast( C.get(), Hpro::TBlockMatrix< value_t > );
 
         C->copy_struct_from( B );
 
@@ -974,13 +966,13 @@ realloc ( hpro::TMatrix *  A )
 //
 // nullify data in matrix, e.g., M := 0
 //
-inline
+template < typename value_t >
 void
-clear ( hpro::TMatrix &  M )
+clear ( Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = ptrcast( & M, hpro::TBlockMatrix );
+        auto  BM = ptrcast( & M, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BM->nblock_rows(); ++i )
         {
@@ -995,18 +987,15 @@ clear ( hpro::TMatrix &  M )
     }// if
     else if ( is_lowrank( & M ) )
     {
-        auto  R = ptrcast( & M, hpro::TRkMatrix );
+        auto  R = ptrcast( & M, Hpro::TRkMatrix< value_t > );
 
         R->set_rank( 0 );
     }// if
     else if ( is_dense( & M ) )
     {
-        auto  D = ptrcast( & M, hpro::TDenseMatrix );
+        auto  D = ptrcast( & M, Hpro::TDenseMatrix< value_t > );
 
-        if ( D->is_complex() )
-            blas::fill( hpro::blas_mat< hpro::complex >( D ), hpro::complex(0) );
-        else
-            blas::fill( hpro::blas_mat< hpro::real >( D ), hpro::real(0) );
+        blas::fill( Hpro::blas_mat< value_t >( D ), value_t(0) );
     }// if
     else
         HLR_ASSERT( false );
@@ -1018,16 +1007,16 @@ clear ( hpro::TMatrix &  M )
 //         different bases
 //
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
-copy_uniform ( const hpro::TMatrix &       M,
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_uniform ( const Hpro::TMatrix< value_t > &       M,
                cluster_basis< value_t > &  rowcb,
                cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
 
@@ -1060,7 +1049,7 @@ copy_uniform ( const hpro::TMatrix &       M,
         //             = U · S · V^H   with  S = (U^H·A)·(V^H·B)^H
         //
         
-        auto  R  = cptrcast( &M, hpro::TRkMatrix );
+        auto  R  = cptrcast( &M, Hpro::TRkMatrix< value_t > );
 
         auto  UA = rowcb.transform_forward( blas::mat_U< value_t >( R ) );
         auto  VB = colcb.transform_forward( blas::mat_V< value_t >( R ) );
@@ -1085,14 +1074,14 @@ copy_uniform ( const hpro::TMatrix &       M,
 // to standard lowrank matrices
 //
 template < typename value_t >
-std::unique_ptr< hpro::TMatrix >
-copy_nonuniform ( const hpro::TMatrix &  M )
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_nonuniform ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BM );
 
@@ -1117,7 +1106,7 @@ copy_nonuniform ( const hpro::TMatrix &  M )
         auto  R  = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  U  = blas::prod( R->row_cb().basis(), R->coeff() );
         auto  V  = blas::copy( R->col_cb().basis() );
-        auto  SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        auto  SR = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
 
         SR->set_id( R->id() );
 
@@ -1136,119 +1125,119 @@ copy_nonuniform ( const hpro::TMatrix &  M )
 using hlr::matrix::convert_to_lowrank;
 using hlr::matrix::convert_to_dense;
 
-//
-// return copy of matrix with uniform low-rank matrices converted
-// to standard lowrank matrices
-//
-inline
-std::unique_ptr< hpro::TMatrix >
-copy_nongeneric ( const hpro::TMatrix &  M )
-{
-    if ( is_blocked( M ) )
-    {
-        auto  BM = cptrcast( &M, hpro::TBlockMatrix );
-        auto  N  = std::make_unique< hpro::TBlockMatrix >();
-        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix );
+// //
+// // return copy of matrix with uniform low-rank matrices converted
+// // to standard lowrank matrices
+// //
+// inline
+// std::unique_ptr< Hpro::TMatrix< value_t > >
+// copy_nongeneric ( const Hpro::TMatrix< value_t > &  M )
+// {
+//     if ( is_blocked( M ) )
+//     {
+//         auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+//         auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+//         auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
 
-        B->copy_struct_from( BM );
+//         B->copy_struct_from( BM );
 
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                if ( ! is_null( BM->block( i, j ) ) )
-                {
-                    auto  B_ij = copy_nongeneric( * BM->block( i, j ) );
+//         for ( uint  i = 0; i < B->nblock_rows(); ++i )
+//         {
+//             for ( uint  j = 0; j < B->nblock_cols(); ++j )
+//             {
+//                 if ( ! is_null( BM->block( i, j ) ) )
+//                 {
+//                     auto  B_ij = copy_nongeneric( * BM->block( i, j ) );
                     
-                    B_ij->set_parent( B );
-                    B->set_block( i, j, B_ij.release() );
-                }// if
-            }// for
-        }// for
+//                     B_ij->set_parent( B );
+//                     B->set_block( i, j, B_ij.release() );
+//                 }// if
+//             }// for
+//         }// for
         
-        return N;
-    }// if
-    else if ( is_generic_lowrank( M ) )
-    {
-        auto  R  = cptrcast( &M, lrmatrix );
+//         return N;
+//     }// if
+//     else if ( is_generic_lowrank( M ) )
+//     {
+//         auto  R  = cptrcast( &M, lrmatrix );
 
-        if ( R->is_compressed() )
-        {
-            HLR_ERROR( "TODO" );
-        }// if
+//         if ( R->is_compressed() )
+//         {
+//             HLR_ERROR( "TODO" );
+//         }// if
 
-        auto  SR = std::unique_ptr< hpro::TRkMatrix >();
+//         auto  SR = std::unique_ptr< Hpro::TRkMatrix< value_t > >();
         
-        if ( R->value_type() == blas::value_type::rfp32 )
-        {
-            auto  U = blas::copy< hpro::real, float >( R->U< float >() );
-            auto  V = blas::copy< hpro::real, float >( R->V< float >() );
+//         if ( R->value_type() == blas::value_type::rfp32 )
+//         {
+//             auto  U = blas::copy< Hpro::real, float >( R->U< float >() );
+//             auto  V = blas::copy< Hpro::real, float >( R->V< float >() );
 
-            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-        }// if
-        else if ( R->value_type() == blas::value_type::rfp64 )
-        {
-            auto  U = blas::copy< hpro::real, double >( R->U< double >() );
-            auto  V = blas::copy< hpro::real, double >( R->V< double >() );
+//             SR = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+//         }// if
+//         else if ( R->value_type() == blas::value_type::rfp64 )
+//         {
+//             auto  U = blas::copy< Hpro::real, double >( R->U< double >() );
+//             auto  V = blas::copy< Hpro::real, double >( R->V< double >() );
 
-            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-        }// if
-        else if ( R->value_type() == blas::value_type::cfp32 )
-        {
-            auto  U = blas::copy< hpro::complex, std::complex< float > >( R->U< std::complex< float > >() );
-            auto  V = blas::copy< hpro::complex, std::complex< float > >( R->V< std::complex< float > >() );
+//             SR = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+//         }// if
+//         else if ( R->value_type() == blas::value_type::cfp32 )
+//         {
+//             auto  U = blas::copy< Hpro::complex, std::complex< float > >( R->U< std::complex< float > >() );
+//             auto  V = blas::copy< Hpro::complex, std::complex< float > >( R->V< std::complex< float > >() );
 
-            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-        }// if
-        else if ( R->value_type() == blas::value_type::cfp64 )
-        {
-            auto  U = blas::copy< hpro::complex, std::complex< double > >( R->U< std::complex< double > >() );
-            auto  V = blas::copy< hpro::complex, std::complex< double > >( R->V< std::complex< double > >() );
+//             SR = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+//         }// if
+//         else if ( R->value_type() == blas::value_type::cfp64 )
+//         {
+//             auto  U = blas::copy< Hpro::complex, std::complex< double > >( R->U< std::complex< double > >() );
+//             auto  V = blas::copy< Hpro::complex, std::complex< double > >( R->V< std::complex< double > >() );
 
-            SR = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-        }// if
+//             SR = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+//         }// if
         
-        SR->set_id( R->id() );
+//         SR->set_id( R->id() );
 
-        return SR;
-    }// if
-    else if ( is_generic_dense( M ) )
-    {
-        auto  D  = cptrcast( &M, dense_matrix );
+//         return SR;
+//     }// if
+//     else if ( is_generic_dense( M ) )
+//     {
+//         auto  D  = cptrcast( &M, dense_matrix );
 
-        if ( D->is_compressed() )
-        {
-            HLR_ERROR( "TODO" );
-        }// if
+//         if ( D->is_compressed() )
+//         {
+//             HLR_ERROR( "TODO" );
+//         }// if
 
-        auto  SD = std::unique_ptr< hpro::TDenseMatrix >();
+//         auto  SD = std::unique_ptr< Hpro::TDenseMatrix< value_t > >();
 
-        if ( D->value_type() == blas::value_type::rfp32 )
-        {
-            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::real, float >( D->M< float >() ) ) );
-        }// if
-        else if ( D->value_type() == blas::value_type::rfp64 )
-        {
-            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::real, double >( D->M< double >() ) ) );
-        }// if
-        else if ( D->value_type() == blas::value_type::cfp32 )
-        {
-            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::complex, std::complex< float > >( D->M< std::complex< float > >() ) ) );
-        }// if
-        else if ( D->value_type() == blas::value_type::cfp64 )
-        {
-            SD = std::make_unique< hpro::TDenseMatrix >( M.row_is(), M.col_is(), std::move( blas::copy< hpro::complex, std::complex< double > >( D->M< std::complex< double > >() ) ) );
-        }// if
+//         if ( D->value_type() == blas::value_type::rfp32 )
+//         {
+//             SD = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy< Hpro::real, float >( D->M< float >() ) ) );
+//         }// if
+//         else if ( D->value_type() == blas::value_type::rfp64 )
+//         {
+//             SD = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy< Hpro::real, double >( D->M< double >() ) ) );
+//         }// if
+//         else if ( D->value_type() == blas::value_type::cfp32 )
+//         {
+//             SD = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy< Hpro::complex, std::complex< float > >( D->M< std::complex< float > >() ) ) );
+//         }// if
+//         else if ( D->value_type() == blas::value_type::cfp64 )
+//         {
+//             SD = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy< Hpro::complex, std::complex< double > >( D->M< std::complex< double > >() ) ) );
+//         }// if
 
-        SD->set_id( D->id() );
+//         SD->set_id( D->id() );
 
-        return SD;
-    }// if
-    else
-    {
-        return M.copy();
-    }// else
-}
+//         return SD;
+//     }// if
+//     else
+//     {
+//         return M.copy();
+//     }// else
+// }
 
 }}}// namespace hlr::seq::matrix
 

@@ -27,7 +27,7 @@ namespace dag
 namespace
 {
 
-using id_t = HLIB::id_t;
+using id_t = Hpro::id_t;
 
 // memory block identifiers
 const id_t  ID_A('A');
@@ -36,24 +36,25 @@ const id_t  ID_C('C');
 //
 // computes C = A^-1
 //
+template < typename value_t >
 struct gauss_node : public node
 {
-    TMatrix *   A;
+    TMatrix< value_t > *   A;
     const id_t  id_A;
     const id_t  id_C;
-    TMatrix *   T;
+    TMatrix< value_t > *   T;
     
-    gauss_node ( TMatrix *   aA,
-                 const id_t  aid_A,
-                 const id_t  aid_C,
-                 TMatrix *   aT )
+    gauss_node ( TMatrix< value_t > *  aA,
+                 const id_t            aid_A,
+                 const id_t            aid_C,
+                 TMatrix< value_t > *  aT )
             : A( aA )
             , id_A( aid_A )
             , id_C( aid_C )
             , T( aT )
     { init(); }
     
-    virtual std::string  to_string () const { return HLIB::to_string( "g( %c/%d, %c/%d )", char(id_A), A->id(), char(id_C), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "g( %c/%d, %c/%d )", char(id_A), A->id(), char(id_C), A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
@@ -66,25 +67,26 @@ private:
 //
 // computes C = β C + α A·B
 //
+template < typename value_t >
 struct update_node : public node
 {
-    const real       alpha;
-    const TMatrix *  A;
-    const id_t       id_A;
-    const TMatrix *  B;
-    const id_t       id_B;
-    const real       beta;
-    TMatrix *        C;
-    const id_t       id_C;
+    const value_t               alpha;
+    const TMatrix< value_t > *  A;
+    const id_t                  id_A;
+    const TMatrix< value_t > *  B;
+    const id_t                  id_B;
+    const value_t               beta;
+    TMatrix< value_t > *        C;
+    const id_t                  id_C;
 
-    update_node ( const real       aalpha,
-                  const TMatrix *  aA,
-                  const id_t       aid_A,
-                  const TMatrix *  aB,
-                  const id_t       aid_B,
-                  const real       abeta,
-                  TMatrix *        aC,
-                  const id_t       aid_C )
+    update_node ( const value_t                 aalpha,
+                  const TMatrix< value_t > * aA,
+                  const id_t                 aid_A,
+                  const TMatrix< value_t > * aB,
+                  const id_t                 aid_B,
+                  const value_t                 abeta,
+                  TMatrix< value_t > *       aC,
+                  const id_t                 aid_C )
             : alpha( aalpha )
             , A( aA )
             , id_A( aid_A )
@@ -95,7 +97,7 @@ struct update_node : public node
             , id_C( aid_C )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "u( %c/%d, %c/%d, %c/%d )",
+    virtual std::string  to_string () const { return Hpro::to_string( "u( %c/%d, %c/%d, %c/%d )",
                                                                       char(id_A), A->id(), char(id_B), B->id(), char(id_C), C->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
@@ -109,24 +111,25 @@ private:
 //
 // assign B = A
 //
+template < typename value_t >
 struct copy_node : public node
 {
-    const TMatrix *  A;
-    const id_t       id_A;
-    TMatrix *        B;
-    const id_t       id_B;
+    const TMatrix< value_t > *  A;
+    const id_t                  id_A;
+    TMatrix< value_t > *        B;
+    const id_t                  id_B;
 
-    copy_node ( const TMatrix *  aA,
-                const id_t       aid_A,
-                TMatrix *        aB,
-                const id_t       aid_B )
+    copy_node ( const TMatrix< value_t > * aA,
+                const id_t                 aid_A,
+                TMatrix< value_t > *       aB,
+                const id_t                 aid_B )
             : A( aA )
             , id_A( aid_A )
             , B( aB )
             , id_B( aid_B )
     { init(); }
 
-    virtual std::string  to_string () const { return HLIB::to_string( "copy( %c%d, %c%d )",
+    virtual std::string  to_string () const { return Hpro::to_string( "copy( %c%d, %c%d )",
                                                                       char(id_A), A->id(), char(id_B), B->id() ); }
     virtual std::string  color     () const { return "75507b"; }
 
@@ -145,15 +148,16 @@ private:
 
 std::atomic< int >  ID_TEMP( 100 );
 
+template < typename value_t >
 local_graph
-gauss_node::refine_ ( const size_t  min_size )
+gauss_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
     
     if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto  BA = ptrcast( A, TBlockMatrix );
-        auto  BT = ptrcast( T, TBlockMatrix );
+        auto  BA = ptrcast( A, TBlockMatrix< value_t > );
+        auto  BT = ptrcast( T, TBlockMatrix< value_t > );
         auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
@@ -200,15 +204,13 @@ gauss_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-gauss_node::run_ ( const TTruncAcc &  acc )
+gauss_node< value_t >::run_ ( const TTruncAcc &  acc )
 {
-    if ( A->is_complex() )
-        hlr::seq::gauss_elim< hpro::complex >( *A, *T, acc );
-    else
-        hlr::seq::gauss_elim< hpro::real >( *A, *T, acc );
+    hlr::seq::gauss_elim( *A, *T, acc );
     
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e", A->id(), norm::frobenius( *A ) ) );
+    hlr::log( 0, Hpro::to_string( "                               %d = %.8e", A->id(), norm::frobenius( *A ) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -217,8 +219,9 @@ gauss_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-update_node::refine_ ( const size_t  min_size )
+update_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
     
@@ -228,9 +231,9 @@ update_node::refine_ ( const size_t  min_size )
         // generate sub nodes assuming 2x2 block structure
         //
 
-        auto  BA = cptrcast( A, TBlockMatrix );
-        auto  BB = cptrcast( B, TBlockMatrix );
-        auto  BC = ptrcast(  C, TBlockMatrix );
+        auto  BA = cptrcast( A, TBlockMatrix< value_t > );
+        auto  BB = cptrcast( B, TBlockMatrix< value_t > );
+        auto  BC = ptrcast(  C, TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BC->block_rows(); ++i )
         {
@@ -255,10 +258,11 @@ update_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-update_node::run_ ( const TTruncAcc &  acc )
+update_node< value_t >::run_ ( const TTruncAcc &  acc )
 {
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e, %d = %.8e, %d = %.8e" ,
+    hlr::log( 0, Hpro::to_string( "                               %d = %.8e, %d = %.8e, %d = %.8e" ,
                                   A->id(), norm::frobenius( *A ),
                                   B->id(), norm::frobenius( *B ),
                                   C->id(), norm::frobenius( *C ) ) );
@@ -266,7 +270,7 @@ update_node::run_ ( const TTruncAcc &  acc )
     HLR_ERROR( "todo" );
     
     // multiply( alpha, apply_normal, A, apply_normal, B, beta, C, acc );
-    hlr::log( 0, HLIB::to_string( "                               %d = %.8e",
+    hlr::log( 0, Hpro::to_string( "                               %d = %.8e",
                                   C->id(), norm::frobenius( *C ) ) );
 }
 
@@ -276,8 +280,9 @@ update_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-copy_node::refine_ ( const size_t  min_size )
+copy_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -287,8 +292,8 @@ copy_node::refine_ ( const size_t  min_size )
         // generate sub nodes assuming 2x2 block structure
         //
 
-        auto  BA = cptrcast( A, TBlockMatrix );
-        auto  BB = ptrcast(  B, TBlockMatrix );
+        auto  BA = cptrcast( A, TBlockMatrix< value_t > );
+        auto  BB = ptrcast(  B, TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BB->block_rows(); ++i )
         {
@@ -305,8 +310,9 @@ copy_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-copy_node::run_ ( const TTruncAcc & )
+copy_node< value_t >::run_ ( const TTruncAcc & )
 {
     // A->copy_to( B );
 }
@@ -319,12 +325,13 @@ copy_node::run_ ( const TTruncAcc & )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 dag::graph
-gen_dag_gauss_elim ( TMatrix *      A,
-                     TMatrix *      T,
-                     refine_func_t  refine )
+gen_dag_gauss_elim ( TMatrix< value_t > *  A,
+                     TMatrix< value_t > *  T,
+                     refine_func_t         refine )
 {
-    return refine( new gauss_node( A, ID_A, ID_C, T ), HLIB::CFG::Arith::max_seq_size, use_single_end_node );
+    return refine( new gauss_node( A, ID_A, ID_C, T ), Hpro::CFG::Arith::max_seq_size, use_single_end_node );
 }
 
 }}// namespace hlr::dag

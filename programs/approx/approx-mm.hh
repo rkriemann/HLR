@@ -35,8 +35,8 @@ get_flops ( const std::string &  method );
 
 template < typename value_t >
 hpro::real_type_t< value_t >
-mm_error ( const hpro::TLinearOperator &  A,
-           const hpro::TLinearOperator &  B )
+mm_error ( const hpro::TLinearOperator< value_t > &  A,
+           const hpro::TLinearOperator< value_t > &  B )
 {
     auto  n = B.domain_dim();
     auto  T = blas::matrix< value_t >( n, 100 );
@@ -50,7 +50,7 @@ mm_error ( const hpro::TLinearOperator &  A,
     blas::fill_fn( T, fill_rand );
     blas::scale( value_t(0), S );
     
-    auto  diff  = hpro::matrix_sum( hpro::real(1.0), &A, hpro::real(-1.0), &B );
+    auto  diff  = hpro::matrix_sum( value_t(1), &A, value_t(-1), &B );
 
     diff->apply_add( value_t(1), T, S, apply_normal );
 
@@ -60,14 +60,13 @@ mm_error ( const hpro::TLinearOperator &  A,
 //
 // standard mat-mul
 //
-template < typename approx_t >
+template < typename value_t,
+           typename approx_t >
 void
-mm_std ( const hpro::TMatrix &    A,
-         const hpro::TTruncAcc &  acc,
-         const std::string &      apx_name )
+mm_std ( const hpro::TMatrix< value_t >  &  A,
+         const hpro::TTruncAcc &            acc,
+         const std::string &                apx_name )
 {
-    using  value_t = typename approx_t::value_t;
-
     std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
     
     approx_t  approx;
@@ -113,7 +112,7 @@ mm_std ( const hpro::TMatrix &    A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -122,14 +121,13 @@ mm_std ( const hpro::TMatrix &    A,
 //
 // accumulator based mat-mul
 //
-template < typename approx_t >
+template < typename value_t,
+           typename approx_t >
 void
-mm_accu ( const hpro::TMatrix &    A,
-          const hpro::TTruncAcc &  acc,
-          const std::string &      apx_name )
+mm_accu ( const hpro::TMatrix< value_t > &  A,
+          const hpro::TTruncAcc &           acc,
+          const std::string &               apx_name )
 {
-    using  value_t = typename approx_t::value_t;
-
     std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
     
     approx_t  approx;
@@ -175,7 +173,7 @@ mm_accu ( const hpro::TMatrix &    A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -184,14 +182,13 @@ mm_accu ( const hpro::TMatrix &    A,
 //
 // lazy mat-mul
 //
-template < typename approx_t >
+template < typename value_t,
+           typename approx_t >
 void
-mm_lazy ( const hpro::TMatrix &    A,
-          const hpro::TTruncAcc &  acc,
-          const std::string &      apx_name )
+mm_lazy ( const hpro::TMatrix< value_t > &  A,
+          const hpro::TTruncAcc &           acc,
+          const std::string &               apx_name )
 {
-    using  value_t = typename approx_t::value_t;
-
     std::cout << "    " << term::bullet << term::bold << apx_name << term::reset << std::endl;
     
     approx_t  approx;
@@ -237,7 +234,7 @@ mm_lazy ( const hpro::TMatrix &    A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), C.get() );
+    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -311,12 +308,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_std< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_std< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_std< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_std< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_std< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
 
     //
@@ -327,12 +324,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_accu< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_accu< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
 
     //
@@ -343,12 +340,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "lazy" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_lazy< hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_lazy< hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_lazy< hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_lazy< hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) mm_lazy< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
     
     LIKWID_MARKER_CLOSE;

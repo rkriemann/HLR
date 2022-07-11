@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -25,22 +25,19 @@
 
 namespace hlr { namespace matrix {
 
-namespace hpro = HLIB;
-
 //
 // return min/avg/max rank of given matrix
 //
 namespace detail
 {
 
+template < typename value_t >
 std::tuple< uint, size_t, uint, size_t >
-rank_info_helper_mat ( const hpro::TMatrix &  M )
+rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 {
-    using namespace hpro;
-    
     if ( is_blocked( M ) )
     {
-        auto    B        = cptrcast( &M, hpro::TBlockMatrix );
+        auto    B        = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
         uint    min_rank = 0;
         uint    max_rank = 0;
         size_t  sum_rank = 0;
@@ -65,13 +62,13 @@ rank_info_helper_mat ( const hpro::TMatrix &  M )
     }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, hpro::TRkMatrix );
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if
     else if ( is_uniform( &M ) )
     {
-        auto  R = cptrcast( &M, hpro::TUniformMatrix );
+        auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
 
         return {
             std::min( R->row_rank(), R->col_rank() ),  // min
@@ -92,8 +89,9 @@ rank_info_helper_mat ( const hpro::TMatrix &  M )
 
 }// namespace detail
 
+template < typename value_t >
 std::tuple< uint, uint, uint >
-rank_info ( const hpro::TMatrix & M )
+rank_info ( const Hpro::TMatrix< value_t > & M )
 {
     auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_mat( M );
 

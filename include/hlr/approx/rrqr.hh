@@ -18,7 +18,7 @@ namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
-using hpro::idx_t;
+using Hpro::idx_t;
 
 namespace detail
 {
@@ -30,9 +30,9 @@ namespace detail
 template < typename value_t >
 int
 trunc_rank ( const blas::matrix< value_t > &  R,
-             const hpro::TTruncAcc &          acc )
+             const Hpro::TTruncAcc &          acc )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = Hpro::real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
@@ -59,7 +59,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 rrqr ( blas::matrix< value_t > &  M,
-       const hpro::TTruncAcc &    acc )
+       const Hpro::TTruncAcc &    acc )
 {
     //
     // algorithm only works for nrows >= ncols, so proceed with
@@ -135,7 +135,7 @@ template <typename T>
 std::pair< blas::matrix< T >, blas::matrix< T > >
 rrqr ( const blas::matrix< T > &  U,
        const blas::matrix< T > &  V,
-       const hpro::TTruncAcc &    acc )
+       const Hpro::TTruncAcc &    acc )
 {
     using  value_t = T;
 
@@ -221,7 +221,7 @@ template< typename value_t >
 std::pair< blas::matrix< value_t >, blas::matrix< value_t > >
 rrqr ( const std::list< blas::matrix< value_t > > &  U,
        const std::list< blas::matrix< value_t > > &  V,
-       const hpro::TTruncAcc &                       acc )
+       const Hpro::TTruncAcc &                       acc )
 {
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -297,7 +297,7 @@ std::pair< blas::matrix< value_t >, blas::matrix< value_t > >
 rrqr ( const std::list< blas::matrix< value_t > > &  U,
        const std::list< blas::matrix< value_t > > &  T,
        const std::list< blas::matrix< value_t > > &  V,
-       const hpro::TTruncAcc &                       acc )
+       const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -396,7 +396,7 @@ struct RRQR
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::rrqr( M, acc );
     }
@@ -405,7 +405,7 @@ struct RRQR
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::rrqr( U, V, acc );
     }
@@ -414,7 +414,7 @@ struct RRQR
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::rrqr( U, V, acc );
     }
@@ -424,7 +424,7 @@ struct RRQR
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::rrqr( U, T, V, acc );
     }
@@ -435,7 +435,7 @@ struct RRQR
     
     blas::matrix< value_t >
     column_basis ( blas::matrix< value_t > &  M,
-                   const hpro::TTruncAcc &    acc ) const
+                   const Hpro::TTruncAcc &    acc ) const
     {
         // see "rrqr" above for comments
 

@@ -162,16 +162,15 @@ sz_uncompress ( const sz::carray_view &  v,
 
 #elif defined(HAS_ZFP)
 
-template < typename mat_value_t,
-           typename zfp_value_t >
-blas::matrix< mat_value_t >
-zfp_uncompress ( zfp::const_array2< zfp_value_t > &  z,
-                 const size_t                        nrows,
-                 const size_t                        ncols )
+template < typename value_t >
+blas::matrix< value_t >
+zfp_uncompress ( const zfp::carray &  v,
+                 const size_t         nrows,
+                 const size_t         ncols )
 {
-    auto  M = blas::matrix< mat_value_t >( nrows, ncols );
+    auto  M = blas::matrix< value_t >( nrows, ncols );
     
-    z.get( (zfp_value_t*) M.data() );
+    zfp::uncompress< value_t >( v, M.data(), nrows, ncols );
 
     return M;
 }
@@ -228,20 +227,10 @@ lrmatrix::mul_vec ( const hpro::real       alpha,
 
                     #elif defined(HAS_ZFP)
                 
-                    auto  cUV = std::visit( 
-                        [this] ( auto &&  zM )
-                        {
-                            using  zfp_value_t = typename std::decay_t< decltype(zM->U) >::value_type;
-                        
-                            auto cU  = zfp_uncompress< value_t, zfp_value_t >( zM->U, nrows(), rank() );
-                            auto cV  = zfp_uncompress< value_t, zfp_value_t >( zM->V, ncols(), rank() );
-                            auto cUV = lrfactors< value_t >{ std::move(cU), std::move(cV) };
+                    auto cU = zfp_uncompress< value_t >( _zdata.U, nrows(), rank() );
+                    auto cV = zfp_uncompress< value_t >( _zdata.V, ncols(), rank() );
 
-                            return cUV;
-                        },
-                        _zdata );
-
-                    lr_mul_vec< value_t >( alpha, cUV.U, cUV.V, op, x, y );
+                    lr_mul_vec< value_t >( alpha, cU, cV, op, x, y );
 
                     #endif
                 }// if
@@ -445,9 +434,9 @@ lrmatrix::compress ( const zconfig_t &  config )
             const size_t  mem_dense = sizeof(value_t) * rank_UV * ( UV.U.nrows() + UV.V.nrows() );
             auto          vU        = sz::compress( config, UV.U.data(), UV.U.nrows(), UV.U.ncols() );
             auto          vV        = sz::compress( config, UV.V.data(), UV.V.nrows(), UV.V.ncols() );
-            const auto    mem_zfp   = vU.size() + vV.size();
+            const auto    mem_sz    = vU.size() + vV.size();
 
-            if ( mem_zfp < mem_dense )
+            if ( mem_sz < mem_dense )
             {
                 _zdata.U = std::move( vU );
                 _zdata.V = std::move( vV );
@@ -466,59 +455,21 @@ lrmatrix::compress ( const zconfig_t &  config )
     std::visit(
         [this,&config] ( auto &&  UV )
         {
-            using  value_t    = typename std::decay_t< decltype(UV) >::value_t;
-            using  real_t     = typename hpro::real_type_t< value_t >;
-            using  real_ptr_t = real_t *;
+            using  value_t = typename std::decay_t< decltype(UV) >::value_t;
 
             const auto    rank_UV   = UV.U.ncols();
-            // auto          config    = zfp_config_rate( rate, false );
-            uint          factor    = sizeof(value_t) / sizeof(real_t);
             const size_t  mem_dense = sizeof(value_t) * rank_UV * ( UV.U.nrows() + UV.V.nrows() );
+            auto          vU        = zfp::compress( config, UV.U.data(), UV.U.nrows(), UV.U.ncols() );
+            auto          vV        = zfp::compress( config, UV.V.data(), UV.V.nrows(), UV.V.ncols() );
+            const auto    mem_zfp   = vU.size() + vV.size();
 
-            if constexpr( std::is_same_v< value_t, real_t > )
+            if ( mem_zfp < mem_dense )
             {
-                auto  zM = std::make_unique< compressed_factors< value_t > >();
-
-                zM->U.set_config( config );
-                zM->V.set_config( config );
-                
-                zM->U.resize( UV.U.nrows(), UV.U.ncols() );
-                zM->V.resize( UV.V.nrows(), UV.V.ncols() );
-                
-                zM->U.set( UV.U.data() );
-                zM->V.set( UV.V.data() );
-
-                const auto  mem_zfp = zM->U.compressed_size() + zM->V.compressed_size();
-
-                if ( mem_zfp < mem_dense )
-                {
-                    _zdata = std::move( zM );
-                    UV.U   = std::move( blas::matrix< value_t >( 0, rank_UV ) ); // remember rank !!!
-                    UV.V   = std::move( blas::matrix< value_t >( 0, rank_UV ) );
-                }// if
+                _zdata.U = std::move( vU );
+                _zdata.V = std::move( vV );
+                UV.U     = std::move( blas::matrix< value_t >( 0, rank_UV ) ); // remember rank !!!
+                UV.V     = std::move( blas::matrix< value_t >( 0, rank_UV ) );
             }// if
-            else
-            {
-                auto  zM = std::make_unique< compressed_factors< real_t > >();
-
-                zM->U.set_config( config );
-                zM->V.set_config( config );
-                
-                zM->U.resize( factor * UV.U.nrows(), UV.U.ncols() );
-                zM->V.resize( factor * UV.V.nrows(), UV.V.ncols() );
-                
-                zM->U.set( real_ptr_t(UV.U.data()) );
-                zM->V.set( real_ptr_t(UV.V.data()) );
-
-                const auto  mem_zfp = zM->U.compressed_size() + zM->V.compressed_size();
-
-                if ( mem_zfp < mem_dense )
-                {
-                    _zdata = std::move( zM );
-                    UV.U   = std::move( blas::matrix< value_t >( 0, 0 ) );
-                    UV.V   = std::move( blas::matrix< value_t >( 0, 0 ) );
-                }// if
-            }// else
         },
         _UV
     );
@@ -548,8 +499,7 @@ lrmatrix::uncompress ()
             UV.U = std::move( cU );
             UV.V = std::move( cV );
 
-            _zdata.U.free();
-            _zdata.V.free();
+            this->remove_compressed();
         },
         _UV );
     
@@ -563,23 +513,13 @@ lrmatrix::uncompress ()
         {
             using  value_t = typename std::decay_t< decltype(UV) >::value_t;
 
-            auto  cUV = std::visit(
-                [this] ( auto && zM )
-                {
-                    using  zfp_value_t = typename std::decay_t< decltype(zM->U) >::value_type;
-                    
-                    auto   cU = zfp_uncompress< value_t, zfp_value_t >( zM->U, nrows(), rank() );
-                    auto   cV = zfp_uncompress< value_t, zfp_value_t >( zM->V, ncols(), rank() );
-                    auto  cUV = lrfactors< value_t >{ std::move(cU), std::move(cV) };
+            auto  cU = zfp_uncompress< value_t >( _zdata.U, nrows(), rank() );
+            auto  cV = zfp_uncompress< value_t >( _zdata.V, ncols(), rank() );
 
-                    zM.reset( nullptr );
-                    
-                    return cUV;
-                },
-                _zdata );
+            UV.U = std::move( cU );
+            UV.V = std::move( cV );
 
-            UV.U = std::move( cUV.U );
-            UV.V = std::move( cUV.V );
+            this->remove_compressed();
         },
         _UV );
     
@@ -604,16 +544,7 @@ lrmatrix::byte_size () const
     
     #elif defined(HAS_ZFP)
     
-    size += sizeof(_zdata);
-
-    std::visit( [&size] ( auto &&  zM )
-    {
-        if ( ! is_null(zM) )
-        {
-            size += sizeof(zM->U) + zM->U.compressed_size();
-            size += sizeof(zM->V) + zM->V.compressed_size();
-        }// if
-    }, _zdata );
+    size += sizeof(_zdata) + _zdata.U.size() + _zdata.V.size();
     
     #endif
     

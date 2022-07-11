@@ -28,22 +28,22 @@
 
 namespace hlr { namespace norm {
 
-namespace hpro = HLIB;
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Frobenius norm
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-inline
-double
-frobenius ( const hpro::TMatrix &  A )
+template < typename value_t >
+Hpro::real_type_t< value_t >
+frobenius ( const Hpro::TMatrix< value_t > &  A )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+    
     if ( is_blocked( A ) )
     {
-        auto    B   = cptrcast( &A, hpro::TBlockMatrix );
-        double  val = 0.0;
+        auto    B   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        real_t  val = 0.0;
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -62,8 +62,6 @@ frobenius ( const hpro::TMatrix &  A )
     }// if
     else if ( is_lowrank( A ) )
     {
-        auto  R = cptrcast( &A, hpro::TRkMatrix );
-        
         //
         // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
         //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
@@ -72,82 +70,69 @@ frobenius ( const hpro::TMatrix &  A )
         //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
         //
 
-        if ( R->is_complex() )
-        {
-            assert( false );
-        }// if
-        else
-        {
-            const auto  U   = hpro::blas_mat_A< hpro::real >( R );
-            const auto  V   = hpro::blas_mat_B< hpro::real >( R );
-            double      val = 0.0;
+        auto        R   = cptrcast( &A, Hpro::TRkMatrix< value_t > );
+        const auto  U   = blas::mat_U( R );
+        const auto  V   = blas::mat_V( R );
+        real_t      val = 0.0;
     
-            for ( size_t  l = 0; l < R->rank(); l++ )
+        for ( size_t  l = 0; l < R->rank(); l++ )
+        {
+            const auto  U_l = U.column( l );
+            const auto  V_l = V.column( l );
+            
+            for ( size_t  k = 0; k < R->rank(); k++ )
             {
-                const auto  U_l = U.column( l );
-                const auto  V_l = V.column( l );
+                const auto  U_k = U.column( k );
+                const auto  V_k = V.column( k );
                 
-                for ( size_t  k = 0; k < R->rank(); k++ )
-                {
-                    const auto  U_k = U.column( k );
-                    const auto  V_k = V.column( k );
-                    
-                    val += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
-                }// for
+                val += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
             }// for
-
-            return std::sqrt( std::abs( val ) );
-        }// else
-    }// if
-    else if ( matrix::is_generic_lowrank( A ) )
-    {
-        auto  R = cptrcast( &A, matrix::lrmatrix );
+        }// for
         
-        //
-        // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
-        //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
-        //              = ∑_ij ∑_k ∑_l U_ik V_jk' U_il' V_jl
-        //              = ∑_k ∑_l ∑_i U_ik U_il' ∑_j V_jk' V_jl
-        //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
-        //
-
-        if ( R->is_complex() )
-        {
-            assert( false );
-        }// if
-        else
-        {
-            const auto  UV  = R->factors();
-
-            return std::visit(
-                [rank=R->rank()] ( auto &&  UV ) -> double
-                {
-                    using  value_t = typename std::decay_t< decltype(UV) >::value_t;
-                    
-                    const auto  U    = UV.U;
-                    const auto  V    = UV.V;
-                    value_t     norm = value_t(0);
-                    
-                    for ( size_t  l = 0; l < rank; l++ )
-                    {
-                        const auto  U_l = U.column( l );
-                        const auto  V_l = V.column( l );
-                        
-                        for ( size_t  k = 0; k < rank; k++ )
-                        {
-                            const auto  U_k = U.column( k );
-                            const auto  V_k = V.column( k );
-                            
-                            norm += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
-                        }// for
-                    }// for
-                    
-                    return std::real( std::sqrt( std::abs( norm ) ) );
-                },
-                R->factors()
-            );
-        }// else
+        return std::sqrt( std::abs( val ) );
     }// if
+    // else if ( matrix::is_generic_lowrank( A ) )
+    // {
+    //     auto  R = cptrcast( &A, matrix::lrmatrix );
+        
+    //     //
+    //     // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
+    //     //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
+    //     //              = ∑_ij ∑_k ∑_l U_ik V_jk' U_il' V_jl
+    //     //              = ∑_k ∑_l ∑_i U_ik U_il' ∑_j V_jk' V_jl
+    //     //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
+    //     //
+
+    //     const auto  UV  = R->factors();
+
+    //     return std::visit(
+    //         [rank=R->rank()] ( auto &&  UV ) -> real_t
+    //         {
+    //             using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+                
+    //             const auto  U    = UV.U;
+    //             const auto  V    = UV.V;
+    //             value_t     norm = value_t(0);
+                
+    //             for ( size_t  l = 0; l < rank; l++ )
+    //             {
+    //                 const auto  U_l = U.column( l );
+    //                 const auto  V_l = V.column( l );
+                    
+    //                 for ( size_t  k = 0; k < rank; k++ )
+    //                 {
+    //                     const auto  U_k = U.column( k );
+    //                     const auto  V_k = V.column( k );
+                        
+    //                     norm += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
+    //                 }// for
+    //             }// for
+                
+    //             return std::real( std::sqrt( std::abs( norm ) ) );
+    //         },
+    //         R->factors()
+    //     );
+    // }// if
     else if ( hlr::matrix::is_tiled_lowrank( A ) )
     {
         //
@@ -158,45 +143,38 @@ frobenius ( const hpro::TMatrix &  A )
         //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
         //
 
-        if ( A.is_complex() )
+        auto          R   = cptrcast( & A, hlr::matrix::tiled_lrmatrix< value_t > );
+        const auto &  U   = R->U();
+        const auto &  V   = R->V();
+        real_t        val = 0.0;
+        
+        for ( size_t  l = 0; l < R->rank(); l++ )
         {
-            assert( false );
-        }// if
-        else
-        {
-            auto          R   = cptrcast( & A, hlr::matrix::tiled_lrmatrix< hpro::real > );
-            const auto &  U   = R->U();
-            const auto &  V   = R->V();
-            double        val = 0.0;
-    
-            for ( size_t  l = 0; l < R->rank(); l++ )
+            for ( size_t  k = 0; k < R->rank(); k++ )
             {
-                for ( size_t  k = 0; k < R->rank(); k++ )
+                real_t  dot_U = 0;
+                real_t  dot_V = 0;
+
+                auto  U_i = U.cbegin();
+                auto  V_i = V.cbegin();
+
+                for ( ; ( U_i != U.cend() ) && ( V_i != V.cend() ); ++U_i, ++V_i )
                 {
-                    double  dot_U = 0;
-                    double  dot_V = 0;
-
-                    auto  U_i = U.cbegin();
-                    auto  V_i = V.cbegin();
-
-                    for ( ; ( U_i != U.cend() ) && ( V_i != V.cend() ); ++U_i, ++V_i )
-                    {
-                        const auto  U_l = (*U_i).second.column( l );
-                        const auto  V_l = (*V_i).second.column( l );
+                    const auto  U_l = (*U_i).second.column( l );
+                    const auto  V_l = (*V_i).second.column( l );
                 
-                        const auto  U_k = (*U_i).second.column( k );
-                        const auto  V_k = (*V_i).second.column( k );
+                    const auto  U_k = (*U_i).second.column( k );
+                    const auto  V_k = (*V_i).second.column( k );
                     
-                        dot_U += blas::dot( U_l, U_k );
-                        dot_V += blas::dot( V_l, V_k );
-                    }// for
-
-                    val += dot_U * dot_V;
+                    dot_U += blas::dot( U_l, U_k );
+                    dot_V += blas::dot( V_l, V_k );
                 }// for
-            }// for
 
-            return std::sqrt( std::abs( val ) );
-        }// else
+                val += dot_U * dot_V;
+            }// for
+        }// for
+
+        return std::sqrt( std::abs( val ) );
     }// if
     else if ( hlr::matrix::is_uniform_lowrank( A ) )
     {
@@ -204,31 +182,19 @@ frobenius ( const hpro::TMatrix &  A )
         // |A| = | U S V' | = |U||S||V| = |S|
         //
 
-        if ( A.is_complex() )
-        {
-            auto  R = cptrcast( &A, hlr::matrix::uniform_lrmatrix< hpro::complex > );
+        auto  R = cptrcast( &A, hlr::matrix::uniform_lrmatrix< value_t > );
         
-            return blas::norm2( R->coeff() );
-        }// if
-        else
-        {
-            auto  R = cptrcast( &A, hlr::matrix::uniform_lrmatrix< hpro::real > );
-        
-            return blas::norm2( R->coeff() );
-        }// if
+        return blas::norm2( R->coeff() );
     }// if
     else if ( is_dense( A ) )
     {
-        if ( A.is_complex() )
-            return blas::normF( hpro::blas_mat< hpro::complex >( cptrcast( &A, hpro::TDenseMatrix ) ) );
-        else
-            return blas::normF( hpro::blas_mat< hpro::real >( cptrcast( &A, hpro::TDenseMatrix ) ) ); 
+        return blas::normF( blas::mat( cptrcast( &A, Hpro::TDenseMatrix< value_t > ) ) );
     }// if
-    else if ( matrix::is_generic_dense( A ) )
-    {
-        return std::visit( [] ( auto &&  M ) -> double { return blas::normF( M ); },
-                           cptrcast( &A, matrix::dense_matrix )->matrix() ); 
-    }// if
+    // else if ( matrix::is_generic_dense( A ) )
+    // {
+    //     return std::visit( [] ( auto &&  M ) -> real_t { return blas::normF( M ); },
+    //                        cptrcast( &A, matrix::dense_matrix )->matrix() ); 
+    // }// if
     else
     {
         HLR_ASSERT( is_blocked( A ) || is_lowrank( A ) || is_dense( A ) );
@@ -240,21 +206,22 @@ frobenius ( const hpro::TMatrix &  A )
 //
 // return Frobenius norm of αA+βB, e.g. |αA+βB|_F
 //
-inline
-double
-frobenius ( const double           alpha,
-            const hpro::TMatrix &  A,
-            const double           beta,
-            const hpro::TMatrix &  B )
+template < typename value_t >
+Hpro::real_type_t< value_t >
+frobenius ( const value_t                     alpha,
+            const Hpro::TMatrix< value_t > &  A,
+            const value_t                     beta,
+            const Hpro::TMatrix< value_t > &  B )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+
     assert( A.block_is()   == B.block_is() );
-    assert( A.is_complex() == B.is_complex() );
     
     if ( is_blocked_all( A, B ) )
     {
-        auto    BA   = cptrcast( &A, hpro::TBlockMatrix );
-        auto    BB   = cptrcast( &B, hpro::TBlockMatrix );
-        double  val = 0.0;
+        auto    BA   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto    BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+        real_t  val = 0.0;
 
         assert(( BA->nblock_rows() == BB->block_rows() ) &&
                ( BA->nblock_cols() == BB->block_cols() ));
@@ -285,8 +252,8 @@ frobenius ( const double           alpha,
     }// if
     else if ( is_lowrank_all( A, B ) )
     {
-        auto  RA = cptrcast( &A, hpro::TRkMatrix );
-        auto  RB = cptrcast( &B, hpro::TRkMatrix );
+        auto  RA = cptrcast( &A, Hpro::TRkMatrix< value_t > );
+        auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
         
         if ( RA->is_complex() )
         {
@@ -301,7 +268,7 @@ frobenius ( const double           alpha,
                           {
                               const auto  rank1 = U1.ncols();
                               const auto  rank2 = U2.ncols();
-                              double      val   = 0.0;
+                              real_t      val   = 0.0;
                               
                               for ( size_t  l = 0; l < rank1; l++ )
                               {
@@ -320,10 +287,10 @@ frobenius ( const double           alpha,
                               return val;
                           };
 
-            const auto  UA  = hpro::blas_mat_A< hpro::real >( RA );
-            const auto  VA  = hpro::blas_mat_B< hpro::real >( RA );
-            const auto  UB  = hpro::blas_mat_A< hpro::real >( RB );
-            const auto  VB  = hpro::blas_mat_B< hpro::real >( RB );
+            const auto  UA  = blas::mat_U( RA );
+            const auto  VA  = blas::mat_V( RA );
+            const auto  UB  = blas::mat_U( RB );
+            const auto  VB  = blas::mat_V( RB );
             const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
                                 alpha * beta  * lrdot( UA, VA, UB, VB ) +
                                 alpha * beta  * lrdot( UB, VB, UA, VA ) +
@@ -334,49 +301,25 @@ frobenius ( const double           alpha,
     }// if
     else if ( is_dense_all( A, B ) )
     {
-        auto  DA = cptrcast( &A, hpro::TDenseMatrix );
-        auto  DB = cptrcast( &B, hpro::TDenseMatrix );
-        
-        if ( A.is_complex() )
-        {
-            auto         MA  = hpro::blas_mat< hpro::complex >( DA );
-            auto         MB  = hpro::blas_mat< hpro::complex >( DB );
-            double       val = 0;
-            const idx_t  n   = idx_t(MA.nrows());
-            const idx_t  m   = idx_t(MA.ncols());
+        auto         DA  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto         DB  = cptrcast( &B, Hpro::TDenseMatrix< value_t > );
+        auto         MA  = blas::mat( DA );
+        auto         MB  = blas::mat( DB );
+        real_t       val = 0;
+        const idx_t  n   = idx_t(MA.nrows());
+        const idx_t  m   = idx_t(MA.ncols());
     
-            for ( idx_t j = 0; j < m; ++j )
-            {
-                for ( idx_t i = 0; i < n; ++i )
-                {
-                    const auto  a_ij = hpro::real(alpha) * MA(i,j) + hpro::real(beta) * MB(i,j);
-                    
-                    val += std::real( math::conj( a_ij ) * a_ij );
-                }// for
-            }// for
-
-            return std::sqrt( std::abs( val ) );
-        }// if
-        else
+        for ( idx_t j = 0; j < m; ++j )
         {
-            auto         MA  = hpro::blas_mat< hpro::real >( DA );
-            auto         MB  = hpro::blas_mat< hpro::real >( DB );
-            double       val = 0;
-            const idx_t  n   = idx_t(MA.nrows());
-            const idx_t  m   = idx_t(MA.ncols());
-    
-            for ( idx_t j = 0; j < m; ++j )
+            for ( idx_t i = 0; i < n; ++i )
             {
-                for ( idx_t i = 0; i < n; ++i )
-                {
-                    const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
                     
-                    val += a_ij * a_ij;
-                }// for
+                val += std::real( math::conj( a_ij ) * a_ij );
             }// for
+        }// for
 
-            return std::sqrt( std::abs( val ) );
-        }// else
+        return std::sqrt( std::abs( val ) );
     }// if
     else
     {
@@ -396,14 +339,14 @@ frobenius ( const double           alpha,
 // compute spectral norm of A via power iteration
 //
 template < typename operator_t >
-double
+Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( const operator_t &  A,
            const bool          squared = true,
-           const real          atol    = 0,
+           const double        atol    = 0,
            const size_t        amax_it = 0 )
 {
-    using  value_t = typename operator_t::value_t;
-    using  real_t  = hpro::real_type_t< value_t >;
+    using  value_t = Hpro::value_type_t< operator_t >;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     const auto  nrows_A = nrows( A );
     const auto  ncols_A = ncols( A );
@@ -417,7 +360,7 @@ spectral ( const operator_t &  A,
     //
     
     auto  generator     = std::default_random_engine();
-    auto  uniform_distr = std::uniform_real_distribution< double >( -1.0, 1.0 );
+    auto  uniform_distr = std::uniform_real_distribution< real_t >( -1.0, 1.0 );
     auto  random        = [&] () { return uniform_distr( generator ); };
     
     blas::fill_fn( x, random );
@@ -450,7 +393,7 @@ spectral ( const operator_t &  A,
             norm_y = lambda_new = blas::norm_2( y );
         }// else
 
-        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.4e (%.4e)", lambda_new, math::abs( ( lambda_new - lambda ) / lambda ) ) );
+        log( 6, "λ" + subscript( i ) + " = " + Hpro::to_string( "%.4e (%.4e)", lambda_new, math::abs( ( lambda_new - lambda ) / lambda ) ) );
         
         // test against given tolerance
         if ( math::abs( ( lambda_new - lambda ) / lambda ) < tol )
@@ -475,87 +418,87 @@ spectral ( const operator_t &  A,
     return lambda;
 }
 
-template <>
-inline
-double
-spectral< hpro::TLinearOperator > ( const hpro::TLinearOperator &  A,
-                                    const bool                     squared,
-                                    const real                     atol,
-                                    const size_t                   amax_it )
-{
-    auto  x = A.domain_vector();
-    auto  y = A.domain_vector();
-    auto  t = A.range_vector();
+// template < typename value_t >
+// Hpro::real_type_t< value_t >
+// spectral< Hpro::TLinearOperator< value_t > > ( const Hpro::TLinearOperator< value_t > &  A,
+//                                                const bool                                squared,
+//                                                const double                              atol,
+//                                                const size_t                              amax_it )
+// {
+//     using  real_t  = Hpro::real_type_t< value_t >;
 
-    // x = rand with |x| = 1
-    x->fill_rand( 0 );
-    x->scale( real(1) / x->norm2() );
+//     auto  x = A.domain_vector();
+//     auto  y = A.domain_vector();
+//     auto  t = A.range_vector();
 
-    const size_t  max_it  = ( amax_it == 0 ? std::max( size_t(5), std::min( A.range_dim(), A.domain_dim() ) / 10 ) : amax_it );
-    const real    tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
-    const real    abs_tol = std::min( real(1e1) * std::numeric_limits< real >::epsilon(), tol );
-    const real    zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
-    real          lambda  = 1.0;
+//     // x = rand with |x| = 1
+//     x->fill_rand( 0 );
+//     x->scale( real_t(1) / x->norm2() );
+
+//     const size_t  max_it  = ( amax_it == 0 ? std::max( size_t(5), std::min( A.range_dim(), A.domain_dim() ) / 10 ) : amax_it );
+//     const real_t  tol     = ( atol    == 0 ? std::sqrt( std::numeric_limits< real >::epsilon() ) : atol );
+//     const real_t  abs_tol = std::min( real_t(1e1) * std::numeric_limits< real >::epsilon(), tol );
+//     const real_t  zero    = std::numeric_limits< real >::epsilon() * std::numeric_limits< real >::epsilon();
+//     real          lambda  = 1.0;
     
-    for ( uint i = 0; i < max_it; i++ )
-    {
-        real  lambda_new = 0;
-        real  norm_y     = 0;
+//     for ( uint i = 0; i < max_it; i++ )
+//     {
+//         real  lambda_new = 0;
+//         real  norm_y     = 0;
         
-        if ( squared )
-        {
-            A.apply( x.get(), t.get(), apply_normal );
-            A.apply( t.get(), y.get(), apply_adjoint );
+//         if ( squared )
+//         {
+//             A.apply( x.get(), t.get(), apply_normal );
+//             A.apply( t.get(), y.get(), apply_adjoint );
 
-            lambda_new = math::sqrt( math::abs( hpro::dot( x.get(), y.get() ) ) );
-            norm_y     = y->norm2();
-        }// if
-        else
-        {
-            A.apply( x.get(), y.get(), apply_normal );
-            norm_y = lambda_new = y->norm2();
-        }// else
+//             lambda_new = math::sqrt( math::abs( Hpro::dot( x.get(), y.get() ) ) );
+//             norm_y     = y->norm2();
+//         }// if
+//         else
+//         {
+//             A.apply( x.get(), y.get(), apply_normal );
+//             norm_y = lambda_new = y->norm2();
+//         }// else
 
-        log( 6, "λ" + subscript( i ) + " = " + hpro::to_string( "%.8e (%.8e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
+//         log( 6, "λ" + subscript( i ) + " = " + Hpro::to_string( "%.8e (%.8e)", lambda_new, std::abs( ( lambda_new - lambda ) / lambda ) ) );
         
-        // test against given tolerance
-        if ( std::abs( ( lambda_new - lambda ) / lambda ) < tol )
-            return lambda_new;
+//         // test against given tolerance
+//         if ( std::abs( ( lambda_new - lambda ) / lambda ) < tol )
+//             return lambda_new;
 
-        // test for machine precision
-        if (( i > 5 ) && ( std::abs( lambda_new - lambda ) < abs_tol ))
-            return lambda_new;
+//         // test for machine precision
+//         if (( i > 5 ) && ( std::abs( lambda_new - lambda ) < abs_tol ))
+//             return lambda_new;
 
-        if ( lambda_new < zero )
-            return lambda_new;
+//         if ( lambda_new < zero )
+//             return lambda_new;
         
-        lambda = lambda_new;
+//         lambda = lambda_new;
 
-        if ( norm_y <= zero )
-            break;
+//         if ( norm_y <= zero )
+//             break;
         
-        y->scale( real(1) / norm_y );
-        y->copy_to( x.get() );
-    }// for
+//         y->scale( real_t(1) / norm_y );
+//         y->copy_to( x.get() );
+//     }// for
 
-    return lambda;
-}
+//     return lambda;
+// }
 
-template <>
-inline
-double
-spectral< hpro::TMatrix > ( const hpro::TMatrix &  A,
-                            const bool             squared,
-                            const real             atol,
-                            const size_t           amax_it )
-{
-    return spectral< hpro::TLinearOperator >( A, squared, atol, amax_it );
-}
+// template < typename value_t >
+// Hpro::real_type_t< value_t >
+// spectral< Hpro::TMatrix< value_t > > ( const Hpro::TMatrix< value_t > &  A,
+//                                        const bool                        squared,
+//                                        const real                        atol,
+//                                        const size_t                      amax_it )
+// {
+//     return spectral< Hpro::TLinearOperator< value_t > >( A, squared, atol, amax_it );
+// }
 
-inline
-double
-inv_error_2 ( const hpro::TMatrix &          A,
-              const hpro::TLinearOperator &  A_inv )
+template < typename value_t >
+Hpro::real_type_t< value_t >
+inv_error_2 ( const Hpro::TMatrix< value_t > &          A,
+              const Hpro::TLinearOperator< value_t > &  A_inv )
 {
     auto  AxInv   = matrix::product( A, A_inv );
     auto  I       = matrix::identity( A.block_is() );
@@ -568,8 +511,8 @@ inv_error_2 ( const hpro::TMatrix &          A,
 // compute inversion error of A vs A^-1 in spectral norm, e.g. |A-A^-1|_2
 //
 // double
-// inv_error_2 ( const TMatrix &  A,
-//               const TMatrix &  A_inv )
+// inv_error_2 ( const TMatrix< value_t > &  A,
+//               const TMatrix< value_t > &  A_inv )
 // {
 //     auto  x     = A->domain_vector();
 //     auto  x_old = A->domain_vector();
@@ -578,31 +521,31 @@ inv_error_2 ( const hpro::TMatrix &          A,
 //     x->fill_rand(1);
     
 //     // normalise x
-//     x->scale( real(1) / x->norm2() );
+//     x->scale( real_t(1) / x->norm2() );
 
 //     complex  lambda     = 0.0;
 //     complex  lambda_old = 1.0;
     
 //     for ( uint i = 0; i < _max_it; i++ )
 //     {
-//         x_old->assign( real(1), x.get() );
+//         x_old->assign( real_t(1), x.get() );
 
 //         apply(               A, x.get(), y.get() );
-//         apply_add( real(-1), B, x.get(), y.get() );
+//         apply_add( real_t(-1), B, x.get(), y.get() );
 
 //         apply(               A, y.get(), x.get(), apply_adjoint );
-//         apply_add( real(-1), B, y.get(), x.get(), apply_adjoint );
+//         apply_add( real_t(-1), B, y.get(), x.get(), apply_adjoint );
 
 //         const auto  lambda = Math::abs( Math::sqrt( dot( x_old.get(), x.get() ) ) );
 
-//         HLR_LOG( 4, hpro::to_string( "%3d : %.6e", i, lambda ) );
+//         HLR_LOG( 4, Hpro::to_string( "%3d : %.6e", i, lambda ) );
 
 //         const real  norm_x = x->norm2();
             
-//         if ( norm_x <= math::square( Limits::epsilon< hpro::real >() ); )
+//         if ( norm_x <= math::square( Limits::epsilon< Hpro::real >() ); )
 //             break;
         
-//         x->scale( real(1) / norm_x );
+//         x->scale( real_t(1) / norm_x );
         
 //         if ( converged( lambda, lambda_old, i ) )
 //             break;

@@ -13,7 +13,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -39,15 +39,16 @@ namespace
 //
 // actual print function
 //
+template < typename value_t >
 void
-print_eps ( const hpro::TMatrix &               M,
+print_eps ( const Hpro::TMatrix< value_t > &    M,
             eps_printer &                       prn,
             const bool                          recurse,
             const std::vector< std::string > &  options )
 {
     if ( is_blocked( M ) && recurse )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -60,7 +61,7 @@ print_eps ( const hpro::TMatrix &               M,
     }// if
     else
     {
-        if ( is_dense( M ) || is_generic_dense( M ) )
+        if ( is_dense( M ) ) // || is_generic_dense( M ) )
         {
             // background
             prn.set_rgb( 243, 94, 94 ); // ScarletRed1!75!White
@@ -78,23 +79,23 @@ print_eps ( const hpro::TMatrix &               M,
                 if ( M.nrows() != M.ncols() )
                     prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                    double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                                   hpro::to_string( "%dx%d", M.nrows(), M.ncols() ) );
+                                   Hpro::to_string( "%dx%d", M.nrows(), M.ncols() ) );
                 else
                     prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                    double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                                   hpro::to_string( "%d", M.nrows() ) );
+                                   Hpro::to_string( "%d", M.nrows() ) );
                 
                 prn.restore();
             }// if
         }// if
-        else if ( is_lowrank( M ) || is_generic_lowrank( M ) )
+        else if ( is_lowrank( M ) ) // || is_generic_lowrank( M ) )
         {
             uint  rank = 0;
 
-            if ( is_lowrank( M ) )
-                rank = cptrcast( &M, hpro::TRkMatrix )->rank();
-            else
-                rank = cptrcast( &M, lrmatrix )->rank();
+            //if ( is_lowrank( M ) )
+                rank = cptrcast( &M, Hpro::TRkMatrix< value_t > )->rank();
+            // else
+            //     rank = cptrcast( &M, lrmatrix )->rank();
 
             // background
             prn.set_rgb( 225, 247, 204 ); // Chameleon1!25!White
@@ -111,14 +112,14 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.set_gray( 0 );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               hpro::to_string( "%d", rank ) );
+                               Hpro::to_string( "%d", rank ) );
                 
                 prn.restore();
             }// if
         }// if
         else if ( is_uniform_lowrank( M ) )
         {
-            auto  R = cptrcast( &M, matrix::uniform_lrmatrix< hpro::real > );
+            auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
 
             // background
             prn.set_rgb( 219, 231, 243 ); // SkyBlue1!25!White
@@ -135,15 +136,15 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.set_gray( 0 );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if
         }// if
         #if defined(USE_LIC_CHECK)
-        else if ( hpro::is_uniform( &M ) )
+        else if ( Hpro::is_uniform( &M ) )
         {
-            auto  R = cptrcast( &M, hpro::TUniformMatrix );
+            auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
 
             // background
             prn.set_rgb( 219, 231, 243 ); // SkyBlue1!25!White
@@ -160,7 +161,7 @@ print_eps ( const hpro::TMatrix &               M,
                 prn.set_gray( 0 );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if
@@ -168,7 +169,7 @@ print_eps ( const hpro::TMatrix &               M,
         #endif
         else if ( is_sparse( M ) )
         {
-            auto  S = cptrcast( &M, hpro::TSparseMatrix );
+            auto  S = cptrcast( &M, Hpro::TSparseMatrix< value_t > );
             
             // background
             prn.set_rgb( 253, 250, 167 ); // Butter1!50!White 242,229,188
@@ -207,12 +208,12 @@ print_eps ( const hpro::TMatrix &               M,
             prn.set_rgb( 92, 53, 102 );
             prn.draw_text( double(M.col_ofs()) + double(M.ncols()) / 2.0,
                            double(M.row_ofs()) + fn_size,
-                           hpro::to_string( "%d ... %d", M.col_ofs(), M.col_ofs() + M.ncols() - 1 ), 'c' );
+                           Hpro::to_string( "%d ... %d", M.col_ofs(), M.col_ofs() + M.ncols() - 1 ), 'c' );
 
             prn.save();
             prn.translate( double(M.col_ofs()) + fn_size, double(M.row_ofs()) + double(M.nrows()) / 2.0 );
             prn.rotate( -90 );
-            prn.draw_text( 0, 0, hpro::to_string( "%d ... %d", M.row_ofs(), M.row_ofs() + M.nrows() - 1 ), 'c' );
+            prn.draw_text( 0, 0, Hpro::to_string( "%d ... %d", M.row_ofs(), M.row_ofs() + M.nrows() - 1 ), 'c' );
             prn.restore();
             
             prn.restore();
@@ -235,7 +236,7 @@ print_eps ( const hpro::TMatrix &               M,
         prn.save();
 
         const auto  fn_size = std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 );
-        const auto  text    = hpro::to_string( "%d", M.id() );
+        const auto  text    = Hpro::to_string( "%d", M.id() );
     
         prn.set_font( "Helvetica", fn_size );
         prn.set_rgb( 32, 74, 135 ); // SkyBlue3
@@ -249,14 +250,15 @@ print_eps ( const hpro::TMatrix &               M,
 //
 // actual print function
 //
+template < typename value_t >
 void
-print_mem ( const hpro::TMatrix &               M,
+print_mem ( const Hpro::TMatrix< value_t > &    M,
             eps_printer &                       prn,
             const std::vector< std::string > &  options )
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -280,7 +282,7 @@ print_mem ( const hpro::TMatrix &               M,
         }// if
         else if ( is_lowrank( M ) )
         {
-            auto  R     = cptrcast( &M, hpro::TRkMatrix );
+            auto  R     = cptrcast( &M, Hpro::TRkMatrix< value_t > );
             auto  rank  = R->rank();
             auto  ratio = ( rank * double( R->nrows() + R->ncols() ) ) / ( double(R->nrows()) * double(R->ncols()) );
             
@@ -293,7 +295,7 @@ print_mem ( const hpro::TMatrix &               M,
         }// if
         else if ( is_uniform_lowrank( M ) )
         {
-            auto  R        = cptrcast( &M, matrix::uniform_lrmatrix< hpro::real > );
+            auto  R        = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
             auto  row_rank = R->row_rank();
             auto  col_rank = R->row_rank();
             auto  ratio    = ( ( row_rank * double( R->nrows() ) +
@@ -323,10 +325,11 @@ print_mem ( const hpro::TMatrix &               M,
 //
 // print matrix <M> to file <filename>
 //
+template < typename value_t >
 void
-print_eps ( const hpro::TMatrix &  M,
-            const std::string &    filename,
-            const std::string &    options )
+print_eps ( const Hpro::TMatrix< value_t > &  M,
+            const std::string &               filename,
+            const std::string &               options )
 {
     const boost::filesystem::path  filepath( filename );
     std::string                    suffix;
@@ -366,10 +369,11 @@ print_eps ( const hpro::TMatrix &  M,
 //
 // print matrix <M> to file <filename>
 //
+template < typename value_t >
 void
-print_lvl_eps ( const hpro::TMatrix &  M,
-                const std::string &    basename,
-                const std::string &    options )
+print_lvl_eps ( const Hpro::TMatrix< value_t > &  M,
+                const std::string &               basename,
+                const std::string &               options )
 {
     std::vector< std::string >  optarr;
 
@@ -388,8 +392,8 @@ print_lvl_eps ( const hpro::TMatrix &  M,
     // go BFS style through matrix and print each level separately
     //
 
-    auto  parents = std::list< const hpro::TMatrix * >();
-    auto  blocks  = std::list< const hpro::TMatrix * >{ & M };
+    auto  parents = std::list< const Hpro::TMatrix< value_t > * >();
+    auto  blocks  = std::list< const Hpro::TMatrix< value_t > * >{ & M };
     uint  lvl     = 0;
 
     while ( ! blocks.empty() )
@@ -445,13 +449,13 @@ print_lvl_eps ( const hpro::TMatrix &  M,
         // next level
         //
 
-        auto  sons = std::list< const hpro::TMatrix * >();
+        auto  sons = std::list< const Hpro::TMatrix< value_t > * >();
 
         for ( auto  M_i : blocks )
         {
             if ( is_blocked( M_i ) )
             {
-                auto  B_i = cptrcast( M_i, hpro::TBlockMatrix );
+                auto  B_i = cptrcast( M_i, Hpro::TBlockMatrix< value_t > );
 
                 for ( uint  i = 0; i < B_i->nblock_rows(); ++i )
                 {
@@ -473,10 +477,11 @@ print_lvl_eps ( const hpro::TMatrix &  M,
 //
 // colorize matrix blocks in <M> according to rank
 //
+template < typename value_t >
 void
-print_mem_eps ( const hpro::TMatrix &  M,
-                const std::string &    filename,
-                const std::string &    options )
+print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
+                const std::string &               filename,
+                const std::string &               options )
 {
     const boost::filesystem::path  filepath( filename );
     std::string                    suffix;
@@ -523,7 +528,7 @@ print_eps ( const cluster_basis_t &  cb,
             const std::string &      options )
 {
     using value_t = typename cluster_basis_t::value_t;
-    using real_t  = hpro::real_type_t< value_t >;
+    using real_t  = Hpro::real_type_t< value_t >;
     
     const boost::filesystem::path  filepath( filename );
     std::string                    suffix;
@@ -674,29 +679,21 @@ template void print_eps< cluster_basis< std::complex< double > > > ( const clust
 
 #if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
 
-template <>
-void
-print_eps< hpro::TClusterBasis< hpro::real > > ( const hpro::TClusterBasis< hpro::real > &  cb,
-                                                 const std::string &                        filename,
-                                                 const std::string &                        /* options */ )
-{
-    hpro::TPSClusterBasisVis< hpro::real >  cbvis;
+#define INST_PRINT_EPS( type )                                          \
+    template <>                                                         \
+    void                                                                \
+    print_eps< Hpro::TClusterBasis< type > > ( const Hpro::TClusterBasis< type > &  cb, \
+                                               const std::string &                 filename, \
+                                               const std::string &                 /* options */ ) \
+    {                                                                   \
+        Hpro::TPSClusterBasisVis< type >  cbvis;                        \
+                                                                        \
+        cbvis.colourise( false );                                       \
+        cbvis.print( &cb, filename );                                   \
+    }
 
-    cbvis.colourise( false );
-    cbvis.print( &cb, filename );
-}
-
-template <>
-void
-print_eps< hpro::TClusterBasis< hpro::complex > > ( const hpro::TClusterBasis< hpro::complex > &  cb,
-                                                    const std::string &                           filename,
-                                                    const std::string &                           /* options */ )
-{
-    hpro::TPSClusterBasisVis< hpro::complex >  cbvis;
-
-    cbvis.colourise( false );
-    cbvis.print( &cb, filename );
-}
+INST_PRINT_EPS( float )
+INST_PRINT_EPS( double )
 
 #endif
 

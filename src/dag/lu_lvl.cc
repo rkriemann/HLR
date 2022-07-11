@@ -21,19 +21,16 @@
 
 namespace hlr { namespace dag {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 namespace
 {
 
+template < typename value_t >
 struct lu_node : public node
 {
-    TMatrix *  A;
+    Hpro::TMatrix< value_t > *  A;
     bool       is_leaf;
     
-    lu_node ( TMatrix *  aA )
+    lu_node ( Hpro::TMatrix< value_t > *  aA )
             : A( aA )
             , is_leaf{ false }
     { init(); }
@@ -42,19 +39,20 @@ struct lu_node : public node
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
+template < typename value_t >
 struct solve_upper_node : public node
 {
-    const TMatrix *  U;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  U;
+    Hpro::TMatrix< value_t > *        A;
     
-    solve_upper_node ( const TMatrix *  aU,
-                       TMatrix *        aA )
+    solve_upper_node ( const Hpro::TMatrix< value_t > *  aU,
+                       Hpro::TMatrix< value_t > *        aA )
             : U( aU )
             , A( aA )
     { init(); }
@@ -63,19 +61,20 @@ struct solve_upper_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
+template < typename value_t >
 struct solve_lower_node : public node
 {
-    const TMatrix *  L;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  L;
+    Hpro::TMatrix< value_t > *        A;
 
-    solve_lower_node ( const TMatrix *  aL,
-                       TMatrix *        aA )
+    solve_lower_node ( const Hpro::TMatrix< value_t > *  aL,
+                       Hpro::TMatrix< value_t > *        aA )
             : L( aL )
             , A( aA )
     { init(); }
@@ -84,21 +83,22 @@ struct solve_lower_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
     
+template < typename value_t >
 struct update_node : public node
 {
-    const TMatrix *  A;
-    const TMatrix *  B;
-    TMatrix *        C;
+    const Hpro::TMatrix< value_t > *  A;
+    const Hpro::TMatrix< value_t > *  B;
+    Hpro::TMatrix< value_t > *        C;
 
-    update_node ( const TMatrix *  aA,
-                  const TMatrix *  aB,
-                  TMatrix *        aC )
+    update_node ( const Hpro::TMatrix< value_t > *  aA,
+                  const Hpro::TMatrix< value_t > *  aB,
+                  Hpro::TMatrix< value_t > *        aC )
             : A( aA )
             , B( aB )
             , C( aC )
@@ -108,18 +108,19 @@ struct update_node : public node
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
+template < typename value_t >
 struct apply_node : public node
 {
-    TMatrix *  A;
+    Hpro::TMatrix< value_t > *  A;
     bool       is_recursive;
     
-    apply_node ( TMatrix *  aA )
+    apply_node ( Hpro::TMatrix< value_t > *  aA )
             : A( aA )
             , is_recursive( false )
     { init(); }
@@ -130,7 +131,7 @@ struct apply_node : public node
     void set_recursive () { is_recursive = true; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; } // not needed because of direct DAG generation
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
@@ -142,8 +143,9 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
     if ( is_leaf || is_dense( A ) )
     {
@@ -158,11 +160,12 @@ lu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-solve_lower_node::run_ ( const TTruncAcc &  acc )
+solve_lower_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
+    if ( Hpro::CFG::Arith::use_accu )
+        A->apply_updates( acc, Hpro::recursive );
     
     HLR_ERROR( "todo" );
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
@@ -174,11 +177,12 @@ solve_lower_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-solve_upper_node::run_ ( const TTruncAcc &  acc )
+solve_upper_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
+    if ( Hpro::CFG::Arith::use_accu )
+        A->apply_updates( acc, Hpro::recursive );
     
     HLR_ERROR( "todo" );
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
@@ -190,10 +194,11 @@ solve_upper_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-update_node::run_ ( const TTruncAcc &  acc )
+update_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
+    if ( Hpro::CFG::Arith::use_accu )
     {
         HLR_ERROR( "todo" );
         
@@ -215,16 +220,17 @@ update_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-apply_node::run_ ( const TTruncAcc &  acc )
+apply_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
     if ( ! is_recursive )
-        A->apply_updates( acc, nonrecursive );
+        A->apply_updates( acc, Hpro::nonrecursive );
     
     // if ( is_blocked( A ) && ! hpro::is_small( A ) )
-    //     A->apply_updates( acc, nonrecursive );
+    //     A->apply_updates( acc, Hpro::nonrecursive );
     // else
-    //     A->apply_updates( acc, recursive );
+    //     A->apply_updates( acc, Hpro::recursive );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -239,9 +245,10 @@ using nodelist_map_t  = std::vector< node_list_t >;
 //
 // add dependency from all sub blocks of A to "node"
 //
+template < typename value_t >
 void
 add_dep_from_all_sub ( node *           node,
-                       const TMatrix *  A,
+                       const Hpro::TMatrix< value_t > *  A,
                        node_map_t &     nodes )
 {
     auto  node_A = nodes[ A->id() ];
@@ -253,16 +260,16 @@ add_dep_from_all_sub ( node *           node,
     }// if
     else if ( is_blocked( A ) )
     {
-        auto  B = cptrcast( A, TBlockMatrix );
+        auto  B = cptrcast( A, Hpro::TBlockMatrix< value_t > );
         
         for ( uint j = 0; j < B->block_cols(); ++j )
         {
             for ( uint i = 0; i < B->block_rows(); ++i )
             {
-                const TMatrix *  B_ij = B->block( i, j );
+                const Hpro::TMatrix< value_t > *  B_ij = B->block( i, j );
                 
                 if ( B_ij != nullptr )
-                    add_dep_from_all_sub( node, B_ij, nodes );
+                    add_dep_from_all_sub< value_t >( node, B_ij, nodes );
             }// for
         }// for
     }// if
@@ -271,9 +278,10 @@ add_dep_from_all_sub ( node *           node,
 //
 // add all dependencies of A and of all subblocks of A to "node"
 //
+template < typename value_t >
 void
 add_dep_from_all_sub ( node *            node,
-                       const TMatrix *   A,
+                       const Hpro::TMatrix< value_t > *   A,
                        node_map_t &      final_map,
                        nodelist_map_t &  updates )
 {
@@ -287,18 +295,18 @@ add_dep_from_all_sub ( node *            node,
     // recurse
     if ( is_blocked( A ) )
     {
-        auto  B = cptrcast( A, TBlockMatrix );
+        auto  B = cptrcast( A, Hpro::TBlockMatrix< value_t > );
         
         for ( uint j = 0; j < B->block_cols(); ++j )
         {
             for ( uint i = 0; i < B->block_rows(); ++i )
             {
-                const TMatrix *  B_ij = B->block( i, j );
+                const Hpro::TMatrix< value_t > *  B_ij = B->block( i, j );
                 
                 if ( B_ij == nullptr )
                     continue;
 
-                add_dep_from_all_sub( node, B_ij, final_map, updates );
+                add_dep_from_all_sub< value_t >( node, B_ij, final_map, updates );
             }// for
         }// for
     }// if
@@ -307,8 +315,9 @@ add_dep_from_all_sub ( node *            node,
 //
 // generate nodes for level-wise LU
 //
+template < typename value_t >
 node *
-dag_lu_lvl ( TMatrix *         A,
+dag_lu_lvl ( Hpro::TMatrix< value_t > *         A,
              node_list_t &     nodes,
              node_map_t &      final_map,
              nodelist_map_t &  updates,
@@ -323,7 +332,7 @@ dag_lu_lvl ( TMatrix *         A,
     ///////////////////////////////////////////////////////////////
 
     const bool  A_is_leaf = ( is_leaf( A ) || is_small( min_size, A ) );
-    auto        node_A    = hlr::dag::alloc_node< lu_node >( nodes, A );
+    auto        node_A    = hlr::dag::alloc_node< lu_node< value_t > >( nodes, A );
 
     final_map[ A->id() ] = node_A;
     
@@ -333,7 +342,7 @@ dag_lu_lvl ( TMatrix *         A,
     }// if
     else
     {
-        auto        B      = ptrcast( A, TBlockMatrix );
+        auto        B      = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         const uint  nbrows = B->nblock_rows();
         const uint  nbcols = B->nblock_cols();
 
@@ -343,7 +352,7 @@ dag_lu_lvl ( TMatrix *         A,
             
             assert( ! is_null( A_ii ) );
             
-            auto  node_A_ii = dag_lu_lvl( A_ii, nodes, final_map, updates, min_size );
+            auto  node_A_ii = dag_lu_lvl< value_t >( A_ii, nodes, final_map, updates, min_size );
             
             node_A->after( node_A_ii );
             node_A->inc_dep_cnt();
@@ -365,7 +374,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ij ) && ( is_leaf( L_ij ) || A_is_leaf ))
         {
-            auto  solve_node = hlr::dag::alloc_node< solve_lower_node >( nodes, A, L_ij );
+            auto  solve_node = hlr::dag::alloc_node< solve_lower_node< value_t > >( nodes, A, L_ij );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -377,7 +386,7 @@ dag_lu_lvl ( TMatrix *         A,
     {
         if ( ! is_null( L_ji ) && ( is_leaf( L_ji ) || A_is_leaf ))
         {
-            auto  solve_node = hlr::dag::alloc_node< solve_upper_node >( nodes, A, L_ji );
+            auto  solve_node = hlr::dag::alloc_node< solve_upper_node< value_t > >( nodes, A, L_ji );
 
             solve_node->after( node_A );
             solve_node->inc_dep_cnt();
@@ -397,7 +406,7 @@ dag_lu_lvl ( TMatrix *         A,
             
             if ( ! is_null_any( L_ji, L_il, L_jl ) && ( is_leaf_any( L_ji, L_il, L_jl ) || A_is_leaf ))
             {
-                auto  upd_node = hlr::dag::alloc_node< update_node >( nodes, L_ji, L_il, L_jl );
+                auto  upd_node = hlr::dag::alloc_node< update_node< value_t > >( nodes, L_ji, L_il, L_jl );
                 
                 updates[ L_jl->id() ].push_back( upd_node );
 
@@ -413,8 +422,9 @@ dag_lu_lvl ( TMatrix *         A,
 //
 // assign collected dependencies
 //
+template < typename value_t >
 void
-assign_dependencies ( TMatrix *            A,
+assign_dependencies ( Hpro::TMatrix< value_t > *            A,
                       node_map_t &         final_map,
                       nodelist_map_t &     updates,
                       const node_list_t &  parent_deps,
@@ -431,7 +441,7 @@ assign_dependencies ( TMatrix *            A,
     if ( is_final && ! is_inner_fac )
     {
         // add dependencies of A and of all subblocks
-        add_dep_from_all_sub( node_A, A, final_map, updates );
+        add_dep_from_all_sub< value_t >( node_A, A, final_map, updates );
 
         // and dependencies from parent nodes
         for ( auto  node : parent_deps )
@@ -454,7 +464,7 @@ assign_dependencies ( TMatrix *            A,
             for ( auto  dep : updates[ A->id() ] )
                 deps_A.push_back( dep );
             
-            auto  B = ptrcast( A, TBlockMatrix );
+            auto  B = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         
             for ( uint j = 0; j < B->block_cols(); ++j )
             {
@@ -463,7 +473,7 @@ assign_dependencies ( TMatrix *            A,
                     auto  B_ij = B->block( i, j );
                 
                     if ( B_ij != nullptr )
-                        assign_dependencies( B_ij, final_map, updates, deps_A, min_size );
+                        assign_dependencies< value_t >( B_ij, final_map, updates, deps_A, min_size );
                 }// for
             }// for
         }// if
@@ -478,10 +488,11 @@ assign_dependencies ( TMatrix *            A,
 // add dependencies from all updates applied to blocks below M_root
 // to node "root_apply"
 //
-apply_node *
-add_dep_from_all_updates_below ( const TMatrix *   M,
-                                 TMatrix *         M_root,
-                                 apply_node *      root_apply,
+template < typename value_t >
+apply_node< value_t > *
+add_dep_from_all_updates_below ( const Hpro::TMatrix< value_t > *   M,
+                                 Hpro::TMatrix< value_t > *         M_root,
+                                 apply_node< value_t > *      root_apply,
                                  node_list_t &     nodes,
                                  nodelist_map_t &  updates )
 {
@@ -492,7 +503,7 @@ add_dep_from_all_updates_below ( const TMatrix *   M,
     {
         // create apply node for root block if updates exist
         if ( root_apply == nullptr )
-            root_apply = hlr::dag::alloc_node< apply_node >( nodes, M_root );
+            root_apply = hlr::dag::alloc_node< apply_node< value_t > >( nodes, M_root );
                 
         for ( auto  upd : updates[ M->id() ] )
         {
@@ -503,7 +514,7 @@ add_dep_from_all_updates_below ( const TMatrix *   M,
 
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( M, TBlockMatrix );
+        auto  B = cptrcast( M, Hpro::TBlockMatrix< value_t > );
         
         for ( uint  i = 0; i < B->block_rows(); ++i )
             for ( uint  j = 0; j < B->block_cols(); ++j )
@@ -517,8 +528,9 @@ add_dep_from_all_updates_below ( const TMatrix *   M,
 // create apply nodes for all blocks below M (including) with updates
 // and set dependencies to the final node of M
 //
+template < typename value_t >
 void
-build_apply_dep ( TMatrix *         M,
+build_apply_dep ( Hpro::TMatrix< value_t > *         M,
                   node *            parent_apply,
                   node_list_t &     nodes,
                   node_map_t &      final_map,
@@ -528,9 +540,9 @@ build_apply_dep ( TMatrix *         M,
     if ( M == nullptr )
         return;
 
-    auto          M_final      = final_map[ M->id() ];
-    const bool    is_inner_fac = ( is_on_diag( M ) && is_blocked( M ) && ! is_small( min_size, M ) );
-    apply_node *  M_apply      = nullptr;
+    auto                     M_final      = final_map[ M->id() ];
+    const bool               is_inner_fac = ( is_on_diag( M ) && is_blocked( M ) && ! is_small( min_size, M ) );
+    apply_node< value_t > *  M_apply      = nullptr;
 
     //
     // if node has updates, it needs an apply node
@@ -538,7 +550,7 @@ build_apply_dep ( TMatrix *         M,
 
     if ( ! updates[ M->id() ].empty() )
     {
-        M_apply = hlr::dag::alloc_node< apply_node >( nodes, M );
+        M_apply = hlr::dag::alloc_node< apply_node< value_t > >( nodes, M );
 
         // all updates form dependency
         for ( auto  upd : updates[ M->id() ] )
@@ -555,7 +567,7 @@ build_apply_dep ( TMatrix *         M,
 
     if (( parent_apply != nullptr ) && ( M_apply == nullptr ))
     {
-        M_apply = hlr::dag::alloc_node< apply_node >( nodes, M );
+        M_apply = hlr::dag::alloc_node< apply_node< value_t > >( nodes, M );
     }// if
     
     //
@@ -593,7 +605,7 @@ build_apply_dep ( TMatrix *         M,
     {
         if ( is_blocked( M ) )
         {
-            auto  B = ptrcast( M, TBlockMatrix );
+            auto  B = ptrcast( M, Hpro::TBlockMatrix< value_t > );
 
             for ( uint  i = 0; i < B->block_rows(); ++i )
                 for ( uint  j = 0; j < B->block_cols(); ++j )
@@ -606,8 +618,9 @@ build_apply_dep ( TMatrix *         M,
 
 }// namespace anonymous
 
+template < typename value_t >
 graph
-gen_dag_lu_lvl ( TMatrix &     A,
+gen_dag_lu_lvl ( Hpro::TMatrix< value_t > &     A,
                  const size_t  min_size )
 {
     //
@@ -624,7 +637,7 @@ gen_dag_lu_lvl ( TMatrix &     A,
 
     auto  final = dag_lu_lvl( & A, nodes, final_map, updates, min_size );
 
-    if ( CFG::Arith::use_accu )
+    if ( Hpro::CFG::Arith::use_accu )
         build_apply_dep( & A, nullptr, nodes, final_map, updates, min_size );
     else
         assign_dependencies( & A, final_map, updates, {}, min_size );

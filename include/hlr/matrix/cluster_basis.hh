@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -25,15 +25,11 @@
 namespace hlr
 { 
 
-namespace hpro = HLIB;
+using indexset     = Hpro::TIndexSet;
+using cluster_tree = Hpro::TCluster;
+using accuracy     = Hpro::TTruncAcc;
 
-using indexset     = hpro::TIndexSet;
-using cluster_tree = hpro::TCluster;
-using accuracy     = hpro::TTruncAcc;
-
-using hpro::real;
-using hpro::complex;
-using hpro::idx_t;
+using Hpro::idx_t;
 
 // local matrix type
 DECLARE_TYPE( cluster_basis );
@@ -312,7 +308,7 @@ rank_info ( const cluster_basis< value_t > &  cb )
 
 template < typename value_t >
 std::tuple< uint, uint, uint >
-rank_info ( const hpro::TClusterBasis< value_t > &  cb )
+rank_info ( const Hpro::TClusterBasis< value_t > &  cb )
 {
     auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_cb( cb );
 

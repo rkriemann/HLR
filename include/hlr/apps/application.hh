@@ -11,13 +11,7 @@
 #include <hpro/cluster/TCoordinate.hh>
 #include <hpro/matrix/TCoeffFn.hh>
 
-namespace hlr
-{
-
-namespace hpro = HLIB;
-
-namespace apps
-{
+namespace hlr { namespace apps {
 
 template < typename T_value >
 class application
@@ -26,21 +20,21 @@ public:
     using  value_t = T_value;
 
     // return true if problem is real/complex valued
-    bool  is_real_valued    () const { return ! hpro::is_complex_type< value_t >::value; }
-    bool  is_complex_valued () const { return   hpro::is_complex_type< value_t >::value; }
+    bool  is_real_valued    () const { return ! Hpro::is_complex_type_v< value_t >; }
+    bool  is_complex_valued () const { return   Hpro::is_complex_type_v< value_t >; }
     
     //
     // set up coordinates
     //
     virtual
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const = 0;
 
     //
     // return coefficient function to evaluate matrix entries
     //
     virtual
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func  () const = 0;
 };
 

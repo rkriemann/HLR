@@ -18,34 +18,32 @@
 
 namespace hlr { namespace apps {
 
-namespace hpro = HLIB;
-
-class helmholtz_slp : public application< hpro::complex >
+class helmholtz_slp : public application< std::complex< double > >
 {
 public:
     // public types
-    using  value_t = hpro::complex;
+    using  value_t = std::complex< double >;
 
 private:
     // BEM data
-    std::unique_ptr< hpro::TGrid >                     _grid;
-    std::unique_ptr< hpro::TFnSpace >                  _fnspace;
-    std::unique_ptr< hpro::TBilinearForm< value_t > >  _bf;
+    std::unique_ptr< Hpro::TGrid >                     _grid;
+    std::unique_ptr< Hpro::TFnSpace< double > >        _fnspace;
+    std::unique_ptr< Hpro::TBilinearForm< value_t > >  _bf;
 
 public:
     // ctor with grid name (plus refinement levels)
-    helmholtz_slp ( const hpro::complex  kappa,
-                    const std::string &  grid );
+    helmholtz_slp ( const std::complex< double >  kappa,
+                    const std::string &           grid );
     
     // dtor
     virtual ~helmholtz_slp () {}
     
     // return coordinates for problem indices
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const;
     
     // return coefficient function to evaluate matrix entries
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func  () const;
 };
 

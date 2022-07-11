@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if USE_GSL == 1
 #include <gsl/gsl_sf_bessel.h>
@@ -31,7 +31,7 @@ namespace hlr { namespace matrix {
 //
 template < typename T_kernel,
            typename T_coordinate >
-class radial_function : public hpro::TCoeffFn< typename T_kernel::value_t >
+class radial_function : public Hpro::TCoeffFn< typename T_kernel::value_t >
 {
 public:
     using  kernel_t     = T_kernel;
@@ -61,8 +61,8 @@ public:
     //!
     //! coefficient evaluation
     //!
-    virtual void eval  ( const std::vector< hpro::idx_t > &  rowidxs,
-                         const std::vector< hpro::idx_t > &  colidxs,
+    virtual void eval  ( const std::vector< Hpro::idx_t > &  rowidxs,
+                         const std::vector< Hpro::idx_t > &  colidxs,
                          value_t *                     matrix ) const
     {
         const size_t  n = rowidxs.size();
@@ -77,18 +77,18 @@ public:
             {
                 const auto    idx0 = rowidxs[ i ];
                 const auto &  x    = _x_vertices[ idx0 ];
-                const auto    dist = hpro::norm2( x - y );
+                const auto    dist = Hpro::norm2( x - y );
 
                 matrix[ j*n + i ] = _kernel( dist );
             }// for
         }// for
     }
-    using hpro::TCoeffFn< value_t >::eval;
+    using Hpro::TCoeffFn< value_t >::eval;
 
     //!
     //! return format of matrix: symmetric as kernel is symmetric
     //!
-    virtual hpro::matform_t  matrix_format  () const { return hpro::symmetric; }
+    virtual Hpro::matform_t  matrix_format  () const { return Hpro::symmetric; }
 };
 
 ////////////////////////////////////////////////////////////

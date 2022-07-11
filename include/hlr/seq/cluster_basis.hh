@@ -19,8 +19,6 @@
 
 namespace hlr { namespace seq { namespace matrix {
 
-namespace hpro = HLIB;
-
 using namespace hlr::matrix;
 
 //
@@ -29,15 +27,15 @@ using namespace hlr::matrix;
 namespace detail
 {
 
-// map HLIB types to HLR 
-using  indexset = hpro::TIndexSet;
+// map HLIBpro types to HLR 
+using  indexset = Hpro::TIndexSet;
 
 // mapping of clusters/indexsets to corresponding matrix blocks
-using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const hpro::TRkMatrix * >, indexset_hash >;
+using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const Hpro::TRkMatrix< value_t > * >, indexset_hash >;
 
 void
 build_lrmatrix_map ( const cluster_tree &   ct,
-                     const hpro::TMatrix &  M,
+                     const Hpro::TMatrix< value_t > &  M,
                      lrmatrix_map_t &       mat_map,
                      const bool             adjoint );
 
@@ -60,7 +58,7 @@ std::pair< std::unique_ptr< cluster_basis< value_t > >,
            std::unique_ptr< cluster_basis< value_t > > >
 construct_from_H ( const cluster_tree &   rowct,
                    const cluster_tree &   colct,
-                   const hpro::TMatrix &  M,
+                   const Hpro::TMatrix< value_t > &  M,
                    const accuracy &       acc )
 {
     //
@@ -91,20 +89,20 @@ namespace detail
 //
 template < typename value_t >
 const blas::matrix< value_t > &
-U ( const hpro::TRkMatrix *  M,
+U ( const Hpro::TRkMatrix< value_t > *  M,
     const bool               adjoint )
 {
-    if ( adjoint ) return hpro::blas_mat_B< value_t >( M );
-    else           return hpro::blas_mat_A< value_t >( M );
+    if ( adjoint ) return Hpro::blas_mat_B< value_t >( M );
+    else           return Hpro::blas_mat_A< value_t >( M );
 }
 
 template < typename value_t >
 const blas::matrix< value_t > &
-V ( const hpro::TRkMatrix *  M,
+V ( const Hpro::TRkMatrix< value_t > *  M,
     const bool               adjoint )
 {
-    if ( adjoint ) return hpro::blas_mat_A< value_t >( M );
-    else           return hpro::blas_mat_B< value_t >( M );
+    if ( adjoint ) return Hpro::blas_mat_A< value_t >( M );
+    else           return Hpro::blas_mat_B< value_t >( M );
 }
 
 //
@@ -112,15 +110,15 @@ V ( const hpro::TRkMatrix *  M,
 //
 void
 build_lrmatrix_map ( const cluster_tree &   ct,
-                     const hpro::TMatrix &  M,
+                     const Hpro::TMatrix< value_t > &  M,
                      lrmatrix_map_t &       mat_map,
                      const bool             adjoint )
 {
-    HLR_ASSERT( ct == M.row_is( adjoint ? hpro::apply_transposed : hpro::apply_normal ) );
+    HLR_ASSERT( ct == M.row_is( adjoint ? Hpro::apply_transposed : Hpro::apply_normal ) );
     
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         if ( adjoint )
         {
@@ -160,7 +158,7 @@ build_lrmatrix_map ( const cluster_tree &   ct,
     else if ( is_lowrank( M ) )
     {
         // std::cout << ct.to_string() << " : " << M.block_is().to_string() << std::endl;
-        mat_map[ ct ].push_back( cptrcast( &M, hpro::TRkMatrix ) );
+        mat_map[ ct ].push_back( cptrcast( &M, Hpro::TRkMatrix< value_t > ) );
     }// if
     else if ( is_dense( M ) )
     {

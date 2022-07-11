@@ -15,7 +15,7 @@
 
 namespace hlr { namespace matrix {
 
-using namespace HLIB;
+using namespace Hpro;
 
 //
 // linear operator mapping
@@ -25,9 +25,10 @@ using namespace HLIB;
 // mapping function of linear operator A, e.g. y ≔ A(x).
 // Depending on \a op, either A, A^T or A^H is applied.
 //
+template < typename value_t >
 void
-triinv_eval::apply  ( const TVector *  x,
-                      TVector *        y,
+triinv_eval< value_t >::apply  ( const TVector< value_t > *  x,
+                      TVector< value_t > *        y,
                       const matop_t    op ) const
 {
     HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
@@ -36,47 +37,35 @@ triinv_eval::apply  ( const TVector *  x,
     x->copy_to( y );
 
     if ( _shape == upper_triangular )
-        hlr::solve_upper_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), _diag );
+        hlr::solve_upper_tri( op, _mat, * ptrcast( y, hpro::TScalarVector< value_t > ), _diag );
     else
-        hlr::solve_lower_tri( op, _mat, * ptrcast( y, hpro::TScalarVector ), _diag );
+        hlr::solve_lower_tri( op, _mat, * ptrcast( y, hpro::TScalarVector< value_t > ), _diag );
 }
 
 //
 // mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
 // Depending on \a op, either A, A^T or A^H is applied.
 //
+template < typename value_t >
 void
-triinv_eval::apply_add  ( const real       alpha,
-                          const TVector *  x,
-                          TVector *        y,
+triinv_eval< value_t >::apply_add  ( const value_t       alpha,
+                          const TVector< value_t > *  x,
+                          TVector< value_t > *        y,
                           const matop_t    op ) const
 {
     HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
 
-    TScalarVector  t;
+    TScalarVector< value_t >  t;
 
     apply( x, & t, op );
     y->axpy( alpha, & t );
 }
 
+template < typename value_t >
 void
-triinv_eval::capply_add  ( const complex    alpha,
-                           const TVector *  x,
-                           TVector *        y,
-                           const matop_t    op ) const
-{
-    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
-
-    TScalarVector  t;
-    
-    apply( x, & t, op );
-    y->caxpy( alpha, & t );
-}
-
-void
-triinv_eval::apply_add  ( const real       /* alpha */,
-                          const TMatrix *  /* X */,
-                          TMatrix *        /* Y */,
+triinv_eval< value_t >::apply_add  ( const value_t       /* alpha */,
+                          const TMatrix< value_t > *  /* X */,
+                          TMatrix< value_t > *        /* Y */,
                           const matop_t    /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
@@ -86,43 +75,24 @@ triinv_eval::apply_add  ( const real       /* alpha */,
 // same as above but only the dimension of the vector spaces is tested,
 // not the corresponding index sets
 //
+template < typename value_t >
 void
-triinv_eval::apply_add   ( const real                    alpha,
-                           const blas::vector< real > &  x,
-                           blas::vector< real > &        y,
-                           const matop_t                 op ) const
+triinv_eval< value_t >::apply_add   ( const value_t                    alpha,
+                           const blas::vector< value_t > &  x,
+                           blas::vector< value_t > &        y,
+                           const matop_t                    op ) const
 {
-    TScalarVector  sx( _mat.row_is(), x );
-    TScalarVector  sy( _mat.row_is(), y );
+    TScalarVector< value_t >  sx( _mat.row_is(), x );
+    TScalarVector< value_t >  sy( _mat.row_is(), y );
     
     apply_add( alpha, & sx, & sy, op );
 }
 
+template < typename value_t >
 void
-triinv_eval::apply_add   ( const complex                    alpha,
-                           const blas::vector< complex > &  x,
-                           blas::vector< complex > &        y,
-                           const matop_t                    op ) const
-{
-    TScalarVector  sx( _mat.row_is(), x );
-    TScalarVector  sy( _mat.row_is(), y );
-    
-    capply_add( alpha, & sx, & sy, op );
-}
-
-void
-triinv_eval::apply_add   ( const real                       /* alpha */,
-                           const blas::matrix< real > &     /* x */,
-                           blas::matrix< real > &           /* y */,
-                           const matop_t                    /* op */ ) const
-{
-    HLR_ERROR( "not implemented" );
-}
-
-void
-triinv_eval::apply_add   ( const complex                    /* alpha */,
-                           const blas::matrix< complex > &  /* x */,
-                           blas::matrix< complex > &        /* y */,
+triinv_eval< value_t >::apply_add   ( const value_t                    /* alpha */,
+                           const blas::matrix< value_t > &  /* x */,
+                           blas::matrix< value_t > &        /* y */,
                            const matop_t                    /* op */ ) const
 {
     HLR_ERROR( "not implemented" );

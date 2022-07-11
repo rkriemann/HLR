@@ -157,18 +157,15 @@ do_compress ( blas::matrix< value_t > &  D,
     
     #elif defined(HAS_ZFP)
     
-    if ( cmdline::compress > 0 )
+    if ( cmdline::compress != 0 )
     {
-        if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                         *zconf = zfp_config_accuracy( cmdline::compress );
+        if      ( cmdline::compress > 1 ) *zconf = hlr::zfp::fixed_rate( int( cmdline::compress ) );
+        else if ( cmdline::compress > 0 ) *zconf = hlr::zfp::fixed_accuracy( cmdline::compress );
+        else                              *zconf = hlr::zfp::reversible();
     }// if
 
     #endif
             
-    // auto  zconf  = zfp_config_reversible();
-    // auto  zconf  = zfp_config_rate( rate, false );
-    // auto  zconf  = zfp_config_precision( rate );
-    // auto  zconf  = zfp_config_accuracy( rate );
     auto    tic   = timer::now();
 
     // impl::matrix::compress_replace< value_t, approx_t >( indexset( 0, D.nrows()-1 ),
@@ -272,12 +269,13 @@ do_H ( blas::matrix< value_t > &  D,
     
     # if defined(HAS_ZFP)
 
-    if ( cmdline::compress > 0 )
+    if ( cmdline::compress != 0 )
     {
         zconf = std::make_unique< zconfig_t >();
         
-        if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                         *zconf = zfp_config_accuracy( cmdline::compress );
+        if      ( cmdline::compress > 1 ) *zconf = hlr::zfp::fixed_rate( int( cmdline::compress ) );
+        else if ( cmdline::compress > 0 ) *zconf = hlr::zfp::fixed_accuracy( delta );
+        else                              *zconf = hlr::zfp::reversible();
     }// if
 
     #  endif
@@ -366,10 +364,11 @@ compress_cuda< double > ( blas::matrix< double > &  D,
     
     #elif defined(HAS_ZFP)
     
-    if ( cmdline::compress > 0 )
+    if ( cmdline::compress != 0 )
     {
-        if ( cmdline::compress > 1 ) *zconf = zfp_config_rate( int( cmdline::compress ), false );
-        else                         *zconf = zfp_config_accuracy( cmdline::compress );
+        if      ( cmdline::compress > 1 ) *zconf = hlr::zfp::fixed_rate( int( cmdline::compress ) );
+        else if ( cmdline::compress > 0 ) *zconf = hlr::zfp::fixed_accuracy( cmdline::compress );
+        else                              *zconf = hlr::zfp::reversible();
     }// if
 
     #endif
@@ -999,7 +998,7 @@ program_main ()
     SZ_Init_Params( & params );
 
     #endif
-    
+
     //
     // read dataset
     //

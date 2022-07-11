@@ -19,18 +19,18 @@ namespace hlr { namespace dag {
 // compute DAG for tile-based LU of <A> in HODLR format
 //
 graph
-gen_dag_lu_hodlr_tiled  ( HLIB::TMatrix &  A,
-                          const size_t     ntile,
-                          refine_func_t    refine );
+gen_dag_lu_hodlr_tiled  ( Hpro::TMatrix< value_t > &  A,
+                          const size_t                ntile,
+                          refine_func_t               refine );
 
 //
 // compute DAG for tile-based LU of <A> in HODLR format
 // with lazy update evaluation
 //
 graph
-gen_dag_lu_hodlr_tiled_lazy  ( HLIB::TMatrix &  A,
-                               const size_t     ntile,
-                               refine_func_t    refine );
+gen_dag_lu_hodlr_tiled_lazy  ( Hpro::TMatrix< value_t > &  A,
+                               const size_t                ntile,
+                               refine_func_t               refine );
 
 }}// namespace hlr::dag
 

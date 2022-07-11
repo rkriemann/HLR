@@ -21,10 +21,6 @@
 
 namespace hlr { namespace omp { namespace accu {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // accumulator based matrix multiplication

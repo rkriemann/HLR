@@ -19,7 +19,7 @@ namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
-using hpro::idx_t;
+using Hpro::idx_t;
 
 namespace detail
 {
@@ -30,13 +30,13 @@ namespace detail
 template < typename operator_t >
 blas::matrix< typename operator_t::value_t >
 rand_column_basis ( const operator_t &       M,
-                    const hpro::TTruncAcc &  acc,
+                    const Hpro::TTruncAcc &  acc,
                     const uint               block_size,
                     const uint               power_steps,
                     const uint               oversampling )
 {
     using  value_t = typename operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
         
     const auto  nrows_M = nrows( M );
     const auto  ncols_M = ncols( M );
@@ -55,7 +55,7 @@ rand_column_basis ( const operator_t &       M,
         
         auto        Q = blas::matrix< value_t >( nrows_M, k + oversampling );
 
-        prod( value_t(1), hpro::apply_normal, M, T, Q );
+        prod( value_t(1), Hpro::apply_normal, M, T, Q );
 
         //
         // power iteration
@@ -72,11 +72,11 @@ rand_column_basis ( const operator_t &       M,
             for ( uint  j = 0; j < power_steps; ++j )
             {
                 blas::scale( value_t(0), MtQ );
-                prod( value_t(1), hpro::apply_adjoint, M, Q, MtQ );
+                prod( value_t(1), Hpro::apply_adjoint, M, Q, MtQ );
                 blas::qr( MtQ, R );
                 
                 blas::scale( value_t(0), Q );
-                prod( value_t(1), hpro::apply_normal, M, MtQ, Q );
+                prod( value_t(1), Hpro::apply_normal, M, MtQ, Q );
                 blas::qr( Q, R );
             }// for
         }// if
@@ -107,7 +107,7 @@ rand_column_basis ( const operator_t &       M,
             
             auto  Q_i = blas::matrix< value_t >( nrows_M, bsize );
 
-            prod( value_t(1), hpro::apply_normal, M, T_i, Q_i );
+            prod( value_t(1), Hpro::apply_normal, M, T_i, Q_i );
 
             // subtract previous Q_j
             if ( ! Qs.empty() )
@@ -147,11 +147,11 @@ rand_column_basis ( const operator_t &       M,
                 for ( uint  j = 0; j < power_steps; ++j )
                 {
                     blas::scale( value_t(0), MtQ );
-                    prod( value_t(1), hpro::apply_adjoint, M, Q_i, MtQ );
+                    prod( value_t(1), Hpro::apply_adjoint, M, Q_i, MtQ );
                     blas::qr( MtQ, R );
                     
                     blas::scale( value_t(0), Q_i );
-                    prod( value_t(1), hpro::apply_normal, M, MtQ, Q_i );
+                    prod( value_t(1), Hpro::apply_normal, M, MtQ, Q_i );
                     blas::qr( Q_i, R );
                 }// for
             }// if
@@ -164,7 +164,7 @@ rand_column_basis ( const operator_t &       M,
                 
             if ( i > 0 )
             {
-                blas::copy( Q_i, TQ_i ); // auto  C_i   = blas::matrix< value_t >( Q_i, hpro::copy_value );
+                blas::copy( Q_i, TQ_i ); // auto  C_i   = blas::matrix< value_t >( Q_i, Hpro::copy_value );
                 
                 for ( const auto &  Q_j : Qs )
                 {
@@ -212,7 +212,7 @@ template < typename value_t >
 blas::matrix< value_t >
 rand_column_basis ( const blas::matrix< value_t > &  U,
                     const blas::matrix< value_t > &  V,
-                    const hpro::TTruncAcc &          acc,
+                    const Hpro::TTruncAcc &          acc,
                     const uint                       block_size,
                     const uint                       power_steps,
                     const uint                       oversampling )
@@ -368,18 +368,18 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 randlr  ( const operator_t &       M,
-          const hpro::TTruncAcc &  acc )
+          const Hpro::TTruncAcc &  acc )
 {
     using  value_t = typename operator_t::value_t;
     
     auto  W = rand_column_basis( M, acc, 2, 0, 0 );
     auto  X = blas::matrix< value_t >( ncols( M ), W.ncols() );
 
-    prod( value_t(1), hpro::apply_adjoint, M, W, X );
+    prod( value_t(1), Hpro::apply_adjoint, M, W, X );
 
     return { std::move( W ), std::move( X ) };
         
-    // using  real_t  = typename hpro::real_type< value_t >::type_t;
+    // using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
     // const auto  nrows_M = nrows( M );
     // const auto  ncols_M = ncols( M );
@@ -404,7 +404,7 @@ randlr  ( const operator_t &       M,
     //     auto  L = blas::vector< value_t >( nrows_M );
         
     //     blas::fill_fn( W, rand );
-    //     prod( value_t(1), hpro::apply_normal, M, W, L );
+    //     prod( value_t(1), Hpro::apply_normal, M, W, L );
 
     //     // subtract previously computed results
     //     if ( k > 0 )
@@ -424,7 +424,7 @@ randlr  ( const operator_t &       M,
     //     blas::scale( value_t( real_t(1) / norm_L ), L );
 
     //     blas::scale( value_t(0), W );
-    //     prod( value_t(1), hpro::apply_adjoint, M, L, W );
+    //     prod( value_t(1), Hpro::apply_adjoint, M, L, W );
 
     //     //
     //     // update norm of M as norm( U·V^H ) and
@@ -489,7 +489,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( blas::matrix< value_t > &  M,
-         const hpro::TTruncAcc &    acc )
+         const Hpro::TTruncAcc &    acc )
 {
     // for update statistics
     HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
@@ -502,7 +502,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( const blas::matrix< value_t > &  U,
          const blas::matrix< value_t > &  V,
-         const hpro::TTruncAcc &          acc )
+         const Hpro::TTruncAcc &          acc )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -559,7 +559,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( const std::list< blas::matrix< value_t > > &  U,
          const std::list< blas::matrix< value_t > > &  V,
-         const hpro::TTruncAcc &                       acc )
+         const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == V.size() );
 
@@ -610,7 +610,7 @@ std::pair< blas::matrix< value_t >,
 randlr ( const std::list< blas::matrix< value_t > > &  U,
          const std::list< blas::matrix< value_t > > &  T,
          const std::list< blas::matrix< value_t > > &  V,
-         const hpro::TTruncAcc &                       acc )
+         const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -678,7 +678,7 @@ struct RandLR
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::randlr( M, acc );
     }
@@ -687,7 +687,7 @@ struct RandLR
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::randlr( U, V, acc );
     }
@@ -696,7 +696,7 @@ struct RandLR
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::randlr( U, V, acc );
     }
@@ -706,7 +706,7 @@ struct RandLR
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::randlr( U, T, V, acc );
     }
@@ -715,7 +715,7 @@ struct RandLR
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const hpro::TTruncAcc &  acc ) const
+                  const Hpro::TTruncAcc &  acc ) const
     {
         return detail::randlr< operator_t >( op, acc );
     }
@@ -727,7 +727,7 @@ struct RandLR
     template < typename operator_t >
     blas::matrix< typename operator_t::value_t >
     column_basis ( const operator_t &       op,
-                   const hpro::TTruncAcc &  acc ) const
+                   const Hpro::TTruncAcc &  acc ) const
     {
         return detail::rand_column_basis< operator_t >( op, acc, 2, 0, 0 );
     }

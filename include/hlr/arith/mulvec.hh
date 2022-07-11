@@ -23,19 +23,19 @@ namespace hlr
 
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TMatrix &            M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y );
+mul_vec ( const value_t                     alpha,
+          const Hpro::matop_t               op_M,
+          const Hpro::TMatrix< value_t > &  M,
+          const blas::vector< value_t > &   x,
+          blas::vector< value_t > &         y );
 
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TBlockMatrix &       M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
+mul_vec ( const value_t                          alpha,
+          const Hpro::matop_t                    op_M,
+          const Hpro::TBlockMatrix< value_t > &  M,
+          const blas::vector< value_t > &        x,
+          blas::vector< value_t > &              y )
 {
     if ( alpha == value_t(0) )
         return;
@@ -62,58 +62,58 @@ mul_vec ( const value_t                    alpha,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TDenseMatrix &       M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
+mul_vec ( const value_t                          alpha,
+          const Hpro::matop_t                    op_M,
+          const Hpro::TDenseMatrix< value_t > &  M,
+          const blas::vector< value_t > &        x,
+          blas::vector< value_t > &              y )
 {
-    blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( M ) ), x, value_t(1), y );
+    blas::mulvec( alpha, blas::mat_view( op_M, Hpro::blas_mat< value_t >( M ) ), x, value_t(1), y );
 }
 
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TRkMatrix &          M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
+mul_vec ( const value_t                       alpha,
+          const Hpro::matop_t                 op_M,
+          const Hpro::TRkMatrix< value_t > &  M,
+          const blas::vector< value_t > &     x,
+          blas::vector< value_t > &           y )
 {
     switch ( op_M )
     {
         case apply_normal :
         {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( M ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::adjoint( Hpro::blas_mat_B< value_t >( M ) ), x );
 
-            blas::mulvec( alpha, hpro::blas_mat_A< value_t >( M ), t, value_t(1), y );
+            blas::mulvec( alpha, Hpro::blas_mat_A< value_t >( M ), t, value_t(1), y );
         }
         break;
         
         case apply_conjugate :
         {
-            assert( ! hpro::is_complex_type< value_t >::value );
+            assert( ! Hpro::is_complex_type_v< value_t > );
 
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( M ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::adjoint( Hpro::blas_mat_B< value_t >( M ) ), x );
 
-            blas::mulvec( alpha, hpro::blas_mat_A< value_t >( M ), t, value_t(1), y );
+            blas::mulvec( alpha, Hpro::blas_mat_A< value_t >( M ), t, value_t(1), y );
         }
         break;
         
         case apply_transposed :
         {
-            assert( ! hpro::is_complex_type< value_t >::value );
+            assert( ! Hpro::is_complex_type_v< value_t > );
             
-            auto  t = blas::mulvec( value_t(1), blas::transposed( hpro::blas_mat_A< value_t >( M ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::transposed( Hpro::blas_mat_A< value_t >( M ) ), x );
 
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( M ), t, value_t(1), y );
+            blas::mulvec( alpha, Hpro::blas_mat_B< value_t >( M ), t, value_t(1), y );
         }
         break;
         
         case apply_adjoint :
         {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( M ) ), x );
+            auto  t = blas::mulvec( value_t(1), blas::adjoint( Hpro::blas_mat_A< value_t >( M ) ), x );
 
-            blas::mulvec( alpha, hpro::blas_mat_B< value_t >( M ), t, value_t(1), y );
+            blas::mulvec( alpha, Hpro::blas_mat_B< value_t >( M ), t, value_t(1), y );
         }
         break;
     }// switch
@@ -122,7 +122,7 @@ mul_vec ( const value_t                    alpha,
 template < typename value_t >
 void
 mul_vec ( const value_t                                alpha,
-          const hpro::matop_t                          op_M,
+          const Hpro::matop_t                          op_M,
           const matrix::uniform_lrmatrix< value_t > &  M,
           const blas::vector< value_t > &              x,
           blas::vector< value_t > &                    y )
@@ -145,7 +145,7 @@ mul_vec ( const value_t                                alpha,
         
         case apply_conjugate :
         {
-            assert( ! hpro::is_complex_type< value_t >::value );
+            assert( ! Hpro::is_complex_type_v< value_t > );
 
             auto  t = M.col_cb().transform_forward( x );
             auto  s = blas::mulvec( value_t(1), M.coeff(), t );
@@ -199,8 +199,8 @@ mul_vec ( const value_t                                alpha,
 template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TUniformMatrix &     M,
+          const Hpro::matop_t              op_M,
+          const Hpro::TUniformMatrix< value_t > &     M,
           const blas::vector< value_t > &  x,
           blas::vector< value_t > &        y )
 {
@@ -213,12 +213,12 @@ mul_vec ( const value_t                    alpha,
             //
         
             // U·S·V' x + y
-            auto  tx = blas::vector< value_t >( hpro::col_basis< value_t >( &M )->rank() );
+            auto  tx = blas::vector< value_t >( Hpro::col_basis( &M )->rank() );
             auto  ty = blas::vector< value_t >( y.length() );
                                                  
-            hpro::col_basis< value_t >( &M )->transform_forward( x, tx );
-            auto  tt = blas::mulvec( value_t(1), hpro::coeff< value_t >( &M ), tx );
-            hpro::row_basis< value_t >( &M )->transform_backward( tt, ty );
+            Hpro::col_basis( &M )->transform_forward( x, tx );
+            auto  tt = blas::mulvec( value_t(1), Hpro::coeff( &M ), tx );
+            Hpro::row_basis( &M )->transform_backward( tt, ty );
 
             blas::add( alpha, ty, y );
         }
@@ -226,7 +226,7 @@ mul_vec ( const value_t                    alpha,
         
         case apply_conjugate :
         {
-            assert( ! hpro::is_complex_type< value_t >::value );
+            assert( ! Hpro::is_complex_type_v< value_t > );
 
             HLR_ERROR( "todo" );
         }
@@ -246,12 +246,12 @@ mul_vec ( const value_t                    alpha,
         case apply_adjoint :
         {
             // (U·S·V')' x + y = V·S'·U' x + y
-            auto  tx = blas::vector< value_t >( hpro::row_basis< value_t >( &M )->rank() );
+            auto  tx = blas::vector< value_t >( Hpro::row_basis( &M )->rank() );
             auto  ty = blas::vector< value_t >( y.length() );
                                                  
-            hpro::row_basis< value_t >( &M )->transform_forward( x, tx );
-            auto  tt = blas::mulvec( value_t(1), blas::adjoint( hpro::coeff< value_t >( &M ) ), tx );
-            hpro::col_basis< value_t >( &M )->transform_backward( tt, ty );
+            Hpro::row_basis( &M )->transform_forward( x, tx );
+            auto  tt = blas::mulvec( value_t(1), blas::adjoint( Hpro::coeff( &M ) ), tx );
+            Hpro::col_basis( &M )->transform_backward( tt, ty );
 
             blas::add( alpha, ty, y );
         }
@@ -263,27 +263,24 @@ mul_vec ( const value_t                    alpha,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const hpro::matop_t              op_M,
-          const hpro::TMatrix &            M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
+mul_vec ( const value_t                     alpha,
+          const Hpro::matop_t               op_M,
+          const Hpro::TMatrix< value_t > &  M,
+          const blas::vector< value_t > &   x,
+          blas::vector< value_t > &         y )
 {
+    using matrix::is_uniform_lowrank;
+    
     // assert( M.ncols( op_M ) == x.length() );
     // assert( M.nrows( op_M ) == y.length() );
 
-    if ( is_blocked( M ) )
-        mul_vec( alpha, op_M, * cptrcast( &M, hpro::TBlockMatrix ), x, y );
-    else if ( is_lowrank( M ) )
-        mul_vec( alpha, op_M, * cptrcast( &M, hpro::TRkMatrix ), x, y );
-    else if ( matrix::is_uniform_lowrank( M ) )
-        mul_vec( alpha, op_M, * cptrcast( &M, matrix::uniform_lrmatrix< value_t > ), x, y );
-    #if defined(HAS_H2)
-    else if ( is_uniform( &M ) )
-        mul_vec( alpha, op_M, * cptrcast( &M, hpro::TUniformMatrix ), x, y );
+    if      ( is_blocked( M ) )         mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TBlockMatrix< value_t > ), x, y );
+    else if ( is_lowrank( M ) )         mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TRkMatrix< value_t > ), x, y );
+    else if ( is_uniform_lowrank( M ) ) mul_vec( alpha, op_M, * cptrcast( &M, matrix::uniform_lrmatrix< value_t > ), x, y );
+    #if defined(HAS_H2) 
+    else if ( is_uniform( &M ) )        mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TUniformMatrix< value_t > ), x, y );
     #endif
-    else if ( is_dense( M ) )
-        mul_vec( alpha, op_M, * cptrcast( &M, hpro::TDenseMatrix ), x, y );
+    else if ( is_dense( M ) )           mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TDenseMatrix< value_t > ), x, y );
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
@@ -297,32 +294,24 @@ mul_vec ( const value_t                    alpha,
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
-          const hpro::matop_t                       op_M,
-          const hpro::TMatrix &                     M,
+          const Hpro::matop_t                       op_M,
+          const Hpro::TMatrix< value_t > &          M,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y )
 {
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
-
-    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
+    mul_vec( alpha, op_M, M, Hpro::blas_vec< value_t >( x ), Hpro::blas_vec< value_t >( y ) );
 }
 
-template < typename value_t >
-void
-mul_vec ( const value_t                alpha,
-          const hpro::matop_t          op_M,
-          const hpro::TMatrix &        M,
-          const hpro::TScalarVector &  x,
-          hpro::TScalarVector &        y )
-{
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
-
-    mul_vec( alpha, op_M, M, hpro::blas_vec< value_t >( x ), hpro::blas_vec< value_t >( y ) );
-}
+// template < typename value_t >
+// void
+// mul_vec ( const value_t                           alpha,
+//           const Hpro::matop_t                     op_M,
+//           const Hpro::TMatrix< value_t > &        M,
+//           const Hpro::TScalarVector< value_t > &  x,
+//           Hpro::TScalarVector< value_t > &        y )
+// {
+//     mul_vec( alpha, op_M, M, Hpro::blas_vec< value_t >( x ), Hpro::blas_vec< value_t >( y ) );
+// }
 
 }// namespace hlr
 

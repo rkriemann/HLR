@@ -301,10 +301,12 @@ compress ( const indexset &                 rowis,
             
             if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
             {
+                // std::cout << "R: " << to_string( rowis ) << " x " << to_string( colis ) << ", " << U.ncols() << std::endl;
                 return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
             }// if
         }// if
 
+        // std::cout << "D: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
         return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if
     else
@@ -404,6 +406,7 @@ compress ( const indexset &                 rowis,
 
             if ( W.byte_size() + X.byte_size() < smem )
             {
+                // std::cout << "R: " << to_string( rowis ) << " x " << to_string( colis ) << ", " << W.ncols() << std::endl;
                 return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
@@ -414,6 +417,7 @@ compress ( const indexset &                 rowis,
         
         if ( all_dense )
         {
+            // std::cout << "D: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
             return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
         }// if
         
@@ -421,6 +425,8 @@ compress ( const indexset &                 rowis,
         // either not all low-rank or memory gets larger: construct block matrix
         // also: finally compress with zfp
         //
+
+        // std::cout << "B: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
 
         auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
 

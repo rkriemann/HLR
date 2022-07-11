@@ -12,22 +12,17 @@
 
 #include "hlr/dag/graph.hh"
 
-namespace hlr
-{
-
-namespace dag
-{
+namespace hlr { namespace dag {
 
 //
 // return graph representing compute DAG for Gaussian elimination of <A>
 //
+template < typename value_t >
 dag::graph
-gen_dag_gauss_elim ( HLIB::TMatrix *  A,
-                     HLIB::TMatrix *  C,
-                     refine_func_t    refine );
+gen_dag_gauss_elim ( Hpro::TMatrix< value_t > *  A,
+                     Hpro::TMatrix< value_t > *  C,
+                     refine_func_t               refine );
 
-}// namespace dag
-
-}// namespace hlr
+}}// namespace hlr::dag
 
 #endif // __HLR_DAG_GAUSS_ELIM_HH

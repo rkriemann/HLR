@@ -29,26 +29,30 @@ DECLARE_TYPE( triinv_eval );
 //
 // implements vector solving for LU using DAGs
 //
-class triinv_eval : public hpro::TLinearOperator
+template < typename T_value >
+class triinv_eval : public Hpro::TLinearOperator< T_value >
 {
+public:
+    using  value_t = T_value;
+    
 private:
     // upper or lower triangular
-    blas::tri_type_t   _shape;
+    blas::tri_type_t            _shape;
     
     // diagonal evaluation
-    blas::diag_type_t  _diag;
+    blas::diag_type_t           _diag;
     
     // matrix containing triangular matrix
-    hpro::TMatrix &    _mat;
+    Hpro::TMatrix< value_t > &  _mat;
 
 public:
     //
     // ctor
     //
 
-    triinv_eval ( hpro::TMatrix &          M,
-                  const blas::tri_type_t   shape,
-                  const blas::diag_type_t  diag )
+    triinv_eval ( Hpro::TMatrix< value_t > &  M,
+                  const blas::tri_type_t      shape,
+                  const blas::diag_type_t     diag )
             : _shape( shape )
             , _diag( diag )
             , _mat( M )
@@ -58,12 +62,6 @@ public:
     // linear operator properties
     //
 
-    // return true, if field type is complex
-    bool  is_complex      () const
-    {
-        return _mat.is_complex();
-    }
-    
     // return true, of operator is self adjoint
     bool  is_self_adjoint () const
     {
@@ -78,47 +76,35 @@ public:
     // mapping function of linear operator A, e.g. y ≔ A(x).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply       ( const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    op = hpro::apply_normal ) const;
+    virtual void  apply       ( const Hpro::TVector< value_t > *  x,
+                                Hpro::TVector< value_t > *        y,
+                                const Hpro::matop_t               op = Hpro::apply_normal ) const;
 
     //
     // mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
     // Depending on \a op, either A, A^T or A^H is applied.
     //
-    virtual void  apply_add   ( const hpro::real       alpha,
-                                const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    op = hpro::apply_normal ) const;
-    virtual void  capply_add  ( const hpro::complex    alpha,
-                                const hpro::TVector *  x,
-                                hpro::TVector *        y,
-                                const hpro::matop_t    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const value_t                     alpha,
+                                const Hpro::TVector< value_t > *  x,
+                                Hpro::TVector< value_t > *        y,
+                                const Hpro::matop_t               op = Hpro::apply_normal ) const;
 
-    virtual void  apply_add   ( const hpro::real       alpha,
-                                const hpro::TMatrix *  X,
-                                hpro::TMatrix *        Y,
-                                const hpro::matop_t    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const value_t                     alpha,
+                                const Hpro::TMatrix< value_t > *  X,
+                                Hpro::TMatrix< value_t > *        Y,
+                                const Hpro::matop_t               op = Hpro::apply_normal ) const;
     
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
-    virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::vector< hpro::real > &     x,
-                                blas::vector< hpro::real > &           y,
-                                const hpro::matop_t                    op = hpro::apply_normal ) const;
-    virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::vector< hpro::complex > &  x,
-                                blas::vector< hpro::complex > &        y,
-                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const value_t                     alpha,
+                                const blas::vector< value_t > &   x,
+                                blas::vector< value_t > &         y,
+                                const Hpro::matop_t               op = Hpro::apply_normal ) const;
 
-    virtual void  apply_add   ( const hpro::real                       alpha,
-                                const blas::matrix< hpro::real > &     X,
-                                blas::matrix< hpro::real > &           Y,
-                                const hpro::matop_t                    op = hpro::apply_normal ) const;
-    virtual void  apply_add   ( const hpro::complex                    alpha,
-                                const blas::matrix< hpro::complex > &  X,
-                                blas::matrix< hpro::complex > &        Y,
-                                const hpro::matop_t                    op = hpro::apply_normal ) const;
+    virtual void  apply_add   ( const value_t                     alpha,
+                                const blas::matrix< value_t > &   X,
+                                blas::matrix< value_t > &         Y,
+                                const Hpro::matop_t               op = Hpro::apply_normal ) const;
 
     //
     // access vector space data
@@ -131,17 +117,17 @@ public:
     virtual size_t  range_dim      () const { return _mat.ncols(); }
     
     // return vector in domain space
-    virtual auto    domain_vector  () const -> std::unique_ptr< hpro::TVector > { return _mat.row_vector(); }
+    virtual auto    domain_vector  () const -> std::unique_ptr< Hpro::TVector< value_t > > { return _mat.row_vector(); }
 
     // return vector in range space
-    virtual auto    range_vector   () const -> std::unique_ptr< hpro::TVector > { return _mat.col_vector(); }
+    virtual auto    range_vector   () const -> std::unique_ptr< Hpro::TVector< value_t > > { return _mat.col_vector(); }
 
     //
     // misc.
     //
 
     // RTTI
-    HLIB_RTTI_DERIVED( triinv_eval, hpro::TLinearOperator )
+    HPRO_RTTI_DERIVED( triinv_eval, Hpro::TLinearOperator< value_t > )
 };
 
 

@@ -32,12 +32,12 @@ namespace hpro
 //
 // write matrix M to file <filename>
 //
-inline
+template < typename value_t >
 void
-write ( const HLIB::TMatrix &  M,
-        const std::string &    filename )
+write ( const Hpro::TMatrix< value_t > &  M,
+        const std::string &               filename )
 {
-    HLIB::THLibMatrixIO  mio;
+    Hpro::THLibMatrixIO  mio;
 
     mio.write( &M, filename );
 }
@@ -45,13 +45,13 @@ write ( const HLIB::TMatrix &  M,
 //
 // read matrix M from file <filename>
 //
-inline
-std::unique_ptr< HLIB::TMatrix >
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 read ( const std::string &  filename )
 {
-    HLIB::THLibMatrixIO  mio;
+    Hpro::THLibMatrixIO  mio;
 
-    return mio.read( filename );
+    return mio.read< value_t >( filename );
 }
 
 }// namespace hpro
@@ -76,44 +76,44 @@ write ( const blas::matrix< value_t > &  M,
         const std::string &              filename = "" )
 {
     if ( filename == "" )
-        HLIB::DBG::write( M, matname + ".mat", matname );
+        Hpro::DBG::write( M, matname + ".mat", matname );
     else
-        HLIB::DBG::write( M, filename, matname );
+        Hpro::DBG::write( M, filename, matname );
 }
 
-inline
+template < typename value_t >
 void
-write ( const HLIB::TMatrix &  M,
-        const std::string &    matname,
-        const std::string &    filename = "" )
+write ( const Hpro::TMatrix< value_t > &  M,
+        const std::string &               matname,
+        const std::string &               filename = "" )
 {
     if ( filename == "" )
-        HLIB::DBG::write( M, matname + ".mat", matname );
+        Hpro::DBG::write( M, matname + ".mat", matname );
     else
-        HLIB::DBG::write( M, filename, matname );
+        Hpro::DBG::write( M, filename, matname );
 }
 
-inline
+template < typename value_t >
 void
-write ( const HLIB::TMatrix *  M,
-        const std::string &    matname,
-        const std::string &    filename = "" )
+write ( const Hpro::TMatrix< value_t > *  M,
+        const std::string &               matname,
+        const std::string &               filename = "" )
 {
     HLR_ASSERT( ! is_null( M ) );
 
     write( *M, matname, filename );
 }
 
-inline
+template < typename value_t >
 void
-write ( const HLIB::TVector &  v,
-        const std::string &    vecname,
-        const std::string &    filename = "" )
+write ( const Hpro::TVector< value_t > &  v,
+        const std::string &               vecname,
+        const std::string &               filename = "" )
 {
     if ( filename == "" )
-        HLIB::DBG::write( &v, vecname + ".mat", vecname );
+        Hpro::DBG::write( &v, vecname + ".mat", vecname );
     else
-        HLIB::DBG::write( &v, filename, vecname );
+        Hpro::DBG::write( &v, filename, vecname );
 }
 
 template < typename value_t >
@@ -123,9 +123,9 @@ write ( const blas::vector< value_t > &  v,
         const std::string &              filename = "" )
 {
     if ( filename == "" )
-        HLIB::DBG::write( v, vecname + ".mat", vecname );
+        Hpro::DBG::write( v, vecname + ".mat", vecname );
     else
-        HLIB::DBG::write( v, filename, vecname );
+        Hpro::DBG::write( v, filename, vecname );
 }
 
 //
@@ -137,12 +137,12 @@ blas::matrix< value_t >
 read ( const std::string &  filename,
        const std::string &  matname = "" )
 {
-    HLIB::TMatlabMatrixIO  mio;
-    auto                   D = mio.read( filename, matname );
+    Hpro::TMatlabMatrixIO  mio;
+    auto                   D = mio.read< value_t >( filename, matname );
 
     HLR_ASSERT( is_dense( *D ) );
     
-    return std::move( blas::mat< value_t >( ptrcast( D.get(), HLIB::TDenseMatrix ) ) );
+    return std::move( blas::mat( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > ) ) );
 }
 
 }// namespace matlab
@@ -166,7 +166,7 @@ write ( const blas::matrix< value_t > &  M,
         const std::string &              matname,
         const std::string &              filename = "" )
 {
-    HLIB::THDF5MatrixIO  mio;
+    Hpro::THDF5MatrixIO  mio;
     
     if ( filename == "" )
         mio.write( M, matname + ".hdf5", matname );
@@ -174,13 +174,13 @@ write ( const blas::matrix< value_t > &  M,
         mio.write( M, filename, matname );
 }
 
-inline
+template < typename value_t >
 void
-write ( const HLIB::TMatrix &  M,
-        const std::string &    matname,
-        const std::string &    filename = "" )
+write ( const Hpro::TMatrix< value_t > &  M,
+        const std::string &               matname,
+        const std::string &               filename = "" )
 {
-    HLIB::THDF5MatrixIO  mio;
+    Hpro::THDF5MatrixIO  mio;
     
     if ( filename == "" )
         mio.write( &M, matname + ".hdf5", matname );
@@ -188,11 +188,11 @@ write ( const HLIB::TMatrix &  M,
         mio.write( &M, filename, matname );
 }
 
-inline
+template < typename value_t >
 void
-write ( const HLIB::TMatrix *  M,
-        const std::string &    matname,
-        const std::string &    filename = "" )
+write ( const Hpro::TMatrix< value_t > *  M,
+        const std::string &               matname,
+        const std::string &               filename = "" )
 {
     HLR_ASSERT( ! is_null( M ) );
 
@@ -207,12 +207,12 @@ template < typename value_t >
 blas::matrix< value_t >
 read ( const std::string &  filename )
 {
-    HLIB::THDF5MatrixIO  mio;
-    auto                 D = mio.read( filename );
+    Hpro::THDF5MatrixIO  mio;
+    auto                 D = mio.read< value_t >( filename );
 
     HLR_ASSERT( is_dense( *D ) );
     
-    return std::move( blas::mat< value_t >( ptrcast( D.get(), HLIB::TDenseMatrix ) ) );
+    return std::move( blas::mat( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > ) ) );
 }
 
 }// namespace hdf5
@@ -231,10 +231,10 @@ namespace eps
 //
 inline
 void
-print ( const HLIB::TCluster &  cl,
+print ( const Hpro::TCluster &  cl,
         const std::string &     filename )
 {
-    HLIB::TPSClusterVis  vis;
+    Hpro::TPSClusterVis  vis;
 
     vis.print( & cl, filename );
 }
@@ -244,10 +244,10 @@ print ( const HLIB::TCluster &  cl,
 //
 inline
 void
-print ( const HLIB::TBlockCluster &  cl,
+print ( const Hpro::TBlockCluster &  cl,
         const std::string &          filename )
 {
-    HLIB::TPSBlockClusterVis  vis;
+    Hpro::TPSBlockClusterVis  vis;
 
     vis.print( & cl, filename );
 }
@@ -255,11 +255,11 @@ print ( const HLIB::TBlockCluster &  cl,
 //
 // print matrix <M> to file <filename>
 //
-inline
+template < typename value_t >
 void
-print ( const HLIB::TMatrix &  M,
-        const std::string &    filename,
-        const std::string &    options = "default" )
+print ( const Hpro::TMatrix< value_t > &  M,
+        const std::string &               filename,
+        const std::string &               options = "default" )
 {
     matrix::print_eps( M, filename, options );
 }
@@ -267,11 +267,11 @@ print ( const HLIB::TMatrix &  M,
 //
 // print matrix <M> level-wise to files with filename <basename><lvl>
 //
-inline
+template < typename value_t >
 void
-print_lvl ( const HLIB::TMatrix &  M,
-            const std::string &    basename,
-            const std::string &    options = "default" )
+print_lvl ( const Hpro::TMatrix< value_t > &  M,
+            const std::string &               basename,
+            const std::string &               options = "default" )
 {
     matrix::print_lvl_eps( M, basename, options );
 }
@@ -279,11 +279,11 @@ print_lvl ( const HLIB::TMatrix &  M,
 //
 // print matrix <M> with blocks coloured according to memory consumption
 //
-inline
+template < typename value_t >
 void
-print_mem ( const HLIB::TMatrix &  M,
-            const std::string &    filename,
-            const std::string &    options = "default" )
+print_mem ( const Hpro::TMatrix< value_t > &  M,
+            const std::string &               filename,
+            const std::string &               options = "default" )
 {
     matrix::print_mem_eps( M, filename, options );
 }
@@ -316,10 +316,10 @@ namespace vtk
 //
 inline
 void
-print ( const HLIB::TCoordinate &  coord,
+print ( const Hpro::TCoordinate &  coord,
         const std::string &        filename )
 {
-    HLIB::TVTKCoordVis  vis;
+    Hpro::TVTKCoordVis  vis;
 
     vis.print( & coord, filename );
 }

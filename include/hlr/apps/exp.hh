@@ -19,25 +19,23 @@
 namespace hlr
 {
 
-namespace hpro = HLIB;
-
 namespace apps
 {
 
-class exp : public application< hpro::real >
+class exp : public application< double >
 {
 public:
     //
     // public types
     //
     
-    using  value_t = hpro::real;
+    using  value_t = double;
 
 private:
     // BEM data
-    std::unique_ptr< hpro::TGrid >                     _grid;
-    std::unique_ptr< hpro::TFnSpace >                  _fnspace;
-    std::unique_ptr< hpro::TBilinearForm< value_t > >  _bf;
+    std::unique_ptr< Hpro::TGrid >                     _grid;
+    std::unique_ptr< Hpro::TFnSpace< double > >        _fnspace;
+    std::unique_ptr< Hpro::TBilinearForm< value_t > >  _bf;
 
 public:
     //
@@ -54,13 +52,13 @@ public:
     //
     // return coordinates for problem indices
     //
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const;
     
     //
     // return coefficient function to evaluate matrix entries
     //
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func  () const;
 };
 

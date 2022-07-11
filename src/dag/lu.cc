@@ -22,101 +22,101 @@
 
 namespace hlr { namespace dag {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 namespace
 {
 
-using hpro::id_t;
+using Hpro::id_t;
 
 // map for apply_node nodes
-using  apply_map_t = std::unordered_map< hpro::id_t, node * >;
+using  apply_map_t = std::unordered_map< Hpro::id_t, node * >;
 
 // identifiers for memory blocks
 const id_t  ID_A    = 'A';
 const id_t  ID_ACCU = 'X';
 
+template < typename value_t >
 struct lu_node : public node
 {
-    TMatrix *      A;
+    Hpro::TMatrix< value_t > *      A;
     apply_map_t &  apply_nodes;
     
-    lu_node ( TMatrix *      aA,
+    lu_node ( Hpro::TMatrix< value_t > *      aA,
               apply_map_t &  aapply_nodes )
             : A( aA )
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "lu( %d )", A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "lu( %d )", A->id() ); }
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
+template < typename value_t >
 struct trsmu_node : public node
 {
-    const TMatrix *  U;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  U;
+    Hpro::TMatrix< value_t > *        A;
     apply_map_t &    apply_nodes;
     
-    trsmu_node ( const TMatrix *  aU,
-                       TMatrix *        aA,
+    trsmu_node ( const Hpro::TMatrix< value_t > *  aU,
+                       Hpro::TMatrix< value_t > *        aA,
                        apply_map_t &    aapply_nodes )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
     { init(); }
     
-    virtual std::string  to_string () const { return hpro::to_string( "%d = trsmu( %d, %d )", A->id(), U->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "%d = trsmu( %d, %d )", A->id(), U->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, U->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
 
+template < typename value_t >
 struct trsml_node : public node
 {
-    const TMatrix *  L;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  L;
+    Hpro::TMatrix< value_t > *        A;
     apply_map_t &    apply_nodes;
 
-    trsml_node ( const TMatrix *  aL,
-                       TMatrix *        aA,
+    trsml_node ( const Hpro::TMatrix< value_t > *  aL,
+                       Hpro::TMatrix< value_t > *        aA,
                        apply_map_t &    aapply_nodes )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "%d = trsml( %d, %d )", A->id(), L->id(), A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "%d = trsml( %d, %d )", A->id(), L->id(), A->id() ); }
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, L->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_A, A->block_is() } }; }
 };
     
+template < typename value_t >
 struct update_node : public node
 {
-    const TMatrix *  A;
-    const TMatrix *  B;
-    TMatrix *        C;
+    const Hpro::TMatrix< value_t > *  A;
+    const Hpro::TMatrix< value_t > *  B;
+    Hpro::TMatrix< value_t > *        C;
     apply_map_t &    apply_nodes;
 
-    update_node ( const TMatrix *  aA,
-                  const TMatrix *  aB,
-                  TMatrix *        aC,
+    update_node ( const Hpro::TMatrix< value_t > *  aA,
+                  const Hpro::TMatrix< value_t > *  aB,
+                  Hpro::TMatrix< value_t > *        aC,
                   apply_map_t &    aapply_nodes )
             : A(    aA )
             , B(    aB )
@@ -124,34 +124,35 @@ struct update_node : public node
             , apply_nodes( aapply_nodes )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "%d = mul( %d, %d )",
+    virtual std::string  to_string () const { return Hpro::to_string( "%d = mul( %d, %d )",
                                                                       C->id(), A->id(), B->id() ); }
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() }, { ID_A, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
     {
-        if ( CFG::Arith::use_accu ) return { { ID_ACCU, C->block_is() } };
+        if ( Hpro::CFG::Arith::use_accu ) return { { ID_ACCU, C->block_is() } };
         else                        return { { ID_A, C->block_is() } };
     }
 };
 
+template < typename value_t >
 struct apply_node : public node
 {
-    TMatrix *  A;
+    Hpro::TMatrix< value_t > *  A;
     
-    apply_node ( TMatrix *  aA )
+    apply_node ( Hpro::TMatrix< value_t > *  aA )
             : A( aA )
     { init(); }
 
-    virtual std::string  to_string () const { return hpro::to_string( "apply( %d )", A->id() ); }
+    virtual std::string  to_string () const { return Hpro::to_string( "apply( %d )", A->id() ); }
     virtual std::string  color     () const { return "edd400"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { { ID_ACCU, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const
@@ -167,14 +168,15 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-lu_node::refine_ ( const size_t  min_size )
+lu_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
     if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto        B   = ptrcast( A, TBlockMatrix );
+        auto        B   = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         const auto  nbr = B->block_rows();
         const auto  nbc = B->block_cols();
         
@@ -190,22 +192,22 @@ lu_node::refine_ ( const size_t  min_size )
 
                 assert( A_ii != nullptr );
 
-                g.alloc_node< lu_node >( A_ii, apply_nodes );
+                g.alloc_node< lu_node< value_t > >( A_ii, apply_nodes );
 
                 if ( ! is_null( B->block( nbr-1, i ) ) )
-                    g.alloc_node< trsmu_node >( A_ii, B->block( nbr-1, i ), apply_nodes );
+                    g.alloc_node< trsmu_node< value_t > >( A_ii, B->block( nbr-1, i ), apply_nodes );
 
                 if ( ! is_null( B->block( i, nbc-1 ) ) )
-                    g.alloc_node< trsml_node >( A_ii, B->block( i, nbc-1 ), apply_nodes );
+                    g.alloc_node< trsml_node< value_t > >( A_ii, B->block( i, nbc-1 ), apply_nodes );
 
                 if ( ! is_null_any( B->block( nbr-1, i ), B->block( i, nbc-1 ), B->block( nbr-1, nbc-1 ) ) )
-                    g.alloc_node< update_node >( B->block( nbr-1, i ),
+                    g.alloc_node< update_node< value_t > >( B->block( nbr-1, i ),
                                                  B->block( i, nbc-1 ),
                                                  B->block( nbr-1, nbc-1 ),
                                                  apply_nodes );
             }// for
 
-            g.alloc_node< lu_node >( B->block( nbr-1, nbc-1 ), apply_nodes );
+            g.alloc_node< lu_node< value_t > >( B->block( nbr-1, nbc-1 ), apply_nodes );
         }// if
         else
         {
@@ -219,27 +221,27 @@ lu_node::refine_ ( const size_t  min_size )
 
                 assert( A_ii != nullptr );
 
-                g.alloc_node< lu_node >( A_ii, apply_nodes );
+                g.alloc_node< lu_node< value_t > >( A_ii, apply_nodes );
 
                 for ( uint j = i+1; j < nbr; j++ )
                     if ( ! is_null( B->block( j, i ) ) )
-                        g.alloc_node< trsmu_node >( A_ii, B->block( j, i ), apply_nodes );
+                        g.alloc_node< trsmu_node< value_t > >( A_ii, B->block( j, i ), apply_nodes );
 
                 for ( uint j = i+1; j < nbc; j++ )
                     if ( ! is_null( B->block( i, j ) ) )
-                        g.alloc_node< trsml_node >( A_ii, B->block( i, j ), apply_nodes );
+                        g.alloc_node< trsml_node< value_t > >( A_ii, B->block( i, j ), apply_nodes );
 
                 for ( uint j = i+1; j < nbr; j++ )
                     for ( uint l = i+1; l < nbc; l++ )
                         if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
-                            g.alloc_node< update_node >( B->block( j, i ),
+                            g.alloc_node< update_node< value_t > >( B->block( j, i ),
                                                          B->block( i, l ),
                                                          B->block( j, l ),
                                                          apply_nodes );
             }// for
         }// else
     }// if
-    else if ( CFG::Arith::use_accu )
+    else if ( Hpro::CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ A->id() ];
         
@@ -251,26 +253,18 @@ lu_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
+    if ( Hpro::CFG::Arith::use_accu )
+        A->apply_updates( acc, Hpro::recursive );
 
-    // hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
+    // Hpro::LU::factorise_rec( A, acc, fac_options_t( block_wise, store_inverse, false ) );
 
-    if ( A->is_complex() )
-    {
-        hlr::approx::SVD< hpro::complex >  apx;
+    hlr::approx::SVD< value_t >  apx;
     
-        hlr::lu< hpro::complex >( *A, acc, apx );
-    }// if
-    else
-    {
-        hlr::approx::SVD< hpro::real >  apx;
-    
-        hlr::lu< hpro::real >( *A, acc, apx );
-    }// else
+    hlr::lu< value_t >( *A, acc, apx );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -279,15 +273,16 @@ lu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-trsmu_node::refine_ ( const size_t  min_size )
+trsmu_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
     if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
-        auto        BU  = cptrcast( U, TBlockMatrix );
-        auto        BA  =  ptrcast( A, TBlockMatrix );
+        auto        BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
+        auto        BA  =  ptrcast( A, Hpro::TBlockMatrix< value_t > );
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
@@ -305,10 +300,10 @@ trsmu_node::refine_ ( const size_t  min_size )
                     
         //             if ( ! is_null( A_ij ) )
         //             {
-        //                 g.alloc_node< trsmu_node >( U_jj, A_ij, apply_nodes );
+        //                 g.alloc_node< trsmu_node< value_t > >( U_jj, A_ij, apply_nodes );
 
         //                 if ( ! is_null_any( BU->block( j, nbc-1 ), BA->block( i, nbc-1 ) ) )
-        //                     g.alloc_node< update_node >( A_ij,
+        //                     g.alloc_node< update_node< value_t > >( A_ij,
         //                                                  BU->block( j, nbc-1 ),
         //                                                  BA->block( i, nbc-1 ),
         //                                                  apply_nodes );
@@ -323,7 +318,7 @@ trsmu_node::refine_ ( const size_t  min_size )
         //         auto  A_ij = BA->block( i, nbc-1 );
                 
         //         if ( ! is_null( A_ij ) )
-        //             g.alloc_node< trsmu_node >( BU->block( nbc-1, nbc-1 ), A_ij, apply_nodes );
+        //             g.alloc_node< trsmu_node< value_t > >( BU->block( nbc-1, nbc-1 ), A_ij, apply_nodes );
         //     }// for
         // }// if
         // else
@@ -336,20 +331,20 @@ trsmu_node::refine_ ( const size_t  min_size )
                 {
                     for ( uint i = 0; i < nbr; ++i )
                         if ( ! is_null( BA->block(i,j) ) )
-                            g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ), apply_nodes );
+                            g.alloc_node< trsmu_node< value_t > >( U_jj, BA->block( i, j ), apply_nodes );
                 }// if
                 
                 for ( uint  k = j+1; k < nbc; ++k )
                     for ( uint  i = 0; i < nbr; ++i )
                         if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                            g.alloc_node< update_node >( BA->block( i, j ),
+                            g.alloc_node< update_node< value_t > >( BA->block( i, j ),
                                                          BU->block( j, k ),
                                                          BA->block( i, k ),
                                                          apply_nodes );
             }// for
         }// else
     }// if
-    else if ( CFG::Arith::use_accu )
+    else if ( Hpro::CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ A->id() ];
 
@@ -361,26 +356,18 @@ trsmu_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
+    if ( Hpro::CFG::Arith::use_accu )
+        A->apply_updates( acc, Hpro::recursive );
     
     // solve_upper_right( A, U, nullptr, acc, solve_option_t( block_wise, general_diag, store_inverse ) );
     
-    if ( A->is_complex() )
-    {
-        hlr::approx::SVD< hpro::complex >  apx;
+    hlr::approx::SVD< value_t >  apx;
     
-        hlr::solve_upper_tri< hpro::complex >( from_right, general_diag, *U, *A, acc, apx );
-    }// if
-    else
-    {
-        hlr::approx::SVD< hpro::real >  apx;
-    
-        hlr::solve_upper_tri< hpro::real >( from_right, general_diag, *U, *A, acc, apx );
-    }// else
+    hlr::solve_upper_tri< value_t >( from_right, general_diag, *U, *A, acc, apx );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -389,15 +376,16 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-trsml_node::refine_ ( const size_t  min_size )
+trsml_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
     if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
-        auto        BL  = cptrcast( L, TBlockMatrix );
-        auto        BA  = ptrcast( A, TBlockMatrix );
+        auto        BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
+        auto        BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
@@ -418,20 +406,20 @@ trsml_node::refine_ ( const size_t  min_size )
                 {
                     for ( uint j = 0; j < nbc; ++j )
                         if ( ! is_null( BA->block( i, j ) ) )
-                            g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_nodes );
+                            g.alloc_node< trsml_node< value_t > >( L_ii, BA->block( i, j ), apply_nodes );
                 }// if
 
                 for ( uint  k = i+1; k < nbr; ++k )
                     for ( uint  j = 0; j < nbc; ++j )
                         if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                            g.alloc_node< update_node >( BL->block( k, i ),
+                            g.alloc_node< update_node< value_t > >( BL->block( k, i ),
                                                          BA->block( i, j ),
                                                          BA->block( k, j ),
                                                          apply_nodes );
             }// for
         }// else
     }// if
-    else if ( CFG::Arith::use_accu )
+    else if ( Hpro::CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ A->id() ];
         
@@ -443,26 +431,18 @@ trsml_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
-        A->apply_updates( acc, recursive );
+    if ( Hpro::CFG::Arith::use_accu )
+        A->apply_updates( acc, Hpro::recursive );
     
     // solve_lower_left( apply_normal, L, A, acc, solve_option_t( block_wise, unit_diag, store_inverse ) );
 
-    if ( A->is_complex() )
-    {
-        hlr::approx::SVD< hpro::complex >  apx;
+    hlr::approx::SVD< value_t >  apx;
     
-        hlr::solve_lower_tri< hpro::complex >( from_left, unit_diag, *L, *A, acc, apx );
-    }// if
-    else
-    {
-        hlr::approx::SVD< hpro::real >  apx;
-    
-        hlr::solve_lower_tri< hpro::real >( from_left, unit_diag, *L, *A, acc, apx );
-    }// else
+    hlr::solve_lower_tri< value_t >( from_left, unit_diag, *L, *A, acc, apx );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -471,8 +451,9 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 local_graph
-update_node::refine_ ( const size_t  min_size )
+update_node< value_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
@@ -482,9 +463,9 @@ update_node::refine_ ( const size_t  min_size )
         // generate sub nodes assuming 2x2 block structure
         //
 
-        auto  BA = cptrcast( A, TBlockMatrix );
-        auto  BB = cptrcast( B, TBlockMatrix );
-        auto  BC = ptrcast(  C, TBlockMatrix );
+        auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
+        auto  BC = ptrcast(  C, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BC->block_rows(); ++i )
         {
@@ -496,7 +477,7 @@ update_node::refine_ ( const size_t  min_size )
                 for ( uint  k = 0; k < BA->block_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        g.alloc_node< update_node >( BA->block( i, k ),
+                        g.alloc_node< update_node< value_t > >( BA->block( i, k ),
                                                      BB->block( k, j ),
                                                      BC->block( i, j ),
                                                      apply_nodes );
@@ -504,7 +485,7 @@ update_node::refine_ ( const size_t  min_size )
             }// for
         }// for
     }// if
-    else if ( CFG::Arith::use_accu )
+    else if ( Hpro::CFG::Arith::use_accu )
     {
         auto  apply = apply_nodes[ C->id() ];
         
@@ -519,10 +500,11 @@ update_node::refine_ ( const size_t  min_size )
     return g;
 }
 
+template < typename value_t >
 void
-update_node::run_ ( const TTruncAcc &  acc )
+update_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( CFG::Arith::use_accu )
+    if ( Hpro::CFG::Arith::use_accu )
     {
         HLR_ERROR( "todo" );
     
@@ -535,18 +517,9 @@ update_node::run_ ( const TTruncAcc &  acc )
     {
         // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
 
-        if ( A->is_complex() )
-        {
-            hlr::approx::SVD< hpro::complex >  apx;
+        hlr::approx::SVD< value_t >  apx;
     
-            hlr::multiply( hpro::complex(-1), apply_normal, *A, apply_normal, *B, *C, acc, apx );
-        }// if
-        else
-        {
-            hlr::approx::SVD< hpro::real >  apx;
-    
-            hlr::multiply( hpro::real(-1), apply_normal, *A, apply_normal, *B, *C, acc, apx );
-        }// else
+        hlr::multiply( value_t(-1), apply_normal, *A, apply_normal, *B, *C, acc, apx );
     }// else
 }
 
@@ -556,13 +529,14 @@ update_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-apply_node::run_ ( const TTruncAcc &  acc )
+apply_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    if ( is_blocked( A ) && ! hpro::is_small( A ) )
-        A->apply_updates( acc, nonrecursive );
+    if ( is_blocked( A ) && ! Hpro::is_small( A ) )
+        A->apply_updates( acc, Hpro::nonrecursive );
     else
-        A->apply_updates( acc, recursive );
+        A->apply_updates( acc, Hpro::recursive );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -574,8 +548,9 @@ apply_node::run_ ( const TTruncAcc &  acc )
 //
 // construct DAG for applying updates
 //
+template < typename value_t >
 void
-build_apply_dag ( TMatrix *           A,
+build_apply_dag ( Hpro::TMatrix< value_t > *           A,
                   node *              parent,
                   apply_map_t &       apply_map,
                   dag::node_list_t &  apply_nodes,
@@ -584,7 +559,7 @@ build_apply_dag ( TMatrix *           A,
     if ( is_null( A ) )
         return;
     
-    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
+    auto  apply = dag::alloc_node< apply_node< value_t > >( apply_nodes, A );
 
     apply_map[ A->id() ] = apply;
 
@@ -593,7 +568,7 @@ build_apply_dag ( TMatrix *           A,
     
     if ( is_blocked( A ) && ! is_small( min_size, A ) )
     {
-        auto  BA = ptrcast( A, TBlockMatrix );
+        auto  BA = ptrcast( A, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -614,8 +589,9 @@ build_apply_dag ( TMatrix *           A,
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 graph
-gen_dag_lu_ip ( TMatrix &      A,
+gen_dag_lu_ip ( Hpro::TMatrix< value_t > &      A,
                 const size_t   min_size,
                 refine_func_t  refine )
 {
@@ -626,16 +602,16 @@ gen_dag_lu_ip ( TMatrix &      A,
     apply_map_t       apply_map;
     dag::node_list_t  apply_nodes;
 
-    if ( CFG::Arith::use_accu )
+    if ( Hpro::CFG::Arith::use_accu )
         build_apply_dag( & A, nullptr, apply_map, apply_nodes, min_size );
     
     //
     // construct DAG for LU
     //
 
-    auto  dag = refine( new lu_node( & A, apply_map ), min_size, use_single_end_node );
+    auto  dag = refine( new lu_node< value_t >( & A, apply_map ), min_size, use_single_end_node );
 
-    if ( ! CFG::Arith::use_accu )
+    if ( ! Hpro::CFG::Arith::use_accu )
         return dag;
     else
     {
@@ -670,7 +646,7 @@ gen_dag_lu_ip ( TMatrix &      A,
 
     dag::node_list_t  work;
     node_set_t        deleted;
-    auto              is_apply_node = [] ( node * node ) { return ( dynamic_cast< apply_node * >( node ) != nullptr ); };
+    auto              is_apply_node = [] ( node * node ) { return ( dynamic_cast< apply_node< value_t > * >( node ) != nullptr ); };
     
     work.push_back( apply_map[ A.id() ] );
 
@@ -728,14 +704,15 @@ gen_dag_lu_ip ( TMatrix &      A,
 //
 // return graph representing compute DAG for solving L X = A
 //
+template < typename value_t >
 graph
-gen_dag_solve_lower  ( const hpro::TMatrix &  L,
-                       hpro::TMatrix &        A,
+gen_dag_solve_lower  ( const Hpro::TMatrix< value_t > &  L,
+                       Hpro::TMatrix< value_t > &        A,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsml_node( &L, &A, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new trsml_node< value_t >( &L, &A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -743,14 +720,15 @@ gen_dag_solve_lower  ( const hpro::TMatrix &  L,
 //
 // return graph representing compute DAG for solving X U = A
 //
+template < typename value_t >
 graph
-gen_dag_solve_upper  ( const hpro::TMatrix &  U,
-                       hpro::TMatrix &        A,
+gen_dag_solve_upper  ( const Hpro::TMatrix< value_t > &  U,
+                       Hpro::TMatrix< value_t > &        A,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new trsmu_node( &U, &A, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new trsmu_node< value_t >( &U, &A, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }
@@ -758,15 +736,16 @@ gen_dag_solve_upper  ( const hpro::TMatrix &  U,
 //
 // return graph representing compute DAG for C = A B + C
 //
+template < typename value_t >
 graph
-gen_dag_update       ( const hpro::TMatrix &  A,
-                       const hpro::TMatrix &  B,
-                       hpro::TMatrix &        C,
+gen_dag_update       ( const Hpro::TMatrix< value_t > &  A,
+                       const Hpro::TMatrix< value_t > &  B,
+                       Hpro::TMatrix< value_t > &        C,
                        const size_t           min_size,
                        refine_func_t          refine )
 {
     apply_map_t  apply_map;
-    auto         dag = refine( new update_node( &A, &B, &C, apply_map ), min_size, use_single_end_node );
+    auto         dag = refine( new update_node< value_t >( &A, &B, &C, apply_map ), min_size, use_single_end_node );
 
     return dag;
 }

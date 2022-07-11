@@ -24,18 +24,20 @@ DECLARE_TYPE( level_matrix );
 // block matrix representing a single, global level
 // in the H hierarchy
 //
-class level_matrix : public HLIB::TBlockMatrix
+template < typename T_value >
+class level_matrix : public Hpro::TBlockMatrix< T_value >
 {
 public:
-    using  matrix_map_t = std::map< HLIB::idx_t, HLIB::TMatrix * >;
+    using  value_t      = T_value;
+    using  matrix_map_t = std::map< Hpro::idx_t, Hpro::TMatrix< value_t > * >;
     
 private:
     // pointers to level matrices above and below
     std::shared_ptr< level_matrix >        _above;
     std::shared_ptr< level_matrix >        _below;
 
-    std::map< HLIB::idx_t, matrix_map_t >  _block_rows;
-    std::map< HLIB::idx_t, matrix_map_t >  _block_cols;
+    std::map< Hpro::idx_t, matrix_map_t >  _block_rows;
+    std::map< Hpro::idx_t, matrix_map_t >  _block_cols;
     
 public:
     //
@@ -46,8 +48,8 @@ public:
     
     level_matrix ( const uint               nrows,
                    const uint               ncols,
-                   const HLIB::TIndexSet &  rowis,
-                   const HLIB::TIndexSet &  colis );
+                   const Hpro::TIndexSet &  rowis,
+                   const Hpro::TIndexSet &  colis );
 
     //
     // give access to level hierarchy
@@ -65,7 +67,7 @@ public:
 
     //! return matrix at index (i,j)
     auto  block ( const uint  i,
-                  const uint  j ) -> HLIB::TMatrix *
+                  const uint  j ) -> Hpro::TMatrix< value_t > *
     {
         return _block_rows[ i ][ j ];
     }
@@ -73,7 +75,7 @@ public:
     //! set matrix block at block index (\a i,\a j) to matrix \a A
     void  set_block ( const uint       i,
                       const uint       j,
-                      HLIB::TMatrix *  A )
+                      Hpro::TMatrix< value_t > *  A )
     {
         _block_rows[ i ][ j ] = A;
         _block_cols[ j ][ i ] = A;
@@ -81,7 +83,7 @@ public:
 
     //! return block-row iterator to next entry starting at (i,j)
     auto  row_iter ( const uint  i,
-                     const uint  j ) -> matrix_map_t::iterator
+                     const uint  j ) -> typename matrix_map_t::iterator
     {
         auto  iter = _block_rows[ i ].begin();
         auto  end  = _block_rows[ i ].end();
@@ -97,7 +99,7 @@ public:
     
     //! return block-column iterator to next entry starting at (i,j)
     auto  col_iter ( const uint  i,
-                     const uint  j ) -> matrix_map_t::iterator
+                     const uint  j ) -> typename matrix_map_t::iterator
     {
         auto  iter = _block_cols[ j ].begin();
         auto  end  = _block_cols[ j ].end();
@@ -112,24 +114,24 @@ public:
     }
 
     //! return end of block-row i
-    auto  row_end ( const uint  i ) -> matrix_map_t::iterator
+    auto  row_end ( const uint  i ) -> typename matrix_map_t::iterator
     {
         return _block_rows[ i ].end();
     }
     
     //! return end of block-column j
-    auto  col_end ( const uint  j ) -> matrix_map_t::iterator
+    auto  col_end ( const uint  j ) -> typename matrix_map_t::iterator
     {
         return _block_cols[ j ].end();
     }
     
     // return block row/column of A
     std::pair< uint, uint >
-    get_index ( const TMatrix *  A )
+    get_index ( const Hpro::TMatrix< value_t > *  A )
     {
-        for ( uint  i = 0; i < nblock_rows(); ++i )
+        for ( uint  i = 0; i < this->nblock_rows(); ++i )
         {
-            for ( uint  j = 0; j < nblock_cols(); ++j )
+            for ( uint  j = 0; j < this->nblock_cols(); ++j )
             {
                 auto  A_ij = block( i, j );
                 
@@ -138,10 +140,10 @@ public:
             }// for
         }// for
 
-        return { nblock_rows(), nblock_cols() };
+        return { this->nblock_rows(), this->nblock_cols() };
     }
     std::pair< uint, uint >
-    get_index ( const TMatrix &  A )
+    get_index ( const Hpro::TMatrix< value_t > &  A )
     {
         return get_index( & A );
     }
@@ -150,10 +152,10 @@ public:
     // RTTI
     //
 
-    HLIB_RTTI_DERIVED( level_matrix, TBlockMatrix )
+    HPRO_RTTI_DERIVED( level_matrix, Hpro::TBlockMatrix< value_t > )
 
     //! return matrix of same class (but no content)
-    virtual auto create () const -> std::unique_ptr< TMatrix >
+    virtual auto create () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
         return std::make_unique< level_matrix >();
     }
@@ -161,15 +163,16 @@ public:
     //! return size in bytes used by this object
     virtual size_t byte_size () const
     {
-        return HLIB::TBlockMatrix::byte_size() + sizeof( _above ) + sizeof( _below );
+        return Hpro::TBlockMatrix< value_t >::byte_size() + sizeof( _above ) + sizeof( _below );
     }
 };
 
 //
 // construct set of level matrices for given H-matrix
 //
-std::vector< std::shared_ptr< level_matrix > >
-construct_lvlhier ( HLIB::TMatrix &  A );
+template < typename value_t >
+std::vector< std::shared_ptr< level_matrix< value_t > > >
+construct_lvlhier ( Hpro::TMatrix< value_t > &  A );
 
 }} // namespace hlr::matrix
 

@@ -25,15 +25,16 @@ namespace hlr
 namespace
 {
 
+template < typename value_t >
 bool
-compare ( const hpro::TMatrix &  A,
-          const hpro::TMatrix &  B,
-          const double           error )
+compare ( const Hpro::TMatrix< value_t > &  A,
+          const Hpro::TMatrix< value_t > &  B,
+          const double                      error )
 {
     if ( is_blocked_all( A, B ) )
     {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
-        auto  BB = cptrcast( &B, hpro::TBlockMatrix );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
 
         if (( BA->block_is()    == BB->block_is() ) &&
             ( BA->nblock_rows() == BB->nblock_rows() ) &&
@@ -88,14 +89,15 @@ compare ( const hpro::TMatrix &  A,
 //
 // compare <A> with reference read from file <filename>
 //
+template < typename value_t >
 void
-compare_ref_file ( hpro::TMatrix *      A,
-                   const std::string &  filename,
-                   const double         error )
+compare_ref_file ( Hpro::TMatrix< value_t > *  A,
+                   const std::string &         filename,
+                   const double                error )
 {
     if ( fs::exists( filename ) )
     {
-        auto  D = hpro::read_matrix( filename );
+        auto  D = Hpro::read_matrix< value_t >( filename );
 
         if ( compare( *A, *D, error ) )
             std::cout << term::ltgreen << "no error" << term::reset << std::endl;

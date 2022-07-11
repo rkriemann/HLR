@@ -19,10 +19,11 @@ namespace hlr
 // compare blocks of <A> with reference read from file <filename>
 // and output difference if larger then <error>
 //
+template < typename value_t >
 void
-compare_ref_file ( HLIB::TMatrix *      A,
-                   const std::string &  filename,
-                   const double         error );
+compare_ref_file ( Hpro::TMatrix< value_t > *  A,
+                   const std::string &         filename,
+                   const double                error );
 
 }// namespace hlr
 

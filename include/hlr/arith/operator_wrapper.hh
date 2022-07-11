@@ -2,10 +2,10 @@
 #define __HLR_ARITH_OPERATOR_WRAPPER_HH
 //
 // Project     : HLR
-// File        : arith/operator_wrapper.hh
+// Module      : arith/operator_wrapper
 // Description : wrapper functions for some standard operators
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
 #include <hpro/cluster/TIndexSet.hh>
@@ -251,7 +251,7 @@ prod ( const value_t                        alpha,
     
     switch ( op_M )
     {
-        case hpro::apply_normal :
+        case Hpro::apply_normal :
         {
             const auto  t = blas::mulvec( alpha, blas::adjoint( op.V ), x );
 
@@ -259,15 +259,15 @@ prod ( const value_t                        alpha,
         }
         break;
 
-        case hpro::apply_conjugate :
+        case Hpro::apply_conjugate :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_transposed :
+        case Hpro::apply_transposed :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_adjoint :
+        case Hpro::apply_adjoint :
         {
             const auto  t = blas::mulvec( alpha, blas::adjoint( op.U ), x );
 
@@ -290,7 +290,7 @@ prod ( const value_t                        alpha,
     
     switch ( op_M )
     {
-        case hpro::apply_normal :
+        case Hpro::apply_normal :
         {
             const auto  T = blas::prod( alpha, blas::adjoint( op.V ), X );
 
@@ -298,15 +298,15 @@ prod ( const value_t                        alpha,
         }
         break;
 
-        case hpro::apply_conjugate :
+        case Hpro::apply_conjugate :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_transposed :
+        case Hpro::apply_transposed :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_adjoint :
+        case Hpro::apply_adjoint :
         {
             const auto  T = blas::prod( alpha, blas::adjoint( op.U ), X );
 
@@ -428,7 +428,7 @@ prod ( const value_t                           alpha,
 {
     switch ( op_M )
     {
-        case hpro::apply_normal :
+        case Hpro::apply_normal :
         {
             auto  U_i = op.U.cbegin();
             auto  V_i = op.V.cbegin();
@@ -445,15 +445,15 @@ prod ( const value_t                           alpha,
         }
         break;
 
-        case hpro::apply_conjugate :
+        case Hpro::apply_conjugate :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_transposed :
+        case Hpro::apply_transposed :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_adjoint :
+        case Hpro::apply_adjoint :
         {
             auto  U_i = op.U.cbegin();
             auto  V_i = op.V.cbegin();
@@ -482,7 +482,7 @@ prod ( const value_t                           alpha,
 {
     switch ( op_M )
     {
-        case hpro::apply_normal :
+        case Hpro::apply_normal :
         {
             auto  U_i = op.U.cbegin();
             auto  V_i = op.V.cbegin();
@@ -499,15 +499,15 @@ prod ( const value_t                           alpha,
         }
         break;
 
-        case hpro::apply_conjugate :
+        case Hpro::apply_conjugate :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_transposed :
+        case Hpro::apply_transposed :
             HLR_ERROR( "todo" );
             break;
         
-        case hpro::apply_adjoint :
+        case Hpro::apply_adjoint :
         {
             auto  U_i = op.U.cbegin();
             auto  V_i = op.V.cbegin();
@@ -629,20 +629,20 @@ operator_wrapper ( const std::list< blas::matrix< value_t > > &  U,
 
 //////////////////////////////////////////////////////////////////////
 //
-// wrapper functions for hpro::TLinearOperator
+// wrapper functions for Hpro::TLinearOperator
 //
 //////////////////////////////////////////////////////////////////////
 
-inline size_t  nrows ( const hpro::TLinearOperator &  M ) { return M.range_dim(); }
-inline size_t  ncols ( const hpro::TLinearOperator &  M ) { return M.domain_dim(); }
+template < typename value_t > size_t  nrows ( const Hpro::TLinearOperator< value_t > &  M ) { return M.range_dim(); }
+template < typename value_t > size_t  ncols ( const Hpro::TLinearOperator< value_t > &  M ) { return M.domain_dim(); }
 
 template < typename value_t >
 void
-prod ( const value_t                    alpha,
-       const matop_t                    op_M,
-       const hpro::TLinearOperator &    M,
-       const blas::vector< value_t > &  x,
-       blas::vector< value_t > &        y )
+prod ( const value_t                             alpha,
+       const matop_t                             op_M,
+       const Hpro::TLinearOperator< value_t > &  M,
+       const blas::vector< value_t > &           x,
+       blas::vector< value_t > &                 y )
 {
     M.apply_add( alpha, x, y, op_M );
 }
@@ -659,12 +659,12 @@ struct coefffn_operator
     using  value_t = typename coeff_fn_t::value_t;
 
     // block index set to be evaluated at
-    hpro::TBlockIndexSet  bis;
+    Hpro::TBlockIndexSet  bis;
 
     // coefficient function
     const coeff_fn_t &    func;
 
-    coefffn_operator ( const hpro::TBlockIndexSet &  abis,
+    coefffn_operator ( const Hpro::TBlockIndexSet &  abis,
                        const coeff_fn_t &            afunc )
             : bis( abis )
             , func( afunc )
@@ -693,7 +693,7 @@ get_row ( const coefffn_operator< coeff_fn_t > &  op,
     blas::vector< typename coeff_fn_t::value_t >  v( ncols( op ) );
     const auto                                    ofs = i + op.bis.row_is().first();
 
-    op.func.eval( hpro::is( ofs, ofs ), op.bis.col_is(), v.data() );
+    op.func.eval( Hpro::is( ofs, ofs ), op.bis.col_is(), v.data() );
                       
     return v;
 }
@@ -706,14 +706,14 @@ get_column ( const coefffn_operator< coeff_fn_t > &  op,
     blas::vector< typename coeff_fn_t::value_t >  v( nrows( op ) );
     const auto                                    ofs = i + op.bis.col_is().first();
 
-    op.func.eval( op.bis.row_is(), hpro::is( ofs, ofs ), v.data() );
+    op.func.eval( op.bis.row_is(), Hpro::is( ofs, ofs ), v.data() );
                       
     return v;
 }
 
 template < typename coeff_fn_t >
 coefffn_operator< coeff_fn_t >
-operator_wrapper ( const hpro::TBlockIndexSet &  bis,
+operator_wrapper ( const Hpro::TBlockIndexSet &  bis,
                    const coeff_fn_t &            func )
 {
     return coefffn_operator< coeff_fn_t > ( bis, func );
