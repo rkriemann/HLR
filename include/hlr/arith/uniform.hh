@@ -24,12 +24,12 @@ namespace hlr { namespace uniform {
 // construct mappings of A_{t × s} to set of uniform leaves per t/s
 //
 template < typename value_t >
-std::pair< is_matrix_map_t,
-           is_matrix_map_t >
+std::pair< is_matrix_map_t< value_t >,
+           is_matrix_map_t< value_t > >
 construct_indexset_to_block_maps ( hpro::TMatrix< value_t > &  A )
 {
-    auto  rowmap = is_matrix_map_t();
-    auto  colmap = is_matrix_map_t();
+    auto  rowmap = is_matrix_map_t< value_t >();
+    auto  colmap = is_matrix_map_t< value_t >();
 
     auto  blocks = std::list< hpro::TMatrix< value_t > * >{ &A };
 
@@ -113,8 +113,8 @@ multiply ( const value_t                     alpha,
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
     //
 
-    auto  rowmap = is_matrix_map_t();
-    auto  colmap = is_matrix_map_t();
+    auto  rowmap = is_matrix_map_t< value_t >();
+    auto  colmap = is_matrix_map_t< value_t >();
 
     auto  blocks = std::list< hpro::TMatrix< value_t > * >{ &C };
 
@@ -165,8 +165,8 @@ lu ( hpro::TMatrix< value_t > &  A,
     // construct mapping of A_{t × s} to set of uniform leaves per t/s
     //
 
-    auto  rowmap = is_matrix_map_t();
-    auto  colmap = is_matrix_map_t();
+    auto  rowmap = is_matrix_map_t< value_t >();
+    auto  colmap = is_matrix_map_t< value_t >();
 
     auto  blocks = std::list< hpro::TMatrix< value_t > *>{ &A };
 
@@ -224,8 +224,8 @@ multiply ( const value_t                     alpha,
            const approx_t &                  approx )
 {
     auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( C );
-    auto  prod_inner         = detail::inner_map_t();
-    auto  accu               = detail::accumulator( & prod_inner );
+    auto  prod_inner         = detail::inner_map_t< value_t >();
+    auto  accu               = detail::accumulator< value_t >( & prod_inner );
 
     accu.add_update( op_A, A, op_B, B );
     
@@ -267,8 +267,8 @@ lu ( hpro::TMatrix< value_t > &  A,
      const approx_t &            approx )
 {
     auto  [ rowmap, colmap ] = construct_indexset_to_block_maps( A );
-    // auto  inner_prod         = detail::inner_map_t();
-    auto  accu               = detail::accumulator();
+    // auto  inner_prod         = detail::inner_map_t< value_t >();
+    auto  accu               = detail::accumulator< value_t >();
 
     detail::lu< value_t >( A, accu, acc, approx, rowmap, colmap );
 }
@@ -292,11 +292,11 @@ lu ( hpro::TMatrix< value_t > &          A,
      matrix::cluster_basis< value_t > &  rowcb_U,
      matrix::cluster_basis< value_t > &  colcb_U )
 {
-    auto  rowmap_L = is_matrix_map_t();
-    auto  colmap_L = is_matrix_map_t();
-    auto  rowmap_U = is_matrix_map_t();
-    auto  colmap_U = is_matrix_map_t();
-    auto  accu     = detail::accumulator();
+    auto  rowmap_L = is_matrix_map_t< value_t >();
+    auto  colmap_L = is_matrix_map_t< value_t >();
+    auto  rowmap_U = is_matrix_map_t< value_t >();
+    auto  colmap_U = is_matrix_map_t< value_t >();
+    auto  accu     = detail::accumulator< value_t >();
     
     detail::lu< value_t >( A, L, U, accu, acc, approx,
                            rowcb_L, colcb_L,
@@ -321,7 +321,7 @@ lu ( hpro::TMatrix< value_t > &  A,
 {
     auto  [ rowmap_L, colmap_L ] = construct_indexset_to_block_maps( L );
     auto  [ rowmap_U, colmap_U ] = construct_indexset_to_block_maps( U );
-    auto  accu                   = detail::accumulator();
+    auto  accu                   = detail::accumulator< value_t >();
     
     detail::lu< value_t >( A, L, U, accu, acc, approx,
                            rowmap_L, colmap_L,
@@ -342,9 +342,9 @@ lu ( hpro::TMatrix< value_t > &          A,
      matrix::cluster_basis< value_t > &  rowcb,
      matrix::cluster_basis< value_t > &  colcb )
 {
-    auto  rowmap = is_matrix_map_t();
-    auto  colmap = is_matrix_map_t();
-    auto  accu   = detail::accumulator();
+    auto  rowmap = is_matrix_map_t< value_t >();
+    auto  colmap = is_matrix_map_t< value_t >();
+    auto  accu   = detail::accumulator< value_t >();
     
     detail::lu< value_t >( A, accu, acc, approx, rowcb, colcb, rowmap, colmap );
 }

@@ -12,7 +12,7 @@
 #include <universal/number/posit/posit.hpp>
 #endif
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -37,17 +37,17 @@ using hlr::matrix::convert_to_dense;
 template < typename T_value_dest,
            typename T_value_src >
 size_t
-convert_prec ( Hpro::TMatrix< value_t > &  M )
+convert_prec ( Hpro::TMatrix< T_value_src > &  M )
 {
     if constexpr( std::is_same_v< T_value_dest, T_value_src > )
         return M.byte_size();
     
     if ( is_blocked( M ) )
     {
-        auto    B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
-        size_t  s = sizeof(Hpro::TBlockMatrix);
+        auto    B = ptrcast( &M, Hpro::TBlockMatrix< T_value_src > );
+        size_t  s = sizeof(Hpro::TBlockMatrix< T_value_src >);
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t > *);
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< T_value_src > *);
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -62,7 +62,7 @@ convert_prec ( Hpro::TMatrix< value_t > &  M )
     }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R = ptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  R = ptrcast( &M, Hpro::TRkMatrix< T_value_src > );
         auto  U = blas::copy< T_value_dest >( blas::mat_U< T_value_src >( R ) );
         auto  V = blas::copy< T_value_dest >( blas::mat_V< T_value_src >( R ) );
 
@@ -71,22 +71,22 @@ convert_prec ( Hpro::TMatrix< value_t > &  M )
 
         return R->byte_size() - sizeof(T_value_src) * R->rank() * ( R->nrows() + R->ncols() ) + sizeof(T_value_dest) * R->rank() * ( R->nrows() + R->ncols() ); 
     }// if
-    else if ( hlr::matrix::is_generic_lowrank( M ) )
-    {
-        auto  R = ptrcast( &M, hlr::matrix::lrmatrix );
+    // else if ( hlr::matrix::is_generic_lowrank( M ) )
+    // {
+    //     auto  R = ptrcast( &M, hlr::matrix::lrmatrix );
 
-        std::visit(
-            [R] ( auto &&  UV )
-            {
-                auto  U = blas::copy< T_value_dest, T_value_src >( UV.U );
-                auto  V = blas::copy< T_value_dest, T_value_src >( UV.V );
+    //     std::visit(
+    //         [R] ( auto &&  UV )
+    //         {
+    //             auto  U = blas::copy< T_value_dest, T_value_src >( UV.U );
+    //             auto  V = blas::copy< T_value_dest, T_value_src >( UV.V );
 
-                R->set_lrmat( std::move( U ), std::move( V ) );
-            },
-            R->factors() );
+    //             R->set_lrmat( std::move( U ), std::move( V ) );
+    //         },
+    //         R->factors() );
 
-        return R->byte_size(); 
-    }// if
+    //     return R->byte_size(); 
+    // }// if
     else if ( is_uniform_lowrank( M ) )
     {
         auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
@@ -98,28 +98,28 @@ convert_prec ( Hpro::TMatrix< value_t > &  M )
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< T_value_src > );
         auto  DD = blas::copy< T_value_dest >( blas::mat< T_value_src >( D ) );
 
         blas::copy< T_value_dest, T_value_src >( DD, blas::mat< T_value_src >( D ) );
 
         return D->byte_size() - sizeof(T_value_src) * D->nrows() * D->ncols() + sizeof(T_value_dest) * D->nrows() * D->ncols();
     }// if
-    else if ( matrix::is_generic_dense( M ) )
-    {
-        auto  D  = ptrcast( &M, matrix::dense_matrix );
+    // else if ( matrix::is_generic_dense( M ) )
+    // {
+    //     auto  D  = ptrcast( &M, matrix::dense_matrix );
 
-        std::visit(
-            [D] ( auto &&  M )
-            {        
-                auto  M2 = blas::copy< T_value_dest, T_value_src >( M );
+    //     std::visit(
+    //         [D] ( auto &&  M )
+    //         {        
+    //             auto  M2 = blas::copy< T_value_dest, T_value_src >( M );
 
-                D->set_matrix( std::move( M2 ) );
-            },
-            D->matrix() );
+    //             D->set_matrix( std::move( M2 ) );
+    //         },
+    //         D->matrix() );
 
-        return D->byte_size();
-    }// if
+    //     return D->byte_size();
+    // }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 
@@ -133,7 +133,7 @@ convert_prec ( Hpro::TMatrix< value_t > &  M )
 template < typename value_t >
 size_t
 convert_zfp ( Hpro::TMatrix< value_t > &  A,
-              zfp_config &     config )
+              zfp_config &                config )
 {
     if ( is_blocked( A ) )
     {

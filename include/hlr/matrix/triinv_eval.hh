@@ -130,6 +130,82 @@ public:
     HPRO_RTTI_DERIVED( triinv_eval, Hpro::TLinearOperator< value_t > )
 };
 
+//
+// mapping function of linear operator A, e.g. y ≔ A(x).
+// Depending on \a op, either A, A^T or A^H is applied.
+//
+template < typename value_t >
+void
+triinv_eval< value_t >::apply  ( const Hpro::TVector< value_t > *  x,
+                                 Hpro::TVector< value_t > *        y,
+                                 const matop_t                     op ) const
+{
+    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
+    HLR_ASSERT( is_scalar_all( x, y ) );
+
+    x->copy_to( y );
+
+    if ( _shape == upper_triangular )
+        hlr::solve_upper_tri( op, _mat, * ptrcast( y, Hpro::TScalarVector< value_t > ), _diag );
+    else
+        hlr::solve_lower_tri( op, _mat, * ptrcast( y, Hpro::TScalarVector< value_t > ), _diag );
+}
+
+//
+// mapping function with update: \a y ≔ \a y + \a α \a A( \a x ).
+// Depending on \a op, either A, A^T or A^H is applied.
+//
+template < typename value_t >
+void
+triinv_eval< value_t >::apply_add  ( const value_t                     alpha,
+                                     const Hpro::TVector< value_t > *  x,
+                                     Hpro::TVector< value_t > *        y,
+                                     const matop_t                     op ) const
+{
+    HLR_ASSERT( ! is_null( x ) && ! is_null( y ) );
+
+    Hpro::TScalarVector< value_t >  t;
+
+    apply( x, & t, op );
+    y->axpy( alpha, & t );
+}
+
+template < typename value_t >
+void
+triinv_eval< value_t >::apply_add  ( const value_t                     /* alpha */,
+                                     const Hpro::TMatrix< value_t > *  /* X */,
+                                     Hpro::TMatrix< value_t > *        /* Y */,
+                                     const matop_t                     /* op */ ) const
+{
+    HLR_ERROR( "not implemented" );
+}
+
+//
+// same as above but only the dimension of the vector spaces is tested,
+// not the corresponding index sets
+//
+template < typename value_t >
+void
+triinv_eval< value_t >::apply_add   ( const value_t                    alpha,
+                                      const blas::vector< value_t > &  x,
+                                      blas::vector< value_t > &        y,
+                                      const matop_t                    op ) const
+{
+    Hpro::TScalarVector< value_t >  sx( _mat.row_is(), x );
+    Hpro::TScalarVector< value_t >  sy( _mat.row_is(), y );
+    
+    apply_add( alpha, & sx, & sy, op );
+}
+
+template < typename value_t >
+void
+triinv_eval< value_t >::apply_add   ( const value_t                    /* alpha */,
+                                      const blas::matrix< value_t > &  /* x */,
+                                      blas::matrix< value_t > &        /* y */,
+                                      const matop_t                    /* op */ ) const
+{
+    HLR_ERROR( "not implemented" );
+}
 
 }} // namespace hlr::matrix
 

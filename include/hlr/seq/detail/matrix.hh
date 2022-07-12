@@ -1157,10 +1157,6 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                 }// if
             }// for
         }// for
-
-        // make value type consistent in block matrix and sub blocks
-        // TODO: really needed when constructing from existing matrix?
-        B->adjust_value_type();
     }// if
     else
     {

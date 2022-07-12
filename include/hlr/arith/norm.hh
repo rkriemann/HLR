@@ -501,7 +501,7 @@ inv_error_2 ( const Hpro::TMatrix< value_t > &          A,
               const Hpro::TLinearOperator< value_t > &  A_inv )
 {
     auto  AxInv   = matrix::product( A, A_inv );
-    auto  I       = matrix::identity( A.block_is() );
+    auto  I       = matrix::identity< value_t >( A.block_is() );
     auto  inv_err = matrix::sum( 1.0, *I, -1.0, *AxInv );
 
     return spectral( *inv_err );

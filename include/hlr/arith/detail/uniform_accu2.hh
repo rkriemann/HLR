@@ -187,7 +187,7 @@ struct accumulator
             {
                 HLR_ASSERT( ! is_null( M.block( i, j ) ) );
 
-                sub_accu(i,j) = restrict< value_t >( i, j, M );
+                sub_accu(i,j) = restrict( i, j, M );
             }// for
         }// for
 
@@ -468,13 +468,11 @@ struct accumulator
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                         
                         if ( handle_dense )
-                            BC->set_block( i, j, new Hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                         BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                         Hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                    BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         else
-                            BC->set_block( i, j, new Hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                      BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                      Hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                 BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
             }// if
@@ -490,11 +488,11 @@ struct accumulator
                      is_dense_all( A, B ) ||
                      ( is_blocked( A ) && is_dense(   B ) ) ||
                      ( is_dense(   A ) && is_blocked( B ) ))
-                    T = std::make_unique< Hpro::TDenseMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ), Hpro::value_type_v< value_t > );
+                    T = std::make_unique< Hpro::TDenseMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
                 else
                 {
                     std::cout << "!!! : " << M.id() << " : " << A->typestr() << " x " << B->typestr() << std::endl;
-                    T = std::make_unique< Hpro::TRkMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ), Hpro::value_type_v< value_t > );
+                    T = std::make_unique< Hpro::TRkMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
                 }// else
 
                 hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
@@ -539,7 +537,7 @@ struct accumulator
             // (to release matrix before recursion)
             //
 
-            auto  sub_accu = restrict< value_t >( *BC );
+            auto  sub_accu = restrict( *BC );
 
             matrix.reset( nullptr );
         
@@ -646,7 +644,7 @@ solve_lower_tri ( const eval_side_t                 side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict< value_t >( *BM );
+        auto  sub_accu = accu.restrict( *BM );
 
         accu.clear_matrix();
 
@@ -787,7 +785,7 @@ solve_upper_tri ( const eval_side_t                 side,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict< value_t >( *BM );
+        auto  sub_accu = accu.restrict( *BM );
 
         accu.clear_matrix();
 
@@ -936,7 +934,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
         //   consumption dependent on hierarchy depth
         //
 
-        auto  sub_accu = accu.restrict< value_t >( *BA );
+        auto  sub_accu = accu.restrict( *BA );
 
         accu.clear_matrix();
 

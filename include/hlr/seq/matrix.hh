@@ -705,7 +705,7 @@ copy_ll ( const Hpro::TMatrix< value_t > &    M,
             {
                 if ( ! is_null( BM->block( i, j ) ) )
                 {
-                    auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
+                    auto  B_ij = ( i == j ? copy_ll( * BM->block( i, j ), diag ) : hlr::seq::matrix::copy( * BM->block( i, j ) ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );
@@ -758,7 +758,7 @@ copy_ur ( const Hpro::TMatrix< value_t > &    M,
             {
                 if ( ! is_null( BM->block( i, j ) ) )
                 {
-                    auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ), diag ) : copy( * BM->block( i, j ) ) );
+                    auto  B_ij = ( i == j ? copy_ur( * BM->block( i, j ), diag ) : hlr::seq::matrix::copy( * BM->block( i, j ) ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );

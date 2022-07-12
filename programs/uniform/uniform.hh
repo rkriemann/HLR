@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -15,7 +15,7 @@
 #if defined( HAS_H2 )
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/algebra/mat_conv.hh>
+#include <hpro/matrix/convert.hh>
 #endif
 
 #include <hlr/seq/norm.hh>
@@ -62,13 +62,13 @@ program_main ()
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-    auto  A = std::unique_ptr< hpro::TMatrix >();
+    auto  A = std::unique_ptr< hpro::TMatrix< value_t > >();
     
     tic = timer::now();
 
     if ( cmdline::matrixfile != "" )
     {
-        A = io::hpro::read( cmdline::matrixfile );
+        A = io::hpro::read< value_t >( cmdline::matrixfile );
     }// if
     else
     {
@@ -110,7 +110,7 @@ program_main ()
 
     auto  rowcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
     auto  colcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
-    auto  A_uni     = std::unique_ptr< hpro::TMatrix >();
+    auto  A_uni     = std::unique_ptr< hpro::TMatrix< value_t > >();
     auto  apx       = approx::SVD< value_t >();
 
     if ( true )
@@ -228,7 +228,7 @@ program_main ()
     
     auto  rowcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
     auto  colcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
-    auto  A_h2     = std::unique_ptr< hpro::TMatrix >();
+    auto  A_h2     = std::unique_ptr< hpro::TMatrix< value_t > >();
     
     if ( true )
     {

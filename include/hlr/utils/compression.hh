@@ -20,8 +20,6 @@
 
 #include <zfp.h>
 
-#endif
-
 namespace hlr { namespace zfp {
 
 //
@@ -181,6 +179,8 @@ uncompress ( const carray &  buffer,
 }
 
 }}// namespace hlr::zfp
+
+#endif
 
 ////////////////////////////////////////////////////////////
 //

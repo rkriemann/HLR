@@ -661,21 +661,24 @@ print_eps ( const cluster_basis_t &  cb,
     prn.end();
 }
 
-template void print_eps< cluster_basis< float > >                  ( const cluster_basis< float > & ,
-                                                                     const std::string &,
-                                                                     const std::string & );
+#define INST_PRINT( type )                                              \
+    template void print_eps< type >     ( const Hpro::TMatrix< type > &, \
+                                          const std::string &          , \
+                                          const std::string &          ); \
+    template void print_lvl_eps< type > ( const Hpro::TMatrix< type > &, \
+                                          const std::string &          , \
+                                          const std::string &          ); \
+    template void print_mem_eps< type > ( const Hpro::TMatrix< type > &, \
+                                          const std::string &          , \
+                                          const std::string &          ); \
+    template void print_eps< cluster_basis< type > > ( const cluster_basis< type > & , \
+                                                       const std::string &, \
+                                                       const std::string & ); \
 
-template void print_eps< cluster_basis< double > >                 ( const cluster_basis< double > & ,
-                                                                     const std::string &,
-                                                                     const std::string & );
-
-template void print_eps< cluster_basis< std::complex< float > > >  ( const cluster_basis< std::complex< float > > & ,
-                                                                     const std::string &,
-                                                                     const std::string & );
-
-template void print_eps< cluster_basis< std::complex< double > > > ( const cluster_basis< std::complex< double > > & ,
-                                                                     const std::string &,
-                                                                     const std::string & );
+INST_PRINT( float )
+INST_PRINT( double )
+INST_PRINT( std::complex< float > )
+INST_PRINT( std::complex< double > )
 
 #if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
 
@@ -694,6 +697,8 @@ template void print_eps< cluster_basis< std::complex< double > > > ( const clust
 
 INST_PRINT_EPS( float )
 INST_PRINT_EPS( double )
+INST_PRINT_EPS( std::complex< float > )
+INST_PRINT_EPS( std::complex< double > )
 
 #endif
 

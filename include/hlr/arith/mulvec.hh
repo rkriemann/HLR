@@ -299,7 +299,7 @@ mul_vec ( const value_t                             alpha,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y )
 {
-    mul_vec( alpha, op_M, M, Hpro::blas_vec< value_t >( x ), Hpro::blas_vec< value_t >( y ) );
+    mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
 // template < typename value_t >

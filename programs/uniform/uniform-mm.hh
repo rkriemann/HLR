@@ -51,7 +51,7 @@ program_main ()
 
     auto  tic    = timer::now();
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A      = io::hpro::read( "A.hm" );
+    // auto  A      = io::hpro::read< value_t >( "A.hm" );
     auto  toc    = timer::since( tic );
 
     // io::hpro::write( *A, "A.hm" );

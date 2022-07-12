@@ -6,7 +6,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -15,7 +15,7 @@
 #if defined( HAS_H2 )
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/algebra/mat_conv.hh>
+#include <hpro/matrix/convert.hh>
 #endif
 
 #include <hlr/seq/norm.hh>
@@ -79,7 +79,7 @@ program_main ()
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A      = io::hpro::read( "A.hm" );
+    // auto  A      = io::hpro::read< value_t >( "A.hm" );
     auto  toc    = timer::since( tic );
 
     // io::hpro::write( *A, "A.hm" );
@@ -139,7 +139,7 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     auto  M1  = seq::matrix::copy_nonuniform< value_t >( *A2 );
-    auto  REF = std::unique_ptr< hpro::TMatrix >();
+    auto  REF = std::unique_ptr< hpro::TMatrix< value_t > >();
             
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
     
@@ -267,7 +267,7 @@ program_main ()
             auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
             auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
             auto  AxLU2    = matrix::product( *M1, U2_inv, L2_inv );
-            auto  I        = matrix::identity( M1->block_is() );
+            auto  I        = matrix::identity< value_t >( M1->block_is() );
             auto  inv_err2 = matrix::sum( 1.0, *I, -1.0, *AxLU2 );
 
             std::cout << "      error  = " << format_error( norm::spectral( *inv_err2 ) ) << std::endl;
@@ -323,7 +323,7 @@ program_main ()
             auto  L2_inv   = matrix::triinv_eval( *L2, blas::lower_triangular, unit_diag );
             auto  U2_inv   = matrix::triinv_eval( *U2, blas::upper_triangular, general_diag );
             auto  AxLU2    = matrix::product( *M1, U2_inv, L2_inv );
-            auto  I        = matrix::identity( M1->block_is() );
+            auto  I        = matrix::identity< value_t >( M1->block_is() );
             auto  inv_err2 = matrix::sum( 1.0, *I, -1.0, *AxLU2 );
 
             std::cout << "      error  = " << format_error( norm::spectral( *inv_err2 ) ) << std::endl;
