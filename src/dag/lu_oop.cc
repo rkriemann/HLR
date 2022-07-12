@@ -155,19 +155,19 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
 
             assert( ! is_null_any( A_ii, L_ii, U_ii ) );
 
-            finished( i, i ) = g.alloc_node< lu_node >( A_ii );
+            finished( i, i ) = g.alloc_node< lu_node< value_t > >( A_ii );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( BA->block( j, i ) ) )
                 {
-                    finished( j, i ) = g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ) );
+                    finished( j, i ) = g.alloc_node< trsmu_node< value_t > >( U_ii, BA->block( j, i ) );
                     finished( j, i )->after( finished( i, i ) );
                 }// if
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( BA->block( i, j ) ) )
                 {
-                    finished( i, j ) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsml_node< value_t > >( L_ii, BA->block( i, j ) );
                     finished( i, j )->after( finished( i, i ) );
                 }// if
         }// for
@@ -180,9 +180,9 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
                 {
                     if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
                     {
-                        auto  update = g.alloc_node< update_node >( BL->block( j, i ),
-                                                                    BU->block( i, l ),
-                                                                    BA->block( j, l ) );
+                        auto  update = g.alloc_node< update_node< value_t > >( BL->block( j, i ),
+                                                                               BU->block( i, l ),
+                                                                               BA->block( j, l ) );
 
                         update->after( finished( j, i ) );
                         update->after( finished( i, l ) );
@@ -236,7 +236,7 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    finished( i, j ) = g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsmu_node< value_t > >(  U_jj, BA->block( i, j ) );
         }// for
         
         for ( uint j = 0; j < nbc; ++j )
@@ -245,9 +245,9 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
                     {
-                        auto  update = g.alloc_node< update_node >( BX->block( i, j ),
-                                                                    BU->block( j, k ),
-                                                                    BA->block( i, k ) );
+                        auto  update = g.alloc_node< update_node< value_t > >( BX->block( i, j ),
+                                                                               BU->block( j, k ),
+                                                                               BA->block( i, k ) );
 
                         update->after( finished( i, j ) );
                         finished( i, k )->after( update );
@@ -298,7 +298,7 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    finished( i, j ) = g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ) );
+                    finished( i, j ) = g.alloc_node< trsml_node< value_t > >(  L_ii, BA->block( i, j ) );
         }// for
         
         for ( uint i = 0; i < nbr; ++i )
@@ -307,9 +307,9 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
                     {
-                        auto  update = g.alloc_node< update_node >( BL->block( k, i ),
-                                                                    BX->block( i, j ),
-                                                                    BA->block( k, j ) );
+                        auto  update = g.alloc_node< update_node< value_t > >( BL->block( k, i ),
+                                                                               BX->block( i, j ),
+                                                                               BA->block( k, j ) );
 
                         update->after( finished( i, j ) );
                         finished( k, j )->after( update );
@@ -362,9 +362,9 @@ update_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        g.alloc_node< update_node >( BA->block( i, k ),
-                                                     BB->block( k, j ),
-                                                     BC->block( i, j ) );
+                        g.alloc_node< update_node< value_t > >( BA->block( i, k ),
+                                                                BB->block( k, j ),
+                                                                BC->block( i, j ) );
                 }// for
             }// for
         }// for
@@ -393,13 +393,22 @@ update_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 
 template < typename value_t >
 graph
-gen_dag_lu_oop ( Hpro::TMatrix< value_t > &      A,
-                 const size_t   min_size,
-                 refine_func_t  refine )
+gen_dag_lu_oop ( Hpro::TMatrix< value_t > &  A,
+                 const size_t                min_size,
+                 refine_func_t               refine )
 {
     return refine( new lu_node( & A ), min_size, use_single_end_node );
 }
 
-}// namespace dag
+#define INST_ALL( type ) \
+    template graph gen_dag_lu_oop< type > ( Hpro::TMatrix< type > &, \
+                                            const size_t           , \
+                                            refine_func_t          );
+    
+INST_ALL( float )
+INST_ALL( double )
+INST_ALL( std::complex< float > )
+INST_ALL( std::complex< double > )
 
-}// namespace hlr
+}}// namespace hlr::dag
+

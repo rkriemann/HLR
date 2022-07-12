@@ -15,6 +15,7 @@
 #include <hpro/matrix/TLinearOperator.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/solve.hh>
 
 namespace hlr { namespace matrix {
 

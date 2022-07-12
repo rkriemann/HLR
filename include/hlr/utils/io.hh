@@ -10,9 +10,20 @@
 
 #include <string>
 
+#include <hpro/config.h>
+
+#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
+#define HAS_H2
+#endif
+
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
+
+#if defined(HAS_H2)
+#include <hpro/io/TClusterBasisVis.hh>
+#include <hpro/matrix/TUniformMatrix.hh>
+#endif
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
@@ -291,14 +302,27 @@ print_mem ( const Hpro::TMatrix< value_t > &  M,
 //
 // print cluster basis <cl> to file <filename>
 //
-template < typename cluster_basis_t >
+template < typename value_t >
 void
-print ( const cluster_basis_t &  cb,
-        const std::string &      filename,
-        const std::string &      options = "default" )
+print ( const hlr::matrix::cluster_basis< value_t > &  cb,
+        const std::string &                            filename,
+        const std::string &                            options = "default" )
 {
     hlr::matrix::print_eps( cb, filename, options );
 }
+
+#if defined(HAS_H2)
+template < typename value_t >
+void
+print ( const Hpro::TClusterBasis< value_t > &  cb,
+        const std::string &                     filename )
+{
+    Hpro::TPSClusterBasisVis< value_t >  cbvis;
+
+    cbvis.colourise( false );
+    cbvis.print( &cb, filename );
+}
+#endif
 
 }// namespace eps
 

@@ -40,13 +40,13 @@ constexpr id_t  ID_ACCU = 'X';
 template < typename value_t >
 struct lu_node : public node
 {
-    Hpro::TMatrix< value_t > *      A;
-    apply_map_t &  apply_nodes;
-    exec_func_t    run_func;
+    Hpro::TMatrix< value_t > *  A;
+    apply_map_t &               apply_nodes;
+    exec_func_t                 run_func;
     
-    lu_node ( Hpro::TMatrix< value_t > *      aA,
-              apply_map_t &  aapply_nodes,
-              exec_func_t    arun_func )
+    lu_node ( Hpro::TMatrix< value_t > *  aA,
+              apply_map_t &               aapply_nodes,
+              exec_func_t                 arun_func )
             : A( aA )
             , apply_nodes( aapply_nodes )
             , run_func(    arun_func )
@@ -67,13 +67,13 @@ struct trsmu_node : public node
 {
     const Hpro::TMatrix< value_t > *  U;
     Hpro::TMatrix< value_t > *        A;
-    apply_map_t &    apply_nodes;
-    exec_func_t      run_func;
+    apply_map_t &                     apply_nodes;
+    exec_func_t                       run_func;
     
     trsmu_node ( const Hpro::TMatrix< value_t > *  aU,
-                       Hpro::TMatrix< value_t > *        aA,
-                       apply_map_t &    aapply_nodes,
-                       exec_func_t      arun_func )
+                       Hpro::TMatrix< value_t > *  aA,
+                       apply_map_t &               aapply_nodes,
+                       exec_func_t                 arun_func )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
@@ -96,13 +96,13 @@ struct trsml_node : public node
 {
     const Hpro::TMatrix< value_t > *  L;
     Hpro::TMatrix< value_t > *        A;
-    apply_map_t &    apply_nodes;
-    exec_func_t      run_func;
+    apply_map_t &                     apply_nodes;
+    exec_func_t                       run_func;
 
     trsml_node ( const Hpro::TMatrix< value_t > *  aL,
-                       Hpro::TMatrix< value_t > *        aA,
-                       apply_map_t &    aapply_nodes,
-                       exec_func_t      arun_func )
+                       Hpro::TMatrix< value_t > *  aA,
+                       apply_map_t &               aapply_nodes,
+                       exec_func_t                 arun_func )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )
@@ -126,14 +126,14 @@ struct update_node : public node
     const Hpro::TMatrix< value_t > *  A;
     const Hpro::TMatrix< value_t > *  B;
     Hpro::TMatrix< value_t > *        C;
-    apply_map_t &    apply_nodes;
-    exec_func_t      run_func;
+    apply_map_t &                     apply_nodes;
+    exec_func_t                       run_func;
 
     update_node ( const Hpro::TMatrix< value_t > *  aA,
                   const Hpro::TMatrix< value_t > *  aB,
                   Hpro::TMatrix< value_t > *        aC,
-                  apply_map_t &    aapply_nodes,
-                  exec_func_t      arun_func )
+                  apply_map_t &                     aapply_nodes,
+                  exec_func_t                       arun_func )
             : A( aA )
             , B( aB )
             , C( aC )
@@ -488,15 +488,26 @@ apply_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 
 template < typename value_t >
 graph
-gen_dag_lu_oop_coarse ( Hpro::TMatrix< value_t > &            A,
-                        const size_t         ncoarse,
-                        const refine_func_t  refine,
-                        const exec_func_t    fine_run )
+gen_dag_lu_oop_coarse ( Hpro::TMatrix< value_t > &  A,
+                        const size_t                ncoarse,
+                        const refine_func_t         refine,
+                        const exec_func_t           fine_run )
 {
     apply_map_t  apply_map;
     auto         dag = refine( new lu_node< value_t >( & A, apply_map, fine_run ), ncoarse, use_single_end_node );
 
     return dag;
 }
+
+#define INST_ALL( type ) \
+template graph gen_dag_lu_oop_coarse< type > ( Hpro::TMatrix< type > &, \
+                                               const size_t           , \
+                                               const refine_func_t    , \
+                                               const exec_func_t       );
+
+INST_ALL( float )
+INST_ALL( double )
+INST_ALL( std::complex< float > )
+INST_ALL( std::complex< double > )
 
 }}// namespace hlr::dag

@@ -37,8 +37,8 @@ const id_t  ID_ACCU = 'X';
 template < typename value_t >
 struct lu_node : public node
 {
-    Hpro::TMatrix< value_t > *      A;
-    apply_map_t &  apply_nodes;
+    Hpro::TMatrix< value_t > *  A;
+    apply_map_t &               apply_nodes;
     
     lu_node ( Hpro::TMatrix< value_t > *      aA,
               apply_map_t &  aapply_nodes )
@@ -61,7 +61,7 @@ struct trsmu_node : public node
 {
     const Hpro::TMatrix< value_t > *  U;
     Hpro::TMatrix< value_t > *        A;
-    apply_map_t &    apply_nodes;
+    apply_map_t &                     apply_nodes;
     
     trsmu_node ( const Hpro::TMatrix< value_t > *  aU,
                        Hpro::TMatrix< value_t > *        aA,
@@ -86,7 +86,7 @@ struct trsml_node : public node
 {
     const Hpro::TMatrix< value_t > *  L;
     Hpro::TMatrix< value_t > *        A;
-    apply_map_t &    apply_nodes;
+    apply_map_t &                     apply_nodes;
 
     trsml_node ( const Hpro::TMatrix< value_t > *  aL,
                        Hpro::TMatrix< value_t > *        aA,
@@ -112,15 +112,15 @@ struct update_node : public node
     const Hpro::TMatrix< value_t > *  A;
     const Hpro::TMatrix< value_t > *  B;
     Hpro::TMatrix< value_t > *        C;
-    apply_map_t &    apply_nodes;
+    apply_map_t &                     apply_nodes;
 
     update_node ( const Hpro::TMatrix< value_t > *  aA,
                   const Hpro::TMatrix< value_t > *  aB,
                   Hpro::TMatrix< value_t > *        aC,
                   apply_map_t &    aapply_nodes )
-            : A(    aA )
-            , B(    aB )
-            , C(    aC )
+            : A( aA )
+            , B( aB )
+            , C( aC )
             , apply_nodes( aapply_nodes )
     { init(); }
 
@@ -550,11 +550,11 @@ apply_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 //
 template < typename value_t >
 void
-build_apply_dag ( Hpro::TMatrix< value_t > *           A,
-                  node *              parent,
-                  apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes,
-                  const size_t        min_size )
+build_apply_dag ( Hpro::TMatrix< value_t > *  A,
+                  node *                      parent,
+                  apply_map_t &               apply_map,
+                  dag::node_list_t &          apply_nodes,
+                  const size_t                min_size )
 {
     if ( is_null( A ) )
         return;
@@ -591,9 +591,9 @@ build_apply_dag ( Hpro::TMatrix< value_t > *           A,
 
 template < typename value_t >
 graph
-gen_dag_lu_ip ( Hpro::TMatrix< value_t > &      A,
-                const size_t   min_size,
-                refine_func_t  refine )
+gen_dag_lu_ip ( Hpro::TMatrix< value_t > &  A,
+                const size_t                min_size,
+                refine_func_t               refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -708,8 +708,8 @@ template < typename value_t >
 graph
 gen_dag_solve_lower  ( const Hpro::TMatrix< value_t > &  L,
                        Hpro::TMatrix< value_t > &        A,
-                       const size_t           min_size,
-                       refine_func_t          refine )
+                       const size_t                      min_size,
+                       refine_func_t                     refine )
 {
     apply_map_t  apply_map;
     auto         dag = refine( new trsml_node< value_t >( &L, &A, apply_map ), min_size, use_single_end_node );
@@ -724,8 +724,8 @@ template < typename value_t >
 graph
 gen_dag_solve_upper  ( const Hpro::TMatrix< value_t > &  U,
                        Hpro::TMatrix< value_t > &        A,
-                       const size_t           min_size,
-                       refine_func_t          refine )
+                       const size_t                      min_size,
+                       refine_func_t                     refine )
 {
     apply_map_t  apply_map;
     auto         dag = refine( new trsmu_node< value_t >( &U, &A, apply_map ), min_size, use_single_end_node );
@@ -741,8 +741,8 @@ graph
 gen_dag_update       ( const Hpro::TMatrix< value_t > &  A,
                        const Hpro::TMatrix< value_t > &  B,
                        Hpro::TMatrix< value_t > &        C,
-                       const size_t           min_size,
-                       refine_func_t          refine )
+                       const size_t                      min_size,
+                       refine_func_t                     refine )
 {
     apply_map_t  apply_map;
     auto         dag = refine( new update_node< value_t >( &A, &B, &C, apply_map ), min_size, use_single_end_node );
@@ -750,6 +750,27 @@ gen_dag_update       ( const Hpro::TMatrix< value_t > &  A,
     return dag;
 }
 
-}// namespace dag
+#define INST_ALL( type )                                                \
+    template graph gen_dag_lu_ip< type >        ( Hpro::TMatrix< type > &      , \
+                                                  const size_t                 , \
+                                                  refine_func_t                ); \
+    template graph gen_dag_solve_lower< type >  ( const Hpro::TMatrix< type > &, \
+                                                  Hpro::TMatrix< type > &      , \
+                                                  const size_t                 , \
+                                                  refine_func_t                ); \
+    template graph gen_dag_solve_upper< type >  ( const Hpro::TMatrix< type > &, \
+                                                  Hpro::TMatrix< type > &      , \
+                                                  const size_t                 , \
+                                                  refine_func_t                ); \
+    template graph gen_dag_update< type >       ( const Hpro::TMatrix< type > &, \
+                                                  const Hpro::TMatrix< type > &, \
+                                                  Hpro::TMatrix< type > &      , \
+                                                  const size_t                 , \
+                                                  refine_func_t                );
 
-}// namespace hlr
+INST_ALL( float )
+INST_ALL( double )
+INST_ALL( std::complex< float > )
+INST_ALL( std::complex< double > )
+    
+}}// namespace hlr::dag

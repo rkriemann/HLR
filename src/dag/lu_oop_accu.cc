@@ -247,7 +247,7 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
         const auto  nbr = B->block_rows();
         const auto  nbc = B->block_cols();
 
-        auto  shift_A = g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node< value_t > >( A );
 
         tensor2< node * >  finished( nbr, nbc );
         
@@ -257,13 +257,13 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
 
             assert( A_ii != nullptr );
 
-            finished(i,i) = g.alloc_node< lu_node >( A_ii );
+            finished(i,i) = g.alloc_node< lu_node< value_t > >( A_ii );
             finished(i,i)->after( shift_A );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( B->block( j, i ) ) )
                 {
-                    finished(j,i) = g.alloc_node< trsmu_node >( A_ii, B->block( j, i ) );
+                    finished(j,i) = g.alloc_node< trsmu_node< value_t > >( A_ii, B->block( j, i ) );
                     finished(j,i)->after( finished(i,i) );
                     finished(j,i)->after( shift_A );
                 }// if
@@ -271,7 +271,7 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( B->block( i, j ) ) )
                 {
-                    finished(i,j) = g.alloc_node< trsml_node >( A_ii, B->block( i, j ) );
+                    finished(i,j) = g.alloc_node< trsml_node< value_t > >( A_ii, B->block( i, j ) );
                     finished(i,j)->after( finished(i,i) );
                     finished(i,j)->after( shift_A );
                 }// if
@@ -283,7 +283,7 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint l = i+1; l < nbc; l++ )
                     if ( ! is_null_any( B->block( j, i ), B->block( i, l ), B->block( j, l ) ) )
                     {
-                        auto  update = g.alloc_node< add_prod_node >( B->block( j, i ),
+                        auto  update = g.alloc_node< add_prod_node< value_t > >( B->block( j, i ),
                                                                       B->block( i, l ),
                                                                       B->block( j, l ) );
 
@@ -295,7 +295,7 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< lu_leaf_node >( A ) );
+        g.alloc_node< apply_node< value_t > >( A )->before( g.alloc_node< lu_leaf_node< value_t > >( A ) );
     }// else
 
     g.finalize();
@@ -337,7 +337,7 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        auto  shift_A = g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node< value_t > >( A );
         
         tensor2< node * >  finished( nbr, nbc );
         
@@ -350,7 +350,7 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
                 {
-                    finished(i,j) = g.alloc_node< trsmu_node >( U_jj, BA->block( i, j ) );
+                    finished(i,j) = g.alloc_node< trsmu_node< value_t > >( U_jj, BA->block( i, j ) );
                     finished(i,j)->after( shift_A );
                 }// if
         }// for
@@ -361,7 +361,7 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
                     {
-                        auto  update = g.alloc_node< add_prod_node >( BA->block( i, j ),
+                        auto  update = g.alloc_node< add_prod_node< value_t > >( BA->block( i, j ),
                                                                       BU->block( j, k ),
                                                                       BA->block( i, k ) );
 
@@ -372,7 +372,7 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsmu_leaf_node >( U, A ) );
+        g.alloc_node< apply_node< value_t > >( A )->before( g.alloc_node< trsmu_leaf_node< value_t > >( U, A ) );
     }// else
 
     g.finalize();
@@ -414,7 +414,7 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
         const auto  nbr = BA->block_rows();
         const auto  nbc = BA->block_cols();
 
-        auto  shift_A = g.alloc_node< shift_node >( A );
+        auto  shift_A = g.alloc_node< shift_node< value_t > >( A );
         
         tensor2< node * >  finished( nbr, nbc );
         
@@ -427,7 +427,7 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
                 {
-                    finished(i,j) = g.alloc_node< trsml_node >( L_ii, BA->block( i, j ) );
+                    finished(i,j) = g.alloc_node< trsml_node< value_t > >( L_ii, BA->block( i, j ) );
                     finished(i,j)->after( shift_A );
                 }// if
         }// for
@@ -438,7 +438,7 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
                     {
-                        auto  update = g.alloc_node< add_prod_node >( BL->block( k, i ),
+                        auto  update = g.alloc_node< add_prod_node< value_t > >( BL->block( k, i ),
                                                                       BA->block( i, j ),
                                                                       BA->block( k, j ) );
 
@@ -449,7 +449,7 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
     }// if
     else
     {
-        g.alloc_node< apply_node >( A )->before( g.alloc_node< trsml_leaf_node >( L, A ) );
+        g.alloc_node< apply_node< value_t > >( A )->before( g.alloc_node< trsml_leaf_node< value_t > >( L, A ) );
     }// else
 
     g.finalize();
@@ -504,9 +504,9 @@ add_prod_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  k = 0; k < BA->block_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        g.alloc_node< add_prod_node >( BA->block( i, k ),
-                                                       BB->block( k, j ),
-                                                       BC->block( i, j ) );
+                        g.alloc_node< add_prod_node< value_t > >( BA->block( i, k ),
+                                                                  BB->block( k, j ),
+                                                                  BC->block( i, j ) );
                 }// for
             }// for
         }// for
@@ -565,9 +565,9 @@ shift_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 
 template < typename value_t >
 graph
-gen_dag_lu_oop_accu ( Hpro::TMatrix< value_t > &      A,
-                      const size_t   min_size,
-                      refine_func_t  refine )
+gen_dag_lu_oop_accu ( Hpro::TMatrix< value_t > &  A,
+                      const size_t                min_size,
+                      refine_func_t               refine )
 {
     if ( hlr::dag::sparsify_mode != hlr::dag::sparsify_none )
         hlr::log( 0, term::red( term::bold( "SPARSIFICATION NOT WORKING WITH ACCUMULATOR ARITHMETIC" ) ) );
@@ -649,5 +649,15 @@ gen_dag_lu_oop_accu ( Hpro::TMatrix< value_t > &      A,
     
     return  dag::graph( std::move( nodes ), std::move( start ), std::move( end ) );
 }
+
+#define INST_ALL( type )                    \
+    template graph gen_dag_lu_oop_accu< type > ( Hpro::TMatrix< type > &, \
+                                                 const size_t           , \
+                                                 refine_func_t          );
+
+INST_ALL( float )
+INST_ALL( double )
+INST_ALL( std::complex< float > )
+INST_ALL( std::complex< double > )
 
 }}// namespace hlr::dag

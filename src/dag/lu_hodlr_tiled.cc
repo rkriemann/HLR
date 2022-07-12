@@ -1335,9 +1335,9 @@ svd_node::run_ ( const Hpro::TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_hodlr_tiled ( Hpro::TMatrix< double > &      A,
-                         const size_t   ntile,
-                         refine_func_t  refine )
+gen_dag_lu_hodlr_tiled ( Hpro::TMatrix< double > &  A,
+                         const size_t               ntile,
+                         refine_func_t              refine )
 {
     // matrix< double >  X( A.nrows(), 16 );
     // matrix< double >  U( A.nrows(), 16 );
@@ -1352,13 +1352,13 @@ gen_dag_lu_hodlr_tiled ( Hpro::TMatrix< double > &      A,
 // compute DAG for TSQR( X·T, U )
 //
 graph
-gen_dag_tsqr ( const size_t                               n,
+gen_dag_tsqr ( const size_t                                 n,
                tile_storage< double > &                     X,
                std::shared_ptr< matrix< double > > &        T,
                tile_storage< double > &                     U,
                std::shared_ptr< tile_storage< double > > &  Q,
                std::shared_ptr< matrix< double > > &        R,
-               refine_func_t                              refine )
+               refine_func_t                                refine )
 {
     return refine( new tsqr_node( 1,
                                   matrix_info( id_t('X'), Hpro::is( 0, n-1 ), & X ),
@@ -1379,7 +1379,7 @@ gen_dag_truncate ( tile_storage< double > &               X,
                    std::shared_ptr< matrix< double > > &  T,
                    tile_storage< double > &               Y,
                    tiled_lrmatrix< double > *             A,
-                   refine_func_t                        refine )
+                   refine_func_t                          refine )
 {
     return refine( new truncate_node( double(1),
                                       matrix_info( id_t('X'), A->row_is(), & X ),
@@ -1397,7 +1397,7 @@ graph
 gen_dag_addlr ( tile_storage< double > &               X,
                 std::shared_ptr< matrix< double > > &  T,
                 tile_storage< double > &               Y,
-                Hpro::TMatrix< double > *                    A,
+                Hpro::TMatrix< double > *              A,
                 refine_func_t                          refine )
 {
     return refine( new addlr_node( matrix_info( id_t('X'), A->row_is(), & X ),

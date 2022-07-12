@@ -196,22 +196,22 @@ lu_node< value_t >::refine_ ( const size_t  min_size )
 
             assert( ! is_null_any( A_ii, L_ii, U_ii ) );
 
-            g.alloc_node< lu_node >( A_ii, apply_map );
+            g.alloc_node< lu_node< value_t > >( A_ii, apply_map );
 
             for ( uint j = i+1; j < nbr; j++ )
                 if ( ! is_null( BA->block( j, i ) ) )
-                    g.alloc_node< trsmu_node >( U_ii, BA->block( j, i ), apply_map );
+                    g.alloc_node< trsmu_node< value_t > >( U_ii, BA->block( j, i ), apply_map );
 
             for ( uint j = i+1; j < nbc; j++ )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    g.alloc_node< trsml_node >( L_ii, BA->block( i, j ), apply_map );
+                    g.alloc_node< trsml_node< value_t > >( L_ii, BA->block( i, j ), apply_map );
 
             for ( uint j = i+1; j < nbr; j++ )
             {
                 for ( uint l = i+1; l < nbc; l++ )
                 {
                     if ( ! is_null_any( BL->block( j, i ), BU->block( i, l ), BA->block( j, l ) ) )
-                        g.alloc_node< update_node >( BL->block( j, i ),
+                        g.alloc_node< update_node< value_t > >( BL->block( j, i ),
                                                      BU->block( i, l ),
                                                      BA->block( j, l ),
                                                      apply_map );
@@ -270,12 +270,12 @@ trsmu_node< value_t >::refine_ ( const size_t  min_size )
 
             for ( uint i = 0; i < nbr; ++i )
                 if ( ! is_null( BA->block(i,j) ) )
-                    g.alloc_node< trsmu_node >(  U_jj, BA->block( i, j ), apply_map );
+                    g.alloc_node< trsmu_node< value_t > >(  U_jj, BA->block( i, j ), apply_map );
 
             for ( uint  k = j+1; k < nbc; ++k )
                 for ( uint  i = 0; i < nbr; ++i )
                     if ( ! is_null_any( BA->block(i,k), BA->block(i,j), BU->block(j,k) ) )
-                        g.alloc_node< update_node >( BX->block( i, j ),
+                        g.alloc_node< update_node< value_t > >( BX->block( i, j ),
                                                      BU->block( j, k ),
                                                      BA->block( i, k ),
                                                      apply_map );
@@ -332,12 +332,12 @@ trsml_node< value_t >::refine_ ( const size_t  min_size )
 
             for ( uint j = 0; j < nbc; ++j )
                 if ( ! is_null( BA->block( i, j ) ) )
-                    g.alloc_node< trsml_node >(  L_ii, BA->block( i, j ), apply_map );
+                    g.alloc_node< trsml_node< value_t > >(  L_ii, BA->block( i, j ), apply_map );
         
             for ( uint  k = i+1; k < nbr; ++k )
                 for ( uint  j = 0; j < nbc; ++j )
                     if ( ! is_null_any( BA->block(k,j), BA->block(i,j), BL->block(k,i) ) )
-                        g.alloc_node< update_node >( BL->block( k, i ),
+                        g.alloc_node< update_node< value_t > >( BL->block( k, i ),
                                                      BX->block( i, j ),
                                                      BA->block( k, j ),
                                                      apply_map );
@@ -398,7 +398,7 @@ update_node< value_t >::refine_ ( const size_t  min_size )
                 for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                 {
                     if ( ! is_null_any( BA->block( i, k ), BB->block( k, j ) ) )
-                        g.alloc_node< update_node >( BA->block( i, k ),
+                        g.alloc_node< update_node< value_t > >( BA->block( i, k ),
                                                      BB->block( k, j ),
                                                      BC->block( i, j ),
                                                      apply_map );
@@ -462,16 +462,16 @@ apply_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 //
 template < typename value_t >
 void
-build_apply_dag ( Hpro::TMatrix< value_t > *           A,
-                  node *              parent,
-                  apply_map_t &       apply_map,
-                  dag::node_list_t &  apply_nodes,
-                  const size_t        min_size )
+build_apply_dag ( Hpro::TMatrix< value_t > * A,
+                  node *                     parent,
+                  apply_map_t &              apply_map,
+                  dag::node_list_t &         apply_nodes,
+                  const size_t               min_size )
 {
     if ( is_null( A ) )
         return;
 
-    auto  apply = dag::alloc_node< apply_node >( apply_nodes, A );
+    auto  apply = dag::alloc_node< apply_node< value_t > >( apply_nodes, A );
 
     apply_map[ A->id() ] = apply;
 
@@ -503,9 +503,9 @@ build_apply_dag ( Hpro::TMatrix< value_t > *           A,
 
 template < typename value_t >
 graph
-gen_dag_lu_oop_accu_sep ( Hpro::TMatrix< value_t > &      A,
-                          const size_t   min_size,
-                          refine_func_t  refine )
+gen_dag_lu_oop_accu_sep ( Hpro::TMatrix< value_t > & A,
+                          const size_t               min_size,
+                          refine_func_t              refine )
 {
     //
     // generate DAG for shifting and applying updates
@@ -537,6 +537,14 @@ gen_dag_lu_oop_accu_sep ( Hpro::TMatrix< value_t > &      A,
     return dag;
 }
 
-}// namespace dag
+#define INST_ALL( type )                    \
+    template graph gen_dag_lu_oop_accu_sep< type > ( Hpro::TMatrix< type > &, \
+                                                     const size_t           , \
+                                                     refine_func_t          );
 
-}// namespace hlr
+INST_ALL( float )
+INST_ALL( double )
+INST_ALL( std::complex< float > )
+INST_ALL( std::complex< double > )
+
+}}// namespace hlr::dag

@@ -19,7 +19,6 @@
 #include <hpro/matrix/TRkMatrix.hh>
 
 #if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-#include <hpro/io/TClusterBasisVis.hh>
 #include <hpro/matrix/TUniformMatrix.hh>
 #endif
 
@@ -521,14 +520,13 @@ print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
 //
 // print cluster basis <cl> to file <filename>
 //
-template < typename cluster_basis_t >
+template < typename value_t >
 void
-print_eps ( const cluster_basis_t &  cb,
-            const std::string &      filename,
-            const std::string &      options )
+print_eps ( const cluster_basis< value_t > &  cb,
+            const std::string &               filename,
+            const std::string &               options )
 {
-    using value_t = typename cluster_basis_t::value_t;
-    using real_t  = Hpro::real_type_t< value_t >;
+    using real_t = Hpro::real_type_t< value_t >;
     
     const boost::filesystem::path  filepath( filename );
     std::string                    suffix;
@@ -549,7 +547,7 @@ print_eps ( const cluster_basis_t &  cb,
     const double  scale_x   = max_x / double(size);
     const double  scale_y   = std::min( 500.0 / double(depth+1), 20.0 );
     const double  prn_width = max_x;
-    auto          bases     = std::list< const cluster_basis_t * >{ & cb };
+    auto          bases     = std::list< const cluster_basis< value_t > * >{ & cb };
     uint          level     = 0;
 
     prn.begin( uint(prn_width), uint(( depth ) * scale_y) );
@@ -671,35 +669,13 @@ print_eps ( const cluster_basis_t &  cb,
     template void print_mem_eps< type > ( const Hpro::TMatrix< type > &, \
                                           const std::string &          , \
                                           const std::string &          ); \
-    template void print_eps< cluster_basis< type > > ( const cluster_basis< type > & , \
-                                                       const std::string &, \
-                                                       const std::string & ); \
+    template void print_eps< type >     ( const cluster_basis< type > & , \
+                                          const std::string &,          \
+                                          const std::string & );        \
 
 INST_PRINT( float )
 INST_PRINT( double )
 INST_PRINT( std::complex< float > )
 INST_PRINT( std::complex< double > )
-
-#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-
-#define INST_PRINT_EPS( type )                                          \
-    template <>                                                         \
-    void                                                                \
-    print_eps< Hpro::TClusterBasis< type > > ( const Hpro::TClusterBasis< type > &  cb, \
-                                               const std::string &                 filename, \
-                                               const std::string &                 /* options */ ) \
-    {                                                                   \
-        Hpro::TPSClusterBasisVis< type >  cbvis;                        \
-                                                                        \
-        cbvis.colourise( false );                                       \
-        cbvis.print( &cb, filename );                                   \
-    }
-
-INST_PRINT_EPS( float )
-INST_PRINT_EPS( double )
-INST_PRINT_EPS( std::complex< float > )
-INST_PRINT_EPS( std::complex< double > )
-
-#endif
 
 }}// namespace hlr::matrix

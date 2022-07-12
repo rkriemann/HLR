@@ -12,6 +12,8 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
+#include <hlr/matrix/cluster_basis.hh>
+
 namespace hlr { namespace matrix {
 
 //
@@ -46,11 +48,11 @@ print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
 //
 // print cluster basis <cl> to file <filename>
 //
-template < typename cluster_basis_t >
+template < typename value_t >
 void
-print_eps ( const cluster_basis_t &  cb,
-            const std::string &      filename,
-            const std::string &      options = "default" );
+print_eps ( const cluster_basis< value_t > &  cb,
+            const std::string &               filename,
+            const std::string &               options = "default" );
 
 }}// namespace hlr::matrix
 
