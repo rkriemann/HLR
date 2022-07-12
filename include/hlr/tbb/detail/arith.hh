@@ -66,7 +66,7 @@ template < typename value_t >
 void
 mul_vec_chunk ( const value_t                    alpha,
                 const hpro::matop_t              op_M,
-                const hpro::TMatrix &            M,
+                const hpro::TMatrix< value_t > & M,
                 const blas::vector< value_t > &  x,
                 blas::vector< value_t > &        y,
                 const size_t                     ofs_rows,
@@ -81,7 +81,7 @@ mul_vec_chunk ( const value_t                    alpha,
 
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< size_t >( 0, B->nblock_rows(),
@@ -110,13 +110,13 @@ mul_vec_chunk ( const value_t                    alpha,
         
         if ( is_dense( M ) )
         {
-            auto  D  = cptrcast( &M, hpro::TDenseMatrix );
+            auto  D  = cptrcast( &M, hpro::TDenseMatrix< value_t > );
         
             blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x_is, value_t(1), yt );
         }// if
         else if ( is_lowrank( M ) )
         {
-            auto  R = cptrcast( &M, hpro::TRkMatrix );
+            auto  R = cptrcast( &M, hpro::TRkMatrix< value_t > );
 
             if ( op_M == hpro::apply_normal )
             {
@@ -203,7 +203,7 @@ template < typename value_t >
 void
 mul_vec_reduce ( const value_t                    alpha,
                  const matop_t                    op_M,
-                 const hpro::TMatrix &            M,
+                 const hpro::TMatrix< value_t > & M,
                  const blas::vector< value_t > &  x,
                  blas::vector< value_t > &        y )
 {

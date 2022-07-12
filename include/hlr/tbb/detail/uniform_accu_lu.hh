@@ -35,11 +35,13 @@ using  hlr::tbb::uniform::detail::compute_extended_basis;
 using  hlr::tbb::uniform::detail::update_coupling;
 
 // maps index set to product U×V' of inner matrix product
-using  inner_map_t   = std::unordered_map< indexset, blas::matrix< hpro::real >, indexset_hash >;
+template < typename value_t >
+using  inner_map_t   = std::unordered_map< indexset, blas::matrix< value_t >, indexset_hash >;
 
 //
 // matrix update accumulator with parallel update handling
 //
+template < typename value_t >
 struct accumulator
 {
     //
@@ -47,20 +49,20 @@ struct accumulator
     //
     struct update
     {
-        const matop_t    op_A;
-        hpro::TMatrix *  A;
-        const matop_t    op_B;
-        hpro::TMatrix *  B;
+        const matop_t               op_A;
+        Hpro::TMatrix< value_t > *  A;
+        const matop_t               op_B;
+        Hpro::TMatrix< value_t > *  B;
     };
     
     // represents set of updates
     using  update_list = std::list< update >;
 
     // accumulated computed updates
-    std::unique_ptr< hpro::TMatrix >   matrix;
+    std::unique_ptr< Hpro::TMatrix< value_t > >   matrix;
 
     // accumulated pending (recursive) updates
-    update_list                        pending;
+    update_list                                   pending;
     
     //
     // ctors
@@ -69,8 +71,8 @@ struct accumulator
     accumulator ()
     {}
     
-    accumulator ( std::unique_ptr< hpro::TMatrix > &&  amatrix,
-                  update_list &&                       apending )
+    accumulator ( std::unique_ptr< Hpro::TMatrix< value_t > > &&  amatrix,
+                  update_list &&                                  apending )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
     {}
@@ -87,7 +89,7 @@ struct accumulator
     //
     // release matrix
     //
-    hpro::TMatrix *
+    Hpro::TMatrix< value_t > *
     release_matrix ()
     {
         return matrix.release();
@@ -97,17 +99,17 @@ struct accumulator
     // add update A×B
     //
     void
-    add_update ( hpro::TMatrix &  A,
-                 hpro::TMatrix &  B )
+    add_update ( Hpro::TMatrix< value_t > &  A,
+                 Hpro::TMatrix< value_t > &  B )
     {
         pending.push_back( { apply_normal, &A, apply_normal, &B } );
     }
 
     void
-    add_update ( const matop_t    op_A,
-                 hpro::TMatrix &  A,
-                 const matop_t    op_B,
-                 hpro::TMatrix &  B )
+    add_update ( const matop_t               op_A,
+                 Hpro::TMatrix< value_t > &  A,
+                 const matop_t               op_B,
+                 Hpro::TMatrix< value_t > &  B )
     {
         pending.push_back( { op_A, &A, op_B, &B } );
     }
@@ -115,13 +117,12 @@ struct accumulator
     //
     // apply accumulated updates and free accumulator matrix
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    apply ( const value_t            alpha,
-            hpro::TMatrix &          M,
-            const hpro::TTruncAcc &  acc,
-            const approx_t &         approx )
+    apply ( const value_t               alpha,
+            Hpro::TMatrix< value_t > &  M,
+            const Hpro::TTruncAcc &     acc,
+            const approx_t &            approx )
     {
         if ( ! is_null( matrix ) )
             hlr::add( alpha, *matrix, M, acc, approx );
@@ -132,13 +133,12 @@ struct accumulator
     //
     // return restriction of updates to block (i,j) of given block matrix
     //
-    template < typename value_t >
     accumulator
-    restrict ( const uint            i,
-               const uint            j,
-               hpro::TBlockMatrix &  M ) const
+    restrict ( const uint                       i,
+               const uint                       j,
+               Hpro::TBlockMatrix< value_t > &  M ) const
     {
-        auto  U_ij = std::unique_ptr< hpro::TMatrix >();
+        auto  U_ij = std::unique_ptr< Hpro::TMatrix< value_t > >();
         auto  P_ij = update_list();
         
         if ( ! is_null( matrix ) )
@@ -158,8 +158,8 @@ struct accumulator
             if ( ! is_blocked_all( A, B ) )
                 continue;
                                             
-            auto  BA = ptrcast( A, hpro::TBlockMatrix );
-            auto  BB = ptrcast( B, hpro::TBlockMatrix );
+            auto  BA = ptrcast( A, Hpro::TBlockMatrix< value_t > );
+            auto  BB = ptrcast( B, Hpro::TBlockMatrix< value_t > );
                                             
             for ( uint  l = 0; l < BA->nblock_cols( op_A ); ++l )
             {
@@ -179,9 +179,8 @@ struct accumulator
     //
     // return restriction of updates to all sub blocks of given block matrix
     //
-    template < typename value_t >
     tensor2< accumulator >
-    restrict ( hpro::TBlockMatrix &  M ) const
+    restrict ( Hpro::TBlockMatrix< value_t > &  M ) const
     {
         tensor2< accumulator >  sub_accu( M.nblock_rows(), M.nblock_cols() );
         
@@ -191,7 +190,7 @@ struct accumulator
             {
                 HLR_ASSERT( ! is_null( M.block( i, j ) ) );
 
-                sub_accu(i,j) = restrict< value_t >( i, j, M );
+                sub_accu(i,j) = restrict( i, j, M );
             }// for
         }// for
 
@@ -201,13 +200,12 @@ struct accumulator
     //
     // evaluate all computable updates to matrix M
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    eval ( const value_t              alpha,
-           hpro::TMatrix &            M,
-           const hpro::TTruncAcc &    acc,
-           const approx_t &           approx )
+    eval ( const value_t               alpha,
+           Hpro::TMatrix< value_t > &  M,
+           const Hpro::TTruncAcc &     acc,
+           const approx_t &            approx )
     {
         //
         // first check for dense handling
@@ -326,19 +324,19 @@ struct accumulator
                 [&,this] ()
                 {
                     if ( ! pending_uniAB.empty() )
-                        R = std::move( sum_uni_uni< value_t >( 0, pending_uniAB.size(), pending_uniAB ) );
+                        R = std::move( sum_uni_uni( 0, pending_uniAB.size(), pending_uniAB ) );
                 },
 
                 [&,this] ()
                 {
                     if ( ! pending_uniA.empty() )
-                        Z = std::move( sum_uni_any< value_t >( 0, pending_uniA.size(), pending_uniA ) );
+                        Z = std::move( sum_uni_any( 0, pending_uniA.size(), pending_uniA ) );
                 },
 
                 [&,this] ()
                 {
                     if ( ! pending_uniB.empty() )
-                        Y = std::move( sum_any_uni< value_t >( 0, pending_uniB.size(), pending_uniB ) );
+                        Y = std::move( sum_any_uni( 0, pending_uniB.size(), pending_uniB ) );
                 }
             );
 
@@ -364,13 +362,13 @@ struct accumulator
                     // just update with U·R·V'
                     //
                     if ( is_null( matrix ) )
-                        matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(),
-                                                                      std::move( blas::prod( alpha, U, R ) ),
-                                                                      std::move( blas::copy( V ) ) );
+                        matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                                 std::move( blas::prod( alpha, U, R ) ),
+                                                                                 std::move( blas::copy( V ) ) );
                     else
                     {
                         auto  US = blas::prod( U, R );
-                        auto  T  = hpro::TRkMatrix( M.row_is(), M.col_is(), US, V );
+                        auto  T  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), US, V );
                 
                         hlr::add( alpha, T, *matrix, acc, approx );
                     }// else
@@ -382,11 +380,11 @@ struct accumulator
                 if ( is_null( matrix ) )
                 {
                     blas::scale( alpha, Z );
-                    matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
+                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
                 }// if
                 else
                 {
-                    auto  T = hpro::TRkMatrix( M.row_is(), M.col_is(), U, Z );
+                    auto  T = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), U, Z );
                     
                     hlr::add( alpha, T, *matrix, acc, approx );
                 }// else
@@ -397,11 +395,11 @@ struct accumulator
                 if ( is_null( matrix ) )
                 {
                     blas::scale( alpha, Y );
-                    matrix = std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
+                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
                 }// if
                 else
                 {
-                    auto  T = hpro::TRkMatrix( M.row_is(), M.col_is(), Y, V );
+                    auto  T = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), Y, V );
                     
                     hlr::add( alpha, T, *matrix, acc, approx );
                 }// else
@@ -427,7 +425,7 @@ struct accumulator
         
         if ( ! pending_comp.empty() )
         {
-            auto  T = std::move( sum_pending< value_t >( 0, pending_comp.size(), pending_comp, handle_dense, acc, approx ) );
+            auto  T = std::move( sum_pending( 0, pending_comp.size(), pending_comp, handle_dense, acc, approx ) );
 
             if ( is_null( matrix ) )
             {
@@ -450,7 +448,7 @@ struct accumulator
         // temporary block matrix for recursion
         //
 
-        auto  BC = std::unique_ptr< hpro::TBlockMatrix >(); // for recursive handling
+        auto  BC = std::unique_ptr< Hpro::TBlockMatrix< value_t > >(); // for recursive handling
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
@@ -471,10 +469,10 @@ struct accumulator
                 if ( ! ( is_lowrank( M ) || hlr::matrix::is_lowrankS( M ) || is_uniform_lowrank( M ) ) )
                     HLR_ERROR( "unsupported matrix type: " + M.typestr() );
                 
-                auto  BA = ptrcast( A, hpro::TBlockMatrix );
-                auto  BB = ptrcast( B, hpro::TBlockMatrix );
+                auto  BA = ptrcast( A, Hpro::TBlockMatrix< value_t > );
+                auto  BB = ptrcast( B, Hpro::TBlockMatrix< value_t > );
                 
-                BC = std::make_unique< hpro::TBlockMatrix >( A->row_is( op_A ), B->col_is( op_B ) );
+                BC = std::make_unique< Hpro::TBlockMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
 
                 BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
 
@@ -485,13 +483,11 @@ struct accumulator
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                         
                         if ( handle_dense )
-                            BC->set_block( i, j, new hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                         BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                         hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                    BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         else
-                            BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                      BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                      hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                 BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
 
@@ -510,7 +506,7 @@ struct accumulator
             // (to release matrix before recursion)
             //
 
-            auto  sub_accu = restrict< value_t >( *BC );
+            auto  sub_accu = restrict( *BC );
 
             matrix.reset( nullptr );
         
@@ -541,7 +537,7 @@ struct accumulator
             //
 
             if ( handle_dense )
-                matrix = seq::matrix::convert_to_dense< value_t >( *BC );
+                matrix = seq::matrix::convert_to_dense( *BC );
             else
                 matrix = seq::matrix::convert_to_lowrank( *BC, acc, approx );
         }// if
@@ -550,7 +546,6 @@ struct accumulator
     //
     // compute sum of uniform × uniform updates
     //
-    template < typename value_t >
     blas::matrix< value_t >
     sum_uni_uni ( const int                lb,
                   const int                ub,
@@ -590,8 +585,8 @@ struct accumulator
             auto       R1  = blas::matrix< value_t >();
             auto       R2  = blas::matrix< value_t >();
 
-            ::tbb::parallel_invoke( [&,lb,mid] () { R1 = sum_uni_uni< value_t >( lb, mid, updates ); },
-                                    [&,mid,ub] () { R2 = sum_uni_uni< value_t >( mid, ub, updates ); } );
+            ::tbb::parallel_invoke( [&,lb,mid] () { R1 = sum_uni_uni( lb, mid, updates ); },
+                                    [&,mid,ub] () { R2 = sum_uni_uni( mid, ub, updates ); } );
             
             blas::add( value_t(1), R1, R2 );
 
@@ -602,7 +597,6 @@ struct accumulator
     //
     // compute sum of uniform × anything updates
     //
-    template < typename value_t >
     blas::matrix< value_t >
     sum_uni_any ( const int                lb,
                   const int                ub,
@@ -638,8 +632,8 @@ struct accumulator
             auto       Z1  = blas::matrix< value_t >();
             auto       Z2  = blas::matrix< value_t >();
 
-            ::tbb::parallel_invoke( [&,lb,mid] () { Z1 = sum_uni_any< value_t >( lb, mid, updates ); },
-                                    [&,mid,ub] () { Z2 = sum_uni_any< value_t >( mid, ub, updates ); } );
+            ::tbb::parallel_invoke( [&,lb,mid] () { Z1 = sum_uni_any( lb, mid, updates ); },
+                                    [&,mid,ub] () { Z2 = sum_uni_any( mid, ub, updates ); } );
 
             blas::add( value_t(1), Z1, Z2 );
 
@@ -650,7 +644,6 @@ struct accumulator
     //
     // compute sum of anything × uniform updates
     //
-    template < typename value_t >
     blas::matrix< value_t >
     sum_any_uni ( const int                lb,
                   const int                ub,
@@ -686,8 +679,8 @@ struct accumulator
             auto       Y1  = blas::matrix< value_t >();
             auto       Y2  = blas::matrix< value_t >();
 
-            ::tbb::parallel_invoke( [&,lb,mid] () { Y1 = sum_any_uni< value_t >( lb, mid, updates ); },
-                                    [&,mid,ub] () { Y2 = sum_any_uni< value_t >( mid, ub, updates ); } );
+            ::tbb::parallel_invoke( [&,lb,mid] () { Y1 = sum_any_uni( lb, mid, updates ); },
+                                    [&,mid,ub] () { Y2 = sum_any_uni( mid, ub, updates ); } );
 
             blas::add( value_t(1), Y1, Y2 );
 
@@ -699,30 +692,29 @@ struct accumulator
     // compute sum of general updates with non-leaf types
     // for at least one factor
     //
-    template < typename value_t,
-               typename approx_t >
-    std::unique_ptr< hpro::TMatrix >
+    template < typename approx_t >
+    std::unique_ptr< Hpro::TMatrix< value_t > >
     sum_pending ( const int                lb,
                   const int                ub,
                   std::vector< update > &  updates,
                   const bool               handle_dense,
-                  const hpro::TTruncAcc &  acc,
+                  const Hpro::TTruncAcc &  acc,
                   const approx_t &         approx )
     {
         if ( ub - lb <= 1 )
         {
             auto  [ op_A, A, op_B, B ] = updates[ lb ];
-            auto  T                    = std::unique_ptr< hpro::TMatrix >();
+            auto  T                    = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
             if ( handle_dense ||
                  is_dense_all( A, B ) ||
                  ( is_blocked( A ) && is_dense(   B ) ) ||
                  ( is_dense(   A ) && is_blocked( B ) ))
-                T = std::make_unique< hpro::TDenseMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                T = std::make_unique< Hpro::TDenseMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
             else
             {
                 std::cout << "!!! : " << A->typestr() << " x " << B->typestr() << std::endl;
-                T = std::make_unique< hpro::TRkMatrix >( A->row_is( op_A ), B->col_is( op_B ), hpro::value_type_v< value_t > );
+                T = std::make_unique< Hpro::TRkMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
             }// else
 
             hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
@@ -732,11 +724,11 @@ struct accumulator
         else
         {
             const int  mid = ( ub + lb ) / 2;
-            auto       T1  = std::unique_ptr< hpro::TMatrix >();
-            auto       T2  = std::unique_ptr< hpro::TMatrix >();
+            auto       T1  = std::unique_ptr< Hpro::TMatrix< value_t > >();
+            auto       T2  = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
-            ::tbb::parallel_invoke( [&,lb,mid,handle_dense] () { T1 = sum_pending< value_t >( lb, mid, updates, handle_dense, acc, approx ); },
-                                    [&,mid,ub,handle_dense] () { T2 = sum_pending< value_t >( mid, ub, updates, handle_dense, acc, approx ); } );
+            ::tbb::parallel_invoke( [&,lb,mid,handle_dense] () { T1 = sum_pending( lb, mid, updates, handle_dense, acc, approx ); },
+                                    [&,mid,ub,handle_dense] () { T2 = sum_pending( mid, ub, updates, handle_dense, acc, approx ); } );
 
             if ( is_dense( *T1 ) )
             {
@@ -764,7 +756,7 @@ struct accumulator
     // - for structured matrices, only next level is tested
     //
     bool
-    check_dense ( const hpro::TMatrix &  M ) const
+    check_dense ( const Hpro::TMatrix< value_t > &  M ) const
     {
         // return false;
         if ( is_dense( M ) )
@@ -777,7 +769,7 @@ struct accumulator
             // test if all subblocks are dense
             //
 
-            auto  B = cptrcast( &M, hpro::TBlockMatrix );
+            auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
             for ( uint  i = 0; i < B->nblock_rows(); ++i )
             {
@@ -800,12 +792,13 @@ struct accumulator
 //
 // build block mappings (indexset to matrix block)
 //
+template < typename value_t >
 void
-build_block_maps ( hpro::TMatrix &    A,
-                   is_matrix_map_t &  rowmap,
-                   is_matrix_map_t &  colmap )
+build_block_maps ( Hpro::TMatrix< value_t > &    A,
+                   is_matrix_map_t< value_t > &  rowmap,
+                   is_matrix_map_t< value_t > &  colmap )
 {
-    auto  blocks = std::list< hpro::TMatrix * >{ &A };
+    auto  blocks = std::list< Hpro::TMatrix< value_t > * >{ &A };
 
     while ( ! blocks.empty() )
     {
@@ -815,7 +808,7 @@ build_block_maps ( hpro::TMatrix &    A,
         {
             if ( is_blocked( M ) )
             {
-                auto  BM = ptrcast( M, hpro::TBlockMatrix );
+                auto  BM = ptrcast( M, Hpro::TBlockMatrix< value_t > );
 
                 for ( uint  i = 0; i < BM->nblock_rows(); ++i )
                     for ( uint  j = 0; j < BM->nblock_cols(); ++j )
@@ -836,32 +829,32 @@ build_block_maps ( hpro::TMatrix &    A,
 //
 // implements recursive LU factorization with accumulator
 //
+template < typename value_t >
 struct rec_lu_factorization
 {
     // maps indexsets to set of uniform matrices sharing corresponding cluster basis
-    is_matrix_map_t   rowmap_L, colmap_L;
-    is_matrix_map_t   rowmap_U, colmap_U;
+    is_matrix_map_t< value_t >   rowmap_L, colmap_L;
+    is_matrix_map_t< value_t >   rowmap_U, colmap_U;
 
     // mutices for mappings
-    std::mutex        rowmap_L_mtx, colmap_L_mtx;
-    std::mutex        rowmap_U_mtx, colmap_U_mtx;
+    std::mutex                   rowmap_L_mtx, colmap_L_mtx;
+    std::mutex                   rowmap_U_mtx, colmap_U_mtx;
     
     //
     // ctor
     //
-    rec_lu_factorization ( hpro::TMatrix &  L,
-                           hpro::TMatrix &  U )
+    rec_lu_factorization ( Hpro::TMatrix< value_t > &  L,
+                           Hpro::TMatrix< value_t > &  U )
     {}
 
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
     solve_lower_tri ( const eval_side_t           side,
                       const diag_type_t           diag,
-                      hpro::TMatrix &             L,
-                      hpro::TMatrix &             M,
-                      accumulator &               accu,
-                      const hpro::TTruncAcc &     acc,
+                      Hpro::TMatrix< value_t > &  L,
+                      Hpro::TMatrix< value_t > &  M,
+                      accumulator< value_t > &    accu,
+                      const Hpro::TTruncAcc &     acc,
                       const approx_t &            approx,
                       cluster_basis< value_t > &  rowcb,   // new cluster bases for M
                       cluster_basis< value_t > &  colcb )
@@ -878,8 +871,8 @@ struct rec_lu_factorization
     
         if ( is_blocked_all( L, M ) )
         {
-            auto  BL = ptrcast( &L, hpro::TBlockMatrix );
-            auto  BM = ptrcast( &M, hpro::TBlockMatrix );
+            auto  BL = ptrcast( &L, Hpro::TBlockMatrix< value_t > );
+            auto  BM = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
             //
             // first, split accumulated updates U and recursive updates upd_rec
@@ -888,7 +881,7 @@ struct rec_lu_factorization
             //   consumption dependent on hierarchy depth
             //
 
-            auto  sub_accu = accu.restrict< value_t >( *BM );
+            auto  sub_accu = accu.restrict( *BM );
 
             accu.clear_matrix();
 
@@ -906,9 +899,9 @@ struct rec_lu_factorization
                     {
                         HLR_ASSERT( ! is_null( colcb.son(j) ) );
                     
-                        solve_lower_tri< value_t >( side, diag, *L_ii, *BM->block(i,j),
-                                                    sub_accu(i,j), acc, approx,
-                                                    *rowcb.son(i), *colcb.son(j) );
+                        solve_lower_tri( side, diag, *L_ii, *BM->block(i,j),
+                                         sub_accu(i,j), acc, approx,
+                                         *rowcb.son(i), *colcb.son(j) );
                     } );
 
                     for ( uint  k = i+1; k < BM->nblock_rows(); ++k )
@@ -930,7 +923,7 @@ struct rec_lu_factorization
             //
 
             auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-            auto  R  = hpro::TRkMatrix( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+            auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
 
             {
                 std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
@@ -946,7 +939,7 @@ struct rec_lu_factorization
         
             trace::region_end( "apply" );
             
-            hlr::solve_lower_tri< value_t >( side, diag, L, R, acc, approx );
+            hlr::solve_lower_tri( side, diag, L, R, acc, approx );
 
             //
             // now replace M by R and update row/column bases
@@ -1013,19 +1006,18 @@ struct rec_lu_factorization
         {
             accu.apply( value_t(-1), M, acc, approx );
 
-            hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+            hlr::solve_lower_tri( side, diag, L, M, acc, approx );
         }// else
     }
 
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
     solve_upper_tri ( const eval_side_t           side,
                       const diag_type_t           diag,
-                      hpro::TMatrix &             U,
-                      hpro::TMatrix &             M,
-                      accumulator &               accu,
-                      const hpro::TTruncAcc &     acc,
+                      Hpro::TMatrix< value_t > &  U,
+                      Hpro::TMatrix< value_t > &  M,
+                      accumulator< value_t > &    accu,
+                      const Hpro::TTruncAcc &     acc,
                       const approx_t &            approx,
                       cluster_basis< value_t > &  rowcb,   // new cluster bases for M
                       cluster_basis< value_t > &  colcb )
@@ -1042,8 +1034,8 @@ struct rec_lu_factorization
         
         if ( is_blocked_all( U, M ) )
         {
-            auto  BU = ptrcast( &U, hpro::TBlockMatrix );
-            auto  BM = ptrcast( &M, hpro::TBlockMatrix );
+            auto  BU = ptrcast( &U, Hpro::TBlockMatrix< value_t > );
+            auto  BM = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
             //
             // first, split accumulated updates U and recursive updates upd_rec
@@ -1052,7 +1044,7 @@ struct rec_lu_factorization
             //   consumption dependent on hierarchy depth
             //
 
-            auto  sub_accu = accu.restrict< value_t >( *BM );
+            auto  sub_accu = accu.restrict( *BM );
 
             accu.clear_matrix();
 
@@ -1074,9 +1066,9 @@ struct rec_lu_factorization
                     {
                         HLR_ASSERT( ! is_null( rowcb.son(i) ) );
                     
-                        solve_upper_tri< value_t >( side, diag, *U_jj, *BM->block( i, j ),
-                                                    sub_accu(i,j), acc, approx, 
-                                                    *rowcb.son(i), *colcb.son(j) );
+                        solve_upper_tri( side, diag, *U_jj, *BM->block( i, j ),
+                                         sub_accu(i,j), acc, approx, 
+                                         *rowcb.son(i), *colcb.son(j) );
                     } );
             
                     for ( uint  k = j+1; k < BM->nblock_cols(); ++k )
@@ -1094,7 +1086,7 @@ struct rec_lu_factorization
             //
 
             auto  UM = ptrcast( &M, uniform_lrmatrix< value_t > );
-            auto  R  = hpro::TRkMatrix( M.row_is(), M.col_is(), hpro::value_type_v< value_t > );
+            auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
                                              
             {
                 std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
@@ -1110,7 +1102,7 @@ struct rec_lu_factorization
 
             trace::region_end( "apply" );
 
-            hlr::solve_upper_tri< value_t >( side, diag, U, R, acc, approx );
+            hlr::solve_upper_tri( side, diag, U, R, acc, approx );
 
             //
             // now replace M by R and update row/column bases
@@ -1177,21 +1169,20 @@ struct rec_lu_factorization
         {
             accu.apply( value_t(-1), M, acc, approx );
             
-            hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+            hlr::solve_upper_tri( side, diag, U, M, acc, approx );
         }// else
     }
                       
     //
     // recursive LU factorization
     //
-    template < typename value_t,
-               typename approx_t >
+    template < typename approx_t >
     void
-    lu ( hpro::TMatrix &             A,
-         hpro::TMatrix &             L,
-         hpro::TMatrix &             U,
-         accumulator &               accu,
-         const hpro::TTruncAcc &     acc,
+    lu ( Hpro::TMatrix< value_t > &  A,
+         Hpro::TMatrix< value_t > &  L,
+         Hpro::TMatrix< value_t > &  U,
+         accumulator< value_t > &    accu,
+         const Hpro::TTruncAcc &     acc,
          const approx_t &            approx,
          cluster_basis< value_t > &  rowcb_L, // new cluster bases for L
          cluster_basis< value_t > &  colcb_L,
@@ -1214,9 +1205,9 @@ struct rec_lu_factorization
 
         if ( is_blocked( A ) )
         {
-            auto  BA = ptrcast( &A, hpro::TBlockMatrix );
-            auto  BL = ptrcast( &L, hpro::TBlockMatrix );
-            auto  BU = ptrcast( &U, hpro::TBlockMatrix );
+            auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+            auto  BL = ptrcast( &L, Hpro::TBlockMatrix< value_t > );
+            auto  BU = ptrcast( &U, Hpro::TBlockMatrix< value_t > );
 
             //
             // first, split accumulated updates U and recursive updates upd_rec
@@ -1225,7 +1216,7 @@ struct rec_lu_factorization
             //   consumption dependent on hierarchy depth
             //
 
-            auto  sub_accu = accu.restrict< value_t >( *BA );
+            auto  sub_accu = accu.restrict( *BA );
 
             accu.clear_matrix();
 
@@ -1238,10 +1229,10 @@ struct rec_lu_factorization
             {
                 HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-                lu< value_t >( * BA->block( i, i ), * BL->block( i, i ), * BU->block( i, i ),
-                               sub_accu(i,i), acc, approx,
-                               *rowcb_L.son(i), *colcb_L.son(i),
-                               *rowcb_U.son(i), *colcb_U.son(i) );
+                lu( * BA->block( i, i ), * BL->block( i, i ), * BU->block( i, i ),
+                    sub_accu(i,i), acc, approx,
+                    *rowcb_L.son(i), *colcb_L.son(i),
+                    *rowcb_U.son(i), *colcb_U.son(i) );
 
                 ::tbb::parallel_invoke( 
                     [&,i,BA,BU,BL] ()
@@ -1251,10 +1242,10 @@ struct rec_lu_factorization
                             [&,i,BA,BU,BL] ( const uint  j )
                             {
                                 if ( ! is_null( BA->block( j, i ) ) )
-                                    solve_upper_tri< value_t >( from_right, general_diag,
-                                                                *BU->block( i, i ), *BL->block( j, i ),
-                                                                sub_accu(j,i), acc, approx,
-                                                                *rowcb_L.son(j), *colcb_L.son(i) );
+                                    solve_upper_tri( from_right, general_diag,
+                                                     *BU->block( i, i ), *BL->block( j, i ),
+                                                     sub_accu(j,i), acc, approx,
+                                                     *rowcb_L.son(j), *colcb_L.son(i) );
                             } );
                     },
                     
@@ -1265,10 +1256,10 @@ struct rec_lu_factorization
                             [&,i,BA,BU,BL] ( const uint  j )
                             {
                                 if ( ! is_null( BA->block( i, j ) ) )
-                                    solve_lower_tri< value_t >( from_left, unit_diag,
-                                                                *BL->block( i, i ), *BU->block( i, j ),
-                                                                sub_accu(i,j), acc, approx,
-                                                                *rowcb_U.son(i), *colcb_U.son(j) );
+                                    solve_lower_tri( from_left, unit_diag,
+                                                     *BL->block( i, i ), *BU->block( i, j ),
+                                                     sub_accu(i,j), acc, approx,
+                                                     *rowcb_U.son(i), *colcb_U.son(j) );
                             } );
                     }
                 );
@@ -1281,8 +1272,8 @@ struct rec_lu_factorization
         }// if
         else if ( is_dense( A ) )
         {
-            auto  DA = ptrcast( &A, hpro::TDenseMatrix );
-            auto  DU = ptrcast( &U, hpro::TDenseMatrix );
+            auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+            auto  DU = ptrcast( &U, Hpro::TDenseMatrix< value_t > );
 
             accu.apply( value_t(-1), A, acc, approx );
 

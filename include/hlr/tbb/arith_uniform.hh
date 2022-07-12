@@ -37,7 +37,7 @@ template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
           const matop_t                             op_M,
-          const TMatrix &                           M,
+          const Hpro::TMatrix< value_t > &          M,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y,
           hlr::matrix::cluster_basis< value_t > &   rowcb,
@@ -69,13 +69,13 @@ mul_vec ( const value_t                             alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
-           const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc )
+multiply ( const value_t                     alpha,
+           const hpro::matop_t               op_A,
+           const hpro::TMatrix< value_t > &  A,
+           const hpro::matop_t               op_B,
+           const hpro::TMatrix< value_t > &  B,
+           hpro::TMatrix< value_t > &        C,
+           const hpro::TTruncAcc &           acc )
 {
     hlr::uniform::multiply< value_t >( alpha, op_A, A, op_B, B, C, acc );
 }
@@ -92,18 +92,18 @@ namespace accu
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t            alpha,
-           const matop_t            op_A,
-           const hpro::TMatrix &    A,
-           const matop_t            op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
+multiply ( const value_t                     alpha,
+           const matop_t                     op_A,
+           const hpro::TMatrix< value_t > &  A,
+           const matop_t                     op_B,
+           const hpro::TMatrix< value_t > &  B,
+           hpro::TMatrix< value_t > &        C,
+           const hpro::TTruncAcc &           acc,
+           const approx_t &                  approx )
 {
     auto  pi_mtx     = std::mutex();
-    auto  prod_inner = detail::inner_map_t();
-    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
+    auto  prod_inner = detail::inner_map_t< value_t >();
+    auto  accu       = detail::accumulator< value_t >( & prod_inner, & pi_mtx );
     auto  mm         = detail::rec_matrix_mult( C );
 
     accu.add_update( op_A, A, op_B, B );
@@ -114,19 +114,19 @@ multiply ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply_cached ( const value_t            alpha,
-                  const matop_t            op_A,
-                  const hpro::TMatrix &    A,
-                  const matop_t            op_B,
-                  const hpro::TMatrix &    B,
-                  hpro::TMatrix &          C,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx )
+multiply_cached ( const value_t                     alpha,
+                  const matop_t                     op_A,
+                  const hpro::TMatrix< value_t > &  A,
+                  const matop_t                     op_B,
+                  const hpro::TMatrix< value_t > &  B,
+                  hpro::TMatrix< value_t > &        C,
+                  const hpro::TTruncAcc &           acc,
+                  const approx_t &                  approx )
 {
     auto  pi_mtx     = std::mutex();
-    auto  prod_inner = detail::inner_map_t();
-    auto  accu       = detail::accumulator( & prod_inner, & pi_mtx );
-    auto  mm         = detail::rec_matrix_mult( C );
+    auto  prod_inner = detail::inner_map_t< value_t >();
+    auto  accu       = detail::accumulator< value_t >( & prod_inner, & pi_mtx );
+    auto  mm         = detail::rec_matrix_mult< value_t >( C );
 
     accu.add_update( op_A, A, op_B, B );
 
@@ -141,9 +141,9 @@ namespace accu2
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &                          A,
-     hpro::TMatrix &                          L,
-     hpro::TMatrix &                          U,
+lu ( hpro::TMatrix< value_t > &               A,
+     hpro::TMatrix< value_t > &               L,
+     hpro::TMatrix< value_t > &               U,
      const hpro::TTruncAcc &                  acc,
      const approx_t &                         approx,
      hlr::matrix::cluster_basis< value_t > &  rowcb_L,
@@ -151,8 +151,8 @@ lu ( hpro::TMatrix &                          A,
      hlr::matrix::cluster_basis< value_t > &  rowcb_U,
      hlr::matrix::cluster_basis< value_t > &  colcb_U )
 {
-    auto  accu = hlr::tbb::uniform::accu::detail2::accumulator();
-    auto  lu   = hlr::tbb::uniform::accu::detail2::rec_lu_factorization( L, U );
+    auto  accu = hlr::tbb::uniform::accu::detail2::accumulator< value_t >();
+    auto  lu   = hlr::tbb::uniform::accu::detail2::rec_lu_factorization< value_t >( L, U );
 
     lu.lu( A, L, U, accu, acc, approx, rowcb_L, colcb_L, rowcb_U, colcb_U );
 }

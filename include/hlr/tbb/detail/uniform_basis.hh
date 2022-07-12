@@ -36,7 +36,7 @@ compute_extended_basis ( const cluster_basis< value_t > &  cb,
                          const blas::matrix< value_t > &   T,
                          const hpro::TTruncAcc &           acc,
                          const basisapx_t &                basisapx,
-                         is_matrix_map_t &                 matmap,
+                         is_matrix_map_t< value_t > &      matmap,
                          std::mutex &                      matmapmtx,
                          const matop_t                     op,
                          uniform_lrmatrix< value_t > *     M = nullptr )
@@ -51,7 +51,7 @@ compute_extended_basis ( const cluster_basis< value_t > &  cb,
     // copy uniform matrices for basis to local list for minimal blocking
     //
         
-    auto  uni_mats = is_matrix_map_t::mapped_type();
+    auto  uni_mats = typename is_matrix_map_t< value_t >::mapped_type();
 
     {
         auto  lock = std::scoped_lock( matmapmtx );
@@ -165,7 +165,7 @@ template < typename value_t >
 void
 update_coupling ( const cluster_basis< value_t > &  cb,
                   const blas::matrix< value_t > &   Un,
-                  is_matrix_map_t &                 matmap,
+                  is_matrix_map_t< value_t > &      matmap,
                   std::mutex &                      matmapmtx,
                   const bool                        cols,
                   uniform_lrmatrix< value_t > *     M = nullptr )
@@ -173,7 +173,7 @@ update_coupling ( const cluster_basis< value_t > &  cb,
     if ( cb.basis().ncols() == 0 )
         return;
             
-    auto  uni_mats = is_matrix_map_t::mapped_type();
+    auto  uni_mats = typename is_matrix_map_t< value_t >::mapped_type();
 
     {
         auto  lock = std::scoped_lock( matmapmtx );

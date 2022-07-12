@@ -32,8 +32,8 @@ using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >
 template < typename value_t >
 void
 mul_vec ( const value_t                                       alpha,
-          const hpro::matop_t                                 op_M,
-          const hpro::TMatrix &                               M,
+          const Hpro::matop_t                                 op_M,
+          const Hpro::TMatrix< value_t > &                    M,
           const uniform_vector< cluster_basis< value_t > > &  x,
           uniform_vector< cluster_basis< value_t > > &        y,
           const scalar_vector< value_t > &                    sx,
@@ -42,7 +42,7 @@ mul_vec ( const value_t                                       alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
                    ( B->nblock_cols( op_M ) == x.nblocks() ));
@@ -71,37 +71,37 @@ mul_vec ( const value_t                                       alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D    = cptrcast( &M, TDenseMatrix );
-        auto  x_i  = blas::vector< value_t >( blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j  = blas::vector< value_t >( blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D    = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         auto  mtx  = mtx_map[ M.row_is( op_M ) ].get();
         auto  lock = std::scoped_lock( *mtx );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
+        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
     }// if
     else if ( hlr::matrix::is_uniform_lowrank( M ) )
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
         
-        if ( op_M == hpro::apply_normal )
+        if ( op_M == Hpro::apply_normal )
         {
             std::scoped_lock  lock( y.mutex() );
 
             blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
         }// if
-        else if ( op_M == hpro::apply_conjugate )
+        else if ( op_M == Hpro::apply_conjugate )
         {
             std::scoped_lock  lock( y.mutex() );
 
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_transposed )
+        else if ( op_M == Hpro::apply_transposed )
         {
             std::scoped_lock  lock( y.mutex() );
 
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_adjoint )
+        else if ( op_M == Hpro::apply_adjoint )
         {
             std::scoped_lock  lock( y.mutex() );
             
@@ -127,7 +127,7 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
         {                    
             if ( cb.rank() > 0 )
             {
-                auto  v_cb = blas::vector< value_t >( blas_vec< value_t >( v ), cb.is() - v.ofs() );
+                auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
                 auto  s    = cb.transform_forward( v_cb );
                 
                 u->set_coeffs( std::move( s ) );
@@ -181,7 +181,7 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
     if ( u.basis().rank() > 0 )
     {
         auto  x   = u.basis().transform_backward( u.coeffs() );
-        auto  v_u = blas::vector< value_t >( blas_vec< value_t >( v ), u.is() - v.ofs() );
+        auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
             
         blas::add( value_t(1), x, v_u );
     }// if

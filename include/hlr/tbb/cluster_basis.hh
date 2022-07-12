@@ -30,10 +30,10 @@ using hlr::seq::matrix::detail::build_lrmatrix_map;
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const cluster_tree &  ct,
-                  lrmatrix_map_t &      mat_map,
-                  const accuracy &      acc,
-                  const bool            adjoint );
+construct_basis ( const cluster_tree &         ct,
+                  lrmatrix_map_t< value_t > &  mat_map,
+                  const accuracy &             acc,
+                  const bool                   adjoint );
 
 }// namespace detail
 
@@ -45,10 +45,10 @@ construct_basis ( const cluster_tree &  ct,
 template < typename value_t >
 std::pair< std::unique_ptr< cluster_basis< value_t > >,
            std::unique_ptr< cluster_basis< value_t > > >
-construct_from_H ( const cluster_tree &   rowct,
-                   const cluster_tree &   colct,
-                   const hpro::TMatrix &  M,
-                   const accuracy &       acc )
+construct_from_H ( const cluster_tree &              rowct,
+                   const cluster_tree &              colct,
+                   const Hpro::TMatrix< value_t > &  M,
+                   const accuracy &                  acc )
 {
     
     //
@@ -56,7 +56,7 @@ construct_from_H ( const cluster_tree &   rowct,
     // set of associated matrix blocks in H-matrix
     //
 
-    detail::lrmatrix_map_t  row_map, col_map;
+    detail::lrmatrix_map_t< value_t >  row_map, col_map;
 
     ::tbb::parallel_invoke( [&] { detail::build_lrmatrix_map( rowct, M, row_map, false ); },
                             [&] { detail::build_lrmatrix_map( colct, M, col_map, true  ); } );
@@ -85,10 +85,10 @@ using hlr::seq::matrix::detail::V;
 //
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const cluster_tree &  ct,
-                  lrmatrix_map_t &      mat_map,
-                  const accuracy &      acc,
-                  const bool            adjoint )
+construct_basis ( const cluster_tree &         ct,
+                  lrmatrix_map_t< value_t > &  mat_map,
+                  const accuracy &             acc,
+                  const bool                   adjoint )
 {
     auto  cb = std::make_unique< cluster_basis< value_t > >( ct );
 

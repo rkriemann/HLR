@@ -15,7 +15,7 @@
 #include <universal/number/posit/posit.hpp>
 #endif
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -36,8 +36,8 @@ using namespace hlr::matrix;
 // convert given matrix into dense format
 //
 template < typename value_t >
-std::unique_ptr< hpro::TDenseMatrix >
-convert_to_dense ( const hpro::TMatrix &  M )
+std::unique_ptr< Hpro::TDenseMatrix< value_t > >
+convert_to_dense ( const Hpro::TMatrix< value_t > &  M )
 {
     return hlr::matrix::convert_to_dense< value_t >( M );
 }
@@ -45,14 +45,13 @@ convert_to_dense ( const hpro::TMatrix &  M )
 //
 // convert given matrix into lowrank format
 //
-template < typename approx_t >
-std::unique_ptr< hpro::TRkMatrix >
-convert_to_lowrank ( const hpro::TMatrix &    M,
-                     const hpro::TTruncAcc &  acc,
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TRkMatrix< value_t > >
+convert_to_lowrank ( const Hpro::TMatrix< value_t > &    M,
+                     const Hpro::TTruncAcc &  acc,
                      const approx_t &         approx )
 {
-    using  value_t = typename approx_t::value_t;
-    
     if ( is_blocked( M ) )
     {
         //
@@ -60,7 +59,7 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
         // enlarge to size of M (pad with zeroes)
         //
 
-        auto        B  = cptrcast( &M, hpro::TBlockMatrix );
+        auto        B  = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
         auto        Us = std::list< blas::matrix< value_t > >();
         auto        Vs = std::list< blas::matrix< value_t > >();
         std::mutex  mtx;
@@ -85,8 +84,8 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
                         auto  U_i  = blas::matrix< value_t >( U, R_ij->row_is() - M.row_ofs(), blas::range::all );
                         auto  V_j  = blas::matrix< value_t >( V, R_ij->col_is() - M.col_ofs(), blas::range::all );
 
-                        blas::copy( hpro::blas_mat_A< value_t >( R_ij ), U_i );
-                        blas::copy( hpro::blas_mat_B< value_t >( R_ij ), V_j );
+                        blas::copy( Hpro::blas_mat_A< value_t >( R_ij ), U_i );
+                        blas::copy( Hpro::blas_mat_B< value_t >( R_ij ), V_j );
 
                         std::scoped_lock  lock( mtx );
                             
@@ -98,24 +97,24 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
 
         auto  [ U, V ] = approx( Us, Vs, acc );
 
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D        = cptrcast( &M, hpro::TDenseMatrix );
-        auto  T        = std::move( blas::copy( hpro::blas_mat< value_t >( D ) ) );
+        auto  D        = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  T        = std::move( blas::copy( Hpro::blas_mat< value_t >( D ) ) );
         auto  [ U, V ] = approx( T, acc );
 
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R        = cptrcast( &M, hpro::TRkMatrix );
-        auto  [ U, V ] = approx( hpro::blas_mat_A< value_t >( R ),
-                                 hpro::blas_mat_B< value_t >( R ),
+        auto  R        = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  [ U, V ] = approx( Hpro::blas_mat_A< value_t >( R ),
+                                 Hpro::blas_mat_B< value_t >( R ),
                                  acc );
         
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -126,14 +125,14 @@ convert_to_lowrank ( const hpro::TMatrix &    M,
 // (only implemented for lowrank compatible formats)
 //
 template < typename value_t >
-std::unique_ptr< hpro::TRkMatrix >
-convert_to_lowrank ( const hpro::TMatrix &  M )
+std::unique_ptr< Hpro::TRkMatrix< value_t > >
+convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
 {
     if ( is_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, hpro::TRkMatrix );
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
         
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(),
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(),
                                                     std::move( blas::copy( blas::mat_U< value_t >( R ) ) ),
                                                     std::move( blas::copy( blas::mat_V< value_t >( R ) ) ) );
     }// if
@@ -143,7 +142,7 @@ convert_to_lowrank ( const hpro::TMatrix &  M )
         auto  U = blas::prod( R->row_basis(), R->coeff() );
         auto  V = blas::copy( R->col_basis() );
         
-        return std::make_unique< hpro::TRkMatrix >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -156,18 +155,18 @@ convert_to_lowrank ( const hpro::TMatrix &  M )
 template < typename T_value_dest,
            typename T_value_src >
 size_t
-convert_prec ( hpro::TMatrix &  M )
+convert_prec ( Hpro::TMatrix< T_value_src > &  M )
 {
     if constexpr( std::is_same_v< T_value_dest, T_value_src > )
         return M.byte_size();
     
     if ( is_blocked( M ) )
     {
-        auto    B   = ptrcast( &M, hpro::TBlockMatrix );
-        size_t  s   = sizeof(hpro::TBlockMatrix);
+        auto    B   = ptrcast( &M, Hpro::TBlockMatrix< T_value_src > );
+        size_t  s   = sizeof(Hpro::TBlockMatrix< T_value_src >);
         auto    mtx = std::mutex();
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(hpro::TMatrix *);
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< T_value_dest > *);
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
@@ -196,7 +195,7 @@ convert_prec ( hpro::TMatrix &  M )
     }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R = ptrcast( &M, hpro::TRkMatrix );
+        auto  R = ptrcast( &M, Hpro::TRkMatrix< T_value_src > );
         auto  U = blas::copy< T_value_dest >( blas::mat_U< T_value_src >( R ) );
         auto  V = blas::copy< T_value_dest >( blas::mat_V< T_value_src >( R ) );
 
@@ -205,22 +204,22 @@ convert_prec ( hpro::TMatrix &  M )
 
         return R->byte_size() - sizeof(T_value_src) * R->rank() * ( R->nrows() + R->ncols() ) + sizeof(T_value_dest) * R->rank() * ( R->nrows() + R->ncols() ); 
     }// if
-    else if ( hlr::matrix::is_generic_lowrank( M ) )
-    {
-        auto  R = ptrcast( &M, hlr::matrix::lrmatrix );
+    // else if ( hlr::matrix::is_generic_lowrank( M ) )
+    // {
+    //     auto  R = ptrcast( &M, hlr::matrix::lrmatrix );
 
-        std::visit(
-            [R] ( auto &&  UV )
-            {
-                auto  U = blas::copy< T_value_dest, T_value_src >( UV.U );
-                auto  V = blas::copy< T_value_dest, T_value_src >( UV.V );
+    //     std::visit(
+    //         [R] ( auto &&  UV )
+    //         {
+    //             auto  U = blas::copy< T_value_dest, T_value_src >( UV.U );
+    //             auto  V = blas::copy< T_value_dest, T_value_src >( UV.V );
 
-                R->set_lrmat( std::move( U ), std::move( V ) );
-            },
-            R->factors() );
+    //             R->set_lrmat( std::move( U ), std::move( V ) );
+    //         },
+    //         R->factors() );
 
-        return R->byte_size(); 
-    }// if
+    //     return R->byte_size(); 
+    // }// if
     else if ( is_uniform_lowrank( M ) )
     {
         auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
@@ -232,28 +231,28 @@ convert_prec ( hpro::TMatrix &  M )
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D  = ptrcast( &M, hpro::TDenseMatrix );
+        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< T_value_src > );
         auto  DD = blas::copy< T_value_dest >( blas::mat< T_value_src >( D ) );
 
         blas::copy< T_value_dest, T_value_src >( DD, blas::mat< T_value_src >( D ) );
 
         return D->byte_size() - sizeof(T_value_src) * D->nrows() * D->ncols() + sizeof(T_value_dest) * D->nrows() * D->ncols();
     }// if
-    else if ( matrix::is_generic_dense( M ) )
-    {
-        auto  D  = ptrcast( &M, matrix::dense_matrix );
+    // else if ( matrix::is_generic_dense( M ) )
+    // {
+    //     auto  D  = ptrcast( &M, matrix::dense_matrix );
 
-        std::visit(
-            [D] ( auto &&  M )
-            {        
-                auto  M2 = blas::copy< T_value_dest, T_value_src >( M );
+    //     std::visit(
+    //         [D] ( auto &&  M )
+    //         {        
+    //             auto  M2 = blas::copy< T_value_dest, T_value_src >( M );
 
-                D->set_matrix( std::move( M2 ) );
-            },
-            D->matrix() );
+    //             D->set_matrix( std::move( M2 ) );
+    //         },
+    //         D->matrix() );
 
-        return D->byte_size();
-    }// if
+    //     return D->byte_size();
+    // }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 
@@ -266,16 +265,16 @@ convert_prec ( hpro::TMatrix &  M )
 //
 template < typename value_t >
 size_t
-convert_zfp ( hpro::TMatrix &  A,
-              zfp_config &     config )
+convert_zfp ( Hpro::TMatrix< value_t > &  A,
+              zfp_config &                config )
 {
     if ( is_blocked( A ) )
     {
-        auto    B   = ptrcast( &A, hpro::TBlockMatrix );
-        size_t  s   = sizeof(hpro::TBlockMatrix);
+        auto    B   = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        size_t  s   = sizeof(Hpro::TBlockMatrix);
         auto    mtx = std::mutex();
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(hpro::TMatrix *);
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t > *);
         
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
@@ -304,7 +303,7 @@ convert_zfp ( hpro::TMatrix &  A,
     }// if
     else if ( is_dense( A ) )
     {
-        auto    D = ptrcast( &A, hpro::TDenseMatrix );
+        auto    D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
         size_t  s = A.byte_size() - sizeof(value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< value_t >);
 
         auto    u = zfp::const_array2< value_t >( D->nrows(), D->ncols(), config, 0, 0 );
@@ -327,68 +326,68 @@ convert_zfp ( hpro::TMatrix &  A,
 
         return s;
     }// if
-    else if ( matrix::is_generic_dense( A ) )
-    {
-        auto    D = ptrcast( &A, matrix::dense_matrix );
-        size_t  s = 0;
+    // else if ( matrix::is_generic_dense( A ) )
+    // {
+    //     auto    D = ptrcast( &A, matrix::dense_matrix );
+    //     size_t  s = 0;
 
-        std::visit(
-            [&s,D,config] ( auto &&  M )
-            {
-                using  m_value_t = typename std::decay_t< decltype(M) >::value_t;
-                using  m_real_t  = typename hpro::real_type_t< m_value_t >;
+    //     std::visit(
+    //         [&s,D,config] ( auto &&  M )
+    //         {
+    //             using  m_value_t = typename std::decay_t< decltype(M) >::value_t;
+    //             using  m_real_t  = typename Hpro::real_type_t< m_value_t >;
 
-                uint   factor    = sizeof(m_value_t) / sizeof(m_real_t);
+    //             uint   factor    = sizeof(m_value_t) / sizeof(m_real_t);
 
-                s = D->byte_size() - sizeof(m_value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< m_value_t >);
+    //             s = D->byte_size() - sizeof(m_value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< m_value_t >);
 
-                if constexpr( std::is_same_v< m_value_t, m_real_t > )
-                {
-                    auto  u = zfp::const_array2< m_value_t >( D->nrows(), D->ncols(), config, 0, 0 );
+    //             if constexpr( std::is_same_v< m_value_t, m_real_t > )
+    //             {
+    //                 auto  u = zfp::const_array2< m_value_t >( D->nrows(), D->ncols(), config, 0, 0 );
 
-                    u.set( M.data() );
+    //                 u.set( M.data() );
 
-                    const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
-                    const size_t  mem_zfp   = u.compressed_size();
+    //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
+    //                 const size_t  mem_zfp   = u.compressed_size();
 
-                    if ( mem_zfp < mem_dense )
-                    {
-                        s += u.compressed_size();
-                        s += sizeof(zfp::const_array2< m_value_t >);
+    //                 if ( mem_zfp < mem_dense )
+    //                 {
+    //                     s += u.compressed_size();
+    //                     s += sizeof(zfp::const_array2< m_value_t >);
 
-                        u.get( M.data() );
-                    }// if
-                    else
-                        s = D->byte_size();
-                }// if
-                else
-                {
-                    auto  u = zfp::const_array3< m_real_t >( D->nrows(), D->ncols(), factor, config, 0, 0 );
+    //                     u.get( M.data() );
+    //                 }// if
+    //                 else
+    //                     s = D->byte_size();
+    //             }// if
+    //             else
+    //             {
+    //                 auto  u = zfp::const_array3< m_real_t >( D->nrows(), D->ncols(), factor, config, 0, 0 );
 
-                    u.set( (m_real_t*) M.data() );
+    //                 u.set( (m_real_t*) M.data() );
 
-                    const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
-                    const size_t  mem_zfp   = u.compressed_size();
+    //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
+    //                 const size_t  mem_zfp   = u.compressed_size();
 
-                    if ( mem_zfp < mem_dense )
-                    {
-                        s += u.compressed_size();
-                        s += sizeof(zfp::const_array3< m_real_t >);
+    //                 if ( mem_zfp < mem_dense )
+    //                 {
+    //                     s += u.compressed_size();
+    //                     s += sizeof(zfp::const_array3< m_real_t >);
 
-                        u.get( (m_real_t*) M.data() );
-                    }// if
-                    else
-                        s = D->byte_size();
-                }// else
-            },
-            D->matrix()
-        );
+    //                     u.get( (m_real_t*) M.data() );
+    //                 }// if
+    //                 else
+    //                     s = D->byte_size();
+    //             }// else
+    //         },
+    //         D->matrix()
+    //     );
         
-        return s;
-    }// if
+    //     return s;
+    // }// if
     else if ( is_lowrank( A ) )
     {
-        auto    R = ptrcast( &A, hpro::TRkMatrix );
+        auto    R = ptrcast( &A, Hpro::TRkMatrix< value_t > );
         size_t  s = A.byte_size() - sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< value_t >);
 
         const size_t  mem_lr  = sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
@@ -430,71 +429,71 @@ convert_zfp ( hpro::TMatrix &  A,
 
         return s;
     }// if
-    else if ( hlr::matrix::is_generic_lowrank( A ) )
-    {
-        auto    R = ptrcast( &A, matrix::lrmatrix );
-        size_t  s = 0;
+    // else if ( hlr::matrix::is_generic_lowrank( A ) )
+    // {
+    //     auto    R = ptrcast( &A, matrix::lrmatrix );
+    //     size_t  s = 0;
 
-        std::visit(
-            [R,&s,&config] ( auto &&  UV )
-            {
-                using  uv_value_t = typename std::decay_t< decltype(UV) >::value_t;
-                using  uv_real_t  = typename hpro::real_type_t< uv_value_t >;
+    //     std::visit(
+    //         [R,&s,&config] ( auto &&  UV )
+    //         {
+    //             using  uv_value_t = typename std::decay_t< decltype(UV) >::value_t;
+    //             using  uv_real_t  = typename Hpro::real_type_t< uv_value_t >;
 
-                uint   factor     = sizeof(uv_value_t) / sizeof(uv_real_t);
+    //             uint   factor     = sizeof(uv_value_t) / sizeof(uv_real_t);
                 
-                s = R->byte_size() - sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< uv_value_t >);
+    //             s = R->byte_size() - sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< uv_value_t >);
 
-                const size_t  mem_lr  = sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() );
-                size_t        mem_zfp = 0;
-                auto          U_zfp   = std::vector< uv_real_t >( R->rank() * R->nrows() * factor );
-                auto          V_zfp   = std::vector< uv_real_t >( R->rank() * R->ncols() * factor );
+    //             const size_t  mem_lr  = sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() );
+    //             size_t        mem_zfp = 0;
+    //             auto          U_zfp   = std::vector< uv_real_t >( R->rank() * R->nrows() * factor );
+    //             auto          V_zfp   = std::vector< uv_real_t >( R->rank() * R->ncols() * factor );
 
-                {
-                    auto  uU = zfp::const_array2< uv_real_t >( R->nrows(), R->rank() * factor, config, 0, 0 );
+    //             {
+    //                 auto  uU = zfp::const_array2< uv_real_t >( R->nrows(), R->rank() * factor, config, 0, 0 );
         
-                    uU.set( (uv_real_t*) UV.U.data() );
+    //                 uU.set( (uv_real_t*) UV.U.data() );
 
-                    mem_zfp += uU.compressed_size();
+    //                 mem_zfp += uU.compressed_size();
 
-                    uU.get( U_zfp.data() );
-                }
+    //                 uU.get( U_zfp.data() );
+    //             }
 
-                {
-                    auto    uV = zfp::const_array2< uv_real_t >( R->ncols(), R->rank() * factor, config, 0, 0 );
+    //             {
+    //                 auto    uV = zfp::const_array2< uv_real_t >( R->ncols(), R->rank() * factor, config, 0, 0 );
 
-                    uV.set( (uv_real_t*) UV.V.data() );
+    //                 uV.set( (uv_real_t*) UV.V.data() );
 
-                    mem_zfp += uV.compressed_size();
+    //                 mem_zfp += uV.compressed_size();
 
-                    uV.get( V_zfp.data() );
-                }
+    //                 uV.get( V_zfp.data() );
+    //             }
         
-                if ( mem_zfp < mem_lr )
-                {
-                    s += mem_zfp;
-                    s += 2*sizeof(zfp::const_array2< uv_real_t >);
+    //             if ( mem_zfp < mem_lr )
+    //             {
+    //                 s += mem_zfp;
+    //                 s += 2*sizeof(zfp::const_array2< uv_real_t >);
 
-                    memcpy( (uv_real_t*) UV.U.data(), U_zfp.data(), sizeof(uv_real_t) * U_zfp.size() );
-                    memcpy( (uv_real_t*) UV.V.data(), V_zfp.data(), sizeof(uv_real_t) * V_zfp.size() );
-                }// if
-                else
-                    s = R->byte_size();
-            },
-            R->factors()
-        );
+    //                 memcpy( (uv_real_t*) UV.U.data(), U_zfp.data(), sizeof(uv_real_t) * U_zfp.size() );
+    //                 memcpy( (uv_real_t*) UV.V.data(), V_zfp.data(), sizeof(uv_real_t) * V_zfp.size() );
+    //             }// if
+    //             else
+    //                 s = R->byte_size();
+    //         },
+    //         R->factors()
+    //     );
 
-        return s;
-    }// if
+    //     return s;
+    // }// if
     #if defined(HAS_H2)
     else if ( is_uniform( &A ) )
     {
-        auto          R       = ptrcast( &A, hpro::TUniformMatrix );
+        auto          R       = ptrcast( &A, Hpro::TUniformMatrix< value_t > );
         const size_t  mem_lr  = sizeof(value_t) * R->row_rank() * R->col_rank();
         size_t        s       = A.byte_size() - mem_lr - sizeof(blas::matrix< value_t >);
         auto          zC      = zfp::const_array2< value_t >( R->row_rank(), R->col_rank(), config, 0, 0 );
         
-        zC.set( hpro::coeff< value_t >( R ).data() );
+        zC.set( Hpro::coeff< value_t >( R ).data() );
 
         const size_t  mem_zfp = zC.compressed_size();
 
@@ -504,7 +503,7 @@ convert_zfp ( hpro::TMatrix &  A,
             s += sizeof(zfp::const_array2< value_t >);
 
             // write back compressed data
-            zC.get( hpro::coeff< value_t >( R ).data() );
+            zC.get( Hpro::coeff< value_t >( R ).data() );
 
             return s;
         }// if
@@ -603,7 +602,7 @@ convert_zfp ( cluster_basis< value_t > &  cb,
 #if defined(HAS_H2)
 template < typename value_t >
 size_t
-convert_zfp ( hpro::TClusterBasis< value_t > &  cb,
+convert_zfp ( Hpro::TClusterBasis< value_t > &  cb,
               zfp_config &                      config )
 {
     //
@@ -702,17 +701,17 @@ convert_zfp ( hpro::TClusterBasis< value_t > &  cb,
 template < uint  bitsize,
            uint  expsize >
 size_t
-convert_posit ( hpro::TMatrix &  A )
+convert_posit ( Hpro::TMatrix< value_t > &  A )
 {
     using  posit_t = sw::universal::posit< bitsize, expsize >;
     
     if ( is_blocked( A ) )
     {
-        auto    B   = ptrcast( &A, hpro::TBlockMatrix );
-        size_t  s   = sizeof(hpro::TBlockMatrix);
+        auto    B   = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        size_t  s   = sizeof(Hpro::TBlockMatrix);
         auto    mtx = std::mutex();
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(hpro::TMatrix *);
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t > *);
         
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
@@ -741,19 +740,15 @@ convert_posit ( hpro::TMatrix &  A )
     }// if
     else if ( is_dense( A ) )
     {
-        auto    D = ptrcast( &A, hpro::TDenseMatrix );
+        auto    D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
         size_t  s = D->byte_size();
-
-        if ( D->is_complex() )
-        {
-            using  value_t = hpro::complex;
-            using  real_t  = hpro::real;
-            
-            auto  M = blas::mat< value_t >( D );
+        auto    M = blas::mat< value_t >( D );
         
-            s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
-            s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
+        s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
+        s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
 
+        if constexpr( ! Hpro::is_complex_type_v< value_t > )
+        {
             for ( uint  j = 0; j < M.ncols(); ++j )
             {
                 for ( uint  i = 0; i < M.nrows(); ++i )
@@ -761,19 +756,12 @@ convert_posit ( hpro::TMatrix &  A )
                     auto  pr_ij = posit_t( std::real( M(i,j) ) );
                     auto  pi_ij = posit_t( std::imag( M(i,j) ) );
                     
-                    M(i,j) = value_t( real_t( pr_ij ), real_t( pi_ij ) );
+                    M(i,j) = value_t( pr_ij, pi_ij );
                 }// for
             }// for
         }// if
         else
         {
-            using  value_t = hpro::real;
-            
-            auto  M = blas::mat< value_t >( D );
-        
-            s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
-            s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
-
             for ( uint  j = 0; j < M.ncols(); ++j )
             {
                 for ( uint  i = 0; i < M.nrows(); ++i )
@@ -787,54 +775,50 @@ convert_posit ( hpro::TMatrix &  A )
         
         return s;
     }// if
-    else if ( matrix::is_generic_dense( A ) )
-    {
-        auto    D = ptrcast( &A, matrix::dense_matrix );
-        size_t  s = 0;
+    // else if ( matrix::is_generic_dense( A ) )
+    // {
+    //     auto    D = ptrcast( &A, matrix::dense_matrix );
+    //     size_t  s = 0;
 
-        std::visit(
-            [&s,D] ( auto &&  M )
-            {
-                using  value_t = typename std::decay_t< decltype(M) >::value_t;
+    //     std::visit(
+    //         [&s,D] ( auto &&  M )
+    //         {
+    //             using  value_t = typename std::decay_t< decltype(M) >::value_t;
 
-                if constexpr( ! hpro::is_complex_type_v< value_t > )
-                {
-                    s  = D->byte_size();
-                    s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
-                    s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
+    //             if constexpr( ! Hpro::is_complex_type_v< value_t > )
+    //             {
+    //                 s  = D->byte_size();
+    //                 s -= ( sizeof(value_t) * D->nrows() * D->ncols() );
+    //                 s += size_t( std::ceil( ( bitsize * D->nrows() * D->ncols() ) / 8.0 ) );
 
-                    for ( uint  j = 0; j < M.ncols(); ++j )
-                    {
-                        for ( uint  i = 0; i < M.nrows(); ++i )
-                        {
-                            auto  p_ij = posit_t( M(i,j) );
+    //                 for ( uint  j = 0; j < M.ncols(); ++j )
+    //                 {
+    //                     for ( uint  i = 0; i < M.nrows(); ++i )
+    //                     {
+    //                         auto  p_ij = posit_t( M(i,j) );
                             
-                            M(i,j) = double(p_ij);
-                        }// for
-                    }// for
-                }// if
-            },
-            D->matrix()
-        );
+    //                         M(i,j) = double(p_ij);
+    //                     }// for
+    //                 }// for
+    //             }// if
+    //         },
+    //         D->matrix()
+    //     );
         
-        return s;
-    }// if
+    //     return s;
+    // }// if
     else if ( is_lowrank( A ) )
     {
-        auto    R = ptrcast( &A, hpro::TRkMatrix );
+        auto    R = ptrcast( &A, Hpro::TRkMatrix< value_t > );
         size_t  s = R->byte_size();
-
-        if ( R->is_complex() )
-        {
-            using  value_t = hpro::complex;
-            using  real_t  = hpro::real;
-
-            auto  U = blas::mat_U< value_t >( R );
-            auto  V = blas::mat_V< value_t >( R );
+        auto    U = blas::mat_U< value_t >( R );
+        auto    V = blas::mat_V< value_t >( R );
         
-            s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
-            s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
-                
+        s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
+        s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
+
+        if constexpr( ! Hpro::is_complex_type_v< value_t > )
+        {
             for ( uint  k = 0; k < U.ncols(); ++k )
             {
                 for ( uint  i = 0; i < U.nrows(); ++i )
@@ -842,7 +826,7 @@ convert_posit ( hpro::TMatrix &  A )
                     auto  pr_ij = posit_t( std::real( U(i,k) ) );
                     auto  pi_ij = posit_t( std::imag( U(i,k) ) );
                             
-                    U(i,k) = value_t( real_t( pr_ij ), real_t( pi_ij ) );
+                    U(i,k) = value_t( pr_ij, pi_ij );
                 }// for
             }// for
 
@@ -853,20 +837,12 @@ convert_posit ( hpro::TMatrix &  A )
                     auto  pr_ij = posit_t( std::real( V(i,k) ) );
                     auto  pi_ij = posit_t( std::imag( V(i,k) ) );
                             
-                    V(i,k) = value_t( real_t( pr_ij ), real_t( pi_ij ) );
+                    V(i,k) = value_t( pr_ij, pi_ij );
                 }// for
             }// for
         }// if
         else
         {
-            using  value_t = hpro::real;
-            
-            auto  U = blas::mat_U< value_t >( R );
-            auto  V = blas::mat_V< value_t >( R );
-        
-            s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
-            s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
-                
             for ( uint  k = 0; k < U.ncols(); ++k )
             {
                 for ( uint  i = 0; i < U.nrows(); ++i )
@@ -891,64 +867,60 @@ convert_posit ( hpro::TMatrix &  A )
         
         return s;
     }// if
-    else if ( hlr::matrix::is_generic_lowrank( A ) )
-    {
-        auto    R = ptrcast( &A, matrix::lrmatrix );
-        size_t  s = 0;
+    // else if ( hlr::matrix::is_generic_lowrank( A ) )
+    // {
+    //     auto    R = ptrcast( &A, matrix::lrmatrix );
+    //     size_t  s = 0;
 
-        std::visit(
-            [R,&s] ( auto &&  UV )
-            {
-                using  value_t = typename std::decay_t< decltype(UV) >::value_t;
+    //     std::visit(
+    //         [R,&s] ( auto &&  UV )
+    //         {
+    //             using  value_t = typename std::decay_t< decltype(UV) >::value_t;
                 
-                if constexpr( ! hpro::is_complex_type_v< value_t > )
-                {
-                    s  = R->byte_size();
-                    s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
-                    s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
+    //             if constexpr( ! Hpro::is_complex_type_v< value_t > )
+    //             {
+    //                 s  = R->byte_size();
+    //                 s -= sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
+    //                 s += size_t( std::ceil( bitsize * R->rank() * ( R->nrows() + R->ncols() ) / 8.0 ) );
                 
-                    for ( uint  k = 0; k < UV.U.ncols(); ++k )
-                    {
-                        for ( uint  i = 0; i < UV.U.nrows(); ++i )
-                        {
-                            auto  p_ij = posit_t( UV.U(i,k) );
+    //                 for ( uint  k = 0; k < UV.U.ncols(); ++k )
+    //                 {
+    //                     for ( uint  i = 0; i < UV.U.nrows(); ++i )
+    //                     {
+    //                         auto  p_ij = posit_t( UV.U(i,k) );
                             
-                            UV.U(i,k) = double(p_ij);
-                        }// for
-                    }// for
+    //                         UV.U(i,k) = double(p_ij);
+    //                     }// for
+    //                 }// for
 
-                    for ( uint  k = 0; k < UV.V.ncols(); ++k )
-                    {
-                        for ( uint  i = 0; i < UV.V.nrows(); ++i )
-                        {
-                            auto  p_ij = posit_t( UV.V(i,k) );
+    //                 for ( uint  k = 0; k < UV.V.ncols(); ++k )
+    //                 {
+    //                     for ( uint  i = 0; i < UV.V.nrows(); ++i )
+    //                     {
+    //                         auto  p_ij = posit_t( UV.V(i,k) );
                             
-                            UV.V(i,k) = double(p_ij);
-                        }// for
-                    }// for
-                }// if
-            },
-            R->factors()
-        );
+    //                         UV.V(i,k) = double(p_ij);
+    //                     }// for
+    //                 }// for
+    //             }// if
+    //         },
+    //         R->factors()
+    //     );
 
-        return s;
-    }// if
+    //     return s;
+    // }// if
     #if defined(HAS_H2)
     else if ( is_uniform( &A ) )
     {
-        auto    R = ptrcast( &A, hpro::TUniformMatrix );
+        auto    R = ptrcast( &A, Hpro::TUniformMatrix< value_t > );
         size_t  s = A.byte_size();
-
-        if ( R->is_complex() )
-        {
-            using  value_t = hpro::complex;
-            using  real_t  = hpro::real;
-
-            auto  C = hpro::coeff< value_t >( R );
+        auto    C = Hpro::coeff< value_t >( R );
             
-            s -= sizeof(value_t) * R->row_rank() * R->col_rank();
-            s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
-        
+        s -= sizeof(value_t) * R->row_rank() * R->col_rank();
+        s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
+
+        if constexpr( ! Hpro::is_complex_type_v< value_t > )
+        {
             for ( uint  j = 0; j < C.ncols(); ++j )
             {
                 for ( uint  i = 0; i < C.nrows(); ++i )
@@ -956,19 +928,12 @@ convert_posit ( hpro::TMatrix &  A )
                     auto  pr_ij = posit_t( std::real( C(i,j) ) );
                     auto  pi_ij = posit_t( std::imag( C(i,j) ) );
                     
-                    C(i,j) = value_t( real_t( pr_ij ), real_t( pi_ij ) );
+                    C(i,j) = value_t( pr_ij, pi_ij );
                 }// for
             }// for
         }// if
         else
         {
-            using  value_t = hpro::real;
-            
-            auto  C = hpro::coeff< value_t >( R );
-            
-            s -= sizeof(value_t) * R->row_rank() * R->col_rank();
-            s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
-        
             for ( uint  j = 0; j < C.ncols(); ++j )
             {
                 for ( uint  i = 0; i < C.nrows(); ++i )
@@ -985,19 +950,15 @@ convert_posit ( hpro::TMatrix &  A )
     #endif
     else if ( is_uniform_lowrank( A ) )
     {
-        // TODO: support float/complex< float >
-        if ( A.is_complex() )
-        {
-            using  value_t = std::complex< double >;
-            using  real_t  = double;
-            
-            auto    R = ptrcast( &A, uniform_lrmatrix< value_t > );
-            size_t  s = A.byte_size();
-            auto    C = R->coeff();
+        auto    R = ptrcast( &A, uniform_lrmatrix< value_t > );
+        size_t  s = A.byte_size();
+        auto    C = R->coeff();
 
-            s -= sizeof(value_t) * R->row_rank() * R->col_rank();
-            s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
+        s -= sizeof(value_t) * R->row_rank() * R->col_rank();
+        s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
         
+        if constexpr( ! Hpro::is_complex_type_v< value_t > )
+        {
             for ( uint  j = 0; j < C.ncols(); ++j )
             {
                 for ( uint  i = 0; i < C.nrows(); ++i )
@@ -1005,23 +966,12 @@ convert_posit ( hpro::TMatrix &  A )
                     auto  pr_ij = posit_t( std::real( C(i,j) ) );
                     auto  pi_ij = posit_t( std::imag( C(i,j) ) );
                             
-                    C(i,j) = value_t( real_t( pr_ij ), real_t( pi_ij ) );
+                    C(i,j) = value_t( pr_ij, pi_ij );
                 }// for
             }// for
-
-            return s;
         }// if
         else
         {
-            using  value_t = double;
-
-            auto    R = ptrcast( &A, uniform_lrmatrix< value_t > );
-            size_t  s = A.byte_size();
-            auto    C = R->coeff();
-
-            s -= sizeof(value_t) * R->row_rank() * R->col_rank();
-            s += size_t( std::ceil( bitsize * R->row_rank() * R->col_rank() / 8.0 ) );
-        
             for ( uint  j = 0; j < C.ncols(); ++j )
             {
                 for ( uint  i = 0; i < C.nrows(); ++i )
@@ -1031,9 +981,9 @@ convert_posit ( hpro::TMatrix &  A )
                     C(i,j) = value_t(p_ij);
                 }// for
             }// for
-
-            return s;
         }// else
+
+        return s;
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
@@ -1101,7 +1051,7 @@ template < uint bitsize,
            uint expsize,
            typename value_t >
 size_t
-convert_posit ( hpro::TClusterBasis< value_t > &  cb )
+convert_posit ( Hpro::TClusterBasis< value_t > &  cb )
 {
     using  posit_t = sw::universal::posit< bitsize, expsize >;
 

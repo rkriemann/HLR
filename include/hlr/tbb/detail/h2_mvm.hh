@@ -10,7 +10,7 @@
 
 #include <tbb/parallel_for.h>
 
-#include <hlib-config.h>
+#include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)
 #define HAS_H2
@@ -23,7 +23,7 @@
 namespace hlr { namespace tbb { namespace h2 { namespace detail {
 
 template < typename value_t >
-using nested_cluster_basis = hpro::TClusterBasis< value_t >;
+using nested_cluster_basis = Hpro::TClusterBasis< value_t >;
 
 using hlr::vector::uniform_vector;
 using hlr::vector::scalar_vector;
@@ -37,8 +37,8 @@ using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >
 template < typename value_t >
 void
 mul_vec ( const value_t                                              alpha,
-          const hpro::matop_t                                        op_M,
-          const hpro::TMatrix &                                      M,
+          const Hpro::matop_t                                        op_M,
+          const Hpro::TMatrix< value_t > &                           M,
           const uniform_vector< nested_cluster_basis< value_t > > &  x,
           uniform_vector< nested_cluster_basis< value_t > > &        y,
           const scalar_vector< value_t > &                           sx,
@@ -47,7 +47,7 @@ mul_vec ( const value_t                                              alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         if ( ! (( B->nblock_rows( op_M ) == y.nblocks() ) &&
                 ( B->nblock_cols( op_M ) == x.nblocks() )) )
@@ -77,37 +77,37 @@ mul_vec ( const value_t                                              alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D    = cptrcast( &M, TDenseMatrix );
-        auto  x_i  = blas::vector< value_t >( blas_vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j  = blas::vector< value_t >( blas_vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D    = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         auto  mtx  = mtx_map[ M.row_is( op_M ) ].get();
         auto  lock = std::scoped_lock( *mtx );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas_mat< value_t >( D ) ), x_i, value_t(1), y_j );
+        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
     }// if
-    else if ( hpro::is_uniform( &M ) )
+    else if ( Hpro::is_uniform( &M ) )
     {
-        auto  R = cptrcast( &M, hpro::TUniformMatrix );
+        auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
         
-        if ( op_M == hpro::apply_normal )
+        if ( op_M == Hpro::apply_normal )
         {
             std::scoped_lock  lock( y.mutex() );
             
-            blas::mulvec( alpha, hpro::coeff< value_t >( R ), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, Hpro::coeff( R ), x.coeffs(), value_t(1), y.coeffs() );
         }// if
-        else if ( op_M == hpro::apply_conjugate )
+        else if ( op_M == Hpro::apply_conjugate )
         {
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_transposed )
+        else if ( op_M == Hpro::apply_transposed )
         {
             HLR_ASSERT( false );
         }// if
-        else if ( op_M == hpro::apply_adjoint )
+        else if ( op_M == Hpro::apply_adjoint )
         {
             std::scoped_lock  lock( y.mutex() );
             
-            blas::mulvec( alpha, blas::adjoint( hpro::coeff< value_t >( R ) ), x.coeffs(), value_t(1), y.coeffs() );
+            blas::mulvec( alpha, blas::adjoint( Hpro::coeff( R ) ), x.coeffs(), value_t(1), y.coeffs() );
         }// if
     }// if
     else
