@@ -66,6 +66,7 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if
+    #if defined(HAS_H2)
     else if ( is_uniform( &M ) )
     {
         auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
@@ -77,6 +78,7 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
             R->row_rank() + R->row_rank() > 0 ? 1 : 0  // #blocks
         };
     }// if
+    #endif
     // else if ( is_generic_lowrank( M ) )
     // {
     //     auto  R = cptrcast( &M, lrmatrix< value_t > );

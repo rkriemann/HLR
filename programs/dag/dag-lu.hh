@@ -9,9 +9,7 @@
 #include "common.hh"
 #include "common-main.hh"
 
-#include <hpro/matrix/TFacInvMatrix.hh>
-#include <hpro/algebra/mat_norm.hh>
-
+#include "hlr/bem/aca.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/cluster/tlr.hh"
@@ -22,6 +20,7 @@
 #include "hlr/dag/lu.hh"
 #include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
+#include "hlr/arith/norm.hh"
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/likwid.hh"
@@ -56,10 +55,10 @@ program_main ()
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< Hpro::TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     }// if
     else if ( matrixfile != "" )
     {
@@ -73,44 +72,44 @@ program_main ()
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
     }// if
-    else if ( sparsefile != "" )
-    {
-        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
-                  << "    sparse matrix = " << sparsefile
-                  << std::endl;
+    // else if ( sparsefile != "" )
+    // {
+    //     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+    //               << "    sparse matrix = " << sparsefile
+    //               << std::endl;
 
-        auto  M = Hpro::read_matrix< value_t >( sparsefile );
-        auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
+    //     auto  M = Hpro::read_matrix< value_t >( sparsefile );
+    //     auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
 
-        // convert to H
-        auto  part_strat    = Hpro::TMongooseAlgPartStrat();
-        auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
-        auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
-        auto  cl            = nd_ct_builder.build( S );
+    //     // convert to H
+    //     auto  part_strat    = Hpro::TMongooseAlgPartStrat();
+    //     auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
+    //     auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+    //     auto  cl            = nd_ct_builder.build( S );
 
-        S->permute( *cl->perm_e2i(), *cl->perm_e2i() );
+    //     S->permute( *cl->perm_e2i(), *cl->perm_e2i() );
 
-        if ( Hpro::verbose( 3 ) )
-            io::eps::print( *S, "S", "noid,pattern" );
+    //     if ( Hpro::verbose( 3 ) )
+    //         io::eps::print( *S, "S", "noid,pattern" );
         
-        auto  adm_cond      = Hpro::TWeakAlgAdmCond( S );
-        auto  bct_builder   = Hpro::TBCBuilder();
-        auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
-        // auto  h_builder     = Hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
+    //     auto  adm_cond      = Hpro::TWeakAlgAdmCond( S );
+    //     auto  bct_builder   = Hpro::TBCBuilder();
+    //     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+    //     // auto  h_builder     = Hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
 
-        if ( Hpro::verbose( 3 ) )
-        {
-            io::eps::print( * cl->root(), "ct" );
-            io::eps::print( * bcl->root(), "bct" );
-        }// if
+    //     if ( Hpro::verbose( 3 ) )
+    //     {
+    //         io::eps::print( * cl->root(), "ct" );
+    //         io::eps::print( * bcl->root(), "bct" );
+    //     }// if
         
-        // h_builder.set_use_zero_mat( true );
-        // A = h_builder.build( bcl.get(), acc );
+    //     // h_builder.set_use_zero_mat( true );
+    //     // A = h_builder.build( bcl.get(), acc );
 
-        approx::SVD< value_t >  apx;
+    //     approx::SVD  apx;
             
-        A = impl::matrix::build( bcl->root(), *S, acc, apx, nseq );
-    }// else
+    //     A = impl::matrix::build( bcl->root(), *S, acc, apx, nseq );
+    // }// else
 
     auto  toc    = timer::since( tic );
     
@@ -280,10 +279,9 @@ program_main ()
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
-    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
-    std::cout << "    error  = " << format_error( Hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //

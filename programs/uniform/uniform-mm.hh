@@ -112,8 +112,8 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-Multiplication" << term::reset << std::endl;
 
-    auto  AxA      = hpro::matrix_product( A.get(), A.get() );
-    auto  norm_AxA = hlr::norm::spectral( *AxA );
+    auto  AxA      = matrix::product( *A, *A );
+    auto  norm_AxA = norm::spectral( *AxA );
     auto  mmapx    = approx::SVD< value_t >();
     
     if ( false )

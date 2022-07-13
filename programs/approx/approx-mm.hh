@@ -10,13 +10,13 @@
 
 #include <hlr/utils/likwid.hh>
 
-#include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/matrix/TMatrixProduct.hh>
 #include <hpro/io/TCoordVis.hh>
 
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
+#include <hlr/matrix/product.hh>
+#include <hlr/matrix/sum.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
@@ -76,8 +76,8 @@ mm_std ( const hpro::TMatrix< value_t >  &  A,
     auto  tic      = timer::now();
     auto  toc      = timer::since( tic );
     
-    auto  AxA      = hpro::matrix_product( &A, &A );
-    auto  norm_AxA = hlr::norm::spectral( *AxA );
+    auto  AxA      = matrix::product( A, A );
+    auto  norm_AxA = norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
     auto  tstart   = timer::now();
         
@@ -137,7 +137,7 @@ mm_accu ( const hpro::TMatrix< value_t > &  A,
     auto  tic      = timer::now();
     auto  toc      = timer::since( tic );
     
-    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  AxA      = matrix::product( A, A );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
     auto  tstart   = timer::now();
@@ -198,7 +198,7 @@ mm_lazy ( const hpro::TMatrix< value_t > &  A,
     auto  tic      = timer::now();
     auto  toc      = timer::since( tic );
     
-    auto  AxA      = hpro::matrix_product( &A, &A );
+    auto  AxA      = matrix::product( A, A );
     auto  norm_AxA = hlr::norm::spectral( *AxA );
     auto  C        = impl::matrix::copy( A );
     auto  tstart   = timer::now();
@@ -301,7 +301,7 @@ program_main ()
               << " )" << term::reset << std::endl;
 
     // exact representation
-    auto  AxA      = hpro::matrix_product( A.get(), A.get() );
+    // auto  AxA      = matrix::product( *A, *A );
     // auto  norm_AxA = hlr::norm::spectral( *AxA );
 
     if ( cmdline::arith == "std" || cmdline::arith == "all" )

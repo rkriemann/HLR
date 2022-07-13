@@ -10,16 +10,12 @@
 
 #include <hlr/utils/likwid.hh>
 
-#include <hpro/matrix/TMatBuilder.hh>
-#include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/matrix/TMatrixProduct.hh>
-#include <hpro/matrix/TFacInvMatrix.hh>
-#include <hpro/algebra/mat_fac.hh>
-#include <hpro/algebra/mat_norm.hh>
-
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
+#include <hlr/matrix/product.hh>
+#include <hlr/matrix/sum.hh>
+#include <hlr/matrix/luinv_eval.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/rrqr.hh>
 #include <hlr/approx/randsvd.hh>
@@ -93,10 +89,10 @@ lu_std ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+    std::cout << "      error  = " << format_error( norm::inv_error_2( A, A_inv ) ) << std::endl;
 }
 
 //
@@ -154,10 +150,10 @@ lu_std_dag ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+    std::cout << "      error  = " << format_error( norm::inv_error_2( A, A_inv ) ) << std::endl;
 }
 
 //
@@ -212,10 +208,10 @@ lu_accu ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+    std::cout << "      error  = " << format_error( norm::inv_error_2( A, A_inv ) ) << std::endl;
 }
 
 //
@@ -274,10 +270,10 @@ lu_accu_dag ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+    std::cout << "      error  = " << format_error( norm::inv_error_2( A, A_inv ) ) << std::endl;
 }
 
 //
@@ -332,10 +328,10 @@ lu_lazy ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-    std::cout << "      error  = " << format_error( inv_approx_2( & A, & A_inv ) ) << std::endl;
+    std::cout << "      error  = " << format_error( norm::inv_error_2( A, A_inv ) ) << std::endl;
 }
 
 //
@@ -367,10 +363,10 @@ program_main ()
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< Hpro::TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     }// if
     else if ( matrixfile != "" )
     {
@@ -384,35 +380,35 @@ program_main ()
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
     }// if
-    else if ( sparsefile != "" )
-    {
-        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
-                  << "    sparse matrix = " << sparsefile
-                  << std::endl;
+    // else if ( sparsefile != "" )
+    // {
+    //     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+    //               << "    sparse matrix = " << sparsefile
+    //               << std::endl;
 
-        auto  M = Hpro::read_matrix< value_t >( sparsefile );
-        auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
+    //     auto  M = Hpro::read_matrix< value_t >( sparsefile );
+    //     auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
 
-        // convert to H
-        auto  part_strat    = Hpro::TMongooseAlgPartStrat();
-        auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
-        auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
-        auto  cl            = nd_ct_builder.build( S );
-        auto  adm_cond      = Hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
-        auto  bct_builder   = Hpro::TBCBuilder();
-        auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
-        auto  h_builder     = Hpro::TSparseMatBuilder< value_t >( S, cl->perm_i2e(), cl->perm_e2i() );
+    //     // convert to H
+    //     auto  part_strat    = Hpro::TMongooseAlgPartStrat();
+    //     auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
+    //     auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+    //     auto  cl            = nd_ct_builder.build( S );
+    //     auto  adm_cond      = Hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
+    //     auto  bct_builder   = Hpro::TBCBuilder();
+    //     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+    //     auto  h_builder     = Hpro::TSparseMatBuilder< value_t >( S, cl->perm_i2e(), cl->perm_e2i() );
 
-        if ( Hpro::verbose( 3 ) )
-        {
-            io::eps::print( * cl->root(), "ct" );
-            io::eps::print( * bcl->root(), "bct" );
-        }// if
+    //     if ( Hpro::verbose( 3 ) )
+    //     {
+    //         io::eps::print( * cl->root(), "ct" );
+    //         io::eps::print( * bcl->root(), "bct" );
+    //     }// if
 
-        h_builder.set_use_zero_mat( true );
+    //     h_builder.set_use_zero_mat( true );
         
-        A = h_builder.build( bcl.get(), acc );
-    }// else
+    //     A = h_builder.build( bcl.get(), acc );
+    // }// else
 
     auto  toc    = timer::since( tic );
     
@@ -441,47 +437,47 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
-        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
-        {
-            std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        // if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
+        // {
+        //     std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
-            std::vector< double >  runtime, flops;
+        //     std::vector< double >  runtime, flops;
 
-            auto  C = impl::matrix::copy( *A );
+        //     auto  C = impl::matrix::copy( *A );
         
-            for ( int i = 0; i < nbench; ++i )
-            {
-                impl::matrix::copy_to( *A, *C );
+        //     for ( int i = 0; i < nbench; ++i )
+        //     {
+        //         impl::matrix::copy_to( *A, *C );
             
-                blas::reset_flops();
+        //         blas::reset_flops();
 
-                tic = timer::now();
+        //         tic = timer::now();
         
-                LIKWID_MARKER_START( "hlustd" );
+        //         LIKWID_MARKER_START( "hlustd" );
             
-                Hpro::LU::factorise_rec( C.get(), acc );
+        //         Hpro::LU::factorise_rec( C.get(), acc );
 
-                LIKWID_MARKER_STOP( "hlustd" );
+        //         LIKWID_MARKER_STOP( "hlustd" );
             
-                toc = timer::since( tic );
-                std::cout << "      LU in    " << format_time( toc ) << std::endl;
+        //         toc = timer::since( tic );
+        //         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
-                flops.push_back( get_flops( "lu" ) );
-                runtime.push_back( toc.seconds() );
-            }// for
+        //         flops.push_back( get_flops( "lu" ) );
+        //         runtime.push_back( toc.seconds() );
+        //     }// for
         
-            // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        //     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
-            if ( runtime.size() > 1 )
-                std::cout << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+        //     if ( runtime.size() > 1 )
+        //         std::cout << "      runtime = "
+        //                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+        //                   << std::endl;
 
-            Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+        //     auto  A_inv = matrix::luinv_eval( *C );
         
-            std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( Hpro::inv_approx_2( A.get(), & A_inv ) ) << std::endl;
-        }// if
+        //     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        //     std::cout << "      error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        // }// if
     
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
@@ -515,52 +511,52 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-        if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
-        {
-            std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
+        // if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
+        // {
+        //     std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
-            std::vector< double >  runtime, flops;
-            auto                   old_config = Hpro::CFG::Arith::use_accu;
+        //     std::vector< double >  runtime, flops;
+        //     auto                   old_config = Hpro::CFG::Arith::use_accu;
 
-            Hpro::CFG::Arith::use_accu = true;
+        //     Hpro::CFG::Arith::use_accu = true;
         
-            auto  C = impl::matrix::copy( *A );
+        //     auto  C = impl::matrix::copy( *A );
         
-            for ( int i = 0; i < nbench; ++i )
-            {
-                impl::matrix::copy_to( *A, *C );
+        //     for ( int i = 0; i < nbench; ++i )
+        //     {
+        //         impl::matrix::copy_to( *A, *C );
             
-                blas::reset_flops();
+        //         blas::reset_flops();
 
-                tic = timer::now();
+        //         tic = timer::now();
         
-                LIKWID_MARKER_START( "hluaccu" );
+        //         LIKWID_MARKER_START( "hluaccu" );
             
-                Hpro::LU::factorise_rec( C.get(), acc );
+        //         Hpro::LU::factorise_rec( C.get(), acc );
 
-                LIKWID_MARKER_STOP( "hluaccu" );
+        //         LIKWID_MARKER_STOP( "hluaccu" );
             
-                toc = timer::since( tic );
-                std::cout << "      LU in    " << format_time( toc ) << std::endl;
+        //         toc = timer::since( tic );
+        //         std::cout << "      LU in    " << format_time( toc ) << std::endl;
 
-                flops.push_back( get_flops( "lu" ) );
-                runtime.push_back( toc.seconds() );
-            }// for
+        //         flops.push_back( get_flops( "lu" ) );
+        //         runtime.push_back( toc.seconds() );
+        //     }// for
 
-            Hpro::CFG::Arith::use_accu = old_config;
+        //     Hpro::CFG::Arith::use_accu = old_config;
         
-            // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
+        //     // std::cout     << "      flops  = " << format_flops( min( flops ), min( runtime ) ) << std::endl;
 
-            if ( runtime.size() > 1 )
-                std::cout << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+        //     if ( runtime.size() > 1 )
+        //         std::cout << "      runtime = "
+        //                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+        //                   << std::endl;
 
-            Hpro::TLUInvMatrix< value_t >  A_inv( C.get(), Hpro::block_wise, Hpro::store_inverse );
+        //     auto  A_inv = matrix::luinv_eval( *C );
         
-            std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
-        }// if
+        //     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
+        //     std::cout << "      error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        // }// if
     
         if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
         if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
