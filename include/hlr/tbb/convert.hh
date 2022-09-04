@@ -259,440 +259,440 @@ convert_prec ( Hpro::TMatrix< T_value_src > &  M )
     return 0;
 }
 
-#if defined(HAS_ZFP)
-//
-// compress data using ZFP and return memory consumption
-//
-template < typename value_t >
-size_t
-convert_zfp ( Hpro::TMatrix< value_t > &  A,
-              zfp_config &                config )
-{
-    if ( is_blocked( A ) )
-    {
-        auto    B   = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        size_t  s   = sizeof(Hpro::TBlockMatrix);
-        auto    mtx = std::mutex();
+// #if defined(HAS_ZFP)
+// //
+// // compress data using ZFP and return memory consumption
+// //
+// template < typename value_t >
+// size_t
+// convert_zfp ( Hpro::TMatrix< value_t > &  A,
+//               zfp_config &                config )
+// {
+//     if ( is_blocked( A ) )
+//     {
+//         auto    B   = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+//         size_t  s   = sizeof(Hpro::TBlockMatrix);
+//         auto    mtx = std::mutex();
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t > *);
+//         s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t > *);
         
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                            0, B->nblock_cols() ),
-            [&s,&mtx,&config,B] ( auto  r )
-            {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        if ( ! is_null( B->block( i, j ) ) )
-                        {
-                            auto  s_ij = convert_zfp< value_t >( * B->block(i,j), config );
+//         ::tbb::parallel_for(
+//             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+//                                             0, B->nblock_cols() ),
+//             [&s,&mtx,&config,B] ( auto  r )
+//             {
+//                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+//                 {
+//                     for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+//                     {
+//                         if ( ! is_null( B->block( i, j ) ) )
+//                         {
+//                             auto  s_ij = convert_zfp< value_t >( * B->block(i,j), config );
 
-                            {
-                                auto  lock = std::scoped_lock( mtx );
+//                             {
+//                                 auto  lock = std::scoped_lock( mtx );
 
-                                s += s_ij;
-                            }
-                        }// if
-                    }// for
-                }// for
-            } );
+//                                 s += s_ij;
+//                             }
+//                         }// if
+//                     }// for
+//                 }// for
+//             } );
 
-        return s;
-    }// if
-    else if ( is_dense( A ) )
-    {
-        auto    D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
-        size_t  s = A.byte_size() - sizeof(value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< value_t >);
+//         return s;
+//     }// if
+//     else if ( is_dense( A ) )
+//     {
+//         auto    D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+//         size_t  s = A.byte_size() - sizeof(value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< value_t >);
 
-        auto    u = zfp::const_array2< value_t >( D->nrows(), D->ncols(), config, 0, 0 );
+//         auto    u = zfp::const_array2< value_t >( D->nrows(), D->ncols(), config, 0, 0 );
 
-        u.set( blas::mat< value_t >( D ).data() );
+//         u.set( blas::mat< value_t >( D ).data() );
 
-        const size_t  mem_dense = sizeof(value_t) * D->nrows() * D->ncols();
-        const size_t  mem_zfp   = u.compressed_size();
+//         const size_t  mem_dense = sizeof(value_t) * D->nrows() * D->ncols();
+//         const size_t  mem_zfp   = u.compressed_size();
 
-        if ( mem_zfp < mem_dense )
-        {
-            s += u.compressed_size();
-            s += sizeof(zfp::const_array2< value_t >);
+//         if ( mem_zfp < mem_dense )
+//         {
+//             s += u.compressed_size();
+//             s += sizeof(zfp::const_array2< value_t >);
 
-            // write back compressed data
-            u.get( blas::mat< value_t >( D ).data() );
-        }// if
-        else
-            return A.byte_size();
+//             // write back compressed data
+//             u.get( blas::mat< value_t >( D ).data() );
+//         }// if
+//         else
+//             return A.byte_size();
 
-        return s;
-    }// if
-    // else if ( matrix::is_generic_dense( A ) )
-    // {
-    //     auto    D = ptrcast( &A, matrix::dense_matrix );
-    //     size_t  s = 0;
+//         return s;
+//     }// if
+//     // else if ( matrix::is_generic_dense( A ) )
+//     // {
+//     //     auto    D = ptrcast( &A, matrix::dense_matrix );
+//     //     size_t  s = 0;
 
-    //     std::visit(
-    //         [&s,D,config] ( auto &&  M )
-    //         {
-    //             using  m_value_t = typename std::decay_t< decltype(M) >::value_t;
-    //             using  m_real_t  = typename Hpro::real_type_t< m_value_t >;
+//     //     std::visit(
+//     //         [&s,D,config] ( auto &&  M )
+//     //         {
+//     //             using  m_value_t = typename std::decay_t< decltype(M) >::value_t;
+//     //             using  m_real_t  = typename Hpro::real_type_t< m_value_t >;
 
-    //             uint   factor    = sizeof(m_value_t) / sizeof(m_real_t);
+//     //             uint   factor    = sizeof(m_value_t) / sizeof(m_real_t);
 
-    //             s = D->byte_size() - sizeof(m_value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< m_value_t >);
+//     //             s = D->byte_size() - sizeof(m_value_t) * D->nrows() * D->ncols() - sizeof(blas::matrix< m_value_t >);
 
-    //             if constexpr( std::is_same_v< m_value_t, m_real_t > )
-    //             {
-    //                 auto  u = zfp::const_array2< m_value_t >( D->nrows(), D->ncols(), config, 0, 0 );
+//     //             if constexpr( std::is_same_v< m_value_t, m_real_t > )
+//     //             {
+//     //                 auto  u = zfp::const_array2< m_value_t >( D->nrows(), D->ncols(), config, 0, 0 );
 
-    //                 u.set( M.data() );
+//     //                 u.set( M.data() );
 
-    //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
-    //                 const size_t  mem_zfp   = u.compressed_size();
+//     //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
+//     //                 const size_t  mem_zfp   = u.compressed_size();
 
-    //                 if ( mem_zfp < mem_dense )
-    //                 {
-    //                     s += u.compressed_size();
-    //                     s += sizeof(zfp::const_array2< m_value_t >);
+//     //                 if ( mem_zfp < mem_dense )
+//     //                 {
+//     //                     s += u.compressed_size();
+//     //                     s += sizeof(zfp::const_array2< m_value_t >);
 
-    //                     u.get( M.data() );
-    //                 }// if
-    //                 else
-    //                     s = D->byte_size();
-    //             }// if
-    //             else
-    //             {
-    //                 auto  u = zfp::const_array3< m_real_t >( D->nrows(), D->ncols(), factor, config, 0, 0 );
+//     //                     u.get( M.data() );
+//     //                 }// if
+//     //                 else
+//     //                     s = D->byte_size();
+//     //             }// if
+//     //             else
+//     //             {
+//     //                 auto  u = zfp::const_array3< m_real_t >( D->nrows(), D->ncols(), factor, config, 0, 0 );
 
-    //                 u.set( (m_real_t*) M.data() );
+//     //                 u.set( (m_real_t*) M.data() );
 
-    //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
-    //                 const size_t  mem_zfp   = u.compressed_size();
+//     //                 const size_t  mem_dense = sizeof(m_value_t) * D->nrows() * D->ncols();
+//     //                 const size_t  mem_zfp   = u.compressed_size();
 
-    //                 if ( mem_zfp < mem_dense )
-    //                 {
-    //                     s += u.compressed_size();
-    //                     s += sizeof(zfp::const_array3< m_real_t >);
+//     //                 if ( mem_zfp < mem_dense )
+//     //                 {
+//     //                     s += u.compressed_size();
+//     //                     s += sizeof(zfp::const_array3< m_real_t >);
 
-    //                     u.get( (m_real_t*) M.data() );
-    //                 }// if
-    //                 else
-    //                     s = D->byte_size();
-    //             }// else
-    //         },
-    //         D->matrix()
-    //     );
+//     //                     u.get( (m_real_t*) M.data() );
+//     //                 }// if
+//     //                 else
+//     //                     s = D->byte_size();
+//     //             }// else
+//     //         },
+//     //         D->matrix()
+//     //     );
         
-    //     return s;
-    // }// if
-    else if ( is_lowrank( A ) )
-    {
-        auto    R = ptrcast( &A, Hpro::TRkMatrix< value_t > );
-        size_t  s = A.byte_size() - sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< value_t >);
+//     //     return s;
+//     // }// if
+//     else if ( is_lowrank( A ) )
+//     {
+//         auto    R = ptrcast( &A, Hpro::TRkMatrix< value_t > );
+//         size_t  s = A.byte_size() - sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< value_t >);
 
-        const size_t  mem_lr  = sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
-        size_t        mem_zfp = 0;
-        auto          U_zfp   = std::vector< value_t >( R->rank() * R->nrows() );
-        auto          V_zfp   = std::vector< value_t >( R->rank() * R->ncols() );
+//         const size_t  mem_lr  = sizeof(value_t) * R->rank() * ( R->nrows() + R->ncols() );
+//         size_t        mem_zfp = 0;
+//         auto          U_zfp   = std::vector< value_t >( R->rank() * R->nrows() );
+//         auto          V_zfp   = std::vector< value_t >( R->rank() * R->ncols() );
 
-        {
-            auto  uU = zfp::const_array2< value_t >( R->nrows(), R->rank(), config, 0, 0 );
+//         {
+//             auto  uU = zfp::const_array2< value_t >( R->nrows(), R->rank(), config, 0, 0 );
         
-            uU.set( blas::mat_U< value_t >( R ).data() );
+//             uU.set( blas::mat_U< value_t >( R ).data() );
 
-            mem_zfp += uU.compressed_size();
+//             mem_zfp += uU.compressed_size();
 
-            uU.get( U_zfp.data() );
-        }
+//             uU.get( U_zfp.data() );
+//         }
 
-        {
-            auto    uV = zfp::const_array2< value_t >( R->ncols(), R->rank(), config, 0, 0 );
+//         {
+//             auto    uV = zfp::const_array2< value_t >( R->ncols(), R->rank(), config, 0, 0 );
 
-            uV.set( blas::mat_V< value_t >( R ).data() );
+//             uV.set( blas::mat_V< value_t >( R ).data() );
 
-            mem_zfp += uV.compressed_size();
+//             mem_zfp += uV.compressed_size();
 
-            uV.get( V_zfp.data() );
-        }
+//             uV.get( V_zfp.data() );
+//         }
         
-        if ( mem_zfp < mem_lr )
-        {
-            s += mem_zfp;
-            s += 2*sizeof(zfp::const_array2< value_t >);
+//         if ( mem_zfp < mem_lr )
+//         {
+//             s += mem_zfp;
+//             s += 2*sizeof(zfp::const_array2< value_t >);
 
-            // write back compressed data
-            memcpy( blas::mat_U< value_t >( R ).data(), U_zfp.data(), sizeof(value_t) * U_zfp.size() );
-            memcpy( blas::mat_V< value_t >( R ).data(), V_zfp.data(), sizeof(value_t) * V_zfp.size() );
-        }// if
-        else
-            return A.byte_size();
+//             // write back compressed data
+//             memcpy( blas::mat_U< value_t >( R ).data(), U_zfp.data(), sizeof(value_t) * U_zfp.size() );
+//             memcpy( blas::mat_V< value_t >( R ).data(), V_zfp.data(), sizeof(value_t) * V_zfp.size() );
+//         }// if
+//         else
+//             return A.byte_size();
 
-        return s;
-    }// if
-    // else if ( hlr::matrix::is_generic_lowrank( A ) )
-    // {
-    //     auto    R = ptrcast( &A, matrix::lrmatrix );
-    //     size_t  s = 0;
+//         return s;
+//     }// if
+//     // else if ( hlr::matrix::is_generic_lowrank( A ) )
+//     // {
+//     //     auto    R = ptrcast( &A, matrix::lrmatrix );
+//     //     size_t  s = 0;
 
-    //     std::visit(
-    //         [R,&s,&config] ( auto &&  UV )
-    //         {
-    //             using  uv_value_t = typename std::decay_t< decltype(UV) >::value_t;
-    //             using  uv_real_t  = typename Hpro::real_type_t< uv_value_t >;
+//     //     std::visit(
+//     //         [R,&s,&config] ( auto &&  UV )
+//     //         {
+//     //             using  uv_value_t = typename std::decay_t< decltype(UV) >::value_t;
+//     //             using  uv_real_t  = typename Hpro::real_type_t< uv_value_t >;
 
-    //             uint   factor     = sizeof(uv_value_t) / sizeof(uv_real_t);
+//     //             uint   factor     = sizeof(uv_value_t) / sizeof(uv_real_t);
                 
-    //             s = R->byte_size() - sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< uv_value_t >);
+//     //             s = R->byte_size() - sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() ) - 2*sizeof(blas::matrix< uv_value_t >);
 
-    //             const size_t  mem_lr  = sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() );
-    //             size_t        mem_zfp = 0;
-    //             auto          U_zfp   = std::vector< uv_real_t >( R->rank() * R->nrows() * factor );
-    //             auto          V_zfp   = std::vector< uv_real_t >( R->rank() * R->ncols() * factor );
+//     //             const size_t  mem_lr  = sizeof(uv_value_t) * R->rank() * ( R->nrows() + R->ncols() );
+//     //             size_t        mem_zfp = 0;
+//     //             auto          U_zfp   = std::vector< uv_real_t >( R->rank() * R->nrows() * factor );
+//     //             auto          V_zfp   = std::vector< uv_real_t >( R->rank() * R->ncols() * factor );
 
-    //             {
-    //                 auto  uU = zfp::const_array2< uv_real_t >( R->nrows(), R->rank() * factor, config, 0, 0 );
+//     //             {
+//     //                 auto  uU = zfp::const_array2< uv_real_t >( R->nrows(), R->rank() * factor, config, 0, 0 );
         
-    //                 uU.set( (uv_real_t*) UV.U.data() );
+//     //                 uU.set( (uv_real_t*) UV.U.data() );
 
-    //                 mem_zfp += uU.compressed_size();
+//     //                 mem_zfp += uU.compressed_size();
 
-    //                 uU.get( U_zfp.data() );
-    //             }
+//     //                 uU.get( U_zfp.data() );
+//     //             }
 
-    //             {
-    //                 auto    uV = zfp::const_array2< uv_real_t >( R->ncols(), R->rank() * factor, config, 0, 0 );
+//     //             {
+//     //                 auto    uV = zfp::const_array2< uv_real_t >( R->ncols(), R->rank() * factor, config, 0, 0 );
 
-    //                 uV.set( (uv_real_t*) UV.V.data() );
+//     //                 uV.set( (uv_real_t*) UV.V.data() );
 
-    //                 mem_zfp += uV.compressed_size();
+//     //                 mem_zfp += uV.compressed_size();
 
-    //                 uV.get( V_zfp.data() );
-    //             }
+//     //                 uV.get( V_zfp.data() );
+//     //             }
         
-    //             if ( mem_zfp < mem_lr )
-    //             {
-    //                 s += mem_zfp;
-    //                 s += 2*sizeof(zfp::const_array2< uv_real_t >);
+//     //             if ( mem_zfp < mem_lr )
+//     //             {
+//     //                 s += mem_zfp;
+//     //                 s += 2*sizeof(zfp::const_array2< uv_real_t >);
 
-    //                 memcpy( (uv_real_t*) UV.U.data(), U_zfp.data(), sizeof(uv_real_t) * U_zfp.size() );
-    //                 memcpy( (uv_real_t*) UV.V.data(), V_zfp.data(), sizeof(uv_real_t) * V_zfp.size() );
-    //             }// if
-    //             else
-    //                 s = R->byte_size();
-    //         },
-    //         R->factors()
-    //     );
+//     //                 memcpy( (uv_real_t*) UV.U.data(), U_zfp.data(), sizeof(uv_real_t) * U_zfp.size() );
+//     //                 memcpy( (uv_real_t*) UV.V.data(), V_zfp.data(), sizeof(uv_real_t) * V_zfp.size() );
+//     //             }// if
+//     //             else
+//     //                 s = R->byte_size();
+//     //         },
+//     //         R->factors()
+//     //     );
 
-    //     return s;
-    // }// if
-    #if defined(HAS_H2)
-    else if ( is_uniform( &A ) )
-    {
-        auto          R       = ptrcast( &A, Hpro::TUniformMatrix< value_t > );
-        const size_t  mem_lr  = sizeof(value_t) * R->row_rank() * R->col_rank();
-        size_t        s       = A.byte_size() - mem_lr - sizeof(blas::matrix< value_t >);
-        auto          zC      = zfp::const_array2< value_t >( R->row_rank(), R->col_rank(), config, 0, 0 );
+//     //     return s;
+//     // }// if
+//     #if defined(HAS_H2)
+//     else if ( is_uniform( &A ) )
+//     {
+//         auto          R       = ptrcast( &A, Hpro::TUniformMatrix< value_t > );
+//         const size_t  mem_lr  = sizeof(value_t) * R->row_rank() * R->col_rank();
+//         size_t        s       = A.byte_size() - mem_lr - sizeof(blas::matrix< value_t >);
+//         auto          zC      = zfp::const_array2< value_t >( R->row_rank(), R->col_rank(), config, 0, 0 );
         
-        zC.set( Hpro::coeff< value_t >( R ).data() );
+//         zC.set( Hpro::coeff< value_t >( R ).data() );
 
-        const size_t  mem_zfp = zC.compressed_size();
+//         const size_t  mem_zfp = zC.compressed_size();
 
-        if ( mem_zfp < mem_lr )
-        {
-            s += mem_zfp;
-            s += sizeof(zfp::const_array2< value_t >);
+//         if ( mem_zfp < mem_lr )
+//         {
+//             s += mem_zfp;
+//             s += sizeof(zfp::const_array2< value_t >);
 
-            // write back compressed data
-            zC.get( Hpro::coeff< value_t >( R ).data() );
+//             // write back compressed data
+//             zC.get( Hpro::coeff< value_t >( R ).data() );
 
-            return s;
-        }// if
-        else
-            return A.byte_size();
-    }// if
-    #endif
-    else if ( is_uniform_lowrank( A ) )
-    {
-        auto          R       = ptrcast( &A, uniform_lrmatrix< value_t > );
-        const size_t  mem_lr  = sizeof(value_t) * R->row_rank() * R->col_rank();
-        size_t        s       = A.byte_size() - mem_lr - sizeof(blas::matrix< value_t >);
-        auto          zC      = zfp::const_array2< value_t >( R->row_rank(), R->col_rank(), config, 0, 0 );
+//             return s;
+//         }// if
+//         else
+//             return A.byte_size();
+//     }// if
+//     #endif
+//     else if ( is_uniform_lowrank( A ) )
+//     {
+//         auto          R       = ptrcast( &A, uniform_lrmatrix< value_t > );
+//         const size_t  mem_lr  = sizeof(value_t) * R->row_rank() * R->col_rank();
+//         size_t        s       = A.byte_size() - mem_lr - sizeof(blas::matrix< value_t >);
+//         auto          zC      = zfp::const_array2< value_t >( R->row_rank(), R->col_rank(), config, 0, 0 );
         
-        zC.set( R->coeff().data() );
+//         zC.set( R->coeff().data() );
 
-        const size_t  mem_zfp = zC.compressed_size();
+//         const size_t  mem_zfp = zC.compressed_size();
 
-        if ( mem_zfp < mem_lr )
-        {
-            s += mem_zfp;
-            s += sizeof(zfp::const_array2< value_t >);
+//         if ( mem_zfp < mem_lr )
+//         {
+//             s += mem_zfp;
+//             s += sizeof(zfp::const_array2< value_t >);
 
-            // write back compressed data
-            zC.get( R->coeff().data() );
+//             // write back compressed data
+//             zC.get( R->coeff().data() );
 
-            return s;
-        }// if
-        else
-            return A.byte_size();
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+//             return s;
+//         }// if
+//         else
+//             return A.byte_size();
+//     }// if
+//     else
+//         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    return 0;
-}
+//     return 0;
+// }
 
-template < typename value_t >
-size_t
-convert_zfp ( cluster_basis< value_t > &  cb,
-              zfp_config &                config )
-{
-    //
-    // convert local basis
-    //
+// template < typename value_t >
+// size_t
+// convert_zfp ( cluster_basis< value_t > &  cb,
+//               zfp_config &                config )
+// {
+//     //
+//     // convert local basis
+//     //
 
-    size_t  s = sizeof( cluster_basis< value_t > );
+//     size_t  s = sizeof( cluster_basis< value_t > );
     
-    if ( cb.rank() > 0 )
-    {
-        auto  C  = cb.basis();
-        auto  zC = zfp::const_array2< value_t >( C.nrows(), C.ncols(), config, 0, 0 );
+//     if ( cb.rank() > 0 )
+//     {
+//         auto  C  = cb.basis();
+//         auto  zC = zfp::const_array2< value_t >( C.nrows(), C.ncols(), config, 0, 0 );
         
-        zC.set( C.data() );
+//         zC.set( C.data() );
 
-        const size_t  mem_dense = sizeof(value_t) * C.nrows() * C.ncols();
-        const size_t  mem_zfp   = zC.compressed_size();
+//         const size_t  mem_dense = sizeof(value_t) * C.nrows() * C.ncols();
+//         const size_t  mem_zfp   = zC.compressed_size();
 
-        if ( mem_zfp < mem_dense )
-        {
-            s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
+//         if ( mem_zfp < mem_dense )
+//         {
+//             s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
             
-            // write back compressed data
-            zC.get( C.data() );
-        }// if
-        else
-        {
-            s += mem_dense;
-        }// else
-    }// if
+//             // write back compressed data
+//             zC.get( C.data() );
+//         }// if
+//         else
+//         {
+//             s += mem_dense;
+//         }// else
+//     }// if
     
-    if ( cb.nsons() > 0 )
-    {
-        auto  mtx = std::mutex();
+//     if ( cb.nsons() > 0 )
+//     {
+//         auto  mtx = std::mutex();
         
-        ::tbb::parallel_for< uint >(
-            0, cb.nsons(),
-            [&] ( auto  i )
-            {
-                if ( ! is_null( cb.son( i ) ) )
-                {
-                    auto  s_i = convert_zfp< value_t >( * cb.son(i), config );
+//         ::tbb::parallel_for< uint >(
+//             0, cb.nsons(),
+//             [&] ( auto  i )
+//             {
+//                 if ( ! is_null( cb.son( i ) ) )
+//                 {
+//                     auto  s_i = convert_zfp< value_t >( * cb.son(i), config );
                     
-                    {
-                        auto  lock = std::scoped_lock( mtx );
+//                     {
+//                         auto  lock = std::scoped_lock( mtx );
                         
-                        s += s_i;
-                    }
-                }// if
-            } );
-    }// if
+//                         s += s_i;
+//                     }
+//                 }// if
+//             } );
+//     }// if
 
-    return s;
-}
+//     return s;
+// }
 
-#if defined(HAS_H2)
-template < typename value_t >
-size_t
-convert_zfp ( Hpro::TClusterBasis< value_t > &  cb,
-              zfp_config &                      config )
-{
-    //
-    // convert local basis
-    //
+// #if defined(HAS_H2)
+// template < typename value_t >
+// size_t
+// convert_zfp ( Hpro::TClusterBasis< value_t > &  cb,
+//               zfp_config &                      config )
+// {
+//     //
+//     // convert local basis
+//     //
 
-    size_t  s = sizeof( cluster_basis< value_t > );
+//     size_t  s = sizeof( cluster_basis< value_t > );
     
-    if ( cb.nsons() == 0 )
-    {
-        auto  C  = cb.basis();
-        auto  zC = zfp::const_array2< value_t >( C.nrows(), C.ncols(), config, 0, 0 );
+//     if ( cb.nsons() == 0 )
+//     {
+//         auto  C  = cb.basis();
+//         auto  zC = zfp::const_array2< value_t >( C.nrows(), C.ncols(), config, 0, 0 );
         
-        zC.set( C.data() );
+//         zC.set( C.data() );
 
-        const size_t  mem_dense = sizeof(value_t) * C.nrows() * C.ncols();
-        const size_t  mem_zfp   = zC.compressed_size();
+//         const size_t  mem_dense = sizeof(value_t) * C.nrows() * C.ncols();
+//         const size_t  mem_zfp   = zC.compressed_size();
 
-        if ( mem_zfp < mem_dense )
-        {
-            s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
+//         if ( mem_zfp < mem_dense )
+//         {
+//             s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
             
-            // write back compressed data
-            zC.get( C.data() );
-        }// if
-        else
-        {
-            s += mem_dense;
-        }// else
-    }// if
-    else 
-    {
-        auto  mtx = std::mutex();
+//             // write back compressed data
+//             zC.get( C.data() );
+//         }// if
+//         else
+//         {
+//             s += mem_dense;
+//         }// else
+//     }// if
+//     else 
+//     {
+//         auto  mtx = std::mutex();
 
-        //
-        // recurse
-        //
+//         //
+//         // recurse
+//         //
         
-        ::tbb::parallel_for< uint >(
-            0, cb.nsons(),
-            [&] ( auto  i )
-            {
-                if ( ! is_null( cb.son( i ) ) )
-                {
-                    auto  s_i = convert_zfp< value_t >( * cb.son(i), config );
+//         ::tbb::parallel_for< uint >(
+//             0, cb.nsons(),
+//             [&] ( auto  i )
+//             {
+//                 if ( ! is_null( cb.son( i ) ) )
+//                 {
+//                     auto  s_i = convert_zfp< value_t >( * cb.son(i), config );
                     
-                    {
-                        auto  lock = std::scoped_lock( mtx );
+//                     {
+//                         auto  lock = std::scoped_lock( mtx );
                         
-                        s += s_i;
-                    }
-                }// if
-            } );
+//                         s += s_i;
+//                     }
+//                 }// if
+//             } );
 
-        //
-        // compress transfer matrices
-        //
+//         //
+//         // compress transfer matrices
+//         //
 
-        if ( cb.rank() > 0 )
-        {
-            for ( uint  i = 0; i < cb.nsons(); ++i )
-            {
-                auto  T  = cb.transfer_mat( i );
-                auto  zT = zfp::const_array2< value_t >( T.nrows(), T.ncols(), config, 0, 0 );
+//         if ( cb.rank() > 0 )
+//         {
+//             for ( uint  i = 0; i < cb.nsons(); ++i )
+//             {
+//                 auto  T  = cb.transfer_mat( i );
+//                 auto  zT = zfp::const_array2< value_t >( T.nrows(), T.ncols(), config, 0, 0 );
         
-                zT.set( T.data() );
+//                 zT.set( T.data() );
 
-                const size_t  mem_dense = sizeof(value_t) * T.nrows() * T.ncols();
-                const size_t  mem_zfp   = zT.compressed_size();
+//                 const size_t  mem_dense = sizeof(value_t) * T.nrows() * T.ncols();
+//                 const size_t  mem_zfp   = zT.compressed_size();
 
-                if ( mem_zfp < mem_dense )
-                {
-                    s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
+//                 if ( mem_zfp < mem_dense )
+//                 {
+//                     s += mem_zfp + sizeof(zfp::const_array2< value_t >) - sizeof(blas::matrix< value_t >);
             
-                    // write back compressed data
-                    zT.get( T.data() );
-                }// if
-                else
-                {
-                    s += mem_dense;
-                }// else
-            }// for
-        }// if
-    }// if
+//                     // write back compressed data
+//                     zT.get( T.data() );
+//                 }// if
+//                 else
+//                 {
+//                     s += mem_dense;
+//                 }// else
+//             }// for
+//         }// if
+//     }// if
 
-    return s;
-}
-#endif
+//     return s;
+// }
+// #endif
 
-#endif
+// #endif
 
 #if defined(HAS_UNIVERSAL)
 //

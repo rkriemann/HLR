@@ -927,6 +927,74 @@ mulvec ( const T_matA &  A,
     return Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
 }
 
+template < typename T_alpha,
+           typename T_value >
+void
+mulvec_lr ( const T_alpha                    alpha,
+            const blas::matrix< T_value > &  U,
+            const blas::matrix< T_value > &  V,
+            const matop_t                    op,
+            const blas::vector< T_value > &  x,
+            blas::vector< T_value > &        y )
+{
+    using  value_t = T_value;
+    
+    if ( op == Hpro::apply_normal )
+    {
+        //
+        // y = y + U·V^H x
+        //
+        
+        // t := V^H x
+        auto  t = blas::mulvec( blas::adjoint( V ), x );
+
+        // t := α·t
+        blas::scale( value_t(alpha), t );
+        
+        // y := y + U t
+        blas::mulvec( U, t, y );
+    }// if
+    else if ( op == Hpro::apply_transposed )
+    {
+        //
+        // y = y + (U·V^H)^T x
+        //   = y + conj(V)·U^T x
+        //
+        
+        // t := U^T x
+        auto  t = blas::mulvec( blas::transposed( U ), x );
+
+        // t := α·t
+        blas::scale( value_t(alpha), t );
+        
+        // r := conj(V) t = conj( V · conj(t) )
+        blas::conj( t );
+            
+        auto  r = blas::mulvec( V, t );
+
+        blas::conj( r );
+
+        // y = y + r
+        blas::add( value_t(1), r, y );
+    }// if
+    else if ( op == Hpro::apply_adjoint )
+    {
+        //
+        // y = y + (U·V^H)^H x
+        //   = y + V·U^H x
+        //
+        
+        // t := U^H x
+        auto  t = blas::mulvec( blas::adjoint( U ), x );
+
+        // t := α·t
+        blas::scale( value_t(alpha), t );
+        
+        // y := t + V t
+        blas::mulvec( V, t, y );
+    }// if
+}
+
 template < typename T_beta,
            typename T_matA,
            typename T_matB,

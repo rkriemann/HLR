@@ -28,357 +28,323 @@ DECLARE_TYPE( lrmatrix );
 namespace matrix
 {
 
-// //
-// // Represents a low-rank matrix in factorised form: U·S·V^H
-// // with U and V represented as row/column cluster bases for
-// // corresponding matrix block (maybe joined by more matrices).
-// //
-// class lrmatrix : public Hpro::TMatrix
-// {
-// private:
-//     //
-//     // compressed storage based on underlying floating point type
-//     //
-//     #if defined(HAS_SZ)
+//
+// Represents a low-rank matrix in factorised form: U·S·V^H
+// with U and V represented as row/column cluster bases for
+// corresponding matrix block (maybe joined by more matrices).
+//
+template < typename T_value >
+class lrmatrix : public Hpro::TRkMatrix< T_value >
+{
+public:
+    using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
     
-//     struct compressed_factors
-//     {
-//         sz::carray_view  U, V;
-//     };
+private:
+    //
+    // compressed storage based on underlying floating point type
+    //
+    #if defined(HAS_ZFP)
 
-//     using  compressed_storage = compressed_factors;
+    struct compressed_factors
+    {
+        zfp::carray  U, V;
+    };
+
+    using  compressed_storage = compressed_factors;
     
-//     #elif defined(HAS_ZFP)
+    #endif
 
-//     struct compressed_factors
-//     {
-//         zfp::carray  U, V;
-//     };
+private:
+    #if defined(HAS_ZFP)
+    // optional: stores compressed data
+    compressed_storage    _zdata;
+    #endif
 
-//     using  compressed_storage = compressed_factors;
+public:
+    //
+    // ctors
+    //
+
+    lrmatrix ()
+            : Hpro::TRkMatrix< value_t >()
+    {}
     
-//     #endif
+    lrmatrix ( const indexset                arow_is,
+               const indexset                acol_is )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+    {}
 
-// public:
-//     template < typename T_value >
-//     struct lrfactors
-//     {
-//         using value_t = T_value;
+    lrmatrix ( const indexset                   arow_is,
+               const indexset                   acol_is,
+               hlr::blas::matrix< value_t > &   aU,
+               hlr::blas::matrix< value_t > &   aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is, aU, aV )
+    {}
+
+    lrmatrix ( const indexset                   arow_is,
+               const indexset                   acol_is,
+               hlr::blas::matrix< value_t > &&  aU,
+               hlr::blas::matrix< value_t > &&  aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is, std::move( aU ), std::move( aV ) )
+    {}
+
+    // dtor
+    virtual ~lrmatrix ()
+    {}
+    
+    //
+    // access internal data
+    //
+
+    blas::matrix< value_t > &        U ()       { return this->blas_mat_A(); }
+    blas::matrix< value_t > &        V ()       { return this->blas_mat_B(); }
+    
+    const blas::matrix< value_t > &  U () const { return this->blas_mat_A(); }
+    const blas::matrix< value_t > &  V () const { return this->blas_mat_B(); }
+    
+    void
+    set_lrmat ( const blas::matrix< value_t > &  aU,
+                const blas::matrix< value_t > &  aV )
+    {
+        HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
+                   ( this->ncols() == aV.nrows() ) &&
+                   ( aU.ncols()    == aV.ncols() ));
+
+        if ( is_compressed() )
+            remove_compressed();
         
-//         blas::matrix< value_t >  U, V;
-//     };
-
-//     using  generic_lrfactors = std::variant<
-//         lrfactors< float >,
-//         lrfactors< std::complex< float > >,
-//         lrfactors< double >,
-//         lrfactors< std::complex< double > >
-//         >;
+        blas::copy( aU, U() );
+        blas::copy( aV, V() );
+    }
     
-// private:
-//     // local index set of matrix
-//     indexset              _row_is, _col_is;
-    
-//     // lowrank factors
-//     generic_lrfactors     _UV;
+    void
+    set_lrmat ( blas::matrix< value_t > &&  aU,
+                blas::matrix< value_t > &&  aV )
+    {
+        HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
+                   ( this->ncols() == aV.nrows() ) &&
+                   ( aU.ncols()    == aV.ncols() ));
 
-//     // indicates internal value type
-//     // - after initialization identical to _M.index()
-//     blas::value_type      _vtype;
-    
-//     #if defined(HAS_SZ) || defined(HAS_ZFP)
-//     // optional: stores compressed data
-//     compressed_storage    _zdata;
-//     #endif
-
-// public:
-//     //
-//     // ctors
-//     //
-
-//     lrmatrix ()
-//             : TMatrix()
-//             , _row_is( 0, 0 )
-//             , _col_is( 0, 0 )
-//             , _vtype( blas::value_type::undefined )
-//     {
-//     }
-    
-//     lrmatrix ( const indexset                arow_is,
-//                const indexset                acol_is )
-//             : TMatrix()
-//             , _row_is( arow_is )
-//             , _col_is( acol_is )
-//             , _vtype( blas::value_type::undefined )
-//     {
-//         set_ofs( _row_is.first(), _col_is.first() );
-//     }
-
-//     template < typename value_t >
-//     lrmatrix ( const indexset                   arow_is,
-//                const indexset                   acol_is,
-//                hlr::blas::matrix< value_t > &   aU,
-//                hlr::blas::matrix< value_t > &   aV )
-//             : TMatrix( Hpro::value_type_v< value_t > )
-//             , _row_is( arow_is )
-//             , _col_is( acol_is )
-//             , _UV( lrfactors< value_t >{ blas::copy( aU ), blas::copy( aV ) } )
-//             , _vtype( blas::value_type_v< value_t > )
-//     {
-//         HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
-//                    ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-//                    ( std::get< lrfactors< value_t > >( _UV ).U.ncols() == std::get< lrfactors< value_t > >( _UV ).V.ncols() ));
-
-//         set_ofs( _row_is.first(), _col_is.first() );
-//     }
-
-//     template < typename value_t >
-//     lrmatrix ( const indexset                   arow_is,
-//                const indexset                   acol_is,
-//                hlr::blas::matrix< value_t > &&  aU,
-//                hlr::blas::matrix< value_t > &&  aV )
-//             : TMatrix( Hpro::value_type_v< value_t > )
-//             , _row_is( arow_is )
-//             , _col_is( acol_is )
-//             , _UV( lrfactors< value_t >{ std::move( aU ), std::move( aV ) } )
-//             , _vtype( blas::value_type_v< value_t > )
-//     {
-//         HLR_ASSERT(( _row_is.size() == std::get< lrfactors< value_t > >( _UV ).U.nrows() ) &&
-//                    ( _col_is.size() == std::get< lrfactors< value_t > >( _UV ).V.nrows() ) &&
-//                    ( std::get< lrfactors< value_t > >( _UV ).U.ncols() == std::get< lrfactors< value_t > >( _UV ).V.ncols() ));
-
-//         set_ofs( _row_is.first(), _col_is.first() );
-//     }
-
-//     // dtor
-//     virtual ~lrmatrix ()
-//     {}
-    
-//     //
-//     // access internal data
-//     //
-
-//     uint
-//     rank () const
-//     {
-//         return std::visit( [] ( auto &&  M ) { return M.U.ncols(); }, _UV );
-//     }
-
-//     // return value type of matrix
-//     blas::value_type  value_type () const { return _vtype; }
-
-//     generic_lrfactors        factors ()       { return _UV; }
-//     const generic_lrfactors  factors () const { return _UV; }
-    
-//     template < typename value_t > blas::matrix< value_t > &        U ()       { return std::get< lrfactors< value_t > >( _UV ).U; }
-//     template < typename value_t > blas::matrix< value_t > &        V ()       { return std::get< lrfactors< value_t > >( _UV ).V; }
-    
-//     template < typename value_t > const blas::matrix< value_t > &  U () const { return std::get< lrfactors< value_t > >( _UV ).U; }
-//     template < typename value_t > const blas::matrix< value_t > &  V () const { return std::get< lrfactors< value_t > >( _UV ).V; }
-    
-//     template < typename value_t >
-//     void
-//     set_lrmat ( const blas::matrix< value_t > &  aU,
-//                 const blas::matrix< value_t > &  aV )
-//     {
-//         HLR_ASSERT(( nrows()    == aU.nrows() ) &&
-//                    ( ncols()    == aV.nrows() ) &&
-//                    ( aU.ncols() == aV.ncols() ));
-
-//         if ( is_compressed() )
-//             remove_compressed();
+        if ( is_compressed() )
+            remove_compressed();
         
-//         if (( blas::value_type_v< value_t > == _vtype ) && ( aU.ncols() == U< value_t >().ncols() ))
-//         {
-//             blas::copy( aU, U< value_t >() );
-//             blas::copy( aV, V< value_t >() );
-//         }// if
-//         else
-//         {
-//             _UV    = lrfactors< value_t >{ blas::copy( aU ), blas::copy( aV ) };
-//             _vtype = blas::value_type_v< value_t >;
-//         }// else
-//     }
-    
-//     template < typename value_t >
-//     void
-//     set_lrmat ( blas::matrix< value_t > &&  aU,
-//                 blas::matrix< value_t > &&  aV )
-//     {
-//         HLR_ASSERT(( nrows()    == aU.nrows() ) &&
-//                    ( ncols()    == aV.nrows() ) &&
-//                    ( aU.ncols() == aV.ncols() ));
+        U() = std::move( aU );
+        V() = std::move( aV );
+    }
 
-//         if ( is_compressed() )
-//             remove_compressed();
+    //
+    // matrix data
+    //
+    
+    virtual void    set_size  ( const size_t  ,
+                                const size_t   ) {} // ignored
+    
+    //
+    // algebra routines
+    //
+
+    //! compute y ≔ α·op(this)·x + β·y
+    virtual void  mul_vec    ( const value_t               alpha,
+                               const Hpro::TVector< value_t > *  x,
+                               const value_t               beta,
+                               Hpro::TVector< value_t > *        y,
+                               const matop_t               op = Hpro::apply_normal ) const;
+    using Hpro::TMatrix< value_t >::mul_vec;
+    
+    // truncate matrix to accuracy acc
+    virtual void truncate ( const Hpro::TTruncAcc & acc );
+
+    // scale matrix by alpha
+    virtual void scale    ( const value_t  alpha )
+    {
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "todo" );
+        }// if
+        else
+        {
+            Hpro::TRkMatrix< value_t >::scale( alpha );
+        }// else
+    }
+
+    //
+    // RTTI
+    //
+
+    HPRO_RTTI_DERIVED( lrmatrix, Hpro::TRkMatrix< value_t > )
+
+    //
+    // virtual constructor
+    //
+
+    // return matrix of same class (but no content)
+    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< lrmatrix< value_t > >(); }
+
+    // return copy of matrix
+    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+
+    // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
+    virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
+                                  const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+
+    // return structural copy of matrix
+    virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+
+    // copy matrix data to A
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const;
+
+    // copy matrix data to A and truncate w.r.t. acc with optional coarsening
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
+                                  const Hpro::TTruncAcc &     acc,
+                                  const bool                  do_coarsen = false ) const;
+    
+    //
+    // misc.
+    //
+
+    // compress internal data
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    {
+        #if defined(HAS_ZFP)
         
-//         _UV    = lrfactors< value_t >{ std::move( aU ), std::move( aV ) };
-//         _vtype = blas::value_type_v< value_t >;
-//     }
+        if ( is_compressed() )
+            return;
 
-//     //
-//     // matrix data
-//     //
+        HLR_ASSERT( acc.is_fixed_prec() );
+        
+        auto          oU      = this->U();
+        auto          oV      = this->V();
+        const auto    orank   = oU.ncols();
+        const size_t  mem_lr  = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
+        const auto    zconfig = zfp::fixed_accuracy( acc.rel_eps() );
+        auto          zU      = zfp::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
+        auto          zV      = zfp::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
+
+        if ( zU.size() + zV.size() < mem_lr )
+        {
+            _zdata.U  = std::move( zU );
+            _zdata.V  = std::move( zV );
+            this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!
+            this->V() = std::move( blas::matrix< value_t >( 0, orank ) );
+        }// if
+
+        #endif
+    }
+
+    // uncompress internal data
+    virtual void   uncompress    ()
+    {
+        #if defined(HAS_ZFP)
+        
+        if ( ! is_compressed() )
+            return;
+
+        auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-//     virtual size_t  nrows     () const { return _row_is.size(); }
-//     virtual size_t  ncols     () const { return _col_is.size(); }
+        zfp::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        zfp::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        
+        this->U() = std::move( uU );
+        this->V() = std::move( uV );
 
-//     virtual size_t  rows      () const { return nrows(); }
-//     virtual size_t  cols      () const { return ncols(); }
+        #endif
+    }
 
-//     // use "op" versions from TMatrix
-//     using TMatrix::nrows;
-//     using TMatrix::ncols;
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        #if defined(HAS_ZFP)
+        return ! is_null( _zdata.U.data() );
+        #else
+        return false;
+        #endif
+    }
     
-//     // return true, if matrix is zero
-//     virtual bool    is_zero   () const { return ( rank() == 0 ); }
+    // return size in bytes used by this object
+    virtual size_t byte_size  () const;
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        #if defined(HAS_ZFP)
+        _zdata.U = zfp::carray();
+        _zdata.V = zfp::carray();
+        #endif
+    }
+};
+
+//
+// type test
+//
+template < typename value_t >
+inline
+bool
+is_compressible_lowrank ( const Hpro::TMatrix< value_t > &  M )
+{
+    return IS_TYPE( &M, lrmatrix );
+}
+
+template < typename value_t >
+bool
+is_compressible_lowrank ( const Hpro::TMatrix< value_t > *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, lrmatrix );
+}
+
+HLR_TEST_ALL( is_compressible_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_compressible_lowrank, Hpro::TMatrix< value_t > )
+
+//
+// matrix vector multiplication
+//
+template < typename value_t >
+void
+lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
+                                const Hpro::TVector< value_t > *  vx,
+                                const value_t                     beta,
+                                Hpro::TVector< value_t > *        vy,
+                                const matop_t                     op ) const
+{
+    #if defined(HAS_ZFP)
+
+    if ( is_compressed() )
+    {
+        HLR_ASSERT( vx->is() == this->col_is( op ) );
+        HLR_ASSERT( vy->is() == this->row_is( op ) );
+        HLR_ASSERT( is_scalar_all( vx, vy ) );
+
+        const auto  sx = cptrcast( vx, Hpro::TScalarVector< value_t > );
+        const auto  sy = ptrcast(  vy, Hpro::TScalarVector< value_t > );
+
+        // y := β·y
+        if ( beta != value_t(1) )
+            vy->scale( beta );
+
+        auto  x = blas::vec( *sx );
+        auto  y = blas::vector< value_t >( sy->size() );
+
+        auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-//     virtual void    set_size  ( const size_t  ,
-//                                 const size_t   ) {} // ignored
+        zfp::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        zfp::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        
+        blas::mulvec_lr( alpha, uU, uV, op, x, y );
+                
+        blas::add( value_t(1), y, blas::vec( *sy ) );
+    }// if
+    else
+
+    #endif
+    {
+        Hpro::TRkMatrix< value_t >::mul_vec( alpha, vx, beta, vy, op );
+    }// else
+}
     
-//     //
-//     // change value type 
-//     //
-    
-//     virtual void  to_real     () { HLR_ASSERT( false ); }
-//     virtual void  to_complex  () { HLR_ASSERT( false ); }
-
-//     //
-//     // algebra routines
-//     //
-
-//     // compute y ≔ β·y + α·op(M)·x, with M = this
-//     virtual void mul_vec  ( const Hpro::real       alpha,
-//                             const Hpro::TVector *  x,
-//                             const Hpro::real       beta,
-//                             Hpro::TVector *        y,
-//                             const Hpro::matop_t    op = Hpro::apply_normal ) const;
-//     using Hpro::TMatrix::mul_vec;
-    
-//     // compute y ≔ β·y + α·op(M)·x, with M = this
-//     virtual void cmul_vec ( const Hpro::complex    alpha,
-//                             const Hpro::TVector *  x,
-//                             const Hpro::complex    beta,
-//                             Hpro::TVector *        y,
-//                             const Hpro::matop_t    op = Hpro::apply_normal ) const;
-    
-//     // truncate matrix to accuracy acc
-//     virtual void truncate ( const Hpro::TTruncAcc & acc );
-
-//     // scale matrix by alpha
-//     virtual void scale    ( const Hpro::real  alpha )
-//     {
-//         if ( is_compressed() )
-//         {
-//             HLR_ERROR( "todo" );
-//         }// if
-//         else
-//         {
-//             std::visit(
-//                 [alpha] ( auto &&  M )
-//                 {
-//                     using  value_t  = typename std::decay_t< decltype(M) >::value_t;
-                    
-//                     if ( M.U.nrows() < M.V.ncols() )
-//                         blas::scale( value_t(alpha), M.U );
-//                     else
-//                         blas::scale( value_t(alpha), M.V );
-//                 },
-//                 _UV );
-//         }// else
-//     }
-
-//     //
-//     // RTTI
-//     //
-
-//     HLIB_RTTI_DERIVED( lrmatrix, TMatrix )
-
-//     //
-//     // virtual constructor
-//     //
-
-//     // return matrix of same class (but no content)
-//     virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix > { return std::make_unique< lrmatrix >(); }
-
-//     // return copy of matrix
-//     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix >;
-
-//     // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
-//     virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
-//                                   const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix >;
-
-//     // return structural copy of matrix
-//     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix >;
-
-//     // copy matrix data to A
-//     virtual void   copy_to      ( Hpro::TMatrix *          A ) const;
-
-//     // copy matrix data to A and truncate w.r.t. acc with optional coarsening
-//     virtual void   copy_to      ( Hpro::TMatrix *          A,
-//                                   const Hpro::TTruncAcc &  acc,
-//                                   const bool               do_coarsen = false ) const;
-    
-//     //
-//     // misc.
-//     //
-
-//     // compress internal data
-//     // - may result in non-compression if storage does not decrease
-//     virtual void   compress      ( const zconfig_t &  config );
-
-//     // uncompress internal data
-//     virtual void   uncompress    ();
-
-//     // return true if data is compressed
-//     virtual bool   is_compressed () const
-//     {
-//         #if defined(HAS_SZ)
-//         return ! is_null( _zdata.U.data() );
-//         #elif defined(HAS_ZFP)
-//         return ! is_null( _zdata.U.data() );
-//         #else
-//         return false;
-//         #endif
-//     }
-    
-//     // return size in bytes used by this object
-//     virtual size_t byte_size  () const;
-
-// protected:
-//     // remove compressed storage (standard storage not restored!)
-//     virtual void   remove_compressed ()
-//     {
-//         #if defined(HAS_SZ)
-//         _zdata.U.free();
-//         _zdata.V.free();
-//         #elif defined(HAS_ZFP)
-//         _zdata.U = zfp::carray();
-//         _zdata.V = zfp::carray();
-//         #endif
-//     }
-// };
-
-// //
-// // type test
-// //
-// inline
-// bool
-// is_generic_lowrank ( const Hpro::TMatrix &  M )
-// {
-//     return IS_TYPE( &M, lrmatrix );
-// }
-
-// inline
-// bool
-// is_generic_lowrank ( const Hpro::TMatrix *  M )
-// {
-//     return ! is_null( M ) && IS_TYPE( M, lrmatrix );
-// }
-
-// HLR_TEST_ALL( is_generic_lowrank, Hpro::TMatrix )
-// HLR_TEST_ANY( is_generic_lowrank, Hpro::TMatrix )
-
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_LRMATRIX_HH
