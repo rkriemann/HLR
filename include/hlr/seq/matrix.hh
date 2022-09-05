@@ -21,6 +21,7 @@
 #include "hlr/approx/svd.hh" // DEBUG
 #include "hlr/matrix/cluster_basis.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
+#include "hlr/matrix/lrmatrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/convert.hh"
 #include "hlr/matrix/restrict.hh"
@@ -69,6 +70,15 @@ build ( const Hpro::TBlockCluster *  bct,
         if ( bct->is_adm() )
         {
             M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
+
+            if ( is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                 std::move( blas::mat_U( R ) ),
+                                                                                 std::move( blas::mat_V( R ) ) );
+                M = std::move( zR );
+            }// if
         }// if
         else
         {

@@ -223,7 +223,21 @@ public:
     }
     
     // return size in bytes used by this object
-    virtual size_t byte_size     () const;
+    virtual size_t byte_size () const
+    {
+        size_t  size = Hpro::TDenseMatrix< value_t >::byte_size();
+
+        #if defined(HAS_ZFP)
+
+        size += sizeof(_zdata) + _zdata.size();
+
+        if ( is_compressed() )
+            size -= this->nrows() * this->ncols() * sizeof(value_t);
+    
+        #endif
+        
+        return size;
+    }
 
 protected:
     // remove compressed storage (standard storage not restored!)

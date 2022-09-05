@@ -145,15 +145,18 @@ public:
     //
 
     //! compute y ≔ α·op(this)·x + β·y
-    virtual void  mul_vec    ( const value_t               alpha,
+    virtual void  mul_vec    ( const value_t                     alpha,
                                const Hpro::TVector< value_t > *  x,
-                               const value_t               beta,
+                               const value_t                     beta,
                                Hpro::TVector< value_t > *        y,
-                               const matop_t               op = Hpro::apply_normal ) const;
+                               const matop_t                     op = Hpro::apply_normal ) const;
     using Hpro::TMatrix< value_t >::mul_vec;
     
     // truncate matrix to accuracy acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc );
+    virtual void truncate ( const Hpro::TTruncAcc & acc )
+    {
+        HLR_ERROR( "todo" );
+    }
 
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
@@ -264,7 +267,21 @@ public:
     }
     
     // return size in bytes used by this object
-    virtual size_t byte_size  () const;
+    virtual size_t byte_size  () const
+    {
+        size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
+
+        #if defined(HAS_ZFP)
+
+        size += sizeof(_zdata) + _zdata.U.size() + _zdata.V.size();
+
+        if ( is_compressed() )
+            size -= this->rank() * ( this->nrows() + this->ncols() ) * sizeof(value_t);
+    
+        #endif
+        
+        return size;
+    }
 
 protected:
     // remove compressed storage (standard storage not restored!)
