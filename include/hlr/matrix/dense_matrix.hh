@@ -149,22 +149,67 @@ public:
     virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< dense_matrix< value_t > >(); }
 
     // return copy of matrix
-    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        auto  M = Hpro::TMatrix< value_t >::copy();
+    
+        HLR_ASSERT( IS_TYPE( M.get(), dense_matrix ) );
+
+        auto  D = ptrcast( M.get(), dense_matrix< value_t > );
+
+        blas::copy( this->blas_mat(), D->blas_mat() );
+        
+        #if defined( HAS_ZFP )
+
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+
+        #endif
+    
+        return M;
+    }
 
     // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
-                                  const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         ( const Hpro::TTruncAcc &  /* acc */,
+                                  const bool               /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        return copy();
+    }
 
     // return structural copy of matrix
-    virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        return std::make_unique< dense_matrix< value_t > >( this->row_is(), this->col_is() );
+    }
 
     // copy matrix data to \a A
-    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const;
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const
+    {
+        Hpro::TDenseMatrix< value_t >::copy_to( A );
+    
+        HLR_ASSERT( IS_TYPE( A, dense_matrix ) );
+
+        #if defined( HAS_ZFP )
+
+        if ( is_compressed() )
+        {
+            // auto  D = ptrcast( A, dense_matrix< value_t > );
+
+            HLR_ERROR( "TODO" );
+        }// if
+
+        #endif
+    }
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     acc,
-                                  const bool                  do_coarsen = false ) const;
+                                  const Hpro::TTruncAcc &     /* acc */,
+                                  const bool                  /* do_coarsen */ = false ) const
+    {
+        copy_to( A );
+    }
     
     //
     // misc.
@@ -255,20 +300,20 @@ protected:
 //
 template < typename value_t >
 bool
-is_compressable_dense ( const Hpro::TMatrix< value_t > &  M )
+is_compressible_dense ( const Hpro::TMatrix< value_t > &  M )
 {
     return IS_TYPE( &M, dense_matrix );
 }
 
 template < typename value_t >
 bool
-is_compressable_dense ( const Hpro::TMatrix< value_t > *  M )
+is_compressible_dense ( const Hpro::TMatrix< value_t > *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, dense_matrix );
 }
 
-HLR_TEST_ALL( is_compressable_dense, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_compressable_dense, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_compressible_dense, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_compressible_dense, Hpro::TMatrix< value_t > )
 
 //
 // matrix vector multiplication

@@ -83,6 +83,14 @@ build ( const Hpro::TBlockCluster *  bct,
         else
         {
             M = coeff.build( rowis, colis );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                M = std::move( zD );
+            }// if
         }// else
     }// if
     else

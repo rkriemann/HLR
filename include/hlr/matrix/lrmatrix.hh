@@ -185,22 +185,66 @@ public:
     virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< lrmatrix< value_t > >(); }
 
     // return copy of matrix
-    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        auto  M = Hpro::TRkMatrix< value_t >::copy();
+    
+        HLR_ASSERT( IS_TYPE( M.get(), lrmatrix ) );
+
+        #if defined( HAS_ZFP )
+
+        if ( is_compressed() )
+        {
+            // auto  R = ptrcast( M.get(), lrmatrix< value_t > );
+
+            HLR_ERROR( "TODO" );
+        }// if
+
+        #endif
+    
+        return M;
+    }
 
     // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
-                                  const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         ( const Hpro::TTruncAcc &  /* acc */,
+                                  const bool               /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        return copy();
+    }
 
     // return structural copy of matrix
-    virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    {
+        return std::make_unique< lrmatrix< value_t > >( this->row_is(), this->col_is() );
+    }
 
     // copy matrix data to A
-    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const;
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const
+    {
+        Hpro::TRkMatrix< value_t >::copy_to( A );
+    
+        HLR_ASSERT( IS_TYPE( A, lrmatrix ) );
+
+        #if defined( HAS_ZFP )
+
+        if ( is_compressed() )
+        {
+            // auto  R = ptrcast( A, lrmatrix< value_t > );
+
+            HLR_ERROR( "TODO" );
+        }// if
+
+        #endif
+    }
+        
 
     // copy matrix data to A and truncate w.r.t. acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     acc,
-                                  const bool                  do_coarsen = false ) const;
+                                  const Hpro::TTruncAcc &     /* acc */,
+                                  const bool                  /* do_coarsen */ = false ) const
+    {
+        return copy_to( A );
+    }
     
     //
     // misc.

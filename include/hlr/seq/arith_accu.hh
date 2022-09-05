@@ -23,8 +23,6 @@
 
 namespace hlr { namespace seq { namespace accu {
 
-namespace timer = Hpro::Time::Wall;
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // accumulator based matrix multiplication

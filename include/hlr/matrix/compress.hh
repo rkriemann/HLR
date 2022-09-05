@@ -51,6 +51,41 @@ compress ( Hpro::TMatrix< value_t > &  M,
     }// if
 }
 
+//
+// uncompress internal data in compressible objects
+// (dense_matrix, lrmatrix)
+//
+template < typename value_t >
+void
+uncompress ( Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( B->block(i,j) ) )
+                    uncompress( *B->block(i,j) );
+            }// for
+        }// for
+    }// if
+    else if ( is_compressible_lowrank( M ) )
+    {
+        auto  R = ptrcast( &M, lrmatrix< value_t > );
+
+        R->uncompress();
+    }// if
+    else if ( is_compressible_dense( M ) )
+    {
+        auto  D = ptrcast( &M, dense_matrix< value_t > );
+
+        D->uncompress();
+    }// if
+}
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_COMPRESS_HH

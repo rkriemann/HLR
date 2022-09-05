@@ -26,8 +26,6 @@
 
 namespace hlr { namespace uniform { namespace accu {
 
-namespace timer = Hpro::Time::Wall;
-
 namespace detail
 {
 
