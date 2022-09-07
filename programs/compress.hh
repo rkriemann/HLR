@@ -84,13 +84,12 @@ program_main ()
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
-        
+    
     //
     // further compress matrix
     //
 
     auto  B      = impl::matrix::copy( *A );
-    auto  mem_A  = A->byte_size();
     auto  norm_A = norm::frobenius( *A );
     auto  delta  = norm_A * hlr::cmdline::eps / A->nrows();
     
@@ -104,7 +103,7 @@ program_main ()
     toc = timer::since( tic );
 
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
+    std::cout << "    mem   = " << format_mem( B->byte_size() ) << std::endl;
 
     matrix::uncompress( *B );
     

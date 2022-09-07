@@ -38,13 +38,13 @@ inline config fixed_rate     ( const uint    rate ) { return config{ zfp_mode_fi
 inline config fixed_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
 
 // holds compressed data
-using  carray = std::vector< unsigned char >;
+using  zarray = std::vector< unsigned char >;
 
 //
 // compression functions
 //
 template < typename value_t >
-carray
+zarray
 compress ( const config &   config,
            value_t *        data,
            const size_t     dim0,
@@ -88,7 +88,7 @@ compress ( const config &   config,
     zfp_stream_set_execution( zfp, zfp_exec_serial );
 
     auto  bufsize = zfp_stream_maximum_size( zfp, field );
-    auto  buffer  = carray( bufsize );
+    auto  buffer  = zarray( bufsize );
     auto  stream  = stream_open( buffer.data(), bufsize );
 
     zfp_stream_set_bit_stream( zfp, stream );
@@ -102,7 +102,7 @@ compress ( const config &   config,
     if ( c_size == 0 )
         HLR_ERROR( "error in zfp_compress" );
     
-    auto  result = carray( c_size );
+    auto  result = zarray( c_size );
 
     std::copy( buffer.begin(), buffer.begin() + c_size, result.begin() );
 
@@ -118,7 +118,7 @@ compress ( const config &   config,
 //
 template < typename value_t >
 void
-uncompress ( const carray &  buffer,
+uncompress ( const zarray &  buffer,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
@@ -146,8 +146,8 @@ uncompress ( const carray &  buffer,
 
     auto  zfp = zfp_stream_open( nullptr );
 
-    zfp_field_set_type( field, type );
-    zfp_field_set_pointer( field, dest );
+    // zfp_field_set_type( field, type );
+    // zfp_field_set_pointer( field, dest );
 
     switch ( ndims )
     {
@@ -216,7 +216,7 @@ inline config  config_abs ( double abs_err_bound   ) { return config{ ABS, abs_e
 //
 // handles arrays allocated within SZ
 //
-struct carray_view
+struct zarray_view
 {
     using value_t = unsigned char;
     using byte_t  = unsigned char;
@@ -226,18 +226,18 @@ private:
     size_t    _size;
 
 public:
-    carray_view ()
+    zarray_view ()
             : _ptr( nullptr )
             , _size( 0 )
     {}
 
-    carray_view ( byte_t *      aptr,
+    zarray_view ( byte_t *      aptr,
                   const size_t  asize )
             : _ptr( aptr )
             , _size( asize )
     {}
 
-    carray_view ( carray_view &&  v )
+    zarray_view ( zarray_view &&  v )
             : _ptr( v._ptr )
             , _size( v._size )
     {
@@ -245,12 +245,12 @@ public:
         v._size = 0;
     }
 
-    ~carray_view ()
+    ~zarray_view ()
     {
         free();
     }
     
-    carray_view &  operator = ( carray_view &&  v )
+    zarray_view &  operator = ( zarray_view &&  v )
     {
         free();
         
@@ -275,7 +275,7 @@ public:
 };
     
 template < typename value_t >
-carray_view
+zarray_view
 compress ( const config &   config,
            const value_t *  data,
            const size_t     dim0,
@@ -286,7 +286,7 @@ compress ( const config &   config,
 
 template <>
 inline
-carray_view
+zarray_view
 compress< float > ( const config &  config,
                     const float *   data,
                     const size_t    dim0,
@@ -303,12 +303,12 @@ compress< float > ( const config &  config,
                                       config.pwr_bound_ratio,
                                       dim4, dim3, dim2, dim1, dim0 );
 
-    return carray_view( ptr, csize );
+    return zarray_view( ptr, csize );
 }
 
 template <>
 inline
-carray_view
+zarray_view
 compress< double > ( const config &  config,
                      const double *  data,
                      const size_t    dim0,
@@ -325,12 +325,12 @@ compress< double > ( const config &  config,
                                       config.pwr_bound_ratio,
                                       dim4, dim3, dim2, dim1, dim0 );
 
-    return carray_view( ptr, csize );
+    return zarray_view( ptr, csize );
 }
 
 template <>
 inline
-carray_view
+zarray_view
 compress< std::complex< float > > ( const config &                 config,
                                     const std::complex< float > *  data,
                                     const size_t                   dim0,
@@ -344,7 +344,7 @@ compress< std::complex< float > > ( const config &                 config,
 
 template <>
 inline
-carray_view
+zarray_view
 compress< std::complex< double > > ( const config &                 config,
                                      const std::complex< double > * data,
                                      const size_t                   dim0,
@@ -358,7 +358,7 @@ compress< std::complex< double > > ( const config &                 config,
 
 template < typename value_t >
 void
-uncompress ( const carray_view &  v,
+uncompress ( const zarray_view &  v,
              value_t *      dest,
              const size_t   dim0,
              const size_t   dim1 = 0,
@@ -369,7 +369,7 @@ uncompress ( const carray_view &  v,
 template <>
 inline
 void
-uncompress< float > ( const carray_view &  v,
+uncompress< float > ( const zarray_view &  v,
                       float *        dest,
                       const size_t   dim0,
                       const size_t   dim1,
@@ -385,7 +385,7 @@ uncompress< float > ( const carray_view &  v,
 template <>
 inline
 void
-uncompress< double > ( const carray_view &  v,
+uncompress< double > ( const zarray_view &  v,
                        double *       dest,
                        const size_t   dim0,
                        const size_t   dim1,
@@ -401,7 +401,7 @@ uncompress< double > ( const carray_view &  v,
 template <>
 inline
 void
-uncompress< std::complex< float > > ( const carray_view &       v,
+uncompress< std::complex< float > > ( const zarray_view &       v,
                                       std::complex< float > *   dest,
                                       const size_t              dim0,
                                       const size_t              dim1,
@@ -415,7 +415,7 @@ uncompress< std::complex< float > > ( const carray_view &       v,
 template <>
 inline
 void
-uncompress< std::complex< double > > ( const carray_view &       v,
+uncompress< std::complex< double > > ( const zarray_view &       v,
                                        std::complex< double > *  dest,
                                        const size_t              dim0,
                                        const size_t              dim1,

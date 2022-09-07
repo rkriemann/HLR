@@ -45,7 +45,7 @@ private:
     //
     #if defined(HAS_ZFP)
     
-    using  compressed_storage = hlr::zfp::carray;
+    using  compressed_storage = hlr::zfp::zarray;
     
     #endif
 
@@ -104,15 +104,25 @@ public:
     // matrix data
     //
     
-    virtual void    set_size  ( const size_t  ,
-                                const size_t   ) {} // ignored
+    virtual void  set_size  ( const size_t  anrows,
+                              const size_t  ancols )
+    {
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+        else
+        {
+            Hpro::TDenseMatrix< value_t >::set_size( anrows, ancols );
+        }// else
+    }
     
     //
     // algebra routines
     //
 
     // scale matrix by constant factor \a f
-    virtual void  scale      ( const value_t               f )
+    virtual void  scale      ( const value_t  f )
     {
         if ( is_compressed() )
         {
@@ -157,16 +167,24 @@ public:
 
         auto  D = ptrcast( M.get(), dense_matrix< value_t > );
 
-        blas::copy( this->blas_mat(), D->blas_mat() );
+        HLR_ASSERT( ( D->nrows() == this->nrows() ) &&
+                    ( D->ncols() == this->ncols() ) );
         
         #if defined( HAS_ZFP )
 
         if ( is_compressed() )
         {
-            HLR_ERROR( "TODO" );
+            D->_zdata = zfp::zarray( _zdata.size() );
+
+            std::copy( _zdata.begin(), _zdata.end(), D->_zdata.begin() );
         }// if
 
         #endif
+
+        else
+        {
+            D->blas_mat() = std::move( blas::copy( this->blas_mat() ) );
+        }// else
     
         return M;
     }
@@ -289,7 +307,7 @@ protected:
     virtual void   remove_compressed ()
     {
         #if defined(HAS_ZFP)
-        _zdata = zfp::carray();
+        _zdata = zfp::zarray();
         #endif
     }
     

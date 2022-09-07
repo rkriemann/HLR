@@ -48,7 +48,7 @@ void
 write ( const Hpro::TMatrix< value_t > &  M,
         const std::string &               filename )
 {
-    Hpro::THLibMatrixIO  mio;
+    Hpro::THproMatrixIO  mio;
 
     mio.write( &M, filename );
 }
@@ -60,7 +60,7 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 read ( const std::string &  filename )
 {
-    Hpro::THLibMatrixIO  mio;
+    Hpro::THproMatrixIO  mio;
 
     return mio.read< value_t >( filename );
 }

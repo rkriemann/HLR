@@ -48,7 +48,7 @@ private:
 
     struct compressed_factors
     {
-        zfp::carray  U, V;
+        zfp::zarray  U, V;
     };
 
     using  compressed_storage = compressed_factors;
@@ -137,8 +137,18 @@ public:
     // matrix data
     //
     
-    virtual void    set_size  ( const size_t  ,
-                                const size_t   ) {} // ignored
+    virtual void    set_size  ( const size_t  anrows,
+                                const size_t  ancols )
+    {
+        if ( is_compressed() )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+        else
+        {
+            Hpro::TRkMatrix< value_t >::set_size( anrows, ancols );
+        }// else
+    }
     
     //
     // algebra routines
@@ -191,17 +201,21 @@ public:
     
         HLR_ASSERT( IS_TYPE( M.get(), lrmatrix ) );
 
+        auto  R = ptrcast( M.get(), lrmatrix< value_t > );
+
         #if defined( HAS_ZFP )
 
         if ( is_compressed() )
         {
-            // auto  R = ptrcast( M.get(), lrmatrix< value_t > );
+            R->_zdata.U = zfp::zarray( _zdata.U.size() );
+            R->_zdata.V = zfp::zarray( _zdata.V.size() );
 
-            HLR_ERROR( "TODO" );
+            std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
+            std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
         }// if
 
         #endif
-    
+
         return M;
     }
 
@@ -332,8 +346,8 @@ protected:
     virtual void   remove_compressed ()
     {
         #if defined(HAS_ZFP)
-        _zdata.U = zfp::carray();
-        _zdata.V = zfp::carray();
+        _zdata.U = zfp::zarray();
+        _zdata.V = zfp::zarray();
         #endif
     }
 };
