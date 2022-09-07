@@ -43,7 +43,7 @@ template < typename value_t >
 void
 mul_vec ( const value_t                    alpha,
           const Hpro::matop_t              op_M,
-          const Hpro::TMatrix< value_t > &            M,
+          const Hpro::TMatrix< value_t > & M,
           const blas::vector< value_t > &  x,
           blas::vector< value_t > &        y )
 {
@@ -1056,6 +1056,54 @@ lu ( Hpro::TMatrix< value_t > &          A,
 }
 
 }// namespace tileh
+
+//
+// collection of arithmetic functions
+//
+struct tbb_arithmetic
+{
+    //
+    // matrix vector multiplication
+    //
+    
+    template < typename value_t >
+    void
+    mul_vec ( const value_t                             alpha,
+              const Hpro::matop_t                       op_M,
+              const Hpro::TMatrix< value_t > &          M,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y ) const
+    {
+        hlr::tbb::mul_vec( alpha, op_M, M, x, y );
+    }
+
+    template < typename value_t >
+    void
+    mul_vec ( const value_t                     alpha,
+              const Hpro::matop_t               op_M,
+              const Hpro::TMatrix< value_t > &  M,
+              const blas::vector< value_t > &   x,
+              blas::vector< value_t > &         y ) const
+    {
+        hlr::tbb::mul_vec( alpha, op_M, M, x, y );
+    }
+
+    template < typename value_t >
+    void
+    prod ( const value_t                             alpha,
+           const matop_t                             op_M,
+           const Hpro::TLinearOperator< value_t > &  M,
+           const blas::vector< value_t > &           x,
+           blas::vector< value_t > &                 y ) const
+    {
+        if ( is_matrix( M ) )
+            hlr::tbb::mul_vec( alpha, op_M, *cptrcast( &M, Hpro::TMatrix< value_t > ), x, y );
+        else
+            M.apply_add( alpha, x, y, op_M );
+    }
+};
+
+constexpr tbb_arithmetic arithmetic{};
 
 }}// namespace hlr::tbb
 

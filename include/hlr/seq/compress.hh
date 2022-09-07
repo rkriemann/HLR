@@ -796,6 +796,41 @@ compress_ml ( const indexset &           rowis,
 }
 
 //
+// compress compressible sub-blocks within H-matrix
+//
+template < typename value_t >
+void
+compress ( Hpro::TMatrix< value_t > &  A,
+           const Hpro::TTruncAcc &     acc )
+{
+    using namespace hlr::matrix;
+
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
+            {
+                if ( is_null( BA->block( i, j ) ) )
+                    continue;
+                
+                compress( *BA->block( i, j ), acc );
+            }// for
+        }// for
+    }// if
+    else if ( is_compressible_lowrank( A ) )
+    {
+        ptrcast( &A, lrmatrix< value_t > )->compress( acc );
+    }// if
+    else if ( is_compressible_dense( A ) )
+    {
+        ptrcast( &A, dense_matrix< value_t > )->compress( acc );
+    }// if
+}
+
+//
 // uncompress matrix
 //
 template < typename value_t >

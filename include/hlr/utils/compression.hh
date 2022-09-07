@@ -20,7 +20,7 @@
 
 #include <zfp.h>
 
-namespace hlr { namespace zfp {
+namespace hlr { namespace compress { namespace zfp {
 
 //
 // define compression mode
@@ -39,6 +39,8 @@ inline config fixed_accuracy ( const double  acc  ) { return config{ zfp_mode_fi
 
 // holds compressed data
 using  zarray = std::vector< unsigned char >;
+
+inline size_t  byte_size ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
 
 //
 // compression functions
@@ -178,7 +180,7 @@ uncompress ( const zarray &  buffer,
     stream_close( stream );
 }
 
-}}// namespace hlr::zfp
+}}}// namespace hlr::compress::zfp
 
 #endif
 
@@ -197,7 +199,7 @@ uncompress ( const zarray &  buffer,
 #include <zlib.h>
 #endif
 
-namespace hlr { namespace sz {
+namespace hlr { namespace compress { namespace sz {
 
 //
 // holds compression parameters
@@ -210,13 +212,13 @@ struct config
     double  pwr_bound_ratio;
 };
 
-inline config  config_rel ( double rel_bound_ratio ) { return config{ REL, 0.0, rel_bound_ratio, 0.0 }; }
-inline config  config_abs ( double abs_err_bound   ) { return config{ ABS, abs_err_bound, 0.0, 0.0 }; }
+inline config  fixed_accuracy    ( double rel_bound_ratio ) { return config{ REL, 0.0, rel_bound_ratio, 0.0 }; }
+inline config  absolute_accuracy ( double abs_err_bound   ) { return config{ ABS, abs_err_bound, 0.0, 0.0 }; }
 
 //
 // handles arrays allocated within SZ
 //
-struct zarray_view
+struct zarray
 {
     using value_t = unsigned char;
     using byte_t  = unsigned char;
@@ -226,18 +228,23 @@ private:
     size_t    _size;
 
 public:
-    zarray_view ()
+    zarray ()
             : _ptr( nullptr )
             , _size( 0 )
     {}
 
-    zarray_view ( byte_t *      aptr,
-                  const size_t  asize )
+    zarray ( const size_t  asize )
+            : _ptr( reinterpret_cast< byte_t * >( ::malloc( asize ) ) )
+            , _size( asize )
+    {}
+
+    zarray ( byte_t *      aptr,
+             const size_t  asize )
             : _ptr( aptr )
             , _size( asize )
     {}
 
-    zarray_view ( zarray_view &&  v )
+    zarray ( zarray &&  v )
             : _ptr( v._ptr )
             , _size( v._size )
     {
@@ -245,12 +252,12 @@ public:
         v._size = 0;
     }
 
-    ~zarray_view ()
+    ~zarray ()
     {
         free();
     }
     
-    zarray_view &  operator = ( zarray_view &&  v )
+    zarray &  operator = ( zarray &&  v )
     {
         free();
         
@@ -263,6 +270,9 @@ public:
         return *this;
     }
     
+    byte_t *  begin () const { return _ptr; }
+    byte_t *  end   () const { return _ptr + _size; }
+    
     byte_t *  data () const { return _ptr; }
     size_t    size () const { return _size; }
 
@@ -273,9 +283,11 @@ public:
         _size = 0;
     }
 };
-    
+
+inline size_t  byte_size ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
+
 template < typename value_t >
-zarray_view
+zarray
 compress ( const config &   config,
            const value_t *  data,
            const size_t     dim0,
@@ -286,7 +298,7 @@ compress ( const config &   config,
 
 template <>
 inline
-zarray_view
+zarray
 compress< float > ( const config &  config,
                     const float *   data,
                     const size_t    dim0,
@@ -303,12 +315,12 @@ compress< float > ( const config &  config,
                                       config.pwr_bound_ratio,
                                       dim4, dim3, dim2, dim1, dim0 );
 
-    return zarray_view( ptr, csize );
+    return zarray( ptr, csize );
 }
 
 template <>
 inline
-zarray_view
+zarray
 compress< double > ( const config &  config,
                      const double *  data,
                      const size_t    dim0,
@@ -325,12 +337,12 @@ compress< double > ( const config &  config,
                                       config.pwr_bound_ratio,
                                       dim4, dim3, dim2, dim1, dim0 );
 
-    return zarray_view( ptr, csize );
+    return zarray( ptr, csize );
 }
 
 template <>
 inline
-zarray_view
+zarray
 compress< std::complex< float > > ( const config &                 config,
                                     const std::complex< float > *  data,
                                     const size_t                   dim0,
@@ -344,7 +356,7 @@ compress< std::complex< float > > ( const config &                 config,
 
 template <>
 inline
-zarray_view
+zarray
 compress< std::complex< double > > ( const config &                 config,
                                      const std::complex< double > * data,
                                      const size_t                   dim0,
@@ -358,7 +370,7 @@ compress< std::complex< double > > ( const config &                 config,
 
 template < typename value_t >
 void
-uncompress ( const zarray_view &  v,
+uncompress ( const zarray &  v,
              value_t *      dest,
              const size_t   dim0,
              const size_t   dim1 = 0,
@@ -369,7 +381,7 @@ uncompress ( const zarray_view &  v,
 template <>
 inline
 void
-uncompress< float > ( const zarray_view &  v,
+uncompress< float > ( const zarray &  v,
                       float *        dest,
                       const size_t   dim0,
                       const size_t   dim1,
@@ -385,7 +397,7 @@ uncompress< float > ( const zarray_view &  v,
 template <>
 inline
 void
-uncompress< double > ( const zarray_view &  v,
+uncompress< double > ( const zarray &  v,
                        double *       dest,
                        const size_t   dim0,
                        const size_t   dim1,
@@ -401,7 +413,7 @@ uncompress< double > ( const zarray_view &  v,
 template <>
 inline
 void
-uncompress< std::complex< float > > ( const zarray_view &       v,
+uncompress< std::complex< float > > ( const zarray &            v,
                                       std::complex< float > *   dest,
                                       const size_t              dim0,
                                       const size_t              dim1,
@@ -415,7 +427,7 @@ uncompress< std::complex< float > > ( const zarray_view &       v,
 template <>
 inline
 void
-uncompress< std::complex< double > > ( const zarray_view &       v,
+uncompress< std::complex< double > > ( const zarray &            v,
                                        std::complex< double > *  dest,
                                        const size_t              dim0,
                                        const size_t              dim1,
@@ -426,10 +438,163 @@ uncompress< std::complex< double > > ( const zarray_view &       v,
     HLR_ERROR( "TO DO" );
 }
 
-}}// namespace hlr::sz
+}}}// namespace hlr::compress::sz
 
 #endif // HAS_SZ
 
+////////////////////////////////////////////////////////////
+//
+// compression using Posits
+//
+////////////////////////////////////////////////////////////
+
+#if defined(HAS_UNIVERSAL)
+
+#include <universal/number/posit/posit.hpp>
+
+namespace hlr { namespace compress { namespace posits {
+
+struct config
+{
+    uint  bitsize;
+};
+
+// holds compressed data
+using  zarray = std::vector< unsigned char >;
+
+inline
+size_t
+byte_size ( const zarray &  v )
+{
+    if ( v.size() > 0 )
+    {
+        const auto  bitsize = v[0];
+        const auto  nposits = (v.size() - 8) / bitsize;
+
+        return std::ceil( nposits * bitsize / 8.0 );
+    }// if
+
+    return 0;
+}
+
+inline config fixed_accuracy ( const double  acc  ) { return config{ 24 }; }
+
+template < typename value_t >
+zarray
+compress ( const config &   config,
+           value_t *        data,
+           const size_t     dim0,
+           const size_t     dim1 = 0,
+           const size_t     dim2 = 0,
+           const size_t     dim3 = 0 );
+
+template <>
+inline
+zarray
+compress< float > ( const config &   config,
+                    float *          data,
+                    const size_t     dim0,
+                    const size_t     dim1,
+                    const size_t     dim2,
+                    const size_t     dim3 )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+zarray
+compress< double > ( const config &   config,
+                     double *         data,
+                     const size_t     dim0,
+                     const size_t     dim1,
+                     const size_t     dim2,
+                     const size_t     dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( 8 + nsize * 8 ); // SW-Posits have fixed size 8!
+
+    zdata[0] = config.bitsize;
+    
+    switch ( config.bitsize )
+    {
+        case 24:
+        {
+            using  posit_t = sw::universal::posit< 24, 2 >;
+
+            auto  ptr = reinterpret_cast< posit_t * >( zdata.data() + 8 );
+
+            for ( size_t  i = 0; i < nsize; ++i )
+                ptr[i] = posit_t( data[i] );
+        }
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+uncompress ( const zarray &  v,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 );
+
+template <>
+inline
+void
+uncompress< float > ( const zarray &  v,
+                      float *        dest,
+                      const size_t   dim0,
+                      const size_t   dim1,
+                      const size_t   dim2,
+                      const size_t   dim3,
+                      const size_t   dim4 )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+void
+uncompress< double > ( const zarray &  zdata,
+                       double *        dest,
+                       const size_t    dim0,
+                       const size_t    dim1,
+                       const size_t    dim2,
+                       const size_t    dim3,
+                       const size_t    dim4 )
+{
+    const size_t  nsize   = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const auto    bitsize = zdata[0];
+    
+    switch ( bitsize )
+    {
+        case 24:
+        {
+            using  posit_t = sw::universal::posit< 24, 2 >;
+
+            auto  ptr = reinterpret_cast< const posit_t * >( zdata.data() + 8 );
+
+            for ( size_t  i = 0; i < nsize; ++i )
+                dest[i] = double( ptr[i] );
+        }
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}}}// namespace hlr::compress::posits
+
+#endif
 
 ////////////////////////////////////////////////////////////
 //
@@ -440,19 +605,55 @@ uncompress< std::complex< double > > ( const zarray_view &       v,
 namespace hlr
 {
 
-#if defined(HAS_SZ)
+namespace compress
+{
 
-using  zconfig_t = hlr::sz::config;
+#if defined(HAS_UNIVERSAL)
+
+#  define HLR_HAS_COMPRESSION  1
+
+using  zconfig_t = hlr::compress::posits::config;
+using  zarray    = hlr::compress::posits::zarray;
+
+using hlr::compress::posits::compress;
+using hlr::compress::posits::uncompress;
+using hlr::compress::posits::fixed_accuracy;
+using hlr::compress::posits::byte_size;
+
+#elif defined(HAS_SZ)
+
+#  define HLR_HAS_COMPRESSION  1
+
+using  zconfig_t = hlr::compress::sz::config;
+using  zarray    = hlr::compress::sz::zarray;
+
+using hlr::compress::sz::compress;
+using hlr::compress::sz::uncompress;
+using hlr::compress::sz::fixed_accuracy;
+using hlr::compress::sz::byte_size;
 
 #elif defined(HAS_ZFP)
 
-using  zconfig_t = hlr::zfp::config;
+#  define HLR_HAS_COMPRESSION  1
+
+using  zconfig_t = hlr::compress::zfp::config;
+using  zarray    = hlr::compress::zfp::zarray;
+
+using hlr::compress::zfp::compress;
+using hlr::compress::zfp::uncompress;
+using hlr::compress::zfp::fixed_accuracy;
+using hlr::compress::zfp::byte_size;
 
 #else 
 
+#  define HLR_HAS_COMPRESSION  0
+
 struct zconfig_t {};
+using  zarray    = std::vector< char >;
 
 #endif
+
+}// namespace compress
 
 }// namespace hlr
 

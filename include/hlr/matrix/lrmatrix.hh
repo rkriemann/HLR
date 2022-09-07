@@ -44,11 +44,11 @@ private:
     //
     // compressed storage based on underlying floating point type
     //
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
 
     struct compressed_factors
     {
-        zfp::zarray  U, V;
+        compress::zarray  U, V;
     };
 
     using  compressed_storage = compressed_factors;
@@ -56,7 +56,7 @@ private:
     #endif
 
 private:
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
     // optional: stores compressed data
     compressed_storage    _zdata;
     #endif
@@ -162,6 +162,14 @@ public:
                                const matop_t                     op = Hpro::apply_normal ) const;
     using Hpro::TMatrix< value_t >::mul_vec;
     
+    // same as above but only the dimension of the vector spaces is tested,
+    // not the corresponding index sets
+    virtual void  apply_add   ( const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                const matop_t                    op = apply_normal ) const;
+    using Hpro::TMatrix< value_t >::apply_add;
+    
     // truncate matrix to accuracy acc
     virtual void truncate ( const Hpro::TTruncAcc & acc )
     {
@@ -203,12 +211,12 @@ public:
 
         auto  R = ptrcast( M.get(), lrmatrix< value_t > );
 
-        #if defined( HAS_ZFP )
+        #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
-            R->_zdata.U = zfp::zarray( _zdata.U.size() );
-            R->_zdata.V = zfp::zarray( _zdata.V.size() );
+            R->_zdata.U = compress::zarray( _zdata.U.size() );
+            R->_zdata.V = compress::zarray( _zdata.V.size() );
 
             std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
             std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
@@ -239,7 +247,7 @@ public:
     
         HLR_ASSERT( IS_TYPE( A, lrmatrix ) );
 
-        #if defined( HAS_ZFP )
+        #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
@@ -266,24 +274,21 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    virtual void   compress      ( const compress::zconfig_t &  zconfig )
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         
         if ( is_compressed() )
             return;
 
-        HLR_ASSERT( acc.is_fixed_prec() );
-        
         auto          oU      = this->U();
         auto          oV      = this->V();
         const auto    orank   = oU.ncols();
         const size_t  mem_lr  = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
-        const auto    zconfig = zfp::fixed_accuracy( acc.rel_eps() );
-        auto          zU      = zfp::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
-        auto          zV      = zfp::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
+        auto          zU      = compress::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
+        auto          zV      = compress::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
 
-        if ( zU.size() + zV.size() < mem_lr )
+        if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
         {
             _zdata.U  = std::move( zU );
             _zdata.V  = std::move( zV );
@@ -294,10 +299,17 @@ public:
         #endif
     }
 
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    {
+        HLR_ASSERT( acc.is_fixed_prec() );
+        
+        compress( compress::fixed_accuracy( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+    }
+
     // uncompress internal data
     virtual void   uncompress    ()
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         
         if ( ! is_compressed() )
             return;
@@ -305,8 +317,8 @@ public:
         auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        zfp::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        zfp::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
         this->U() = std::move( uU );
         this->V() = std::move( uV );
@@ -317,7 +329,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zdata.U.data() );
         #else
         return false;
@@ -329,9 +341,10 @@ public:
     {
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
 
-        size += sizeof(_zdata) + _zdata.U.size() + _zdata.V.size();
+        size += hlr::compress::byte_size( _zdata.U );
+        size += hlr::compress::byte_size( _zdata.V );
 
         if ( is_compressed() )
             size -= this->rank() * ( this->nrows() + this->ncols() ) * sizeof(value_t);
@@ -345,9 +358,9 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if defined(HAS_ZFP)
-        _zdata.U = zfp::zarray();
-        _zdata.V = zfp::zarray();
+        #if HLR_HAS_COMPRESSION == 1
+        _zdata.U = compress::zarray();
+        _zdata.V = compress::zarray();
         #endif
     }
 };
@@ -384,7 +397,7 @@ lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
                                 Hpro::TVector< value_t > *        vy,
                                 const matop_t                     op ) const
 {
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
 
     if ( is_compressed() )
     {
@@ -400,23 +413,54 @@ lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
             vy->scale( beta );
 
         auto  x = blas::vec( *sx );
-        auto  y = blas::vector< value_t >( sy->size() );
+        // auto  y = blas::vector< value_t >( sy->size() );
 
         auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        zfp::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        zfp::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
-        blas::mulvec_lr( alpha, uU, uV, op, x, y );
-                
-        blas::add( value_t(1), y, blas::vec( *sy ) );
+        blas::mulvec_lr( alpha, uU, uV, op, x, blas::vec( *sy ) );
+        // blas::add( value_t(1), y, blas::vec( *sy ) );
     }// if
     else
 
     #endif
     {
         Hpro::TRkMatrix< value_t >::mul_vec( alpha, vx, beta, vy, op );
+    }// else
+}
+    
+template < typename value_t >
+void
+lrmatrix< value_t >::apply_add ( const value_t                   alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                 const matop_t                   op ) const
+{
+    #if HLR_HAS_COMPRESSION == 1
+
+    if ( is_compressed() )
+    {
+        HLR_ASSERT( x.length() == this->ncols( op ) );
+        HLR_ASSERT( y.length() == this->nrows( op ) );
+
+        // auto  ty = blas::vector< value_t >( y.length() );
+        auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
+    
+        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        
+        blas::mulvec_lr( alpha, uU, uV, op, x, y );
+        // blas::add( value_t(1), ty, y );
+    }// if
+    else
+
+    #endif
+    {
+        Hpro::TRkMatrix< value_t >::apply_add( alpha, x, y, op );
     }// else
 }
     

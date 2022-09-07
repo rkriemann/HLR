@@ -43,14 +43,14 @@ private:
     //
     // compressed storage based on underlying floating point type
     //
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
     
-    using  compressed_storage = hlr::zfp::zarray;
+    using  compressed_storage = hlr::compress::zarray;
     
     #endif
 
 private:
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
     // optional: stores compressed data
     compressed_storage    _zdata;
     #endif
@@ -135,12 +135,20 @@ public:
     }
     
     //! compute y ≔ α·op(this)·x + β·y
-    virtual void  mul_vec    ( const value_t               alpha,
+    virtual void  mul_vec    ( const value_t                     alpha,
                                const Hpro::TVector< value_t > *  x,
-                               const value_t               beta,
+                               const value_t                     beta,
                                Hpro::TVector< value_t > *        y,
-                               const matop_t               op = Hpro::apply_normal ) const;
+                               const matop_t                     op = Hpro::apply_normal ) const;
     using Hpro::TMatrix< value_t >::mul_vec;
+
+    // same as above but only the dimension of the vector spaces is tested,
+    // not the corresponding index sets
+    virtual void  apply_add   ( const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                const matop_t                    op = apply_normal ) const;
+    using Hpro::TMatrix< value_t >::apply_add;
     
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const Hpro::TTruncAcc & ) {}
@@ -170,11 +178,11 @@ public:
         HLR_ASSERT( ( D->nrows() == this->nrows() ) &&
                     ( D->ncols() == this->ncols() ) );
         
-        #if defined( HAS_ZFP )
+        #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
-            D->_zdata = zfp::zarray( _zdata.size() );
+            D->_zdata = compress::zarray( _zdata.size() );
 
             std::copy( _zdata.begin(), _zdata.end(), D->_zdata.begin() );
         }// if
@@ -209,7 +217,7 @@ public:
     
         HLR_ASSERT( IS_TYPE( A, dense_matrix ) );
 
-        #if defined( HAS_ZFP )
+        #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
@@ -235,21 +243,18 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    virtual void   compress      ( const compress::zconfig_t &  zconfig )
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         
         if ( is_compressed() )
             return;
 
-        HLR_ASSERT( acc.is_fixed_prec() );
-        
         auto          M         = this->blas_mat();
         const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
-        const auto    zconfig   = zfp::fixed_accuracy( acc.rel_eps() );
-        auto          v         = zfp::compress< value_t >( zconfig, M.data(), M.nrows(), M.ncols() );
+        auto          v         = compress::compress< value_t >( zconfig, M.data(), M.nrows(), M.ncols() );
 
-        if ( v.size() < mem_dense )
+        if ( compress::byte_size( v ) < mem_dense )
         {
             _zdata           = std::move( v );
             this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
@@ -258,17 +263,24 @@ public:
         #endif
     }
 
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    {
+        HLR_ASSERT( acc.is_fixed_prec() );
+        
+        compress( compress::fixed_accuracy( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+    }
+
     // uncompress internal data
     virtual void   uncompress    ()
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         
         if ( ! is_compressed() )
             return;
 
         auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-        zfp::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
         
         this->blas_mat() = std::move( M );
 
@@ -278,7 +290,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zdata.data() );
         #else
         return false;
@@ -290,9 +302,9 @@ public:
     {
         size_t  size = Hpro::TDenseMatrix< value_t >::byte_size();
 
-        #if defined(HAS_ZFP)
+        #if HLR_HAS_COMPRESSION == 1
 
-        size += sizeof(_zdata) + _zdata.size();
+        size += hlr::compress::byte_size( _zdata );
 
         if ( is_compressed() )
             size -= this->nrows() * this->ncols() * sizeof(value_t);
@@ -306,8 +318,8 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if defined(HAS_ZFP)
-        _zdata = zfp::zarray();
+        #if HLR_HAS_COMPRESSION == 1
+        _zdata = compress::zarray();
         #endif
     }
     
@@ -344,7 +356,7 @@ dense_matrix< value_t >::mul_vec    ( const value_t                     alpha,
                                       Hpro::TVector< value_t > *        vy,
                                       const matop_t                     op ) const
 {
-    #if defined(HAS_ZFP)
+    #if HLR_HAS_COMPRESSION == 1
 
     if ( is_compressed() )
     {
@@ -360,15 +372,13 @@ dense_matrix< value_t >::mul_vec    ( const value_t                     alpha,
             vy->scale( beta );
 
         auto  x = blas::vec( *sx );
-        auto  y = blas::vector< value_t >( sy->size() );
-
+        // auto  y = blas::vector< value_t >( sy->size() );
         auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-        zfp::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
         
-        blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(0), y );
-        
-        blas::add( value_t(1), y, blas::vec( sy ) );
+        blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(1), blas::vec( sy ) );
+        // blas::add( value_t(1), y, blas::vec( sy ) );
     }// if
     else
 
@@ -377,6 +387,36 @@ dense_matrix< value_t >::mul_vec    ( const value_t                     alpha,
         Hpro::TDenseMatrix< value_t >::mul_vec( alpha, vx, beta, vy, op );
     }// else
     
+}
+
+template < typename value_t >
+void
+dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
+                                       const blas::vector< value_t > &  x,
+                                       blas::vector< value_t > &        y,
+                                       const matop_t                    op ) const
+{
+    #if HLR_HAS_COMPRESSION == 1
+
+    if ( is_compressed() )
+    {
+        HLR_ASSERT( x.length() == this->ncols( op ) );
+        HLR_ASSERT( y.length() == this->nrows( op ) );
+
+        // auto  ty = blas::vector< value_t >( y.length() );
+        auto  M  = blas::matrix< value_t >( this->nrows(), this->ncols() );
+    
+        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        
+        blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(1), y );
+        // blas::add( value_t(1), ty, y );
+    }// if
+    else
+
+    #endif
+    {
+        Hpro::TDenseMatrix< value_t >::apply_add( alpha, x, y, op );
+    }// else
 }
 
 }} // namespace hlr::matrix

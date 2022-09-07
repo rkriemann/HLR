@@ -250,6 +250,16 @@ eps_printer::set_rgb ( const int r, const int g, const int b )
 }
 
 void
+eps_printer::set_rgb ( const uint rgb )
+{
+    const auto  r = ( rgb & 0xFF0000 ) >> 16;
+    const auto  g = ( rgb & 0x00FF00 ) >> 8;
+    const auto  b =   rgb & 0x0000FF;
+
+    set_rgb( r, g, b );
+}
+
+void
 eps_printer::set_line_width ( const double width )
 {
     _output << width << " SW" << std::endl;

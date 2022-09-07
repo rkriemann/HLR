@@ -88,6 +88,7 @@ struct eps_printer
     void set_rgb         ( const int  r,
                            const int  g,
                            const int  b );
+    void set_rgb         ( const uint rgb );
 
     void set_line_width  ( const double         width );
     

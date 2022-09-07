@@ -36,6 +36,59 @@ namespace
 {
 
 //
+// color indices
+//
+enum {
+    HLR_COLOR_BG_DEFAULT,
+    HLR_COLOR_BG_BLOCKED,
+    HLR_COLOR_BG_DENSE,
+    HLR_COLOR_BG_DENSE_COMPRESSED,
+    HLR_COLOR_BG_LOWRANK,
+    HLR_COLOR_BG_LOWRANK_COMPRESSED,
+    HLR_COLOR_BG_UNIFORM,
+    HLR_COLOR_BG_UNIFORM_COMPRESSED,
+    HLR_COLOR_BG_H2,
+    HLR_COLOR_BG_H2_COMPRESSED,
+    HLR_COLOR_BG_SPARSE,
+    HLR_COLOR_BG_SPARSE_COMPRESSED,
+    HLR_COLOR_FG_DEFAULT,
+    HLR_COLOR_FG_BORDER,
+    HLR_COLOR_FG_DIM,
+    HLR_COLOR_FG_RANK,
+    HLR_COLOR_FG_INDEXSET,
+    HLR_COLOR_FG_ID,
+    HLR_COLOR_FG_PATTERN,
+};
+
+//
+// color palette for matrix printing
+//
+const uint colors[] = {
+    // background
+    0xFFFFFF,   // default
+    0xA0A0A0,   // blocked
+    0xF35E5E,   // dense (ScarletRed1!75!White)
+    0xF79494,   // compressed dense (ScarletRed1!50!White)
+    0xC4F099,   // lowrank (Chameleon1!50!White)
+    0xE1F7CC,   // compressed lowrank (Chameleon1!25!White)
+    0xB8CFE7,   // uniform (SkyBlue1!50!White)
+    0xDBE7F3,   // compressed uniform (SkyBlue1)
+    0xB8CFE7,   // H2 (SkyBlue1!50!White)
+    0xDBE7F3,   // compressed H2 (SkyBlue1!25!White)
+    0xFDF4A7,   // sparse (Butter!50!White)
+    0xFEF9D3,   // compressed sparse (Butter!25!White)
+    
+    // foreground
+    0x000000,   // default
+    0x000000,   // border
+    0x000000,   // dimensions
+    0x000000,   // rank
+    0x5C3566,   // indexset (Plum3)
+    0x204A87,   // id (SkyBlue3)
+    0x000000    // pattern
+};
+    
+//
 // actual print function
 //
 template < typename value_t >
@@ -60,10 +113,12 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
     }// if
     else
     {
-        if ( is_dense( M ) ) // || is_generic_dense( M ) )
+        if ( is_dense( M ) || is_compressible_dense( M ) )
         {
-            // background
-            prn.set_rgb( 243, 94, 94 ); // ScarletRed1!75!White
+            if ( is_compressible_dense( M ) && cptrcast( &M, dense_matrix< value_t > )->is_compressed() )
+                prn.set_rgb( colors[HLR_COLOR_BG_DENSE_COMPRESSED] );
+            else
+                prn.set_rgb( colors[HLR_COLOR_BG_DENSE] );
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -74,7 +129,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
                 
-                prn.set_gray( 0 );
+                prn.set_rgb( colors[HLR_COLOR_FG_DIM] );
                 if ( M.nrows() != M.ncols() )
                     prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                    double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
@@ -87,17 +142,15 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.restore();
             }// if
         }// if
-        else if ( is_lowrank( M ) ) // || is_generic_lowrank( M ) )
+        else if ( is_lowrank( M ) || is_compressible_lowrank( M ) )
         {
-            uint  rank = 0;
+            auto  rank = cptrcast( &M, Hpro::TRkMatrix< value_t > )->rank();
 
-            //if ( is_lowrank( M ) )
-                rank = cptrcast( &M, Hpro::TRkMatrix< value_t > )->rank();
-            // else
-            //     rank = cptrcast( &M, lrmatrix )->rank();
+            if ( is_compressible_lowrank( M ) && cptrcast( &M, lrmatrix< value_t > )->is_compressed() )
+                prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+            else
+                prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
 
-            // background
-            prn.set_rgb( 225, 247, 204 ); // Chameleon1!25!White
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -108,7 +161,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
                 
-                prn.set_gray( 0 );
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                Hpro::to_string( "%d", rank ) );
@@ -121,7 +174,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
 
             // background
-            prn.set_rgb( 219, 231, 243 ); // SkyBlue1!25!White
+            prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -132,7 +185,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
                 
-                prn.set_gray( 0 );
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
@@ -145,8 +198,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         {
             auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
 
-            // background
-            prn.set_rgb( 219, 231, 243 ); // SkyBlue1!25!White
+            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -157,7 +209,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.save();
                 prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
                 
-                prn.set_gray( 0 );
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
@@ -171,7 +223,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             auto  S = cptrcast( &M, Hpro::TSparseMatrix< value_t > );
             
             // background
-            prn.set_rgb( 253, 250, 167 ); // Butter1!50!White 242,229,188
+            prn.set_rgb( colors[HLR_COLOR_BG_SPARSE] );
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -179,7 +231,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
 
             if ( contains( options, "pattern" ) )
             {
-                prn.set_gray( 0 );
+                prn.set_rgb( colors[HLR_COLOR_FG_PATTERN] );
 
                 for ( uint  i = 0; i < S->nrows(); ++i )
                 {
@@ -204,7 +256,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             prn.save();
             prn.set_font( "Helvetica", fn_size );
                 
-            prn.set_rgb( 92, 53, 102 );
+            prn.set_rgb( colors[HLR_COLOR_FG_INDEXSET] );
             prn.draw_text( double(M.col_ofs()) + double(M.ncols()) / 2.0,
                            double(M.row_ofs()) + fn_size,
                            Hpro::to_string( "%d ... %d", M.col_ofs(), M.col_ofs() + M.ncols() - 1 ), 'c' );
@@ -221,7 +273,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         //
         // draw frame
         //
-        prn.set_gray( 0 );
+        prn.set_rgb( colors[HLR_COLOR_FG_BORDER] );
         prn.draw_rect( M.col_ofs(),
                        M.row_ofs(),
                        M.col_ofs() + M.ncols(),
@@ -238,7 +290,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         const auto  text    = Hpro::to_string( "%d", M.id() );
     
         prn.set_font( "Helvetica", fn_size );
-        prn.set_rgb( 32, 74, 135 ); // SkyBlue3
+        prn.set_rgb( colors[HLR_COLOR_FG_ID] );
         prn.draw_text( double(M.col_ofs()) + double(M.cols()) / 2.0 - fn_size * text.length() / 4.0,
                        double(M.row_ofs()) + double(M.rows()) / 2.0 + fn_size / 3.0,
                        text );

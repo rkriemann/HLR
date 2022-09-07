@@ -14,6 +14,7 @@
 
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/operator_wrapper.hh"
+#include "hlr/arith/defaults.hh"
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include "hlr/matrix/tiled_lrmatrix.hh"
@@ -338,9 +339,11 @@ frobenius ( const value_t                     alpha,
 //
 // compute spectral norm of A via power iteration
 //
-template < typename operator_t >
+template < typename arithmetic_t,
+           typename operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
-spectral ( const operator_t &  A,
+spectral ( arithmetic_t &&     arithmetic,
+           const operator_t &  A,
            const bool          squared = true,
            const double        atol    = 0,
            const size_t        amax_it = 0 )
@@ -380,16 +383,16 @@ spectral ( const operator_t &  A,
         if ( squared )
         {
             blas::fill( t, value_t(0) );
-            prod( value_t(1), apply_normal,  A, x, t );
+            arithmetic.prod( value_t(1), apply_normal,  A, x, t );
             blas::fill( y, value_t(0) );
-            prod( value_t(1), apply_adjoint, A, t, y );
+            arithmetic.prod( value_t(1), apply_adjoint, A, t, y );
 
             lambda_new = math::sqrt( math::abs( blas::dot( x, y ) ) );
             norm_y     = blas::norm_2( y );
         }// if
         else
         {
-            prod( value_t(1), apply_normal,  A, x, y );
+            arithmetic.prod( value_t(1), apply_normal,  A, x, y );
             norm_y = lambda_new = blas::norm_2( y );
         }// else
 
@@ -416,6 +419,16 @@ spectral ( const operator_t &  A,
     }// for
 
     return lambda;
+}
+
+template < typename operator_t >
+Hpro::real_type_t< Hpro::value_type_t< operator_t > >
+spectral ( const operator_t &  A,
+           const bool          squared = true,
+           const double        atol    = 0,
+           const size_t        amax_it = 0 )
+{
+    return spectral( hlr::arithmetic, A, squared, atol, amax_it );
 }
 
 // template < typename value_t >

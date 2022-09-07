@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range2d.h>
+
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/utils/tensor.hh>
@@ -15,252 +18,6 @@
 
 namespace hlr { namespace tbb { namespace matrix {
 
-namespace detail
-{
-
-//
-// adaptively compress data by low-rank approximation and
-// replace original data by approximate data
-// - store total size of compressed data in <compressed_size>
-//
-template < typename value_t, typename approx_t, typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
-compress_replace ( const indexset &           rowis,
-                   const indexset &           colis,
-                   blas::matrix< value_t > &  D,
-                   size_t &                   compressed_size,
-                   const hpro::TTruncAcc &    acc,
-                   const approx_t &           approx,
-                   const size_t               ntile,
-                   const zconfig_t *          zconf = nullptr )
-{
-    using namespace hlr::matrix;
-
-    // std::cout << "START " << rowis.to_string() << " × " << colis.to_string() << std::endl;
-
-    if ( std::min( D.nrows(), D.ncols() ) <= ntile )
-    {
-        //
-        // build leaf
-        //
-        // Apply low-rank approximation and compare memory consumption
-        // with dense representation. If low-rank format uses less memory
-        // the leaf is represented as low-rank (considered admissible).
-        // Otherwise a dense representation is used.
-        //
-
-        if ( ! acc.is_exact() )
-        {
-            auto  Dc       = blas::copy( D );  // do not modify D directly
-            auto  [ U, V ] = approx( Dc, acc( rowis, colis ) );
-            
-            if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
-            {
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
-            }// if
-        }// if
-        
-        auto  M = std::make_unique< dense_matrix >( rowis, colis, blas::copy( D ) );
-
-        if ( ! is_null( zconf ) )
-            M->compress( *zconf );
-
-        // remember compressed size (with or without ZFP compression)
-        compressed_size += M->byte_size();
-
-        // uncompress and replace
-        if ( M->is_compressed() )
-        {
-            M->uncompress();
-            
-            auto  T = M->matrix();
-            
-            blas::copy( std::get< blas::matrix< value_t > >( T ), D );
-        }// if
-        
-        // and discard matrix
-        return std::unique_ptr< hpro::TMatrix >();
-    }// if
-    else
-    {
-        //
-        // Recursion
-        //
-        // If all sub blocks are low-rank, an agglomorated low-rank matrix of all sub-blocks
-        // is constructed. If the memory of this low-rank matrix is smaller compared to the
-        // combined memory of the sub-block, it is kept. Otherwise a block matrix with the
-        // already constructed sub-blocks is created.
-        //
-
-        const auto  mid_row = ( rowis.first() + rowis.last() + 1 ) / 2;
-        const auto  mid_col = ( colis.first() + colis.last() + 1 ) / 2;
-
-        indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
-        indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
-        size_t      sub_size     = 0;
-        auto        mtx          = std::mutex();
-
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
-            [&,ntile] ( const auto &  r )
-            {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        auto  D_sub = D( sub_rowis[i] - rowis.first(),
-                                         sub_colis[j] - colis.first() );
-                        
-                        sub_D(i,j) = compress_replace( sub_rowis[i], sub_colis[j], D_sub, compressed_size, acc, approx, ntile, zconf );
-                        
-                        if ( ! is_null( sub_D(i,j) ) )
-                        {
-                            auto  lock = std::scoped_lock( mtx );
-                            
-                            sub_size += sub_D(i,j)->byte_size();
-                        }// if
-                    }// for
-                }// for
-            } );
-
-        bool  all_lowrank = true;
-
-        for ( uint  i = 0; i < 2; ++i )
-            for ( uint  j = 0; j < 2; ++j )
-                if ( is_null( sub_D(i,j) ) || ! is_generic_lowrank( *sub_D(i,j) ) )
-                    all_lowrank = false;
-        
-        if ( all_lowrank )
-        {
-            //
-            // construct larger lowrank matrix out of smaller sub blocks
-            //
-
-            // compute initial total rank
-            uint  rank_sum = 0;
-
-            for ( uint  i = 0; i < 2; ++i )
-                for ( uint  j = 0; j < 2; ++j )
-                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix )->rank();
-
-            // copy sub block data into global structure
-            auto    U    = blas::matrix< value_t >( rowis.size(), rank_sum );
-            auto    V    = blas::matrix< value_t >( colis.size(), rank_sum );
-            auto    pos  = 0; // pointer to next free space in U/V
-            size_t  smem = 0; // holds memory of sub blocks
-            
-            for ( uint  i = 0; i < 2; ++i )
-            {
-                for ( uint  j = 0; j < 2; ++j )
-                {
-                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix );
-                    auto  Uij   = Rij->U< value_t >();
-                    auto  Vij   = Rij->V< value_t >();
-                    auto  U_sub = U( sub_rowis[i] - rowis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
-                    auto  V_sub = V( sub_colis[j] - colis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
-
-                    blas::copy( Uij, U_sub );
-                    blas::copy( Vij, V_sub );
-
-                    pos  += Uij.ncols();
-                    smem += Uij.byte_size() + Vij.byte_size();
-                }// for
-            }// for
-            
-            auto  [ W, X ] = approx( U, V, acc( rowis, colis ) );
-
-            if ( W.byte_size() + X.byte_size() < smem )
-            {
-                //
-                // larger low-rank block more memory efficient than sum of sub-blocks: keep it
-                //
-
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
-            }// if
-        }// if
-
-        //
-        // otherwise copy back compressed data and discard low-rank matrices
-        //
-
-        for ( uint  i = 0; i < 2; ++i )
-        {
-            for ( uint  j = 0; j < 2; ++j )
-            {
-                auto  D_sub = D( sub_rowis[i] - rowis.first(),
-                                 sub_colis[j] - colis.first() );
-                
-                if ( ! is_null( sub_D(i,j) ) && is_generic_lowrank( *sub_D(i,j) ) )
-                {
-                    auto  Rij = ptrcast( sub_D(i,j).get(), lrmatrix );
-
-                    if ( ! is_null( zconf ) )
-                    {
-                        Rij->compress( *zconf );
-                        compressed_size += Rij->byte_size();
-                        Rij->uncompress();
-                    }// if
-                    else
-                        compressed_size += Rij->byte_size();
-
-                    auto  DR  = blas::prod( Rij->U< value_t >(), blas::adjoint( Rij->V< value_t >() ) );
-
-                    blas::copy( DR, D_sub );
-                }// if
-
-                sub_D(i,j).release();
-            }// for
-        }// for
-            
-        return std::unique_ptr< hpro::TMatrix >();
-    }// else
-}
-
-}// namespace detail
-
-//
-// wrapper function handling global low-rank case
-//
-template < typename value_t,
-           typename approx_t,
-           typename zconfig_t >
-void
-compress_replace ( const indexset &           rowis,
-                   const indexset &           colis,
-                   blas::matrix< value_t > &  D,
-                   size_t &                   compressed_size,
-                   const hpro::TTruncAcc &    acc,
-                   const approx_t &           approx,
-                   const size_t               ntile,
-                   const zconfig_t *          zconf = nullptr )
-{
-    auto  M = detail::compress_replace( rowis, colis, D, compressed_size, acc, approx, ntile, zconf );
-
-    if ( ! is_null( M ) )
-    {
-        compressed_size += M->byte_size();
-
-        if ( is_generic_lowrank( *M ) )
-        {
-            auto  R = ptrcast( M.get(), lrmatrix );
-
-            if ( ! is_null( zconf ) )
-            {
-                R->compress( *zconf );
-                compressed_size += R->byte_size();
-                R->uncompress();
-            }// if
-            else
-                compressed_size += R->byte_size();
-
-            auto  DR  = blas::prod( R->U< value_t >(), blas::adjoint( R->V< value_t >() ) );
-
-            blas::copy( DR, D );
-        }// if
-    }// if
-}
-    
 //
 // build H-matrix from given dense matrix without reording rows/columns
 // starting lowrank approximation at blocks of size ntile × ntile and
@@ -272,11 +29,11 @@ namespace detail
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
            const blas::matrix< value_t > &  D,
-           const hpro::TTruncAcc &          acc,
+           const Hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
            const zconfig_t *                zconf = nullptr )
@@ -302,12 +59,12 @@ compress ( const indexset &                 rowis,
             if ( U.byte_size() + V.byte_size() < Dc.byte_size() )
             {
                 // std::cout << "R: " << to_string( rowis ) << " x " << to_string( colis ) << ", " << U.ncols() << std::endl;
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+                return std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( U ), std::move( V ) );
             }// if
         }// if
 
         // std::cout << "D: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
-        return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+        return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if
     else
     {
@@ -325,7 +82,7 @@ compress ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
@@ -352,10 +109,10 @@ compress ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_generic_lowrank( *sub_D(i,j) ) )
+                if ( ! is_compressible_lowrank( *sub_D(i,j) ) )
                     all_lowrank = false;
                 
-                if ( ! is_generic_dense( *sub_D(i,j) ) )
+                if ( ! is_compressible_dense( *sub_D(i,j) ) )
                     all_dense = false;
             }// for
         }// for
@@ -371,7 +128,7 @@ compress ( const indexset &                 rowis,
 
             for ( uint  i = 0; i < 2; ++i )
                 for ( uint  j = 0; j < 2; ++j )
-                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix )->rank();
+                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix< value_t > )->rank();
 
             // copy sub block data into global structure
             auto    U    = blas::matrix< value_t >( rowis.size(), rank_sum );
@@ -383,9 +140,9 @@ compress ( const indexset &                 rowis,
             {
                 for ( uint  j = 0; j < 2; ++j )
                 {
-                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix );
-                    auto  Uij   = Rij->U< value_t >();
-                    auto  Vij   = Rij->V< value_t >();
+                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix< value_t > );
+                    auto  Uij   = Rij->U();
+                    auto  Vij   = Rij->V();
                     auto  U_sub = U( sub_rowis[i] - rowis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
                     auto  V_sub = V( sub_colis[j] - colis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
 
@@ -407,7 +164,7 @@ compress ( const indexset &                 rowis,
             if ( W.byte_size() + X.byte_size() < smem )
             {
                 // std::cout << "R: " << to_string( rowis ) << " x " << to_string( colis ) << ", " << W.ncols() << std::endl;
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
+                return std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
 
@@ -418,7 +175,7 @@ compress ( const indexset &                 rowis,
         if ( all_dense )
         {
             // std::cout << "D: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
-            return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+            return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
         }// if
         
         //
@@ -428,7 +185,7 @@ compress ( const indexset &                 rowis,
 
         // std::cout << "B: " << to_string( rowis ) << " x " << to_string( colis ) << std::endl;
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -439,10 +196,10 @@ compress ( const indexset &                 rowis,
                 if ( ! is_null( zconf ) )
                 {
                     if ( is_generic_lowrank( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), lrmatrix )->compress( *zconf );
+                        ptrcast( sub_D(i,j).get(), lrmatrix< value_t > )->compress( *zconf );
                 
                     if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zconf );
+                        ptrcast( sub_D(i,j).get(), dense_matrix< value_t > )->compress( *zconf );
                 }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
@@ -458,11 +215,11 @@ compress ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress ( const indexset &                 rowis,
            const indexset &                 colis,
            const blas::matrix< value_t > &  D,
-           const hpro::TTruncAcc &          acc,
+           const Hpro::TTruncAcc &          acc,
            const approx_t &                 approx,
            const size_t                     ntile,
            const zconfig_t *                zconf = nullptr )
@@ -479,11 +236,11 @@ compress ( const indexset &                 rowis,
     
     if ( ! is_null( zconf ) )
     {
-        if ( is_generic_lowrank( *M ) )
-            ptrcast( M.get(), lrmatrix )->compress( *zconf );
+        if ( is_compressible_lowrank( *M ) )
+            ptrcast( M.get(), lrmatrix< value_t > )->compress( *zconf );
                 
-        if ( is_generic_dense( *M ) )
-            ptrcast( M.get(), dense_matrix )->compress( *zconf );
+        if ( is_compressible_dense( *M ) )
+            ptrcast( M.get(), dense_matrix< value_t > )->compress( *zconf );
     }// if
 
     return M;
@@ -499,11 +256,11 @@ namespace detail
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
                    const blas::matrix< value_t > &  D,
-                   const hpro::TTruncAcc &          acc,
+                   const Hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
                    const size_t                     max_rank,
@@ -527,10 +284,10 @@ compress_topdown ( const indexset &                 rowis,
             
             if ( U.ncols() < std::min( D.nrows(), D.ncols() ) / 2 )
             {
-                auto  R = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+                auto  R = std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( U ), std::move( V ) );
 
                 if ( ! is_null( zconf ) )
-                    ptrcast( R.get(), lrmatrix )->compress( *zconf );
+                    ptrcast( R.get(), lrmatrix< value_t > )->compress( *zconf );
 
                 return R;
             }// if
@@ -546,10 +303,10 @@ compress_topdown ( const indexset &                 rowis,
             
             if ( U.ncols() <= std::min( max_rank, std::min( D.nrows(), D.ncols() ) / 2 - 1 ) )
             {
-                auto  R = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+                auto  R = std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( U ), std::move( V ) );
                 
                 if ( ! is_null( zconf ) )
-                    ptrcast( R.get(), lrmatrix )->compress( *zconf );
+                    ptrcast( R.get(), lrmatrix< value_t > )->compress( *zconf );
                 
                 return R;
             }// if
@@ -562,7 +319,7 @@ compress_topdown ( const indexset &                 rowis,
         // low-rank approximation did not compress, so stick with dense format
         //
         
-        return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+        return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if
     else
     {
@@ -580,7 +337,7 @@ compress_topdown ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
@@ -607,10 +364,10 @@ compress_topdown ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_generic_lowrank( *sub_D(i,j) ) )
+                if ( ! is_compressible_lowrank( *sub_D(i,j) ) )
                     all_lowrank = false;
                 
-                if ( ! is_generic_dense( *sub_D(i,j) ) )
+                if ( ! is_compressible_dense( *sub_D(i,j) ) )
                     all_dense = false;
             }// for
         }// for
@@ -626,7 +383,7 @@ compress_topdown ( const indexset &                 rowis,
 
             for ( uint  i = 0; i < 2; ++i )
                 for ( uint  j = 0; j < 2; ++j )
-                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix )->rank();
+                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix< value_t > )->rank();
 
             // copy sub block data into global structure
             auto    U    = blas::matrix< value_t >( rowis.size(), rank_sum );
@@ -638,9 +395,9 @@ compress_topdown ( const indexset &                 rowis,
             {
                 for ( uint  j = 0; j < 2; ++j )
                 {
-                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix );
-                    auto  Uij   = Rij->U< value_t >();
-                    auto  Vij   = Rij->V< value_t >();
+                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix< value_t > );
+                    auto  Uij   = Rij->U();
+                    auto  Vij   = Rij->V();
                     auto  U_sub = U( sub_rowis[i] - rowis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
                     auto  V_sub = V( sub_colis[j] - colis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
 
@@ -661,7 +418,7 @@ compress_topdown ( const indexset &                 rowis,
 
             if ( W.byte_size() + X.byte_size() < smem )
             {
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
+                return std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
 
@@ -671,7 +428,7 @@ compress_topdown ( const indexset &                 rowis,
         
         if ( all_dense )
         {
-            return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+            return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
         }// if
         
         //
@@ -679,7 +436,7 @@ compress_topdown ( const indexset &                 rowis,
         // also: finally compress with zfp
         //
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -689,8 +446,8 @@ compress_topdown ( const indexset &                 rowis,
             {
                 if ( ! is_null( zconf ) )
                 {
-                    if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zconf );
+                    if ( is_compressible_dense( *sub_D(i,j) ) )
+                        ptrcast( sub_D(i,j).get(), dense_matrix< value_t > )->compress( *zconf );
                 }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
@@ -704,11 +461,11 @@ compress_topdown ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown_orig ( const indexset &                 rowis,
                         const indexset &                 colis,
                         const blas::matrix< value_t > &  D,
-                        const hpro::TTruncAcc &          acc,
+                        const Hpro::TTruncAcc &          acc,
                         const approx_t &                 approx,
                         const size_t                     ntile,
                         const size_t                     max_rank,
@@ -734,10 +491,10 @@ compress_topdown_orig ( const indexset &                 rowis,
             
         if ( U.ncols() <= std::min( max_rank, std::min( D.nrows(), D.ncols() ) / 2 - 1 ) )
         {
-            auto  R = std::make_unique< lrmatrix >( rowis, colis, std::move( U ), std::move( V ) );
+            auto  R = std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( U ), std::move( V ) );
             
             if ( ! is_null( zconf ) )
-                ptrcast( R.get(), lrmatrix )->compress( *zconf );
+                ptrcast( R.get(), lrmatrix< value_t > )->compress( *zconf );
             
             return R;
         }// if
@@ -749,7 +506,7 @@ compress_topdown_orig ( const indexset &                 rowis,
         // low-rank approximation did not compress, so stick with dense format
         //
         
-        return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+        return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
     }// if
     else
     {
@@ -767,7 +524,7 @@ compress_topdown_orig ( const indexset &                 rowis,
 
         indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
         indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
-        auto        sub_D        = tensor2< std::unique_ptr< hpro::TMatrix > >( 2, 2 );
+        auto        sub_D        = tensor2< std::unique_ptr< Hpro::TMatrix< value_t > > >( 2, 2 );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
@@ -794,10 +551,10 @@ compress_topdown_orig ( const indexset &                 rowis,
         {
             for ( uint  j = 0; j < 2; ++j )
             {
-                if ( ! is_generic_lowrank( *sub_D(i,j) ) )
+                if ( ! is_compressible_lowrank( *sub_D(i,j) ) )
                     all_lowrank = false;
                 
-                if ( ! is_generic_dense( *sub_D(i,j) ) )
+                if ( ! is_compressible_dense( *sub_D(i,j) ) )
                     all_dense = false;
             }// for
         }// for
@@ -813,7 +570,7 @@ compress_topdown_orig ( const indexset &                 rowis,
 
             for ( uint  i = 0; i < 2; ++i )
                 for ( uint  j = 0; j < 2; ++j )
-                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix )->rank();
+                    rank_sum += ptrcast( sub_D(i,j).get(), lrmatrix< value_t > )->rank();
 
             // copy sub block data into global structure
             auto    U    = blas::matrix< value_t >( rowis.size(), rank_sum );
@@ -825,9 +582,9 @@ compress_topdown_orig ( const indexset &                 rowis,
             {
                 for ( uint  j = 0; j < 2; ++j )
                 {
-                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix );
-                    auto  Uij   = Rij->U< value_t >();
-                    auto  Vij   = Rij->V< value_t >();
+                    auto  Rij   = ptrcast( sub_D(i,j).get(), lrmatrix< value_t > );
+                    auto  Uij   = Rij->U();
+                    auto  Vij   = Rij->V();
                     auto  U_sub = U( sub_rowis[i] - rowis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
                     auto  V_sub = V( sub_colis[j] - colis.first(), blas::range( pos, pos + Uij.ncols() - 1 ) );
 
@@ -853,7 +610,7 @@ compress_topdown_orig ( const indexset &                 rowis,
 
             if ( W.ncols() <= std::min( max_rank, std::min( D.nrows(), D.ncols() ) / 2 - 1 ) )
             {
-                return std::make_unique< lrmatrix >( rowis, colis, std::move( W ), std::move( X ) );
+                return std::make_unique< lrmatrix< value_t > >( rowis, colis, std::move( W ), std::move( X ) );
             }// if
         }// if
 
@@ -863,14 +620,14 @@ compress_topdown_orig ( const indexset &                 rowis,
         
         if ( all_dense )
         {
-            return std::make_unique< dense_matrix >( rowis, colis, std::move( blas::copy( D ) ) );
+            return std::make_unique< dense_matrix< value_t > >( rowis, colis, std::move( blas::copy( D ) ) );
         }// if
 
         //
         // either not all low-rank or memory gets larger: construct block matrix
         //
 
-        auto  B = std::make_unique< hpro::TBlockMatrix >( rowis, colis );
+        auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( rowis, colis );
 
         B->set_block_struct( 2, 2 );
         
@@ -880,8 +637,8 @@ compress_topdown_orig ( const indexset &                 rowis,
             {
                 if ( ! is_null( zconf ) )
                 {
-                    if ( is_generic_dense( *sub_D(i,j) ) )
-                        ptrcast( sub_D(i,j).get(), dense_matrix )->compress( *zconf );
+                    if ( is_compressible_dense( *sub_D(i,j) ) )
+                        ptrcast( sub_D(i,j).get(), dense_matrix< value_t > )->compress( *zconf );
                 }// if
                 
                 B->set_block( i, j, sub_D(i,j).release() );
@@ -897,11 +654,11 @@ compress_topdown_orig ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown ( const indexset &                 rowis,
                    const indexset &                 colis,
                    const blas::matrix< value_t > &  D,
-                   const hpro::TTruncAcc &          acc,
+                   const Hpro::TTruncAcc &          acc,
                    const approx_t &                 approx,
                    const size_t                     ntile,
                    const size_t                     max_rank,
@@ -919,8 +676,8 @@ compress_topdown ( const indexset &                 rowis,
     
     if ( ! is_null( zconf ) )
     {
-        if ( is_generic_dense( *M ) )
-            ptrcast( M.get(), dense_matrix )->compress( *zconf );
+        if ( is_compressible_dense( *M ) )
+            ptrcast( M.get(), dense_matrix< value_t > )->compress( *zconf );
     }// if
 
     return M;
@@ -929,11 +686,11 @@ compress_topdown ( const indexset &                 rowis,
 template < typename value_t,
            typename approx_t,
            typename zconfig_t >
-std::unique_ptr< hpro::TMatrix >
+std::unique_ptr< Hpro::TMatrix< value_t > >
 compress_topdown_orig ( const indexset &                 rowis,
                         const indexset &                 colis,
                         const blas::matrix< value_t > &  D,
-                        const hpro::TTruncAcc &          acc,
+                        const Hpro::TTruncAcc &          acc,
                         const approx_t &                 approx,
                         const size_t                     ntile,
                         const size_t                     max_rank,
@@ -951,8 +708,8 @@ compress_topdown_orig ( const indexset &                 rowis,
     
     if ( ! is_null( zconf ) )
     {
-        if ( is_generic_dense( *M ) )
-            ptrcast( M.get(), dense_matrix )->compress( *zconf );
+        if ( is_compressible_dense( *M ) )
+            ptrcast( M.get(), dense_matrix< value_t > )->compress( *zconf );
     }// if
 
     return M;
@@ -973,7 +730,7 @@ compress_ml ( const indexset &           rowis,
               blas::matrix< value_t > &  D,
               size_t &                   csize,
               const size_t               lvl_rank,
-              const hpro::TTruncAcc &    acc,
+              const Hpro::TTruncAcc &    acc,
               const approx_t &           approx,
               const size_t               ntile,
               const zconfig_t *          zconf = nullptr )
@@ -1064,7 +821,7 @@ compress_ml ( const indexset &           rowis,
               blas::matrix< value_t > &  D,
               size_t &                   csize,
               const size_t               lvl_rank,
-              const hpro::TTruncAcc &    acc,
+              const Hpro::TTruncAcc &    acc,
               const approx_t &           approx,
               const size_t               ntile,
               const zconfig_t *          zconf = nullptr )
@@ -1075,16 +832,58 @@ compress_ml ( const indexset &           rowis,
 }
 
 //
-// uncompress matrix
+// compress compressible sub-blocks withi H-matrix
 //
+template < typename value_t >
 void
-uncompress ( hpro::TMatrix &  A )
+compress ( Hpro::TMatrix< value_t > &  A,
+           const Hpro::TTruncAcc &     acc )
 {
     using namespace hlr::matrix;
 
     if ( is_blocked( A ) )
     {
-        auto  BA = ptrcast( &A, hpro::TBlockMatrix );
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
+                                              0, BA->nblock_cols() ),
+            [=] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( is_null( BA->block( i, j ) ) )
+                            continue;
+                
+                        compress( *BA->block( i, j ), acc );
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( is_compressible_lowrank( A ) )
+    {
+        ptrcast( &A, lrmatrix< value_t > )->compress( acc );
+    }// if
+    else if ( is_compressible_dense( A ) )
+    {
+        ptrcast( &A, dense_matrix< value_t > )->compress( acc );
+    }// if
+}
+
+//
+// uncompress matrix
+//
+template < typename value_t >
+void
+uncompress ( Hpro::TMatrix< value_t > &  A )
+{
+    using namespace hlr::matrix;
+
+    if ( is_blocked( A ) )
+    {
+        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
         
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
@@ -1103,13 +902,13 @@ uncompress ( hpro::TMatrix &  A )
                 }// for
             } );
     }// if
-    else if ( is_generic_lowrank( A ) )
+    else if ( is_compressible_lowrank( A ) )
     {
-        ptrcast( &A, lrmatrix )->uncompress();
+        ptrcast( &A, lrmatrix< value_t > )->uncompress();
     }// if
-    else if ( is_generic_dense( A ) )
+    else if ( is_compressible_dense( A ) )
     {
-        ptrcast( &A, dense_matrix )->uncompress();
+        ptrcast( &A, dense_matrix< value_t > )->uncompress();
     }// if
 }
 
