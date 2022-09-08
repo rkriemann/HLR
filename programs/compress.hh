@@ -87,7 +87,10 @@ program_main ()
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
-    std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
+
+    const auto  mem_A = A->byte_size();
+    
+    std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
@@ -96,7 +99,7 @@ program_main ()
     // further compress matrix
     //
 
-    auto  B      = impl::matrix::copy( *A );
+    auto  zA     = impl::matrix::copy( *A );
     auto  norm_A = norm::frobenius( *A );
     
     std::cout << "  " << term::bullet << term::bold << "compression, "
@@ -105,33 +108,43 @@ program_main ()
 
     tic = timer::now();
     
-    impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() * 0.01 ) );
-    // impl::matrix::compress( *B, local_accuracy( acc.rel_eps() * norm_A / A->nrows() ) );
+    impl::matrix::compress( *zA, Hpro::fixed_prec( acc.rel_eps() ) );
+    // impl::matrix::compress( *zA, local_accuracy( acc.rel_eps() * norm_A / A->nrows() ) );
 
     toc = timer::since( tic );
 
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( B->byte_size() ) << std::endl;
+
+    const auto  mem_zA = zA->byte_size();
+    
+    std::cout << "    mem   = " << format_mem( zA->byte_size() ) << std::endl;
+    std::cout << "      rate  " << boost::format( "%.2f" ) % ( double(mem_A) / double(mem_zA) ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *B, "B", "noid,norank,nosize" );
+        matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
     
-    auto  diff = matrix::sum( value_t(1), *A, value_t(-1), *B );
+    auto  diff = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );
     
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     std::cout << "  " << term::bullet << term::bold << "uncompression " << term::reset << std::endl;
+
+    {
+        auto  zB = impl::matrix::copy( *zA );
+        
+        tic = timer::now();
     
-    // tic = timer::now();
+        impl::matrix::uncompress( *zB );
+
+        toc = timer::since( tic );
+
+        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
+    }
     
-    // impl::matrix::uncompress( *B );
-
-    // toc = timer::since( tic );
-
-    // std::cout << "    done in " << format_time( toc ) << std::endl;
-    // std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diff ) ) << std::endl;
-
     // {
     //     using  posit_t = sw::universal::posit< 24, 2 >;
 
@@ -143,75 +156,85 @@ program_main ()
     // H-matrix matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////
-    
-    auto  runtime = std::vector< double >();
-    
-    std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
-    if ( true )
+    if ( nbench > 0 )
     {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
-        
-        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
-        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
-
-        x->fill( 1 );
-
-        for ( int i = 0; i < nbench; ++i )
-        {
-            tic = timer::now();
+        auto  runtime = std::vector< double >();
     
-            for ( int j = 0; j < 50; ++j )
-                impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
+        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+        double  t_orig       = 0.0;
+        double  t_compressed = 0.0;
         
-            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
-
-            if ( i < nbench-1 )
-                y->fill( 1 );
-        }// for
-        
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
-        
-        runtime.clear();
-    }// if
-
-    if ( true )
-    {
-        std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
-        
-        auto  x = std::make_unique< vector::scalar_vector< value_t > >( B->col_is() );
-        auto  y = std::make_unique< vector::scalar_vector< value_t > >( B->row_is() );
-
-        x->fill( 1 );
-
-        for ( int i = 0; i < nbench; ++i )
         {
-            tic = timer::now();
+            std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
     
-            for ( int j = 0; j < 50; ++j )
-                impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *B, *x, *y );
+                for ( int j = 0; j < 50; ++j )
+                    impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
         
-            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                y->fill( 1 );
-        }// for
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            t_orig = min( runtime );
+            
+            runtime.clear();
+        }
+
+        {
+            std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
         
-        runtime.clear();
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < 50; ++j )
+                    impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *zA, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+        
+            t_compressed = min( runtime );
+            
+            runtime.clear();
+
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+        }
     }// if
 }
     

@@ -267,11 +267,18 @@ public:
     {
         HLR_ASSERT( acc.is_fixed_prec() );
 
-        const auto  lacc = acc( this->row_is(), this->col_is() );
-        const auto  peps = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
+        if ( this->nrows() * this->ncols() == 0 )
+            return;
+        
+        const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
+        const auto  normF = blas::norm_F( this->blas_mat() );
+        const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
+        // const auto  lacc  = acc( this->row_is(), this->col_is() );
+        // const auto  peps  = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
         // const auto  vmax = blas::max_val( this->blas_mat() );
         
-        compress( compress::fixed_accuracy( lacc.rel_eps() ) );
+        compress( compress::absolute_accuracy( eps ) );
+        // compress( compress::relative_accuracy( eps * normF ) );
     }
 
     // uncompress internal data

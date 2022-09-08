@@ -302,8 +302,16 @@ public:
     virtual void   compress      ( const Hpro::TTruncAcc &  acc )
     {
         HLR_ASSERT( acc.is_fixed_prec() );
+
+        if ( this->nrows() * this->ncols() == 0 )
+            return;
         
-        compress( compress::fixed_accuracy( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+        const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
+        const auto  normF = blas::norm_F( this->U(), this->V() );
+        const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
+
+        compress( compress::absolute_accuracy( eps ) );
+        // compress( compress::relative_accuracy( eps * normF ) );
     }
 
     // uncompress internal data

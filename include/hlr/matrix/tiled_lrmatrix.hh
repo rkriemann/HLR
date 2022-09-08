@@ -328,14 +328,14 @@ tiled_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
     if ( beta != value_t(1) )
         blas::scale( beta, y->blas_vec() );
                      
-    blas::vector  t( _rank );
+    blas::vector< value_t >  t( _rank );
             
     if ( op == Hpro::apply_normal )
     {
         // t := Σ V_i^H x_i
         for ( const auto & [ is, V_i ] : _V )
         {
-            const auto  x_i = blas::vector( x->blas_vec(), is - _col_is.first() );
+            const auto  x_i = blas::vector< value_t >( x->blas_vec(), is - _col_is.first() );
 
             blas::mulvec( value_t(1), blas::adjoint( V_i ), x_i, value_t(1), t );
         }// for
@@ -343,7 +343,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         // y_i := y_i + α U_i t
         for ( const auto & [ is, U_i ] : _U )
         {
-            auto  y_i = blas::vector( y->blas_vec(), is - _row_is.first() );
+            auto  y_i = blas::vector< value_t >( y->blas_vec(), is - _row_is.first() );
 
             blas::mulvec( value_t(alpha), U_i, t, value_t(1), y_i );
         }// for
@@ -353,7 +353,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         // t := Σ U_i^H x_i
         for ( const auto & [ is, U_i ] : _U )
         {
-            const auto  x_i = blas::vector( x->blas_vec(), is - _row_is.first() );
+            const auto  x_i = blas::vector< value_t >( x->blas_vec(), is - _row_is.first() );
 
             blas::mulvec( value_t(1), blas::adjoint( U_i ), x_i, value_t(1), t );
         }// for
@@ -361,7 +361,7 @@ tiled_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         // y_i := y_i + α V_i t
         for ( const auto & [ is, V_i ] : _V )
         {
-            auto  y_i = blas::vector( y->blas_vec(), is - _col_is.first() );
+            auto  y_i = blas::vector< value_t >( y->blas_vec(), is - _col_is.first() );
 
             blas::mulvec( value_t(alpha), V_i, t, value_t(1), y_i );
         }// for

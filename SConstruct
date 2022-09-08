@@ -29,7 +29,7 @@ CXXFLAGS     = '-std=c++17'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
-WARNFLAGS    = '-Wall'
+WARNFLAGS    = '' # '-Wall'
 LINKFLAGS    = ''
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
 
@@ -56,6 +56,8 @@ zfp           = False
 ZFP_DIR       = '/'
 sz            = False
 SZ_DIR        = '/'
+sz3           = False
+SZ3_DIR       = '/'
 universal     = False
 UNIVERSAL_DIR = '/'
 
@@ -215,6 +217,8 @@ opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',        z
 opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',         ZFP_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'sz',            'use SZ compression library',         sz ) )
 opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',          SZ_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        sz3 ) )
+opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 
@@ -279,6 +283,8 @@ zfp           = opt_env['zfp']
 ZFP_DIR       = opt_env['zfp_dir']
 sz            = opt_env['sz']
 SZ_DIR        = opt_env['sz_dir']
+sz3           = opt_env['sz3']
+SZ3_DIR       = opt_env['sz3_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 
@@ -471,6 +477,13 @@ if sz :
     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'SZ' ] )
+        
+# support for SZ3 compression
+if sz3 :
+    env.Append( CPPDEFINES = 'HAS_SZ3' )
+    env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zstd' ] )
         
 # support for universal number library
 if universal :

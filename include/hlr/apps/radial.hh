@@ -1,5 +1,5 @@
 #ifndef __HLR_APPS_RADIAL_HH
-#define __HLR_APPS_MATERN_HH
+#define __HLR_APPS_RADIAL_HH
 //
 // Project     : HLib
 // Module      : apps/radial
@@ -78,4 +78,4 @@ struct gaussian : public radial< matrix::gaussian_function< double > >
 
 }}// namespace hlr::apps
 
-#endif  // __HLR_APPS_MATERN_HH
+#endif  // __HLR_APPS_RADIAL_HH

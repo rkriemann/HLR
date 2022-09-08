@@ -345,8 +345,8 @@ Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
            const bool          squared = true,
-           const double        atol    = 0,
-           const size_t        amax_it = 0 )
+           const double        atol    = 1e-3,
+           const size_t        amax_it = 50 )
 {
     using  value_t = Hpro::value_type_t< operator_t >;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -425,8 +425,8 @@ template < typename operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( const operator_t &  A,
            const bool          squared = true,
-           const double        atol    = 0,
-           const size_t        amax_it = 0 )
+           const double        atol    = 1e-3,
+           const size_t        amax_it = 50 )
 {
     return spectral( hlr::arithmetic, A, squared, atol, amax_it );
 }

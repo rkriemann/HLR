@@ -785,13 +785,13 @@ max_val ( const T1 &  M )
 
 #define  HLR_BLAS_NORM1( type, func )                                   \
     inline                                                              \
-    typename Hpro::real_type< type >::type_t                            \
+    typename Hpro::real_type_t< type >                                  \
     norm_1 ( const matrix< type > &  M )                                \
     {                                                                   \
-        typename Hpro::real_type< type >::type_t  work = 0;             \
-        const blas_int_t                          nrows = M.nrows();    \
-        const blas_int_t                          ncols = M.ncols();    \
-        const blas_int_t                          ldM   = M.col_stride(); \
+        typename Hpro::real_type_t< type >  work = 0;                   \
+        const blas_int_t                    nrows = M.nrows();          \
+        const blas_int_t                    ncols = M.ncols();          \
+        const blas_int_t                    ldM   = M.col_stride();     \
                                                                         \
         return func( "1", & nrows, & ncols, M.data(), & ldM, & work );  \
     }
@@ -804,13 +804,13 @@ HLR_BLAS_NORM1( std::complex< double >, zlange_ )
 
 #define  HLR_BLAS_NORMI( type, func )                                   \
     inline                                                              \
-    typename Hpro::real_type< type >::type_t                            \
+    typename Hpro::real_type_t< type >                                  \
     norm_inf ( const matrix< type > &  M )                              \
     {                                                                   \
-        typename Hpro::real_type< type >::type_t  work = 0;             \
-        const blas_int_t                          nrows = M.nrows();    \
-        const blas_int_t                          ncols = M.ncols();    \
-        const blas_int_t                          ldM   = M.col_stride(); \
+        typename Hpro::real_type_t< type >  work = 0;                   \
+        const blas_int_t                    nrows = M.nrows();          \
+        const blas_int_t                    ncols = M.ncols();          \
+        const blas_int_t                    ldM   = M.col_stride();     \
                                                                         \
         return func( "I", & nrows, & ncols, M.data(), & ldM, & work );  \
     }
@@ -823,13 +823,13 @@ HLR_BLAS_NORMI( std::complex< double >, zlange_ )
 
 #define  HLR_BLAS_NORMM( type, func )                                   \
     inline                                                              \
-    typename Hpro::real_type< type >::type_t                            \
+    typename Hpro::real_type_t< type >                                  \
     norm_max ( const matrix< type > &  M )                              \
     {                                                                   \
-        typename Hpro::real_type< type >::type_t  work = 0;             \
-        const blas_int_t                          nrows = M.nrows();    \
-        const blas_int_t                          ncols = M.ncols();    \
-        const blas_int_t                          ldM   = M.col_stride(); \
+        typename Hpro::real_type_t< type >  work = 0;                   \
+        const blas_int_t                    nrows = M.nrows();          \
+        const blas_int_t                    ncols = M.ncols();          \
+        const blas_int_t                    ldM   = M.col_stride();     \
                                                                         \
         return func( "M", & nrows, & ncols, M.data(), & ldM, & work );  \
     }
@@ -844,7 +844,7 @@ HLR_BLAS_NORMM( std::complex< double >, zlange_ )
 // Frobenius norm for lowrank matrices
 //
 template < typename value_t >
-typename Hpro::real_type< value_t >::type_t
+typename Hpro::real_type_t< value_t >
 norm_F ( const matrix< value_t > &  U,
          const matrix< value_t > &  V )
 {
