@@ -6,6 +6,21 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+#if defined(HAS_UNIVERSAL)
+
+#include <universal/number/posit/posit.hpp>
+
+namespace std
+{
+
+template <> struct __is_floating_point_helper< sw::universal::posit< 24, 2 > > : public true_type { };
+
+sw::universal::posit< 24, 2 > real ( sw::universal::posit< 24, 2 >  f ) { return f; }
+
+};
+
+#endif
+
 #include <hlr/utils/io.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
@@ -90,7 +105,7 @@ program_main ()
 
     tic = timer::now();
     
-    impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() * 10.0 ) );
+    impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() * 0.01 ) );
     // impl::matrix::compress( *B, local_accuracy( acc.rel_eps() * norm_A / A->nrows() ) );
 
     toc = timer::since( tic );
@@ -102,20 +117,26 @@ program_main ()
         matrix::print_eps( *B, "B", "noid,norank,nosize" );
     
     auto  diff = matrix::sum( value_t(1), *A, value_t(-1), *B );
-
-    std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diff ) ) << std::endl;
+    auto  error = norm::spectral( impl::arithmetic, *diff );
+    
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     std::cout << "  " << term::bullet << term::bold << "uncompression " << term::reset << std::endl;
     
-    tic = timer::now();
+    // tic = timer::now();
     
-    impl::matrix::uncompress( *B );
+    // impl::matrix::uncompress( *B );
 
-    toc = timer::since( tic );
+    // toc = timer::since( tic );
 
-    std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diff ) ) << std::endl;
+    // std::cout << "    done in " << format_time( toc ) << std::endl;
+    // std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diff ) ) << std::endl;
 
+    // {
+    //     using  posit_t = sw::universal::posit< 24, 2 >;
+
+    //     auto   D       = Hpro::TDenseMatrix< posit_t >( A->row_is(), A->col_is() );
+    // }
 
     //////////////////////////////////////////////////////////////////////
     //

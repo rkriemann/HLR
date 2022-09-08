@@ -284,6 +284,8 @@ public:
         
         this->blas_mat() = std::move( M );
 
+        remove_compressed();
+
         #endif
     }
 

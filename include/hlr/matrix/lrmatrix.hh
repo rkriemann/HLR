@@ -323,6 +323,8 @@ public:
         this->U() = std::move( uU );
         this->V() = std::move( uV );
 
+        remove_compressed();
+        
         #endif
     }
 
