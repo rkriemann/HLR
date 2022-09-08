@@ -65,6 +65,9 @@ using range = Hpro::BLAS::Range;
 template < typename value_t > using vector = Hpro::BLAS::Vector< value_t >;
 template < typename value_t > using matrix = Hpro::BLAS::Matrix< value_t >;
 
+template < typename type_t > inline constexpr bool is_vector_v = is_vector< type_t >::value;
+template < typename type_t > inline constexpr bool is_matrix_v = is_matrix< type_t >::value;
+
 //
 // generic matrix type holding all different floating types
 // - just for storage, not for direct arithmetic!
@@ -662,8 +665,7 @@ copy ( const vector< value_src_t > &  v )
 }
 
 template < typename T_matrix >
-typename std::enable_if_t< is_matrix< T_matrix >::value,
-                           matrix< typename T_matrix::value_t > >
+typename std::enable_if_t< is_matrix_v< T_matrix >, matrix< typename T_matrix::value_t > >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
@@ -757,6 +759,24 @@ fill_fn ( MatrixBase< T_matrix > &  M,
             M(i,j) = func();
 }
        
+//
+// determine maximal absolute value in M
+//
+template < typename T1 >
+std::enable_if_t< is_matrix_v< T1 >, typename T1::value_t >
+max_val ( const T1 &  M )
+{
+    HLR_ASSERT( M.nrows() * M.ncols() > 0 );
+
+    // todo
+    HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
+               ( M.row_stride() == 1 ));
+        
+    const auto  res = max_idx( blas_int_t(M.nrows() * M.ncols()), M.data(), 1 );
+
+    return M.data()[res];
+}
+
 //////////////////////////////////////////////////////////////////////
 //
 // norm computations
@@ -863,9 +883,6 @@ using Hpro::BLAS::norm_F;
 // various simplified forms of matrix addition, multiplication
 //
 //////////////////////////////////////////////////////////////////////
-
-template < typename type_t > inline constexpr bool is_vector_v = is_vector< type_t >::value;
-template < typename type_t > inline constexpr bool is_matrix_v = is_matrix< type_t >::value;
 
 template < typename T_alpha,
            typename T_vecX,

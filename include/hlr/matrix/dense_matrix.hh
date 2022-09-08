@@ -266,8 +266,12 @@ public:
     virtual void   compress      ( const Hpro::TTruncAcc &  acc )
     {
         HLR_ASSERT( acc.is_fixed_prec() );
+
+        const auto  lacc = acc( this->row_is(), this->col_is() );
+        const auto  peps = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
+        // const auto  vmax = blas::max_val( this->blas_mat() );
         
-        compress( compress::fixed_accuracy( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+        compress( compress::fixed_accuracy( lacc.rel_eps() ) );
     }
 
     // uncompress internal data
