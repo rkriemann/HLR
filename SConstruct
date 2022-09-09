@@ -623,6 +623,7 @@ def show_options ( target, source, env ):
     print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),    pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),       pathstr( ZFP_DIR       if zfp       else '' ) )
     print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),        pathstr( SZ_DIR        if sz        else '' ) )
+    print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),       pathstr( SZ3_DIR       if sz3       else '' ) )
     print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ), pathstr( UNIVERSAL_DIR if universal else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )

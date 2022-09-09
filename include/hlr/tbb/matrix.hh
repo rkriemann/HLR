@@ -74,21 +74,15 @@ build ( const hpro::TBlockCluster *  bct,
             // auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
             auto  T = lrapx.build( bct, acc( rowis, colis ) );
 
-            // if ( is_lowrank( *T ) )
-            // {
-            //     auto  RT = ptrcast( T.get(), hpro::TRkMatrix< value_t > );
-            //     auto  R  = std::make_unique< matrix::lrmatrix >( T->row_is(), T->col_is() );
-
-            //     if ( T->is_complex() )
-            //         R->set_lrmat( std::move( blas::mat_U< hpro::complex >( *RT ) ),
-            //                       std::move( blas::mat_V< hpro::complex >( *RT ) ) );
-            //     else
-            //         R->set_lrmat( std::move( blas::mat_U< hpro::real >( *RT ) ),
-            //                       std::move( blas::mat_V< hpro::real >( *RT ) ) );
-
-            //     M = std::move( R );
-            // }// if
-            // else
+            if ( is_lowrank( *T ) )
+            {
+                auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                 std::move( blas::mat_U( R ) ),
+                                                                                 std::move( blas::mat_V( R ) ) );
+                M = std::move( zR );
+            }// if
+            else
             {
                 M = std::move( T );
             }// else
@@ -96,6 +90,14 @@ build ( const hpro::TBlockCluster *  bct,
         else
         {
             M = coeff.build( rowis, colis );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                M = std::move( zD );
+            }// if
         }// else
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )

@@ -102,8 +102,9 @@ program_main ()
     auto  zA     = impl::matrix::copy( *A );
     auto  norm_A = norm::frobenius( *A );
     
-    std::cout << "  " << term::bullet << term::bold << "compression, "
-              << cmdline::approx << ", ε = " << cmdline::eps << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "compression via "
+              << hlr::compress::provider
+              << ", ε = " << cmdline::eps << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     tic = timer::now();
@@ -145,12 +146,6 @@ program_main ()
         std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
     }
     
-    // {
-    //     using  posit_t = sw::universal::posit< 24, 2 >;
-
-    //     auto   D       = Hpro::TDenseMatrix< posit_t >( A->row_is(), A->col_is() );
-    // }
-
     //////////////////////////////////////////////////////////////////////
     //
     // H-matrix matrix vector multiplication

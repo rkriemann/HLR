@@ -801,6 +801,24 @@ uncompress< std::complex< double > > ( const zarray &            v,
 
 namespace hlr { namespace compress { namespace posits {
 
+inline
+uint
+eps_to_rate ( const double eps )
+{
+    if      ( eps >= 1e-2  ) return 12;
+    else if ( eps >= 1e-3  ) return 16;
+    else if ( eps >= 1e-4  ) return 20;
+    else if ( eps >= 1e-5  ) return 22;
+    else if ( eps >= 1e-6  ) return 26;
+    else if ( eps >= 1e-7  ) return 30;
+    else if ( eps >= 1e-8  ) return 34;
+    else if ( eps >= 1e-9  ) return 36;
+    else if ( eps >= 1e-10 ) return 40;
+    else if ( eps >= 1e-12 ) return 44;
+    else if ( eps >= 1e-14 ) return 54;
+    else                     return 64;
+}
+
 struct config
 {
     uint  bitsize;
@@ -816,7 +834,7 @@ byte_size ( const zarray &  v )
     if ( v.size() > 0 )
     {
         const auto  bitsize = v[0];
-        const auto  nposits = (v.size() - 8) / bitsize;
+        const auto  nposits = (v.size() - 8) / 8;
 
         return std::ceil( nposits * bitsize / 8.0 );
     }// if
@@ -824,8 +842,36 @@ byte_size ( const zarray &  v )
     return 0;
 }
 
-inline config  relative_accuracy ( const double  eps  ) { return config{ 24 }; } // TODO!!!
-inline config  absolute_accuracy ( const double  eps  ) { return config{ 24 }; }
+inline config  relative_accuracy ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
+inline config  absolute_accuracy ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
+
+template < typename value_t, int bitsize, int expsize >
+void
+to_posit ( unsigned char *  cptr,
+           const value_t *  data,
+           const size_t     nsize )
+{
+    using  posit_t = sw::universal::posit< bitsize, expsize >;
+
+    auto  ptr = reinterpret_cast< posit_t * >( cptr );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        ptr[i] = posit_t( data[i] );
+}
+
+template < typename value_t, int bitsize, int expsize >
+void
+from_posit ( const unsigned char *  cptr,
+             value_t *              data,
+             const size_t           nsize )
+{
+    using  posit_t = sw::universal::posit< bitsize, expsize >;
+
+    auto  ptr = reinterpret_cast< const posit_t * >( cptr );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        data[i] = value_t( ptr[i] );
+}
 
 template < typename value_t >
 zarray
@@ -866,19 +912,28 @@ compress< double > ( const config &   config,
     
     switch ( config.bitsize )
     {
-        case 24:
-        {
-            using  posit_t = sw::universal::posit< 24, 2 >;
-
-            auto  ptr = reinterpret_cast< posit_t * >( zdata.data() + 8 );
-
-            for ( size_t  i = 0; i < nsize; ++i )
-                ptr[i] = posit_t( data[i] );
-        }
-        break;
+        case  8: to_posit< double,  8, 1 >( zdata.data() + 8, data, nsize ); break;
+        case 10: to_posit< double, 10, 1 >( zdata.data() + 8, data, nsize ); break;
+        case 12: to_posit< double, 12, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 14: to_posit< double, 14, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 16: to_posit< double, 16, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 18: to_posit< double, 18, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 20: to_posit< double, 20, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 22: to_posit< double, 22, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 24: to_posit< double, 24, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 26: to_posit< double, 26, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 28: to_posit< double, 28, 2 >( zdata.data() + 8, data, nsize ); break;
+        case 30: to_posit< double, 30, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 32: to_posit< double, 32, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 34: to_posit< double, 34, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 36: to_posit< double, 36, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 40: to_posit< double, 40, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 44: to_posit< double, 44, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 54: to_posit< double, 54, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 64: to_posit< double, 64, 3 >( zdata.data() + 8, data, nsize ); break;
 
         default:
-            HLR_ERROR( "TODO" );
+            HLR_ERROR( "unsupported bitsize " + Hpro::to_string( config.bitsize ) );
     }// switch
 
     return zdata;
@@ -924,23 +979,153 @@ uncompress< double > ( const zarray &  zdata,
     
     switch ( bitsize )
     {
-        case 24:
-        {
-            using  posit_t = sw::universal::posit< 24, 2 >;
-
-            auto  ptr = reinterpret_cast< const posit_t * >( zdata.data() + 8 );
-
-            for ( size_t  i = 0; i < nsize; ++i )
-                dest[i] = double( ptr[i] );
-        }
-        break;
+        case  8: from_posit< double,  8, 1 >( zdata.data() + 8, dest, nsize ); break;
+        case 10: from_posit< double, 10, 1 >( zdata.data() + 8, dest, nsize ); break;
+        case 12: from_posit< double, 12, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 14: from_posit< double, 14, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 16: from_posit< double, 16, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 18: from_posit< double, 18, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 20: from_posit< double, 20, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 22: from_posit< double, 22, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 24: from_posit< double, 24, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 26: from_posit< double, 26, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 28: from_posit< double, 28, 2 >( zdata.data() + 8, dest, nsize ); break;
+        case 30: from_posit< double, 30, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 32: from_posit< double, 32, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 34: from_posit< double, 34, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 36: from_posit< double, 36, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 40: from_posit< double, 40, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 44: from_posit< double, 44, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 54: from_posit< double, 54, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 64: from_posit< double, 64, 3 >( zdata.data() + 8, dest, nsize ); break;
 
         default:
-            HLR_ERROR( "TODO" );
+            HLR_ERROR( "unsupported bitsize " + Hpro::to_string( bitsize ) );
     }// switch
 }
 
 }}}// namespace hlr::compress::posits
+
+#endif
+
+////////////////////////////////////////////////////////////
+//
+// compression using FP16 via half library
+// - only fixed compression size (16 bits)
+//
+////////////////////////////////////////////////////////////
+
+#if defined(HAS_HALF)
+
+#include <half.hpp>
+
+namespace hlr { namespace compress { namespace half {
+
+using half = half_float::half;
+
+struct config
+{};
+
+// holds compressed data
+using  zarray = std::vector< half >;
+
+inline size_t byte_size ( const zarray &  v ) { return v.size() * sizeof(half); }
+
+inline config  relative_accuracy ( const double  eps  ) { return config{}; } // fixed size
+inline config  absolute_accuracy ( const double  eps  ) { return config{}; }
+
+template < typename value_t >
+zarray
+compress ( const config &   config,
+           value_t *        data,
+           const size_t     dim0,
+           const size_t     dim1 = 0,
+           const size_t     dim2 = 0,
+           const size_t     dim3 = 0 );
+
+template <>
+inline
+zarray
+compress< float > ( const config &   config,
+                    float *          data,
+                    const size_t     dim0,
+                    const size_t     dim1,
+                    const size_t     dim2,
+                    const size_t     dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( nsize );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+        zdata[i] = half(data[i]);
+
+    return zdata;
+}
+
+template <>
+inline
+zarray
+compress< double > ( const config &   config,
+                     double *         data,
+                     const size_t     dim0,
+                     const size_t     dim1,
+                     const size_t     dim2,
+                     const size_t     dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( nsize );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+        zdata[i] = half(data[i]);
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+uncompress ( const zarray &  v,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 );
+
+template <>
+inline
+void
+uncompress< float > ( const zarray &  zdata,
+                      float *         dest,
+                      const size_t    dim0,
+                      const size_t    dim1,
+                      const size_t    dim2,
+                      const size_t    dim3,
+                      const size_t    dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        dest[i] = float( zdata[i] );
+}
+
+template <>
+inline
+void
+uncompress< double > ( const zarray &  zdata,
+                       double *        dest,
+                       const size_t    dim0,
+                       const size_t    dim1,
+                       const size_t    dim2,
+                       const size_t    dim3,
+                       const size_t    dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        dest[i] = double( zdata[i] );
+}
+
+}}}// namespace hlr::compress::half
 
 #endif
 
@@ -956,9 +1141,25 @@ namespace hlr
 namespace compress
 {
 
-#if defined(HAS_UNIVERSAL)
+#if defined(HAS_HALF)
 
 #  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "half";
+
+using  zconfig_t = hlr::compress::half::config;
+using  zarray    = hlr::compress::half::zarray;
+
+using hlr::compress::half::compress;
+using hlr::compress::half::uncompress;
+using hlr::compress::half::absolute_accuracy;
+using hlr::compress::half::byte_size;
+
+#elif defined(HAS_UNIVERSAL)
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "universal";
 
 using  zconfig_t = hlr::compress::posits::config;
 using  zarray    = hlr::compress::posits::zarray;
@@ -972,6 +1173,8 @@ using hlr::compress::posits::byte_size;
 
 #  define HLR_HAS_COMPRESSION  1
 
+static const char provider[] = "SZ3";
+
 using  zconfig_t = hlr::compress::sz3::config;
 using  zarray    = hlr::compress::sz3::zarray;
 
@@ -983,6 +1186,8 @@ using hlr::compress::sz3::byte_size;
 #elif defined(HAS_SZ)
 
 #  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "SZ";
 
 using  zconfig_t = hlr::compress::sz::config;
 using  zarray    = hlr::compress::sz::zarray;
@@ -996,6 +1201,8 @@ using hlr::compress::sz::byte_size;
 
 #  define HLR_HAS_COMPRESSION  1
 
+static const char provider[] = "ZFP";
+
 using  zconfig_t = hlr::compress::zfp::config;
 using  zarray    = hlr::compress::zfp::zarray;
 
@@ -1007,6 +1214,8 @@ using hlr::compress::zfp::byte_size;
 #else 
 
 #  define HLR_HAS_COMPRESSION  0
+
+static const char provider[] = "none";
 
 struct zconfig_t {};
 using  zarray    = std::vector< char >;

@@ -10,9 +10,7 @@
 
 namespace hlr { namespace tbb { namespace detail {
 
-namespace hpro = HLIB;
-
-using indexset = hpro::TIndexSet;
+using indexset = Hpro::TIndexSet;
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -65,8 +63,8 @@ update ( const indexset &                 is,
 template < typename value_t >
 void
 mul_vec_chunk ( const value_t                    alpha,
-                const hpro::matop_t              op_M,
-                const hpro::TMatrix< value_t > & M,
+                const Hpro::matop_t              op_M,
+                const Hpro::TMatrix< value_t > & M,
                 const blas::vector< value_t > &  x,
                 blas::vector< value_t > &        y,
                 const size_t                     ofs_rows,
@@ -81,7 +79,7 @@ mul_vec_chunk ( const value_t                    alpha,
 
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< size_t >( 0, B->nblock_rows(),
@@ -108,42 +106,50 @@ mul_vec_chunk ( const value_t                    alpha,
         auto        y_is   = y( row_is - ofs_rows );
         auto        yt     = blas::vector< value_t >( y_is.length() );
         
-        if ( is_dense( M ) )
+        if ( matrix::is_compressible_dense( M ) )
         {
-            auto  D  = cptrcast( &M, hpro::TDenseMatrix< value_t > );
+            M.apply_add( alpha, x_is, yt, op_M );
+        }// if
+        else if ( is_dense( M ) )
+        {
+            auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         
-            blas::mulvec( alpha, blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ), x_is, value_t(1), yt );
+            blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_is, value_t(1), yt );
+        }// if
+        else if ( matrix::is_compressible_lowrank( M ) )
+        {
+            M.apply_add( alpha, x_is, yt, op_M );
         }// if
         else if ( is_lowrank( M ) )
         {
-            auto  R = cptrcast( &M, hpro::TRkMatrix< value_t > );
+            auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
 
-            if ( op_M == hpro::apply_normal )
+            if ( op_M == Hpro::apply_normal )
             {
-                auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_B< value_t >( R ) ), x_is );
+                auto  t = blas::mulvec( value_t(1), blas::adjoint( blas::mat_V( R ) ), x_is );
 
-                blas::mulvec( alpha, hpro::blas_mat_A< value_t >( R ), t, value_t(1), yt );
+                blas::mulvec( alpha, blas::mat_U( R ), t, value_t(1), yt );
             }// if
-            else if ( op_M == hpro::apply_transposed )
+            else if ( op_M == Hpro::apply_transposed )
             {
-                assert( hpro::is_complex_type< value_t >::value == false );
+                assert( Hpro::is_complex_type< value_t >::value == false );
             
-                auto  t = blas::mulvec( value_t(1), blas::transposed( hpro::blas_mat_A< value_t >( R ) ), x_is );
+                auto  t = blas::mulvec( value_t(1), blas::transposed( blas::mat_U( R ) ), x_is );
 
-                blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), yt );
+                blas::mulvec( alpha, blas::mat_V( R ), t, value_t(1), yt );
             }// if
-            else if ( op_M == hpro::apply_adjoint )
+            else if ( op_M == Hpro::apply_adjoint )
             {
-                auto  t = blas::mulvec( value_t(1), blas::adjoint( hpro::blas_mat_A< value_t >( R ) ), x_is );
+                auto  t = blas::mulvec( value_t(1), blas::adjoint( blas::mat_U( R ) ), x_is );
 
-                blas::mulvec( alpha, hpro::blas_mat_B< value_t >( R ), t, value_t(1), yt );
+                blas::mulvec( alpha, blas::mat_V( R ), t, value_t(1), yt );
             }// if
         }// if
         else if ( hlr::matrix::is_uniform_lowrank( M ) )
         {
             auto  R = cptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
         
-            if ( op_M == hpro::apply_normal )
+            if ( op_M == Hpro::apply_normal )
             {
                 //
                 // y = y + U·S·V^H x
@@ -154,7 +160,7 @@ mul_vec_chunk ( const value_t                    alpha,
 
                 yt = std::move( R->row_cb().transform_backward( s ) );
             }// if
-            else if ( op_M == hpro::apply_transposed )
+            else if ( op_M == Hpro::apply_transposed )
             {
                 //
                 // y = y + (U·S·V^H)^T x
@@ -173,7 +179,7 @@ mul_vec_chunk ( const value_t                    alpha,
 
                 yt = std::move( R->col_cb().transform_backward( s ) );
             }// if
-            else if ( op_M == hpro::apply_adjoint )
+            else if ( op_M == Hpro::apply_adjoint )
             {
                 //
                 // y = y + (U·S·V^H)^H x
@@ -203,7 +209,7 @@ template < typename value_t >
 void
 mul_vec_reduce ( const value_t                    alpha,
                  const matop_t                    op_M,
-                 const hpro::TMatrix< value_t > & M,
+                 const Hpro::TMatrix< value_t > & M,
                  const blas::vector< value_t > &  x,
                  blas::vector< value_t > &        y )
 {
