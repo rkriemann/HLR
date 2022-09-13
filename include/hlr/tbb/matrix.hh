@@ -74,15 +74,15 @@ build ( const hpro::TBlockCluster *  bct,
             // auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
             auto  T = lrapx.build( bct, acc( rowis, colis ) );
 
-            if ( is_lowrank( *T ) )
-            {
-                auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
-                                                                                 std::move( blas::mat_U( R ) ),
-                                                                                 std::move( blas::mat_V( R ) ) );
-                M = std::move( zR );
-            }// if
-            else
+            // if ( is_lowrank( *T ) )
+            // {
+            //     auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
+            //     auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+            //                                                                      std::move( blas::mat_U( R ) ),
+            //                                                                      std::move( blas::mat_V( R ) ) );
+            //     M = std::move( zR );
+            // }// if
+            // else
             {
                 M = std::move( T );
             }// else
@@ -91,13 +91,13 @@ build ( const hpro::TBlockCluster *  bct,
         {
             M = coeff.build( rowis, colis );
 
-            if ( is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+            // if ( is_dense( *M ) )
+            // {
+            //     auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+            //     auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
 
-                M = std::move( zD );
-            }// if
+            //     M = std::move( zD );
+            // }// if
         }// else
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
@@ -538,6 +538,72 @@ copy ( const hpro::TMatrix< value_t > &  M,
 
         return Mc;
     }// else
+}
+
+//
+// return compressible version of M
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_compressible ( const Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [B,BM] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( ! is_null( BM->block( i, j ) ) )
+                        {
+                            auto  B_ij = copy_compressible( * BM->block( i, j ) );
+                            
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        return N;
+    }// if
+    else if ( hlr::matrix::is_compressible_lowrank( M ) )
+    {
+        return M.copy();
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  U = blas::copy( blas::mat_U( R ) );
+        auto  V = blas::copy( blas::mat_V( R ) );
+
+        return  std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( matrix::is_compressible_dense( M ) )
+    {
+        return M.copy();
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  DD = blas::copy( blas::mat( D ) );
+
+        return  std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+
+    return 0;
 }
 
 //

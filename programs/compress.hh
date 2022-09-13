@@ -37,18 +37,18 @@ sw::universal::posit< 24, 2 > real ( sw::universal::posit< 24, 2 >  f ) { return
 
 using namespace hlr;
 
-using indexset = hpro::TIndexSet;
+using indexset = Hpro::TIndexSet;
 
-struct local_accuracy : public hpro::TTruncAcc
+struct local_accuracy : public Hpro::TTruncAcc
 {
     local_accuracy ( const double  abs_eps )
-            : hpro::TTruncAcc( 0.0, abs_eps )
+            : Hpro::TTruncAcc( 0.0, abs_eps )
     {}
     
     virtual const TTruncAcc  acc ( const indexset &  rowis,
                                    const indexset &  colis ) const
     {
-        return hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
+        return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
     }
 };
 
@@ -61,29 +61,42 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
-    auto  problem = gen_problem< problem_t >();
-    auto  coord   = problem->coordinates();
-    auto  ct      = gen_ct( *coord );
-    auto  bct     = gen_bct( *ct, *ct );
-    
-    if ( verbose( 3 ) )
-    {
-        hpro::TPSBlockClusterVis   bc_vis;
-
-        print_vtk( coord.get(), "coord" );
-        bc_vis.id( false ).print( bct->root(), "bct" );
-    }// if
+    auto  tic    = timer::now();
+    auto  toc    = timer::since( tic );
 
     blas::reset_flops();
     
     auto  acc    = gen_accuracy();
-    auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< bem::aca_lrapx< hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+    auto  A      = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
-    auto  tic    = timer::now();
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
-    auto  toc    = timer::since( tic );
+    if ( matrixfile == "" )
+    {
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
+        auto  coeff   = problem->coeff_func();
+        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+    
+        if ( verbose( 3 ) )
+        {
+            Hpro::TPSBlockClusterVis   bc_vis;
+
+            print_vtk( coord.get(), "coord" );
+            bc_vis.id( false ).print( bct->root(), "bct" );
+        }// if
+
+        tic    = timer::now();
+        A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        toc    = timer::since( tic );
+
+        io::hpro::write< value_t >( *A, "A.hm" );
+    }// if
+    else
+    {
+        A = io::hpro::read< value_t >( matrixfile );
+    }// else
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -99,7 +112,7 @@ program_main ()
     // further compress matrix
     //
 
-    auto  zA     = impl::matrix::copy( *A );
+    auto  zA     = impl::matrix::copy_compressible( *A );
     auto  norm_A = norm::frobenius( *A );
     
     std::cout << "  " << term::bullet << term::bold << "compression via "
@@ -174,7 +187,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
+                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -208,7 +221,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *zA, *x, *y );
+                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
