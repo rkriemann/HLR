@@ -11,11 +11,10 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
+#include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
-#include <hlr/matrix/compressible.hh>
 
 namespace hlr
 { 

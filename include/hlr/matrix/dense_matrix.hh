@@ -13,8 +13,8 @@
 
 #include <hpro/matrix/TDenseMatrix.hh>
 
+#include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -33,7 +33,7 @@ namespace matrix
 // implements compressable dense matrix
 //
 template < typename T_value >
-class dense_matrix : public Hpro::TDenseMatrix< T_value >
+class dense_matrix : public Hpro::TDenseMatrix< T_value >, public compressible
 {
 public:
     using  value_t = T_value;

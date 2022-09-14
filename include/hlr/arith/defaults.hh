@@ -14,7 +14,7 @@ namespace hlr
 {
 
 //
-// collection of arithmetic functions
+// default collection of arithmetic functions
 //
 struct default_arithmetic
 {

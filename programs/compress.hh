@@ -6,21 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
-// #if defined(HAS_UNIVERSAL)
-
-// #include <universal/number/posit/posit.hpp>
-
-// namespace std
-// {
-
-// template <> struct __is_floating_point_helper< sw::universal::posit< 24, 2 > > : public true_type { };
-
-// sw::universal::posit< 24, 2 > real ( sw::universal::posit< 24, 2 >  f ) { return f; }
-
-// };
-
-// #endif
-
 #include <hlr/utils/io.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
@@ -87,11 +72,11 @@ program_main ()
             bc_vis.id( false ).print( bct->root(), "bct" );
         }// if
 
-        tic    = timer::now();
-        A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
-        toc    = timer::since( tic );
+        tic = timer::now();
+        A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        toc = timer::since( tic );
 
-        io::hpro::write< value_t >( *A, "A.hm" );
+        // io::hpro::write< value_t >( *A, "A.hm" );
     }// if
     else
     {

@@ -18,11 +18,11 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
-#include "hlr/arith/blas.hh"
-#include "hlr/arith/multiply.hh"
-#include "hlr/arith/solve.hh"
-#include "hlr/seq/arith.hh"
-#include "hlr/matrix/sum.hh"
+#include <hlr/arith/blas.hh>
+#include <hlr/arith/multiply.hh>
+#include <hlr/arith/solve.hh>
+#include <hlr/seq/arith.hh>
+#include <hlr/matrix/sum.hh>
 
 #include <hlr/dag/lu.hh>
 #include <hlr/tbb/dag.hh>

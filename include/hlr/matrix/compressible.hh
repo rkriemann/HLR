@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
+#include <hlr/utils/compression.hh>
+#include <hlr/utils/checks.hh>
+
 namespace hlr { namespace matrix {
 
 struct compressible

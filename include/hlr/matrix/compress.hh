@@ -38,23 +38,9 @@ compress ( Hpro::TMatrix< value_t > &  M,
             }// for
         }// for
     }// if
-    else if ( is_compressible_lowrank( M ) )
+    else if ( is_compressible( M ) )
     {
-        auto  R = ptrcast( &M, lrmatrix< value_t > );
-
-        R->compress( acc );
-    }// if
-    else if ( is_compressible_lowrankS( M ) )
-    {
-        auto  R = ptrcast( &M, lrsmatrix< value_t > );
-
-        R->compress( acc );
-    }// if
-    else if ( is_compressible_dense( M ) )
-    {
-        auto  D = ptrcast( &M, dense_matrix< value_t > );
-
-        D->compress( acc );
+        dynamic_cast< compressible * >( &M )->compress( acc );
     }// if
 }
 
@@ -79,17 +65,9 @@ decompress ( Hpro::TMatrix< value_t > &  M )
             }// for
         }// for
     }// if
-    else if ( is_compressible_lowrank( M ) )
+    else if ( is_compressible( M ) )
     {
-        auto  R = ptrcast( &M, lrmatrix< value_t > );
-
-        R->decompress();
-    }// if
-    else if ( is_compressible_dense( M ) )
-    {
-        auto  D = ptrcast( &M, dense_matrix< value_t > );
-
-        D->decompress();
+        dynamic_cast< compressible * >( &M )->decompress();
     }// if
 }
 
