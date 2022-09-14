@@ -547,7 +547,22 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         auto  U = blas::copy( blas::mat_U( R ) );
         auto  V = blas::copy( blas::mat_V( R ) );
 
-        return  std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+        if ( true )
+        {
+            auto  RU = blas::matrix< value_t >( U.ncols(), U.ncols() );
+            auto  RV = blas::matrix< value_t >( V.ncols(), V.ncols() );
+
+            blas::qr( U, RU );
+            blas::qr( V, RV );
+
+            auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+            return  std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
+        }// if
+        else
+        {
+            return  std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+        }// else
     }// if
     else if ( matrix::is_compressible_dense( M ) )
     {

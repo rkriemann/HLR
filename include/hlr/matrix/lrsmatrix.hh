@@ -8,13 +8,11 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-#include <cassert>
-#include <map>
-
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -31,25 +29,42 @@ namespace matrix
 
 //
 // Represents a low-rank matrix in factorised form: U·S·V'.
-// - U and V do not need to be orthogonal and are not shared
+// - U and V are expected to be orthogonal (CHECK!) and not shared
+// - compression for U, S and V is implemented
 //
 template < typename T_value >
 class lrsmatrix : public Hpro::TMatrix< T_value >
 {
 public:
-    //
-    // export local types
-    //
-
-    // value type
     using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
+    //
+    // compressed storage based on underlying floating point type
+    //
+    #if HLR_HAS_COMPRESSION == 1
+
+    struct compressed_factors
+    {
+        compress::zarray  U, S, V;
+    };
+
+    using  compressed_storage = compressed_factors;
+    
+    #endif
+
+private:
     // local index set of matrix
-    indexset                      _row_is, _col_is;
+    indexset                 _row_is, _col_is;
     
     // low-rank factors
     blas::matrix< value_t >  _U, _S, _V;
+
+    #if HLR_HAS_COMPRESSION == 1
+    // optional: stores compressed data
+    compressed_storage       _zdata;
+    #endif
     
 public:
     //
@@ -60,11 +75,10 @@ public:
             : Hpro::TMatrix< value_t >()
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
-    {
-    }
+    {}
     
-    lrsmatrix ( const indexset                arow_is,
-                const indexset                acol_is )
+    lrsmatrix ( const indexset  arow_is,
+                const indexset  acol_is )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -72,8 +86,8 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    lrsmatrix ( const indexset                        arow_is,
-                const indexset                        acol_is,
+    lrsmatrix ( const indexset                   arow_is,
+                const indexset                   acol_is,
                 const blas::matrix< value_t > &  aU,
                 const blas::matrix< value_t > &  aS,
                 const blas::matrix< value_t > &  aV )
@@ -87,8 +101,8 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    lrsmatrix ( const indexset                   arow_is,
-                const indexset                   acol_is,
+    lrsmatrix ( const indexset              arow_is,
+                const indexset              acol_is,
                 blas::matrix< value_t > &&  aU,
                 blas::matrix< value_t > &&  aS,
                 blas::matrix< value_t > &&  aV )
@@ -110,13 +124,13 @@ public:
     // access internal data
     //
 
-    uint  rank     () const { return std::min( _S.nrows(), _S.ncols() ); }
+    uint  rank     () const { return std::min( row_rank(), col_rank() ); }
 
-    uint  row_rank () const { return _S.nrows(); }
-    uint  col_rank () const { return _S.ncols(); }
+    uint  row_rank () const { return _U.ncols(); }
+    uint  col_rank () const { return _V.ncols(); }
 
-    uint  row_rank ( const Hpro::matop_t  op )       { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
-    uint  col_rank ( const Hpro::matop_t  op )       { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
+    uint  row_rank ( const Hpro::matop_t  op )  { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
+    uint  col_rank ( const Hpro::matop_t  op )  { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
 
     const blas::matrix< value_t > &  U () const { return _U; }
     const blas::matrix< value_t > &  S () const { return _S; }
@@ -130,6 +144,9 @@ public:
         HLR_ASSERT( aU.ncols() == aS.nrows() );
         HLR_ASSERT( aV.ncols() == aS.ncols() );
         
+        if ( is_compressed() )
+            remove_compressed();
+        
         _U = aU;
         _S = aS;
         _V = aV;
@@ -142,6 +159,9 @@ public:
     {
         HLR_ASSERT( aU.ncols() == aS.nrows() );
         HLR_ASSERT( aV.ncols() == aS.ncols() );
+        
+        if ( is_compressed() )
+            remove_compressed();
         
         _U = std::move( aU );
         _S = std::move( aS );
@@ -185,8 +205,12 @@ public:
     // return true, if matrix is zero
     virtual bool    is_zero   () const { return ( rank() == 0 ); }
     
-    virtual void    set_size  ( const size_t  ,
-                                const size_t   ) {} // ignored
+    virtual void    set_size  ( const size_t  anrows,
+                                const size_t  ancols )
+    {
+        // change of dimensions not supported
+        HLR_ASSERT(( anrows == nrows() ) && ( ancols == ncols() ));
+    }
     
     //
     // algebra routines
@@ -227,7 +251,7 @@ public:
     //
 
     // return matrix of same class (but no content)
-    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< lrsmatrix >(); }
+    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< lrsmatrix< value_t > >(); }
 
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
@@ -240,12 +264,36 @@ public:
     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // copy matrix data to \a A
-    virtual void   copy_to      ( Hpro::TMatrix< value_t > *          A ) const;
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const;
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
-    virtual void   copy_to      ( Hpro::TMatrix< value_t > *          A,
-                                  const Hpro::TTruncAcc &  acc,
-                                  const bool               do_coarsen = false ) const;
+    virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
+                                  const Hpro::TTruncAcc &     acc,
+                                  const bool                  do_coarsen = false ) const;
+    
+    //
+    // compression
+    //
+
+    // compress internal data
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+
+    // compress data based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+
+    // decompress internal data
+    virtual void   decompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        return ! is_null( _zdata.U.data() );
+        #else
+        return false;
+        #endif
+    }
     
     //
     // misc.
@@ -253,6 +301,17 @@ public:
 
     // return size in bytes used by this object
     virtual size_t byte_size  () const;
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        _zdata.U = compress::zarray();
+        _zdata.S = compress::zarray();
+        _zdata.V = compress::zarray();
+        #endif
+    }
 };
 
 //
@@ -266,63 +325,23 @@ lrsmatrix< value_t >::mul_vec ( const value_t                     alpha,
                                 Hpro::TVector< value_t > *        vy,
                                 const Hpro::matop_t               op ) const
 {
-    assert( vx->is() == this->col_is( op ) );
-    assert( vy->is() == this->row_is( op ) );
-    assert( is_scalar_all( vx, vy ) );
+    HLR_ASSERT( vx->is() == this->col_is( op ) );
+    HLR_ASSERT( vy->is() == this->row_is( op ) );
+    HLR_ASSERT( is_scalar_all( vx, vy ) );
 
     // exclude complex value and transposed operation for now
-    assert( (  op == Hpro::apply_normal     ) ||
-            (  op == Hpro::apply_adjoint    ) ||
-            (( op == Hpro::apply_transposed ) && ! Hpro::is_complex_type_v< value_t > ) );
+    HLR_ASSERT( (  op == Hpro::apply_normal     ) ||
+                (  op == Hpro::apply_adjoint    ) ||
+                (( op == Hpro::apply_transposed ) && ! Hpro::is_complex_type_v< value_t > ) );
 
     const auto  x = cptrcast( vx, Hpro::TScalarVector< value_t > );
     const auto  y = ptrcast(  vy, Hpro::TScalarVector< value_t > );
 
     // y := β·y
     if ( beta != value_t(1) )
-        blas::scale( value_t(beta), Hpro::blas_vec< value_t >( y ) );
-                     
-    if ( op == Hpro::apply_normal )
-    {
-        //
-        // y = y + α U·(S·(V' x))
-        //
-        
-        auto  t = blas::mulvec( blas::adjoint( _V ), blas::vec< value_t >( x ) );
-        auto  s = blas::mulvec( value_t(1), _S, t );
+        blas::scale( value_t(beta), blas::vec( y ) );
 
-        blas::mulvec( value_t(alpha), _U, s, value_t(1), blas::vec< value_t >( y ) );
-    }// if
-    else if ( op == Hpro::apply_transposed )
-    {
-        //
-        // y = y + (U·S·V')^T x
-        //   = y + conj(V)·(S^T·(U^T x))
-        //
-        
-        auto  t = blas::mulvec( blas::transposed(_U), blas::vec< value_t >( x ) );
-        auto  s = blas::mulvec( blas::transposed(_S), t );
-
-        blas::conj( s );
-        
-        auto  r = blas::mulvec( _V, s );
-
-        blas::conj( r );
-        
-        blas::add( value_t(alpha), r, blas::vec< value_t >( y ) );
-    }// if
-    else if ( op == Hpro::apply_adjoint )
-    {
-        //
-        // y = y + α·(U·S·V')' x
-        //   = y + α·V·(S'·(U' x))
-        //
-        
-        auto  t = blas::mulvec( blas::adjoint(_U), blas::vec< value_t >( x ) );
-        auto  s = blas::mulvec( blas::adjoint(_S), t );
-
-        blas::mulvec( value_t(alpha), _V, s, value_t(1), blas::vec< value_t >( y ) );
-    }// if
+    apply_add( alpha, blas::vec( *x ), blas::vec( *y ), op );
 }
 
 template < typename value_t >
@@ -332,62 +351,31 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
                                    blas::vector< value_t > &        y,
                                    const matop_t                    op ) const
 {
-    switch ( op )
+    // exclude complex value and transposed operation for now
+    HLR_ASSERT( (  op == Hpro::apply_normal     ) ||
+                (  op == Hpro::apply_adjoint    ) ||
+                (( op == Hpro::apply_transposed ) && ! Hpro::is_complex_type_v< value_t > ) );
+
+    #if HLR_HAS_COMPRESSION == 1
+
+    if ( is_compressed() )
     {
-        case apply_normal :
-        {
-            // y = y + U·(S·(V'·x))
-            auto  t1 = blas::mulvec( blas::adjoint( _V ), x );
-            auto  t2 = blas::mulvec( _S, t1 );
-
-            blas::mulvec( alpha, _U, t2, value_t(1), y );
-        }
-        break;
-
-        case apply_conjugate :
-        {
-            if constexpr ( Hpro::is_complex_type_v< value_t > )
-            {
-                HLR_ERROR( "not implemented" );
-            }// if
-            else
-            {
-                // y = y + U·(S·(V'·x))
-                auto  t1 = blas::mulvec( blas::adjoint( _V ), x );
-                auto  t2 = blas::mulvec( _S, t1 );
-
-                blas::mulvec( alpha, _U, t2, value_t(1), y );
-            }// else
-        }
-        break;
+        auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
+        auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
+        auto  uV = blas::matrix< value_t >( this->ncols(), this->col_rank() );
+    
+        compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
+        compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
-        case apply_transposed :
-        {
-            if constexpr ( Hpro::is_complex_type_v< value_t > )
-            {
-                HLR_ERROR( "not implemented" );
-            }// if
-            else
-            {
-                // y = y + V·(S'·(U'·x))
-                auto  t1 = blas::mulvec( blas::adjoint( _U ), x );
-                auto  t2 = blas::mulvec( blas::adjoint( _S ), t1 );
+        blas::mulvec_lrs( alpha, uU, uS, uV, op, x, y );
+    }// if
+    else
 
-                blas::mulvec( alpha, _V, t2, value_t(1), y );
-            }// else
-        }
-        break;
-        
-        case apply_adjoint :
-        {
-            // y = y + V·(S'·(U'·x))
-            auto  t1 = blas::mulvec( blas::adjoint( _U ), x );
-            auto  t2 = blas::mulvec( blas::adjoint( _S ), t1 );
-
-            blas::mulvec( alpha, _V, t2, value_t(1), y );
-        }
-        break;
-    }// switch
+    #endif
+    {
+        blas::mulvec_lrs( alpha, U(), S(), V(), op, x, y );
+    }// else
 }
 
 template < typename value_t >
@@ -397,6 +385,9 @@ lrsmatrix< value_t >::apply_add ( const value_t                    alpha,
                                   blas::matrix< value_t > &        Y,
                                   const matop_t                    op ) const
 {
+    if ( is_compressed() )
+        HLR_ERROR( "TODO" );
+    
     switch ( op )
     {
         case apply_normal :
@@ -471,12 +462,31 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 lrsmatrix< value_t >::copy () const
 {
-    auto  M = std::make_unique< lrsmatrix >( _row_is, _col_is,
-                                             std::move( blas::copy( _U ) ),
-                                             std::move( blas::copy( _S ) ),
-                                             std::move( blas::copy( _V ) ) );
+    auto  M = std::make_unique< lrsmatrix< value_t > >( _row_is, _col_is,
+                                                        std::move( blas::copy( _U ) ),
+                                                        std::move( blas::copy( _S ) ),
+                                                        std::move( blas::copy( _V ) ) );
 
     M->copy_struct_from( this );
+    
+    HLR_ASSERT( IS_TYPE( M.get(), lrsmatrix ) );
+
+    auto  R = ptrcast( M.get(), lrsmatrix< value_t > );
+
+    #if HLR_HAS_COMPRESSION == 1
+
+    if ( is_compressed() )
+    {
+        R->_zdata.U = compress::zarray( _zdata.U.size() );
+        R->_zdata.S = compress::zarray( _zdata.S.size() );
+        R->_zdata.V = compress::zarray( _zdata.V.size() );
+
+        std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
+        std::copy( _zdata.S.begin(), _zdata.S.end(), R->_zdata.S.begin() );
+        std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
+    }// if
+
+    #endif
     
     return M;
 }
@@ -499,7 +509,7 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 lrsmatrix< value_t >::copy_struct  () const
 {
-    return std::make_unique< lrsmatrix >( _row_is, _col_is );
+    return std::make_unique< lrsmatrix< value_t > >( _row_is, _col_is );
 }
 
 //
@@ -511,15 +521,26 @@ lrsmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 {
     Hpro::TMatrix< value_t >::copy_to( A );
     
-    assert( IS_TYPE( A, lrsmatrix ) );
+    HLR_ASSERT( IS_TYPE( A, lrsmatrix ) );
 
-    auto  R = ptrcast( A, lrsmatrix );
+    auto  R = ptrcast( A, lrsmatrix< value_t > );
 
     R->_row_is = _row_is;
     R->_col_is = _col_is;
     R->_U      = std::move( blas::copy( _U ) );
     R->_S      = std::move( blas::copy( _S ) );
     R->_V      = std::move( blas::copy( _V ) );
+
+    HLR_ASSERT( IS_TYPE( A, lrsmatrix ) );
+
+    #if HLR_HAS_COMPRESSION == 1
+
+    if ( is_compressed() )
+    {
+        HLR_ERROR( "TODO" );
+    }// if
+
+    #endif
 }
 
 //
@@ -535,6 +556,97 @@ lrsmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A,
 }
 
 //
+// compress internal data
+// - may result in non-compression if storage does not decrease
+//
+template < typename value_t >
+void
+lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( is_compressed() )
+        return;
+
+    auto          oU       = this->U();
+    auto          oS       = this->S();
+    auto          oV       = this->V();
+    const auto    orowrank = this->row_rank();
+    const auto    ocolrank = this->row_rank();
+    const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() + orowrank * ocolrank );
+    auto          zU       = compress::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
+    auto          zS       = compress::compress< value_t >( zconfig, oS.data(), oS.nrows(), oS.ncols() );
+    auto          zV       = compress::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
+
+    // const auto  vmin = blas::min_abs_val( oU );
+    // const auto  vmax = blas::max_abs_val( oU );
+
+    // std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
+        
+    if ( compress::byte_size( zU ) + compress::byte_size( zV ) + compress::byte_size( zS ) < mem_lr )
+    {
+        _zdata.U  = std::move( zU );
+        _U        = std::move( blas::matrix< value_t >( 0, orowrank ) ); // remember rank !!!
+
+        _zdata.V  = std::move( zV );
+        _V        = std::move( blas::matrix< value_t >( 0, ocolrank ) );
+        
+        _S        = std::move( blas::matrix< value_t >( 0, 0 ) );
+        _zdata.S  = std::move( zS );
+    }// if
+
+    #endif
+}
+
+template < typename value_t >
+void
+lrsmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+{
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    if ( this->nrows() * this->ncols() == 0 )
+        return;
+        
+    const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
+    const auto  normF = blas::norm_F( _S ); // assuming U/V being orthogonal
+        
+    // compress( compress::absolute_accuracy( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+    compress( compress::absolute_accuracy( eps ) );
+}
+
+//
+// decompress internal data
+//
+template < typename value_t >
+void
+lrsmatrix< value_t >::decompress ()
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( ! is_compressed() )
+        return;
+
+    auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
+
+    compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+    _U = std::move( uU );
+    
+    auto  uV = blas::matrix< value_t >( this->ncols(), this->col_rank() );
+
+    compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+    _V = std::move( uV );
+    
+    auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
+
+    compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
+    _S = std::move( uS );
+
+    remove_compressed();
+        
+    #endif
+}
+
+//
 // return size in bytes used by this object
 //
 template < typename value_t >
@@ -546,6 +658,14 @@ lrsmatrix< value_t >::byte_size () const
     size += sizeof(_row_is) + sizeof(_col_is);
     size += _U.byte_size() + _S.byte_size() + _V.byte_size();
 
+    #if HLR_HAS_COMPRESSION == 1
+
+    size += hlr::compress::byte_size( _zdata.U );
+    size += hlr::compress::byte_size( _zdata.S );
+    size += hlr::compress::byte_size( _zdata.V );
+    
+    #endif
+    
     return size;
 }
 
@@ -568,6 +688,23 @@ is_lowrankS ( const Hpro::TMatrix< value_t > *  M )
 
 HLR_TEST_ALL( is_lowrankS, Hpro::TMatrix< value_t > )
 HLR_TEST_ANY( is_lowrankS, Hpro::TMatrix< value_t > )
+
+template < typename value_t >
+bool
+is_compressible_lowrankS ( const Hpro::TMatrix< value_t > &  M )
+{
+    return IS_TYPE( &M, lrsmatrix );
+}
+
+template < typename value_t >
+bool
+is_compressible_lowrankS ( const Hpro::TMatrix< value_t > *  M )
+{
+    return ! is_null( M ) && IS_TYPE( M, lrsmatrix );
+}
+
+HLR_TEST_ALL( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
 
 }} // namespace hlr::matrix
 

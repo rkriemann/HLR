@@ -238,67 +238,18 @@ public:
     }
     
     //
-    // misc.
+    // compression
     //
 
-    // compress internal data
+    // compress internal data based on given configuration
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig )
-    {
-        #if HLR_HAS_COMPRESSION == 1
-        
-        if ( is_compressed() )
-            return;
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
 
-        auto          M         = this->blas_mat();
-        const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
-        auto          v         = compress::compress< value_t >( zconfig, M.data(), M.nrows(), M.ncols() );
+    // compress internal data based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
 
-        if ( compress::byte_size( v ) < mem_dense )
-        {
-            _zdata           = std::move( v );
-            this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
-        }// if
-
-        #endif
-    }
-
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
-    {
-        HLR_ASSERT( acc.is_fixed_prec() );
-
-        if ( this->nrows() * this->ncols() == 0 )
-            return;
-        
-        const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
-        const auto  normF = blas::norm_F( this->blas_mat() );
-        const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
-        // const auto  lacc  = acc( this->row_is(), this->col_is() );
-        // const auto  peps  = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
-        // const auto  vmax = blas::max_val( this->blas_mat() );
-        
-        compress( compress::absolute_accuracy( eps ) );
-        // compress( compress::relative_accuracy( eps * normF ) );
-    }
-
-    // uncompress internal data
-    virtual void   uncompress    ()
-    {
-        #if HLR_HAS_COMPRESSION == 1
-        
-        if ( ! is_compressed() )
-            return;
-
-        auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
-    
-        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
-        
-        this->blas_mat() = std::move( M );
-
-        remove_compressed();
-
-        #endif
-    }
+    // decompress internal data
+    virtual void   decompress    ();
 
     // return true if data is compressed
     virtual bool   is_compressed () const
@@ -309,6 +260,10 @@ public:
         return false;
         #endif
     }
+
+    //
+    // misc
+    //
     
     // return size in bytes used by this object
     virtual size_t byte_size () const
@@ -384,14 +339,7 @@ dense_matrix< value_t >::mul_vec    ( const value_t                     alpha,
         if ( beta != value_t(1) )
             vy->scale( beta );
 
-        auto  x = blas::vec( *sx );
-        // auto  y = blas::vector< value_t >( sy->size() );
-        auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
-    
-        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
-        
-        blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(1), blas::vec( sy ) );
-        // blas::add( value_t(1), y, blas::vec( sy ) );
+        apply_add( alpha, blas::vec( *sx ), blas::vec( sy ), op );
     }// if
     else
 
@@ -416,13 +364,10 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
         HLR_ASSERT( x.length() == this->ncols( op ) );
         HLR_ASSERT( y.length() == this->nrows( op ) );
 
-        // auto  ty = blas::vector< value_t >( y.length() );
         auto  M  = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-        compress::uncompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
-        
-        blas::mulvec( value_t(alpha), blas::mat_view( op, M ), x, value_t(1), y );
-        // blas::add( value_t(1), ty, y );
+        compress::decompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
     }// if
     else
 
@@ -430,6 +375,78 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     {
         Hpro::TDenseMatrix< value_t >::apply_add( alpha, x, y, op );
     }// else
+}
+
+//
+// compress internal data
+// - may result in non-compression if storage does not decrease
+//
+template < typename value_t >
+void
+dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( is_compressed() )
+        return;
+
+    auto          M         = this->blas_mat();
+    const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
+    auto          v         = compress::compress< value_t >( zconfig, M.data(), M.nrows(), M.ncols() );
+
+    if ( compress::byte_size( v ) < mem_dense )
+    {
+        _zdata           = std::move( v );
+        this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
+
+    #endif
+}
+
+template < typename value_t >
+void
+dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+{
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    if ( this->nrows() * this->ncols() == 0 )
+        return;
+        
+    const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
+    const auto  normF = blas::norm_F( this->blas_mat() );
+    const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
+    // const auto  lacc  = acc( this->row_is(), this->col_is() );
+    // const auto  peps  = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
+    // const auto  vmin = blas::min_val( this->blas_mat() );
+    // const auto  vmax = blas::max_val( this->blas_mat() );
+
+    // std::cout << vmin << " / " << vmax << std::endl;
+        
+    // compress( compress::absolute_accuracy( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+    compress( compress::absolute_accuracy( eps ) );
+}
+
+//
+// decompress internal data
+//
+template < typename value_t >
+void
+dense_matrix< value_t >::decompress ()
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( ! is_compressed() )
+        return;
+
+    auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
+    
+    compress::decompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        
+    this->blas_mat() = std::move( M );
+
+    remove_compressed();
+
+    #endif
 }
 
 }} // namespace hlr::matrix

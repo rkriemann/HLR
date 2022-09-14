@@ -12,6 +12,7 @@
 #include <tbb/blocked_range2d.h>
 
 #include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/utils/tensor.hh>
 #include <hlr/approx/aca.hh>
@@ -866,6 +867,10 @@ compress ( Hpro::TMatrix< value_t > &  A,
     {
         ptrcast( &A, lrmatrix< value_t > )->compress( acc );
     }// if
+    else if ( is_compressible_lowrankS( A ) )
+    {
+        ptrcast( &A, lrsmatrix< value_t > )->compress( acc );
+    }// if
     else if ( is_compressible_dense( A ) )
     {
         ptrcast( &A, dense_matrix< value_t > )->compress( acc );
@@ -873,11 +878,11 @@ compress ( Hpro::TMatrix< value_t > &  A,
 }
 
 //
-// uncompress matrix
+// decompress matrix
 //
 template < typename value_t >
 void
-uncompress ( Hpro::TMatrix< value_t > &  A )
+decompress ( Hpro::TMatrix< value_t > &  A )
 {
     using namespace hlr::matrix;
 
@@ -897,18 +902,18 @@ uncompress ( Hpro::TMatrix< value_t > &  A )
                         if ( is_null( BA->block( i, j ) ) )
                             continue;
                 
-                        uncompress( *BA->block( i, j ) );
+                        decompress( *BA->block( i, j ) );
                     }// for
                 }// for
             } );
     }// if
     else if ( is_compressible_lowrank( A ) )
     {
-        ptrcast( &A, lrmatrix< value_t > )->uncompress();
+        ptrcast( &A, lrmatrix< value_t > )->decompress();
     }// if
     else if ( is_compressible_dense( A ) )
     {
-        ptrcast( &A, dense_matrix< value_t > )->uncompress();
+        ptrcast( &A, dense_matrix< value_t > )->decompress();
     }// if
 }
 

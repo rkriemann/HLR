@@ -717,7 +717,7 @@ template < typename T_vector,
            typename T_value >
 void
 fill ( VectorBase< T_vector > &  v,
-       const T_value                   f )
+       const T_value             f )
 {
     using value_v_t = typename T_vector::value_t;
     
@@ -729,7 +729,7 @@ template < typename T_matrix,
            typename T_value >
 void
 fill ( MatrixBase< T_matrix > &    M,
-       const T_value                     f )
+       const T_value               f )
 {
     using value_M_t = typename T_matrix::value_t;
     
@@ -742,7 +742,7 @@ template < typename T_vector,
            typename T_func >
 void
 fill_fn ( VectorBase< T_vector > &   v,
-          T_func &&                        fill_fn )
+          T_func &&                  fill_fn )
 {
     for ( size_t  i = 0; i < v.length(); ++i )
         v(i) = fill_fn();
@@ -752,7 +752,7 @@ template < typename T_matrix,
            typename T_func >
 void
 fill_fn ( MatrixBase< T_matrix > &  M,
-          T_func &&                       func )
+          T_func &&                 func )
 {
     for ( size_t  i = 0; i < M.nrows(); ++i )
         for ( size_t  j = 0; j < M.ncols(); ++j )
@@ -764,7 +764,7 @@ fill_fn ( MatrixBase< T_matrix > &  M,
 //
 template < typename T1 >
 std::enable_if_t< is_matrix_v< T1 >, typename T1::value_t >
-max_val ( const T1 &  M )
+max_abs_val ( const T1 &  M )
 {
     HLR_ASSERT( M.nrows() * M.ncols() > 0 );
 
@@ -774,7 +774,33 @@ max_val ( const T1 &  M )
         
     const auto  res = max_idx( blas_int_t(M.nrows() * M.ncols()), M.data(), 1 );
 
-    return M.data()[res];
+    return std::abs( M.data()[res] );
+}
+
+//
+// determine minimal absolute value in M
+//
+template < typename T1 >
+std::enable_if_t< is_matrix_v< T1 >, typename T1::value_t >
+min_abs_val ( const T1 &  M )
+{
+    HLR_ASSERT( M.nrows() * M.ncols() > 0 );
+
+    // todo
+    HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
+               ( M.row_stride() == 1 ));
+
+    using  value_t = typename T1::value_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
+    
+    value_t *     ptr  = M.data();
+    real_t        vmin = std::abs( ptr[0] );
+    const size_t  n    = M.nrows() * M.ncols();
+    
+    for ( size_t  i = 0; i < n; ++i )
+        vmin = std::min( vmin, std::abs( ptr[i] ) );
+
+    return vmin;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -944,6 +970,11 @@ mulvec ( const T_matA &  A,
     return Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
 }
 
+using Hpro::BLAS::mulvec;
+
+//
+// compute op(U·V')·x = y
+//
 template < typename T_alpha,
            typename T_value >
 void
@@ -1009,6 +1040,78 @@ mulvec_lr ( const T_alpha                    alpha,
         
         // y := t + V t
         blas::mulvec( V, t, y );
+    }// if
+}
+
+//
+// compute op(U·S·V')·x = y
+//
+template < typename T_alpha,
+           typename T_value >
+void
+mulvec_lrs ( const T_alpha                    alpha,
+             const blas::matrix< T_value > &  U,
+             const blas::matrix< T_value > &  S,
+             const blas::matrix< T_value > &  V,
+             const matop_t                    op,
+             const blas::vector< T_value > &  x,
+             blas::vector< T_value > &        y )
+{
+    using  value_t = T_value;
+    
+    if ( op == Hpro::apply_normal )
+    {
+        //
+        // y = y + U·S·V^H x
+        //
+        
+        // t := V^H x
+        auto  t = blas::mulvec( blas::adjoint( V ), x );
+
+        // s := α S t
+        auto  s = blas::mulvec( alpha, S, t );
+
+        // y := y + U s
+        blas::mulvec( U, s, y );
+    }// if
+    else if ( op == Hpro::apply_transposed )
+    {
+        //
+        // y = y + (U·S·V^H)^T x
+        //   = y + conj(V)·S^T·U^T x
+        //
+        
+        // t := U^T x
+        auto  t = blas::mulvec( blas::transposed( U ), x );
+
+        // s := α S^T t
+        auto  s = blas::mulvec( alpha, blas::transposed( S ), t );
+        
+        // r := conj(V) s = conj( V · conj(s) )
+        blas::conj( s );
+            
+        auto  r = blas::mulvec( V, s );
+
+        blas::conj( r );
+
+        // y = y + r
+        blas::add( value_t(1), r, y );
+    }// if
+    else if ( op == Hpro::apply_adjoint )
+    {
+        //
+        // y = y + (U·S·V^H)^H x
+        //   = y + V·S^H·U^H x
+        //
+        
+        // t := U^H x
+        auto  t = blas::mulvec( blas::adjoint( U ), x );
+
+        // s := α S^T t
+        auto  s = blas::mulvec( alpha, blas::adjoint( S ), t );
+        
+        // y := t + V t
+        blas::mulvec( V, s, y );
     }// if
 }
 

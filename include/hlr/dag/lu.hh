@@ -9,10 +9,9 @@
 //
 
 #include <hpro/matrix/TMatrix.hh>
-#include <hpro/matrix/TRkMatrix.hh>
 
-#include "hlr/dag/graph.hh"
-#include "hlr/dag/lu_nodes.hh"
+#include <hlr/dag/graph.hh>
+#include <hlr/dag/lu_nodes.hh>
 
 namespace hlr { namespace dag {
 

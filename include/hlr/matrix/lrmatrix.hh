@@ -269,7 +269,7 @@ public:
     }
     
     //
-    // misc.
+    // compression
     //
 
     // compress internal data
@@ -288,6 +288,11 @@ public:
         auto          zU      = compress::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
         auto          zV      = compress::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
 
+        const auto  vmin = blas::min_abs_val( oU );
+        const auto  vmax = blas::max_abs_val( oU );
+
+        std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
+        
         if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
         {
             _zdata.U  = std::move( zU );
@@ -314,8 +319,8 @@ public:
         // compress( compress::relative_accuracy( eps * normF ) );
     }
 
-    // uncompress internal data
-    virtual void   uncompress    ()
+    // decompress internal data
+    virtual void   decompress    ()
     {
         #if HLR_HAS_COMPRESSION == 1
         
@@ -325,8 +330,8 @@ public:
         auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
         this->U() = std::move( uU );
         this->V() = std::move( uV );
@@ -345,6 +350,10 @@ public:
         return false;
         #endif
     }
+
+    //
+    // misc.
+    //
     
     // return size in bytes used by this object
     virtual size_t byte_size  () const
@@ -428,8 +437,8 @@ lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
         auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
         blas::mulvec_lr( alpha, uU, uV, op, x, blas::vec( *sy ) );
         // blas::add( value_t(1), y, blas::vec( *sy ) );
@@ -460,8 +469,8 @@ lrmatrix< value_t >::apply_add ( const value_t                   alpha,
         auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        compress::uncompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        compress::uncompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
+        compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
         
         blas::mulvec_lr( alpha, uU, uV, op, x, y );
         // blas::add( value_t(1), ty, y );

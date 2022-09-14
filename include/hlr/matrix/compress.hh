@@ -11,6 +11,7 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 
 #include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 
 namespace hlr { namespace matrix {
@@ -43,6 +44,12 @@ compress ( Hpro::TMatrix< value_t > &  M,
 
         R->compress( acc );
     }// if
+    else if ( is_compressible_lowrankS( M ) )
+    {
+        auto  R = ptrcast( &M, lrsmatrix< value_t > );
+
+        R->compress( acc );
+    }// if
     else if ( is_compressible_dense( M ) )
     {
         auto  D = ptrcast( &M, dense_matrix< value_t > );
@@ -52,12 +59,12 @@ compress ( Hpro::TMatrix< value_t > &  M,
 }
 
 //
-// uncompress internal data in compressible objects
+// decompress internal data in compressible objects
 // (dense_matrix, lrmatrix)
 //
 template < typename value_t >
 void
-uncompress ( Hpro::TMatrix< value_t > &  M )
+decompress ( Hpro::TMatrix< value_t > &  M )
 {
     if ( is_blocked( M ) )
     {
@@ -68,7 +75,7 @@ uncompress ( Hpro::TMatrix< value_t > &  M )
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 if ( ! is_null( B->block(i,j) ) )
-                    uncompress( *B->block(i,j) );
+                    decompress( *B->block(i,j) );
             }// for
         }// for
     }// if
@@ -76,13 +83,13 @@ uncompress ( Hpro::TMatrix< value_t > &  M )
     {
         auto  R = ptrcast( &M, lrmatrix< value_t > );
 
-        R->uncompress();
+        R->decompress();
     }// if
     else if ( is_compressible_dense( M ) )
     {
         auto  D = ptrcast( &M, dense_matrix< value_t > );
 
-        D->uncompress();
+        D->decompress();
     }// if
 }
 

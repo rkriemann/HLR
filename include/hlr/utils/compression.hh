@@ -138,7 +138,7 @@ compress ( const config &   config,
 //
 template < typename value_t >
 void
-uncompress ( const zarray &  buffer,
+decompress ( const zarray &  buffer,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
@@ -388,7 +388,7 @@ compress< std::complex< double > > ( const config &                 config,
 
 template < typename value_t >
 void
-uncompress ( const zarray &  v,
+decompress ( const zarray &  v,
              value_t *      dest,
              const size_t   dim0,
              const size_t   dim1 = 0,
@@ -399,7 +399,7 @@ uncompress ( const zarray &  v,
 template <>
 inline
 void
-uncompress< float > ( const zarray &  v,
+decompress< float > ( const zarray &  v,
                       float *        dest,
                       const size_t   dim0,
                       const size_t   dim1,
@@ -415,7 +415,7 @@ uncompress< float > ( const zarray &  v,
 template <>
 inline
 void
-uncompress< double > ( const zarray &  v,
+decompress< double > ( const zarray &  v,
                        double *       dest,
                        const size_t   dim0,
                        const size_t   dim1,
@@ -431,7 +431,7 @@ uncompress< double > ( const zarray &  v,
 template <>
 inline
 void
-uncompress< std::complex< float > > ( const zarray &            v,
+decompress< std::complex< float > > ( const zarray &            v,
                                       std::complex< float > *   dest,
                                       const size_t              dim0,
                                       const size_t              dim1,
@@ -445,7 +445,7 @@ uncompress< std::complex< float > > ( const zarray &            v,
 template <>
 inline
 void
-uncompress< std::complex< double > > ( const zarray &            v,
+decompress< std::complex< double > > ( const zarray &            v,
                                        std::complex< double > *  dest,
                                        const size_t              dim0,
                                        const size_t              dim1,
@@ -485,8 +485,9 @@ struct config
     double  eps;
 };
 
-// inline config  relative_accuracy ( double  eps ) { return config{ SZ::EB_L2NORM, eps }; }
-inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_ABS,    eps }; }
+inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_REL, eps }; }
+// inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_L2NORM, eps }; }
+// inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_ABS,    eps }; }
 
 //
 // handles arrays allocated within SZ
@@ -597,6 +598,11 @@ compress< float > ( const config &  config,
     
     switch ( config.mode )
     {
+        case SZ::EB_REL :
+            conf.errorBoundMode = SZ::EB_REL;
+            conf.relErrorBound  = config.eps;
+            break;
+            
         case SZ::EB_ABS :
             conf.errorBoundMode = SZ::EB_ABS;
             conf.absErrorBound  = config.eps;
@@ -645,6 +651,11 @@ compress< double > ( const config &  config,
     
     switch ( config.mode )
     {
+        case SZ::EB_REL :
+            conf.errorBoundMode = SZ::EB_REL;
+            conf.relErrorBound  = config.eps;
+            break;
+            
         case SZ::EB_ABS :
             conf.errorBoundMode = SZ::EB_ABS;
             conf.absErrorBound  = config.eps;
@@ -695,7 +706,7 @@ compress< std::complex< double > > ( const config &                 config,
 
 template < typename value_t >
 void
-uncompress ( const zarray &  v,
+decompress ( const zarray &  v,
              value_t *      dest,
              const size_t   dim0,
              const size_t   dim1 = 0,
@@ -706,7 +717,7 @@ uncompress ( const zarray &  v,
 template <>
 inline
 void
-uncompress< float > ( const zarray &  v,
+decompress< float > ( const zarray &  v,
                       float *        dest,
                       const size_t   dim0,
                       const size_t   dim1,
@@ -733,7 +744,7 @@ uncompress< float > ( const zarray &  v,
 template <>
 inline
 void
-uncompress< double > ( const zarray &  v,
+decompress< double > ( const zarray &  v,
                        double *       dest,
                        const size_t   dim0,
                        const size_t   dim1,
@@ -760,7 +771,7 @@ uncompress< double > ( const zarray &  v,
 template <>
 inline
 void
-uncompress< std::complex< float > > ( const zarray &            v,
+decompress< std::complex< float > > ( const zarray &            v,
                                       std::complex< float > *   dest,
                                       const size_t              dim0,
                                       const size_t              dim1,
@@ -774,7 +785,7 @@ uncompress< std::complex< float > > ( const zarray &            v,
 template <>
 inline
 void
-uncompress< std::complex< double > > ( const zarray &            v,
+decompress< std::complex< double > > ( const zarray &            v,
                                        std::complex< double > *  dest,
                                        const size_t              dim0,
                                        const size_t              dim1,
@@ -941,7 +952,7 @@ compress< double > ( const config &   config,
 
 template < typename value_t >
 void
-uncompress ( const zarray &  v,
+decompress ( const zarray &  v,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
@@ -952,7 +963,7 @@ uncompress ( const zarray &  v,
 template <>
 inline
 void
-uncompress< float > ( const zarray &  v,
+decompress< float > ( const zarray &  v,
                       float *        dest,
                       const size_t   dim0,
                       const size_t   dim1,
@@ -966,7 +977,7 @@ uncompress< float > ( const zarray &  v,
 template <>
 inline
 void
-uncompress< double > ( const zarray &  zdata,
+decompress< double > ( const zarray &  zdata,
                        double *        dest,
                        const size_t    dim0,
                        const size_t    dim1,
@@ -1083,7 +1094,7 @@ compress< double > ( const config &   config,
 
 template < typename value_t >
 void
-uncompress ( const zarray &  v,
+decompress ( const zarray &  v,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
@@ -1094,7 +1105,7 @@ uncompress ( const zarray &  v,
 template <>
 inline
 void
-uncompress< float > ( const zarray &  zdata,
+decompress< float > ( const zarray &  zdata,
                       float *         dest,
                       const size_t    dim0,
                       const size_t    dim1,
@@ -1111,7 +1122,7 @@ uncompress< float > ( const zarray &  zdata,
 template <>
 inline
 void
-uncompress< double > ( const zarray &  zdata,
+decompress< double > ( const zarray &  zdata,
                        double *        dest,
                        const size_t    dim0,
                        const size_t    dim1,
@@ -1151,7 +1162,7 @@ using  zconfig_t = hlr::compress::half::config;
 using  zarray    = hlr::compress::half::zarray;
 
 using hlr::compress::half::compress;
-using hlr::compress::half::uncompress;
+using hlr::compress::half::decompress;
 using hlr::compress::half::absolute_accuracy;
 using hlr::compress::half::byte_size;
 
@@ -1165,7 +1176,7 @@ using  zconfig_t = hlr::compress::posits::config;
 using  zarray    = hlr::compress::posits::zarray;
 
 using hlr::compress::posits::compress;
-using hlr::compress::posits::uncompress;
+using hlr::compress::posits::decompress;
 using hlr::compress::posits::absolute_accuracy;
 using hlr::compress::posits::byte_size;
 
@@ -1179,7 +1190,7 @@ using  zconfig_t = hlr::compress::sz3::config;
 using  zarray    = hlr::compress::sz3::zarray;
 
 using hlr::compress::sz3::compress;
-using hlr::compress::sz3::uncompress;
+using hlr::compress::sz3::decompress;
 using hlr::compress::sz3::absolute_accuracy;
 using hlr::compress::sz3::byte_size;
 
@@ -1193,7 +1204,7 @@ using  zconfig_t = hlr::compress::sz::config;
 using  zarray    = hlr::compress::sz::zarray;
 
 using hlr::compress::sz::compress;
-using hlr::compress::sz::uncompress;
+using hlr::compress::sz::decompress;
 using hlr::compress::sz::absolute_accuracy;
 using hlr::compress::sz::byte_size;
 
@@ -1207,7 +1218,7 @@ using  zconfig_t = hlr::compress::zfp::config;
 using  zarray    = hlr::compress::zfp::zarray;
 
 using hlr::compress::zfp::compress;
-using hlr::compress::zfp::uncompress;
+using hlr::compress::zfp::decompress;
 using hlr::compress::zfp::absolute_accuracy;
 using hlr::compress::zfp::byte_size;
 

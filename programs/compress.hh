@@ -117,7 +117,7 @@ program_main ()
     
     std::cout << "  " << term::bullet << term::bold << "compression via "
               << hlr::compress::provider
-              << ", ε = " << cmdline::eps << term::reset << std::endl;
+              << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     tic = timer::now();
@@ -137,19 +137,19 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
     
-    auto  diff = matrix::sum( value_t(1), *A, value_t(-1), *zA );
+    auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );
     
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
-    std::cout << "  " << term::bullet << term::bold << "uncompression " << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 
     {
         auto  zB = impl::matrix::copy( *zA );
         
         tic = timer::now();
     
-        impl::matrix::uncompress( *zB );
+        impl::matrix::decompress( *zB );
 
         toc = timer::since( tic );
 

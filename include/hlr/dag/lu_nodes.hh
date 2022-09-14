@@ -9,7 +9,6 @@
 //
 
 #include <hpro/matrix/TMatrix.hh>
-#include <hpro/matrix/TRkMatrix.hh>
 
 #include "hlr/dag/graph.hh"
 #include "hlr/arith/add.hh"
