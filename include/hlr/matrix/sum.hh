@@ -103,7 +103,7 @@ public:
                                 const matrix_t *  X,
                                 matrix_t *        Y,
                                 const matop_t     op = apply_normal ) const;
-    
+
     // same as above but for blas types (no indexset test!)
     virtual void  apply_add   ( const value_t                    alpha,
                                 const blas::vector< value_t > &  x,
@@ -113,6 +113,14 @@ public:
     virtual void  apply_add   ( const value_t                    alpha,
                                 const blas::matrix< value_t > &  X,
                                 blas::matrix< value_t > &        Y,
+                                const matop_t                    op = apply_normal ) const;
+
+    // same as above but use given arithmetic object for computation
+    template < typename arithmetic_t >
+    void          apply_add   ( arithmetic_t &&                  arithmetic,
+                                const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
                                 const matop_t                    op = apply_normal ) const;
 
     ///////////////////////////////////////////////////////////
@@ -227,6 +235,19 @@ linop_sum< value_t >::apply_add   ( const value_t                    alpha,
 {
     for ( auto &  s : _summands )
         s.linop->apply_add( alpha*s.scale, X, Y, blas::apply_op( op, s.op ) );
+}
+
+template < typename value_t >
+template < typename arithmetic_t >
+void
+linop_sum< value_t >::apply_add   ( arithmetic_t &&                  arithmetic,
+                                    const value_t                    alpha,
+                                    const blas::vector< value_t > &  x,
+                                    blas::vector< value_t > &        y,
+                                    const matop_t                    op ) const
+{
+    for ( auto &  s : _summands )
+        arithmetic.prod( alpha * s.scale, blas::apply_op( op, s.op ), * s.linop, x, y );
 }
 
 //

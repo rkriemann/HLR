@@ -22,6 +22,7 @@
 #include "hlr/arith/multiply.hh"
 #include "hlr/arith/solve.hh"
 #include "hlr/seq/arith.hh"
+#include "hlr/matrix/sum.hh"
 
 #include <hlr/dag/lu.hh>
 #include <hlr/tbb/dag.hh>
@@ -1098,6 +1099,8 @@ struct tbb_arithmetic
     {
         if ( is_matrix( M ) )
             hlr::tbb::mul_vec( alpha, op_M, *cptrcast( &M, Hpro::TMatrix< value_t > ), x, y );
+        else if ( dynamic_cast< const hlr::matrix::linop_sum< value_t > * >( &M ) != nullptr )
+            cptrcast( &M, matrix::linop_sum< value_t > )->apply_add( *this, alpha, x, y, op_M );
         else
             M.apply_add( alpha, x, y, op_M );
     }

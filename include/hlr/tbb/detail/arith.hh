@@ -120,6 +120,10 @@ mul_vec_chunk ( const value_t                    alpha,
         {
             M.apply_add( alpha, x_is, yt, op_M );
         }// if
+        else if ( matrix::is_compressible_lowrankS( M ) )
+        {
+            M.apply_add( alpha, x_is, yt, op_M );
+        }// if
         else if ( is_lowrank( M ) )
         {
             auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
@@ -132,7 +136,7 @@ mul_vec_chunk ( const value_t                    alpha,
             }// if
             else if ( op_M == Hpro::apply_transposed )
             {
-                assert( Hpro::is_complex_type< value_t >::value == false );
+                HLR_ASSERT( Hpro::is_complex_type< value_t >::value == false );
             
                 auto  t = blas::mulvec( value_t(1), blas::transposed( blas::mat_U( R ) ), x_is );
 
@@ -193,7 +197,7 @@ mul_vec_chunk ( const value_t                    alpha,
             }// if
         }// if
         else
-            assert( false );
+            HLR_ASSERT( "unsupported matrix type" );
 
         update( M.row_is( op_M ), yt, y_is, mtx_map );
     }// else

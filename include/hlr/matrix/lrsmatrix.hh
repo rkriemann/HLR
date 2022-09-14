@@ -2,10 +2,10 @@
 #define __HLR_MATRIX_LRSMATRIX_HH
 //
 // Project     : HLR
-// File        : lrsmatrix.hh
+// Module      : matrix/lrsmatrix
 // Description : low-rank matrix with U·S·V' representation
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>
@@ -15,6 +15,7 @@
 #include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
+#include <hlr/matrix/compressible.hh>
 
 namespace hlr
 { 
@@ -33,7 +34,7 @@ namespace matrix
 // - compression for U, S and V is implemented
 //
 template < typename T_value >
-class lrsmatrix : public Hpro::TMatrix< T_value >
+class lrsmatrix : public Hpro::TMatrix< T_value >, public compressible
 {
 public:
     using  value_t = T_value;

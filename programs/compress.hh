@@ -6,20 +6,20 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
-#if defined(HAS_UNIVERSAL)
+// #if defined(HAS_UNIVERSAL)
 
-#include <universal/number/posit/posit.hpp>
+// #include <universal/number/posit/posit.hpp>
 
-namespace std
-{
+// namespace std
+// {
 
-template <> struct __is_floating_point_helper< sw::universal::posit< 24, 2 > > : public true_type { };
+// template <> struct __is_floating_point_helper< sw::universal::posit< 24, 2 > > : public true_type { };
 
-sw::universal::posit< 24, 2 > real ( sw::universal::posit< 24, 2 >  f ) { return f; }
+// sw::universal::posit< 24, 2 > real ( sw::universal::posit< 24, 2 >  f ) { return f; }
 
-};
+// };
 
-#endif
+// #endif
 
 #include <hlr/utils/io.hh>
 #include <hlr/matrix/lrmatrix.hh>
@@ -173,6 +173,7 @@ program_main ()
 
         double  t_orig       = 0.0;
         double  t_compressed = 0.0;
+        auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
         
         {
             std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
@@ -206,6 +207,8 @@ program_main ()
             t_orig = min( runtime );
             
             runtime.clear();
+
+            y_ref = std::move( y );
         }
 
         {
@@ -242,6 +245,14 @@ program_main ()
             runtime.clear();
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
     }// if
 }

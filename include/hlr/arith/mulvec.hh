@@ -13,6 +13,7 @@
 #include "hlr/arith/h2.hh"
 #include "hlr/matrix/dense_matrix.hh"
 #include "hlr/matrix/lrmatrix.hh"
+#include "hlr/matrix/lrsmatrix.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
 
@@ -80,6 +81,17 @@ mul_vec ( const value_t                        alpha,
           const matrix::lrmatrix< value_t > &  M,
           const blas::vector< value_t > &      x,
           blas::vector< value_t > &            y )
+{
+    M.apply_add( alpha, x, y, op_M );
+}
+
+template < typename value_t >
+void
+mul_vec ( const value_t                         alpha,
+          const Hpro::matop_t                   op_M,
+          const matrix::lrsmatrix< value_t > &  M,
+          const blas::vector< value_t > &       x,
+          blas::vector< value_t > &             y )
 {
     M.apply_add( alpha, x, y, op_M );
 }
@@ -295,6 +307,7 @@ mul_vec ( const value_t                     alpha,
 {
     using matrix::is_uniform_lowrank;
     using matrix::is_compressible_lowrank;
+    using matrix::is_compressible_lowrankS;
     using matrix::is_compressible_dense;
     
     // assert( M.ncols( op_M ) == x.length() );
@@ -304,6 +317,8 @@ mul_vec ( const value_t                     alpha,
         mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TBlockMatrix< value_t > ), x, y );
     else if ( is_compressible_lowrank( M ) )
         mul_vec( alpha, op_M, * cptrcast( &M, matrix::lrmatrix< value_t > ), x, y );
+    else if ( is_compressible_lowrankS( M ) )
+        mul_vec( alpha, op_M, * cptrcast( &M, matrix::lrsmatrix< value_t > ), x, y );
     else if ( is_lowrank( M ) )
         mul_vec( alpha, op_M, * cptrcast( &M, Hpro::TRkMatrix< value_t > ), x, y );
     else if ( is_uniform_lowrank( M ) )

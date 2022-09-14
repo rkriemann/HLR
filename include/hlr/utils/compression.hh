@@ -817,8 +817,8 @@ uint
 eps_to_rate ( const double eps )
 {
     if      ( eps >= 1e-2  ) return 12;
-    else if ( eps >= 1e-3  ) return 16;
-    else if ( eps >= 1e-4  ) return 20;
+    else if ( eps >= 1e-3  ) return 14;
+    else if ( eps >= 1e-4  ) return 18;
     else if ( eps >= 1e-5  ) return 22;
     else if ( eps >= 1e-6  ) return 26;
     else if ( eps >= 1e-7  ) return 30;
