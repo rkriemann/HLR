@@ -1229,7 +1229,7 @@ using hlr::compress::zfp::byte_size;
 static const char provider[] = "none";
 
 struct zconfig_t {};
-using  zarray    = std::vector< char >;
+struct zarray    {};
 
 #endif
 
