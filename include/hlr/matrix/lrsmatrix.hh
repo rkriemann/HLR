@@ -19,6 +19,9 @@
 namespace hlr
 { 
 
+// activate to also compress S
+#define COMPRESS_S
+
 using indexset = Hpro::TIndexSet;
 
 // local matrix type
@@ -47,7 +50,10 @@ private:
 
     struct compressed_factors
     {
-        compress::zarray  U, S, V;
+        compress::zarray  U, V;
+        #if defined(COMPRESS_S)
+        compress::zarray  S;
+        #endif
     };
 
     using  compressed_storage = compressed_factors;
@@ -308,8 +314,10 @@ protected:
     {
         #if HLR_HAS_COMPRESSION == 1
         _zdata.U = compress::zarray();
-        _zdata.S = compress::zarray();
         _zdata.V = compress::zarray();
+        #if defined(COMPRESS_S)
+        _zdata.S = compress::zarray();
+        #endif
         #endif
     }
 };
@@ -361,12 +369,16 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
     if ( is_compressed() )
     {
         auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
-        auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->col_rank() );
-    
+
         compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
         compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        
+        #if defined(COMPRESS_S)
+        auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
+
+        compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
+        #endif
         
         blas::mulvec_lrs( alpha, uU, uS, uV, op, x, y );
     }// if
@@ -478,12 +490,16 @@ lrsmatrix< value_t >::copy () const
     if ( is_compressed() )
     {
         R->_zdata.U = compress::zarray( _zdata.U.size() );
-        R->_zdata.S = compress::zarray( _zdata.S.size() );
         R->_zdata.V = compress::zarray( _zdata.V.size() );
 
         std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
-        std::copy( _zdata.S.begin(), _zdata.S.end(), R->_zdata.S.begin() );
         std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
+
+        #if defined(COMPRESS_S)
+        R->_zdata.S = compress::zarray( _zdata.S.size() );
+
+        std::copy( _zdata.S.begin(), _zdata.S.end(), R->_zdata.S.begin() );
+        #endif
     }// if
 
     #endif
@@ -569,21 +585,28 @@ lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         return;
 
     auto          oU       = this->U();
-    auto          oS       = this->S();
     auto          oV       = this->V();
     const auto    orowrank = this->row_rank();
     const auto    ocolrank = this->row_rank();
-    const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() + orowrank * ocolrank );
     auto          zU       = compress::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
-    auto          zS       = compress::compress< value_t >( zconfig, oS.data(), oS.nrows(), oS.ncols() );
     auto          zV       = compress::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
+
+    #if defined(COMPRESS_S)
+    auto          oS       = this->S();
+    auto          zS       = compress::compress< value_t >( zconfig, oS.data(), oS.nrows(), oS.ncols() );
+    const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() + orowrank * ocolrank );
+    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV ) + compress::byte_size( zS );
+    #else
+    const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() );
+    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV );
+    #endif
 
     // const auto  vmin = blas::min_abs_val( oU );
     // const auto  vmax = blas::max_abs_val( oU );
 
     // std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
         
-    if ( compress::byte_size( zU ) + compress::byte_size( zV ) + compress::byte_size( zS ) < mem_lr )
+    if ( mem_z < mem_lr )
     {
         _zdata.U  = std::move( zU );
         _U        = std::move( blas::matrix< value_t >( 0, orowrank ) ); // remember rank !!!
@@ -591,8 +614,10 @@ lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _zdata.V  = std::move( zV );
         _V        = std::move( blas::matrix< value_t >( 0, ocolrank ) );
         
+        #if defined(COMPRESS_S)
         _S        = std::move( blas::matrix< value_t >( 0, 0 ) );
         _zdata.S  = std::move( zS );
+        #endif
     }// if
 
     #endif
@@ -627,19 +652,20 @@ lrsmatrix< value_t >::decompress ()
         return;
 
     auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
-
-    compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-    _U = std::move( uU );
-    
     auto  uV = blas::matrix< value_t >( this->ncols(), this->col_rank() );
 
+    compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
     compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+
+    _U = std::move( uU );
     _V = std::move( uV );
     
+    #if defined(COMPRESS_S)
     auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
 
     compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
     _S = std::move( uS );
+    #endif
 
     remove_compressed();
         
@@ -661,8 +687,11 @@ lrsmatrix< value_t >::byte_size () const
     #if HLR_HAS_COMPRESSION == 1
 
     size += hlr::compress::byte_size( _zdata.U );
-    size += hlr::compress::byte_size( _zdata.S );
     size += hlr::compress::byte_size( _zdata.V );
+
+    #if defined(COMPRESS_S)
+    size += hlr::compress::byte_size( _zdata.S );
+    #endif
     
     #endif
     
