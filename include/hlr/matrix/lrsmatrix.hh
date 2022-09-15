@@ -20,7 +20,7 @@ namespace hlr
 { 
 
 // activate to also compress S
-#define COMPRESS_S
+// #define COMPRESS_S
 
 using indexset = Hpro::TIndexSet;
 
@@ -378,9 +378,14 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
         auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
 
         compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
-        #endif
-        
+
         blas::mulvec_lrs( alpha, uU, uS, uV, op, x, y );
+
+        #else
+        
+        blas::mulvec_lrs( alpha, uU, S(), uV, op, x, y );
+        
+        #endif
     }// if
     else
 
