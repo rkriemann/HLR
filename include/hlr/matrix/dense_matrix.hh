@@ -364,10 +364,18 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
         HLR_ASSERT( x.length() == this->ncols( op ) );
         HLR_ASSERT( y.length() == this->nrows( op ) );
 
+        // #if defined(HAS_UNIVERSAL)
+
+        // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zdata, x.data(), value_t(1), y.data() );
+
+        // #else
+        
         auto  M  = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
         compress::decompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
         blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
+
+        // #endif
     }// if
     else
 

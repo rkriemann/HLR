@@ -230,8 +230,8 @@ struct config
     double  pwr_bound_ratio;
 };
 
-inline config  relative_accuracy ( double  eps ) { return config{ REL, 0.0, eps, 0.0 }; }
-inline config  absolute_accuracy ( double  eps ) { return config{ ABS, eps, 0.0, 0.0 }; }
+// inline config  relative_accuracy ( double  eps ) { return config{ REL, 0.0, eps, 0.0 }; }
+inline config  absolute_accuracy ( double  eps ) { return config{ REL, eps, 0.0, 0.0 }; }
 
 //
 // handles arrays allocated within SZ
@@ -1015,6 +1015,140 @@ decompress< double > ( const zarray &  zdata,
     }// switch
 }
 
+namespace detail
+{
+
+//
+// some basic blas functions
+//
+template < size_t nbits,
+           size_t es >
+inline
+void
+mulvec ( const size_t           nrows,
+         const size_t           ncols,
+         const Hpro::matop_t    op_A,
+         const double           dalpha,
+         const unsigned char *  A_ptr,
+         const double *         x_ptr,
+         const double           beta,
+         double *               y_ptr )
+{
+    using  posit_t = sw::universal::posit< nbits, es >;
+
+    auto           A     = reinterpret_cast< const posit_t * >( A_ptr );
+    const posit_t  alpha = dalpha;
+
+    if ( op_A == Hpro::apply_normal )
+    {
+        auto  y = std::vector< posit_t >( nrows );
+        
+        for ( size_t  i = 0; i < nrows; ++i )
+            y[i] = beta * y_ptr[i];
+
+        for ( size_t  j = 0; j < ncols; ++j )
+        {
+            const posit_t  x_j = x_ptr[j];
+            
+            for ( size_t  i = 0; i < nrows; ++i )
+                y[i] += alpha * A[j*nrows+i] * x_j;
+        }// for
+
+        for ( size_t  i = 0; i < nrows; ++i )
+            y_ptr[i] = double( y[i] );
+    }// if
+    else if ( op_A == Hpro::apply_transposed )
+    {
+        auto  x = std::vector< posit_t >( nrows );
+        
+        for ( size_t  i = 0; i < nrows; ++i )
+            x[i] = x_ptr[i];
+        
+        for ( size_t  j = 0; j < ncols; ++j )
+        {
+            posit_t  y_j = beta * y_ptr[j];
+        
+            for ( size_t  i = 0; i < nrows; ++i )
+                y_j += alpha * A[j*nrows+i] * x[i];
+
+            y_ptr[j] = double( y_j );
+        }// for
+    }// if
+    else if ( op_A == Hpro::apply_adjoint )
+    {
+        auto  x = std::vector< posit_t >( nrows );
+        
+        for ( size_t  i = 0; i < nrows; ++i )
+            x[i] = x_ptr[i];
+        
+        for ( size_t  j = 0; j < ncols; ++j )
+        {
+            posit_t  y_j = beta * y_ptr[j];
+        
+            for ( size_t  i = 0; i < nrows; ++i )
+                y_j += alpha * A[j*nrows+i] * x[i];
+
+            y_ptr[j] = double( y_j );
+        }// for
+    }// if
+    else
+        HLR_ERROR( "TODO" );
+}
+
+}// namespace detail
+
+template < typename value_t >
+void
+mulvec ( const size_t         nrows,
+         const size_t         ncols,
+         const Hpro::matop_t  op_A,
+         const value_t        alpha,
+         const zarray &       A,
+         const value_t *      x,
+         const value_t        beta,
+         value_t *            y );
+
+template <>
+inline
+void
+mulvec< double > ( const size_t         nrows,
+                   const size_t         ncols,
+                   const Hpro::matop_t  op_A,
+                   const double         alpha,
+                   const zarray &       A,
+                   const double *       x,
+                   const double         beta,
+                   double *             y )
+{
+    const auto  bitsize = A[0];
+
+    switch ( bitsize )
+    {
+        case  8: detail::mulvec<  8, 1 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 10: detail::mulvec< 10, 1 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 12: detail::mulvec< 12, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 14: detail::mulvec< 14, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 16: detail::mulvec< 16, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 18: detail::mulvec< 18, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 20: detail::mulvec< 20, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 22: detail::mulvec< 22, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 24: detail::mulvec< 24, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 26: detail::mulvec< 26, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 28: detail::mulvec< 28, 2 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 30: detail::mulvec< 30, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 32: detail::mulvec< 32, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 34: detail::mulvec< 34, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 36: detail::mulvec< 36, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 40: detail::mulvec< 40, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 44: detail::mulvec< 44, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 54: detail::mulvec< 54, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+        case 64: detail::mulvec< 64, 3 >( nrows, ncols, op_A, alpha, A.data() + 8, x, beta, y ); break;
+
+        default:
+            HLR_ERROR( "unsupported bitsize " + Hpro::to_string( bitsize ) );
+    }// switch
+}
+    
 }}}// namespace hlr::compress::posits
 
 #endif

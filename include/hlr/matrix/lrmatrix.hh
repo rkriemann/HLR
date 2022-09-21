@@ -288,10 +288,10 @@ public:
         auto          zU      = compress::compress< value_t >( zconfig, oU.data(), oU.nrows(), oU.ncols() );
         auto          zV      = compress::compress< value_t >( zconfig, oV.data(), oV.nrows(), oV.ncols() );
 
-        const auto  vmin = blas::min_abs_val( oU );
-        const auto  vmax = blas::max_abs_val( oU );
+        // const auto  vmin = blas::min_abs_val( oU );
+        // const auto  vmax = blas::max_abs_val( oU );
 
-        std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
+        // std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
         
         if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
         {
