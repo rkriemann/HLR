@@ -92,6 +92,16 @@ MALLOCS      = [ 'default',
                  'tbbmalloc',
                  'tcmalloc' ]
 
+# supported and active compressor
+COMPRESSORS   = [ 'none',
+                  'fp32',
+                  'fp16',
+                  'zfp',
+                  'posits',
+                  'sz',
+                  'sz3' ]
+compressor    = 'none'
+
 ######################################################################
 #
 # helper functions
@@ -221,6 +231,7 @@ opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        s
 opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
+opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS, ignorecase = 2 ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
 opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
@@ -287,6 +298,7 @@ sz3           = opt_env['sz3']
 SZ3_DIR       = opt_env['sz3_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
+compressor    = opt_env['compressor']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
@@ -489,7 +501,14 @@ if sz3 :
 if universal :
     env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-        
+
+if   compressor == 'fp32'   : env.Append( CPPDEFINES = 'COMPRESSOR=1' )
+elif compressor == 'fp16'   : env.Append( CPPDEFINES = 'COMPRESSOR=2' )
+elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'COMPRESSOR=3' )
+elif compressor == 'posits' : env.Append( CPPDEFINES = 'COMPRESSOR=4' )
+elif compressor == 'sz'     : env.Append( CPPDEFINES = 'COMPRESSOR=5' )
+elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
+
 ######################################################################
 #
 # target 'help'
@@ -620,12 +639,13 @@ def show_options ( target, source, env ):
         print( '  {0}lapackflags{1}│ user provided link flags      │ {2}'.format( colors['bold'], colors['reset'], LAPACK_FLAGS ) )
     print( '  {0}malloc{1}     │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
            pathstr( JEMALLOC_DIR if malloc == 'jemalloc' else MIMALLOC_DIR if malloc == 'mimalloc' else TCMALLOC_DIR if malloc == 'tcmalloc' else '' ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),    pathstr( LIKWID_DIR    if likwid    else '' ) )
-    print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),       pathstr( ZFP_DIR       if zfp       else '' ) )
-    print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),        pathstr( SZ_DIR        if sz        else '' ) )
-    print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),       pathstr( SZ3_DIR       if sz3       else '' ) )
-    print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ), pathstr( UNIVERSAL_DIR if universal else '' ) )
-    print( '  {0}half{1}       │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),      pathstr( HALF_DIR      if half      else '' ) )
+    print( '  {0}compressor{1} │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
+    print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
+    print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
+    print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
+    print( '  {0}half{1}       │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
