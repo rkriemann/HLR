@@ -295,6 +295,7 @@ public:
         
         if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
         {
+            std::cout << "lr compressed" << std::endl;
             _zdata.U  = std::move( zU );
             _zdata.V  = std::move( zV );
             this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!
@@ -312,11 +313,11 @@ public:
             return;
         
         const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
-        const auto  normF = blas::norm_F( this->U(), this->V() );
-        const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
+        // const auto  normF = blas::norm_F( this->U(), this->V() );
+        // const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
 
-        compress( compress::absolute_accuracy( eps ) );
-        // compress( compress::relative_accuracy( eps * normF ) );
+        compress( compress::get_config( eps ) );
+        // compress( compress::get_config( eps * normF ) );
     }
 
     // decompress internal data

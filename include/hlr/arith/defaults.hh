@@ -54,6 +54,17 @@ struct default_arithmetic
     {
         M.apply_add( alpha, x, y, op_M );
     }
+
+    template < typename value_t >
+    void
+    prod ( const value_t                    alpha,
+           const matop_t                    op_M,
+           const blas::matrix< value_t > &  M,
+           const blas::vector< value_t > &  x,
+           blas::vector< value_t > &        y ) const
+    {
+        blas::mulvec( alpha, blas::mat_view( op_M, M ), x, value_t(1), y );
+    }
 };
 
 constexpr default_arithmetic arithmetic{};

@@ -9,6 +9,7 @@
 //
 
 #include <hlr/matrix/compress.hh>
+#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/approx/aca.hh>
 #include <hlr/utils/io.hh>
 
@@ -827,6 +828,30 @@ compress ( Hpro::TMatrix< value_t > &  A,
 }
 
 //
+// compress cluster basis data
+//
+template < typename value_t >
+void
+compress ( matrix::cluster_basis< value_t > &  cb,
+           const Hpro::TTruncAcc &             acc )
+{
+    using namespace hlr::matrix;
+
+    cb.compress( acc );
+    
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            if ( is_null( cb.son(i) ) )
+                continue;
+                
+            compress( *cb.son(i), acc );
+        }// for
+    }// if
+}
+
+//
 // decompress matrix
 //
 template < typename value_t >
@@ -853,6 +878,29 @@ decompress ( Hpro::TMatrix< value_t > &  A )
     else if ( is_compressible( A ) )
     {
         dynamic_cast< compressible * >( &A )->decompress();
+    }// if
+}
+
+//
+// decompress cluster basis data
+//
+template < typename value_t >
+void
+decompress ( matrix::cluster_basis< value_t > &  cb )
+{
+    using namespace hlr::matrix;
+
+    cb.decompress();
+    
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            if ( is_null( cb.son(i) ) )
+                continue;
+                
+            decompress( *cb.son(i) );
+        }// for
     }// if
 }
 

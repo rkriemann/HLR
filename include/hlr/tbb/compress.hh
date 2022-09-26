@@ -849,7 +849,7 @@ compress ( Hpro::TMatrix< value_t > &  A,
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
                                               0, BA->nblock_cols() ),
-            [=] ( const auto &  r )
+            [&] ( const auto &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -870,6 +870,30 @@ compress ( Hpro::TMatrix< value_t > &  A,
 }
 
 //
+// compress cluster basis data
+//
+template < typename value_t >
+void
+compress ( matrix::cluster_basis< value_t > &  cb,
+           const Hpro::TTruncAcc &             acc )
+{
+    using namespace hlr::matrix;
+
+    cb.compress( acc );
+    
+    if ( cb.nsons() > 0 )
+    {
+        ::tbb::parallel_for< size_t >(
+            0, cb.nsons(),
+            [&] ( const auto  i )
+            {
+                if ( ! is_null( cb.son(i) ) )
+                    compress( *cb.son(i), acc );
+            } );
+    }// if
+}
+
+//
 // decompress matrix
 //
 template < typename value_t >
@@ -885,7 +909,7 @@ decompress ( Hpro::TMatrix< value_t > &  A )
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< size_t >( 0, BA->nblock_rows(),
                                               0, BA->nblock_cols() ),
-            [=] ( const auto &  r )
+            [&] ( const auto &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -902,6 +926,29 @@ decompress ( Hpro::TMatrix< value_t > &  A )
     else if ( is_compressible( A ) )
     {
         dynamic_cast< compressible * >( &A )->decompress();
+    }// if
+}
+
+//
+// decompress cluster basis data
+//
+template < typename value_t >
+void
+decompress ( matrix::cluster_basis< value_t > &  cb )
+{
+    using namespace hlr::matrix;
+
+    cb.decompress();
+    
+    if ( cb.nsons() > 0 )
+    {
+        ::tbb::parallel_for< size_t >(
+            0, cb.nsons(),
+            [&] ( const auto  i )
+            {
+                if ( ! is_null( cb.son(i) ) )
+                    decompress( *cb.son(i) );
+            } );
     }// if
 }
 

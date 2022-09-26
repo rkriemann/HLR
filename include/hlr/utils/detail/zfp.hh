@@ -49,9 +49,8 @@ eps_to_rate ( const double eps )
 //
 inline config  reversible        ()                     { return config{ zfp_mode_reversible, 0.0, 0, 0 }; }
 inline config  fixed_rate        ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }
-
-inline config  absolute_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_rate, 0.0, 0, eps_to_rate( acc ) }; } // config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
-inline config  relative_accuracy ( const double  acc  ) { HLR_ERROR( "no supported by ZFP" ); return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
+inline config  absolute_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
+inline config  get_config        ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
 
 // holds compressed data
 using  zarray = std::vector< unsigned char >;
@@ -204,7 +203,7 @@ struct mem_accessor
     config  mode;
 
     mem_accessor ( const double  eps )
-            : mode( absolute_accuracy( eps ) )
+            : mode( get_config( eps ) )
     {}
     
     template < typename value_t >

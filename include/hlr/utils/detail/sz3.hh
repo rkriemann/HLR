@@ -33,9 +33,9 @@ struct config
     double  eps;
 };
 
-inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_REL, eps }; }
-// inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_L2NORM, eps }; }
-// inline config  absolute_accuracy ( double  eps ) { return config{ SZ::EB_ABS,    eps }; }
+inline config  get_config ( double  eps ) { return config{ SZ::EB_REL, eps }; }
+// inline config  get_config ( double  eps ) { return config{ SZ::EB_L2NORM, eps }; }
+// inline config  get_config ( double  eps ) { return config{ SZ::EB_ABS,    eps }; }
 
 //
 // handles arrays allocated within SZ
@@ -352,7 +352,7 @@ struct mem_accessor
     config  mode;
 
     mem_accessor ( const double  eps )
-            : mode( absolute_accuracy( eps ) )
+            : mode( get_config( eps ) )
     {}
     
     template < typename value_t >

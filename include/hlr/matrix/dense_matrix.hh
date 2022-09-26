@@ -187,9 +187,9 @@ public:
             std::copy( _zdata.begin(), _zdata.end(), D->_zdata.begin() );
         }// if
 
-        #endif
-
         else
+
+        #endif
         {
             D->blas_mat() = std::move( blas::copy( this->blas_mat() ) );
         }// else
@@ -404,6 +404,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     if ( compress::byte_size( v ) < mem_dense )
     {
+        std::cout << "dense compressed" << std::endl;
         _zdata           = std::move( v );
         this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
@@ -421,8 +422,8 @@ dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         return;
         
     const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
-    const auto  normF = blas::norm_F( this->blas_mat() );
-    const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
+    // const auto  normF = blas::norm_F( this->blas_mat() );
+    // const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
     // const auto  lacc  = acc( this->row_is(), this->col_is() );
     // const auto  peps  = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
     // const auto  vmin = blas::min_val( this->blas_mat() );
@@ -430,8 +431,8 @@ dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
     // std::cout << vmin << " / " << vmax << std::endl;
         
-    // compress( compress::absolute_accuracy( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
-    compress( compress::absolute_accuracy( eps ) );
+    // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+    compress( compress::get_config( eps ) );
 }
 
 //

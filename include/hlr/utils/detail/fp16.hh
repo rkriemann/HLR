@@ -29,10 +29,8 @@ struct config
 // holds compressed data
 using  zarray = std::vector< half >;
 
-inline size_t byte_size ( const zarray &  v ) { return v.size() * sizeof(half); }
-
-inline config  relative_accuracy ( const double  eps  ) { return config{}; } // fixed size
-inline config  absolute_accuracy ( const double  eps  ) { return config{}; }
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(half); }
+inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
 zarray

@@ -42,7 +42,7 @@ using  zarray    = hlr::compress::fp32::zarray;
 
 using hlr::compress::fp32::compress;
 using hlr::compress::fp32::decompress;
-using hlr::compress::fp32::absolute_accuracy;
+using hlr::compress::fp32::get_config;
 using hlr::compress::fp32::byte_size;
 
 #elif COMPRESSOR == 2
@@ -60,7 +60,7 @@ using  zarray    = hlr::compress::fp16::zarray;
 
 using hlr::compress::fp16::compress;
 using hlr::compress::fp16::decompress;
-using hlr::compress::fp16::absolute_accuracy;
+using hlr::compress::fp16::get_config;
 using hlr::compress::fp16::byte_size;
 
 #elif COMPRESSOR == 3 && defined(HAS_ZFP)
@@ -78,7 +78,7 @@ using  zarray    = hlr::compress::zfp::zarray;
 
 using hlr::compress::zfp::compress;
 using hlr::compress::zfp::decompress;
-using hlr::compress::zfp::absolute_accuracy;
+using hlr::compress::zfp::get_config;
 using hlr::compress::zfp::byte_size;
 
 #elif COMPRESSOR == 4
@@ -96,7 +96,7 @@ using  zarray    = hlr::compress::posits::zarray;
 
 using hlr::compress::posits::compress;
 using hlr::compress::posits::decompress;
-using hlr::compress::posits::absolute_accuracy;
+using hlr::compress::posits::get_config;
 using hlr::compress::posits::byte_size;
 
 #elif COMPRESSOR == 5
@@ -114,7 +114,7 @@ using  zarray    = hlr::compress::sz::zarray;
 
 using hlr::compress::sz::compress;
 using hlr::compress::sz::decompress;
-using hlr::compress::sz::absolute_accuracy;
+using hlr::compress::sz::get_config;
 using hlr::compress::sz::byte_size;
 
 #elif COMPRESSOR == 6
@@ -132,7 +132,7 @@ using  zarray    = hlr::compress::sz3::zarray;
 
 using hlr::compress::sz3::compress;
 using hlr::compress::sz3::decompress;
-using hlr::compress::sz3::absolute_accuracy;
+using hlr::compress::sz3::get_config;
 using hlr::compress::sz3::byte_size;
 
 #else // no library available
@@ -155,6 +155,9 @@ static const char provider[] = "none";
 struct zconfig_t {};
 struct zarray    {};
 
+inline zconfig_t  get_config ( double /* eps */ ) { return zconfig_t{}; }
+inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+    
 #endif
 
 }// namespace compress

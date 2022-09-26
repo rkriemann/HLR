@@ -19,8 +19,9 @@
 #include <hpro/cluster/TClusterBasis.hh>
 #endif
 
-#include <hlr/utils/checks.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/compression.hh>
+#include <hlr/utils/checks.hh>
 
 namespace hlr
 { 
@@ -60,6 +61,11 @@ private:
 
     // mutex for synchronised changes
     std::mutex                                 _mtx;
+
+    #if HLR_HAS_COMPRESSION == 1
+    // stores compressed data
+    compress::zarray                           _zdata;
+    #endif
     
 public:
     
@@ -104,7 +110,7 @@ public:
     const cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
 
     void                   set_son   ( const uint       i,
-                                       cluster_basis *  cb )   { _sons[i] = cb; }
+                                       cluster_basis *  cb ) { _sons[i] = cb; }
 
     //
     // access basis
@@ -236,6 +242,39 @@ public:
     //
 
     decltype(_mtx) &  mutex () { return _mtx; }
+
+    //
+    // compression
+    //
+
+    // compress internal data based on given configuration
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+
+    // compress internal data based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+
+    // decompress internal data
+    virtual void   decompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        return ! is_null( _zdata.data() );
+        #else
+        return false;
+        #endif
+    }
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        _zdata = compress::zarray();
+        #endif
+    }
 };
 
 //
@@ -258,6 +297,65 @@ copy ( const cluster_basis< value_src_t > &  src )
     }// for
 
     return dest;
+}
+
+//
+// compress internal data
+//
+template < typename value_t >
+void
+cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( is_compressed() )
+        return;
+
+    const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
+    auto          zV        = compress::compress< value_t >( zconfig, _V.data(), _V.nrows(), _V.ncols() );
+
+    if ( compress::byte_size( zV ) < mem_dense )
+    {
+        _zdata = std::move( zV );
+        _V     = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
+    }// if
+
+    #endif
+}
+
+template < typename value_t >
+void
+cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+{
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    if ( _V.nrows() * _V.ncols() == 0 )
+        return;
+        
+    compress( compress::get_config( acc.rel_eps() ) );
+}
+
+//
+// decompress internal data
+//
+template < typename value_t >
+void
+cluster_basis< value_t >::decompress ()
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( ! is_compressed() )
+        return;
+
+    auto  M = blas::matrix< value_t >( _is.size(), rank() );
+    
+    compress::decompress< value_t >( _zdata, M.data(), M.nrows(), M.ncols() );
+        
+    _V = std::move( M );
+
+    remove_compressed();
+
+    #endif
 }
 
 //

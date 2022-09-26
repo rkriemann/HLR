@@ -20,6 +20,7 @@
 #include "common.hh"
 #include "common-main.hh"
 
+
 using namespace hlr;
 
 using indexset = Hpro::TIndexSet;
@@ -44,34 +45,39 @@ template < typename problem_t >
 void
 program_main ()
 {
+    {
+        using posit_t = sw::universal::posit< 16, 2 >;
+
+        blas::vector< posit_t >  x( 10 );
+        blas::vector< posit_t >  y( 10 );
+
+        blas::add( posit_t(1), x, y );
+
+        blas::matrix< posit_t >  M( 10, 10 );
+
+        blas::mulvec( M, x, y );
+        blas::mulvec( blas::adjoint( M ), x, y );
+    }
+    
     using value_t = typename problem_t::value_t;
 
-    auto  tic    = timer::now();
-    auto  toc    = timer::since( tic );
+    auto  tic     = timer::now();
+    auto  toc     = timer::since( tic );
 
     blas::reset_flops();
     
-    auto  acc    = gen_accuracy();
-    auto  A      = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  acc     = gen_accuracy();
+    auto  problem = gen_problem< problem_t >();
+    auto  coord   = problem->coordinates();
+    auto  ct      = gen_ct( *coord );
+    auto  bct     = gen_bct( *ct, *ct );
+    auto  coeff   = problem->coeff_func();
+    auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+    auto  A       = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
     if ( matrixfile == "" )
     {
-        auto  problem = gen_problem< problem_t >();
-        auto  coord   = problem->coordinates();
-        auto  ct      = gen_ct( *coord );
-        auto  bct     = gen_bct( *ct, *ct );
-        auto  coeff   = problem->coeff_func();
-        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
-    
-        if ( verbose( 3 ) )
-        {
-            Hpro::TPSBlockClusterVis   bc_vis;
-
-            print_vtk( coord.get(), "coord" );
-            bc_vis.id( false ).print( bct->root(), "bct" );
-        }// if
-
         tic = timer::now();
         A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
@@ -92,10 +98,15 @@ program_main ()
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
+
+    // assign clusters since needed for cluster bases
+    seq::matrix::assign_cluster( *A, *bct->root() );
     
+    //////////////////////////////////////////////////////////////////////
     //
     // further compress matrix
     //
+    //////////////////////////////////////////////////////////////////////
 
     auto  zA     = impl::matrix::copy_compressible( *A );
     auto  norm_A = norm::frobenius( *A );
@@ -134,6 +145,75 @@ program_main ()
         
         tic = timer::now();
     
+        impl::matrix::decompress( *zB );
+
+        toc = timer::since( tic );
+
+        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
+    }
+    
+    //////////////////////////////////////////////////////////////////////
+    //
+    // try uniform format
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
+    
+    auto  apx = approx::SVD< value_t >();
+    
+    tic = timer::now();
+    
+    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+
+    toc = timer::since( tic );
+
+    const auto  mem_A2 = A2->byte_size();
+    const auto  mem_rb = rowcb->byte_size();
+    const auto  mem_cb = colcb->byte_size();
+    
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
+
+    tic = timer::now();
+
+    impl::matrix::compress( *rowcb, Hpro::fixed_prec( acc.rel_eps() ) );
+    impl::matrix::compress( *colcb, Hpro::fixed_prec( acc.rel_eps() ) );
+    impl::matrix::compress( *A2, Hpro::fixed_prec( acc.rel_eps() ) );
+
+    toc = timer::since( tic );
+
+    std::cout << "    done in " << format_time( toc ) << std::endl;
+
+    const auto  mem_zA2 = A2->byte_size();
+    const auto  mem_zrb = rowcb->byte_size();
+    const auto  mem_zcb = colcb->byte_size();
+    
+    std::cout << "    mem   = " << format_mem( mem_zA2, mem_zrb, mem_zcb ) << std::endl;
+    std::cout << "      rate  " << boost::format( "%.2f" ) % ( double(mem_A2 + mem_rb + mem_cb) / double(mem_zA2 + mem_zrb + mem_zcb) ) << std::endl;
+
+    auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+
+    error = norm::spectral( impl::arithmetic, *diff2 );
+    
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
+
+    {
+        auto  zB     = impl::matrix::copy( *A2 );
+        auto  rowcb2 = rowcb->copy();
+        auto  colcb2 = colcb->copy();
+                
+        matrix::replace_cluster_basis( *zB, *rowcb2, *colcb2 );
+        
+        tic = timer::now();
+    
+        impl::matrix::decompress( *rowcb2 );
+        impl::matrix::decompress( *colcb2 );
         impl::matrix::decompress( *zB );
 
         toc = timer::since( tic );

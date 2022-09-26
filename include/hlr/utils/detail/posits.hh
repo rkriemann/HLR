@@ -61,8 +61,7 @@ byte_size ( const zarray &  v )
     return 0;
 }
 
-inline config  relative_accuracy ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
-inline config  absolute_accuracy ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
+inline config  get_config ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
 
 template < typename value_t, int bitsize, int expsize >
 void
@@ -365,7 +364,7 @@ struct mem_accessor
     config  mode;
 
     mem_accessor ( const double  eps )
-            : mode( absolute_accuracy( eps ) )
+            : mode( get_config( eps ) )
     {}
     
     template < typename value_t >
