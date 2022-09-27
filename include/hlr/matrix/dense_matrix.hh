@@ -42,7 +42,7 @@ public:
 private:
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
-    compress::zarray  _zdata;
+    compress::zarray  _zM;
     #endif
     
 public:
@@ -161,7 +161,7 @@ public:
     virtual bool   is_compressed () const
     {
         #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _zdata.data() );
+        return ! is_null( _zM.data() );
         #else
         return false;
         #endif
@@ -192,9 +192,9 @@ public:
 
         if ( is_compressed() )
         {
-            D->_zdata = compress::zarray( _zdata.size() );
+            D->_zM = compress::zarray( _zM.size() );
 
-            std::copy( _zdata.begin(), _zdata.end(), D->_zdata.begin() );
+            std::copy( _zM.begin(), _zM.end(), D->_zM.begin() );
         }// if
 
         else
@@ -258,7 +258,7 @@ public:
 
         #if HLR_HAS_COMPRESSION == 1
 
-        size += hlr::compress::byte_size( _zdata );
+        size += hlr::compress::byte_size( _zM );
 
         if ( is_compressed() )
             size -= this->nrows() * this->ncols() * sizeof(value_t);
@@ -273,7 +273,7 @@ protected:
     virtual void   remove_compressed ()
     {
         #if HLR_HAS_COMPRESSION == 1
-        _zdata = compress::zarray();
+        _zM = compress::zarray();
         #endif
     }
     
@@ -352,13 +352,13 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
 
         // #if defined(HAS_UNIVERSAL)
 
-        // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zdata, x.data(), value_t(1), y.data() );
+        // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zM, x.data(), value_t(1), y.data() );
 
         // #else
         
         auto  M  = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-        compress::decompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+        compress::decompress< value_t >( _zM, M );
         blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
 
         // #endif
@@ -386,11 +386,11 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     auto          M         = this->blas_mat();
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
-    auto          v         = compress::compress< value_t >( zconfig, M.data(), M.nrows(), M.ncols() );
+    auto          zM        = compress::compress< value_t >( zconfig, M );
 
-    if ( compress::byte_size( v ) < mem_dense )
+    if ( compress::byte_size( zM ) < mem_dense )
     {
-        _zdata           = std::move( v );
+        _zM           = std::move( zM );
         this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
 
@@ -434,7 +434,7 @@ dense_matrix< value_t >::decompress ()
 
     auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-    compress::decompress< value_t >( _zdata, M.data(), this->nrows(), this->ncols() );
+    compress::decompress< value_t >( _zM, M );
         
     this->blas_mat() = std::move( M );
 

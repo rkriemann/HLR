@@ -20,6 +20,7 @@
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 
 #include <hlr/tbb/detail/uniform_basis.hh>
 
@@ -1715,7 +1716,9 @@ struct rec_uniform_construction
             cluster_basis< typename coeff_t::value_t > &  colcb )
     {
         using value_t = typename coeff_t::value_t;
-    
+
+        using namespace hlr::matrix;
+        
         //
         // decide upon cluster type, how to construct matrix
         //
@@ -1793,6 +1796,14 @@ struct rec_uniform_construction
             else
             {
                 M = coeff.build( bct->is().row_is(), bct->is().col_is() );
+
+                if ( is_dense( *M ) )
+                {
+                    auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                    auto  DD = blas::copy( blas::mat( D ) );
+
+                    return  M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+                }// if
             }// else
         }// if
         else
@@ -1846,6 +1857,8 @@ struct rec_uniform_construction
             cluster_basis< value_t > &        rowcb,
             cluster_basis< value_t > &        colcb )
     {
+        using namespace hlr::matrix;
+
         //
         // decide upon cluster type, how to construct matrix
         //
@@ -1947,6 +1960,13 @@ struct rec_uniform_construction
                         }// for
                     }// for
                 } );
+        }// if
+        else if ( is_dense( A ) )
+        {
+            auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
+            auto  DD = blas::copy( blas::mat( D ) );
+
+            return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
         }// if
         else
         {

@@ -45,20 +45,6 @@ template < typename problem_t >
 void
 program_main ()
 {
-    // {
-    //     using posit_t = sw::universal::posit< 16, 2 >;
-
-    //     blas::vector< posit_t >  x( 10 );
-    //     blas::vector< posit_t >  y( 10 );
-
-    //     blas::add( posit_t(1), x, y );
-
-    //     blas::matrix< posit_t >  M( 10, 10 );
-
-    //     blas::mulvec( M, x, y );
-    //     blas::mulvec( blas::adjoint( M ), x, y );
-    // }
-    
     using value_t = typename problem_t::value_t;
 
     auto  tic     = timer::now();
@@ -128,7 +114,7 @@ program_main ()
     const auto  mem_zA = zA->byte_size();
     
     std::cout << "    mem   = " << format_mem( zA->byte_size() ) << std::endl;
-    std::cout << "      rate  " << boost::format( "%.2f" ) % ( double(mem_A) / double(mem_zA) ) << std::endl;
+    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
@@ -174,9 +160,11 @@ program_main ()
     const auto  mem_A2 = A2->byte_size();
     const auto  mem_rb = rowcb->byte_size();
     const auto  mem_cb = colcb->byte_size();
+    const auto  mem_U  = mem_A2 + mem_rb + mem_cb;
     
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
+    std::cout << "    done in " << format_time( toc ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
+    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_U) / double(mem_A) ) << std::endl;
 
     tic = timer::now();
 
@@ -194,14 +182,15 @@ program_main ()
     const auto  mem_zU  = mem_zA2 + mem_zrb + mem_zcb;
     
     std::cout << "    mem   = " << format_mem( mem_zA2, mem_zrb, mem_zcb ) << std::endl;
-    std::cout << "      rate  " << boost::format( "%.2f" ) % ( double(mem_A2 + mem_rb + mem_cb) / double(mem_zA2 + mem_zrb + mem_zcb) ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.2f" ) % ( double(mem_zU) / double(mem_zA) ) << std::endl;
+    std::cout << "      vs U  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_U) ) << std::endl;
+    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_A) ) << std::endl;
+    std::cout << "      vs zH " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_zA) ) << std::endl;
 
-    // auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+    auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
 
-    // error = norm::spectral( impl::arithmetic, *diff2 );
+    error = norm::spectral( impl::arithmetic, *diff2 );
     
-    // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     // std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 

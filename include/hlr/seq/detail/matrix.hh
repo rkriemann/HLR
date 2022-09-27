@@ -11,6 +11,7 @@
 #include <unordered_map>
 
 #include <hlr/arith/detail/uniform_basis.hh>
+#include <hlr/matrix/dense_matrix.hh>
 
 namespace hlr { namespace seq { namespace matrix { namespace detail {
 
@@ -905,6 +906,8 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
 {
     using value_t = typename coeff_t::value_t;
 
+    using namespace hlr::matrix;
+    
     //
     // decide upon cluster type, how to construct matrix
     //
@@ -982,6 +985,14 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
         else
         {
             M = coeff.build( bct->is().row_is(), bct->is().col_is() );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  DD = blas::copy( blas::mat( D ) );
+
+                return  M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+            }// if
         }// else
     }// if
     else
@@ -1048,14 +1059,16 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
 template < typename basisapx_t >
 std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > >
 build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                    const basisapx_t &                                 basisapx,
-                    const Hpro::TTruncAcc &                            acc,
-                    cluster_basis< typename basisapx_t::value_t > &    rowcb,
-                    cluster_basis< typename basisapx_t::value_t > &    colcb,
-                    is_matrix_map_t< typename basisapx_t::value_t > &  rowmap,
-                    is_matrix_map_t< typename basisapx_t::value_t > &  colmap )
+                    const basisapx_t &                                     basisapx,
+                    const Hpro::TTruncAcc &                                acc,
+                    cluster_basis< typename basisapx_t::value_t > &        rowcb,
+                    cluster_basis< typename basisapx_t::value_t > &        colcb,
+                    is_matrix_map_t< typename basisapx_t::value_t > &      rowmap,
+                    is_matrix_map_t< typename basisapx_t::value_t > &      colmap )
 {
     using value_t = typename basisapx_t::value_t;
+
+    using namespace hlr::matrix;
 
     //
     // decide upon cluster type, how to construct matrix
@@ -1158,6 +1171,13 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
             }// for
         }// for
     }// if
+    else if ( is_dense( A ) )
+    {
+        auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  DD = blas::copy( blas::mat( D ) );
+
+        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+    }// if
     else
     {
         M = A.copy();
@@ -1171,9 +1191,9 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
 template < typename value_t >
 void
-init_cluster_bases ( const Hpro::TMatrix< value_t > &       M,
-                     cluster_basis< value_t > &  rowcb,
-                     cluster_basis< value_t > &  colcb )
+init_cluster_bases ( const Hpro::TMatrix< value_t > &  M,
+                     cluster_basis< value_t > &        rowcb,
+                     cluster_basis< value_t > &        colcb )
 {
     if ( is_blocked( M ) )
     {

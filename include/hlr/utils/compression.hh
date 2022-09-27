@@ -17,6 +17,8 @@
 #include <hlr/utils/detail/fp16.hh>
 #include <hlr/utils/detail/fp32.hh>
 
+#include <hlr/arith/blas.hh>
+
 ////////////////////////////////////////////////////////////
 //
 // compression configuration type
@@ -159,6 +161,41 @@ inline zconfig_t  get_config ( double /* eps */ ) { return zconfig_t{}; }
 inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
     
 #endif
+
+//
+// wrappers for blas::matrix and blas::vector
+//
+template < typename value_t >
+zarray
+compress ( const zconfig_t &                config,
+           const blas::matrix< value_t > &  M )
+{
+    return compress< value_t >( config, M.data(), M.nrows(), M.ncols() );
+}
+
+template < typename value_t >
+zarray
+compress ( const zconfig_t &                config,
+           const blas::vector< value_t > &  v )
+{
+    return compress< value_t >( config, v.data(), v.length() );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &             zdata,
+             blas::matrix< value_t > &  M )
+{
+    return decompress< value_t >( zdata, M.data(), M.nrows(), M.ncols() );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &             zdata,
+             blas::vector< value_t > &  v )
+{
+    return decompress< value_t >( zdata, v.data(), v.length() );
+}
 
 }// namespace compress
 

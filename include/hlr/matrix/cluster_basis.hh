@@ -125,6 +125,18 @@ public:
     // return local basis
     const hlr::blas::matrix< value_t > &  basis   () const { return _V; }
     
+    // return decompressed local basis
+    const hlr::blas::matrix< value_t >    basis_decompressed () const
+    {
+        HLR_ASSERT( is_compressed() );
+
+        auto  V = blas::matrix< value_t >( _is.size(), rank() );
+    
+        compress::decompress< value_t >( _zV, V.data(), V.nrows(), V.ncols() );
+
+        return V;
+    }
+    
     // set local basis
     void
     set_basis  ( const hlr::blas::matrix< value_t > &  aV )
@@ -351,11 +363,7 @@ cluster_basis< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    auto  M = blas::matrix< value_t >( _is.size(), rank() );
-    
-    compress::decompress< value_t >( _zV, M.data(), M.nrows(), M.ncols() );
-        
-    _V = std::move( M );
+    _V = std::move( basis_decompressed() );
 
     remove_compressed();
 

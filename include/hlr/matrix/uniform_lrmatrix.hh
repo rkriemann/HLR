@@ -159,6 +159,18 @@ public:
 
     blas::matrix< value_t > &        coeff ()       { return _S; }
     const blas::matrix< value_t > &  coeff () const { return _S; }
+
+    // return decompressed local basis
+    const hlr::blas::matrix< value_t >  coeff_decompressed () const
+    {
+        HLR_ASSERT( is_compressed() );
+
+        auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
+    
+        compress::decompress< value_t >( _zS, S );
+
+        return S;
+    }
     
     void
     set_coeff ( const blas::matrix< value_t > &  aS )
@@ -220,6 +232,13 @@ public:
                             const value_t                     beta,
                             Hpro::TVector< value_t > *        y,
                             const Hpro::matop_t               op = Hpro::apply_normal ) const;
+    
+    // same as above but for blas::vector
+    virtual void  apply_add   ( const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                const matop_t                    op = apply_normal ) const;
+    using Hpro::TMatrix< value_t >::apply_add;
     
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const Hpro::TTruncAcc & acc );
@@ -313,8 +332,6 @@ uniform_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
                                        Hpro::TVector< value_t > *        vy,
                                        const Hpro::matop_t               op ) const
 {
-    HLR_ASSERT( vx->is_complex() == this->is_complex() );
-    HLR_ASSERT( vy->is_complex() == this->is_complex() );
     HLR_ASSERT( vx->is() == this->col_is( op ) );
     HLR_ASSERT( vy->is() == this->row_is( op ) );
     HLR_ASSERT( is_scalar_all( vx, vy ) );
@@ -324,25 +341,36 @@ uniform_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         
     // y := β·y
     if ( beta != value_t(1) )
-        blas::scale( value_t(beta), Hpro::blas_vec< value_t >( y ) );
-                     
+        blas::scale( value_t(beta), blas::vec( y ) );
+
+    apply_add( alpha, blas::vec( *x ), blas::vec( *y ), op );
+}
+
+template < typename value_t >
+void
+uniform_lrmatrix< value_t >::apply_add ( const value_t                    alpha,
+                                         const blas::vector< value_t > &  x,
+                                         blas::vector< value_t > &        y,
+                                         const Hpro::matop_t              op ) const
+{
+    HLR_ASSERT( x.length() == this->col_is( op ).size() );
+    HLR_ASSERT( y.length() == this->row_is( op ).size() );
+
+    const auto  U = ( row_cb().is_compressed() ? row_cb().basis_decompressed() : row_cb().basis() );
+    const auto  V = ( col_cb().is_compressed() ? col_cb().basis_decompressed() : col_cb().basis() );
+    const auto  S = ( is_compressed()          ? coeff_decompressed()          : coeff() );
+    
     if ( op == Hpro::apply_normal )
     {
         //
         // y = y + U·S·V^H x
         //
-            
-        // t := V^H x
-        auto  t = blas::mulvec( blas::adjoint( col_basis() ), Hpro::blas_vec< value_t >( x ) );
-
-        // s := S t
-        auto  s = blas::mulvec( _S, t );
         
-        // r := U s
-        auto  r = blas::mulvec( row_basis(), s );
+        auto  t = blas::mulvec( blas::adjoint( V ), x );    // t := V^H x
+        auto  s = blas::mulvec( S, t );                     // s := S t
+        auto  r = blas::mulvec( U, s );                     // r := U s
 
-        // y = y + r
-        blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, y );                  // y = y + r
     }// if
     else if ( op == Hpro::apply_transposed )
     {
@@ -351,21 +379,15 @@ uniform_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         //   = y + conj(V)·S^T·U^T x
         //
         
-        // t := U^T x
-        auto  t = blas::mulvec( blas::transposed( row_basis() ), Hpro::blas_vec< value_t >( x ) );
+        auto  t = blas::mulvec( blas::transposed( U ), x ); // t := U^T x
+        auto  s = blas::mulvec( blas::transposed( S ), t ); // s := S^T t
         
-        // s := S^T t
-        auto  s = blas::mulvec( blas::transposed(_S), t );
-
-        // r := conj(V) s
-        blas::conj( s );
+        blas::conj( s );                                    // r := conj(V) s
             
-        auto  r = blas::mulvec( col_basis(), s );
+        auto  r = blas::mulvec( V, s );
 
         blas::conj( r );
-
-        // y = y + r
-        blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, y );                  // y = y + r
     }// if
     else if ( op == Hpro::apply_adjoint )
     {
@@ -374,20 +396,13 @@ uniform_lrmatrix< value_t >::mul_vec ( const value_t                     alpha,
         //   = y + V·S^H·U^H x
         //
         
-        // t := U^H x
-        auto  t = blas::mulvec( blas::adjoint( row_basis() ), Hpro::blas_vec< value_t >( x ) );
+        auto  t = blas::mulvec( blas::adjoint( U ), x );    // t := U^H x
+        auto  s = blas::mulvec( blas::adjoint( S ), t );    // s := S t
+        auto  r = blas::mulvec( V, s );                     // r := V s
 
-        // s := S t
-        auto  s = blas::mulvec( blas::adjoint(_S), t );
-        
-        // r := V s
-        auto  r = blas::mulvec( col_basis(), s );
-
-        // y = y + r
-        blas::add( value_t(alpha), r, Hpro::blas_vec< value_t >( y ) );
+        blas::add( value_t(alpha), r, y );                  // y = y + r
     }// if
 }
-
 
 //
 // truncate matrix to accuracy <acc>
@@ -411,7 +426,7 @@ uniform_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         return;
 
     const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
-    auto          zS        = compress::compress< value_t >( zconfig, _S.data(), _S.nrows(), _S.ncols() );
+    auto          zS        = compress::compress( zconfig, _S );
 
     if ( compress::byte_size( zS ) < mem_dense )
     {
@@ -446,11 +461,7 @@ uniform_lrmatrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    auto  M = blas::matrix< value_t >( row_rank(), col_rank() );
-    
-    compress::decompress< value_t >( _zS, M.data(), M.nrows(), M.ncols() );
-        
-    _S = std::move( M );
+    _S = std::move( coeff_decompressed() );
 
     remove_compressed();
 
@@ -467,6 +478,13 @@ uniform_lrmatrix< value_t >::copy () const
     auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
 
     M->copy_struct_from( this );
+
+    #if HLR_HAS_COMPRESSION == 1
+
+    M->_zS = compress::zarray( _zS.size() );
+    std::copy( _zS.begin(), _zS.end(), M->_zS.begin() );
+
+    #endif
     
     return M;
 }
@@ -510,6 +528,13 @@ uniform_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
     R->_row_cb = _row_cb;
     R->_col_cb = _col_cb;
     R->_S      = std::move( blas::copy( _S ) );
+
+    #if HLR_HAS_COMPRESSION == 1
+
+    R->_zS = compress::zarray( _zS.size() );
+    std::copy( _zS.begin(), _zS.end(), R->_zS.begin() );
+
+    #endif
 }
 
 //
@@ -537,6 +562,12 @@ uniform_lrmatrix< value_t >::byte_size () const
     size += sizeof(_row_cb) + sizeof(_col_cb);
     size += sizeof(_S) + sizeof(value_t) * _S.nrows() * _S.ncols();
 
+    #if HLR_HAS_COMPRESSION == 1
+
+    size += compress::byte_size( _zS );
+
+    #endif
+    
     return size;
 }
 
