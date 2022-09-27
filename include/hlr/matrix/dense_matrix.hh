@@ -40,19 +40,9 @@ public:
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
-    //
-    // compressed storage based on underlying floating point type
-    //
     #if HLR_HAS_COMPRESSION == 1
-    
-    using  compressed_storage = hlr::compress::zarray;
-    
-    #endif
-
-private:
-    #if HLR_HAS_COMPRESSION == 1
-    // optional: stores compressed data
-    compressed_storage    _zdata;
+    // stores compressed data
+    compress::zarray  _zdata;
     #endif
     
 public:
@@ -154,14 +144,34 @@ public:
     virtual void truncate ( const Hpro::TTruncAcc & ) {}
 
     //
+    // compression
+    //
+
+    // compress internal data based on given configuration
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+
+    // compress internal data based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+
+    // decompress internal data
+    virtual void   decompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        return ! is_null( _zdata.data() );
+        #else
+        return false;
+        #endif
+    }
+
+    //
     // RTTI
     //
 
     HPRO_RTTI_DERIVED( dense_matrix, Hpro::TDenseMatrix< value_t > )
-
-    //
-    // virtual constructor
-    //
 
     // return matrix of same class (but no content)
     virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< dense_matrix< value_t > >(); }
@@ -237,30 +247,6 @@ public:
         copy_to( A );
     }
     
-    //
-    // compression
-    //
-
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
-    // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
-
-    // decompress internal data
-    virtual void   decompress    ();
-
-    // return true if data is compressed
-    virtual bool   is_compressed () const
-    {
-        #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _zdata.data() );
-        #else
-        return false;
-        #endif
-    }
-
     //
     // misc
     //
@@ -404,7 +390,6 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     if ( compress::byte_size( v ) < mem_dense )
     {
-        std::cout << "dense compressed" << std::endl;
         _zdata           = std::move( v );
         this->blas_mat() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if

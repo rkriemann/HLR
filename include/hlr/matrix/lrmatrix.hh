@@ -295,7 +295,6 @@ public:
         
         if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
         {
-            std::cout << "lr compressed" << std::endl;
             _zdata.U  = std::move( zU );
             _zdata.V  = std::move( zV );
             this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!

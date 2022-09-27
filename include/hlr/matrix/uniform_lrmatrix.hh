@@ -15,6 +15,7 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
+#include <hlr/matrix/compressible.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
@@ -36,7 +37,7 @@ namespace matrix
 // corresponding matrix block (maybe joined by more matrices).
 //
 template < typename T_value >
-class uniform_lrmatrix : public Hpro::TMatrix< T_value >
+class uniform_lrmatrix : public Hpro::TMatrix< T_value >, public compressible
 {
 public:
     //
@@ -56,6 +57,11 @@ private:
 
     // local coupling matrix
     blas::matrix< value_t >     _S;
+    
+    #if HLR_HAS_COMPRESSION == 1
+    // stores compressed data
+    compress::zarray            _zS;
+    #endif
     
 public:
     //
@@ -120,10 +126,10 @@ public:
     // access internal data
     //
 
-    uint                              rank     () const { return std::min( _S.nrows(), _S.ncols() ); }
+    uint                              rank     () const { return std::min( row_rank(), col_rank() ); }
 
-    uint                              row_rank () const { return _S.nrows(); }
-    uint                              col_rank () const { return _S.ncols(); }
+    uint                              row_rank () const { HLR_ASSERT( ! is_null( _row_cb ) ); return _row_cb->rank(); }
+    uint                              col_rank () const { HLR_ASSERT( ! is_null( _col_cb ) ); return _col_cb->rank(); }
 
     uint                              row_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
     uint                              col_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
@@ -225,6 +231,30 @@ public:
     }
 
     //
+    // compression
+    //
+
+    // compress internal data based on given configuration
+    // - may result in non-compression if storage does not decrease
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+
+    // compress internal data based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+
+    // decompress internal data
+    virtual void   decompress    ();
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        return ! is_null( _zS.data() );
+        #else
+        return false;
+        #endif
+    }
+
+    //
     // RTTI
     //
 
@@ -261,6 +291,15 @@ public:
 
     // return size in bytes used by this object
     virtual size_t byte_size  () const;
+
+protected:
+    // remove compressed storage (standard storage not restored!)
+    virtual void   remove_compressed ()
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        _zS = compress::zarray();
+        #endif
+    }
 };
 
 //
@@ -357,6 +396,65 @@ template < typename value_t >
 void
 uniform_lrmatrix< value_t >::truncate ( const Hpro::TTruncAcc & )
 {
+}
+
+//
+// compress internal data
+//
+template < typename value_t >
+void
+uniform_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( is_compressed() )
+        return;
+
+    const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
+    auto          zS        = compress::compress< value_t >( zconfig, _S.data(), _S.nrows(), _S.ncols() );
+
+    if ( compress::byte_size( zS ) < mem_dense )
+    {
+        _zS = std::move( zS );
+        _S  = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
+
+    #endif
+}
+
+template < typename value_t >
+void
+uniform_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+{
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    if ( this->nrows() * this->ncols() == 0 )
+        return;
+        
+    compress( compress::get_config( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+}
+
+//
+// decompress internal data
+//
+template < typename value_t >
+void
+uniform_lrmatrix< value_t >::decompress ()
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( ! is_compressed() )
+        return;
+
+    auto  M = blas::matrix< value_t >( row_rank(), col_rank() );
+    
+    compress::decompress< value_t >( _zS, M.data(), M.nrows(), M.ncols() );
+        
+    _S = std::move( M );
+
+    remove_compressed();
+
+    #endif
 }
 
 //

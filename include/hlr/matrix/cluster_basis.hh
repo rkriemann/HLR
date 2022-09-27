@@ -64,7 +64,7 @@ private:
 
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
-    compress::zarray                           _zdata;
+    compress::zarray                           _zV;
     #endif
     
 public:
@@ -219,6 +219,10 @@ public:
                       sizeof(cluster_basis< value_t > *) * _sons.size() +
                       sizeof(_V) + sizeof(value_t) * _V.nrows() * _V.ncols() );
 
+        #if HLR_HAS_COMPRESSION == 1
+        n += hlr::compress::byte_size( _zV );
+        #endif
+        
         for ( auto  son : _sons )
             n += son->byte_size();
 
@@ -261,7 +265,7 @@ public:
     virtual bool   is_compressed () const
     {
         #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _zdata.data() );
+        return ! is_null( _zV.data() );
         #else
         return false;
         #endif
@@ -272,7 +276,7 @@ protected:
     virtual void   remove_compressed ()
     {
         #if HLR_HAS_COMPRESSION == 1
-        _zdata = compress::zarray();
+        _zV = compress::zarray();
         #endif
     }
 };
@@ -316,8 +320,8 @@ cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     if ( compress::byte_size( zV ) < mem_dense )
     {
-        _zdata = std::move( zV );
-        _V     = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
+        _zV = std::move( zV );
+        _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
     }// if
 
     #endif
@@ -349,7 +353,7 @@ cluster_basis< value_t >::decompress ()
 
     auto  M = blas::matrix< value_t >( _is.size(), rank() );
     
-    compress::decompress< value_t >( _zdata, M.data(), M.nrows(), M.ncols() );
+    compress::decompress< value_t >( _zV, M.data(), M.nrows(), M.ncols() );
         
     _V = std::move( M );
 
