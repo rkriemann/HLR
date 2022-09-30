@@ -16,6 +16,9 @@
 #include <hlr/utils/detail/posits.hh>
 #include <hlr/utils/detail/fp16.hh>
 #include <hlr/utils/detail/fp32.hh>
+#include <hlr/utils/detail/lz4.hh>
+#include <hlr/utils/detail/zlib.hh>
+#include <hlr/utils/detail/zstd.hh>
 
 #include <hlr/arith/blas.hh>
 
@@ -33,6 +36,9 @@ namespace compress
 
 #if defined(COMPRESSOR)
 
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #if COMPRESSOR == 1
 
 #  define HLR_HAS_COMPRESSION  1
@@ -46,6 +52,9 @@ using hlr::compress::fp32::compress;
 using hlr::compress::fp32::decompress;
 using hlr::compress::fp32::get_config;
 using hlr::compress::fp32::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 #elif COMPRESSOR == 2
 
@@ -65,7 +74,10 @@ using hlr::compress::fp16::decompress;
 using hlr::compress::fp16::get_config;
 using hlr::compress::fp16::byte_size;
 
-#elif COMPRESSOR == 3 && defined(HAS_ZFP)
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 3
 
 #  if !defined(HAS_ZFP)
 #    error "ZFP library not available"
@@ -82,6 +94,9 @@ using hlr::compress::zfp::compress;
 using hlr::compress::zfp::decompress;
 using hlr::compress::zfp::get_config;
 using hlr::compress::zfp::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 #elif COMPRESSOR == 4
 
@@ -101,6 +116,9 @@ using hlr::compress::posits::decompress;
 using hlr::compress::posits::get_config;
 using hlr::compress::posits::byte_size;
 
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif COMPRESSOR == 5
 
 #  if !defined(HAS_SZ)
@@ -119,6 +137,9 @@ using hlr::compress::sz::decompress;
 using hlr::compress::sz::get_config;
 using hlr::compress::sz::byte_size;
 
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif COMPRESSOR == 6
 
 #  if !defined(HAS_SZ3)
@@ -136,6 +157,72 @@ using hlr::compress::sz3::compress;
 using hlr::compress::sz3::decompress;
 using hlr::compress::sz3::get_config;
 using hlr::compress::sz3::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 7
+
+#  if !defined(HAS_LZ4)
+#    error "LZ4 library not available"
+#  endif
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "LZ4";
+
+using  zconfig_t = hlr::compress::lz4::config;
+using  zarray    = hlr::compress::lz4::zarray;
+
+using hlr::compress::lz4::compress;
+using hlr::compress::lz4::decompress;
+using hlr::compress::lz4::get_config;
+using hlr::compress::lz4::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 8
+
+#  if !defined(HAS_ZLIB)
+#    error "ZLIB library not available"
+#  endif
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "zlib";
+
+using  zconfig_t = hlr::compress::zlib::config;
+using  zarray    = hlr::compress::zlib::zarray;
+
+using hlr::compress::zlib::compress;
+using hlr::compress::zlib::decompress;
+using hlr::compress::zlib::get_config;
+using hlr::compress::zlib::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 9
+
+#  if !defined(HAS_ZSTD)
+#    error "ZSTD library not available"
+#  endif
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "Zstd";
+
+using  zconfig_t = hlr::compress::zstd::config;
+using  zarray    = hlr::compress::zstd::zarray;
+
+using hlr::compress::zstd::compress;
+using hlr::compress::zstd::decompress;
+using hlr::compress::zstd::get_config;
+using hlr::compress::zstd::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 #else // no library available
 

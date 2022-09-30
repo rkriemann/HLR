@@ -58,6 +58,12 @@ sz            = False
 SZ_DIR        = '/'
 sz3           = False
 SZ3_DIR       = '/'
+lz4           = False
+LZ4_DIR       = '/'
+zlib          = False
+ZLIB_DIR      = '/'
+zstd          = False
+ZSTD_DIR      = '/'
 universal     = False
 UNIVERSAL_DIR = '/'
 
@@ -99,7 +105,10 @@ COMPRESSORS   = [ 'none',
                   'zfp',
                   'posits',
                   'sz',
-                  'sz3' ]
+                  'sz3',
+                  'lz4',
+                  'zlib',
+                  'zstd' ]
 compressor    = 'none'
 
 ######################################################################
@@ -229,6 +238,12 @@ opts.Add( BoolVariable( 'sz',            'use SZ compression library',         s
 opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',          SZ_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        sz3 ) )
 opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
+opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
+opts.Add( PathVariable( 'zlib_dir',      'ZLIB installation directory',        ZLIB_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       zstd ) )
+opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS, ignorecase = 2 ) )
@@ -296,6 +311,12 @@ sz            = opt_env['sz']
 SZ_DIR        = opt_env['sz_dir']
 sz3           = opt_env['sz3']
 SZ3_DIR       = opt_env['sz3_dir']
+lz4           = opt_env['lz4']
+LZ4_DIR       = opt_env['lz4_dir']
+zlib          = opt_env['zlib']
+ZLIB_DIR      = opt_env['zlib_dir']
+zstd          = opt_env['zstd']
+ZSTD_DIR      = opt_env['zstd_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 compressor    = opt_env['compressor']
@@ -497,6 +518,27 @@ if sz3 :
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
         
+# support for LZ4 compression
+if lz4 :
+    env.Append( CPPDEFINES = 'HAS_LZ4' )
+    env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'lz4' ] )
+        
+# support for ZLIB compression
+if zlib :
+    env.Append( CPPDEFINES = 'HAS_ZLIB' )
+    env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'z' ] )
+        
+# support for Zstd compression
+if zstd :
+    env.Append( CPPDEFINES = 'HAS_ZSTD' )
+    env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'z' ] )
+        
 # support for universal number library
 if universal :
     env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
@@ -508,6 +550,9 @@ elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'COMPRESSOR=3' )
 elif compressor == 'posits' : env.Append( CPPDEFINES = 'COMPRESSOR=4' )
 elif compressor == 'sz'     : env.Append( CPPDEFINES = 'COMPRESSOR=5' )
 elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
+elif compressor == 'lz4'    : env.Append( CPPDEFINES = 'COMPRESSOR=7' )
+elif compressor == 'zlib'   : env.Append( CPPDEFINES = 'COMPRESSOR=8' )
+elif compressor == 'zstd'   : env.Append( CPPDEFINES = 'COMPRESSOR=9' )
 
 ######################################################################
 #

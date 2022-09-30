@@ -167,6 +167,6 @@ private:
     
 }}}// namespace hlr::compress::fp16
 
-#endif
+#endif // HAS_HALF
 
 #endif // __HLR_UTILS_DETAIL_FP16_HH

@@ -149,6 +149,8 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
     
+    std::cout << "  " << term::bullet << term::bold << "construction" << term::reset << std::endl;
+    
     auto  apx = approx::SVD< value_t >();
     
     tic = timer::now();
@@ -166,6 +168,17 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_U) / double(mem_A) ) << std::endl;
 
+    {
+        auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+
+        error = norm::spectral( impl::arithmetic, *diff2 );
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    }
+    
+    std::cout << "  " << term::bullet << term::bold << "compression via "
+              << hlr::compress::provider
+              << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
+    
     tic = timer::now();
 
     impl::matrix::compress( *rowcb, Hpro::fixed_prec( acc.rel_eps() ) );
@@ -186,11 +199,12 @@ program_main ()
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_A) ) << std::endl;
     std::cout << "      vs zH " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_zA) ) << std::endl;
 
-    auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+    {
+        auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
 
-    error = norm::spectral( impl::arithmetic, *diff2 );
-    
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+        error = norm::spectral( impl::arithmetic, *diff2 );
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    }
 
     // std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 

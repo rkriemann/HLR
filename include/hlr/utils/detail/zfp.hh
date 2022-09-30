@@ -51,6 +51,7 @@ inline config  reversible        ()                     { return config{ zfp_mod
 inline config  fixed_rate        ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }
 inline config  absolute_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
 inline config  get_config        ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
+// inline config  get_config        ( const double  acc  ) { return absolute_accuracy( acc ); }
 
 // holds compressed data
 using  zarray = std::vector< unsigned char >;
@@ -242,6 +243,6 @@ private:
 
 }}}// namespace hlr::compress::zfp
 
-#endif
+#endif // HAS_ZFP
 
 #endif // __HLR_UTILS_DETAIL_ZFP_HH
