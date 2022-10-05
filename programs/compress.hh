@@ -49,6 +49,7 @@ program_main ()
 
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
+    auto  runtime = std::vector< double >();
 
     blas::reset_flops();
     
@@ -95,21 +96,37 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     auto  zA     = impl::matrix::copy_compressible( *A );
-    auto  norm_A = norm::frobenius( *A );
+    auto  norm_A = norm::spectral( impl::arithmetic, *A );
     
     std::cout << "  " << term::bullet << term::bold << "compression via "
               << hlr::compress::provider
               << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
-    tic = timer::now();
+    {
+        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+        {
+            auto  B = impl::matrix::copy( *zA );
+        
+            tic = timer::now();
     
-    impl::matrix::compress( *zA, Hpro::fixed_prec( acc.rel_eps() ) );
-    // impl::matrix::compress( *zA, local_accuracy( acc.rel_eps() * norm_A / A->nrows() ) );
+            impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() ) );
 
-    toc = timer::since( tic );
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-    std::cout << "    done in " << format_time( toc ) << std::endl;
+            if ( i == nbench-1 )
+                zA = std::move( B );
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        runtime.clear();
+    }
 
     const auto  mem_zA = zA->byte_size();
     
@@ -129,16 +146,29 @@ program_main ()
     {
         auto  zB = impl::matrix::copy( *zA );
         
-        tic = timer::now();
+        for ( uint  i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
     
-        impl::matrix::decompress( *zB );
+            impl::matrix::decompress( *zB );
+            
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-        toc = timer::since( tic );
+            if ( i < nbench-1 )
+                zB = std::move( impl::matrix::copy( *zA ) );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
 
         auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
-        
-        std::cout << "    done in " << format_time( toc ) << std::endl;
-        std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
+
+        error = norm::spectral( impl::arithmetic, *diffB );
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
     
     //////////////////////////////////////////////////////////////////////
@@ -179,15 +209,40 @@ program_main ()
               << hlr::compress::provider
               << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
     
-    tic = timer::now();
+    {
+        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+        {
+            auto  zA2    = impl::matrix::copy( *A2 );
+            auto  zrowcb = rowcb->copy();
+            auto  zcolcb = colcb->copy();
+        
+            tic = timer::now();
 
-    impl::matrix::compress( *rowcb, Hpro::fixed_prec( acc.rel_eps() ) );
-    impl::matrix::compress( *colcb, Hpro::fixed_prec( acc.rel_eps() ) );
-    impl::matrix::compress( *A2, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zrowcb, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zcolcb, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zA2,    Hpro::fixed_prec( acc.rel_eps() ) );
 
-    toc = timer::since( tic );
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-    std::cout << "    done in " << format_time( toc ) << std::endl;
+            if ( i == nbench-1 )
+            {
+                A2    = std::move( zA2 );
+                rowcb = std::move( zrowcb );
+                colcb = std::move( zcolcb );
+                // update pointers in A2
+                matrix::replace_cluster_basis( *A2, *rowcb, *colcb );
+            }// if
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        runtime.clear();
+    }
 
     const auto  mem_zA2 = A2->byte_size();
     const auto  mem_zrb = rowcb->byte_size();
@@ -237,8 +292,6 @@ program_main ()
 
     if ( nbench > 0 )
     {
-        auto  runtime = std::vector< double >();
-    
         std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
         double  t_orig       = 0.0;

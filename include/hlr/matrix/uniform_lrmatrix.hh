@@ -150,8 +150,8 @@ public:
     set_cluster_bases ( cluster_basis< value_t > &  arow_cb,
                         cluster_basis< value_t > &  acol_cb )
     {
-        HLR_ASSERT(( _S.nrows() == arow_cb.rank() ) &&
-                   ( _S.ncols() == acol_cb.rank() ));
+        HLR_ASSERT(( row_rank() == arow_cb.rank() ) &&
+                   ( col_rank() == acol_cb.rank() ));
             
         _row_cb = & arow_cb;
         _col_cb = & acol_cb;
@@ -175,7 +175,8 @@ public:
     void
     set_coeff ( const blas::matrix< value_t > &  aS )
     {
-        HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
+        HLR_ASSERT( ! is_compressed() );
+        HLR_ASSERT(( aS.nrows() == row_rank() ) && ( aS.ncols() == col_rank() ));
 
         blas::copy( aS, _S );
     }
@@ -183,7 +184,8 @@ public:
     void
     set_coeff ( blas::matrix< value_t > &&  aS )
     {
-        HLR_ASSERT(( aS.nrows() == _row_cb->rank() ) && ( aS.ncols() == _col_cb->rank() ));
+        HLR_ASSERT( ! is_compressed() );
+        HLR_ASSERT(( aS.nrows() == row_rank() ) && ( aS.ncols() == col_rank() ));
 
         _S = std::move( aS );
     }
@@ -193,12 +195,14 @@ public:
     void
     set_coeff_unsafe ( const blas::matrix< value_t > &  aS )
     {
+        HLR_ASSERT( ! is_compressed() );
         blas::copy( aS, _S );
     }
     
     void
     set_coeff_unsafe ( blas::matrix< value_t > &&  aS )
     {
+        HLR_ASSERT( ! is_compressed() );
         _S = std::move( aS );
     }
     
