@@ -102,6 +102,9 @@ MALLOCS      = [ 'default',
 COMPRESSORS   = [ 'none',
                   'fp32',
                   'fp16',
+                  'bf16',
+                  'tf32',
+                  'bf24',
                   'zfp',
                   'posits',
                   'sz',
@@ -553,6 +556,9 @@ elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
 elif compressor == 'lz4'    : env.Append( CPPDEFINES = 'COMPRESSOR=7' )
 elif compressor == 'zlib'   : env.Append( CPPDEFINES = 'COMPRESSOR=8' )
 elif compressor == 'zstd'   : env.Append( CPPDEFINES = 'COMPRESSOR=9' )
+elif compressor == 'bf16'   : env.Append( CPPDEFINES = 'COMPRESSOR=10' )
+elif compressor == 'tf32'   : env.Append( CPPDEFINES = 'COMPRESSOR=11' )
+elif compressor == 'bf24'   : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
 
 ######################################################################
 #

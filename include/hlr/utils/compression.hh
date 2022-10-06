@@ -15,6 +15,9 @@
 #include <hlr/utils/detail/sz3.hh>
 #include <hlr/utils/detail/posits.hh>
 #include <hlr/utils/detail/fp16.hh>
+#include <hlr/utils/detail/bf16.hh>
+#include <hlr/utils/detail/tf32.hh>
+#include <hlr/utils/detail/bf24.hh>
 #include <hlr/utils/detail/fp32.hh>
 #include <hlr/utils/detail/lz4.hh>
 #include <hlr/utils/detail/zlib.hh>
@@ -220,6 +223,57 @@ using hlr::compress::zstd::compress;
 using hlr::compress::zstd::decompress;
 using hlr::compress::zstd::get_config;
 using hlr::compress::zstd::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 10
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "BF16";
+
+using  zconfig_t = hlr::compress::bf16::config;
+using  zarray    = hlr::compress::bf16::zarray;
+
+using hlr::compress::bf16::compress;
+using hlr::compress::bf16::decompress;
+using hlr::compress::bf16::get_config;
+using hlr::compress::bf16::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 11
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "TF32";
+
+using  zconfig_t = hlr::compress::tf32::config;
+using  zarray    = hlr::compress::tf32::zarray;
+
+using hlr::compress::tf32::compress;
+using hlr::compress::tf32::decompress;
+using hlr::compress::tf32::get_config;
+using hlr::compress::tf32::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 12
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "BF24";
+
+using  zconfig_t = hlr::compress::bf24::config;
+using  zarray    = hlr::compress::bf24::zarray;
+
+using hlr::compress::bf24::compress;
+using hlr::compress::bf24::decompress;
+using hlr::compress::bf24::get_config;
+using hlr::compress::bf24::byte_size;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
