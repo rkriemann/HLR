@@ -485,8 +485,11 @@ uniform_lrmatrix< value_t >::copy () const
 
     #if HLR_HAS_COMPRESSION == 1
 
-    M->_zS = compress::zarray( _zS.size() );
-    std::copy( _zS.begin(), _zS.end(), M->_zS.begin() );
+    if ( is_compressed() )
+    {
+        M->_zS = compress::zarray( _zS.size() );
+        std::copy( _zS.begin(), _zS.end(), M->_zS.begin() );
+    }// if
 
     #endif
     

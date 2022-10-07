@@ -76,8 +76,8 @@ program_main ()
         A = io::hpro::read< value_t >( matrixfile );
     }// else
     
-    std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
+    std::cout << "    done in " << format_time( toc ) << std::endl;
 
     const auto  mem_A = A->byte_size();
     
@@ -200,8 +200,8 @@ program_main ()
 
     {
         auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-
-        error = norm::spectral( impl::arithmetic, *diff2 );
+        auto  error = norm::spectral( impl::arithmetic, *diff2 );
+        
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
     
@@ -216,6 +216,8 @@ program_main ()
             auto  zrowcb = rowcb->copy();
             auto  zcolcb = colcb->copy();
         
+            matrix::replace_cluster_basis( *zA2, *zrowcb, *zcolcb );
+            
             tic = timer::now();
 
             impl::matrix::compress( *zrowcb, Hpro::fixed_prec( acc.rel_eps() ) );
@@ -232,7 +234,7 @@ program_main ()
                 rowcb = std::move( zrowcb );
                 colcb = std::move( zcolcb );
                 // update pointers in A2
-                matrix::replace_cluster_basis( *A2, *rowcb, *colcb );
+                // matrix::replace_cluster_basis( *A2, *rowcb, *colcb );
             }// if
         }// for
 
@@ -256,33 +258,33 @@ program_main ()
 
     {
         auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-
-        error = norm::spectral( impl::arithmetic, *diff2 );
+        auto  error = norm::spectral( impl::arithmetic, *diff2 );
+        
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
-    // std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 
-    // {
-    //     auto  zB     = impl::matrix::copy( *A2 );
-    //     auto  rowcb2 = rowcb->copy();
-    //     auto  colcb2 = colcb->copy();
+    {
+        auto  zB     = impl::matrix::copy( *A2 );
+        auto  rowcb2 = rowcb->copy();
+        auto  colcb2 = colcb->copy();
                 
-    //     matrix::replace_cluster_basis( *zB, *rowcb2, *colcb2 );
+        matrix::replace_cluster_basis( *zB, *rowcb2, *colcb2 );
         
-    //     tic = timer::now();
+        tic = timer::now();
     
-    //     impl::matrix::decompress( *rowcb2 );
-    //     impl::matrix::decompress( *colcb2 );
-    //     impl::matrix::decompress( *zB );
+        impl::matrix::decompress( *rowcb2 );
+        impl::matrix::decompress( *colcb2 );
+        impl::matrix::decompress( *zB );
 
-    //     toc = timer::since( tic );
+        toc = timer::since( tic );
 
-    //     auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
         
-    //     std::cout << "    done in " << format_time( toc ) << std::endl;
-    //     std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
-    // }
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
+    }
     
     //////////////////////////////////////////////////////////////////////
     //

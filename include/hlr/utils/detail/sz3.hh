@@ -56,9 +56,12 @@ public:
     {}
 
     zarray ( const size_t  asize )
-            : _ptr( reinterpret_cast< byte_t * >( ::malloc( asize ) ) )
+            : _ptr( nullptr )
             , _size( asize )
-    {}
+    {
+        if ( asize > 0 )
+            _ptr = new byte_t[ asize ];
+    }
 
     zarray ( byte_t *      aptr,
              const size_t  asize )
@@ -100,7 +103,7 @@ public:
 
     void  free ()
     {
-        ::free( _ptr );
+        delete[] _ptr;
         _ptr  = nullptr;
         _size = 0;
     }

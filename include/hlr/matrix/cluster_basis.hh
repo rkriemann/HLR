@@ -132,7 +132,7 @@ public:
 
         auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-        compress::decompress< value_t >( _zV, V.data(), V.nrows(), V.ncols() );
+        compress::decompress< value_t >( _zV, V );
 
         return V;
     }
@@ -328,7 +328,7 @@ cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
         return;
 
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
-    auto          zV        = compress::compress< value_t >( zconfig, _V.data(), _V.nrows(), _V.ncols() );
+    auto          zV        = compress::compress< value_t >( zconfig, _V );
 
     if ( compress::byte_size( zV ) < mem_dense )
     {
