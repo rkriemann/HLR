@@ -283,7 +283,10 @@ program_main ()
         auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
         
         std::cout << "    done in " << format_time( toc ) << std::endl;
-        std::cout << "    error = " << format_error( norm::spectral( impl::arithmetic, *diffB ) ) << std::endl;
+
+        const auto  error = norm::spectral( impl::arithmetic, *diffB );
+            
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
     
     //////////////////////////////////////////////////////////////////////

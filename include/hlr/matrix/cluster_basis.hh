@@ -126,7 +126,7 @@ public:
     const hlr::blas::matrix< value_t > &  basis   () const { return _V; }
     
     // return decompressed local basis
-    const hlr::blas::matrix< value_t >    basis_decompressed () const
+    hlr::blas::matrix< value_t >          basis_decompressed () const
     {
         HLR_ASSERT( is_compressed() );
 
@@ -201,6 +201,17 @@ public:
     {
         auto  cb = std::make_unique< cluster_basis >( _is, std::move( blas::copy( _V ) ) );
 
+        #if HLR_HAS_COMPRESSION == 1
+        
+        if ( is_compressed() )
+        {
+            cb->_zV = compress::zarray( _zV.size() );
+
+            std::copy( _zV.begin(), _zV.end(), cb->_zV.begin() );
+        }// if
+
+        #endif
+        
         cb->set_nsons( nsons() );
 
         for ( uint  i = 0; i < nsons(); ++i )

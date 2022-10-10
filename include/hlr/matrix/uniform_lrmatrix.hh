@@ -161,7 +161,7 @@ public:
     const blas::matrix< value_t > &  coeff () const { return _S; }
 
     // return decompressed local basis
-    const hlr::blas::matrix< value_t >  coeff_decompressed () const
+    hlr::blas::matrix< value_t >     coeff_decompressed () const
     {
         HLR_ASSERT( is_compressed() );
 

@@ -108,6 +108,18 @@ compress< double > ( const config &   config,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     zarray        zdata( nsize );
 
+    // // look for max/min value
+    // double  vmax = data[0];
+    // double  vmin = data[0];
+
+    // for ( size_t  i = 0; i < nsize; ++i )
+    // {
+    //     vmax = std::max( vmax, data[i] );
+    //     vmin = std::min( vmin, data[i] );
+    // }// for
+
+    // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::ceil( std::log2( vmax / vmin ) ) ) ) << std::endl;
+    
     for ( size_t  i = 0; i < nsize; ++i )
         zdata[i] = bfloat24(data[i]);
 
