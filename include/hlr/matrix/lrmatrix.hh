@@ -451,8 +451,8 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     //     compress::decompress( zU, dU );
 
-    //     io::matlab::write( oU, "U1" );
-    //     io::matlab::write( dU, "U2" );
+    //     // io::matlab::write( oU, "U1" );
+    //     // io::matlab::write( dU, "U2" );
             
     //     blas::add( value_t(-1), oU, dU );
     //     std::cout << "U " << this->id() << " : " << blas::norm_F( dU ) / blas::norm_F(oU) << std::endl;
@@ -475,8 +475,8 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     //     compress::decompress( zV, dV );
 
-    //     io::matlab::write( oV, "V1" );
-    //     io::matlab::write( dV, "V2" );
+    //     // io::matlab::write( oV, "V1" );
+    //     // io::matlab::write( dV, "V2" );
             
     //     blas::add( value_t(-1), oV, dV );
     //     std::cout << "V " << this->id() << " : " << blas::norm_F( dV ) / blas::norm_F(oV) << std::endl;

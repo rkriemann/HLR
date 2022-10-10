@@ -90,13 +90,15 @@ compress< double > ( const config &   config,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     // look for min/max value
-    auto  vmin = std::abs( data[0] );
-    auto  vmax = std::abs( data[0] );
+    // (use "float" type to ensure "vmin" really is minimal value
+    //  so we don't have values in [1,2) later)
+    float  vmin = std::abs( data[0] );
+    float  vmax = std::abs( data[0] );
 
     for ( size_t  i = 0; i < nsize; ++i )
     {
-        vmin = std::min( vmin, std::abs( data[i] ) );
-        vmax = std::max( vmax, std::abs( data[i] ) );
+        vmin = std::min< float >( vmin, std::abs( data[i] ) );
+        vmax = std::max< float >( vmax, std::abs( data[i] ) );
     }// for
 
     // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
@@ -152,6 +154,23 @@ compress< double > ( const config &   config,
         const uint    zmant = smant >> prec_ofs;
         uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
+        // if ( i == 4025 )
+        // {
+        //     const byte_t  fp32_sign_pos  = 31;
+        //     const byte_t  sign_shift = exp_bits + prec_bits;
+            
+        //     const uint   mant  = zval & prec_mask;
+        //     const uint   exp   = (zval >> prec_bits) & exp_mask;
+        //     const bool   sign  = zval >> sign_shift;
+
+        //     const uint   rexp  = exp | 0b10000000; // re-add leading bit
+        //     const uint   rmant = mant << prec_ofs;
+        //     const uint   irval = (rexp << fp32_mant_bits) | rmant;
+        //     const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+
+        //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
+        // }
+        
         //
         // copy bits of zval into data buffer
         //

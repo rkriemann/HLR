@@ -171,8 +171,6 @@ program_main ()
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
-    std::exit( 0 );
-    
     //////////////////////////////////////////////////////////////////////
     //
     // try uniform format

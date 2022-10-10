@@ -393,7 +393,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     //     compress::decompress( zM, dM );
     //     blas::add( value_t(-1), M, dM );
-    //     std::cout << "D " << this->id() << " : " << blas::norm_F( dM ) / blas::norm_F(M) << std::endl;
+    //     std::cout << "D " << this->block_is().to_string() << " : " << blas::norm_F( dM ) / blas::norm_F(M) << std::endl;
             
     //     // for ( size_t  i = 0; i < M.nrows() * M.ncols(); ++i )
     //     // {
