@@ -22,6 +22,7 @@
 #include <hlr/utils/detail/lz4.hh>
 #include <hlr/utils/detail/zlib.hh>
 #include <hlr/utils/detail/zstd.hh>
+#include <hlr/utils/detail/afloat.hh>
 
 #include <hlr/arith/blas.hh>
 
@@ -274,6 +275,23 @@ using hlr::compress::bf24::compress;
 using hlr::compress::bf24::decompress;
 using hlr::compress::bf24::get_config;
 using hlr::compress::bf24::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 13
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "afloat";
+
+using  zconfig_t = hlr::compress::afloat::config;
+using  zarray    = hlr::compress::afloat::zarray;
+
+using hlr::compress::afloat::compress;
+using hlr::compress::afloat::decompress;
+using hlr::compress::afloat::get_config;
+using hlr::compress::afloat::byte_size;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////

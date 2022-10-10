@@ -17,6 +17,8 @@
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
+#include <hlr/utils/io.hh> // DEBUG
+
 namespace hlr
 { 
 
@@ -274,72 +276,11 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig )
-    {
-        #if HLR_HAS_COMPRESSION == 1
-        
-        if ( is_compressed() )
-            return;
-
-        auto          oU      = this->U();
-        auto          oV      = this->V();
-        const auto    orank   = oU.ncols();
-        const size_t  mem_lr  = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
-        auto          zU      = compress::compress< value_t >( zconfig, oU );
-        auto          zV      = compress::compress< value_t >( zconfig, oV );
-
-        // const auto  vmin = blas::min_abs_val( oU );
-        // const auto  vmax = blas::max_abs_val( oU );
-
-        // std::cout << vmin << " / " << vmax << " / " << vmax / vmin << std::endl;
-        
-        if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
-        {
-            _zdata.U  = std::move( zU );
-            _zdata.V  = std::move( zV );
-            this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!
-            this->V() = std::move( blas::matrix< value_t >( 0, orank ) );
-        }// if
-
-        #endif
-    }
-
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
-    {
-        HLR_ASSERT( acc.is_fixed_prec() );
-
-        if ( this->nrows() * this->ncols() == 0 )
-            return;
-        
-        const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
-        // const auto  normF = blas::norm_F( this->U(), this->V() );
-        // const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
-
-        compress( compress::get_config( eps ) );
-        // compress( compress::get_config( eps * normF ) );
-    }
+    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+    virtual void   compress      ( const Hpro::TTruncAcc &      acc );
 
     // decompress internal data
-    virtual void   decompress    ()
-    {
-        #if HLR_HAS_COMPRESSION == 1
-        
-        if ( ! is_compressed() )
-            return;
-
-        auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
-        auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
-    
-        compress::decompress< value_t >( _zdata.U, uU );
-        compress::decompress< value_t >( _zdata.V, uV );
-        
-        this->U() = std::move( uU );
-        this->V() = std::move( uV );
-
-        remove_compressed();
-        
-        #endif
-    }
+    virtual void   decompress    ();
 
     // return true if data is compressed
     virtual bool   is_compressed () const
@@ -454,8 +395,8 @@ lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
 template < typename value_t >
 void
 lrmatrix< value_t >::apply_add ( const value_t                   alpha,
-                                const blas::vector< value_t > &  x,
-                                blas::vector< value_t > &        y,
+                                 const blas::vector< value_t > &  x,
+                                 blas::vector< value_t > &        y,
                                  const matop_t                   op ) const
 {
     #if HLR_HAS_COMPRESSION == 1
@@ -482,7 +423,124 @@ lrmatrix< value_t >::apply_add ( const value_t                   alpha,
         Hpro::TRkMatrix< value_t >::apply_add( alpha, x, y, op );
     }// else
 }
+
+//
+// compression
+//
+
+// compress internal data
+// - may result in non-compression if storage does not decrease
+template < typename value_t >
+void
+lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( is_compressed() )
+        return;
+
+    auto          oU      = this->U();
+    auto          oV      = this->V();
+    const auto    orank   = oU.ncols();
+    const size_t  mem_lr  = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
+    auto          zU      = compress::compress< value_t >( zconfig, oU );
+    auto          zV      = compress::compress< value_t >( zconfig, oV );
+
+    // {
+    //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+
+    //     compress::decompress( zU, dU );
+
+    //     io::matlab::write( oU, "U1" );
+    //     io::matlab::write( dU, "U2" );
+            
+    //     blas::add( value_t(-1), oU, dU );
+    //     std::cout << "U " << this->id() << " : " << blas::norm_F( dU ) / blas::norm_F(oU) << std::endl;
+
+    //     // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
+    //     // {
+    //     //     const auto  error = std::abs( (oU.data()[i] - dU.data()[i]) / oU.data()[i] );
+
+    //     //     if ( error > 1e-6 )
+    //     //         std::cout << "U " << i << " : "
+    //     //                   << oU.data()[i] << " / "
+    //     //                   << dU.data()[i] << " / "
+    //     //                   << std::abs( error )
+    //     //                   << std::endl;
+    //     // }// for
+    // }
     
+    // {
+    //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+
+    //     compress::decompress( zV, dV );
+
+    //     io::matlab::write( oV, "V1" );
+    //     io::matlab::write( dV, "V2" );
+            
+    //     blas::add( value_t(-1), oV, dV );
+    //     std::cout << "V " << this->id() << " : " << blas::norm_F( dV ) / blas::norm_F(oV) << std::endl;
+
+    //     // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )
+    //     // {
+    //     //     const auto  error = std::abs( (oV.data()[i] - dV.data()[i]) / oV.data()[i] );
+
+    //     //     if ( error > 1e-6 )
+    //     //         std::cout << "V " << i << " : "
+    //     //                   << oV.data()[i] << " / "
+    //     //                   << dV.data()[i] << " / "
+    //     //                   << std::abs( error )
+    //     //                   << std::endl;
+    //     // }// for
+    // }
+    
+    if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
+    {
+        _zdata.U  = std::move( zU );
+        _zdata.V  = std::move( zV );
+        this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!
+        this->V() = std::move( blas::matrix< value_t >( 0, orank ) );
+    }// if
+
+    #endif
+}
+
+template < typename value_t >
+void
+lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+{
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    if ( this->nrows() * this->ncols() == 0 )
+        return;
+        
+    compress( compress::get_config( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+}
+
+// decompress internal data
+template < typename value_t >
+void
+lrmatrix< value_t >::decompress ()
+{
+    #if HLR_HAS_COMPRESSION == 1
+        
+    if ( ! is_compressed() )
+        return;
+
+    auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
+    auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
+    
+    compress::decompress< value_t >( _zdata.U, uU );
+    compress::decompress< value_t >( _zdata.V, uV );
+        
+    this->U() = std::move( uU );
+    this->V() = std::move( uV );
+
+    remove_compressed();
+        
+    #endif
+}
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_LRMATRIX_HH

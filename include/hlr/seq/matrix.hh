@@ -547,7 +547,7 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         auto  U = blas::copy( blas::mat_U( R ) );
         auto  V = blas::copy( blas::mat_V( R ) );
 
-        if ( true )
+        if ( false )
         {
             auto  RU = blas::matrix< value_t >( U.ncols(), U.ncols() );
             auto  RV = blas::matrix< value_t >( V.ncols(), V.ncols() );

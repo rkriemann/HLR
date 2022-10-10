@@ -1,0 +1,357 @@
+#ifndef __HLR_UTILS_DETAIL_AFLOAT_HH
+#define __HLR_UTILS_DETAIL_AFLOAT_HH
+//
+// Project     : HLR
+// Module      : utils/detail/afloat
+// Description : functions for adaptive floating points
+// Author      : Ronald Kriemann
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+//
+
+// DEBUG
+#include <bitset>
+
+////////////////////////////////////////////////////////////
+//
+// compression using adaptive float representation
+//
+////////////////////////////////////////////////////////////
+
+namespace hlr { namespace compress { namespace afloat {
+
+using byte_t = unsigned char;
+
+inline
+byte_t
+eps_to_rate ( const double eps )
+{
+    if      ( eps >= 1e-2  ) return 10;
+    else if ( eps >= 1e-3  ) return 12;
+    else if ( eps >= 1e-4  ) return 14;
+    else if ( eps >= 1e-5  ) return 16;
+    else if ( eps >= 1e-6  ) return 19;
+    else if ( eps >= 1e-7  ) return 24;
+    else if ( eps >= 1e-8  ) return 34;
+    else if ( eps >= 1e-9  ) return 36;
+    else if ( eps >= 1e-10 ) return 40;
+    else if ( eps >= 1e-12 ) return 44;
+    else if ( eps >= 1e-14 ) return 54;
+    else                     return 64;
+}
+
+struct config
+{
+    byte_t  bitrate;
+};
+
+// holds compressed data
+using  zarray = std::vector< byte_t >;
+
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size(); }
+inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
+
+template < typename value_t >
+zarray
+compress ( const config &   config,
+           value_t *        data,
+           const size_t     dim0,
+           const size_t     dim1 = 0,
+           const size_t     dim2 = 0,
+           const size_t     dim3 = 0 );
+
+template <>
+inline
+zarray
+compress< float > ( const config &   config,
+                    float *          data,
+                    const size_t     dim0,
+                    const size_t     dim1,
+                    const size_t     dim2,
+                    const size_t     dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( nsize );
+
+    HLR_ERROR( "TODO" );
+    
+    return zdata;
+}
+
+template <>
+inline
+zarray
+compress< double > ( const config &   config,
+                     double *         data,
+                     const size_t     dim0,
+                     const size_t     dim1,
+                     const size_t     dim2,
+                     const size_t     dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+
+    // look for min/max value
+    auto  vmin = std::abs( data[0] );
+    auto  vmax = std::abs( data[0] );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        vmin = std::min( vmin, std::abs( data[i] ) );
+        vmax = std::max( vmax, std::abs( data[i] ) );
+    }// for
+
+    // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
+
+    const byte_t  fp32_mant_bits = 23;
+    const byte_t  fp32_exp_bits  = 8;
+    const byte_t  fp32_sign_pos  = 31;
+    
+    const float   scale     = 1.0 / vmin;
+    const byte_t  exp_bits  = std::ceil( std::log2( std::log2( vmax / vmin ) ) ); // maybe - 1 ???
+    const uint    exp_mask  = ( 1 << exp_bits ) - 1;
+    const byte_t  prec_bits = config.bitrate;
+    const uint    prec_mask = ( 1 << prec_bits ) - 1;
+    const byte_t  prec_ofs  = fp32_mant_bits - prec_bits;
+
+    // std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_ofs << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
+
+    const size_t  nbits      = 1 + exp_bits + prec_bits; // number of bits per value
+    const size_t  n_tot_bits = nsize * nbits;            // number of bits for all values
+    const size_t  zsize      = 4 + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
+    auto          zdata      = std::vector< byte_t >( zsize );
+    size_t        pos        = 6; // data starts after scaling factor, exponent bits and precision bits
+    byte_t        bpos       = 0; // start bit position in current byte
+
+    // 32 bit integer as max for now
+    HLR_ASSERT( nbits <= 32 );
+    
+    // first, store scaling factor
+    memcpy( zdata.data(), & scale, 4 );
+
+    // then store number of exponents bits
+    memcpy( zdata.data() + 4, & exp_bits, 1 );
+            
+    // and precision bits
+    memcpy( zdata.data() + 5, & prec_bits, 1 );
+            
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const float   val   = data[i];
+        // const uint    ival  = (*reinterpret_cast< const uint * >( & val ) );
+        // const uint    exp   = ( ival >> 23 ) & ((1 << 8) - 1);
+        // const uint    mant  = ( ival & ((1 << 23) - 1) );
+
+        // scaled value decomposed in exponent and mantissa
+        const float   sval  = scale * std::abs(val) + 1; // +1 for ensuring first bit 1 in exponent ([1:2) => first bit zero!)
+        const uint    isval = (*reinterpret_cast< const uint * >( & sval ) );
+        const uint    sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
+        const uint    smant = ( isval & ((1u << fp32_mant_bits) - 1) );
+
+        // exponent and mantissa reduced to stored size
+        const bool    zsign = ( val < 0 );
+        const uint    zexp  = sexp & exp_mask;
+        const uint    zmant = smant >> prec_ofs;
+        uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+
+        //
+        // copy bits of zval into data buffer
+        //
+        
+        byte_t  sbits = 0; // number of already stored bits of zval
+            
+        do
+        {
+            const byte_t  crest = 8 - bpos;       // remaining bits in current byte
+            const byte_t  zrest = nbits - sbits;  // remaining bits in zval
+            const byte_t  zbyte = zval & 0xff;    // lowest byte of zval
+            
+            HLR_ASSERT( pos < zsize );
+        
+            zdata[pos] |= (zbyte << bpos);
+            zval      >>= crest;
+            sbits      += crest;
+            
+            if ( crest <= zrest )
+            {
+                ++pos;
+                bpos = 0;
+            }// if
+            else
+            {
+                bpos += zrest;
+            }// else
+        } while ( sbits < nbits );
+        
+        
+        // double  val   = data[i];
+        // ulong   ival  = (*reinterpret_cast< ulong * >( & val ) );
+        // uint    exp   = ( ival >> 52 ) & 0x7ff;
+        // auto    bits  = std::bitset< 11 >( exp );
+
+        // double  sval  = val / vmin + 1;
+        // ulong   isval = (*reinterpret_cast< ulong * >( & sval ) );
+        // uint    sexp  = ( isval >> 52 ) & 0x7ff;
+        // auto    sbits = std::bitset< 11 >( sexp );
+        
+        // std::cout << val << " , " << std::bitset< 8 >( exp ) << ":" << std::bitset< 23 >( mant ) << " / "
+        //           // << sval << " , " << std::bitset< 8 >( sexp ) << ":" << std::bitset< 23 >( smant ) << " / "
+        //           // << std::bitset< 8 >( aexp ) << ":" << std::bitset< 23 >( amant ) << " / "
+        //           << rval << " , " << std::bitset< 8 >( rexp ) << ":" << std::bitset< 23 >( rmant ) << " / "
+        //           << std::abs((val - rval) / val)
+        //           << std::endl;
+    }// for
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  v,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 );
+
+template <>
+inline
+void
+decompress< float > ( const zarray &  zdata,
+                      float *         dest,
+                      const size_t    dim0,
+                      const size_t    dim1,
+                      const size_t    dim2,
+                      const size_t    dim3,
+                      const size_t    dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        dest[i] = float( zdata[i] );
+}
+
+template <>
+inline
+void
+decompress< double > ( const zarray &  zdata,
+                       double *        dest,
+                       const size_t    dim0,
+                       const size_t    dim1,
+                       const size_t    dim2,
+                       const size_t    dim3,
+                       const size_t    dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+
+
+    float   scale;
+    byte_t  exp_bits;
+    byte_t  prec_bits;
+
+    // extract scaling factor
+    memcpy( & scale, zdata.data(), 4 );
+
+    // and exponent bits
+    memcpy( & exp_bits, zdata.data() + 4, 1 );
+
+    // and precision bits
+    memcpy( & prec_bits, zdata.data() + 5, 1 );
+
+    const byte_t  fp32_mant_bits = 23;
+    const byte_t  fp32_sign_pos  = 31;
+
+    const byte_t  nbits      = 1 + exp_bits + prec_bits;
+    const uint    prec_mask  = ( 1 << prec_bits ) - 1;
+    const uint    prec_ofs   = fp32_mant_bits - prec_bits;
+    const uint    exp_mask   = ( 1 << exp_bits ) - 1;
+    const byte_t  sign_shift = exp_bits + prec_bits;
+    
+    size_t        pos        = 6;
+    byte_t        bpos       = 0; // bit position in current byte
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        uint    zval  = 0;
+        byte_t  sbits = 0;  // already read bits of zval
+        
+        do
+        {
+            HLR_ASSERT( pos < zdata.size() );
+        
+            const byte_t  crest = 8 - bpos;                               // remaining bits in current byte
+            const byte_t  zrest = nbits - sbits;                          // remaining bits to read for zval
+            const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
+            const byte_t  data  = (zdata[pos] >> bpos) & zmask;           // part of zval in current byte
+                
+            zval  |= (data << sbits); // lowest to highest bit in zdata
+            sbits += crest;
+
+            if ( crest <= zrest )
+            {
+                ++pos;
+                bpos = 0;
+            }// if
+            else
+            {
+                bpos += zrest;
+            }// else
+        } while ( sbits < nbits );
+        
+        const uint   mant  = zval & prec_mask;
+        const uint   exp   = (zval >> prec_bits) & exp_mask;
+        const bool   sign  = zval >> sign_shift;
+
+        const uint   rexp  = exp | 0b10000000; // re-add leading bit
+        const uint   rmant = mant << prec_ofs;
+        const uint   irval = (rexp << fp32_mant_bits) | rmant;
+        const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+
+        dest[i] = double( rval );
+    }// for
+}
+
+//
+// memory accessor
+//
+struct mem_accessor
+{
+    mem_accessor ( const double  /* eps */ )
+    {}
+    
+    template < typename value_t >
+    zarray
+    encode ( value_t *        data,
+             const size_t     dim0,
+             const size_t     dim1 = 0,
+             const size_t     dim2 = 0,
+             const size_t     dim3 = 0 )
+    {
+        return compress( config(), data, dim0, dim1, dim2, dim3 );
+    }
+    
+    template < typename value_t >
+    void
+    decode ( const zarray &  buffer,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0 )
+    {
+        decompress( buffer, dest, dim0, dim1, dim2, dim3 );
+    }
+    
+    size_t
+    byte_size ( const zarray &  v )
+    {
+        return afloat::byte_size( v );
+    }
+    
+private:
+
+    mem_accessor ();
+};
+    
+}}}// namespace hlr::compress::afloat
+
+#endif // __HLR_UTILS_DETAIL_AFLOAT_HH

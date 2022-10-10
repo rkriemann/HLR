@@ -170,6 +170,8 @@ program_main ()
         error = norm::spectral( impl::arithmetic, *diffB );
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
+
+    std::exit( 0 );
     
     //////////////////////////////////////////////////////////////////////
     //

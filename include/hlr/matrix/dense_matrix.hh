@@ -388,6 +388,26 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
 
+    // {
+    //     auto  dM = blas::matrix< value_t >( M.nrows(), M.ncols() );
+
+    //     compress::decompress( zM, dM );
+    //     blas::add( value_t(-1), M, dM );
+    //     std::cout << "D " << this->id() << " : " << blas::norm_F( dM ) / blas::norm_F(M) << std::endl;
+            
+    //     // for ( size_t  i = 0; i < M.nrows() * M.ncols(); ++i )
+    //     // {
+    //     //     const auto  error = std::abs( (M.data()[i] - dM.data()[i]) / M.data()[i] );
+
+    //     //     if ( error > 1e-6 )
+    //     //         std::cout << "D " << i << " : "
+    //     //                   << M.data()[i] << " / "
+    //     //                   << dM.data()[i] << " / "
+    //     //                   << std::abs( error )
+    //     //                   << std::endl;
+    //     // }// for
+    // }
+    
     if ( compress::byte_size( zM ) < mem_dense )
     {
         _zM           = std::move( zM );

@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
+// DEBUG
+#include <bitset>
+
 ////////////////////////////////////////////////////////////
 //
 // compression using BF24 via half library
@@ -108,17 +111,72 @@ compress< double > ( const config &   config,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     zarray        zdata( nsize );
 
-    // // look for max/min value
-    // double  vmax = data[0];
-    // double  vmin = data[0];
+    // look for min value
+    const size_t  step = std::ceil( nsize / 20 );
+    double        vmin = data[0];
+    double        vmax = data[0];
 
-    // for ( size_t  i = 0; i < nsize; ++i )
-    // {
-    //     vmax = std::max( vmax, data[i] );
-    //     vmin = std::min( vmin, data[i] );
-    // }// for
+    for ( size_t  i = 0; i < nsize; i += step )
+    {
+        vmin = std::min( vmin, data[i] );
+        vmax = std::max( vmax, data[i] );
+    }// for
+
+    std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
+
+    const float scale      = 1.0 / vmin;
+    const uint  exp_bits   = std::ceil( std::log2( std::log2( vmax / vmin ) ) ); // maybe - 1 ???
+    const uint  exp_mask   = ( 1 << exp_bits ) - 1;
+    const uint  mant_bits  = 23;
+    const uint  prec_bits  = 16;
+    const uint  prec_mask  = ( 1 << prec_bits ) - 1;
+    const uint  prec_shift = mant_bits - prec_bits;
+
+    std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_shift << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
+    
+    for ( size_t  i = 0; i < nsize; i += step )
+    {
+        float   val   = data[i];
+        uint    ival  = (*reinterpret_cast< uint * >( & val ) );
+        uint    exp   = ( ival >> 23 ) & ((1 << 8) - 1);
+        uint    mant  = ( ival & ((1 << 23) - 1) );
+        bool    sign  = ival & (1 << 31);
+
+        float   sval  = scale * val + 1; // +1 for ensuring first bit 1 in exponent ([1:2) => first bit zero!)
+        uint    isval = (*reinterpret_cast< uint * >( & sval ) );
+        uint    sexp  = ( isval >> 23 ) & ((1 << 8) - 1);
+        uint    smant = ( isval & ((1 << 23) - 1) );
+
+        uint    aexp  = sexp & exp_mask;
+        uint    amant = smant >> prec_shift;
+
+        uint    rexp  = aexp | 0b10000000;
+        uint    rmant = amant << prec_shift;
+        uint    rival = (rexp << 23) | rmant;
+        float   rval  = ( * reinterpret_cast< float * >( & rival ) - 1 ) / scale;
+        // float   rval  = (sval - 1) / scale;
+        
+        // double  val   = data[i];
+        // ulong   ival  = (*reinterpret_cast< ulong * >( & val ) );
+        // uint    exp   = ( ival >> 52 ) & 0x7ff;
+        // auto    bits  = std::bitset< 11 >( exp );
+
+        // double  sval  = val / vmin + 1;
+        // ulong   isval = (*reinterpret_cast< ulong * >( & sval ) );
+        // uint    sexp  = ( isval >> 52 ) & 0x7ff;
+        // auto    sbits = std::bitset< 11 >( sexp );
+        
+        std::cout << val << " , " << std::bitset< 8 >( exp ) << ":" << std::bitset< 23 >( mant ) << " / "
+                  // << sval << " , " << std::bitset< 8 >( sexp ) << ":" << std::bitset< 23 >( smant ) << " / "
+                  // << std::bitset< 8 >( aexp ) << ":" << std::bitset< 23 >( amant ) << " / "
+                  << rval << " , " << std::bitset< 8 >( rexp ) << ":" << std::bitset< 23 >( rmant ) << " / "
+                  << std::abs((val - rval) / val)
+                  << std::endl;
+    }// for
 
     // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::ceil( std::log2( vmax / vmin ) ) ) ) << std::endl;
+
+    std::exit( 0 );
     
     for ( size_t  i = 0; i < nsize; ++i )
         zdata[i] = bfloat24(data[i]);
