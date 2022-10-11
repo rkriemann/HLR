@@ -11,57 +11,21 @@
 ////////////////////////////////////////////////////////////
 //
 // compression using BF16 via half library
-// - only fixed compression size (16 bits)
+// - only fixed compression size (1+8+7 bits)
 //
 ////////////////////////////////////////////////////////////
 
 namespace hlr { namespace compress { namespace bf16 {
 
-struct bfloat16
-{
-    unsigned short int  data;
-    
-public:
-    bfloat16 ()
-    {
-        data = 0;
-    }
-    
-    bfloat16 ( const float f )
-    {
-        *this = f;
-    }
-    
-    // cast to float
-    operator float () const
-    {
-        unsigned int proc = data << 16;
-        
-        return * reinterpret_cast< float* >( & proc );
-    }
-    
-    // cast to bfloat16
-    bfloat16 &
-    operator = ( float float_val )
-    {
-        data = (*reinterpret_cast< unsigned int * >( & float_val ) ) >> 16;
-        
-        return *this;
-    }
-
-    bfloat16 operator + ( bfloat16  f ) { return float(*this) + float(f); }
-    bfloat16 operator - ( bfloat16  f ) { return float(*this) - float(f); }
-    bfloat16 operator * ( bfloat16  f ) { return float(*this) * float(f); }
-    bfloat16 operator / ( bfloat16  f ) { return float(*this) / float(f); }
-};
+using ushort_t = unsigned short;
 
 struct config
 {};
 
 // holds compressed data
-using  zarray = std::vector< bfloat16 >;
+using  zarray = std::vector< ushort_t >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(bfloat16); }
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(ushort_t); }
 inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
@@ -87,8 +51,12 @@ compress< float > ( const config &   config,
     zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = bfloat16(data[i]);
+    {
+        const uint  ival = (* reinterpret_cast< const uint * >( & data[i] ) ) >> 16;
 
+        zdata[i] = ival;
+    }// for
+    
     return zdata;
 }
 
@@ -106,7 +74,12 @@ compress< double > ( const config &   config,
     zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = bfloat16(data[i]);
+    {
+        const float  fval = float( data[i] );
+        const uint   ival = (* reinterpret_cast< const uint * >( & fval ) ) >> 16;
+
+        zdata[i] = ival;
+    }// for
 
     return zdata;
 }
@@ -135,7 +108,11 @@ decompress< float > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = float( zdata[i] );
+    {
+        const uint  ival = zdata[i] << 16;
+        
+        dest[i] = * reinterpret_cast< const float * >( & ival );
+    }// for
 }
 
 template <>
@@ -152,7 +129,12 @@ decompress< double > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = double( zdata[i] );
+    {
+        const uint   ival = zdata[i] << 16;
+        const float  fval = * reinterpret_cast< const float * >( & ival );
+        
+        dest[i] = double( fval );
+    }// for
 }
 
 //

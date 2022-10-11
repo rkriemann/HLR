@@ -37,9 +37,9 @@ eps_to_rate ( const double eps )
     else if ( eps >= 1e-3  ) return 12;
     else if ( eps >= 1e-4  ) return 14;
     else if ( eps >= 1e-5  ) return 16;
-    else if ( eps >= 1e-6  ) return 19;
-    else if ( eps >= 1e-7  ) return 24;
-    else if ( eps >= 1e-8  ) return 34;
+    else if ( eps >= 1e-6  ) return 20;
+    else if ( eps >= 1e-7  ) return 22;
+    else if ( eps >= 1e-8  ) return 23;
     else if ( eps >= 1e-9  ) return 36;
     else if ( eps >= 1e-10 ) return 40;
     else if ( eps >= 1e-12 ) return 44;
@@ -124,6 +124,7 @@ compress< double > ( const config &   config,
     const uint    prec_mask = ( 1 << prec_bits ) - 1;
     const byte_t  prec_ofs  = fp32_mant_bits - prec_bits;
 
+    // std::cout << uint(exp_bits) << std::endl;
     // std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_ofs << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
 
     const size_t  nbits      = 1 + exp_bits + prec_bits; // number of bits per value
@@ -133,8 +134,11 @@ compress< double > ( const config &   config,
     size_t        pos        = 6; // data starts after scaling factor, exponent bits and precision bits
     byte_t        bpos       = 0; // start bit position in current byte
 
+    // std::cout << uint(nbits) << std::endl;
+    
     // 32 bit integer as max for now
     HLR_ASSERT( nbits <= 32 );
+    HLR_ASSERT( prec_bits <= 23 );
     
     // first, store scaling factor
     memcpy( zdata.data(), & scale, 4 );
@@ -166,7 +170,6 @@ compress< double > ( const config &   config,
         const uint    zmant = smant >> prec_ofs;
         uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
-        // if ( i == 4025 )
         // {
         //     const byte_t  fp32_sign_pos  = 31;
         //     const byte_t  sign_shift = exp_bits + prec_bits;
