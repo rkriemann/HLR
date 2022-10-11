@@ -20,6 +20,10 @@
 #include "common.hh"
 #include "common-main.hh"
 
+// namespace hlr { namespace compress { namespace afloat {
+// double  t_load = 0;
+// double  t_decode = 0;
+// }}}
 
 using namespace hlr;
 
@@ -383,5 +387,8 @@ program_main ()
             std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
     }// if
+
+    // std::cout << "load   = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_load   << std::endl;
+    // std::cout << "decode = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_decode << std::endl;
 }
     

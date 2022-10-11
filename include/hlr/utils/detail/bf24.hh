@@ -17,54 +17,15 @@
 
 namespace hlr { namespace compress { namespace bf24 {
 
-struct bfloat24
-{
-    unsigned char  data[3];
-    
-public:
-    bfloat24 ()
-            : data{ 0, 0, 0 }
-    {}
-    
-    bfloat24 ( const float f )
-    {
-        *this = f;
-    }
-    
-    // cast to float
-    operator float () const
-    {
-        unsigned int  proc = (data[2] << 24) | (data[1] << 16) | (data[0] << 8);
-
-        return * reinterpret_cast< float* >( & proc );
-    }
-    
-    // cast to bfloat24
-    bfloat24 &
-    operator = ( float  float_val )
-    {
-        unsigned int  uf = (*reinterpret_cast< unsigned int * >( & float_val ) ) >> 8;
-
-        data[2] = (uf & 0xff0000) >> 16;
-        data[1] = (uf & 0xff00) >> 8;
-        data[0] = (uf & 0xff);
-        
-        return *this;
-    }
-
-    bfloat24 operator + ( bfloat24  f ) { return float(*this) + float(f); }
-    bfloat24 operator - ( bfloat24  f ) { return float(*this) - float(f); }
-    bfloat24 operator * ( bfloat24  f ) { return float(*this) * float(f); }
-    bfloat24 operator / ( bfloat24  f ) { return float(*this) / float(f); }
-};
+using byte_t = unsigned char;
 
 struct config
 {};
 
 // holds compressed data
-using  zarray = std::vector< bfloat24 >;
+using  zarray = std::vector< byte_t >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(bfloat24); }
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size(); }
 inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
@@ -87,10 +48,18 @@ compress< float > ( const config &   config,
                     const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize );
+    zarray        zdata( nsize * 3 );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = bfloat24(data[i]);
+    {
+        // reduce mantissa size by 8 bits
+        const uint    ival = (*reinterpret_cast< const uint * >( & data[i] ) ) >> 8;
+        const size_t  zpos = 3*i;
+
+        zdata[zpos+2] = (ival & 0xff0000) >> 16;
+        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
+        zdata[zpos]   = (ival & 0x0000ff);
+    }// for
 
     return zdata;
 }
@@ -106,10 +75,19 @@ compress< double > ( const config &   config,
                      const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize );
+    zarray        zdata( nsize * 3 );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = bfloat24(data[i]);
+    {
+        // convert to float, reduce mantissa size by 8 bits
+        const float   fval = data[i];
+        const uint    ival = (*reinterpret_cast< const uint * >( & fval ) ) >> 8;
+        const size_t  zpos = 3*i;
+
+        zdata[zpos+2] = (ival & 0xff0000) >> 16;
+        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
+        zdata[zpos]   = (ival & 0x0000ff);
+    }// for
 
     return zdata;
 }
@@ -138,7 +116,12 @@ decompress< float > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = float( zdata[i] );
+    {
+        const size_t  zpos = 3*i;
+        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
+        
+        dest[i] = * reinterpret_cast< const float * >( & ival );
+    }// for
 }
 
 template <>
@@ -155,7 +138,13 @@ decompress< double > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = double( zdata[i] );
+    {
+        const size_t  zpos = 3*i;
+        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
+        const float   fval = * reinterpret_cast< const float * >( & ival );
+        
+        dest[i] = double( fval );
+    }// for
 }
 
 //
