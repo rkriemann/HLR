@@ -128,6 +128,8 @@ public:
     // return decompressed local basis
     hlr::blas::matrix< value_t >          basis_decompressed () const
     {
+        #if HLR_HAS_COMPRESSION == 1
+        
         HLR_ASSERT( is_compressed() );
 
         auto  V = blas::matrix< value_t >( _is.size(), rank() );
@@ -135,6 +137,12 @@ public:
         compress::decompress< value_t >( _zV, V );
 
         return V;
+
+        #else
+
+        return _V;
+        
+        #endif
     }
     
     // set local basis

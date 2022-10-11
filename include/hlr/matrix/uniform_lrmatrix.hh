@@ -163,6 +163,8 @@ public:
     // return decompressed local basis
     hlr::blas::matrix< value_t >     coeff_decompressed () const
     {
+        #if HLR_HAS_COMPRESSION == 1
+        
         HLR_ASSERT( is_compressed() );
 
         auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
@@ -170,6 +172,12 @@ public:
         compress::decompress< value_t >( _zS, S );
 
         return S;
+
+        #else
+
+        return _S;
+
+        #endif
     }
     
     void
