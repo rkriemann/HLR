@@ -212,6 +212,7 @@ opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', ''
 
 opts.Add(               'cxx',       'C++ compiler to use',           CXX )
 opts.Add(               'cxxflags',  'C++ compiler flags',            CXXFLAGS )
+opts.Add(               'optflags',  'compiler optimization flags',   OPTFLAGS )
 opts.Add(               'cpuflags',  'path to cpuflags',              CPUFLAGS )
 opts.Add(               'defines',   'preprocessor defines',          DEFINES )
 
@@ -284,6 +285,7 @@ if 'all' in frameworks : frameworks = FRAMEWORKS
 
 CXX          = opt_env['cxx']
 CXXFLAGS     = opt_env['cxxflags']
+OPTFLAGS     = opt_env['optflags']
 CPUFLAGS     = opt_env['cpuflags']
 DEFINES      = opt_env['defines']
 
@@ -669,6 +671,10 @@ def show_options ( target, source, env ):
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}cxx{1}        │ C++ compiler                  │'.format( colors['bold'], colors['reset'] ), CXX )
+    print( '  {0}cxxflags{1}   │ C++ compiler flags            │'.format( colors['bold'], colors['reset'] ), CXXFLAGS )
+    print( '  {0}optflags{1}   │ compiler optimization flags   │'.format( colors['bold'], colors['reset'] ), OPTFLAGS )
     print( ' ────────────┼───────────────────────────────┼──────────' )
 
     # split "programs" into smaller pieces

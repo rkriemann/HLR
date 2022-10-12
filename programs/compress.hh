@@ -20,10 +20,10 @@
 #include "common.hh"
 #include "common-main.hh"
 
-// namespace hlr { namespace compress { namespace afloat {
-// double  t_load = 0;
-// double  t_decode = 0;
-// }}}
+namespace hlr { namespace compress { namespace afloat {
+double  t_load = 0;
+double  t_decode = 0;
+}}}
 
 using namespace hlr;
 
@@ -181,117 +181,117 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
+    // std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
     
-    std::cout << "  " << term::bullet << term::bold << "construction" << term::reset << std::endl;
+    // std::cout << "  " << term::bullet << term::bold << "construction" << term::reset << std::endl;
     
-    auto  apx = approx::SVD< value_t >();
+    // auto  apx = approx::SVD< value_t >();
     
-    tic = timer::now();
+    // tic = timer::now();
     
-    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+    // auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
-    toc = timer::since( tic );
+    // toc = timer::since( tic );
 
-    const auto  mem_A2 = A2->byte_size();
-    const auto  mem_rb = rowcb->byte_size();
-    const auto  mem_cb = colcb->byte_size();
-    const auto  mem_U  = mem_A2 + mem_rb + mem_cb;
+    // const auto  mem_A2 = A2->byte_size();
+    // const auto  mem_rb = rowcb->byte_size();
+    // const auto  mem_cb = colcb->byte_size();
+    // const auto  mem_U  = mem_A2 + mem_rb + mem_cb;
     
-    std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_U) / double(mem_A) ) << std::endl;
+    // std::cout << "    done in " << format_time( toc ) << std::endl;
+    // std::cout << "    mem   = " << format_mem( mem_A2, mem_rb, mem_cb ) << std::endl;
+    // std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_U) / double(mem_A) ) << std::endl;
 
-    {
-        auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = norm::spectral( impl::arithmetic, *diff2 );
+    // {
+    //     auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+    //     auto  error = norm::spectral( impl::arithmetic, *diff2 );
         
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
-    }
+    //     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // }
     
-    std::cout << "  " << term::bullet << term::bold << "compression via "
-              << hlr::compress::provider
-              << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
+    // std::cout << "  " << term::bullet << term::bold << "compression via "
+    //           << hlr::compress::provider
+    //           << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
     
-    {
-        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
-        {
-            auto  zA2    = impl::matrix::copy( *A2 );
-            auto  zrowcb = rowcb->copy();
-            auto  zcolcb = colcb->copy();
+    // {
+    //     for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+    //     {
+    //         auto  zA2    = impl::matrix::copy( *A2 );
+    //         auto  zrowcb = rowcb->copy();
+    //         auto  zcolcb = colcb->copy();
         
-            matrix::replace_cluster_basis( *zA2, *zrowcb, *zcolcb );
+    //         matrix::replace_cluster_basis( *zA2, *zrowcb, *zcolcb );
             
-            tic = timer::now();
+    //         tic = timer::now();
 
-            impl::matrix::compress( *zrowcb, Hpro::fixed_prec( acc.rel_eps() ) );
-            impl::matrix::compress( *zcolcb, Hpro::fixed_prec( acc.rel_eps() ) );
-            impl::matrix::compress( *zA2,    Hpro::fixed_prec( acc.rel_eps() ) );
+    //         impl::matrix::compress( *zrowcb, Hpro::fixed_prec( acc.rel_eps() ) );
+    //         impl::matrix::compress( *zcolcb, Hpro::fixed_prec( acc.rel_eps() ) );
+    //         impl::matrix::compress( *zA2,    Hpro::fixed_prec( acc.rel_eps() ) );
 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+    //         toc = timer::since( tic );
+    //         runtime.push_back( toc.seconds() );
+    //         std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == nbench-1 )
-            {
-                A2    = std::move( zA2 );
-                rowcb = std::move( zrowcb );
-                colcb = std::move( zcolcb );
-                // update pointers in A2
-                // matrix::replace_cluster_basis( *A2, *rowcb, *colcb );
-            }// if
-        }// for
+    //         if ( i == nbench-1 )
+    //         {
+    //             A2    = std::move( zA2 );
+    //             rowcb = std::move( zrowcb );
+    //             colcb = std::move( zcolcb );
+    //             // update pointers in A2
+    //             // matrix::replace_cluster_basis( *A2, *rowcb, *colcb );
+    //         }// if
+    //     }// for
 
-        if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+    //     if ( nbench > 1 )
+    //         std::cout << "    runtime  = "
+    //                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+    //                   << std::endl;
 
-        runtime.clear();
-    }
+    //     runtime.clear();
+    // }
 
-    const auto  mem_zA2 = A2->byte_size();
-    const auto  mem_zrb = rowcb->byte_size();
-    const auto  mem_zcb = colcb->byte_size();
-    const auto  mem_zU  = mem_zA2 + mem_zrb + mem_zcb;
+    // const auto  mem_zA2 = A2->byte_size();
+    // const auto  mem_zrb = rowcb->byte_size();
+    // const auto  mem_zcb = colcb->byte_size();
+    // const auto  mem_zU  = mem_zA2 + mem_zrb + mem_zcb;
     
-    std::cout << "    mem   = " << format_mem( mem_zA2, mem_zrb, mem_zcb ) << std::endl;
-    std::cout << "      vs U  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_U) ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_A) ) << std::endl;
-    std::cout << "      vs zH " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_zA) ) << std::endl;
+    // std::cout << "    mem   = " << format_mem( mem_zA2, mem_zrb, mem_zcb ) << std::endl;
+    // std::cout << "      vs U  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_U) ) << std::endl;
+    // std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_A) ) << std::endl;
+    // std::cout << "      vs zH " << boost::format( "%.3f" ) % ( double(mem_zU) / double(mem_zA) ) << std::endl;
 
-    {
-        auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = norm::spectral( impl::arithmetic, *diff2 );
+    // {
+    //     auto  diff2 = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+    //     auto  error = norm::spectral( impl::arithmetic, *diff2 );
         
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
-    }
+    //     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // }
 
-    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
+    // std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 
-    {
-        auto  zB     = impl::matrix::copy( *A2 );
-        auto  rowcb2 = rowcb->copy();
-        auto  colcb2 = colcb->copy();
+    // {
+    //     auto  zB     = impl::matrix::copy( *A2 );
+    //     auto  rowcb2 = rowcb->copy();
+    //     auto  colcb2 = colcb->copy();
                 
-        matrix::replace_cluster_basis( *zB, *rowcb2, *colcb2 );
+    //     matrix::replace_cluster_basis( *zB, *rowcb2, *colcb2 );
         
-        tic = timer::now();
+    //     tic = timer::now();
     
-        impl::matrix::decompress( *rowcb2 );
-        impl::matrix::decompress( *colcb2 );
-        impl::matrix::decompress( *zB );
+    //     impl::matrix::decompress( *rowcb2 );
+    //     impl::matrix::decompress( *colcb2 );
+    //     impl::matrix::decompress( *zB );
 
-        toc = timer::since( tic );
+    //     toc = timer::since( tic );
 
-        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+    //     auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
         
-        std::cout << "    done in " << format_time( toc ) << std::endl;
+    //     std::cout << "    done in " << format_time( toc ) << std::endl;
 
-        const auto  error = norm::spectral( impl::arithmetic, *diffB );
+    //     const auto  error = norm::spectral( impl::arithmetic, *diffB );
             
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
-    }
+    //     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // }
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -388,7 +388,7 @@ program_main ()
         }
     }// if
 
-    // std::cout << "load   = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_load   << std::endl;
-    // std::cout << "decode = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_decode << std::endl;
+    std::cout << "load   = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_load   << std::endl;
+    std::cout << "decode = " << boost::format( "%.6e" ) % hlr::compress::afloat::t_decode << std::endl;
 }
     
