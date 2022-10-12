@@ -51,6 +51,24 @@ is_compressible ( const T *  ptr )
     return ! is_null( dynamic_cast< const compressible * >( ptr ) );
 }
 
+template < typename T >
+bool
+is_compressed ( const T &  ref )
+{
+    const auto  C = dynamic_cast< const compressible * >( &ref );
+    
+    return ! is_null( C ) && C->is_compressed();
+}
+
+template < typename T >
+bool
+is_compressed ( const T *  ptr )
+{
+    const auto  C = dynamic_cast< const compressible * >( ptr );
+    
+    return ! is_null( C ) && C->is_compressed();
+}
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_COMPRESSIBLE_HH

@@ -108,6 +108,8 @@ program_main ()
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
+        runtime.clear();
+        
         for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
         {
             auto  B = impl::matrix::copy( *zA );
@@ -128,8 +130,6 @@ program_main ()
             std::cout << "    runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-
-        runtime.clear();
     }
 
     const auto  mem_zA = zA->byte_size();
@@ -148,6 +148,8 @@ program_main ()
     std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 
     {
+        runtime.clear();
+        
         auto  zB = impl::matrix::copy( *zA );
         
         for ( uint  i = 0; i < nbench; ++i )
@@ -308,6 +310,8 @@ program_main ()
         auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
         
         {
+            runtime.clear();
+            
             std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
@@ -338,12 +342,12 @@ program_main ()
 
             t_orig = min( runtime );
             
-            runtime.clear();
-
             y_ref = std::move( y );
         }
 
         {
+            runtime.clear();
+            
             std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
@@ -373,8 +377,6 @@ program_main ()
                           << std::endl;
         
             t_compressed = min( runtime );
-            
-            runtime.clear();
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 

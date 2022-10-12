@@ -772,7 +772,7 @@ max_abs_val ( const T1 &  M )
     HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
                ( M.row_stride() == 1 ));
         
-    const auto  res = max_idx( blas_int_t(M.nrows() * M.ncols()), M.data(), 1 );
+    const auto  res = max_idx( blas_int_t(M.nrows() * M.ncols()), M.data(), 1 )-1;
 
     return std::abs( M.data()[res] );
 }

@@ -80,7 +80,29 @@ public:
     // access internal data
     //
 
-    void
+    blas::matrix< value_t > &        mat ()       { return this->blas_mat(); }
+    const blas::matrix< value_t > &  mat () const { return this->blas_mat(); }
+    
+    blas::matrix< value_t >          mat_decompressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        
+        HLR_ASSERT( is_compressed() );
+
+        auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
+    
+        compress::decompress< value_t >( _zM, dM );
+
+        return dM;
+
+        #else
+
+        return mat();
+
+        #endif
+    }
+
+        void
     set_matrix ( const blas::matrix< value_t > &  aM )
     {
         HLR_ASSERT(( this->nrows() == aM.nrows() ) && ( this->ncols() == aM.ncols() ));
@@ -385,7 +407,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     if ( is_compressed() )
         return;
 
-    // if ( this->block_is() == Hpro::bis( Hpro::is( 64, 79 ), Hpro::is( 112, 128 ) ) )
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 336, 351 ), Hpro::is( 336, 351 ) ) )
     //     std::cout << std::endl;
     
     auto          M         = this->blas_mat();
@@ -401,7 +423,12 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     io::matlab::write( dM, "M2" );
         
     //     blas::add( value_t(-1), M, dM );
-    //     std::cout << "D " << this->block_is().to_string() << " : " << blas::norm_F( dM ) / blas::norm_F(M) << std::endl;
+
+    //     std::cout << "D " << this->block_is().to_string() << " : "
+    //               << blas::norm_F( dM ) / blas::norm_F(M)
+    //               << " / "
+    //               << blas::max_abs_val( dM )
+    //               << std::endl;
             
     //     // for ( size_t  i = 0; i < M.nrows() * M.ncols(); ++i )
     //     // {
@@ -460,11 +487,7 @@ dense_matrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    auto  M = blas::matrix< value_t >( this->nrows(), this->ncols() );
-    
-    compress::decompress< value_t >( _zM, M );
-        
-    this->blas_mat() = std::move( M );
+    this->blas_mat() = std::move( mat_decompressed() );
 
     remove_compressed();
 

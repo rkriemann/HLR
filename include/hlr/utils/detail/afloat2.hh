@@ -142,10 +142,10 @@ compress< double > ( const config &   config,
     memcpy( zdata.data(), & scale, 8 );
 
     // then store number of exponents bits
-    memcpy( zdata.data() + 8, & exp_bits, 1 );
+    zdata[8] = exp_bits;
             
     // and precision bits
-    memcpy( zdata.data() + 9, & prec_bits, 1 );
+    zdata[9] = prec_bits;
 
     for ( size_t  i = 0; i < nsize; ++i )
     {
@@ -171,7 +171,7 @@ compress< double > ( const config &   config,
         // {
         //     const uint    fp64_sign_pos = 63;
         //     const uint    sign_shift    = exp_bits + prec_bits;
-        //     const ulong   prec_mask     = ( 1 << prec_bits ) - 1;
+        //     const ulong   prec_mask     = ( 1ul << prec_bits ) - 1;
             
         //     const ulong   mant  = zval & prec_mask;
         //     const ulong   exp   = (zval >> prec_bits) & exp_mask;
@@ -380,29 +380,22 @@ decompress< double > ( const zarray &  zdata,
     // read compression header (scaling, exponent and precision bits)
     //
     
-    double  scale;
-    byte_t  exp_bits;
-    byte_t  prec_bits;
+    double        scale;
+    const byte_t  exp_bits  = zdata[8];
+    const byte_t  prec_bits = zdata[9];
 
-    // extract scaling factor
     memcpy( & scale, zdata.data(), 8 );
-
-    // and exponent bits
-    memcpy( & exp_bits, zdata.data() + 8, 1 );
-
-    // and precision bits
-    memcpy( & prec_bits, zdata.data() + 9, 1 );
 
     //
     // read compressed data
     //
     
-    const     uint   nbits       = 1 + exp_bits + prec_bits;
-    const     uint   nbyte       = nbits / 8;
-    const     ulong  prec_mask   = ( 1 << prec_bits ) - 1;
-    const     uint   prec_ofs    = fp64_mant_bits - prec_bits;
-    const     ulong  exp_mask    = ( 1 << exp_bits ) - 1;
-    const     uint   sign_shift  = exp_bits + prec_bits;
+    const  uint   nbits      = 1 + exp_bits + prec_bits;
+    const  uint   nbyte      = nbits / 8;
+    const  ulong  prec_mask  = ( 1ul << prec_bits ) - 1;
+    const  uint   prec_ofs   = fp64_mant_bits - prec_bits;
+    const  ulong  exp_mask   = ( 1 << exp_bits ) - 1;
+    const  uint   sign_shift = exp_bits + prec_bits;
 
     // number of values to read before decoding
     constexpr size_t  nchunk = 32;

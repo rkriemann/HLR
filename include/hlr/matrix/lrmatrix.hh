@@ -104,6 +104,44 @@ public:
     
     const blas::matrix< value_t > &  U () const { return this->blas_mat_A(); }
     const blas::matrix< value_t > &  V () const { return this->blas_mat_B(); }
+
+    blas::matrix< value_t >          U_decompressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        
+        HLR_ASSERT( is_compressed() );
+
+        auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
+    
+        compress::decompress< value_t >( _zdata.U, dU );
+
+        return dU;
+
+        #else
+
+        return U();
+
+        #endif
+    }
+    
+    blas::matrix< value_t >          V_decompressed () const
+    {
+        #if HLR_HAS_COMPRESSION == 1
+        
+        HLR_ASSERT( is_compressed() );
+
+        auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
+    
+        compress::decompress< value_t >( _zdata.V, dV );
+
+        return dV;
+
+        #else
+
+        return V();
+
+        #endif
+    }
     
     void
     set_lrmat ( const blas::matrix< value_t > &  aU,
@@ -527,14 +565,8 @@ lrmatrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
-    auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
-    
-    compress::decompress< value_t >( _zdata.U, uU );
-    compress::decompress< value_t >( _zdata.V, uV );
-        
-    this->U() = std::move( uU );
-    this->V() = std::move( uV );
+    this->U() = std::move( U_decompressed() );
+    this->V() = std::move( V_decompressed() );
 
     remove_compressed();
         
