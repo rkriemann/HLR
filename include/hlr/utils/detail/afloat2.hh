@@ -36,9 +36,9 @@ eps_to_rate ( const double eps )
     else if ( eps >= 1e-5  ) return 16;
     else if ( eps >= 1e-6  ) return 20;
     else if ( eps >= 1e-7  ) return 22;
-    else if ( eps >= 1e-8  ) return 23;
-    else if ( eps >= 1e-9  ) return 36;
-    else if ( eps >= 1e-10 ) return 40;
+    else if ( eps >= 1e-8  ) return 24;
+    else if ( eps >= 1e-9  ) return 28;
+    else if ( eps >= 1e-10 ) return 32;
     else if ( eps >= 1e-12 ) return 44;
     else if ( eps >= 1e-14 ) return 54;
     else                     return 64;
@@ -108,14 +108,14 @@ compress< double > ( const config &   config,
 
     // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
 
-    const uint    fp64_mant_bits = 53;
-    const uint    fp64_exp_bits  = 11;
-    const uint    fp64_sign_pos  = 63;
+    constexpr uint    fp64_mant_bits = 52;
+    constexpr uint    fp64_exp_bits  = 11;
+    constexpr uint    fp64_sign_pos  = 63;
 
     // scale all values v_i such that we have |v_i| >= 1
     const double  scale      = 1.0 / vmin;
     // number of bits needed to represent exponent values
-    const uint    exp_bits   = std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
+    const byte_t  exp_bits   = std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
     const ulong   exp_mask   = ( 1 << exp_bits ) - 1;
 
     // std::cout << uint(exp_bits) << std::endl;
@@ -126,8 +126,7 @@ compress< double > ( const config &   config,
     const uint    nbits      = ( nbits_min / 8 ) * 8 + ( nbits_min % 8 != 0 ? 8 : 0 ); // actual number of bits per value
     const uint    nbyte      = nbits / 8;
 
-    const uint    prec_bits  = nbits - 1 - exp_bits;
-    const ulong   prec_mask  = ( 1 << prec_bits ) - 1;
+    const byte_t  prec_bits  = nbits - 1 - exp_bits;
     const uint    prec_ofs   = fp64_mant_bits - prec_bits;
     
     const size_t  zsize      = 8 + 1 + 1 + nsize * nbyte;
@@ -143,7 +142,7 @@ compress< double > ( const config &   config,
     memcpy( zdata.data(), & scale, 8 );
 
     // then store number of exponents bits
-    memcpy( zdata.data() + 7, & exp_bits, 1 );
+    memcpy( zdata.data() + 8, & exp_bits, 1 );
             
     // and precision bits
     memcpy( zdata.data() + 9, & prec_bits, 1 );
@@ -169,21 +168,22 @@ compress< double > ( const config &   config,
         const ulong   zmant = smant >> prec_ofs;
         const ulong   zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
-        {
-            const uint    fp64_sign_pos = 31;
-            const uint    sign_shift    = exp_bits + prec_bits;
+        // {
+        //     const uint    fp64_sign_pos = 63;
+        //     const uint    sign_shift    = exp_bits + prec_bits;
+        //     const ulong   prec_mask     = ( 1 << prec_bits ) - 1;
             
-            const ulong   mant  = zval & prec_mask;
-            const ulong   exp   = (zval >> prec_bits) & exp_mask;
-            const bool    sign  = zval >> sign_shift;
+        //     const ulong   mant  = zval & prec_mask;
+        //     const ulong   exp   = (zval >> prec_bits) & exp_mask;
+        //     const bool    sign  = zval >> sign_shift;
 
-            const ulong   rexp  = exp | 0b10000000000; // re-add leading bit
-            const ulong   rmant = mant << prec_ofs;
-            const ulong   irval = (rexp << fp64_mant_bits) | rmant;
-            const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+        //     const ulong   rexp  = exp | 0b10000000000; // re-add leading bit
+        //     const ulong   rmant = mant << prec_ofs;
+        //     const ulong   irval = (rexp << fp64_mant_bits) | rmant;
+        //     const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
 
-            std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
-        }
+        //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
+        // }
         
         //
         // copy zval into data buffer
@@ -253,9 +253,9 @@ compress< double > ( const config &   config,
 //     const uint    nbits      = ( nbits_min / 8 ) * 8 + ( nbits_min % 8 != 0 ? 8 : 0 ); // actual number of bits per value
 //     const uint    nbyte      = nbits / 8;
 
-//     const uint    prec_bits  = nbits - 1 - exp_bits;
+//     const byte_t  prec_bits  = nbits - 1 - exp_bits;
 //     const uint    prec_mask  = ( 1 << prec_bits ) - 1;
-//     const byte_t  prec_ofs   = fp32_mant_bits - prec_bits;
+//     const uint    prec_ofs   = fp32_mant_bits - prec_bits;
     
 //     const size_t  zsize      = 4 + 1 + 1 + nsize * nbyte;
 //     auto          zdata      = std::vector< byte_t >( zsize );
@@ -370,8 +370,9 @@ decompress< double > ( const zarray &  zdata,
                        const size_t    dim3,
                        const size_t    dim4 )
 {
-    constexpr uint  fp64_mant_bits = 53;
-    constexpr uint  fp64_sign_pos  = 63;
+    constexpr uint   fp64_mant_bits   = 52;
+    constexpr uint   fp64_sign_pos    = 63;
+    constexpr ulong  fp64_exp_highbit = 0b10000000000;
 
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
@@ -396,13 +397,12 @@ decompress< double > ( const zarray &  zdata,
     // read compressed data
     //
     
-    const uint   nbits       = 1 + exp_bits + prec_bits;
-    const uint   nbyte       = nbits / 8;
-    const ulong  prec_mask   = ( 1 << prec_bits ) - 1;
-    const uint   prec_ofs    = fp64_mant_bits - prec_bits;
-    const ulong  exp_mask    = ( 1 << exp_bits ) - 1;
-    const ulong  exp_highbit = 0b10000000000;
-    const uint   sign_shift  = exp_bits + prec_bits;
+    const     uint   nbits       = 1 + exp_bits + prec_bits;
+    const     uint   nbyte       = nbits / 8;
+    const     ulong  prec_mask   = ( 1 << prec_bits ) - 1;
+    const     uint   prec_ofs    = fp64_mant_bits - prec_bits;
+    const     ulong  exp_mask    = ( 1 << exp_bits ) - 1;
+    const     uint   sign_shift  = exp_bits + prec_bits;
 
     // number of values to read before decoding
     constexpr size_t  nchunk = 32;
@@ -475,8 +475,12 @@ decompress< double > ( const zarray &  zdata,
             {
                 const size_t  pos  = 10 + (i+lpos)*nbyte;
 
-                zval_buf[lpos] = ( (zdata[pos+5] << 40) | (zdata[pos+4] << 32) |
-                                   (zdata[pos+3] << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos] );
+                zval_buf[lpos] = ( (ulong(zdata[pos+5]) << 40) |
+                                   (ulong(zdata[pos+4]) << 32) |
+                                   (ulong(zdata[pos+3]) << 24) |
+                                   (ulong(zdata[pos+2]) << 16) |
+                                   (ulong(zdata[pos+1]) <<  8) |
+                                   (ulong(zdata[pos])        ) );
             }// for
         }// if
         else if ( nbyte == 7 )
@@ -485,8 +489,13 @@ decompress< double > ( const zarray &  zdata,
             {
                 const size_t  pos  = 10 + (i+lpos)*nbyte;
 
-                zval_buf[lpos] = ( (zdata[pos+6] << 48) | (zdata[pos+5] << 40) | (zdata[pos+4] << 32) |
-                                   (zdata[pos+3] << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] <<  8) | zdata[pos] );
+                zval_buf[lpos] = ( (ulong(zdata[pos+6]) << 48) |
+                                   (ulong(zdata[pos+5]) << 40) |
+                                   (ulong(zdata[pos+4]) << 32) |
+                                   (ulong(zdata[pos+3]) << 24) |
+                                   (ulong(zdata[pos+2]) << 16) |
+                                   (ulong(zdata[pos+1]) <<  8) |
+                                   (ulong(zdata[pos])        ) );
             }// for
         }// if
         else if ( nbyte == 8 )
@@ -495,8 +504,14 @@ decompress< double > ( const zarray &  zdata,
             {
                 const size_t  pos  = 10 + (i+lpos)*nbyte;
 
-                zval_buf[lpos] = ( (zdata[pos+7] << 56) | (zdata[pos+6] << 48) | (zdata[pos+5] << 40) | (zdata[pos+4] << 32) |
-                                   (zdata[pos+3] << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] <<  8) | zdata[pos] );
+                zval_buf[lpos] = ( (ulong(zdata[pos+7]) << 56) |
+                                   (ulong(zdata[pos+6]) << 48) |
+                                   (ulong(zdata[pos+5]) << 40) |
+                                   (ulong(zdata[pos+4]) << 32) |
+                                   (ulong(zdata[pos+3]) << 24) |
+                                   (ulong(zdata[pos+2]) << 16) |
+                                   (ulong(zdata[pos+1]) <<  8) |
+                                   (ulong(zdata[pos])        ) );
             }// for
         }// if
 
@@ -513,15 +528,15 @@ decompress< double > ( const zarray &  zdata,
         
         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
         {
-            const ulong  zval  = zval_buf[lpos];
-            const ulong  mant  = zval & prec_mask;
-            const ulong  exp   = (zval >> prec_bits) & exp_mask;
-            const bool   sign  = zval >> sign_shift;
+            const ulong   zval  = zval_buf[lpos];
+            const ulong   mant  = zval & prec_mask;
+            const ulong   exp   = (zval >> prec_bits) & exp_mask;
+            const bool    sign  = zval >> sign_shift;
 
-            const ulong  rexp  = exp | exp_highbit; // re-add leading bit
-            const ulong  rmant = mant << prec_ofs;
-            const ulong  irval = (rexp << fp64_mant_bits) | rmant;
-            const double rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+            const ulong   rexp  = exp | fp64_exp_highbit; // re-add leading bit
+            const ulong   rmant = mant << prec_ofs;
+            const ulong   irval = (rexp << fp64_mant_bits) | rmant;
+            const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
 
             dest[i+lpos] = rval;
         }// for
@@ -535,18 +550,18 @@ decompress< double > ( const zarray &  zdata,
     for ( ; i < nsize; ++i )
     {
         uint          zval = 0;
-        const size_t  pos  = 6 + i*nbyte;
+        const size_t  pos  = 10 + i*nbyte;
             
         switch ( nbyte )
         {
-            case  8 : zval |= zdata[pos+7] << 56;
-            case  7 : zval |= zdata[pos+6] << 48;
-            case  6 : zval |= zdata[pos+5] << 40;
-            case  5 : zval |= zdata[pos+4] << 32;
-            case  4 : zval |= zdata[pos+3] << 24;
-            case  3 : zval |= zdata[pos+2] << 16;
-            case  2 : zval |= zdata[pos+1] << 8;
-            case  1 : zval |= zdata[pos]; break;
+            case  8 : zval |= ulong(zdata[pos+7]) << 56;
+            case  7 : zval |= ulong(zdata[pos+6]) << 48;
+            case  6 : zval |= ulong(zdata[pos+5]) << 40;
+            case  5 : zval |= ulong(zdata[pos+4]) << 32;
+            case  4 : zval |= ulong(zdata[pos+3]) << 24;
+            case  3 : zval |= ulong(zdata[pos+2]) << 16;
+            case  2 : zval |= ulong(zdata[pos+1]) << 8;
+            case  1 : zval |= ulong(zdata[pos]); break;
             default :
                 HLR_ERROR( "???" );
         }// switch
@@ -554,7 +569,7 @@ decompress< double > ( const zarray &  zdata,
         const ulong   mant  = zval & prec_mask;
         const ulong   exp   = (zval >> prec_bits) & exp_mask;
         const bool    sign  = zval >> sign_shift;
-        const ulong   irval = ((exp | exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
+        const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
         const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
 
         dest[i] = rval;

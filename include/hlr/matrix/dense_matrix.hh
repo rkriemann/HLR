@@ -17,6 +17,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
+#include <hlr/utils/io.hh>
 
 namespace hlr
 { 
@@ -384,6 +385,9 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     if ( is_compressed() )
         return;
 
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 64, 79 ), Hpro::is( 112, 128 ) ) )
+    //     std::cout << std::endl;
+    
     auto          M         = this->blas_mat();
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
@@ -392,6 +396,10 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     auto  dM = blas::matrix< value_t >( M.nrows(), M.ncols() );
 
     //     compress::decompress( zM, dM );
+
+    //     io::matlab::write( M, "M1" );
+    //     io::matlab::write( dM, "M2" );
+        
     //     blas::add( value_t(-1), M, dM );
     //     std::cout << "D " << this->block_is().to_string() << " : " << blas::norm_F( dM ) / blas::norm_F(M) << std::endl;
             
