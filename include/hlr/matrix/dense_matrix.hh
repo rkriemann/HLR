@@ -407,9 +407,9 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     if ( is_compressed() )
         return;
 
-    // if ( this->block_is() == Hpro::bis( Hpro::is( 336, 351 ), Hpro::is( 336, 351 ) ) )
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 96, 111 ), Hpro::is( 225, 240 ) ) )
     //     std::cout << std::endl;
-    
+
     auto          M         = this->blas_mat();
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );

@@ -217,7 +217,6 @@ compress< double > ( const config &   config,
     const uint    nbyte      = nbits / 8;
 
     const byte_t  prec_bits  = nbits - 1 - exp_bits;
-    const uint    prec_ofs   = fp64_mant_bits - prec_bits;
     
     const size_t  zsize      = 8 + 1 + 1 + nsize * nbyte;
     auto          zdata      = std::vector< byte_t >( zsize );
@@ -225,195 +224,164 @@ compress< double > ( const config &   config,
     HLR_ASSERT( nbits     <= 64 );
     HLR_ASSERT( prec_bits <= fp64_mant_bits );
     
-    // first, store scaling factor
-    memcpy( zdata.data(), & scale, 8 );
-
-    // then store number of exponents bits
-    zdata[8] = exp_bits;
-            
-    // and precision bits
-    zdata[9] = prec_bits;
-
-    for ( size_t  i = 0; i < nsize; ++i )
+    if (( nbyte <= 4 ) && ( prec_bits <= fp32_mant_bits ))
     {
-        const double  val   = data[i];
-        const bool    zsign = ( val < 0 );
-
         //
-        // Use absolute value and scale v_i and add 1 such that v_i >= 2.
-        // With this, highest exponent bit is 1 and we only need to store
-        // lowest <exp_bits> exponent bits
+        // store header (exponent bits, precision bits and scaling factor)
         //
         
-        const double  sval  = scale * std::abs(val) + 1;
-        const ulong   isval = (*reinterpret_cast< const ulong * >( & sval ) );
-        const ulong   sexp  = ( isval >> fp64_mant_bits ) & ((1u << fp64_exp_bits) - 1);
-        const ulong   smant = ( isval & ((1ul << fp64_mant_bits) - 1) );
+        const uint   prec_ofs = fp32_mant_bits - prec_bits;
+        const float  fscale   = scale;
 
-        // exponent and mantissa reduced to stored size
-        const ulong   zexp  = sexp & exp_mask;
-        const ulong   zmant = smant >> prec_ofs;
-        const ulong   zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+        zdata[0] = exp_bits;
+        zdata[1] = prec_bits;
+        memcpy( zdata.data() + 2, & fscale, 4 );
 
-        // {
-        //     const uint    fp64_sign_bit = 63;
-        //     const uint    sign_shift    = exp_bits + prec_bits;
-        //     const ulong   prec_mask     = ( 1ul << prec_bits ) - 1;
-            
-        //     const ulong   mant  = zval & prec_mask;
-        //     const ulong   exp   = (zval >> prec_bits) & exp_mask;
-        //     const bool    sign  = zval >> sign_shift;
-
-        //     const ulong   rexp  = exp | 0b10000000000; // re-add leading bit
-        //     const ulong   rmant = mant << prec_ofs;
-        //     const ulong   irval = (rexp << fp64_mant_bits) | rmant;
-        //     const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
-
-        //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
-        // }
-        
-        //
-        // copy zval into data buffer
-        //
-
-        const size_t  pos = 10 + i * nbyte;
-        
-        switch ( nbyte )
+        for ( size_t  i = 0; i < nsize; ++i )
         {
-            case  8 : zdata[pos+7] = ( zval & 0xff00000000000000 ) >> 56;
-            case  7 : zdata[pos+6] = ( zval & 0x00ff000000000000 ) >> 48;
-            case  6 : zdata[pos+5] = ( zval & 0x0000ff0000000000 ) >> 40;
-            case  5 : zdata[pos+4] = ( zval & 0x000000ff00000000 ) >> 32;
-            case  4 : zdata[pos+3] = ( zval & 0x00000000ff000000 ) >> 24;
-            case  3 : zdata[pos+2] = ( zval & 0x0000000000ff0000 ) >> 16;
-            case  2 : zdata[pos+1] = ( zval & 0x000000000000ff00 ) >> 8;
-            case  1 : zdata[pos]   = ( zval & 0x00000000000000ff ); break;
-            default :
-                HLR_ERROR( "unsupported storage size" );
-        }// switch
-    }// for
+            const float   val   = data[i];
+            const bool    zsign = ( val < 0 );
+
+            //
+            // Use absolute value and scale v_i and add 1 such that v_i >= 2.
+            // With this, highest exponent bit is 1 and we only need to store
+            // lowest <exp_bits> exponent bits
+            //
+        
+            const float   sval  = std::max( fscale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
+            const uint    isval = (*reinterpret_cast< const uint * >( & sval ) );
+            const uint    sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
+            const uint    smant = ( isval & ((1u << fp32_mant_bits) - 1) );
+
+            // exponent and mantissa reduced to stored size
+            const uint    zexp  = sexp & exp_mask;
+            const uint    zmant = smant >> prec_ofs;
+            const uint    zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+
+            // // DEBUG
+            // {
+            //     const byte_t  fp32_sign_bit = 31;
+            //     const byte_t  sign_shift    = exp_bits + prec_bits;
+            //     const uint    prec_mask     = ( 1u << prec_bits ) - 1;
+            
+            //     const uint   mant  = zval & prec_mask;
+            //     const uint   exp   = (zval >> prec_bits) & exp_mask;
+            //     const bool   sign  = zval >> sign_shift;
+
+            //     const uint   rexp  = exp | 0b10000000; // re-add leading bit
+            //     const uint   rmant = mant << prec_ofs;
+            //     const uint   irval = (rexp << fp32_mant_bits) | rmant;
+            //     const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+
+            //     if ( std::abs( (val - rval) / val ) > 1e-2 )
+            //         std::cout << i << " : "
+            //                   << val << " / "
+            //                   << sval << " / "
+            //                   << isval << " / "
+            //                   << rval << " / "
+            //                   << irval << " / "
+            //                   << std::abs( (val - rval) / val ) << std::endl;
+            // }
+        
+            //
+            // copy zval into data buffer
+            //
+
+            const size_t  pos = 6 + i * nbyte;
+        
+            switch ( nbyte )
+            {
+                case  4 : zdata[pos+3] = ( zval & 0xff000000 ) >> 24;
+                case  3 : zdata[pos+2] = ( zval & 0x00ff0000 ) >> 16;
+                case  2 : zdata[pos+1] = ( zval & 0x0000ff00 ) >> 8;
+                case  1 : zdata[pos]   = ( zval & 0x000000ff ); break;
+                default :
+                    HLR_ERROR( "unsupported storage size" );
+            }// switch
+        }// for
+    }// if
+    else
+    {
+        //
+        // store header (exponent bits, precision bits and scaling factor)
+        //
+        
+        const uint  prec_ofs = fp64_mant_bits - prec_bits;
+
+        zdata[0] = exp_bits;
+        zdata[1] = prec_bits;
+        memcpy( zdata.data() + 2, & scale, 8 );
+
+        for ( size_t  i = 0; i < nsize; ++i )
+        {
+            const double  val   = data[i];
+            const bool    zsign = ( val < 0 );
+
+            //
+            // Use absolute value and scale v_i and add 1 such that v_i >= 2.
+            // With this, highest exponent bit is 1 and we only need to store
+            // lowest <exp_bits> exponent bits
+            //
+        
+            const double  sval  = scale * std::abs(val) + 1;
+            const ulong   isval = (*reinterpret_cast< const ulong * >( & sval ) );
+            const ulong   sexp  = ( isval >> fp64_mant_bits ) & ((1u << fp64_exp_bits) - 1);
+            const ulong   smant = ( isval & ((1ul << fp64_mant_bits) - 1) );
+
+            // exponent and mantissa reduced to stored size
+            const ulong   zexp  = sexp & exp_mask;
+            const ulong   zmant = smant >> prec_ofs;
+            const ulong   zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+
+            // // DEBUG
+            // {
+            //     const uint    fp64_sign_bit = 63;
+            //     const uint    sign_shift    = exp_bits + prec_bits;
+            //     const ulong   prec_mask     = ( 1ul << prec_bits ) - 1;
+            
+            //     const ulong   mant  = zval & prec_mask;
+            //     const ulong   exp   = (zval >> prec_bits) & exp_mask;
+            //     const bool    sign  = zval >> sign_shift;
+
+            //     const ulong   rexp  = exp | 0b10000000000; // re-add leading bit
+            //     const ulong   rmant = mant << prec_ofs;
+            //     const ulong   irval = (rexp << fp64_mant_bits) | rmant;
+            //     const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+
+            //     if ( std::abs( (val - rval) / val ) > 1e-2 )
+            //         std::cout << i << " : "
+            //                   << val << " / "
+            //                   << sval << " / "
+            //                   << isval << " / "
+            //                   << rval << " / "
+            //                   << irval << " / "
+            //                   << std::abs( (val - rval) / val ) << std::endl;
+            // }
+        
+            //
+            // copy zval into data buffer
+            //
+
+            const size_t  pos = 10 + i * nbyte;
+        
+            switch ( nbyte )
+            {
+                case  8 : zdata[pos+7] = ( zval & 0xff00000000000000 ) >> 56;
+                case  7 : zdata[pos+6] = ( zval & 0x00ff000000000000 ) >> 48;
+                case  6 : zdata[pos+5] = ( zval & 0x0000ff0000000000 ) >> 40;
+                case  5 : zdata[pos+4] = ( zval & 0x000000ff00000000 ) >> 32;
+                case  4 : zdata[pos+3] = ( zval & 0x00000000ff000000 ) >> 24;
+                case  3 : zdata[pos+2] = ( zval & 0x0000000000ff0000 ) >> 16;
+                case  2 : zdata[pos+1] = ( zval & 0x000000000000ff00 ) >> 8;
+                case  1 : zdata[pos]   = ( zval & 0x00000000000000ff ); break;
+                default :
+                    HLR_ERROR( "unsupported storage size" );
+            }// switch
+        }// for
+    }// else
 
     return zdata;
 }
-
-// template <>
-// inline
-// zarray
-// compress< double > ( const config &   config,
-//                      double *         data,
-//                      const size_t     dim0,
-//                      const size_t     dim1,
-//                      const size_t     dim2,
-//                      const size_t     dim3 )
-// {
-//     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-
-//     // look for min/max value
-//     // (use "float" type to ensure "vmin" really is minimal value
-//     //  so we don't have values in [1,2) later)
-//     float  vmin = std::abs( data[0] );
-//     float  vmax = std::abs( data[0] );
-
-//     for ( size_t  i = 0; i < nsize; ++i )
-//     {
-//         vmin = std::min< float >( vmin, std::abs( data[i] ) );
-//         vmax = std::max< float >( vmax, std::abs( data[i] ) );
-//     }// for
-
-//     // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
-
-//     // scale all values v_i such that we have |v_i| >= 1
-//     const float   scale      = 1.0 / vmin;
-//     // number of bits needed to represent exponent values
-//     const byte_t  exp_bits   = std::max< float >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
-//     const uint    exp_mask   = ( 1 << exp_bits ) - 1;
-
-//     // std::cout << uint(exp_bits) << std::endl;
-//     // std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_ofs << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
-
-//     // round up to next multiple of 8
-//     const uint    nbits_min  = 1 + exp_bits + config.bitrate;                          // minimal number of bits per value for precision
-//     const uint    nbits      = ( nbits_min / 8 ) * 8 + ( nbits_min % 8 != 0 ? 8 : 0 ); // actual number of bits per value
-//     const uint    nbyte      = nbits / 8;
-
-//     const byte_t  prec_bits  = nbits - 1 - exp_bits;
-//     const uint    prec_mask  = ( 1 << prec_bits ) - 1;
-//     const uint    prec_ofs   = fp32_mant_bits - prec_bits;
-    
-//     const size_t  zsize      = 4 + 1 + 1 + nsize * nbyte;
-//     auto          zdata      = std::vector< byte_t >( zsize );
-
-//     // std::cout << uint(nbits) << std::endl;
-    
-//     // 32 bit integer as max for now
-//     HLR_ASSERT( nbits <= 32 );
-//     HLR_ASSERT( prec_bits <= 23 );
-    
-//     // first, store scaling factor
-//     memcpy( zdata.data(), & scale, 4 );
-
-//     // then store number of exponents bits
-//     memcpy( zdata.data() + 4, & exp_bits, 1 );
-            
-//     // and precision bits
-//     memcpy( zdata.data() + 5, & prec_bits, 1 );
-
-//     for ( size_t  i = 0; i < nsize; ++i )
-//     {
-//         const float   val   = data[i];
-//         const bool    zsign = ( val < 0 );
-
-//         //
-//         // Use absolute value and scale v_i and add 1 such that v_i >= 2.
-//         // With this, highest exponent bit is 1 and we only need to store
-//         // lowest <exp_bits> exponent bits
-//         //
-        
-//         const float   sval  = scale * std::abs(val) + 1;
-//         const uint    isval = (*reinterpret_cast< const uint * >( & sval ) );
-//         const uint    sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
-//         const uint    smant = ( isval & ((1u << fp32_mant_bits) - 1) );
-
-//         // exponent and mantissa reduced to stored size
-//         const uint    zexp  = sexp & exp_mask;
-//         const uint    zmant = smant >> prec_ofs;
-//         const uint    zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
-
-//         // {
-//         //     const byte_t  fp32_sign_bit  = 31;
-//         //     const byte_t  sign_shift = exp_bits + prec_bits;
-            
-//         //     const uint   mant  = zval & prec_mask;
-//         //     const uint   exp   = (zval >> prec_bits) & exp_mask;
-//         //     const bool   sign  = zval >> sign_shift;
-
-//         //     const uint   rexp  = exp | 0b10000000; // re-add leading bit
-//         //     const uint   rmant = mant << prec_ofs;
-//         //     const uint   irval = (rexp << fp32_mant_bits) | rmant;
-//         //     const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
-
-//         //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
-//         // }
-        
-//         //
-//         // copy zval into data buffer
-//         //
-
-//         const size_t  pos = 6 + i * nbyte;
-        
-//         switch ( nbyte )
-//         {
-//             case  4 : zdata[pos+3] = ( zval & 0xff000000 ) >> 24;
-//             case  3 : zdata[pos+2] = ( zval & 0x00ff0000 ) >> 16;
-//             case  2 : zdata[pos+1] = ( zval & 0x0000ff00 ) >> 8;
-//             case  1 : zdata[pos]   = ( zval & 0x000000ff ); break;
-//             default :
-//                 HLR_ERROR( "???" );
-//         }// switch
-//     }// for
-
-//     return zdata;
-// }
 
 template < typename value_t >
 void
@@ -451,7 +419,7 @@ decompress< float > ( const zarray &  zdata,
     //
     // read compressed data
     //
-    
+
     const uint    nbits       = 1 + exp_bits + prec_bits;
     const uint    nbyte       = nbits / 8;
     const uint    prec_mask   = ( 1 << prec_bits ) - 1;
@@ -462,9 +430,8 @@ decompress< float > ( const zarray &  zdata,
 
     // number of values to read before decoding
     constexpr size_t  nchunk = 32;
-    
-    size_t  ncsize     = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
-    size_t  i          = 0;
+    const size_t      ncsize = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+    size_t            i      = 0;
 
     for ( ; i < ncsize; i += nchunk )
     {
@@ -549,7 +516,7 @@ decompress< float > ( const zarray &  zdata,
             case  2 : zval |= zdata[pos+1] << 8;
             case  1 : zval |= zdata[pos]; break;
             default :
-                HLR_ERROR( "???" );
+                HLR_ERROR( "unsupported storage size" );
         }// switch
 
         const uint   mant  = zval & prec_mask;
@@ -579,193 +546,590 @@ decompress< double > ( const zarray &  zdata,
     // read compression header (scaling, exponent and precision bits)
     //
     
-    double        scale;
-    const byte_t  exp_bits  = zdata[8];
-    const byte_t  prec_bits = zdata[9];
-
-    memcpy( & scale, zdata.data(), 8 );
+    const byte_t  exp_bits  = zdata[0];
+    const byte_t  prec_bits = zdata[1];
 
     //
     // read compressed data
     //
     
-    const  uint   nbits      = 1 + exp_bits + prec_bits;
-    const  uint   nbyte      = nbits / 8;
-    const  ulong  prec_mask  = ( 1ul << prec_bits ) - 1;
-    const  uint   prec_ofs   = fp64_mant_bits - prec_bits;
-    const  ulong  exp_mask   = ( 1 << exp_bits ) - 1;
-    const  uint   sign_shift = exp_bits + prec_bits;
-
-    // number of values to read before decoding
-    constexpr size_t  nchunk = 32;
+    const  uint  nbits = 1 + exp_bits + prec_bits;
+    const  uint  nbyte = nbits / 8;
     
-    size_t  ncsize     = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
-    size_t  i          = 0;
-
-    for ( ; i < ncsize; i += nchunk )
+    if (( nbyte <= 4 ) && ( prec_bits <= fp32_mant_bits ))
     {
-        ulong  zval_buf[ nchunk ];
-        
-        //
-        // read next 8 values into local buffer
-        //
+        const uint    prec_mask   = ( 1 << prec_bits ) - 1;
+        const uint    prec_ofs    = fp32_mant_bits - prec_bits;
+        const uint    exp_mask    = ( 1 << exp_bits ) - 1;
+        const byte_t  sign_shift  = exp_bits + prec_bits;
+        size_t        i           = 0;
+        float         scale;
 
-        // auto  tic = my_clock::now();
+        memcpy( & scale, zdata.data() + 2, 4 );
+
+        // number of values to read before decoding
+        constexpr size_t  nchunk = 64;
+        const size_t      ncsize = nsize - nsize % nchunk;  // largest multiple of <nchunk> below <nsize>
 
         if ( nbyte == 1 )
         {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+            for ( ; i < ncsize; i += nchunk )
             {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
+                //
+                // read next values into local buffer
+                //
 
-                zval_buf[lpos] = zdata[pos];
+                byte_t  zval_buf[ nchunk ];
+        
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    zval_buf[lpos] = zdata[6 + (i+lpos)*nbyte];
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const byte_t  zval  = zval_buf[lpos];
+                    const byte_t  mant  = zval & prec_mask;
+                    const byte_t  exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const uint    irval = (uint(exp | fp32_exp_highbit) << fp32_mant_bits) | (uint(mant) << prec_ofs);
+
+                    dest[i+lpos] = double( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+                }// for
             }// for
         }// if
         else if ( nbyte == 2 )
         {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+            for ( ; i < ncsize; i += nchunk )
             {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
+                //
+                // read next values into local buffer
+                //
 
-                zval_buf[lpos] = (zdata[pos+1] << 8) | zdata[pos];
-            }// for
-        }// if
-        else if ( nbyte == 3 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
-            }// for
-        }// if
-        else if ( nbyte == 4 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = (ulong(zdata[pos+3]) << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
-            }// for
-        }// if
-        else if ( nbyte == 5 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = ( (ulong(zdata[pos+4]) << 32) |
-                                   (ulong(zdata[pos+3]) << 24) |
-                                   (ulong(zdata[pos+2]) << 16) |
-                                   (ulong(zdata[pos+1]) <<  8) |
-                                   (ulong(zdata[pos])        ) );
-            }// for
-        }// if
-        else if ( nbyte == 6 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = ( (ulong(zdata[pos+5]) << 40) |
-                                   (ulong(zdata[pos+4]) << 32) |
-                                   (ulong(zdata[pos+3]) << 24) |
-                                   (ulong(zdata[pos+2]) << 16) |
-                                   (ulong(zdata[pos+1]) <<  8) |
-                                   (ulong(zdata[pos])        ) );
-            }// for
-        }// if
-        else if ( nbyte == 7 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = ( (ulong(zdata[pos+6]) << 48) |
-                                   (ulong(zdata[pos+5]) << 40) |
-                                   (ulong(zdata[pos+4]) << 32) |
-                                   (ulong(zdata[pos+3]) << 24) |
-                                   (ulong(zdata[pos+2]) << 16) |
-                                   (ulong(zdata[pos+1]) <<  8) |
-                                   (ulong(zdata[pos])        ) );
-            }// for
-        }// if
-        else if ( nbyte == 8 )
-        {
-            for ( uint  lpos = 0; lpos < nchunk; ++lpos )
-            {
-                const size_t  pos  = 10 + (i+lpos)*nbyte;
-
-                zval_buf[lpos] = ( (ulong(zdata[pos+7]) << 56) |
-                                   (ulong(zdata[pos+6]) << 48) |
-                                   (ulong(zdata[pos+5]) << 40) |
-                                   (ulong(zdata[pos+4]) << 32) |
-                                   (ulong(zdata[pos+3]) << 24) |
-                                   (ulong(zdata[pos+2]) << 16) |
-                                   (ulong(zdata[pos+1]) <<  8) |
-                                   (ulong(zdata[pos])        ) );
-            }// for
-        }// if
-
-        // auto  toc   = my_clock::now();
-        // auto  since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-        // t_load += since;
+                ushort  zval_buf[ nchunk ];
         
-        //
-        // convert all 8 values
-        //
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const size_t  pos  = 6 + (i+lpos)*nbyte;
 
-        // tic = my_clock::now();
-        
-        for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    zval_buf[lpos] = (zdata[pos+1] << 8) | zdata[pos];
+                }// for
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const ushort  zval  = zval_buf[lpos];
+                    const ushort  mant  = zval & prec_mask;
+                    const ushort  exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const uint    irval = (uint(exp | fp32_exp_highbit) << fp32_mant_bits) | (uint(mant) << prec_ofs);
+
+                    dest[i+lpos] = double( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+                }// for
+            }// for
+        }// if
+        else
         {
-            const ulong   zval  = zval_buf[lpos];
+            for ( ; i < ncsize; i += nchunk )
+            {
+                //
+                // read next values into local buffer
+                //
+
+                uint  zval_buf[ nchunk ];
+        
+                if ( nbyte == 3 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 6 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+                    }// for
+                }// if
+                else if ( nbyte == 4 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 6 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = (zdata[pos+3] << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+                    }// for
+                }// if
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const uint  zval  = zval_buf[lpos];
+                    const uint  mant  = zval & prec_mask;
+                    const uint  exp   = (zval >> prec_bits) & exp_mask;
+                    const bool  sign  = zval >> sign_shift;
+                    const uint  irval = ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs);
+
+                    dest[i+lpos] = double( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+                }// for
+            }// for
+        }// else
+        
+        for ( ; i < nsize; ++i )
+        {
+            uint          zval = 0;
+            const size_t  pos  = 6 + i*nbyte;
+            
+            switch ( nbyte )
+            {
+                case  4 : zval |= zdata[pos+3] << 24;
+                case  3 : zval |= zdata[pos+2] << 16;
+                case  2 : zval |= zdata[pos+1] << 8;
+                case  1 : zval |= zdata[pos]; break;
+                default :
+                    HLR_ERROR( "unsupported storage size" );
+            }// switch
+
+            const uint   mant  = zval & prec_mask;
+            const uint   exp   = (zval >> prec_bits) & exp_mask;
+            const bool   sign  = zval >> sign_shift;
+            const uint   irval = ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs);
+            const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+
+            dest[i] = double( rval );
+        }// for
+    }// if
+    else
+    {
+        const  uint   prec_ofs   = fp64_mant_bits - prec_bits;
+        const  uint   sign_shift = exp_bits + prec_bits;
+        size_t        i          = 0;
+        double        scale;
+
+        memcpy( & scale, zdata.data() + 2, 8 );
+
+        if ( nbyte == 1 )
+        {
+            // number of values to read before decoding
+            constexpr size_t  nchunk    = 32;
+            size_t            ncsize    = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+            const byte_t      prec_mask = ( 1 << prec_bits ) - 1;
+            const byte_t      exp_mask  = ( 1 << exp_bits  ) - 1;
+
+            for ( ; i < ncsize; i += nchunk )
+            {
+                //
+                // read next values into local buffer
+                //
+            
+                byte_t  zval_buf[ nchunk ];
+        
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    zval_buf[lpos] = zdata[10 + (i+lpos)*nbyte];
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const byte_t  zval  = zval_buf[lpos];
+                    const byte_t  mant  = zval & prec_mask;
+                    const byte_t  exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const ulong   irval = (ulong(exp | fp64_exp_highbit) << fp64_mant_bits) | (ulong(mant) << prec_ofs);
+
+                    dest[i+lpos] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+                }// for
+            }// for
+        }// if
+        else if ( nbyte == 2 )
+        {
+            // number of values to read before decoding
+            constexpr size_t  nchunk    = 32;
+            const size_t      ncsize    = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+            const ushort      prec_mask = ( 1 << prec_bits ) - 1;
+            const ushort      exp_mask  = ( 1 << exp_bits  ) - 1;
+
+            for ( ; i < ncsize; i += nchunk )
+            {
+                //
+                // read next values into local buffer
+                //
+
+                ushort  zval_buf[ nchunk ];
+        
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const size_t  pos  = 10 + (i+lpos)*nbyte;
+                
+                    zval_buf[lpos] = (zdata[pos+1] << 8) | zdata[pos];
+                }// for
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const ushort  zval  = zval_buf[lpos];
+                    const ushort  mant  = zval & prec_mask;
+                    const ushort  exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const ulong   irval = (ulong(exp | fp64_exp_highbit) << fp64_mant_bits) | (ulong(mant) << prec_ofs);
+
+                    dest[i+lpos] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+                }// for
+            }// for
+        }// if
+        else if (( nbyte == 3 ) || ( nbyte == 4 ))
+        {
+            // number of values to read before decoding
+            constexpr size_t  nchunk    = 32;
+            const size_t      ncsize    = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+            const uint        prec_mask = ( 1u << prec_bits ) - 1;
+            const uint        exp_mask  = ( 1u << exp_bits  ) - 1;
+
+            for ( ; i < ncsize; i += nchunk )
+            {
+                //
+                // read next values into local buffer
+                //
+
+                uint  zval_buf[ nchunk ];
+        
+                if ( nbyte == 3 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+                    }// for
+                }// if
+                else // if ( nbyte == 4 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = (zdata[pos+3] << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+                    }// for
+                }// if
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const uint   zval  = zval_buf[lpos];
+                    const uint   mant  = zval & prec_mask;
+                    const uint   exp   = (zval >> prec_bits) & exp_mask;
+                    const bool   sign  = zval >> sign_shift;
+                    const ulong  irval = (ulong(exp | fp64_exp_highbit) << fp64_mant_bits) | (ulong(mant) << prec_ofs);
+
+                    dest[i+lpos] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+                }// for
+            }// for
+        }// if
+        else
+        {
+            constexpr size_t  nchunk    = 32;
+            const size_t      ncsize    = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+            const ulong       prec_mask = ( 1ul << prec_bits ) - 1;
+            const ulong       exp_mask  = ( 1ul << exp_bits  ) - 1;
+
+            for ( ; i < ncsize; i += nchunk )
+            {
+                //
+                // read next values into local buffer
+                //
+
+                ulong  zval_buf[ nchunk ];
+        
+                if ( nbyte == 5 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = ( (ulong(zdata[pos+4]) << 32) |
+                                           (ulong(zdata[pos+3]) << 24) |
+                                           (ulong(zdata[pos+2]) << 16) |
+                                           (ulong(zdata[pos+1]) <<  8) |
+                                           (ulong(zdata[pos])        ) );
+                    }// for
+                }// if
+                else if ( nbyte == 6 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = ( (ulong(zdata[pos+5]) << 40) |
+                                           (ulong(zdata[pos+4]) << 32) |
+                                           (ulong(zdata[pos+3]) << 24) |
+                                           (ulong(zdata[pos+2]) << 16) |
+                                           (ulong(zdata[pos+1]) <<  8) |
+                                           (ulong(zdata[pos])        ) );
+                    }// for
+                }// if
+                else if ( nbyte == 7 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = ( (ulong(zdata[pos+6]) << 48) |
+                                           (ulong(zdata[pos+5]) << 40) |
+                                           (ulong(zdata[pos+4]) << 32) |
+                                           (ulong(zdata[pos+3]) << 24) |
+                                           (ulong(zdata[pos+2]) << 16) |
+                                           (ulong(zdata[pos+1]) <<  8) |
+                                           (ulong(zdata[pos])        ) );
+                    }// for
+                }// if
+                else if ( nbyte == 8 )
+                {
+                    for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                    {
+                        const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+                        zval_buf[lpos] = ( (ulong(zdata[pos+7]) << 56) |
+                                           (ulong(zdata[pos+6]) << 48) |
+                                           (ulong(zdata[pos+5]) << 40) |
+                                           (ulong(zdata[pos+4]) << 32) |
+                                           (ulong(zdata[pos+3]) << 24) |
+                                           (ulong(zdata[pos+2]) << 16) |
+                                           (ulong(zdata[pos+1]) <<  8) |
+                                           (ulong(zdata[pos])        ) );
+                    }// for
+                }// if
+
+                //
+                // convert all values
+                //
+
+                for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+                {
+                    const ulong   zval  = zval_buf[lpos];
+                    const ulong   mant  = zval & prec_mask;
+                    const ulong   exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
+
+                    dest[i+lpos] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+                }// for
+            }// for
+        }// else
+    
+        const ulong  prec_mask = ( 1ul << prec_bits ) - 1;
+        const ulong  exp_mask  = ( 1ul << exp_bits  ) - 1;
+        
+        for ( ; i < nsize; ++i )
+        {
+            ulong         zval = 0;
+            const size_t  pos  = 10 + i*nbyte;
+            
+            switch ( nbyte )
+            {
+                case  8 : zval |= ulong(zdata[pos+7]) << 56;
+                case  7 : zval |= ulong(zdata[pos+6]) << 48;
+                case  6 : zval |= ulong(zdata[pos+5]) << 40;
+                case  5 : zval |= ulong(zdata[pos+4]) << 32;
+                case  4 : zval |= ulong(zdata[pos+3]) << 24;
+                case  3 : zval |= ulong(zdata[pos+2]) << 16;
+                case  2 : zval |= ulong(zdata[pos+1]) << 8;
+                case  1 : zval |= ulong(zdata[pos]); break;
+                default :
+                    HLR_ERROR( "???" );
+            }// switch
+
             const ulong   mant  = zval & prec_mask;
             const ulong   exp   = (zval >> prec_bits) & exp_mask;
             const bool    sign  = zval >> sign_shift;
-
-            const ulong   rexp  = exp | fp64_exp_highbit; // re-add leading bit
-            const ulong   rmant = mant << prec_ofs;
-            const ulong   irval = (rexp << fp64_mant_bits) | rmant;
+            const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
             const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
 
-            dest[i+lpos] = rval;
+            dest[i] = rval;
         }// for
+    }// if
+    
+    // // number of values to read before decoding
+    // constexpr size_t  nchunk = 32;
+    
+    // size_t  ncsize     = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+    // size_t  i          = 0;
 
-        // toc   = my_clock::now();
-        // since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
+    // for ( ; i < ncsize; i += nchunk )
+    // {
+    //     ulong  zval_buf[ nchunk ];
+        
+    //     //
+    //     // read next 8 values into local buffer
+    //     //
 
-        // t_decode += since;
-    }// for
+    //     // auto  tic = my_clock::now();
 
-    for ( ; i < nsize; ++i )
-    {
-        uint          zval = 0;
-        const size_t  pos  = 10 + i*nbyte;
+    //     if ( nbyte == 1 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = zdata[pos];
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 2 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = (zdata[pos+1] << 8) | zdata[pos];
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 3 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 4 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = (ulong(zdata[pos+3]) << 24) | (zdata[pos+2] << 16) | (zdata[pos+1] << 8) | zdata[pos];
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 5 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = ( (ulong(zdata[pos+4]) << 32) |
+    //                                (ulong(zdata[pos+3]) << 24) |
+    //                                (ulong(zdata[pos+2]) << 16) |
+    //                                (ulong(zdata[pos+1]) <<  8) |
+    //                                (ulong(zdata[pos])        ) );
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 6 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = ( (ulong(zdata[pos+5]) << 40) |
+    //                                (ulong(zdata[pos+4]) << 32) |
+    //                                (ulong(zdata[pos+3]) << 24) |
+    //                                (ulong(zdata[pos+2]) << 16) |
+    //                                (ulong(zdata[pos+1]) <<  8) |
+    //                                (ulong(zdata[pos])        ) );
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 7 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = ( (ulong(zdata[pos+6]) << 48) |
+    //                                (ulong(zdata[pos+5]) << 40) |
+    //                                (ulong(zdata[pos+4]) << 32) |
+    //                                (ulong(zdata[pos+3]) << 24) |
+    //                                (ulong(zdata[pos+2]) << 16) |
+    //                                (ulong(zdata[pos+1]) <<  8) |
+    //                                (ulong(zdata[pos])        ) );
+    //         }// for
+    //     }// if
+    //     else if ( nbyte == 8 )
+    //     {
+    //         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //         {
+    //             const size_t  pos  = 10 + (i+lpos)*nbyte;
+
+    //             zval_buf[lpos] = ( (ulong(zdata[pos+7]) << 56) |
+    //                                (ulong(zdata[pos+6]) << 48) |
+    //                                (ulong(zdata[pos+5]) << 40) |
+    //                                (ulong(zdata[pos+4]) << 32) |
+    //                                (ulong(zdata[pos+3]) << 24) |
+    //                                (ulong(zdata[pos+2]) << 16) |
+    //                                (ulong(zdata[pos+1]) <<  8) |
+    //                                (ulong(zdata[pos])        ) );
+    //         }// for
+    //     }// if
+
+    //     // auto  toc   = my_clock::now();
+    //     // auto  since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
+
+    //     // t_load += since;
+        
+    //     //
+    //     // convert all 8 values
+    //     //
+
+    //     // tic = my_clock::now();
+        
+    //     for ( uint  lpos = 0; lpos < nchunk; ++lpos )
+    //     {
+    //         const ulong   zval  = zval_buf[lpos];
+    //         const ulong   mant  = zval & prec_mask;
+    //         const ulong   exp   = (zval >> prec_bits) & exp_mask;
+    //         const bool    sign  = zval >> sign_shift;
+
+    //         const ulong   rexp  = exp | fp64_exp_highbit; // re-add leading bit
+    //         const ulong   rmant = mant << prec_ofs;
+    //         const ulong   irval = (rexp << fp64_mant_bits) | rmant;
+    //         const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+
+    //         dest[i+lpos] = rval;
+    //     }// for
+
+    //     // toc   = my_clock::now();
+    //     // since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
+
+    //     // t_decode += since;
+    // }// for
+
+    // for ( ; i < nsize; ++i )
+    // {
+    //     ulong         zval = 0;
+    //     const size_t  pos  = 10 + i*nbyte;
             
-        switch ( nbyte )
-        {
-            case  8 : zval |= ulong(zdata[pos+7]) << 56;
-            case  7 : zval |= ulong(zdata[pos+6]) << 48;
-            case  6 : zval |= ulong(zdata[pos+5]) << 40;
-            case  5 : zval |= ulong(zdata[pos+4]) << 32;
-            case  4 : zval |= ulong(zdata[pos+3]) << 24;
-            case  3 : zval |= ulong(zdata[pos+2]) << 16;
-            case  2 : zval |= ulong(zdata[pos+1]) << 8;
-            case  1 : zval |= ulong(zdata[pos]); break;
-            default :
-                HLR_ERROR( "???" );
-        }// switch
+    //     switch ( nbyte )
+    //     {
+    //         case  8 : zval |= ulong(zdata[pos+7]) << 56;
+    //         case  7 : zval |= ulong(zdata[pos+6]) << 48;
+    //         case  6 : zval |= ulong(zdata[pos+5]) << 40;
+    //         case  5 : zval |= ulong(zdata[pos+4]) << 32;
+    //         case  4 : zval |= ulong(zdata[pos+3]) << 24;
+    //         case  3 : zval |= ulong(zdata[pos+2]) << 16;
+    //         case  2 : zval |= ulong(zdata[pos+1]) << 8;
+    //         case  1 : zval |= ulong(zdata[pos]); break;
+    //         default :
+    //             HLR_ERROR( "???" );
+    //     }// switch
 
-        const ulong   mant  = zval & prec_mask;
-        const ulong   exp   = (zval >> prec_bits) & exp_mask;
-        const bool    sign  = zval >> sign_shift;
-        const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
-        const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+    //     const ulong   mant  = zval & prec_mask;
+    //     const ulong   exp   = (zval >> prec_bits) & exp_mask;
+    //     const bool    sign  = zval >> sign_shift;
+    //     const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
+    //     const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
 
-        dest[i] = rval;
-    }// for
+    //     dest[i] = rval;
+    // }// for
 }
 
 // template <>
