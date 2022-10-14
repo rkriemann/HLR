@@ -379,9 +379,8 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
 
         // #else
         
-        auto  M  = blas::matrix< value_t >( this->nrows(), this->ncols() );
-    
-        compress::decompress< value_t >( _zM, M );
+        auto  M = mat_decompressed();
+        
         blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
 
         // #endif

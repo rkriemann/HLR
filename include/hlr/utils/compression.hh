@@ -22,7 +22,7 @@
 #include <hlr/utils/detail/lz4.hh>
 #include <hlr/utils/detail/zlib.hh>
 #include <hlr/utils/detail/zstd.hh>
-#include <hlr/utils/detail/afloat2.hh>
+#include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/detail/bfloat.hh>
 
 #include <hlr/arith/blas.hh>

@@ -239,15 +239,15 @@ compress< double > ( const config &   config,
 
         for ( size_t  i = 0; i < nsize; ++i )
         {
-            const float   val   = data[i];
-            const bool    zsign = ( val < 0 );
-
             //
             // Use absolute value and scale v_i and add 1 such that v_i >= 2.
             // With this, highest exponent bit is 1 and we only need to store
             // lowest <exp_bits> exponent bits
             //
         
+            const float   val   = data[i];
+            const bool    zsign = ( val < 0 );
+
             const float   sval  = std::max( fscale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
             const uint    isval = (*reinterpret_cast< const uint * >( & sval ) );
             const uint    sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
@@ -260,9 +260,8 @@ compress< double > ( const config &   config,
 
             // // DEBUG
             // {
-            //     const byte_t  fp32_sign_bit = 31;
-            //     const byte_t  sign_shift    = exp_bits + prec_bits;
-            //     const uint    prec_mask     = ( 1u << prec_bits ) - 1;
+            //     const byte_t  sign_shift = exp_bits + prec_bits;
+            //     const uint    prec_mask  = ( 1u << prec_bits ) - 1;
             
             //     const uint   mant  = zval & prec_mask;
             //     const uint   exp   = (zval >> prec_bits) & exp_mask;
