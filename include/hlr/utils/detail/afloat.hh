@@ -290,21 +290,21 @@ compress< double > ( const config &   config,
             const uint    zmant = smant >> prec_ofs;
             uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
-            {
-                const byte_t  sign_shift = exp_bits + prec_bits;
-                const uint    prec_mask  = ( 1 << prec_bits ) - 1;
+            // {
+            //     const byte_t  sign_shift = exp_bits + prec_bits;
+            //     const uint    prec_mask  = ( 1 << prec_bits ) - 1;
             
-                const uint   mant  = zval & prec_mask;
-                const uint   exp   = (zval >> prec_bits) & exp_mask;
-                const bool   sign  = zval >> sign_shift;
+            //     const uint   mant  = zval & prec_mask;
+            //     const uint   exp   = (zval >> prec_bits) & exp_mask;
+            //     const bool   sign  = zval >> sign_shift;
 
-                const uint   rexp  = exp | fp32_exp_highbit; // re-add leading bit
-                const uint   rmant = mant << prec_ofs;
-                const uint   irval = (rexp << fp32_mant_bits) | rmant;
-                const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+            //     const uint   rexp  = exp | fp32_exp_highbit; // re-add leading bit
+            //     const uint   rmant = mant << prec_ofs;
+            //     const uint   irval = (rexp << fp32_mant_bits) | rmant;
+            //     const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
 
-                std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
-            }
+            //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
+            // }
         
             //
             // copy bits of zval into data buffer
