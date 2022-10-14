@@ -476,6 +476,9 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         
     if ( is_compressed() )
         return;
+                 
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 192, 255 ), Hpro::is( 256, 319 ) ) )
+    //     std::cout << std::endl;
 
     auto          oU      = this->U();
     auto          oV      = this->V();
@@ -493,7 +496,11 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dU, "U2" );
             
     //     blas::add( value_t(-1), oU, dU );
-    //     std::cout << "U " << this->id() << " : " << blas::norm_F( dU ) / blas::norm_F(oU) << std::endl;
+    //     std::cout << "U " << this->block_is().to_string() << " : "
+    //               << blas::norm_F( dU ) / blas::norm_F(oU)
+    //               << " / "
+    //               << blas::max_abs_val( dU )
+    //               << std::endl;
 
     //     // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
     //     // {
@@ -517,7 +524,11 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dV, "V2" );
             
     //     blas::add( value_t(-1), oV, dV );
-    //     std::cout << "V " << this->id() << " : " << blas::norm_F( dV ) / blas::norm_F(oV) << std::endl;
+    //     std::cout << "V " << this->block_is().to_string() << " : "
+    //               << blas::norm_F( dV ) / blas::norm_F(oV)
+    //               << " / "
+    //               << blas::max_abs_val( dV )
+    //               << std::endl;
 
     //     // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )
     //     // {

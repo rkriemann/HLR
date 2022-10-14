@@ -44,7 +44,7 @@ compress ( const config &   config,
 
     const auto  retval = compress2( zdata.data(), & csize,
                                     reinterpret_cast< const Bytef * >( data ), nsize * sizeof(value_t),
-                                    Z_DEFAULT_COMPRESSION );
+                                    9 ); // Z_DEFAULT_COMPRESSION );
 
     HLR_ASSERT( retval == Z_OK );
 
@@ -72,48 +72,6 @@ decompress ( const zarray &  zdata,
     HLR_ASSERT( dsize  == nsize * sizeof(value_t) );
 }
 
-//
-// memory accessor
-//
-struct mem_accessor
-{
-    mem_accessor ( const double  /* eps */ )
-    {}
-    
-    template < typename value_t >
-    zarray
-    encode ( value_t *        data,
-             const size_t     dim0,
-             const size_t     dim1 = 0,
-             const size_t     dim2 = 0,
-             const size_t     dim3 = 0 )
-    {
-        return compress( config(), data, dim0, dim1, dim2, dim3 );
-    }
-        
-    template < typename value_t >
-    void
-    decode ( const zarray &  buffer,
-             value_t *       dest,
-             const size_t    dim0,
-             const size_t    dim1 = 0,
-             const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
-    {
-        decompress( buffer, dest, dim0, dim1, dim2, dim3 );
-    }
-    
-    size_t
-    byte_size ( const zarray &  v )
-    {
-        return zlib::byte_size( v );
-    }
-
-private:
-
-    mem_accessor ();
-};
-    
 }}}// namespace hlr::compress::zlib
 
 #endif // HAS_ZLIB

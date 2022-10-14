@@ -112,7 +112,8 @@ COMPRESSORS   = [ 'none',
                   'lz4',
                   'zlib',
                   'zstd',
-                  'afloat' ]
+                  'afloat',
+                  'bfloat' ]
 compressor    = 'none'
 
 ######################################################################
@@ -563,6 +564,7 @@ elif compressor == 'bf16'   : env.Append( CPPDEFINES = 'COMPRESSOR=10' )
 elif compressor == 'tf32'   : env.Append( CPPDEFINES = 'COMPRESSOR=11' )
 elif compressor == 'bf24'   : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
 elif compressor == 'afloat' : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
+elif compressor == 'bfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
 
 ######################################################################
 #

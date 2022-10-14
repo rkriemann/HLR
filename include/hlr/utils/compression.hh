@@ -23,6 +23,7 @@
 #include <hlr/utils/detail/zlib.hh>
 #include <hlr/utils/detail/zstd.hh>
 #include <hlr/utils/detail/afloat2.hh>
+#include <hlr/utils/detail/bfloat.hh>
 
 #include <hlr/arith/blas.hh>
 
@@ -296,6 +297,23 @@ using hlr::compress::afloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif COMPRESSOR == 14
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "bfloat";
+
+using  zconfig_t = hlr::compress::bfloat::config;
+using  zarray    = hlr::compress::bfloat::zarray;
+
+using hlr::compress::bfloat::compress;
+using hlr::compress::bfloat::decompress;
+using hlr::compress::bfloat::get_config;
+using hlr::compress::bfloat::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #else // no library available
 
 #  define HLR_HAS_COMPRESSION  0
@@ -355,6 +373,81 @@ decompress ( const zarray &             zdata,
 {
     return decompress< value_t >( zdata, v.data(), v.length() );
 }
+
+//
+// memory accessor
+//
+struct mem_accessor
+{
+    zconfig_t  mode;
+
+    mem_accessor ( const double  eps )
+            : mode( compress::get_config( eps ) )
+    {}
+    
+    template < typename value_t >
+    zarray
+    encode ( value_t *        data,
+             const size_t     dim0,
+             const size_t     dim1 = 0,
+             const size_t     dim2 = 0,
+             const size_t     dim3 = 0 )
+    {
+        return compress::compress( mode, data, dim0, dim1, dim2, dim3 );
+    }
+    
+    template < typename value_t >
+    zarray
+    encode ( const blas::matrix< value_t > &  M )
+    {
+        return compress::compress( mode, M );
+    }
+    
+    template < typename value_t >
+    zarray
+    encode ( const blas::vector< value_t > &  v )
+    {
+        return compress::compress( mode, v );
+    }
+    
+    template < typename value_t >
+    void
+    decode ( const zarray &  zbuf,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0 )
+    {
+        compress::decompress( zbuf, dest, dim0, dim1, dim2, dim3 );
+    }
+
+    template < typename value_t >
+    void
+    decode ( const zarray &             zbuf,
+             blas::matrix< value_t > &  M )
+    {
+        compress::decompress( zbuf, M );
+    }
+
+    template < typename value_t >
+    void
+    decode ( const zarray &             zbuf,
+             blas::vector< value_t > &  v )
+    {
+        compress::decompress( zbuf, v );
+    }
+
+    size_t
+    byte_size ( const zarray &  zbuf )
+    {
+        return compress::byte_size( zbuf );
+    }
+
+private:
+
+    mem_accessor ();
+};
 
 }// namespace compress
 

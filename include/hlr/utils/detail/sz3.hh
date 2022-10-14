@@ -347,51 +347,6 @@ decompress< std::complex< double > > ( const zarray &            v,
     HLR_ERROR( "TO DO" );
 }
 
-//
-// memory accessor
-//
-struct mem_accessor
-{
-    config  mode;
-
-    mem_accessor ( const double  eps )
-            : mode( get_config( eps ) )
-    {}
-    
-    template < typename value_t >
-    zarray
-    encode ( value_t *        data,
-             const size_t     dim0,
-             const size_t     dim1 = 0,
-             const size_t     dim2 = 0,
-             const size_t     dim3 = 0 )
-    {
-        return compress( mode, data, dim0, dim1, dim2, dim3 );
-    }
-    
-    template < typename value_t >
-    void
-    decode ( const zarray &  buffer,
-             value_t *       dest,
-             const size_t    dim0,
-             const size_t    dim1 = 0,
-             const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
-    {
-        decompress( buffer, dest, dim0, dim1, dim2, dim3 );
-    }
-
-    size_t
-    byte_size ( const zarray &  v )
-    {
-        return sz3::byte_size( v );
-    }
-
-private:
-
-    mem_accessor ();
-};
-    
 }}}// namespace hlr::compress::sz
 
 #endif // HAS_SZ3

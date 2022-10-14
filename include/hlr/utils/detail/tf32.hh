@@ -167,48 +167,6 @@ decompress< double > ( const zarray &  zdata,
         dest[i] = double( zdata[i] );
 }
 
-//
-// memory accessor
-//
-struct mem_accessor
-{
-    mem_accessor ( const double  /* eps */ )
-    {}
-    
-    template < typename value_t >
-    zarray
-    encode ( value_t *        data,
-             const size_t     dim0,
-             const size_t     dim1 = 0,
-             const size_t     dim2 = 0,
-             const size_t     dim3 = 0 )
-    {
-        return compress( config(), data, dim0, dim1, dim2, dim3 );
-    }
-    
-    template < typename value_t >
-    void
-    decode ( const zarray &  buffer,
-             value_t *       dest,
-             const size_t    dim0,
-             const size_t    dim1 = 0,
-             const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
-    {
-        decompress( buffer, dest, dim0, dim1, dim2, dim3 );
-    }
-    
-    size_t
-    byte_size ( const zarray &  v )
-    {
-        return tf32::byte_size( v );
-    }
-    
-private:
-
-    mem_accessor ();
-};
-    
 }}}// namespace hlr::compress::tf32
 
 #endif // __HLR_UTILS_DETAIL_TF32_HH
