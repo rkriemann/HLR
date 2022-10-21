@@ -23,6 +23,7 @@
 #include <hlr/utils/detail/zlib.hh>
 #include <hlr/utils/detail/zstd.hh>
 #include <hlr/utils/detail/afloat.hh>
+#include <hlr/utils/detail/apfloat.hh>
 #include <hlr/utils/detail/bfloat.hh>
 
 #include <hlr/arith/blas.hh>
@@ -298,6 +299,23 @@ using hlr::compress::afloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 
 #elif COMPRESSOR == 14
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "apfloat";
+
+using  zconfig_t = hlr::compress::apfloat::config;
+using  zarray    = hlr::compress::apfloat::zarray;
+
+using hlr::compress::apfloat::compress;
+using hlr::compress::apfloat::decompress;
+using hlr::compress::apfloat::get_config;
+using hlr::compress::apfloat::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 15
 
 #  define HLR_HAS_COMPRESSION  1
 

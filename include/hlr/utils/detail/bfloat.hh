@@ -129,7 +129,9 @@ compress< float > ( const config &   config,
         zarray  zdata( bf_header_ofs + nsize * 4 );
 
         zdata[0] = nbyte;
-        memcpy( zdata.data() + bf_header_ofs, data, nsize*4 );
+        std::copy( reinterpret_cast< const byte_t * >( data ),
+                   reinterpret_cast< const byte_t * >( data + nsize ),
+                   zdata.data() + bf_header_ofs );
     }// if
     else
         HLR_ERROR( "unsupported storage size" );
@@ -338,7 +340,9 @@ compress< double > ( const config &   config,
         zarray  zdata( bf_header_ofs + nsize * 8 );
 
         zdata[0] = nbyte;
-        memcpy( zdata.data() + bf_header_ofs, data, nsize*8 );
+        std::copy( reinterpret_cast< const byte_t * >( data ),
+                   reinterpret_cast< const byte_t * >( data + nsize ),
+                   zdata.data() + bf_header_ofs );
     }// if
 
     return zdata;
@@ -484,20 +488,7 @@ decompress< double > ( const zarray &  zdata,
     }// if
     else if ( nbyte == 8 )
     {
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const size_t  zpos = 8*i + bf_header_ofs;
-            const ulong   ival = ( (ulong(zdata[zpos+7]) << 56) |
-                                   (ulong(zdata[zpos+6]) << 48) |
-                                   (ulong(zdata[zpos+5]) << 40) |
-                                   (ulong(zdata[zpos+4]) << 32) |
-                                   (ulong(zdata[zpos+3]) << 24) |
-                                   (ulong(zdata[zpos+2]) << 16) |
-                                   (ulong(zdata[zpos+1]) <<  8) |
-                                   (ulong(zdata[zpos])        ) );
-        
-            dest[i] = double( * reinterpret_cast< const double * >( & ival ) );
-        }// for
+        std::copy( zdata.data() + bf_header_ofs, zdata.data() + zdata.size(), reinterpret_cast< byte_t * >( dest ) );
     }// if
 }
 

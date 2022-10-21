@@ -8,36 +8,29 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
-// DEBUG
-// #include <bitset>
-
-#include <chrono>
-
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
+//
+// - exponent size based on exponent range of input
+// - scale input D such that |d_i| ≥ 1
+// - mantissa size depends on precision
 //
 ////////////////////////////////////////////////////////////
 
 namespace hlr { namespace compress { namespace afloat {
 
-// // timing
-// using  my_clock = std::chrono::high_resolution_clock;
-
-// extern double  t_load;
-// extern double  t_decode;
-
 using byte_t = unsigned char;
 
-constexpr byte_t  fp32_mant_bits   = 23;
-constexpr byte_t  fp32_exp_bits    = 8;
-constexpr byte_t  fp32_sign_bit    = 31;
-constexpr ulong   fp32_exp_highbit = 0b10000000;
+constexpr uint   fp32_mant_bits   = 23;
+constexpr uint   fp32_exp_bits    = 8;
+constexpr uint   fp32_sign_bit    = 31;
+constexpr ulong  fp32_exp_highbit = 1 << (fp32_exp_bits-1);
 
-constexpr uint    fp64_mant_bits   = 52;
-constexpr uint    fp64_exp_bits    = 11;
-constexpr uint    fp64_sign_bit    = 63;
-constexpr ulong   fp64_exp_highbit = 0b10000000000;
+constexpr uint   fp64_mant_bits   = 52;
+constexpr uint   fp64_exp_bits    = 11;
+constexpr uint   fp64_sign_bit    = 63;
+constexpr ulong  fp64_exp_highbit = 1 << (fp64_exp_bits-1);
 
 inline
 byte_t
@@ -101,23 +94,15 @@ compress< float > ( const config &   config,
         vmax = std::max< float >( vmax, std::abs( data[i] ) );
     }// for
 
-    // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
-
-    const byte_t  fp32_mant_bits = 23;
-    const byte_t  fp32_exp_bits  = 8;
-    const byte_t  fp32_sign_pos  = 31;
-
     // scale all values v_i such that we have |v_i| >= 1
     const float   scale     = 1.0 / vmin;
+    
     // number of bits needed to represent exponent values
-    const byte_t  exp_bits  = std::max< float >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
+    const uint    exp_bits  = std::max< float >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
     const uint    exp_mask  = ( 1 << exp_bits ) - 1;
-    const byte_t  prec_bits = config.bitrate;
+    const uint    prec_bits = config.bitrate;
     const uint    prec_mask = ( 1 << prec_bits ) - 1;
-    const byte_t  prec_ofs  = fp32_mant_bits - prec_bits;
-
-    // std::cout << uint(exp_bits) << std::endl;
-    // std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_ofs << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
+    const uint    prec_ofs  = fp32_mant_bits - prec_bits;
 
     const size_t  nbits      = 1 + exp_bits + prec_bits; // number of bits per value
     const size_t  n_tot_bits = nsize * nbits;            // number of bits for all values
@@ -160,8 +145,8 @@ compress< float > ( const config &   config,
         const uint    zmant = smant >> prec_ofs;
         uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
+        // // DEBUG
         // {
-        //     const byte_t  fp32_sign_pos  = 31;
         //     const byte_t  sign_shift = exp_bits + prec_bits;
             
         //     const uint   mant  = zval & prec_mask;
@@ -231,17 +216,13 @@ compress< double > ( const config &   config,
         vmax = std::max( vmax, std::abs( data[i] ) );
     }// for
 
-    // std::cout << vmin << " / " << vmax << " / " << std::ceil( std::log2( std::log2( vmax / vmin ) ) ) << std::endl;
-
     // scale all values v_i such that we have |v_i| >= 1
     const double  scale     = 1.0 / vmin;
-    // number of bits needed to represent exponent values
-    const byte_t  exp_bits  = std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
-    const uint    exp_mask  = ( 1 << exp_bits ) - 1;
-    const byte_t  prec_bits = config.bitrate;
 
-    // std::cout << uint(exp_bits) << std::endl;
-    // std::cout << std::bitset< 8 >( exp_mask ) << " / " << prec_ofs << " / " << std::bitset< 23 >( prec_mask ) << std::endl;
+    // number of bits needed to represent exponent values
+    const uint    exp_bits  = std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );
+    const uint    exp_mask  = ( 1 << exp_bits ) - 1;
+    const uint    prec_bits = config.bitrate;
 
     const size_t  nbits      = 1 + exp_bits + prec_bits; // number of bits per value
     const size_t  n_tot_bits = nsize * nbits;            // number of bits for all values
@@ -255,7 +236,7 @@ compress< double > ( const config &   config,
         // store header (exponents and precision bits and scaling factor)
         //
     
-        const float   fscale   = scale;
+        const float   fscale = scale;
         
         zdata[0] = exp_bits;
         zdata[1] = prec_bits;
@@ -265,9 +246,9 @@ compress< double > ( const config &   config,
         // store data
         //
         
-        const byte_t  prec_ofs = fp32_mant_bits - prec_bits;
-        size_t        pos      = 6; // data starts after scaling factor, exponent bits and precision bits
-        uint          bpos     = 0; // start bit position in current byte
+        const uint  prec_ofs = fp32_mant_bits - prec_bits;
+        size_t      pos      = 6; // data starts after scaling factor, exponent bits and precision bits
+        uint        bpos     = 0; // start bit position in current byte
 
         for ( size_t  i = 0; i < nsize; ++i )
         {
@@ -290,6 +271,7 @@ compress< double > ( const config &   config,
             const uint    zmant = smant >> prec_ofs;
             uint          zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
+            // // DEBUG
             // {
             //     const byte_t  sign_shift = exp_bits + prec_bits;
             //     const uint    prec_mask  = ( 1 << prec_bits ) - 1;
@@ -380,6 +362,7 @@ compress< double > ( const config &   config,
             const ulong   zmant = smant >> prec_ofs;
             ulong         zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
+            // // DEBUG
             // {
             //     const byte_t  sign_shift = exp_bits + prec_bits;
             //     const ulong   prec_mask  = ( 1ul << prec_bits ) - 1;
@@ -457,9 +440,9 @@ decompress< float > ( const zarray &  zdata,
     // read compression header (scaling, exponent and precision bits)
     //
     
-    const byte_t  exp_bits  = zdata[0];
-    const byte_t  prec_bits = zdata[1];
-    float         scale;
+    const uint  exp_bits  = zdata[0];
+    const uint  prec_bits = zdata[1];
+    float       scale;
 
     memcpy( & scale, zdata.data() + 2, 4 );
 
@@ -467,45 +450,43 @@ decompress< float > ( const zarray &  zdata,
     // read compressed data
     //
     
-    const byte_t  nbits       = 1 + exp_bits + prec_bits;
-    const uint    prec_mask   = ( 1 << prec_bits ) - 1;
-    const uint    prec_ofs    = fp32_mant_bits - prec_bits;
-    const uint    exp_mask    = ( 1 << exp_bits ) - 1;
-    const byte_t  sign_shift  = exp_bits + prec_bits;
+    const uint  nbits       = 1 + exp_bits + prec_bits;
+    const uint  prec_mask   = ( 1 << prec_bits ) - 1;
+    const uint  prec_ofs    = fp32_mant_bits - prec_bits;
+    const uint  exp_mask    = ( 1 << exp_bits ) - 1;
+    const uint  sign_shift  = exp_bits + prec_bits;
 
     // number of values to read before decoding
     constexpr size_t  nchunk = 32;
     
     size_t  pos    = 6;
-    byte_t  bpos   = 0;                          // bit position in current byte
+    uint    bpos   = 0;                          // bit position in current byte
     size_t  ncsize = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
     size_t  i      = 0;
 
     for ( ; i < ncsize; i += nchunk )
     {
         //
-        // read next 8 values into local buffer
+        // read next values into local buffer
         //
 
         uint  zval_buf[ nchunk ];
         
-        // auto  tic = my_clock::now();
-        
         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
         {
-            uint    zval  = 0;
-            byte_t  sbits = 0;  // already read bits of zval
+            uint  zval  = 0;
+            uint  sbits = 0;  // already read bits of zval
             
             do
             {
                 HLR_DBG_ASSERT( pos < zdata.size() );
         
-                const byte_t  crest = 8 - bpos;                               // remaining bits in current byte
-                const byte_t  zrest = nbits - sbits;                          // remaining bits to read for zval
+                const uint    crest = 8 - bpos;                               // remaining bits in current byte
+                const uint    zrest = nbits - sbits;                          // remaining bits to read for zval
                 const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
                 const byte_t  data  = (zdata[pos] >> bpos) & zmask;           // part of zval in current byte
                 
-                zval  |= (data << sbits); // lowest to highest bit in zdata
+                zval  |= (uint(data) << sbits); // lowest to highest bit in zdata
                 sbits += crest;
 
                 if ( crest <= zrest )
@@ -522,16 +503,9 @@ decompress< float > ( const zarray &  zdata,
             zval_buf[lpos] = zval;
         }// for
 
-        // auto  toc   = my_clock::now();
-        // auto  since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-        // t_load += since;
-        
         //
-        // convert all 8 values
+        // convert all values
         //
-
-        // tic = my_clock::now();
         
         for ( uint  lpos = 0; lpos < nchunk; ++lpos )
         {
@@ -547,28 +521,23 @@ decompress< float > ( const zarray &  zdata,
 
             dest[i+lpos] = rval;
         }// for
-
-        // toc   = my_clock::now();
-        // since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-        // t_decode += since;
     }// for
 
     for ( ; i < nsize; ++i )
     {
-        uint    zval  = 0;
-        byte_t  sbits = 0;
+        uint  zval  = 0;
+        uint  sbits = 0;
             
         do
         {
             HLR_DBG_ASSERT( pos < zdata.size() );
         
-            const byte_t  crest = 8 - bpos;
-            const byte_t  zrest = nbits - sbits;
+            const uint    crest = 8 - bpos;
+            const uint    zrest = nbits - sbits;
             const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
             const byte_t  data  = (zdata[pos] >> bpos) & zmask;
                 
-            zval  |= (data << sbits);
+            zval  |= (uint(data) << sbits);
             sbits += crest;
 
             if ( crest <= zrest )
@@ -607,9 +576,9 @@ decompress< double > ( const zarray &  zdata,
     // read compression header (scaling, exponent and precision bits)
     //
     
-    const byte_t  exp_bits  = zdata[0];
-    const byte_t  prec_bits = zdata[1];
-    const byte_t  nbits     = 1 + exp_bits + prec_bits;
+    const uint  exp_bits  = zdata[0];
+    const uint  prec_bits = zdata[1];
+    const uint  nbits     = 1 + exp_bits + prec_bits;
 
     if (( prec_bits <= 23 ) && ( nbits <= 32 ))
     {
@@ -617,7 +586,7 @@ decompress< double > ( const zarray &  zdata,
         // read scaling factor
         //
         
-        float         scale;
+        float  scale;
 
         memcpy( & scale, zdata.data() + 2, 4 );
 
@@ -625,43 +594,41 @@ decompress< double > ( const zarray &  zdata,
         // read compressed data
         //
     
-        const uint    prec_mask   = ( 1 << prec_bits ) - 1;
-        const uint    prec_ofs    = fp32_mant_bits - prec_bits;
-        const uint    exp_mask    = ( 1 << exp_bits ) - 1;
-        const byte_t  sign_shift  = exp_bits + prec_bits;
+        const uint  prec_mask  = ( 1 << prec_bits ) - 1;
+        const uint  prec_ofs   = fp32_mant_bits - prec_bits;
+        const uint  exp_mask   = ( 1 << exp_bits ) - 1;
+        const uint  sign_shift = exp_bits + prec_bits;
 
         // number of values to read before decoding
         constexpr size_t  nchunk = 32;
     
-        size_t  pos        = 6;
-        byte_t  bpos       = 0;                          // bit position in current byte
-        size_t  ncsize     = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
-        size_t  i          = 0;
+        size_t  pos    = 6;
+        uint    bpos   = 0;                          // bit position in current byte
+        size_t  ncsize = (nsize / nchunk) * nchunk;  // largest multiple of <nchunk> below <nsize>
+        size_t  i      = 0;
         uint    zval_buf[ nchunk ];
 
         for ( ; i < ncsize; i += nchunk )
         {
             //
-            // read next 8 values into local buffer
+            // read next values into local buffer
             //
-
-            // auto  tic = my_clock::now();
         
             for ( uint  lpos = 0; lpos < nchunk; ++lpos )
             {
-                uint    zval  = 0;
-                byte_t  sbits = 0;  // already read bits of zval
+                uint  zval  = 0;
+                uint  sbits = 0;  // already read bits of zval
             
                 do
                 {
                     HLR_DBG_ASSERT( pos < zdata.size() );
         
-                    const byte_t  crest = 8 - bpos;                               // remaining bits in current byte
-                    const byte_t  zrest = nbits - sbits;                          // remaining bits to read for zval
+                    const uint    crest = 8 - bpos;                               // remaining bits in current byte
+                    const uint    zrest = nbits - sbits;                          // remaining bits to read for zval
                     const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
                     const byte_t  data  = (zdata[pos] >> bpos) & zmask;           // part of zval in current byte
                 
-                    zval  |= (data << sbits); // lowest to highest bit in zdata
+                    zval  |= (uint(data) << sbits); // lowest to highest bit in zdata
                     sbits += crest;
 
                     if ( crest <= zrest )
@@ -678,16 +645,9 @@ decompress< double > ( const zarray &  zdata,
                 zval_buf[lpos] = zval;
             }// for
 
-            // auto  toc   = my_clock::now();
-            // auto  since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-            // t_load += since;
-        
             //
-            // convert all 8 values
+            // convert all values
             //
-
-            // tic = my_clock::now();
         
             for ( uint  lpos = 0; lpos < nchunk; ++lpos )
             {
@@ -703,28 +663,23 @@ decompress< double > ( const zarray &  zdata,
 
                 dest[i+lpos] = double( rval );
             }// for
-
-            // toc   = my_clock::now();
-            // since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-            // t_decode += since;
         }// for
 
         for ( ; i < nsize; ++i )
         {
-            uint    zval  = 0;
-            byte_t  sbits = 0;
+            uint  zval  = 0;
+            uint  sbits = 0;
             
             do
             {
                 HLR_DBG_ASSERT( pos < zdata.size() );
         
-                const byte_t  crest = 8 - bpos;
-                const byte_t  zrest = nbits - sbits;
+                const uint    crest = 8 - bpos;
+                const uint    zrest = nbits - sbits;
                 const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
                 const byte_t  data  = (zdata[pos] >> bpos) & zmask;
                 
-                zval  |= (data << sbits);
+                zval  |= (uint(data) << sbits);
                 sbits += crest;
 
                 if ( crest <= zrest )
@@ -759,10 +714,10 @@ decompress< double > ( const zarray &  zdata,
         // read compressed data
         //
     
-        const ulong   prec_mask  = ( 1ul << prec_bits ) - 1;
-        const uint    prec_ofs   = fp64_mant_bits - prec_bits;
-        const ulong   exp_mask   = ( 1ul << exp_bits ) - 1;
-        const byte_t  sign_shift = exp_bits + prec_bits;
+        const ulong  prec_mask  = ( 1ul << prec_bits ) - 1;
+        const uint   prec_ofs   = fp64_mant_bits - prec_bits;
+        const ulong  exp_mask   = ( 1ul << exp_bits ) - 1;
+        const uint   sign_shift = exp_bits + prec_bits;
 
         // number of values to read before decoding
         constexpr size_t  nchunk = 32;
@@ -775,13 +730,11 @@ decompress< double > ( const zarray &  zdata,
         for ( ; i < ncsize; i += nchunk )
         {
             //
-            // read next 8 values into local buffer
+            // read next values into local buffer
             //
 
             ulong  zval_buf[ nchunk ];
             
-            // auto  tic = my_clock::now();
-        
             for ( uint  lpos = 0; lpos < nchunk; ++lpos )
             {
                 ulong  zval  = 0;
@@ -794,9 +747,9 @@ decompress< double > ( const zarray &  zdata,
                     const uint    crest = 8 - bpos;                               // remaining bits in current byte
                     const uint    zrest = nbits - sbits;                          // remaining bits to read for zval
                     const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
-                    const ulong   data  = (zdata[pos] >> bpos) & zmask;           // part of zval in current byte
+                    const byte_t  data  = (zdata[pos] >> bpos) & zmask;           // part of zval in current byte
                 
-                    zval  |= (data << sbits); // lowest to highest bit in zdata
+                    zval  |= (ulong(data) << sbits); // lowest to highest bit in zdata
                     sbits += crest;
 
                     if ( crest <= zrest )
@@ -813,16 +766,9 @@ decompress< double > ( const zarray &  zdata,
                 zval_buf[lpos] = zval;
             }// for
 
-            // auto  toc   = my_clock::now();
-            // auto  since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-            // t_load += since;
-        
             //
-            // convert all 8 values
+            // convert all values
             //
-
-            // tic = my_clock::now();
         
             for ( uint  lpos = 0; lpos < nchunk; ++lpos )
             {
@@ -838,11 +784,6 @@ decompress< double > ( const zarray &  zdata,
 
                 dest[i+lpos] = rval;
             }// for
-
-            // toc   = my_clock::now();
-            // since = std::chrono::duration_cast< std::chrono::microseconds >( toc - tic ).count() / 1e6;
-
-            // t_decode += since;
         }// for
 
         for ( ; i < nsize; ++i )
@@ -857,9 +798,9 @@ decompress< double > ( const zarray &  zdata,
                 const uint    crest = 8 - bpos;
                 const uint    zrest = nbits - sbits;
                 const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
-                const ulong   data  = (zdata[pos] >> bpos) & zmask;
+                const byte_t  data  = (zdata[pos] >> bpos) & zmask;
                 
-                zval  |= (data << sbits);
+                zval  |= (ulong(data) << sbits);
                 sbits += crest;
 
                 if ( crest <= zrest )

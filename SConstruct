@@ -113,6 +113,7 @@ COMPRESSORS   = [ 'none',
                   'zlib',
                   'zstd',
                   'afloat',
+                  'apfloat',
                   'bfloat' ]
 compressor    = 'none'
 
@@ -551,20 +552,21 @@ if universal :
     env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 
-if   compressor == 'fp32'   : env.Append( CPPDEFINES = 'COMPRESSOR=1' )
-elif compressor == 'fp16'   : env.Append( CPPDEFINES = 'COMPRESSOR=2' )
-elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'COMPRESSOR=3' )
-elif compressor == 'posits' : env.Append( CPPDEFINES = 'COMPRESSOR=4' )
-elif compressor == 'sz'     : env.Append( CPPDEFINES = 'COMPRESSOR=5' )
-elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
-elif compressor == 'lz4'    : env.Append( CPPDEFINES = 'COMPRESSOR=7' )
-elif compressor == 'zlib'   : env.Append( CPPDEFINES = 'COMPRESSOR=8' )
-elif compressor == 'zstd'   : env.Append( CPPDEFINES = 'COMPRESSOR=9' )
-elif compressor == 'bf16'   : env.Append( CPPDEFINES = 'COMPRESSOR=10' )
-elif compressor == 'tf32'   : env.Append( CPPDEFINES = 'COMPRESSOR=11' )
-elif compressor == 'bf24'   : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
-elif compressor == 'afloat' : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
-elif compressor == 'bfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
+if   compressor == 'fp32'    : env.Append( CPPDEFINES = 'COMPRESSOR=1' )
+elif compressor == 'fp16'    : env.Append( CPPDEFINES = 'COMPRESSOR=2' )
+elif compressor == 'zfp'     : env.Append( CPPDEFINES = 'COMPRESSOR=3' )
+elif compressor == 'posits'  : env.Append( CPPDEFINES = 'COMPRESSOR=4' )
+elif compressor == 'sz'      : env.Append( CPPDEFINES = 'COMPRESSOR=5' )
+elif compressor == 'sz3'     : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
+elif compressor == 'lz4'     : env.Append( CPPDEFINES = 'COMPRESSOR=7' )
+elif compressor == 'zlib'    : env.Append( CPPDEFINES = 'COMPRESSOR=8' )
+elif compressor == 'zstd'    : env.Append( CPPDEFINES = 'COMPRESSOR=9' )
+elif compressor == 'bf16'    : env.Append( CPPDEFINES = 'COMPRESSOR=10' )
+elif compressor == 'tf32'    : env.Append( CPPDEFINES = 'COMPRESSOR=11' )
+elif compressor == 'bf24'    : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
+elif compressor == 'afloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
+elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
+elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=15' )
 
 ######################################################################
 #
