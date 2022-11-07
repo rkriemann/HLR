@@ -92,7 +92,7 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
-    const auto  normA = hlr::norm::spectral( *A, true, 1e-4 );
+    const auto  normA = hlr::norm::spectral( *A, 1e-4 );
 
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
     
@@ -134,7 +134,7 @@ program_main ()
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-            auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+            auto  error = hlr::norm::spectral( *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
@@ -167,7 +167,7 @@ program_main ()
         
         {
             auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-            auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+            auto  error = hlr::norm::spectral( *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
@@ -213,7 +213,7 @@ program_main ()
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        auto  error = hlr::norm::spectral( *diff, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }// if
@@ -271,7 +271,7 @@ program_main ()
         std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::norm::spectral( *diff, true, 1e-4 );
+        auto  error = hlr::norm::spectral( *diff, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         

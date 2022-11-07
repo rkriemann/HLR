@@ -14,6 +14,15 @@ namespace hlr
 {
 
 //
+// define trait and concept for testing arithmetic
+//
+template < typename T > struct is_arithmetic { static constexpr bool value = false; };
+
+template < typename T > inline constexpr bool is_arithmetic_v = is_arithmetic< T >::value;
+
+template < typename T > concept provides_arithmetic = is_arithmetic_v< T >;
+
+//
 // default collection of arithmetic functions
 //
 struct default_arithmetic
@@ -68,6 +77,11 @@ struct default_arithmetic
 };
 
 constexpr default_arithmetic arithmetic{};
+
+template <> struct is_arithmetic<       default_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const default_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic<       default_arithmetic & > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const default_arithmetic & > { static constexpr bool value = true; };
 
 }// namespace hlr
 

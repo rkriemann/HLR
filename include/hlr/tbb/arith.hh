@@ -18,6 +18,7 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
+#include <hlr/arith/defaults.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>
@@ -1108,6 +1109,13 @@ struct tbb_arithmetic
 
 constexpr tbb_arithmetic arithmetic{};
 
-}}// namespace hlr::tbb
+}// namespace tbb
+
+template <> struct is_arithmetic<       tbb::tbb_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const tbb::tbb_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic<       tbb::tbb_arithmetic & > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const tbb::tbb_arithmetic & > { static constexpr bool value = true; };
+
+}// namespace hlr
 
 #endif // __HLR_TBB_ARITH_HH

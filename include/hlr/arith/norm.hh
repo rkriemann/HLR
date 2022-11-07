@@ -12,6 +12,7 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
+#include "hlr/arith/defaults.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/operator_wrapper.hh"
 #include "hlr/arith/defaults.hh"
@@ -434,12 +435,14 @@ frobenius ( const value_t                     alpha,
 //
 template < typename arithmetic_t,
            typename operator_t >
+requires provides_arithmetic< arithmetic_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
+//std::enable_if_t< hlr::is_arithmetic_v< arithmetic_t >, Hpro::real_type_t< Hpro::value_type_t< operator_t > > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
-           const bool          squared = true,
            const double        atol    = 1e-3,
-           const size_t        amax_it = 50 )
+           const size_t        amax_it = 50,
+           const bool          squared = true )
 {
     using  value_t = Hpro::value_type_t< operator_t >;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -517,11 +520,11 @@ spectral ( arithmetic_t &&     arithmetic,
 template < typename operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( const operator_t &  A,
-           const bool          squared = true,
            const double        atol    = 1e-3,
-           const size_t        amax_it = 50 )
+           const size_t        amax_it = 50,
+           const bool          squared = true )
 {
-    return spectral( hlr::arithmetic, A, squared, atol, amax_it );
+    return spectral( hlr::arithmetic, A, atol, amax_it, squared );
 }
 
 // template < typename value_t >

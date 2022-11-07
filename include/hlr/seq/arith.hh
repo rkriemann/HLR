@@ -13,6 +13,7 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
+#include <hlr/arith/defaults.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/add.hh>
 #include <hlr/arith/multiply.hh>
@@ -686,6 +687,13 @@ struct seq_arithmetic
 
 constexpr seq_arithmetic arithmetic{};
 
-}}// namespace hlr::seq
+}
+
+template <> struct is_arithmetic<       seq::seq_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const seq::seq_arithmetic   > { static constexpr bool value = true; };
+template <> struct is_arithmetic<       seq::seq_arithmetic & > { static constexpr bool value = true; };
+template <> struct is_arithmetic< const seq::seq_arithmetic & > { static constexpr bool value = true; };
+
+}// namespace hlr::seq
 
 #endif // __HLR_SEQ_ARITH_HH
