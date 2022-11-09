@@ -371,13 +371,14 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
         auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
         auto  uV = blas::matrix< value_t >( this->ncols(), this->col_rank() );
 
-        compress::decompress< value_t >( _zdata.U, uU.data(), uU.nrows(), uU.ncols() );
-        compress::decompress< value_t >( _zdata.V, uV.data(), uV.nrows(), uV.ncols() );
+        compress::decompress< value_t >( _zdata.U, uU );
+        compress::decompress< value_t >( _zdata.V, uV );
         
         #if defined(COMPRESS_S)
+        
         auto  uS = blas::matrix< value_t >( this->row_rank(), this->col_rank() );
 
-        compress::decompress< value_t >( _zdata.S, uS.data(), uS.nrows(), uS.ncols() );
+        compress::decompress< value_t >( _zdata.S, uS );
 
         blas::mulvec_lrs( alpha, uU, uS, uV, op, x, y );
 

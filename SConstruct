@@ -756,19 +756,20 @@ sources = [ 'src/apps/exp.cc',
             'src/utils/term.cc',
             'src/utils/text.cc' ]
 
-# add when needed 
-# source += [ 'src/dag/gauss_elim.cc',
-#             'src/dag/invert.cc',
-#             'src/dag/lu.cc',
-#             'src/dag/lu_coarse.cc',
-#             'src/dag/lu_hodlr_tiled.cc',
-#             'src/dag/lu_hodlr_tiled_lazy.cc',
-#             'src/dag/lu_lvl.cc',
-#             'src/dag/lu_oop.cc',
-#             'src/dag/lu_oop_accu.cc',
-#             'src/dag/lu_oop_accu_sep.cc',
-#             'src/dag/lu_oop_auto.cc',
-#             'src/dag/lu_tileh.cc' ]
+# add when needed
+if 'dag-lu' in programs :
+    sources += [ 'src/dag/gauss_elim.cc',
+                 'src/dag/invert.cc',
+                 'src/dag/lu.cc',
+                 'src/dag/lu_coarse.cc',
+                 'src/dag/lu_hodlr_tiled.cc',
+                 'src/dag/lu_hodlr_tiled_lazy.cc',
+                 'src/dag/lu_lvl.cc',
+                 'src/dag/lu_oop.cc',
+                 'src/dag/lu_oop_accu.cc',
+                 'src/dag/lu_oop_accu_sep.cc',
+                 'src/dag/lu_oop_auto.cc',
+                 'src/dag/lu_tileh.cc' ]
 
 libhlr = env.StaticLibrary( 'hlr', sources )
 

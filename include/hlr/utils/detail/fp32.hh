@@ -75,6 +75,50 @@ compress< double > ( const config &   config,
     return zdata;
 }
 
+template <>
+inline
+zarray
+compress< std::complex< float > > ( const config &           config,
+                                    std::complex< float > *  data,
+                                    const size_t             dim0,
+                                    const size_t             dim1,
+                                    const size_t             dim2,
+                                    const size_t             dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( nsize*2 );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        zdata[2*i]   = fp32_t( std::real( data[i] ) );
+        zdata[2*i+1] = fp32_t( std::imag( data[i] ) );
+    }// for
+
+    return zdata;
+}
+
+template <>
+inline
+zarray
+compress< std::complex< double > > ( const config &            config,
+                                     std::complex< double > *  data,
+                                     const size_t              dim0,
+                                     const size_t              dim1,
+                                     const size_t              dim2,
+                                     const size_t              dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    zarray        zdata( nsize*2 );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        zdata[2*i]   = fp32_t( std::real( data[i] ) );
+        zdata[2*i+1] = fp32_t( std::imag( data[i] ) );
+    }// for
+
+    return zdata;
+}
+
 template < typename value_t >
 void
 decompress ( const zarray &  v,
@@ -117,6 +161,40 @@ decompress< double > ( const zarray &  zdata,
     
     for ( size_t  i = 0; i < nsize; ++i )
         dest[i] = double( zdata[i] );
+}
+
+template <>
+inline
+void
+decompress< std::complex< float > > ( const zarray &           zdata,
+                                      std::complex< float > *  dest,
+                                      const size_t             dim0,
+                                      const size_t             dim1,
+                                      const size_t             dim2,
+                                      const size_t             dim3,
+                                      const size_t             dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        dest[i] = std::complex< float >( zdata[2*i], zdata[2*i+1] );
+}
+
+template <>
+inline
+void
+decompress< std::complex< double > > ( const zarray &            zdata,
+                                       std::complex< double > *  dest,
+                                       const size_t              dim0,
+                                       const size_t              dim1,
+                                       const size_t              dim2,
+                                       const size_t              dim3,
+                                       const size_t              dim4 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    
+    for ( size_t  i = 0; i < nsize; ++i )
+        dest[i] = std::complex< double >( zdata[2*i], zdata[2*i+1] );
 }
 
 }}}// namespace hlr::compress::fp32

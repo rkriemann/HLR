@@ -415,6 +415,32 @@ compress< double > ( const config &   config,
     }// else
 }
 
+template <>
+inline
+zarray
+compress< std::complex< float > > ( const config &           config,
+                                    std::complex< float > *  data,
+                                    const size_t             dim0,
+                                    const size_t             dim1,
+                                    const size_t             dim2,
+                                    const size_t             dim3 )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+zarray
+compress< std::complex< double > > ( const config &            config,
+                                     std::complex< double > *  data,
+                                     const size_t              dim0,
+                                     const size_t              dim1,
+                                     const size_t              dim2,
+                                     const size_t              dim3 )
+{
+    HLR_ERROR( "TODO" );
+}
+
 template < typename value_t >
 void
 decompress ( const zarray &  v,
@@ -825,6 +851,34 @@ decompress< double > ( const zarray &  zdata,
     }// else
 }
 
+template <>
+inline
+void
+decompress< std::complex< float > > ( const zarray &           zdata,
+                                      std::complex< float > *  dest,
+                                      const size_t             dim0,
+                                      const size_t             dim1,
+                                      const size_t             dim2,
+                                      const size_t             dim3,
+                                      const size_t             dim4 )
+{
+    HLR_ERROR( "TODO" );
+}
+    
+template <>
+inline
+void
+decompress< std::complex< double > > ( const zarray &            zdata,
+                                       std::complex< double > *  dest,
+                                       const size_t              dim0,
+                                       const size_t              dim1,
+                                       const size_t              dim2,
+                                       const size_t              dim3,
+                                       const size_t              dim4 )
+{
+    HLR_ERROR( "TODO" );
+}
+    
 }}}// namespace hlr::compress::afloat
 
 #endif // __HLR_UTILS_DETAIL_AFLOAT_HH
