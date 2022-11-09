@@ -725,8 +725,7 @@ solve_lower_tri ( const eval_side_t                 side,
         rowcb.set_basis( std::move( Un ) );
         colcb.set_basis( std::move( Vn ) );
 
-        UM->set_coeff_unsafe( std::move( Sn ) );
-        UM->set_cluster_bases( rowcb, colcb );
+        UM->set_matrix_data( rowcb, std::move( Sn ), colcb );
 
         // M now also part of matrices sharing rowcb/colcb
         rowmap[ rowcb.is() ].push_back( UM );
@@ -865,8 +864,7 @@ solve_upper_tri ( const eval_side_t                 side,
         rowcb.set_basis( std::move( Un ) );
         colcb.set_basis( std::move( Vn ) );
 
-        UM->set_coeff_unsafe( std::move( Sn ) );
-        UM->set_cluster_bases( rowcb, colcb );
+        UM->set_matrix_data( rowcb, std::move( Sn ), colcb );
 
         // M now also part of matrices sharing rowcb/colcb
         rowmap[ rowcb.is() ].push_back( UM );

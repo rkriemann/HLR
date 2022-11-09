@@ -150,6 +150,9 @@ public:
     set_cluster_bases ( cluster_basis< value_t > &  arow_cb,
                         cluster_basis< value_t > &  acol_cb )
     {
+        if (( row_rank() != arow_cb.rank() ) || ( col_rank() != acol_cb.rank() ))
+            std::cout << std::endl;
+        
         HLR_ASSERT(( row_rank() == arow_cb.rank() ) &&
                    ( col_rank() == acol_cb.rank() ));
             
@@ -214,6 +217,32 @@ public:
         _S = std::move( aS );
     }
     
+    void
+    set_matrix_data ( cluster_basis< value_t > &       arow_cb,
+                      const blas::matrix< value_t > &  aS,
+                      cluster_basis< value_t > &       acol_cb )
+    {
+        HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
+                   ( aS.ncols() == acol_cb.rank() ));
+            
+        blas::copy( aS, _S );
+        _row_cb = & arow_cb;
+        _col_cb = & acol_cb;
+    }
+
+    void
+    set_matrix_data ( cluster_basis< value_t > &  arow_cb,
+                      blas::matrix< value_t > &&  aS,
+                      cluster_basis< value_t > &  acol_cb )
+    {
+        HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
+                   ( aS.ncols() == acol_cb.rank() ));
+            
+        _S = std::move( aS );
+        _row_cb = & arow_cb;
+        _col_cb = & acol_cb;
+    }
+
     //
     // matrix data
     //

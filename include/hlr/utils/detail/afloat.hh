@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
+#include <cstring>
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
