@@ -988,8 +988,7 @@ struct rec_lu_factorization
                 auto  TS = blas::prod( TU, T );
                 auto  Sn = blas::prod( TS, blas::adjoint( TV ) );
 
-                UM->set_coeff_unsafe( std::move( Sn ) );
-                UM->set_cluster_bases( rowcb, colcb );
+                UM->set_matrix_data( rowcb, std::move( Sn ), colcb );
 
                 // M now also part of matrices sharing rowcb/colcb
                 {
@@ -1151,8 +1150,7 @@ struct rec_lu_factorization
                 auto  TS = blas::prod( TU, T );
                 auto  Sn = blas::prod( TS, blas::adjoint( TV ) );
                 
-                UM->set_coeff_unsafe( std::move( Sn ) );
-                UM->set_cluster_bases( rowcb, colcb );
+                UM->set_matrix_data( rowcb, std::move( Sn ), colcb );
 
                 // M now also part of matrices sharing rowcb/colcb
                 {
