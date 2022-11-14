@@ -143,7 +143,7 @@ program_main ()
             
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
     
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "eager" << term::reset << std::endl;
                 
@@ -197,7 +197,7 @@ program_main ()
         runtime.clear();
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
                 

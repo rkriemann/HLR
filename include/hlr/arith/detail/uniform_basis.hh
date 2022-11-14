@@ -21,7 +21,10 @@ namespace hlr { namespace uniform {
 // maps index set to set of all matrices in block row (or column)
 //
 template < typename value_t >
-using  is_matrix_map_t = std::unordered_map< indexset, std::list< Hpro::TMatrix< value_t > * >, indexset_hash >;
+using  is_matrix_map_t  = std::unordered_map< indexset, std::list< Hpro::TMatrix< value_t > * >, indexset_hash >;
+
+template < typename value_t >
+using  is_matrix_cmap_t = std::unordered_map< indexset, std::list< const Hpro::TMatrix< value_t > * >, indexset_hash >;
 
 //////////////////////////////////////////////////////////////////////
 //

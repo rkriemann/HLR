@@ -215,9 +215,7 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_dense_all( A, B ) ||
-                 ( is_blocked( A ) && is_dense(   B ) ) ||
-                 ( is_dense(   A ) && is_blocked( B ) ))
+            if ( is_dense_all( A, B ) || ( is_blocked_any( A, B ) && is_dense_any( A, B ) ) )
             {
                 handle_dense = true;
                 break;
@@ -269,22 +267,18 @@ struct accumulator
 
             //
             // initialize matrices
-            // - for definition of matrices see sections below
             //
             
-            auto  U = blas::matrix< value_t >();
-            auto  V = blas::matrix< value_t >();
-            auto  R = blas::matrix< value_t >();
-            auto  Z = blas::matrix< value_t >();
-            auto  Y = blas::matrix< value_t >();
+            auto  U = blas::matrix< value_t >(); // row basis of uniform × uniform
+            auto  V = blas::matrix< value_t >(); // column basis of uniform × uniform
+            auto  R = blas::matrix< value_t >(); // sum of couplings for uniform × uniform
+            auto  Z = blas::matrix< value_t >(); // result of uniform × *
+            auto  Y = blas::matrix< value_t >(); // result of * × uniform
 
             if ( ! pending_uniAB.empty() )
             {
                 auto  [ op_A, A, op_B, B ] = pending_uniAB.front();
 
-                ptrcast( A, uniform_lrmatrix< value_t > )->row_cb( op_A ).mutex().lock();
-                ptrcast( B, uniform_lrmatrix< value_t > )->col_cb( op_B ).mutex().lock();
-                
                 U = ptrcast( A, uniform_lrmatrix< value_t > )->row_basis( op_A );
                 V = ptrcast( B, uniform_lrmatrix< value_t > )->col_basis( op_B );
             }// if
@@ -295,7 +289,6 @@ struct accumulator
                 
                 if ( U.ncols() == 0 )
                 {
-                    ptrcast( A, uniform_lrmatrix< value_t > )->row_cb( op_A ).mutex().lock();
                     U = ptrcast( A, uniform_lrmatrix< value_t > )->row_basis( op_A );
                 }// if
                 
@@ -308,7 +301,6 @@ struct accumulator
 
                 if ( V.ncols() == 0 )
                 {
-                    ptrcast( B, uniform_lrmatrix< value_t > )->col_cb( op_B ).mutex().lock();
                     V = ptrcast( B, hlr::matrix::uniform_lrmatrix< value_t > )->col_basis( op_B );
                 }// if
 
@@ -316,7 +308,7 @@ struct accumulator
             }// if
 
             //
-            // handle different uniform product variants in parallel
+            // evaluate updates by handling different uniform product variants in parallel
             //
 
             ::tbb::parallel_invoke(
@@ -339,7 +331,7 @@ struct accumulator
                         Y = std::move( sum_any_uni( 0, pending_uniB.size(), pending_uniB ) );
                 }
             );
-
+            
             //
             // sum up individual updates
             //
@@ -921,6 +913,11 @@ struct rec_lu_factorization
             //
             // update and solve local matrix
             //
+            // Remark: local basis may be changed in parallel but the numerical data of M
+            //         is not (this task is repsonsible for this). So, when converting to
+            //         standard low-rank format, all subsequent operations are only working
+            //         with task-local data.
+            //
 
             auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
             auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
@@ -957,6 +954,9 @@ struct rec_lu_factorization
 
             auto  T  = blas::prod( RW, blas::adjoint( RX ) );
 
+            // Remark: now we leave the pure-local part and need to synchonise with 
+            //         parallel tasks possibly changing the row/column bases
+            
             ::tbb::this_task_arena::isolate( [&] ()
             {
                 auto  lock_cb = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
@@ -1083,6 +1083,11 @@ struct rec_lu_factorization
             //
             // update and solve local matrix
             //
+            // Remark: local basis may be changed in parallel but the numerical data of M
+            //         is not (this task is repsonsible for this). So, when converting to
+            //         standard low-rank format, all subsequent operations are only working
+            //         with task-local data.
+            //
 
             auto  UM = ptrcast( &M, uniform_lrmatrix< value_t > );
             auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
@@ -1118,6 +1123,9 @@ struct rec_lu_factorization
                                     [&] () { blas::qr( X, RX ); } );
 
             auto  T = blas::prod( RW, blas::adjoint( RX ) );
+
+            // Remark: now we leave the pure-local part and need to synchonise with 
+            //         parallel tasks possibly changing the row/column bases
 
             ::tbb::this_task_arena::isolate( [&] ()
             {

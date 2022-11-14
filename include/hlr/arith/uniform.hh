@@ -24,6 +24,45 @@ namespace hlr { namespace uniform {
 // construct mappings of A_{t × s} to set of uniform leaves per t/s
 //
 template < typename value_t >
+is_matrix_cmap_t< value_t >
+construct_indexset_to_block_map_rows ( const hpro::TMatrix< value_t > &  A,
+                                       const bool                        all_leaves )
+{
+    auto  rowmap = is_matrix_cmap_t< value_t >();
+    auto  blocks = std::list< const hpro::TMatrix< value_t > * >{ &A };
+
+    while ( ! blocks.empty() )
+    {
+        auto  subblocks = std::list< const hpro::TMatrix< value_t > * >();
+
+        for ( auto  M : blocks )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  BM = cptrcast( M, hpro::TBlockMatrix< value_t > );
+
+                for ( uint  i = 0; i < BM->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < BM->nblock_cols(); ++j )
+                        if ( ! is_null( BM->block( i, j ) ) )
+                            subblocks.push_back( BM->block( i, j ) );
+            }// if
+            else
+            {
+                if ( all_leaves || matrix::is_uniform_lowrank( M ) )
+                    rowmap[ M->row_is() ].push_back( M );
+            }// if
+        }// for
+
+        blocks = std::move( subblocks );
+    }// while
+
+    return rowmap;
+}
+
+//
+// construct mappings of A_{t × s} to set of uniform leaves per t/s
+//
+template < typename value_t >
 std::pair< is_matrix_map_t< value_t >,
            is_matrix_map_t< value_t > >
 construct_indexset_to_block_maps ( hpro::TMatrix< value_t > &  A )
@@ -92,6 +131,32 @@ mul_vec ( const value_t                             alpha,
 
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y );
+}
+
+template < typename value_t >
+void
+mul_vec2 ( const value_t                             alpha,
+           const hpro::matop_t                       op_M,
+           const hpro::TMatrix< value_t > &          M,
+           const vector::scalar_vector< value_t > &  x,
+           vector::scalar_vector< value_t > &        y,
+           matrix::cluster_basis< value_t > &        rowcb,
+           matrix::cluster_basis< value_t > &        colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux     = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  rowmap = construct_indexset_to_block_map_rows( M, true );
+
+    if ( op_M == apply_normal )
+        detail::mul_vec2( alpha, op_M, M, *ux, x, y, rowmap );
+    else
+        HLR_ERROR( "TO DO" );
 }
 
 //

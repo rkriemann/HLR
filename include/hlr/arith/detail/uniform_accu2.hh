@@ -210,9 +210,7 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_dense_all( A, B ) ||
-                 ( is_blocked( A ) && is_dense(   B ) ) ||
-                 ( is_dense(   A ) && is_blocked( B ) ))
+            if ( is_dense_all( A, B ) || ( is_blocked_any( A, B ) && is_dense_any( A, B ) ) )
             {
                 handle_dense = true;
                 break;

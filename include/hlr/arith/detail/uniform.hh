@@ -36,6 +36,8 @@ using matrix::is_uniform_lowrank;
 using vector::scalar_vector;
 using vector::uniform_vector;
 
+using indexset = Hpro::TIndexSet;
+
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
 // For dense blocks of M, the actual result is directly updated.
@@ -177,6 +179,26 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
     }// if
 }
 
+template < typename value_t >
+void
+mul_vec2 ( const value_t                                       alpha,
+           const Hpro::matop_t                                 op_M,
+           const Hpro::TMatrix< value_t > &                    M,
+           const uniform_vector< cluster_basis< value_t > > &  x,
+           const scalar_vector< value_t > &                    sx,
+           scalar_vector< value_t > &                          sy,
+           const is_matrix_cmap_t< value_t > &                 matmap )
+{
+    //
+    // go over all clusters in <matmap> and compute local update to y
+    //
+
+    for ( auto  cl : matmap )
+    {
+        
+    }// for
+}
+
 }// namespace detail
 
 
@@ -185,8 +207,6 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 // LU factorization
 //
 ////////////////////////////////////////////////////////////
-
-using  indexset = Hpro::TIndexSet;
 
 namespace detail
 {
