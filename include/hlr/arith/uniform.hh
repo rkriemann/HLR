@@ -150,11 +150,13 @@ mul_vec2 ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    auto  ux     = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  cmap   = detail::is_veccoeff_map_t< value_t >();
     auto  rowmap = construct_indexset_to_block_map_rows( M, true );
+    
+    detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x, cmap );
 
     if ( op_M == apply_normal )
-        detail::mul_vec2( alpha, op_M, M, *ux, x, y, rowmap );
+        detail::mul_vec2( alpha, op_M, M, cmap, x, y, rowmap );
     else
         HLR_ERROR( "TO DO" );
 }

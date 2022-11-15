@@ -375,6 +375,7 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
 
         // #if defined(HAS_UNIVERSAL)
 
+        // // perform mat-vec directly with posits
         // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zM, x.data(), value_t(1), y.data() );
 
         // #else
@@ -413,6 +414,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
 
+    // DEBUG
     // {
     //     auto  dM = blas::matrix< value_t >( M.nrows(), M.ncols() );
 

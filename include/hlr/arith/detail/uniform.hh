@@ -87,25 +87,26 @@ mul_vec ( const value_t                                       alpha,
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
-        
-        if ( op_M == Hpro::apply_normal )
-        {
-            blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
-        else if ( op_M == Hpro::apply_conjugate )
-        {
-            std::scoped_lock  lock( y.mutex() );
 
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == Hpro::apply_transposed )
+        switch ( op_M )
         {
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == Hpro::apply_adjoint )
-        {
-            blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
+            case Hpro::apply_normal :
+                blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+                break;
+
+            case Hpro::apply_conjugate :
+                HLR_ASSERT( false );
+
+            case Hpro::apply_transposed :
+                HLR_ASSERT( false );
+
+            case Hpro::apply_adjoint :
+                blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
+                break;
+
+            default:
+                HLR_ERROR( "unsupported matrix operator" );
+        }// switch
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -136,6 +137,30 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
     }// if
 
     return u;
+}
+
+template < typename value_t >
+using  is_veccoeff_map_t  = std::unordered_map< indexset, blas::vector< value_t >, indexset_hash >;
+
+template < typename value_t >
+void
+scalar_to_uniform ( const cluster_basis< value_t > &  cb,
+                    const scalar_vector< value_t > &  v,
+                    is_veccoeff_map_t< value_t > &    coeffmap )
+{
+    if ( cb.rank() > 0 )
+    {
+        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
+        auto  s    = cb.transform_forward( v_cb );
+
+        coeffmap[ cb.is() ] = std::move( s );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            scalar_to_uniform( *cb.son(i), v, coeffmap );
+    }// if
 }
 
 //
@@ -181,13 +206,13 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 
 template < typename value_t >
 void
-mul_vec2 ( const value_t                                       alpha,
-           const Hpro::matop_t                                 op_M,
-           const Hpro::TMatrix< value_t > &                    M,
-           const uniform_vector< cluster_basis< value_t > > &  x,
-           const scalar_vector< value_t > &                    sx,
-           scalar_vector< value_t > &                          sy,
-           const is_matrix_cmap_t< value_t > &                 matmap )
+mul_vec2 ( const value_t                         alpha,
+           const Hpro::matop_t                   op_M,
+           const Hpro::TMatrix< value_t > &      M,
+           const is_veccoeff_map_t< value_t > &  x_cmap,
+           const scalar_vector< value_t > &      x,
+           scalar_vector< value_t > &            y,
+           const is_matrix_cmap_t< value_t > &   matmap )
 {
     //
     // go over all clusters in <matmap> and compute local update to y
@@ -195,7 +220,66 @@ mul_vec2 ( const value_t                                       alpha,
 
     for ( auto  cl : matmap )
     {
-        
+        auto                              sy    = blas::vector< value_t >();
+        const cluster_basis< value_t > *  rowcb = nullptr;
+
+        for ( auto  M : matmap.at( cl ) )
+        {
+            if ( is_uniform_lowrank( M ) )
+            {
+                auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
+                auto  x_i = x_cmap[ R->col_is( op_M ) ];
+
+                if ( sy.length() == 0 )
+                    sy = std::move( blas::vector< value_t >( R->col_cb( op_M ).rank() ) );
+
+                if ( is_null( rowcb ) )
+                    rowcb = & R->row_cb( op_M );
+                
+                switch ( op_M )
+                {
+                    case Hpro::apply_normal :
+                        blas::mulvec( alpha, R->coeff(), x_i, value_t(1), sy );
+                        break;
+
+                    case Hpro::apply_conjugate :
+                        HLR_ASSERT( false );
+
+                    case Hpro::apply_transposed :
+                        HLR_ASSERT( false );
+
+                    case Hpro::apply_adjoint :
+                        blas::mulvec( alpha, blas::adjoint(R->coeff()), x_i, value_t(1), sy );
+                        break;
+
+                    default:
+                        HLR_ERROR( "unsupported matrix operator" );
+                }// switch
+            }// if
+            else if ( Hpro::is_dense( M ) )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                auto  y_j = blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() );
+                
+                M->apply_add( alpha, x_i, y_j, op_M );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+
+        //
+        // apply uniform update to y
+        //
+
+        HLR_ASSERT( ( sy.length() > 0 ) && ! is_null( rowcb ) );
+                    
+        if ( ! is_null( rowcb ) )
+        {
+            auto  t   = rowcb->transform_backward( sy );
+            auto  y_j = blas::vector< value_t >( blas::vec( y ), rowcb->is() - y.ofs() );
+
+            blas::add( value_t(1), t, y_j );
+        }// if
     }// for
 }
 
