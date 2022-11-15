@@ -31,6 +31,8 @@ using boost::format;
 #include <hlr/cluster/tileh.hh>
 #include <hlr/cluster/h.hh>
 
+#include <hlr/utils/timer.hh>
+
 namespace hpro = HLIB;
 
 #include "cmdline.hh"
@@ -118,12 +120,6 @@ format_flops ( const double  f,
 {
     return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
 }
-
-//
-// timing
-//
-
-namespace timer = hpro::Time::Wall;
 
 //
 // return min/max/median of elements in container

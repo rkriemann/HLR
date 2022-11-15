@@ -218,23 +218,29 @@ mul_vec2 ( const value_t                         alpha,
     // go over all clusters in <matmap> and compute local update to y
     //
 
-    for ( auto  cl : matmap )
+    for ( auto  entry : matmap )
     {
+        const auto                        is    = entry.first;
+        auto                              y_j   = blas::vector< value_t >();
+        auto                              ly    = blas::vector< value_t >();
         auto                              sy    = blas::vector< value_t >();
         const cluster_basis< value_t > *  rowcb = nullptr;
-
-        for ( auto  M : matmap.at( cl ) )
+        
+        for ( auto  M : matmap.at( is ) )
         {
             if ( is_uniform_lowrank( M ) )
             {
-                auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
-                auto  x_i = x_cmap[ R->col_is( op_M ) ];
+                auto  R   = cptrcast( M, uniform_lrmatrix< value_t > );
+                auto  x_i = x_cmap.at( R->col_is( op_M ) );
 
                 if ( sy.length() == 0 )
-                    sy = std::move( blas::vector< value_t >( R->col_cb( op_M ).rank() ) );
+                    sy = std::move( blas::vector< value_t >( R->row_cb( op_M ).rank() ) );
 
                 if ( is_null( rowcb ) )
                     rowcb = & R->row_cb( op_M );
+
+                if ( y_j.length() == 0 )
+                    y_j = std::move( blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() ) );
                 
                 switch ( op_M )
                 {
@@ -259,24 +265,31 @@ mul_vec2 ( const value_t                         alpha,
             else if ( Hpro::is_dense( M ) )
             {
                 auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
-                auto  y_j = blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() );
+
+                if ( ly.length() == 0 )
+                    ly = std::move( blas::vector< value_t >( M->row_is( op_M ).size() ) );
                 
-                M->apply_add( alpha, x_i, y_j, op_M );
+                if ( y_j.length() == 0 )
+                    y_j = std::move( blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() ) );
+                
+                M->apply_add( alpha, x_i, ly, op_M );
             }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + M->typestr() );
         }// for
 
         //
-        // apply uniform update to y
+        // apply updates to y
         //
 
-        HLR_ASSERT( ( sy.length() > 0 ) && ! is_null( rowcb ) );
-                    
+        if ( ly.length() > 0 )
+            blas::add( value_t(1), ly, y_j );
+            
         if ( ! is_null( rowcb ) )
         {
-            auto  t   = rowcb->transform_backward( sy );
-            auto  y_j = blas::vector< value_t >( blas::vec( y ), rowcb->is() - y.ofs() );
+            HLR_ASSERT( sy.length() > 0 );
+            
+            auto  t = rowcb->transform_backward( sy );
 
             blas::add( value_t(1), t, y_j );
         }// if

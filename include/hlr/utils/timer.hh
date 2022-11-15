@@ -14,6 +14,14 @@
 namespace hlr
 {
 
+namespace timer
+{
+
+using Hpro::Time::Wall::now;
+using Hpro::Time::Wall::since;
+
+}// namespace timer
+
 //
 // measure time from instantiation to destruction and store
 // value in given variable
