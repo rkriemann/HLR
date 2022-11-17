@@ -64,6 +64,36 @@ mul_vec ( const value_t                             alpha,
     detail::add_uniform_to_scalar( *uy, y );
 }
 
+template < typename value_t >
+void
+mul_vec2 ( const value_t                             alpha,
+           const matop_t                             op_M,
+           const Hpro::TMatrix< value_t > &          M,
+           const vector::scalar_vector< value_t > &  x,
+           vector::scalar_vector< value_t > &        y,
+           hlr::matrix::cluster_basis< value_t > &   rowcb,
+           hlr::matrix::cluster_basis< value_t > &   colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    
+    //
+    // construct uniform representation of x and y
+    //
+
+    detail::mutex_map_t  mtx_map;
+    
+    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
+
+    detail::mul_vec2( alpha, op_M, M, *ux, *uy, x, y );
+    detail::add_uniform_to_scalar( *uy, y );
+}
+
 //
 // matrix multiplication (eager version)
 //

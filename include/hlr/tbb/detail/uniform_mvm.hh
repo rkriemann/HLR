@@ -74,7 +74,7 @@ mul_vec ( const value_t                                       alpha,
         auto  D    = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
-        auto  mtx  = mtx_map[ M.row_is( op_M ) ].get();
+        auto  mtx  = mtx_map.at( M.row_is( op_M ) ).get();
         auto  lock = std::scoped_lock( *mtx );
         
         blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
@@ -107,6 +107,63 @@ mul_vec ( const value_t                                       alpha,
             
             blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
         }// if
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+}
+
+template < typename value_t >
+void
+mul_vec2 ( const value_t                                       alpha,
+           const Hpro::matop_t                                 op_M,
+           const Hpro::TMatrix< value_t > &                    M,
+           const uniform_vector< cluster_basis< value_t > > &  x,
+           uniform_vector< cluster_basis< value_t > > &        y,
+           const scalar_vector< value_t > &                    sx,
+           scalar_vector< value_t > &                          sy )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
+                   ( B->nblock_cols( op_M ) == x.nblocks() ));
+
+        ::tbb::parallel_for< uint >(
+            0, B->nblock_rows( op_M ),
+            [&,alpha,op_M,B] ( const auto  i )
+            {
+                auto  y_i = y.block( i );
+                
+                for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
+                {
+                    auto  B_ij = B->block( i, j, op_M );
+                    
+                    if ( ! is_null( B_ij ) )
+                    {
+                        auto  x_j = x.block( j );
+                        
+                        mul_vec2( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
+                    }// if
+                }// for
+            } );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D   = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        
+        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
+        
+        if      ( op_M == Hpro::apply_normal     ) blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+        else if ( op_M == Hpro::apply_conjugate  ) { HLR_ASSERT( false ); }
+        else if ( op_M == Hpro::apply_transposed ) { HLR_ASSERT( false ); }
+        else if ( op_M == Hpro::apply_adjoint    ) blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -204,15 +261,10 @@ void
 build_mutex_map ( const cluster_basis< value_t > &  cb,
                   mutex_map_t &                     mtx_map )
 {
-    if ( cb.nsons() == 0 )
-    {
-        mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
-    }// if
-    else
-    {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            build_mutex_map( *cb.son(i), mtx_map );
-    }// else
+    mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
+
+    for ( uint  i = 0; i < cb.nsons(); ++i )
+        build_mutex_map( *cb.son(i), mtx_map );
 }
 
 }}}}// namespace hlr::tbb::uniform::detail
