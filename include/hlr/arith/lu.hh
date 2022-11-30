@@ -39,18 +39,18 @@ lu ( Hpro::TMatrix< value_t > &  A,
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            lu< value_t >( * BA->block( i, i ), acc, approx );
+            lu( * BA->block( i, i ), acc, approx );
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
                 if ( ! is_null( BA->block( j, i ) ) )
-                    solve_upper_tri< value_t >( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
+                    solve_upper_tri( from_right, general_diag, *BA->block( i, i ), *BA->block( j, i ), acc, approx );
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
             {
                 if ( ! is_null( BA->block( i, j ) ) )
-                    solve_lower_tri< value_t >( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
+                    solve_lower_tri( from_left, unit_diag, *BA->block( i, i ), *BA->block( i, j ), acc, approx );
             }// for
 
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )

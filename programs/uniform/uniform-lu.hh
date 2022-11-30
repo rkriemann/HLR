@@ -197,7 +197,7 @@ program_main ()
         runtime.clear();
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
                 
@@ -236,7 +236,7 @@ program_main ()
                     
         std::cout << "    error  = " << format_error( norm::inv_error_2( *M1, A_inv ) ) << std::endl;
 
-        if ( false )
+        if ( true )
         {
             std::cout << "    " << term::bullet << term::bold << "uniform H with sep. factors/bases" << term::reset << std::endl;
             

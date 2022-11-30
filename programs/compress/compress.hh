@@ -1,7 +1,7 @@
 //
 // Project     : HLR
-// Program     : combustion
-// Description : compression of datasets from combustion simulation
+// Program     : compress
+// Description : construction and MVM with compressed data blocks
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
