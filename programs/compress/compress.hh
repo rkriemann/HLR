@@ -7,14 +7,8 @@
 //
 
 #include <hlr/utils/io.hh>
-#include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/approx/svd.hh>
-#include <hlr/approx/rrqr.hh>
-#include <hlr/approx/randsvd.hh>
-#include <hlr/approx/aca.hh>
 #include <hlr/arith/norm.hh>
-#include <hlr/utils/tensor.hh>
 #include <hlr/bem/aca.hh>
 
 #include "common.hh"

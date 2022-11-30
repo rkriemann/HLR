@@ -51,6 +51,9 @@ is_compressible ( const T *  ptr )
     return ! is_null( dynamic_cast< const compressible * >( ptr ) );
 }
 
+HLR_TEST_ALL( is_compressible, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_compressible, Hpro::TMatrix< value_t > )
+
 template < typename T >
 bool
 is_compressed ( const T &  ref )

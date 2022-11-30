@@ -129,6 +129,10 @@ mul_vec2 ( const value_t                                       alpha,
         HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
                    ( B->nblock_cols( op_M ) == x.nblocks() ));
 
+        //
+        // parallelise only block rows, then only one task will access y
+        //
+        
         ::tbb::parallel_for< uint >(
             0, B->nblock_rows( op_M ),
             [&,alpha,op_M,B] ( const auto  i )

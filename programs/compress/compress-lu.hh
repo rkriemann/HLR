@@ -7,15 +7,10 @@
 //
 
 #include <hlr/utils/io.hh>
-#include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/approx/svd.hh>
-#include <hlr/approx/rrqr.hh>
-#include <hlr/approx/randsvd.hh>
-#include <hlr/approx/aca.hh>
 #include <hlr/arith/norm.hh>
-#include <hlr/utils/tensor.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/matrix/luinv_eval.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -46,6 +41,7 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    auto  prnopt  = "noinnerid";
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();
@@ -104,7 +100,7 @@ program_main ()
 
     tic = timer::now();
 
-    impl::matrix::compress( *zB, Hpro::fixed_prec( acc.rel_eps() ) );
+    impl::matrix::compress( *zA, Hpro::fixed_prec( acc.rel_eps() ) );
 
     toc = timer::since( tic );
     runtime.push_back( toc.seconds() );
@@ -123,5 +119,88 @@ program_main ()
     
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // uncompressed H-LU
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    auto  apx = approx::SVD< value_t >();
+
+    std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
+        
+    std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
+
+    {
+        auto  LU = seq::matrix::copy( *A );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::accu::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
+
+    std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
+
+    {
+        auto  LU = seq::matrix::copy( *zA );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::accu::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
 }
     

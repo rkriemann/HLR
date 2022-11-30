@@ -239,24 +239,14 @@ struct accumulator
                     break;
                 }// if
             }// else
-            
-            // if ( ! is_blocked_all( A, B ) ||
-            //      ( is_blocked( A ) && is_dense(   B ) ) ||
-            //      ( is_dense(   A ) && is_blocked( B ) ) )
-            // {
-            //     handle_dense = true;
-            //     break;
-            // }// if
         }// for
         
         for ( auto  [ op_A, A, op_B, B, op_D, D ] : pending )
         {
-            if (( is_null( D ) && is_blocked_all( A, B, &M ) ) ||
-                ( is_blocked_all( A, B, D, &M ) ))
+            if (( is_null( D ) && is_blocked_all( A, B, &M ) ) || is_blocked_all( A, B, D, &M ) )
                 continue;
         
-            if (( is_null( D ) && is_blocked_all( A, B ) ) ||
-                ( is_blocked_all( A, B, D ) ))
+            if (( is_null( D ) && is_blocked_all( A, B ) ) || is_blocked_all( A, B, D ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
