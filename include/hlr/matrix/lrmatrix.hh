@@ -96,7 +96,7 @@ public:
     {}
     
     //
-    // access internal data
+    // access low-rank factors
     //
 
     blas::matrix< value_t > &        U ()       { return this->blas_mat_A(); }
@@ -142,6 +142,23 @@ public:
 
         #endif
     }
+
+    //
+    // access low-rank factors with matrix operator
+    //
+    
+    blas::matrix< value_t > &        U ( const Hpro::matop_t  op ) { return ( op == apply_normal ? U() : V() ); }
+    blas::matrix< value_t > &        V ( const Hpro::matop_t  op ) { return ( op == apply_normal ? V() : U() ); }
+    
+    const blas::matrix< value_t > &  U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
+    const blas::matrix< value_t > &  V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
+
+    blas::matrix< value_t >          U_decompressed ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U_decompressed() : V_decompressed() ); }
+    blas::matrix< value_t >          V_decompressed ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V_decompressed() : U_decompressed() ); }
+
+    //
+    // directly set low-rank factors
+    //
     
     void
     set_lrmat ( const blas::matrix< value_t > &  aU,

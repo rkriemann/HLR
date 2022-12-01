@@ -769,12 +769,25 @@ lu ( Hpro::TMatrix< value_t > &  M,
         accu.apply( value_t(-1), M, acc, approx );
 
         trace::region_end( "apply" );
-        
+
         if ( is_dense( M ) )
         {
-            auto  D = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
+            if ( matrix::is_compressible( M ) )
+            {
+                auto  D = ptrcast( &M, matrix::dense_matrix< value_t > );
 
-            invert< value_t >( *D );
+                D->decompress();
+                
+                invert( *D );
+
+                D->compress( acc );
+            }// if
+            else
+            {
+                auto  D = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
+
+                invert( *D );
+            }// if
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );

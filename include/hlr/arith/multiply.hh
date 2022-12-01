@@ -861,14 +861,35 @@ multiply ( const value_t                     alpha,
            const Hpro::TMatrix< value_t > &  B )
 {
     std::unique_ptr< Hpro::TMatrix< value_t > >  C;
-    
+
     if ( is_lowrank( A ) )
     {
+        //
         // U·V' × B = W·X'
-        auto  RA = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  V  = blas::mat_V( RA, op_A );
-        auto  W  = blas::copy( blas::mat_U( RA, op_A ) );
-        auto  X  = blas::matrix< value_t >( B.ncols( op_B ), RA->rank() );
+        //
+
+        uint  k = 0;
+        auto  V = blas::matrix< value_t >();
+        auto  W = blas::matrix< value_t >();
+        
+        if ( matrix::is_compressible( A ) )
+        {
+            auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
+
+            V = std::move( RA->V_decompressed( op_A ) );
+            W = std::move( blas::copy( RA->U_decompressed( op_A ) ) );
+            k = RA->rank();
+        }// if
+        else
+        {
+            auto  RA = cptrcast( &A, Hpro::TRkMatrix< value_t > );
+
+            V = std::move( blas::mat_V( RA, op_A ) );
+            W = std::move( blas::copy( blas::mat_U( RA, op_A ) ) );
+            k = RA->rank();
+        }// else
+        
+        auto  X = blas::matrix< value_t >( B.ncols( op_B ), k );
 
         multiply( alpha, blas::adjoint( op_B ), B, V, X );
 
@@ -877,17 +898,38 @@ multiply ( const value_t                     alpha,
             blas::conj( W );
             blas::conj( X );
         }// if
-
+        
         return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
     else if ( is_lowrank( B ) )
     {
+        //
         // A × U·V' = W·X'
-        auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
-        auto  U  = blas::mat_U( RB, op_B );
-        auto  W  = blas::matrix< value_t >( A.nrows( op_A ), RB->rank() );
-        auto  X  = blas::copy( blas::mat_V( RB, op_B ) );
+        //
 
+        uint  k = 0;
+        auto  U = blas::matrix< value_t >();
+        auto  X = blas::matrix< value_t >();
+        
+        if ( matrix::is_compressible( B ) )
+        {
+            auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
+            
+            U = std::move( RB->U_decompressed( op_B ) );
+            X = std::move( blas::copy( RB->V_decompressed( op_B ) ) );
+            k = RB->rank();
+        }// if
+        else
+        {
+            auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
+            
+            U = std::move( blas::mat_U( RB, op_B ) );
+            X = std::move( blas::copy( blas::mat_V( RB, op_B ) ) );
+            k = RB->rank();
+        }// else
+        
+        auto  W  = blas::matrix< value_t >( A.nrows( op_A ), k );
+        
         multiply( alpha, op_A, A, U, W );
 
         return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
