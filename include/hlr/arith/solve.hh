@@ -278,7 +278,7 @@ solve_lower_tri ( const eval_side_t                 side,
     HLR_ASSERT( (( side == from_left  ) && ( L.col_is() == M.row_is() )) ||
                 (( side == from_right ) && ( M.col_is() == L.row_is() )) );
 
-    HLR_ASSERT( ! is_compressible_any( L, M ) );
+    HLR_ASSERT( ! is_compressible_any( M ) );
     
     // if ( is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->decompress();
@@ -296,16 +296,16 @@ solve_lower_tri ( const eval_side_t                 side,
     }// if
     else if ( is_dense( L ) )
     {
-        // if ( is_compressible( L ) )
-        // {
-        //     if ( is_lowrank( M ) )
-        //         solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
-        //     else if ( is_dense( M ) )
-        //         solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
-        //     else
-        //         HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
-        // }// if
-        // else
+        if ( is_compressible( L ) )
+        {
+            if ( is_lowrank( M ) )
+                solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
+            else if ( is_dense( M ) )
+                solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+            else
+                HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
+        }// if
+        else
         {
             if ( is_lowrank( M ) )
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -543,7 +543,7 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
     
-    HLR_ASSERT( ! is_compressible_any( U, M ) );
+    HLR_ASSERT( ! is_compressible( M ) );
     
     // if ( is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->decompress();
@@ -561,16 +561,16 @@ solve_upper_tri ( const eval_side_t                 side,
     }//if
     else if ( is_dense( U ) )
     {
-        // if ( is_compressible( U ) )
-        // {
-        //     if ( is_lowrank( M ) )
-        //         solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
-        //     else if ( is_dense( M ) )
-        //         solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
-        //     else
-        //         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
-        // }// if
-        // else
+        if ( is_compressible( U ) )
+        {
+            if ( is_lowrank( M ) )
+                solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
+            else if ( is_dense( M ) )
+                solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+            else
+                HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+        }// if
+        else
         {
             if ( is_lowrank( M ) )
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
