@@ -764,6 +764,11 @@ lu ( Hpro::TMatrix< value_t > &  M,
         // and factorize
         //
 
+        std::cout << M.typestr() << std::endl;
+
+        if ( matrix::is_compressible( M ) )
+            std::cout << ptrcast( &M, matrix::dense_matrix< value_t > )->is_compressed() << std::endl;
+        
         trace::region_start( "apply" );
         
         accu.apply( value_t(-1), M, acc, approx );

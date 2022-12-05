@@ -129,9 +129,10 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
-    std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
-
+    if ( false )
     {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
+
         auto  LU = seq::matrix::copy( *A );
                 
         runtime.clear();
@@ -166,9 +167,9 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
     }
 
-    std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
-
     {
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
+
         auto  LU = seq::matrix::copy( *zA );
                 
         runtime.clear();

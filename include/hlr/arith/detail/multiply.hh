@@ -16,6 +16,7 @@
                                                       C.typestr().c_str(), C.id() ) )
 
 #include <hlr/arith/detail/multiply_blas.hh>
+#include <hlr/arith/detail/multiply_compressed.hh>
 #include <hlr/arith/detail/multiply_uniform.hh>
 
 namespace hlr {
