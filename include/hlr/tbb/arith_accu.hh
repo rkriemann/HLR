@@ -251,10 +251,10 @@ struct accumulator
     //
     template < typename approx_t >
     void
-    eval ( const value_t            alpha,
-           const Hpro::TMatrix< value_t > &    M,
-           const Hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
+    eval ( const value_t                     alpha,
+           const Hpro::TMatrix< value_t > &  M,
+           const Hpro::TTruncAcc &           acc,
+           const approx_t &                  approx )
     {
         std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
 
@@ -324,7 +324,7 @@ struct accumulator
             }// else
         }// for
 
-        // handle computable updated in parallel
+        // handle computable updates in parallel
         if ( ! computable.empty() )
         {
             auto  T = compute_reduce( computable, 0, computable.size(), alpha, acc, approx, handle_dense );

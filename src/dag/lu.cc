@@ -40,8 +40,8 @@ struct lu_node : public node
     Hpro::TMatrix< value_t > *  A;
     apply_map_t &               apply_nodes;
     
-    lu_node ( Hpro::TMatrix< value_t > *      aA,
-              apply_map_t &  aapply_nodes )
+    lu_node ( Hpro::TMatrix< value_t > *  aA,
+              apply_map_t &               aapply_nodes )
             : A( aA )
             , apply_nodes( aapply_nodes )
     { init(); }
@@ -64,8 +64,8 @@ struct trsmu_node : public node
     apply_map_t &                     apply_nodes;
     
     trsmu_node ( const Hpro::TMatrix< value_t > *  aU,
-                       Hpro::TMatrix< value_t > *        aA,
-                       apply_map_t &    aapply_nodes )
+                 Hpro::TMatrix< value_t > *        aA,
+                 apply_map_t &                     aapply_nodes )
             : U( aU )
             , A( aA )
             , apply_nodes( aapply_nodes )
@@ -89,8 +89,8 @@ struct trsml_node : public node
     apply_map_t &                     apply_nodes;
 
     trsml_node ( const Hpro::TMatrix< value_t > *  aL,
-                       Hpro::TMatrix< value_t > *        aA,
-                       apply_map_t &    aapply_nodes )
+                 Hpro::TMatrix< value_t > *        aA,
+                 apply_map_t &                     aapply_nodes )
             : L( aL )
             , A( aA )
             , apply_nodes( aapply_nodes )

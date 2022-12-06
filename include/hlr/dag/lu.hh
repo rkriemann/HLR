@@ -5,13 +5,14 @@
 // Module      : dag/lu
 // Description : generate DAG for LU factorization
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/dag/graph.hh>
-#include <hlr/dag/lu_nodes.hh>
+#include <hlr/dag/detail/lu.hh>
+#include <hlr/dag/detail/lu_accu.hh>
 
 namespace hlr { namespace dag {
 
@@ -23,7 +24,8 @@ template < typename value_t,
 graph
 gen_dag_lu ( Hpro::TMatrix< value_t > & A,
              const size_t               min_size,
-             refine_func_t              refine )
+             refine_func_t              refine,
+             const approx_t &           /* apx */ )
 {
     auto  dag = refine( new lu::lu_node< value_t, approx_t >( & A ), min_size, use_single_end_node );
 

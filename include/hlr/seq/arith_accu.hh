@@ -773,21 +773,14 @@ lu ( Hpro::TMatrix< value_t > &  M,
         if ( is_dense( M ) )
         {
             if ( matrix::is_compressible( M ) )
-            {
-                auto  D = ptrcast( &M, matrix::dense_matrix< value_t > );
+                dynamic_cast< matrix::compressible * >( &M )->decompress();
+            
+            auto  D = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
 
-                D->decompress();
-                
-                invert( *D );
+            invert( *D );
 
-                D->compress( acc );
-            }// if
-            else
-            {
-                auto  D = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
-
-                invert( *D );
-            }// if
+            if ( matrix::is_compressible( M ) )
+                dynamic_cast< matrix::compressible * >( &M )->compress( acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );

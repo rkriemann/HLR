@@ -173,7 +173,7 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *A );
-        auto  dag = std::move( hlr::dag::gen_dag_lu_ip( *LU, nseq, impl::dag::refine ) );
+        auto  dag = std::move( hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx ) );
                 
         runtime.clear();
 
