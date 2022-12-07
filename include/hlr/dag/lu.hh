@@ -39,14 +39,15 @@ gen_dag_lu ( Hpro::TMatrix< value_t > & A,
 //
 template < typename value_t,
            typename approx_t >
-std::pair< graph, dag::lu::accu::accumulator_map_t< value_t > >
+std::pair< graph, dag::lu::accu::accumulator_map_t< value_t > * >
 gen_dag_lu_accu ( Hpro::TMatrix< value_t > & A,
                   const size_t               min_size,
-                  refine_func_t              refine )
+                  refine_func_t              refine,
+                  const approx_t &           /* apx */ )
 {
     // generate DAG for shifting and applying updates
-    auto  accu_map                   = dag::lu::accu::accumulator_map_t< value_t >();
-    auto  [ apply_map, apply_nodes ] = lu::accu::build_apply_dag< value_t, approx_t >( & A, accu_map, min_size );
+    auto  accu_map                   = new dag::lu::accu::accumulator_map_t< value_t >();
+    auto  [ apply_map, apply_nodes ] = lu::accu::build_apply_dag< value_t, approx_t >( & A, *accu_map, min_size );
 
     // construct H-LU DAG
     auto  dag = refine( new lu::accu::lu_node< value_t, approx_t >( & A, apply_map ), min_size, use_single_end_node );
@@ -71,7 +72,9 @@ gen_dag_lu_accu ( Hpro::TMatrix< value_t > & A,
     dag.start().clear();
     dag.start().push_back( apply_map[ A.id() ] );
         
-    return { std::move( dag ), std::move( accu_map ) };
+    std::cout << accu_map->contains( 0 ) << std::endl;
+        
+    return { std::move( dag ), accu_map };
 }
 
 //

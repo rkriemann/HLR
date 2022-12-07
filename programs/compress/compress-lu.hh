@@ -130,7 +130,7 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
 
@@ -172,9 +172,16 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
 
-        auto  LU  = seq::matrix::copy( *A );
-        auto  dag = std::move( hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx ) );
-                
+        auto  LU                = seq::matrix::copy( *A );
+        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+
+        std::cout << accu_map->contains( 0 ) << std::endl;
+        
+        dag.print_dot( "LU.dot" );
+
+        for ( const auto &  [ key, value ] : *accu_map )
+            std::cout << key << std::endl;
+        
         runtime.clear();
 
         for ( int i = 0; i < nbench; ++i )
