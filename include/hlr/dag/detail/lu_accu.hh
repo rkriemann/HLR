@@ -221,7 +221,7 @@ struct accumulator
 
                 // TODO: guard access to accu_map???
                 
-                if ( accu_map.contains( M_ij->id() ) )
+                if ( ! accu_map.contains( M_ij->id() ) )
                 {
                     //
                     // not yet any accumulator for M_ij
@@ -509,7 +509,7 @@ struct apply_node : public node
                 const Hpro::TMatrix< value_t > &  B,
                 const Hpro::TTruncAcc &           acc )
     {
-        if ( accu_map->contains( M->id() ) )
+        if ( ! accu_map->contains( M->id() ) )
             accu_map->emplace( std::make_pair( M->id(), accumulator< value_t >() ) );
 
         accu_map->at( M->id() ).template add_update< approx_t >( op_A, A, op_B, B, *M, acc );

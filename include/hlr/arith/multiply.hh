@@ -416,9 +416,7 @@ multiply_compressible ( const value_t                     alpha,
     if (( alpha == value_t(0) ) || A.is_zero() || B.is_zero() )
         return;
     
-    using hlr::matrix::lrmatrix;
-    using hlr::matrix::dense_matrix;
-    using hlr::matrix::is_compressible;
+    using namespace hlr::matrix;
 
     #if HLR_MULT_TESTS == 1
 
@@ -431,9 +429,16 @@ multiply_compressible ( const value_t                     alpha,
     #endif
 
     // ensure that we really have only compressible types 
-    HLR_DBG_ASSERT( ( is_lowrank( A ) || is_dense( A ) ) && is_compressible( A ) );
-    HLR_DBG_ASSERT( ( is_lowrank( B ) || is_dense( B ) ) && is_compressible( B ) );
-    HLR_DBG_ASSERT( ( is_lowrank( C ) || is_dense( C ) ) && is_compressible( C ) );
+    if ( ! ( ( is_lowrank( A ) || is_dense( A ) ) && is_compressible( A ) ) )
+        HLR_ERROR( "todo" );
+    
+    if ( ! ( ( is_lowrank( B ) || is_dense( B ) ) && is_compressible( B ) ) )
+        HLR_ERROR( "todo" );
+    
+    // HLR_DBG_ASSERT( ( is_lowrank( C ) || is_dense( C ) ) && is_compressible( C ) );
+
+    if ( is_compressible( C ) )
+        dynamic_cast< compressible * >( &C )->decompress();
     
     if ( is_blocked( A ) )
     {
@@ -664,6 +669,9 @@ multiply_compressible ( const value_t                     alpha,
     }// if
 
     #endif
+
+    if ( is_compressible( C ) )
+        dynamic_cast< compressible * >( &C )->compress( acc );
 }
 
 template < typename value_t >

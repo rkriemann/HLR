@@ -80,7 +80,7 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,norank,nosize" );
+        matrix::print_eps( *A, "A", "norank,nosize" );
 
     // assign clusters since needed for cluster bases
     seq::matrix::assign_cluster( *A, *bct->root() );
@@ -130,6 +130,44 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
+
+        auto  LU = seq::matrix::copy( *A );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
+
     if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
@@ -170,18 +208,13 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
-        auto  LU                = seq::matrix::copy( *A );
-        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+        auto  LU  = seq::matrix::copy( *A );
+        auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        std::cout << accu_map->contains( 0 ) << std::endl;
-        
         dag.print_dot( "LU.dot" );
 
-        for ( const auto &  [ key, value ] : *accu_map )
-            std::cout << key << std::endl;
-        
         runtime.clear();
 
         for ( int i = 0; i < nbench; ++i )
@@ -207,13 +240,55 @@ program_main ()
         std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU", prnopt );
+            io::eps::print( *LU, "HLU2", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
         std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
     }
-    
+
+    if ( false )
+    {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
+
+        auto  LU                = seq::matrix::copy( *A );
+        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+
+        dag.print_dot( "LUa.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU2", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
+
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
 
@@ -245,6 +320,88 @@ program_main ()
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
+
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
+
+        auto  LU  = seq::matrix::copy( *zA );
+        auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
+
+        dag.print_dot( "zLU.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "zHLU2", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+    }
+
+    if ( false )
+    {
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG)" << term::reset << std::endl;
+
+        auto  LU                = seq::matrix::copy( *zA );
+        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+
+        dag.print_dot( "zLUa.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "zHLU2", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     

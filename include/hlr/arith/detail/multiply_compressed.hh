@@ -263,7 +263,18 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         B,
            matrix::dense_matrix< value_t > &               C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  DA = A.mat_decompressed();
+    auto  DB = B.mat_decompressed();
+    
+    std::scoped_lock  lock( C.mutex() );
+    
+    // C = C + A B
+    blas::prod( alpha,
+                blas::mat_view( op_A, DA ),
+                blas::mat_view( op_B, DB ),
+                value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >
@@ -348,7 +359,22 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // [ U(C), V(C) ] = approx( C - A B )
+    auto  DA = A.mat_decompressed();
+    auto  DB = B.mat_decompressed();
+    auto  AB = blas::prod( alpha,
+                           blas::mat_view( op_A, DA ),
+                           blas::mat_view( op_B, DB ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( value_t(1), blas::mat_U( C ), blas::adjoint( blas::mat_V( C ) ), value_t(1), AB );
+
+    auto [ U, V ] = approx( AB, acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 //
@@ -381,7 +407,17 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             B,
            matrix::dense_matrix< value_t > &               C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // C = C + ( A U(B) ) V(B)^H
+    auto  DA = A.mat_decompressed();
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >
@@ -519,7 +555,17 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         B,
            matrix::dense_matrix< value_t > &               C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // C = C + U(A) ( V(A)^H B )
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  DB = B.mat_decompressed();
+    auto  VB = blas::prod( value_t(1), blas::adjoint( VA ), blas::mat_view( op_B, DB ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, UA, VB, value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >
@@ -600,7 +646,19 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), U(A) V(A)^H U(B) ] , [ V(C), V(B)^H ] )
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    
+    auto  T  = blas::prod( value_t(1), blas::adjoint( VA ), UB );
+    auto  UT = blas::prod(      alpha, UA, T );
+    auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( C.row_is(), C.col_is(), UT, VB );
+        
+    hlr::add< value_t >( value_t(1), *R, C, acc, approx );
 }
 
 //
@@ -615,7 +673,21 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             B,
            matrix::dense_matrix< value_t > &               C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // C = C + U(A) ( V(A)^H U(B) ) V(B)^H
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    
+    auto  T  = blas::prod( value_t(1), blas::adjoint( VA ), UB );
+    auto  UT = blas::prod( value_t(1), UA, T );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, UT, blas::adjoint( VB ), value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >

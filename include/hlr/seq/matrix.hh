@@ -453,13 +453,19 @@ copy ( const Hpro::TMatrix< value_t > &  M )
                 }// if
             }// for
         }// for
+
+        N->set_id( M.id() );
         
         return N;
     }// if
     else
     {
         // assuming non-structured block
-        return M.copy();
+        auto  N = M.copy();
+
+        N->set_id( M.id() );
+        
+        return N;
     }// else
 }
 

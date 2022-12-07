@@ -210,8 +210,6 @@ run ( graph &                  dag,
     {
         auto  t = behead( worklist );
 
-        HLR_LOG( 4, t->to_string() );
-        
         t->run( acc );
 
         // size_t  new_mem = HLIB::Mem::usage();

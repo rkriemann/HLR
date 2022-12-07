@@ -8,11 +8,14 @@
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
 //
 
+#include <set>
+
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/dag/graph.hh>
 #include <hlr/dag/detail/lu.hh>
 #include <hlr/dag/detail/lu_accu.hh>
+#include <hlr/utils/tools.hh>
 
 namespace hlr { namespace dag {
 
@@ -71,10 +74,70 @@ gen_dag_lu_accu ( Hpro::TMatrix< value_t > & A,
     
     dag.start().clear();
     dag.start().push_back( apply_map[ A.id() ] );
+
+    //
+    // loop over apply nodes from top to bottom and remove nodes without updates
+    //
+
+    using  node_set_t = std::set< node * >;
+
+    dag::node_list_t  work;
+    node_set_t        deleted;
+    auto              is_apply_node = [] ( node * node ) { return ( dynamic_cast< lu::accu::apply_node< value_t, approx_t > * >( node ) != nullptr ); };
+    
+    work.push_back( apply_map[ A.id() ] );
+
+    while ( ! work.empty() )
+    {
+        dag::node_list_t  succ;
         
-    std::cout << accu_map->contains( 0 ) << std::endl;
-        
-    return { std::move( dag ), accu_map };
+        while ( ! work.empty() )
+        {
+            auto  node = behead( work );
+
+            if ( is_apply_node( node ) )
+            {
+                if ( node->dep_cnt() == 0 )
+                {
+                    for ( auto  out : node->successors() )
+                    {
+                        out->dec_dep_cnt();
+                        
+                        if ( is_apply_node( out ) )
+                            succ.push_back( out );
+                    }// for
+                    
+                    deleted.insert( node );
+                }// if
+            }// if
+        }// while
+
+        work = std::move( succ );
+    }// while
+    
+    dag::node_list_t  nodes, start, end;
+
+    for ( auto  node : dag.nodes() )
+    {
+        if ( contains( deleted, node ) )
+        {
+            delete node;
+        }// if
+        else
+        {
+            nodes.push_back( node );
+            
+            if ( node->dep_cnt() == 0 )
+                start.push_back( node );
+
+            if ( node->successors().empty() )
+                end.push_back( node );
+        }// else
+    }// for
+    
+    return  { std::move( dag::graph( std::move( nodes ), std::move( start ), std::move( end ) ) ), accu_map };
+    
+    // return { std::move( dag ), accu_map };
 }
 
 //
