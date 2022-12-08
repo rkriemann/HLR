@@ -28,6 +28,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/matrix/print.hh>
+#include <hlr/dag/graph.hh>
 
 namespace hlr { namespace io {
 
@@ -346,6 +347,28 @@ print ( const Hpro::TCoordinate &  coord,
     Hpro::TVTKCoordVis  vis;
 
     vis.print( & coord, filename );
+}
+
+}// namespace vtk
+
+//////////////////////////////////////////////////////////////////////
+//
+// GraphViz format
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace dot
+{
+
+//
+// print coordinates
+//
+inline
+void
+print ( const dag::graph &   graph,
+        const std::string &  filename )
+{
+    graph.print_dot( filename );
 }
 
 }// namespace vtk

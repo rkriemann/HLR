@@ -130,7 +130,7 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
 
@@ -213,7 +213,7 @@ program_main ()
         auto  LU  = seq::matrix::copy( *A );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        dag.print_dot( "LU.dot" );
+        io::dot::print( dag, "LU.dot" );
 
         runtime.clear();
 
@@ -254,7 +254,7 @@ program_main ()
         auto  LU                = seq::matrix::copy( *A );
         auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
-        dag.print_dot( "LUa.dot" );
+        io::dot::print( dag, "LUa.dot" );
 
         runtime.clear();
 
@@ -328,12 +328,12 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (DAG)" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *zA );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        dag.print_dot( "zLU.dot" );
+        io::dot::print( dag, "zLU.dot" );
 
         runtime.clear();
 
@@ -374,7 +374,7 @@ program_main ()
         auto  LU                = seq::matrix::copy( *zA );
         auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
-        dag.print_dot( "zLUa.dot" );
+        io::dot::print( dag, "zLUa.dot" );
 
         runtime.clear();
 

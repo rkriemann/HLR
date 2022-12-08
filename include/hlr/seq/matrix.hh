@@ -474,8 +474,8 @@ copy ( const Hpro::TMatrix< value_t > &  M )
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-copy ( const Hpro::TMatrix< value_t > &    M,
-       const Hpro::TTruncAcc &  acc )
+copy ( const Hpro::TMatrix< value_t > &  M,
+       const Hpro::TTruncAcc &           acc )
 {
     if ( is_blocked( M ) )
     {
@@ -540,12 +540,18 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
                 }// if
             }// for
         }// for
+
+        N->set_id( M.id() );
         
         return N;
     }// if
     else if ( hlr::matrix::is_compressible_lowrank( M ) )
     {
-        return M.copy();
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else if ( is_lowrank( M ) )
     {
@@ -562,24 +568,38 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
             blas::qr( V, RV );
 
             auto  S = blas::prod( RU, blas::adjoint( RV ) );
-
-            return  std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
+            auto  N = std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
+        
+            N->set_id( M.id() );
+        
+            return N;
         }// if
         else
         {
-            return  std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            auto  N = std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            
+            N->set_id( M.id() );
+        
+            return N;
         }// else
     }// if
     else if ( matrix::is_compressible_dense( M ) )
     {
-        return M.copy();
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else if ( is_dense( M ) )
     {
         auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  DD = blas::copy( blas::mat( D ) );
-
-        return  std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        auto  N  = std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -619,12 +639,18 @@ copy_nearfield ( const Hpro::TMatrix< value_t > &  M )
             }// for
         }// for
         
+        N->set_id( M.id() );
+        
         return N;
     }// if
     else if ( is_dense( M ) )
     {
         // assuming non-structured block
-        return M.copy();
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// else
     else
         return nullptr;

@@ -36,7 +36,7 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C )
+           Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_ERROR( "todo" );
 }
@@ -52,7 +52,7 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
@@ -120,18 +120,6 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C )
-{
-    HLR_ERROR( "todo" );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const Hpro::TBlockMatrix< value_t > &           A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_ERROR( "todo" );
@@ -148,7 +136,7 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
@@ -198,18 +186,6 @@ multiply ( const value_t                                   alpha,
     HLR_ERROR( "todo" );
 }
 
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const Hpro::TBlockMatrix< value_t > &           A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C )
-{
-    HLR_ERROR( "todo" );
-}
-
 //
 // blocked x lowrank = lowrank
 //
@@ -221,11 +197,25 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const matrix::lrmatrix< value_t > &             B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  UC = blas::matrix< value_t >( C.nrows(), B.rank() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { UC, blas::mat_U( C ) },
+                            { VB, blas::mat_V( C ) },
+                            acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 //
@@ -256,18 +246,6 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C )
-{
-    HLR_ERROR( "todo" );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_ERROR( "todo" );
@@ -284,7 +262,7 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
@@ -319,39 +297,16 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C )
-{
-    HLR_MULT_PRINT;
-
-    auto  DA = A.mat_decompressed();
-    auto  DB = B.mat_decompressed();
-    
-    std::scoped_lock  lock( C.mutex() );
-    
-    // C = C + A B
-    blas::prod( alpha,
-                blas::mat_view( op_A, DA ),
-                blas::mat_view( op_B, DB ),
-                value_t(1), blas::mat( C ) );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_MULT_PRINT;
+
+    auto  DA = A.mat_decompressed();
+    auto  DB = B.mat_decompressed();
     
     std::scoped_lock  lock( C.mutex() );
     
     // C = C + A B
-    auto  DA = A.mat_decompressed();
-    auto  DB = B.mat_decompressed();
-    
     blas::prod( alpha,
                 blas::mat_view( op_A, DA ),
                 blas::mat_view( op_B, DB ),
@@ -413,7 +368,7 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
@@ -463,7 +418,7 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C )
+           Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_MULT_PRINT;
     
@@ -476,18 +431,6 @@ multiply ( const value_t                                   alpha,
     std::scoped_lock  lock( C.mutex() );
     
     blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), blas::mat( C ) );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           Hpro::TDenseMatrix< value_t > &                 C )
-{
-    HLR_ERROR( "todo" );
 }
 
 template < typename value_t >
@@ -525,11 +468,25 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         A,
            const Hpro::matop_t                             op_B,
            const matrix::lrmatrix< value_t > &             B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
+    auto  DA = A.mat_decompressed();
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  AU = blas::prod( alpha, blas::mat_view( op_A, DA ), UB );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U( C ), AU },
+                            { blas::mat_V( C ), VB },
+                            acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 //
@@ -570,7 +527,7 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C )
+           Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_ERROR( "todo" );
 }
@@ -586,11 +543,25 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  VC = blas::matrix< value_t >( C.ncols(), A.rank() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U( C ), UA },
+                            { blas::mat_V( C ), VC },
+                            acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 //
@@ -621,7 +592,7 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C )
+           Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_MULT_PRINT;
     
@@ -634,18 +605,6 @@ multiply ( const value_t                                   alpha,
     std::scoped_lock  lock( C.mutex() );
     
     blas::prod( alpha, UA, VB, value_t(1), blas::mat( C ) );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           Hpro::TDenseMatrix< value_t > &                 C )
-{
-    HLR_ERROR( "todo" );
 }
 
 template < typename value_t >
@@ -678,7 +637,15 @@ multiply ( const value_t                                   alpha,
            const matrix::dense_matrix< value_t > &         B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // C = C + U(A) ( V(A)^H B )
+    auto  DB = B.mat_decompressed();
+    auto  VB = blas::prod( value_t(1), blas::adjoint( blas::mat_V( A, op_A ) ), blas::mat_view( op_B, DB ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    blas::prod( alpha, blas::mat_U( A, op_A ), VB, value_t(1), blas::mat( C ) );
 }
 
 //
@@ -692,11 +659,25 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const matrix::dense_matrix< value_t > &         B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  DB = B.mat_decompressed();
+    auto  VB = blas::prod( alpha, blas::adjoint( blas::mat_view( op_B, DB ) ), VA );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U( C ), UA },
+                            { blas::mat_V( C ), VB },
+                            acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 //
@@ -739,7 +720,7 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C )
+           Hpro::TDenseMatrix< value_t > &                 C )
 {
     HLR_MULT_PRINT;
     
@@ -756,18 +737,6 @@ multiply ( const value_t                                   alpha,
     std::scoped_lock  lock( C.mutex() );
     
     blas::prod( alpha, UT, blas::adjoint( VB ), value_t(1), blas::mat( C ) );
-}
-
-template < typename value_t >
-void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           Hpro::TDenseMatrix< value_t > &                 C )
-{
-    HLR_ERROR( "todo" );
 }
 
 template < typename value_t >
@@ -805,11 +774,29 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             A,
            const Hpro::matop_t                             op_B,
            const matrix::lrmatrix< value_t > &             B,
-           matrix::lrmatrix< value_t > &                   C,
+           Hpro::TRkMatrix< value_t > &                    C,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), U(A) V(A)^H U(B) ] , [ V(C), V(B)^H ] )
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    
+    auto  T  = blas::prod( value_t(1), blas::adjoint( VA ), UB );
+    auto  UT = blas::prod(      alpha, UA, T );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    auto [ U, V ] = approx( { blas::mat_U( C ), UT },
+                            { blas::mat_V( C ), VB },
+                            acc );
+        
+    C.set_lrmat( std::move( U ), std::move( V ) );
 }
 
 }// namespace hlr
