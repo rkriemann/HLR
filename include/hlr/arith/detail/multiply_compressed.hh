@@ -12,6 +12,21 @@ namespace hlr
 {
 
 //
+// forward decl.(s)
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                     alpha,
+           const Hpro::matop_t               op_A,
+           const Hpro::TMatrix< value_t > &  A,
+           const Hpro::matop_t               op_B,
+           const Hpro::TMatrix< value_t > &  B,
+           Hpro::TMatrix< value_t > &        C,
+           const Hpro::TTruncAcc &           acc,
+           const approx_t &                  approx );
+
+//
 // blocked x blocked = dense
 //
 template < typename value_t >
@@ -41,7 +56,40 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    //
+    // compute temporary block matrix BC and sub blocks
+    // BC_ij for each  i,j ∈ nblocks(A) × ncols(B)
+    // and combine all for update of C
+    //
+
+    auto  BC = std::make_unique< Hpro::TBlockMatrix< value_t > >( C.row_is(), C.col_is() );
+
+    BC->set_block_struct( A.nblock_rows( op_A ), B.nblock_cols( op_B ) );
+    
+    for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
+    {
+        for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+        {
+            for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
+            {
+                if ( ! is_null_any( A.block( i, l, op_A ), B.block( l, j, op_B ) ) )
+                {
+                    auto  A_il = A.block( i, l, op_A );
+                    auto  B_lj = B.block( l, j, op_B );
+
+                    if ( is_null( BC->block( i, j ) ) )
+                        BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( A_il->row_is( op_A ), B_lj->col_is( op_B ) ) );
+                    
+                    multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
+                }// if
+            }// if       
+        }// for
+    }// for
+
+    // apply update
+    hlr::add< value_t >( value_t(1), *BC, C, acc, approx );
 }
 
 //
@@ -122,7 +170,17 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  UC = blas::matrix< value_t >( C.nrows(), B.rank() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  RC = Hpro::TRkMatrix< value_t >( C.row_is(), C.col_is(), UC, VB );
+    
+    hlr::add< value_t >( value_t(1), RC, C, acc, approx );
 }
 
 //
@@ -489,7 +547,17 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  VC = blas::matrix< value_t >( C.ncols(), A.rank() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
+
+    auto  RC = Hpro::TRkMatrix< value_t >( C.row_is(), C.col_is(), UA, VC );
+    
+    hlr::add< value_t >( value_t(1), RC, C, acc, approx );
 }
 
 //

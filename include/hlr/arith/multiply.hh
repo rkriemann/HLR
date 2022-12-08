@@ -429,10 +429,10 @@ multiply_compressible ( const value_t                     alpha,
     #endif
 
     // ensure that we really have only compressible types 
-    if ( ! ( ( is_lowrank( A ) || is_dense( A ) ) && is_compressible( A ) ) )
+    if ( ! ( ! ( is_lowrank( A ) || is_dense( A ) ) || is_compressible( A ) ) )
         HLR_ERROR( "todo" );
     
-    if ( ! ( ( is_lowrank( B ) || is_dense( B ) ) && is_compressible( B ) ) )
+    if ( ! ( ! ( is_lowrank( B ) || is_dense( B ) ) || is_compressible( B ) ) )
         HLR_ERROR( "todo" );
     
     // HLR_DBG_ASSERT( ( is_lowrank( C ) || is_dense( C ) ) && is_compressible( C ) );
