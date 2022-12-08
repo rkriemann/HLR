@@ -482,12 +482,18 @@ copy ( const hpro::TMatrix< value_t > &  M )
                 }// for
             } );
 
+        N->set_id( M.id() );
+        
         return N;
     }// if
     else
     {
         // assuming non-structured block and hence no parallel copy needed
-        return M.copy();
+        auto  N = M.copy();
+
+        N->set_id( M.id() );
+        
+        return N;
     }// else
 }
 
@@ -528,16 +534,19 @@ copy ( const hpro::TMatrix< value_t > &  M,
                 }// for
             } );
 
+        N->set_id( M.id() );
+        
         return N;
     }// if
     else
     {
         // assuming non-structured block and hence no parallel copy needed
-        auto  Mc = M.copy();
+        auto  N = M.copy();
 
-        Mc->truncate( acc( M.row_is(), M.col_is() ) );
+        N->truncate( acc( M.row_is(), M.col_is() ) );
+        N->set_id( M.id() );
 
-        return Mc;
+        return N;
     }// else
 }
 
@@ -576,11 +585,17 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
                 }// for
             } );
 
+        N->set_id( M.id() );
+        
         return N;
     }// if
     else if ( hlr::matrix::is_compressible_lowrank( M ) )
     {
-        return M.copy();
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else if ( is_lowrank( M ) )
     {
@@ -597,24 +612,38 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
             blas::qr( V, RV );
 
             auto  S = blas::prod( RU, blas::adjoint( RV ) );
+            auto  N = std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
 
-            return  std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
+            N->set_id( M.id() );
+        
+            return N;
         }// if
         else
         {
-            return  std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            auto  N = std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+
+            N->set_id( M.id() );
+        
+            return N;
         }// else
     }// if
     else if ( matrix::is_compressible_dense( M ) )
     {
-        return M.copy();
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else if ( is_dense( M ) )
     {
         auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  DD = blas::copy( blas::mat( D ) );
+        auto  N  = std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
 
-        return  std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        N->set_id( M.id() );
+        
+        return N;
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -661,12 +690,18 @@ copy_nearfield ( const hpro::TMatrix< value_t > &  M )
                 }// for
             } );
 
+        N->set_id( M.id() );
+        
         return N;
     }// if
     else if ( is_dense( M ) )
     {
         // assuming non-structured block
-        return M.copy();
+        auto  N = M.copy();
+
+        N->set_id( M.id() );
+        
+        return N;
     }// else
     else
         return nullptr;

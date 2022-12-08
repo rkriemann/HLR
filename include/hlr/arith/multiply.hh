@@ -54,7 +54,11 @@ multiply ( const value_t                     alpha,
 
     // decompress destination as it is modified anyway
     if ( is_compressible( C ) )
+    {
+        auto  lock = std::scoped_lock( C.mutex() );
+        
         dynamic_cast< compressible * >( &C )->decompress();
+    }// if
     
     #if HLR_MULT_TESTS == 1
 
@@ -800,7 +804,11 @@ multiply ( const value_t                     alpha,
 
     // recompress after update
     if ( is_compressible( C ) )
+    {
+        auto  lock = std::scoped_lock( C.mutex() );
+        
         dynamic_cast< compressible * >( &C )->compress( acc );
+    }// if
 }
 
 // template < typename value_t,
