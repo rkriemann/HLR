@@ -41,7 +41,7 @@ eps_to_rate ( const double eps )
     // else if ( eps >= 1e-8 ) return 28;
     // else if ( eps >= 1e-9 ) return 30;
     // else if ( eps >= 1e-9 ) return 30;
-    return uint( std::ceil( std::abs( std::log2( eps ) ) ) );
+    return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 8;
 }
 
 //

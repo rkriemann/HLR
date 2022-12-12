@@ -33,15 +33,32 @@ byte_t
 eps_to_rate ( const double eps )
 {
     if      ( eps >= 1e-2  ) return 7;
-    else if ( eps >= 1e-4  ) return 15;
-    else if ( eps >= 1e-7  ) return 23;
-    else if ( eps >= 1e-8  ) return 24;
-    else if ( eps >= 1e-9  ) return 28;
-    else if ( eps >= 1e-10 ) return 32;
+    else if ( eps >= 1e-3  ) return 14;
+    else if ( eps >= 1e-4  ) return 23;
+    else if ( eps >= 1e-6  ) return 23;
+    else if ( eps >= 1e-7  ) return 31;
+    else if ( eps >= 1e-8  ) return 31;
+    else if ( eps >= 1e-9  ) return 39;
+    else if ( eps >= 1e-10 ) return 39;
     else if ( eps >= 1e-12 ) return 44;
     else if ( eps >= 1e-14 ) return 54;
     else                     return 64;
 }
+
+// inline
+// byte_t
+// eps_to_rate ( const double eps )
+// {
+//     if      ( eps >= 1e-2  ) return 7;
+//     else if ( eps >= 1e-4  ) return 15;
+//     else if ( eps >= 1e-7  ) return 23;
+//     else if ( eps >= 1e-8  ) return 24;
+//     else if ( eps >= 1e-9  ) return 28;
+//     else if ( eps >= 1e-10 ) return 32;
+//     else if ( eps >= 1e-12 ) return 44;
+//     else if ( eps >= 1e-14 ) return 54;
+//     else                     return 64;
+// }
 
 struct config
 {

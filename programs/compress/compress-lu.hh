@@ -126,7 +126,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  apx = approx::SVD< value_t >();
+    auto    apx    = approx::SVD< value_t >();
+    size_t  mem_LU = 0;
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
@@ -165,7 +166,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( false )
@@ -203,7 +204,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( true )
@@ -238,15 +239,17 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
+
+        mem_LU = LU->byte_size();
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( mem_LU ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "HLU2", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( false )
@@ -287,7 +290,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( false )
@@ -325,7 +328,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( true )
@@ -358,15 +361,18 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
-        
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU2", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
     if ( false )
@@ -407,7 +413,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 }
     

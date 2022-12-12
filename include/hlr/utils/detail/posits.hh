@@ -25,7 +25,7 @@ uint
 eps_to_rate ( const double eps )
 {
     if      ( eps >= 1e-2  ) return 12;
-    else if ( eps >= 1e-3  ) return 14;
+    else if ( eps >= 1e-3  ) return 20;
     else if ( eps >= 1e-4  ) return 18;
     else if ( eps >= 1e-5  ) return 22;
     else if ( eps >= 1e-6  ) return 26;
@@ -37,6 +37,24 @@ eps_to_rate ( const double eps )
     else if ( eps >= 1e-14 ) return 54;
     else                     return 64;
 }
+
+// inline
+// uint
+// eps_to_rate ( const double eps )
+// {
+//     if      ( eps >= 1e-2  ) return 12;
+//     else if ( eps >= 1e-3  ) return 14;
+//     else if ( eps >= 1e-4  ) return 18;
+//     else if ( eps >= 1e-5  ) return 22;
+//     else if ( eps >= 1e-6  ) return 26;
+//     else if ( eps >= 1e-7  ) return 30;
+//     else if ( eps >= 1e-8  ) return 34;
+//     else if ( eps >= 1e-9  ) return 36;
+//     else if ( eps >= 1e-10 ) return 40;
+//     else if ( eps >= 1e-12 ) return 44;
+//     else if ( eps >= 1e-14 ) return 54;
+//     else                     return 64;
+// }
 
 struct config
 {
