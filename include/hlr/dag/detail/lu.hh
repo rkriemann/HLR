@@ -52,6 +52,7 @@ private:
         const approx_t  apx;
     
         hlr::lu< value_t >( *A, acc, apx );
+        // HLR_LOG( 4, to_string() + Hpro::to_string( " : %.4e", norm::frobenius( *A ) ) );
     }
     
     virtual local_graph  refine_  ( const size_t  min_size );
@@ -82,6 +83,7 @@ private:
         const approx_t  apx;
     
         hlr::solve_upper_tri< value_t >( from_right, general_diag, *U, *A, acc, apx );
+        // HLR_LOG( 4, to_string() + Hpro::to_string( " : %.4e", norm::frobenius( *A ) ) );
     }
     
     virtual local_graph  refine_  ( const size_t  min_size );
@@ -112,6 +114,7 @@ private:
         const approx_t  apx;
         
         hlr::solve_lower_tri< value_t >( from_left, unit_diag, *L, *A, acc, apx );
+        // HLR_LOG( 4, to_string() + Hpro::to_string( " : %.4e", norm::frobenius( *A ) ) );
     }
 
     virtual local_graph  refine_  ( const size_t  min_size );

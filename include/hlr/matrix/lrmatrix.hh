@@ -188,6 +188,8 @@ public:
         
         U() = std::move( aU );
         V() = std::move( aV );
+
+        this->_rank = U().ncols();
     }
 
     //
@@ -262,12 +264,19 @@ public:
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
-        auto  M = Hpro::TRkMatrix< value_t >::copy();
+        auto  M = Hpro::TMatrix< value_t >::copy();
     
         HLR_ASSERT( IS_TYPE( M.get(), lrmatrix ) );
 
         auto  R = ptrcast( M.get(), lrmatrix< value_t > );
 
+        if ( this->cluster() != nullptr )
+            R->set_cluster( this->cluster() );
+
+        R->_rank  = this->_rank;
+        R->_mat_A = std::move( blas::copy( this->_mat_A ) );
+        R->_mat_B = std::move( blas::copy( this->_mat_B ) );
+        
         #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
@@ -367,6 +376,24 @@ public:
         #endif
         
         return size;
+    }
+
+    // test data for invalid values, e.g. INF and NAN
+    virtual void check_data () const
+    {
+        if ( is_compressed() )
+        {
+            auto  RU = U_decompressed();
+            auto  RV = V_decompressed();
+
+            RU.check_data();
+            RV.check_data();
+        }// if
+        else
+        {
+            U().check_data();
+            V().check_data();
+        }// else
     }
 
 protected:
@@ -564,8 +591,8 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     {
         _zdata.U  = std::move( zU );
         _zdata.V  = std::move( zV );
-        this->U() = std::move( blas::matrix< value_t >( 0, orank ) ); // remember rank !!!
-        this->V() = std::move( blas::matrix< value_t >( 0, orank ) );
+        this->U() = std::move( blas::matrix< value_t >( 0, 0 ) );
+        this->V() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
 
     #endif

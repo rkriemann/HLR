@@ -80,7 +80,7 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "norank,nosize" );
+        io::eps::print( *A, "A", "noinnerid,norank,nosize" );
 
     // assign clusters since needed for cluster bases
     seq::matrix::assign_cluster( *A, *bct->root() );
@@ -113,7 +113,7 @@ program_main ()
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
+        io::eps::print( *zA, "zA", "noid,norank,nosize" );
     
     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );
@@ -231,6 +231,8 @@ program_main ()
             if ( i < nbench-1 )
                 impl::matrix::copy_to( *A, *LU );
         }// for
+
+        io::hpro::write( *LU, "LU.hm" );
         
         if ( nbench > 1 )
             std::cout << "  runtime  = "
@@ -290,7 +292,7 @@ program_main ()
 
     if ( false )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator)" << term::reset << std::endl;
 
         auto  LU = seq::matrix::copy( *zA );
                 
@@ -328,7 +330,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", DAG)" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *zA );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
@@ -369,7 +371,7 @@ program_main ()
 
     if ( false )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator, DAG)" << term::reset << std::endl;
 
         auto  LU                = seq::matrix::copy( *zA );
         auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );

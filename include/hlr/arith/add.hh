@@ -32,14 +32,31 @@ add ( const value_t                     alpha,
     using  matrix::is_lowrankS;
     using  matrix::lrsmatrix;
 
-    if ( is_compressible( C ) )
-        dynamic_cast< compressible * >( &C )->decompress();
+    // if ( is_compressible( C ) )
+    // {
+    //     auto  lock = std::scoped_lock( C.mutex() );
+        
+    //     dynamic_cast< compressible * >( &C )->decompress();
+    // }// if
         
     if ( is_blocked( A ) )
     {
-        if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),    acc, approx );
-        else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+        if ( is_blocked( C ) )
+            add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( is_lowrank( C ) )
+        {
+            if ( is_compressible( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ), acc, approx );
+        }// if
+        else if ( is_dense( C ) )
+        {
+            if ( is_compressible( C ) )
+                add< value_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, dense_matrix< value_t > ), acc );
+            else
+                add< value_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+        }// if
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
@@ -47,17 +64,43 @@ add ( const value_t                     alpha,
     {
         if ( is_dense( A ) )
         {
-            if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
-            else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
-            else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            if ( is_blocked( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+            else if ( is_lowrank( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+                else
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ), acc, approx );
+            }// if
+            else if ( is_dense( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, dense_matrix< value_t > ), acc );
+                else
+                    add< value_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_lowrank( A ) )
         {
-            if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
-            else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
-            else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            if ( is_blocked( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+            else if ( is_lowrank( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+                else
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ), acc, approx );
+            }// if
+            else if ( is_dense( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, dense_matrix< value_t > ), acc );
+                else
+                    add< value_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -68,19 +111,47 @@ add ( const value_t                     alpha,
     {
         if ( is_dense( A ) )
         {
-            if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
-            else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
-            else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
-            else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            if ( is_blocked( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+            else if ( is_lowrank( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+                else
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ), acc, approx );
+            }// if
+            else if ( is_lowrankS( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
+            else if ( is_dense( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, dense_matrix< value_t > ), acc );
+                else
+                    add< value_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_lowrank( A ) )
         {
-            if      ( is_blocked(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ),   acc, approx );
-            else if ( is_lowrank(  C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ),      acc, approx );
-            else if ( is_lowrankS( C ) ) add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
-            else if ( is_dense(    C ) ) add< value_t >(           alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            if ( is_blocked( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+            else if ( is_lowrank( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+                else
+                    add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TRkMatrix< value_t > ), acc, approx );
+            }// if
+            else if ( is_lowrankS( C ) )
+                add< value_t, approx_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, lrsmatrix< value_t > ), acc, approx );
+            else if ( is_dense( C ) )
+            {
+                if ( is_compressible( C ) )
+                    add< value_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, dense_matrix< value_t > ), acc );
+                else
+                    add< value_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ), *ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -88,8 +159,12 @@ add ( const value_t                     alpha,
             HLR_ERROR( "unsupported matrix type : " + A.typestr() );
     }// else
 
-    if ( is_compressible( C ) )
-        dynamic_cast< compressible * >( &C )->compress( acc );
+    // if ( is_compressible( C ) )
+    // {
+    //     auto  lock = std::scoped_lock( C.mutex() );
+        
+    //     dynamic_cast< compressible * >( &C )->compress( acc );
+    // }// if
 }
 
 //

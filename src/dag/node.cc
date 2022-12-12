@@ -429,6 +429,8 @@ node::run ( const TTruncAcc & acc )
     
     run_( acc );
     reset_dep_cnt();
+
+    // HLR_LOG( 4, term::bold( term::green( "end( " ) ) + term::bold( this->to_string() ) + term::bold( term::green( " )" ) ) );
 }
 
 //

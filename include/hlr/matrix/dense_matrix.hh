@@ -208,6 +208,10 @@ public:
 
         auto  D = ptrcast( M.get(), dense_matrix< value_t > );
 
+        D->_rows = this->_rows;
+        D->_cols = this->_cols;
+        D->_mat  = std::move( blas::copy( this->_mat ) );
+        
         HLR_ASSERT( ( D->nrows() == this->nrows() ) &&
                     ( D->ncols() == this->ncols() ) );
         
@@ -220,12 +224,7 @@ public:
             std::copy( _zM.begin(), _zM.end(), D->_zM.begin() );
         }// if
 
-        else
-
         #endif
-        {
-            D->blas_mat() = std::move( blas::copy( this->blas_mat() ) );
-        }// else
     
         return M;
     }
@@ -289,6 +288,21 @@ public:
         #endif
         
         return size;
+    }
+
+    // test data for invalid values, e.g. INF and NAN
+    virtual void check_data () const
+    {
+        if ( is_compressed() )
+        {
+            auto  M = mat_decompressed();
+
+            M.check_data();
+        }// if
+        else
+        {
+            mat().check_data();
+        }// else
     }
 
 protected:
