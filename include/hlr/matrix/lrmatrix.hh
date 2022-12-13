@@ -315,17 +315,27 @@ public:
     // copy matrix data to A
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const
     {
-        Hpro::TRkMatrix< value_t >::copy_to( A );
-    
         HLR_ASSERT( IS_TYPE( A, lrmatrix ) );
 
+        Hpro::TMatrix< value_t >::copy_to( A );
+    
+        auto  R = ptrcast( A, lrmatrix< value_t > );
+
+        R->_rows  = this->_rows;
+        R->_cols  = this->_cols;
+        R->_rank  = this->_rank;
+        R->_mat_A = std::move( blas::copy( this->blas_mat_A() ) );
+        R->_mat_B = std::move( blas::copy( this->blas_mat_B() ) );
+            
         #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
-            // auto  R = ptrcast( A, lrmatrix< value_t > );
+            R->_zdata.U = compress::zarray( _zdata.U.size() );
+            R->_zdata.V = compress::zarray( _zdata.V.size() );
 
-            HLR_ERROR( "TODO" );
+            std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
+            std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
         }// if
 
         #endif

@@ -248,17 +248,23 @@ public:
     // copy matrix data to \a A
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A ) const
     {
-        Hpro::TDenseMatrix< value_t >::copy_to( A );
+        Hpro::TMatrix< value_t >::copy_to( A );
     
         HLR_ASSERT( IS_TYPE( A, dense_matrix ) );
+
+        auto  D = ptrcast( A, dense_matrix< value_t > );
+
+        D->_rows = this->_rows;
+        D->_cols = this->_cols;
+        D->_mat  = std::move( blas::copy( this->_mat ) );
 
         #if HLR_HAS_COMPRESSION == 1
 
         if ( is_compressed() )
         {
-            // auto  D = ptrcast( A, dense_matrix< value_t > );
+            D->_zM = compress::zarray( _zM.size() );
 
-            HLR_ERROR( "TODO" );
+            std::copy( _zM.begin(), _zM.end(), D->_zM.begin() );
         }// if
 
         #endif
