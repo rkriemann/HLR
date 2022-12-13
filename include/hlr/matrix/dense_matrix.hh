@@ -87,13 +87,16 @@ public:
     {
         #if HLR_HAS_COMPRESSION == 1
         
-        HLR_ASSERT( is_compressed() );
-
-        auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
+        if ( is_compressed() )
+        {
+            auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-        compress::decompress< value_t >( _zM, dM );
-
-        return dM;
+            compress::decompress< value_t >( _zM, dM );
+            
+            return dM;
+        }// if
+        else
+            return mat();
 
         #else
 

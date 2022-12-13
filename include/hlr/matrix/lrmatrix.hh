@@ -109,14 +109,17 @@ public:
     {
         #if HLR_HAS_COMPRESSION == 1
         
-        HLR_ASSERT( is_compressed() );
-
-        auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        if ( is_compressed() )
+        {
+            auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
     
-        compress::decompress< value_t >( _zdata.U, dU );
+            compress::decompress< value_t >( _zdata.U, dU );
 
-        return dU;
-
+            return dU;
+        }// if
+        else
+            return U();
+        
         #else
 
         return U();
@@ -128,14 +131,17 @@ public:
     {
         #if HLR_HAS_COMPRESSION == 1
         
-        HLR_ASSERT( is_compressed() );
-
-        auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
+        if ( is_compressed() )
+        {
+            auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-        compress::decompress< value_t >( _zdata.V, dV );
+            compress::decompress< value_t >( _zdata.V, dV );
 
-        return dV;
-
+            return dV;
+        }// if
+        else
+            return V();
+        
         #else
 
         return V();

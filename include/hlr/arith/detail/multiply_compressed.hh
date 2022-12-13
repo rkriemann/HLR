@@ -486,7 +486,14 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  DA = A.mat_decompressed();
+    auto  DB = B.mat_decompressed();
+    auto  DT = blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ) );
+    auto  T  = Hpro::TDenseMatrix< value_t >( C.row_is(), C.col_is(), std::move( DT ) );
+        
+    hlr::add< value_t >( value_t(1), T, C, acc, approx );
 }
 
 //
