@@ -10,6 +10,8 @@
 
 #include <hpro/matrix/TLinearOperator.hh>
 
+// #include <hlr/matrix/arithmetic_support.hh>
+
 namespace hlr { namespace matrix {
 
 // local matrix type
@@ -19,7 +21,9 @@ DECLARE_TYPE( linop_sum );
 // represents Σ_i α_i A_i of linear operators
 //
 template < typename T_value >
-class linop_sum : public Hpro::TLinearOperator< T_value >
+class linop_sum
+    : public Hpro::TLinearOperator< T_value >
+// , public arithmetic_support< linop_sum< T_value > >
 {
 public:
  
@@ -178,6 +182,11 @@ public:
 
     HPRO_RTTI_DERIVED( linop_sum, Hpro::TLinearOperator< value_t > );
 };
+
+//
+// enable arithmetic support
+//
+// SUPPORTS_ARITHMETIC_TEMPLATE( linop_sum )
 
 //
 // multiplication functions

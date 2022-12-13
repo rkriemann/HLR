@@ -37,7 +37,7 @@ struct config
 };
 
 // inline config  relative_accuracy ( double  eps ) { return config{ REL, 0.0, eps, 0.0 }; }
-inline config  get_config ( double  eps ) { return config{ REL, eps, 0.0, 0.0 }; }
+inline config  get_config ( double  eps ) { return config{ REL, 0.0, eps, 0.0 }; }
 
 //
 // handles arrays allocated within SZ

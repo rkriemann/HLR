@@ -133,7 +133,7 @@ namespace hlr { namespace matrix {
 //     {
 //         HLR_ASSERT( _factors.size() > 0 );
         
-//         const auto  s = _factors.front();
+//         const auto  s = _factors.back();
     
 //         if ( s.op == apply_normal ) return s.linop->domain_dim();
 //         else                        return s.linop->range_dim();
@@ -155,7 +155,7 @@ namespace hlr { namespace matrix {
 //     {
 //         HLR_ASSERT( _factors.size() > 0 );
         
-//         const auto  s = _factors.front();
+//         const auto  s = _factors.back();
         
 //         if ( s.op == apply_normal ) return s.linop->domain_vector();
 //         else                        return s.linop->range_vector();
@@ -188,23 +188,23 @@ namespace hlr { namespace matrix {
 //                                   vector_t *        y,
 //                                   const matop_t     op ) const
 // {
-//     const auto  N = _factors.size();
-
-//     if ( N == 1 )
+//     y->scale( value_t(0) );
+        
+//     if ( _factors.size() == 1 )
 //     {
 //         _factors[0].linop->apply_add( _factors[0].scale, x, y, blas::apply_op( op, _factors[0].op ) );
 //     }// if
 //     else
 //     {
+//         const auto  n_fac = _factors.size();
+//         auto        tx    = std::unique_ptr< Hpro::TVector< value_t > >();
+//         auto        ty    = std::unique_ptr< Hpro::TVector< value_t > >();
+        
 //         if ( op == apply_normal )
 //         {
 //             //
 //             // A₀(A₁(A₂x))
 //             //
-
-//             const auto  n_fac = _factors.size();
-//             auto        tx    = std::unique_ptr< Hpro::TVector< value_t > >();
-//             auto        ty    = std::unique_ptr< Hpro::TVector< value_t > >();
 
 //             {
 //                 auto  p = _factors[ n_fac-1 ];
@@ -212,7 +212,7 @@ namespace hlr { namespace matrix {
 //                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
 //                 else                                              ty = p.linop->domain_vector();
 
-//                 p.linop->apply( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
+//                 p.linop->apply_add( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
 //             }
             
 //             for ( int  i = n_fac-2; i > 0; --i )
@@ -224,13 +224,13 @@ namespace hlr { namespace matrix {
 //                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
 //                 else                                              ty = p.linop->domain_vector();
             
-//                 p.linop->apply( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
+//                 p.linop->apply_add( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
 //             }// for
 
 //             {
 //                 auto  p = _factors[ 0 ];
                 
-//                 p.linop->apply_add( p.scale, ty.get(), y, p.op );
+//                 p.linop->apply_add( p.scale, ty.get(), y, blas::apply_op( op, p.op ) );
 //             }
 //         }// if
 //         else
@@ -239,17 +239,13 @@ namespace hlr { namespace matrix {
 //             // (A₀A₁A₂)'x = A₂'A₁'A₀'x
 //             //
 
-//             const auto  n_fac = _factors.size();
-//             auto        tx    = std::unique_ptr< Hpro::TVector< value_t > >();
-//             auto        ty    = std::unique_ptr< Hpro::TVector< value_t > >();
-
 //             {
 //                 auto  p = _factors[ 0 ];
                 
 //                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
 //                 else                                              ty = p.linop->domain_vector();
 
-//                 p.linop->apply( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
+//                 p.linop->apply_add( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
 //             }
             
 //             for ( int  i = 1; i < n_fac-1; ++i )
@@ -261,13 +257,13 @@ namespace hlr { namespace matrix {
 //                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
 //                 else                                               ty = p.linop->domain_vector();
             
-//                 p.linop->apply( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
+//                 p.linop->apply_add( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
 //             }// for
 
 //             {
 //                 auto  p = _factors[ n_fac-1 ];
                 
-//                 p.linop->apply_add( p.scale, ty.get(), y, p.op );
+//                 p.linop->apply_add( p.scale, ty.get(), y, blas::apply_op( op, p.op ) );
 //             }
 //         }// else
 //     }// else
@@ -280,8 +276,83 @@ namespace hlr { namespace matrix {
 //                                         vector_t *        y,
 //                                         const matop_t     op ) const
 // {
-//     for ( auto &  s : _factors )
-//         s.linop->apply_add( s.scale, x, y, blas::apply_op( op, s.op ) );
+//     if ( _factors.size() == 1 )
+//     {
+//         _factors[0].linop->apply_add( alpha * _factors[0].scale, x, y, blas::apply_op( op, _factors[0].op ) );
+//     }// if
+//     else
+//     {
+//         const auto  n_fac = _factors.size();
+//         auto        tx    = std::unique_ptr< Hpro::TVector< value_t > >();
+//         auto        ty    = std::unique_ptr< Hpro::TVector< value_t > >();
+
+//         if ( op == apply_normal )
+//         {
+//             //
+//             // A₀(A₁(A₂x))
+//             //
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
+//                 else                                              ty = p.linop->domain_vector();
+
+//                 p.linop->apply_add( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
+//             }
+            
+//             for ( int  i = n_fac-2; i > 0; --i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
+//                 else                                              ty = p.linop->domain_vector();
+            
+//                 p.linop->apply_add( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 p.linop->apply_add( alpha * p.scale, ty.get(), y, blas::apply_op( op, p.op ) );
+//             }
+//         }// if
+//         else
+//         {
+//             //
+//             // (A₀A₁A₂)'x = A₂'A₁'A₀'x
+//             //
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
+//                 else                                              ty = p.linop->domain_vector();
+
+//                 p.linop->apply_add( p.scale, x, ty.get(), blas::apply_op( op, p.op ) );
+//             }
+            
+//             for ( int  i = 1; i < n_fac-1; ++i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = p.linop->range_vector();
+//                 else                                               ty = p.linop->domain_vector();
+            
+//                 p.linop->apply_add( p.scale, tx.get(), ty.get(), blas::apply_op( op, p.op ) );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 p.linop->apply_add( alpha * p.scale, ty.get(), y, blas::apply_op( op, p.op ) );
+//             }
+//         }// else
+//     }// else
 // }
 
 // template < typename value_t >
@@ -301,8 +372,83 @@ namespace hlr { namespace matrix {
 //                                         blas::vector< value_t > &        y,
 //                                         const matop_t                    op ) const
 // {
-//     for ( auto &  s : _factors )
-//         s.linop->apply_add( alpha*s.scale, x, y, blas::apply_op( op, s.op ) );
+//     if ( _factors.size() == 1 )
+//     {
+//         _factors[0].linop->apply_add( alpha * _factors[0].scale, x, y, blas::apply_op( op, _factors[0].op ) );
+//     }// if
+//     else
+//     {
+//         const auto  n_fac = _factors.size();
+//         auto        tx    = blas::vector< value_t >();
+//         auto        ty    = blas::vector< value_t >();
+
+//         if ( op == apply_normal )
+//         {
+//             //
+//             // A₀(A₁(A₂x))
+//             //
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = std::move( blas::vector< value_t >( p.linop->range_dim() ) );
+//                 else                                              ty = std::move( blas::vector< value_t >( p.linop->domain_dim() ) );
+
+//                 p.linop->apply_add( p.scale, x, ty, blas::apply_op( op, p.op ) );
+//             }
+            
+//             for ( int  i = n_fac-2; i > 0; --i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = std::move( blas::vector< value_t >( p.linop->range_dim() ) );
+//                 else                                              ty = std::move( blas::vector< value_t >( p.linop->domain_dim() ) );
+            
+//                 p.linop->apply_add( p.scale, tx, ty, blas::apply_op( op, p.op ) );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 p.linop->apply_add( alpha * p.scale, ty, y, blas::apply_op( op, p.op ) );
+//             }
+//         }// if
+//         else
+//         {
+//             //
+//             // (A₀A₁A₂)'x = A₂'A₁'A₀'x
+//             //
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = std::move( blas::vector< value_t >( p.linop->range_dim() ) );
+//                 else                                              ty = std::move( blas::vector< value_t >( p.linop->domain_dim() ) );
+
+//                 p.linop->apply_add( p.scale, x, ty, blas::apply_op( op, p.op ) );
+//             }
+            
+//             for ( int  i = 1; i < n_fac-1; ++i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = std::move( blas::vector< value_t >( p.linop->range_dim() ) );
+//                 else                                              ty = std::move( blas::vector< value_t >( p.linop->domain_dim() ) );
+            
+//                 p.linop->apply_add( p.scale, tx, ty, blas::apply_op( op, p.op ) );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 p.linop->apply_add( alpha * p.scale, ty, y, blas::apply_op( op, p.op ) );
+//             }
+//         }// else
+//     }// else
 // }
 
 // template < typename value_t >
@@ -312,8 +458,7 @@ namespace hlr { namespace matrix {
 //                                         blas::matrix< value_t > &        Y,
 //                                         const matop_t                    op ) const
 // {
-//     for ( auto &  s : _factors )
-//         s.linop->apply_add( alpha*s.scale, X, Y, blas::apply_op( op, s.op ) );
+//     HLR_ERROR( "TODO" );
 // }
 
 // template < typename value_t >
@@ -325,8 +470,83 @@ namespace hlr { namespace matrix {
 //                                         blas::vector< value_t > &        y,
 //                                         const matop_t                    op ) const
 // {
-//     for ( auto &  s : _factors )
-//         arithmetic.prod( alpha * s.scale, blas::apply_op( op, s.op ), * s.linop, x, y );
+//     if ( _factors.size() == 1 )
+//     {
+//         _factors[0].linop->apply_add( alpha * _factors[0].scale, x, y, blas::apply_op( op, _factors[0].op ) );
+//     }// if
+//     else
+//     {
+//         const auto  n_fac = _factors.size();
+//         auto        tx    = blas::vector< value_t >();
+//         auto        ty    = blas::vector< value_t >();
+
+//         if ( op == apply_normal )
+//         {
+//             //
+//             // A₀(A₁(A₂x))
+//             //
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = blas::vector< value_t >( p.linop->range_dim() );
+//                 else                                              ty = blas::vector< value_t >( p.linop->domain_dim() );
+
+//                 arithmetic.prod( p.scale, blas::apply_op( op, p.op ), * p.linop, x, ty );
+//             }
+            
+//             for ( int  i = n_fac-2; i > 0; --i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = blas::vector< value_t >( p.linop->range_dim() );
+//                 else                                              ty = blas::vector< value_t >( p.linop->domain_dim() );
+            
+//                 arithmetic.prod( p.scale, blas::apply_op( op, p.op ), * p.linop, tx, ty );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 arithmetic.prod( alpha * p.scale, blas::apply_op( op, p.op ), * p.linop, ty, y );
+//             }
+//         }// if
+//         else
+//         {
+//             //
+//             // (A₀A₁A₂)'x = A₂'A₁'A₀'x
+//             //
+
+//             {
+//                 auto  p = _factors[ 0 ];
+                
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = blas::vector< value_t >( p.linop->range_dim() );
+//                 else                                              ty = blas::vector< value_t >( p.linop->domain_dim() );
+
+//                 arithmetic.prod( p.scale, blas::apply_op( op, p.op ), * p.linop, x, ty );
+//             }
+            
+//             for ( int  i = 1; i < n_fac-1; ++i )
+//             {
+//                 auto  p = _factors[ i ];
+
+//                 tx = std::move( ty );
+
+//                 if ( blas::apply_op( p.op, op ) == apply_normal ) ty = blas::vector< value_t >( p.linop->range_dim() );
+//                 else                                              ty = blas::vector< value_t >( p.linop->domain_dim() );
+            
+//                 arithmetic.prod( p.scale, blas::apply_op( op, p.op ), * p.linop, tx, ty );
+//             }// for
+
+//             {
+//                 auto  p = _factors[ n_fac-1 ];
+                
+//                 arithmetic.prod( alpha * p.scale, blas::apply_op( op, p.op ), * p.linop, ty, y );
+//             }
+//         }// else
+//     }// else
 // }
 
 // //

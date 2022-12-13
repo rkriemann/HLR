@@ -24,15 +24,15 @@ inline
 uint
 eps_to_rate ( const double eps )
 {
-    if      ( eps >= 1e-2  ) return 12;
+    if      ( eps >= 1e-2  ) return 16;
     else if ( eps >= 1e-3  ) return 20;
-    else if ( eps >= 1e-4  ) return 18;
-    else if ( eps >= 1e-5  ) return 22;
-    else if ( eps >= 1e-6  ) return 26;
-    else if ( eps >= 1e-7  ) return 30;
-    else if ( eps >= 1e-8  ) return 34;
-    else if ( eps >= 1e-9  ) return 36;
-    else if ( eps >= 1e-10 ) return 40;
+    else if ( eps >= 1e-4  ) return 24;
+    else if ( eps >= 1e-5  ) return 28;
+    else if ( eps >= 1e-6  ) return 30;
+    else if ( eps >= 1e-7  ) return 34;
+    else if ( eps >= 1e-8  ) return 36;
+    else if ( eps >= 1e-9  ) return 40;
+    else if ( eps >= 1e-10 ) return 42;
     else if ( eps >= 1e-12 ) return 44;
     else if ( eps >= 1e-14 ) return 54;
     else                     return 64;
@@ -163,7 +163,9 @@ compress< double > ( const config &   config,
         case 32: to_posit< double, 32, 3 >( zdata.data() + 8, data, nsize ); break;
         case 34: to_posit< double, 34, 3 >( zdata.data() + 8, data, nsize ); break;
         case 36: to_posit< double, 36, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 38: to_posit< double, 38, 3 >( zdata.data() + 8, data, nsize ); break;
         case 40: to_posit< double, 40, 3 >( zdata.data() + 8, data, nsize ); break;
+        case 42: to_posit< double, 42, 3 >( zdata.data() + 8, data, nsize ); break;
         case 44: to_posit< double, 44, 3 >( zdata.data() + 8, data, nsize ); break;
         case 54: to_posit< double, 54, 3 >( zdata.data() + 8, data, nsize ); break;
         case 64: to_posit< double, 64, 3 >( zdata.data() + 8, data, nsize ); break;
@@ -230,7 +232,9 @@ decompress< double > ( const zarray &  zdata,
         case 32: from_posit< double, 32, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 34: from_posit< double, 34, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 36: from_posit< double, 36, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 38: from_posit< double, 38, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 40: from_posit< double, 40, 3 >( zdata.data() + 8, dest, nsize ); break;
+        case 42: from_posit< double, 42, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 44: from_posit< double, 44, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 54: from_posit< double, 54, 3 >( zdata.data() + 8, dest, nsize ); break;
         case 64: from_posit< double, 64, 3 >( zdata.data() + 8, dest, nsize ); break;

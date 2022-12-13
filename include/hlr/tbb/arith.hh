@@ -24,6 +24,7 @@
 #include <hlr/arith/solve.hh>
 #include <hlr/seq/arith.hh>
 #include <hlr/matrix/sum.hh>
+#include <hlr/matrix/product.hh>
 
 #include <hlr/dag/lu.hh>
 #include <hlr/tbb/dag.hh>
@@ -1090,6 +1091,22 @@ struct tbb_arithmetic
         hlr::tbb::mul_vec( alpha, op_M, M, x, y );
     }
 
+    // template < typename linop_t >
+    // void
+    // prod ( const typename linop_t::value_t                    alpha,
+    //        const matop_t                                      op_M,
+    //        const linop_t &                                    M,
+    //        const blas::vector< typename linop_t::value_t > &  x,
+    //        blas::vector< typename linop_t::value_t > &        y ) const
+    // {
+    //     if ( is_matrix( M ) )
+    //         hlr::tbb::mul_vec( alpha, op_M, *cptrcast( &M, Hpro::TMatrix< value_t > ), x, y );
+    //     else if constexpr ( supports_arithmetic< linop_t > )
+    //         cptrcast( &M, arithmetic_support< linop_t > )->apply_add( *this, alpha, x, y, op_M );
+    //     else
+    //         M.apply_add( alpha, x, y, op_M );
+    // }
+
     template < typename value_t >
     void
     prod ( const value_t                             alpha,
@@ -1102,6 +1119,8 @@ struct tbb_arithmetic
             hlr::tbb::mul_vec( alpha, op_M, *cptrcast( &M, Hpro::TMatrix< value_t > ), x, y );
         else if ( dynamic_cast< const hlr::matrix::linop_sum< value_t > * >( &M ) != nullptr )
             cptrcast( &M, matrix::linop_sum< value_t > )->apply_add( *this, alpha, x, y, op_M );
+        // else if ( dynamic_cast< const hlr::matrix::linop_product< value_t > * >( &M ) != nullptr )
+        //     cptrcast( &M, matrix::linop_product< value_t > )->apply_add( *this, alpha, x, y, op_M );
         else
             M.apply_add( alpha, x, y, op_M );
     }
