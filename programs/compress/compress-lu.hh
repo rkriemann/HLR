@@ -80,7 +80,7 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::print( *A, "A", "noinnerid,norank,nosize" );
+        io::eps::print( *A, "A", "norank,nosize" );
 
     // assign clusters since needed for cluster bases
     seq::matrix::assign_cluster( *A, *bct->root() );
@@ -131,7 +131,7 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
 
@@ -207,7 +207,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
@@ -256,8 +256,8 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
 
-        auto  LU                = seq::matrix::copy( *A );
-        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+        auto  LU                  = seq::matrix::copy( *A );
+        auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
         // io::dot::print( dag, "LUa.dot" );
 
@@ -293,7 +293,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator)" << term::reset << std::endl;
 
@@ -321,7 +321,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU", prnopt );
@@ -331,7 +334,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", DAG)" << term::reset << std::endl;
 
@@ -375,12 +378,12 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator, DAG)" << term::reset << std::endl;
 
-        auto  LU                = seq::matrix::copy( *zA );
-        auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+        auto  LU                  = seq::matrix::copy( *zA );
+        auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
         // io::dot::print( dag, "zLUa.dot" );
 
@@ -406,7 +409,10 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU2", prnopt );
