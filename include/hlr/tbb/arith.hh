@@ -139,14 +139,14 @@ add ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t            alpha,
-           const Hpro::matop_t      op_A,
-           const Hpro::TMatrix< value_t > &    A,
-           const Hpro::matop_t      op_B,
-           const Hpro::TMatrix< value_t > &    B,
-           Hpro::TMatrix< value_t > &          C,
-           const Hpro::TTruncAcc &  acc,
-           const approx_t &         approx )
+multiply ( const value_t                     alpha,
+           const Hpro::matop_t               op_A,
+           const Hpro::TMatrix< value_t > &  A,
+           const Hpro::matop_t               op_B,
+           const Hpro::TMatrix< value_t > &  B,
+           Hpro::TMatrix< value_t > &        C,
+           const Hpro::TTruncAcc &           acc,
+           const approx_t &                  approx )
 {
     if ( is_blocked_all( A, B, C ) )
     {
@@ -191,11 +191,11 @@ multiply ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply_hadamard ( const value_t            alpha,
-                    Hpro::TMatrix< value_t > &          A,
-                    const Hpro::TMatrix< value_t > &    B,
-                    const Hpro::TTruncAcc &  acc,
-                    const approx_t &         approx )
+multiply_hadamard ( const value_t                     alpha,
+                    Hpro::TMatrix< value_t > &        A,
+                    const Hpro::TMatrix< value_t > &  B,
+                    const Hpro::TTruncAcc &           acc,
+                    const approx_t &                  approx )
 {
     if ( is_blocked_all( A, B ) )
     {
@@ -234,12 +234,12 @@ multiply_hadamard ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const Hpro::TMatrix< value_t > &    L,
-                  Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &  acc,
-                  const approx_t &         approx )
+solve_lower_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  L,
+                  Hpro::TMatrix< value_t > &        M,
+                  const Hpro::TTruncAcc &           acc,
+                  const approx_t &                  approx )
 {
     if ( is_nd( L ) && is_blocked( M ) )
     {
@@ -362,12 +362,12 @@ solve_lower_tri ( const eval_side_t        side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const Hpro::TMatrix< value_t > &    U,
-                  Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &  acc,
-                  const approx_t &         approx )
+solve_upper_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  U,
+                  Hpro::TMatrix< value_t > &        M,
+                  const Hpro::TTruncAcc &           acc,
+                  const approx_t &                  approx )
 {
     if ( is_nd( U ) && is_blocked( M ) )
     {
@@ -490,9 +490,9 @@ solve_upper_tri ( const eval_side_t        side,
 template < typename value_t,
            typename approx_t >
 void
-lu ( Hpro::TMatrix< value_t > &          A,
-     const Hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( Hpro::TMatrix< value_t > &  A,
+     const Hpro::TTruncAcc &     acc,
+     const approx_t &            approx )
 {
     if ( is_blocked( A ) )
     {
@@ -566,9 +566,9 @@ lu ( Hpro::TMatrix< value_t > &          A,
 template < typename value_t,
            typename approx_t >
 void
-lu_nd ( Hpro::TMatrix< value_t > &          A,
-        const Hpro::TTruncAcc &  acc,
-        const approx_t &         approx )
+lu_nd ( Hpro::TMatrix< value_t > &  A,
+        const Hpro::TTruncAcc &     acc,
+        const approx_t &            approx )
 {
     if ( is_nd( A ) )
     {
@@ -956,9 +956,9 @@ addlr ( blas::matrix< value_t > &  U,
 template < typename value_t,
            typename approx_t >
 void
-lu ( Hpro::TMatrix< value_t > &          A,
-     const Hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( Hpro::TMatrix< value_t > &  A,
+     const Hpro::TTruncAcc &     acc,
+     const approx_t &            approx )
 {
     HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) );
     
@@ -1008,9 +1008,9 @@ namespace tileh
 template < typename value_t,
            typename approx_t >
 void
-lu ( Hpro::TMatrix< value_t > &          A,
-     const Hpro::TTruncAcc &  acc,
-     const approx_t &         approx )
+lu ( Hpro::TMatrix< value_t > &  A,
+     const Hpro::TTruncAcc &     acc,
+     const approx_t &            approx )
 {
     HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) );
 

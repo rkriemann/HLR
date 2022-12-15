@@ -13,6 +13,12 @@
 namespace hlr
 {
 
+#if defined(NDEBUG)
+#  define HLR_SOLVE_PRINT( msg )
+#else
+#  define HLR_SOLVE_PRINT( msg )   HLR_LOG( 4, msg )
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // matrix solving with diagonal D
@@ -417,7 +423,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                acc,
                   const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, B %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, B %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -523,7 +529,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  L,
                   Hpro::TDenseMatrix< value_t > &        M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -579,7 +585,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   matrix::dense_matrix< value_t > &      M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -640,7 +646,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  L,
                   Hpro::TRkMatrix< value_t > &           M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -667,7 +673,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   matrix::lrmatrix< value_t > &          M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -701,7 +707,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  L,
                   matrix::lrsmatrix< value_t > &         M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -730,7 +736,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                /* acc */,
                   const approx_t &                       /* approx */ )
 {
-    // HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, B %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, B %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -752,7 +758,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  L,
                   Hpro::TDenseMatrix< value_t > &        M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
     
     // Hpro::DBG::write( L, "L.mat", "L" );
     // Hpro::DBG::write( M, "M.mat", "M" );
@@ -787,7 +793,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   matrix::dense_matrix< value_t > &      M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
     
     // Hpro::DBG::write( L, "L.mat", "L" );
     // Hpro::DBG::write( M, "M.mat", "M" );
@@ -827,7 +833,7 @@ solve_lower_tri ( const eval_side_t                        side,
                   const matrix::dense_matrix< value_t > &  L,
                   Hpro::TDenseMatrix< value_t > &          M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
     
     if ( diag == unit_diag )
         return;
@@ -860,7 +866,7 @@ solve_lower_tri ( const eval_side_t                        side,
                   matrix::dense_matrix< value_t > &        M,
                   const Hpro::TTruncAcc &                  acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
     
     if ( diag == unit_diag )
         return;
@@ -898,7 +904,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  L,
                   Hpro::TRkMatrix< value_t > &           M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -928,7 +934,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   matrix::lrmatrix< value_t > &          M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -964,7 +970,7 @@ solve_lower_tri ( const eval_side_t                        side,
                   const matrix::dense_matrix< value_t > &  L,
                   Hpro::TRkMatrix< value_t > &             M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -994,7 +1000,7 @@ solve_lower_tri ( const eval_side_t                        side,
                   matrix::lrmatrix< value_t > &            M,
                   const Hpro::TTruncAcc &                  acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1030,7 +1036,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  L,
                   matrix::lrsmatrix< value_t > &         M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, R %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1094,7 +1100,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                acc,
                   const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, B %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, B %d )", U.id(), M.id() ) );
     
     if ( side == from_left )
     {
@@ -1142,7 +1148,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  U,
                   Hpro::TDenseMatrix< value_t > &        M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -1222,7 +1228,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   matrix::dense_matrix< value_t > &      M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
 
     auto  lock = std::scoped_lock( M.mutex() );
 
@@ -1307,7 +1313,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  U,
                   Hpro::TRkMatrix< value_t > &           M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -1335,7 +1341,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   matrix::lrmatrix< value_t > &          M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -1369,7 +1375,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TBlockMatrix< value_t > &  U,
                   matrix::lrsmatrix< value_t > &         M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -1399,7 +1405,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                /* acc */,
                   const approx_t &                       /* approx */ )
 {
-    // HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1421,7 +1427,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  U,
                   Hpro::TDenseMatrix< value_t > &        M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1455,7 +1461,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   matrix::dense_matrix< value_t > &      M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1494,7 +1500,7 @@ solve_upper_tri ( const eval_side_t                        side,
                   const matrix::dense_matrix< value_t > &  U,
                   Hpro::TDenseMatrix< value_t > &          M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1530,7 +1536,7 @@ solve_upper_tri ( const eval_side_t                        side,
                   matrix::dense_matrix< value_t > &        M,
                   const Hpro::TTruncAcc &                  acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1571,7 +1577,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  U,
                   Hpro::TRkMatrix< value_t > &           M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1602,7 +1608,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   matrix::lrmatrix< value_t > &          M,
                   const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1639,7 +1645,7 @@ solve_upper_tri ( const eval_side_t                        side,
                   const matrix::dense_matrix< value_t > &  U,
                   Hpro::TRkMatrix< value_t > &             M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1670,7 +1676,7 @@ solve_upper_tri ( const eval_side_t                        side,
                   matrix::lrmatrix< value_t > &            M,
                   const Hpro::TTruncAcc &                  acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1707,7 +1713,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TDenseMatrix< value_t > &  U,
                   matrix::lrsmatrix< value_t > &         M )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, R %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;

@@ -16,6 +16,12 @@
 namespace hlr
 {
 
+#if defined(NDEBUG)
+#  define HLR_ADD_PRINT( msg )
+#else
+#  define HLR_ADD_PRINT( msg )   HLR_LOG( 4, msg )
+#endif
+
 //
 // forward decl.
 //
@@ -46,7 +52,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     HLR_ASSERT(( A.block_rows() == C.nblock_rows() ) &&
                ( A.block_cols() == C.nblock_cols() ));
@@ -77,7 +83,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -182,7 +188,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -291,7 +297,7 @@ add ( const value_t                       alpha,
       const Hpro::TTruncAcc &             acc,
       const approx_t &                    approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if (( alpha == value_t(0) ) || ( A.rank() == 0 ))
         return;
@@ -326,7 +332,7 @@ add ( const value_t                        alpha,
       const Hpro::TTruncAcc &              acc,
       const approx_t &                     approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if (( alpha == value_t(0) ) || ( A.rank() == 0 ))
         return;
@@ -361,7 +367,7 @@ add ( const value_t                          alpha,
       const Hpro::TBlockMatrix< value_t > &  A,
       Hpro::TDenseMatrix< value_t > &        C )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -398,7 +404,7 @@ add ( const value_t                          alpha,
       matrix::dense_matrix< value_t > &      C,
       const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -441,7 +447,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -477,7 +483,7 @@ add ( const value_t                            alpha,
       const Hpro::TTruncAcc &                  acc,
       const approx_t &                         approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     if ( alpha == value_t(0) )
         return;
@@ -515,7 +521,7 @@ add ( const value_t                       alpha,
       const Hpro::TTruncAcc &             acc,
       const approx_t &                    approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -553,7 +559,7 @@ add ( const value_t                       alpha,
       const Hpro::TTruncAcc &             acc,
       const approx_t &                    approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -595,7 +601,7 @@ add ( const value_t                        alpha,
       const Hpro::TTruncAcc &              acc,
       const approx_t &                     approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -636,7 +642,7 @@ add ( const value_t                        alpha,
       const Hpro::TTruncAcc &              acc,
       const approx_t &                     approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -681,7 +687,7 @@ add ( const value_t                         alpha,
       const Hpro::TTruncAcc &               acc,
       const approx_t &                      approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -709,7 +715,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -737,7 +743,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -769,7 +775,7 @@ add ( const value_t                            alpha,
       const Hpro::TTruncAcc &                  acc,
       const approx_t &                         approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -798,7 +804,7 @@ add ( const value_t                            alpha,
       const Hpro::TTruncAcc &                  acc,
       const approx_t &                         approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -831,7 +837,7 @@ add ( const value_t                       alpha,
       const Hpro::TTruncAcc &             acc,
       const approx_t &                    approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -874,7 +880,7 @@ add ( const value_t                          alpha,
       const Hpro::TTruncAcc &                acc,
       const approx_t &                       approx )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     if ( alpha == value_t(0) )
         return;
@@ -898,7 +904,7 @@ add ( const value_t                       alpha,
       const Hpro::TRkMatrix< value_t > &  A,
       Hpro::TDenseMatrix< value_t > &     C )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
@@ -913,7 +919,7 @@ add ( const value_t                       alpha,
       matrix::dense_matrix< value_t > &   C,
       const Hpro::TTruncAcc &             acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
 
@@ -931,7 +937,7 @@ add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       Hpro::TDenseMatrix< value_t > &      C )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     auto              UA = A.U_decompressed();
@@ -948,7 +954,7 @@ add ( const value_t                        alpha,
       matrix::dense_matrix< value_t > &    C,
       const Hpro::TTruncAcc &              acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     auto              UA = A.U_decompressed();
@@ -968,7 +974,7 @@ add ( const value_t                          alpha,
       const Hpro::TDenseMatrix< value_t > &  A,
       Hpro::TDenseMatrix< value_t > &        C )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
@@ -983,7 +989,7 @@ add ( const value_t                          alpha,
       matrix::dense_matrix< value_t > &      C,
       const Hpro::TTruncAcc &                acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
@@ -1001,7 +1007,7 @@ add ( const value_t                            alpha,
       const matrix::dense_matrix< value_t > &  A,
       Hpro::TDenseMatrix< value_t > &          C )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     
@@ -1018,7 +1024,7 @@ add ( const value_t                            alpha,
       matrix::dense_matrix< value_t > &        C,
       const Hpro::TTruncAcc &                  acc )
 {
-    HLR_LOG( 4, Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
     

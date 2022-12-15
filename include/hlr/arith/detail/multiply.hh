@@ -8,12 +8,14 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
-// #define HLR_MULT_PRINT   // std::cout << C.id() << std::endl;
-
-#define HLR_MULT_PRINT   HLR_LOG( 4, Hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
-                                                      A.typestr().c_str(), A.id(), \
-                                                      B.typestr().c_str(), B.id(), \
-                                                      C.typestr().c_str(), C.id() ) )
+#if defined(NDEBUG)
+#  define HLR_MULT_PRINT
+#else
+#  define HLR_MULT_PRINT   HLR_LOG( 4, Hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
+                                                        A.typestr().c_str(), A.id(), \
+                                                        B.typestr().c_str(), B.id(), \
+                                                        C.typestr().c_str(), C.id() ) )
+#endif
 
 #include <hlr/arith/detail/multiply_blas.hh>
 #include <hlr/arith/detail/multiply_compressed.hh>
