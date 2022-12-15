@@ -9,6 +9,7 @@
 //
 
 #include <hlr/arith/mulvec.hh>
+#include <hlr/arith/detail/solve_vec.hh>
 
 namespace hlr
 {
@@ -34,7 +35,7 @@ struct default_arithmetic
     template < typename value_t >
     void
     mul_vec ( const value_t                             alpha,
-              const Hpro::matop_t                       op_M,
+              const matop_t                             op_M,
               const Hpro::TMatrix< value_t > &          M,
               const vector::scalar_vector< value_t > &  x,
               vector::scalar_vector< value_t > &        y ) const
@@ -45,7 +46,7 @@ struct default_arithmetic
     template < typename value_t >
     void
     mul_vec ( const value_t                     alpha,
-              const Hpro::matop_t               op_M,
+              const matop_t                     op_M,
               const Hpro::TMatrix< value_t > &  M,
               const blas::vector< value_t > &   x,
               blas::vector< value_t > &         y ) const
@@ -73,6 +74,30 @@ struct default_arithmetic
            blas::vector< value_t > &        y ) const
     {
         blas::mulvec( alpha, blas::mat_view( op_M, M ), x, value_t(1), y );
+    }
+
+    //
+    // vector solves
+    //
+
+    template < typename value_t >
+    void
+    solve_lower_tri ( const matop_t                       op_L,
+                      const Hpro::TMatrix< value_t > &    L,
+                      vector::scalar_vector< value_t > &  v,
+                      const Hpro::diag_type_t             diag_mode ) const
+    {
+        hlr::solve_lower_tri( op_L, L, v, diag_mode );
+    }
+
+    template < typename value_t >
+    void
+    solve_upper_tri ( const matop_t                       op_U,
+                      const Hpro::TMatrix< value_t > &    U,
+                      vector::scalar_vector< value_t > &  v,
+                      const Hpro::diag_type_t             diag_mode ) const
+    {
+        hlr::solve_upper_tri( op_U, U, v, diag_mode );
     }
 };
 

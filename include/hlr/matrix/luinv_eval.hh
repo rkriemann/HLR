@@ -92,6 +92,14 @@ public:
                                 blas::matrix< value_t > &         Y,
                                 const Hpro::matop_t               op = Hpro::apply_normal ) const;
 
+    // same as above but use given arithmetic object for computation
+    template < typename arithmetic_t >
+    void          apply_add   ( arithmetic_t &&                  arithmetic,
+                                const value_t                    alpha,
+                                const blas::vector< value_t > &  x,
+                                blas::vector< value_t > &        y,
+                                const matop_t                    op = apply_normal ) const;
+
     //
     // access vector space data
     //
@@ -203,6 +211,33 @@ luinv_eval< value_t >::apply_add   ( const value_t                    /* alpha *
                                      const matop_t                    /* op */ ) const
 {
     HLR_ERROR( "not implemented" );
+}
+
+template < typename value_t >
+template < typename arithmetic_t >
+void
+luinv_eval< value_t >::apply_add  ( arithmetic_t &&                  arithmetic,
+                                    const value_t                    alpha,
+                                    const blas::vector< value_t > &  x,
+                                    blas::vector< value_t > &        y,
+                                    const matop_t                    op ) const
+{
+    Hpro::TScalarVector< value_t >  t( _mat.row_is() );
+    
+    blas::copy( x, blas::vec( t ) );
+
+    if ( op == apply_normal )
+    {
+        arithmetic.solve_lower_tri( op, _mat, t, unit_diag );
+        arithmetic.solve_upper_tri( op, _mat, t, general_diag );
+    }// if
+    else
+    {
+        arithmetic.solve_upper_tri( op, _mat, t, general_diag );
+        arithmetic.solve_lower_tri( op, _mat, t, unit_diag );
+    }// else
+
+    blas::add( alpha, blas::vec( t ), y );
 }
 
 }} // namespace hlr::matrix

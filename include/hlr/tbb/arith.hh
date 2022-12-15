@@ -25,6 +25,7 @@
 #include <hlr/seq/arith.hh>
 #include <hlr/matrix/sum.hh>
 #include <hlr/matrix/product.hh>
+#include <hlr/matrix/luinv_eval.hh>
 
 #include <hlr/dag/lu.hh>
 #include <hlr/tbb/dag.hh>
@@ -693,6 +694,32 @@ gauss_elim ( Hpro::TMatrix< value_t > &  A,
     HLR_LOG( 4, Hpro::to_string( "} gauss_elim( %d )", A.id() ) );
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// vector solving with lower/upper triangular matrix
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+void
+solve_lower_tri ( const Hpro::matop_t               op_L,
+                  const Hpro::TMatrix< value_t > &  L,
+                  Hpro::TScalarVector< value_t > &  v,
+                  const Hpro::diag_type_t           diag_mode )
+{
+    hlr::tbb::detail::solve_lower_tri( op_L, L, v, diag_mode );
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const Hpro::matop_t               op_U,
+                  const Hpro::TMatrix< value_t > &  U,
+                  Hpro::TScalarVector< value_t > &  v,
+                  const Hpro::diag_type_t           diag_mode )
+{
+    hlr::tbb::detail::solve_upper_tri( op_U, U, v, diag_mode );
+}
+
 namespace tlr
 {
 
@@ -1119,10 +1146,36 @@ struct tbb_arithmetic
             hlr::tbb::mul_vec( alpha, op_M, *cptrcast( &M, Hpro::TMatrix< value_t > ), x, y );
         else if ( dynamic_cast< const hlr::matrix::linop_sum< value_t > * >( &M ) != nullptr )
             cptrcast( &M, matrix::linop_sum< value_t > )->apply_add( *this, alpha, x, y, op_M );
-        // else if ( dynamic_cast< const hlr::matrix::linop_product< value_t > * >( &M ) != nullptr )
-        //     cptrcast( &M, matrix::linop_product< value_t > )->apply_add( *this, alpha, x, y, op_M );
+        else if ( dynamic_cast< const hlr::matrix::linop_product< value_t > * >( &M ) != nullptr )
+            cptrcast( &M, matrix::linop_product< value_t > )->apply_add( *this, alpha, x, y, op_M );
+        else if ( dynamic_cast< const hlr::matrix::luinv_eval< value_t > * >( &M ) != nullptr )
+            cptrcast( &M, matrix::luinv_eval< value_t > )->apply_add( *this, alpha, x, y, op_M );
         else
             M.apply_add( alpha, x, y, op_M );
+    }
+
+    //
+    // vector solves
+    //
+
+    template < typename value_t >
+    void
+    solve_lower_tri ( const matop_t                       op_L,
+                      const Hpro::TMatrix< value_t > &    L,
+                      vector::scalar_vector< value_t > &  v,
+                      const Hpro::diag_type_t             diag_mode ) const
+    {
+        hlr::tbb::solve_lower_tri( op_L, L, v, diag_mode );
+    }
+
+    template < typename value_t >
+    void
+    solve_upper_tri ( const matop_t                       op_U,
+                      const Hpro::TMatrix< value_t > &    U,
+                      vector::scalar_vector< value_t > &  v,
+                      const Hpro::diag_type_t             diag_mode ) const
+    {
+        hlr::tbb::solve_upper_tri( op_U, U, v, diag_mode );
     }
 };
 

@@ -163,7 +163,7 @@ program_main ()
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "HLU", prnopt );
-                
+
         auto  A_inv = matrix::luinv_eval( *LU );
                     
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
@@ -331,6 +331,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
+        impl::matrix::decompress( *LU );
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
@@ -375,6 +376,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
+        impl::matrix::decompress( *LU );
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
@@ -419,6 +421,7 @@ program_main ()
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
+        impl::matrix::decompress( *LU );
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 }

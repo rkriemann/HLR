@@ -17,7 +17,6 @@
 #include <hpro/base/TTruncAcc.hh>
 
 #include "hlr/arith/blas.hh"
-#include "hlr/arith/norm.hh"
 #include "hlr/approx/svd.hh" // DEBUG
 #include "hlr/matrix/cluster_basis.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"

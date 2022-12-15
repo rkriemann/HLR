@@ -11,7 +11,7 @@
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/add.hh>
-#include <hlr/arith/norm.hh>
+#include <hlr/arith/detail/norm.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
