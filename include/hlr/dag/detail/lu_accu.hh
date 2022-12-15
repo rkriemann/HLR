@@ -18,6 +18,8 @@
 #include "hlr/utils/tensor.hh"
 #include "hlr/matrix/restrict.hh"
 
+#include "hlr/arith/norm.hh" // DEBUG
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // accumulated version
@@ -353,6 +355,8 @@ private:
         const approx_t  apx;
     
         hlr::lu< value_t >( *A, acc, apx );
+
+        std::cout << "lu " << A->id() << " : " << norm::frobenius( *A ) << std::endl;
     }
 
     virtual local_graph  refine_  ( const size_t  min_size );
@@ -392,6 +396,8 @@ private:
         const approx_t  apx;
         
         hlr::solve_upper_tri< value_t >( from_right, general_diag, *U, *A, acc, apx );
+
+        std::cout << "upper " << A->id() << " : " << norm::frobenius( *A ) << std::endl;
     }
 
     virtual local_graph  refine_  ( const size_t  min_size );
@@ -431,6 +437,8 @@ private:
         const approx_t  apx;
         
         hlr::solve_lower_tri< value_t >( from_left, unit_diag, *L, *A, acc, apx );
+
+        std::cout << "lower " << A->id() << " : " << norm::frobenius( *A ) << std::endl;
     }
 
     virtual local_graph  refine_  ( const size_t  min_size );
@@ -530,7 +538,7 @@ private:
     {
         const approx_t  apx;
         
-        if ( is_blocked( M ) && ! Hpro::is_small( M ) )
+        if ( is_blocked( M ) ) // && ! Hpro::is_small( M ) )
         {
             if ( accu_map->contains( M->id() ) )
                 accu_map->at( M->id() ).template shift< approx_t >( * ptrcast( M, Hpro::TBlockMatrix< value_t > ), *accu_map, acc, apx );
@@ -539,6 +547,8 @@ private:
         {
             if ( accu_map->contains( M->id() ) )
                 accu_map->at( M->id() ).template apply< approx_t >( value_t(-1), *M, acc, apx );
+
+            std::cout << "apply " << M->id() << " : " << norm::frobenius( *M ) << std::endl;
         }// else
     }
 

@@ -627,7 +627,11 @@ solve_lower_tri ( const eval_side_t                 side,
 
         trace::region_end( "apply" );
 
+        std::cout << "apply " << M.id() << " : " << norm::frobenius( M ) << std::endl;
+        
         hlr::solve_lower_tri< value_t >( side, diag, L, M, acc, approx );
+
+        std::cout << "lower " << M.id() << " : " << norm::frobenius( M ) << std::endl;
     }// if
 }
 
@@ -693,7 +697,11 @@ solve_upper_tri ( const eval_side_t                 side,
 
         trace::region_end( "apply" );
         
+        std::cout << "apply " << M.id() << " : " << norm::frobenius( M ) << std::endl;
+
         hlr::solve_upper_tri< value_t >( side, diag, U, M, acc, approx );
+
+        std::cout << "upper " << M.id() << " : " << norm::frobenius( M ) << std::endl;
     }// if
 }
 
@@ -770,6 +778,8 @@ lu ( Hpro::TMatrix< value_t > &  M,
 
         trace::region_end( "apply" );
 
+        std::cout << "apply " << M.id() << " : " << norm::frobenius( M ) << std::endl;
+        
         if ( is_dense( M ) )
         {
             if ( matrix::is_compressible( M ) )
@@ -784,6 +794,8 @@ lu ( Hpro::TMatrix< value_t > &  M,
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+
+        std::cout << "lu " << M.id() << " : " << norm::frobenius( M ) << std::endl;
     }// else
 }
 

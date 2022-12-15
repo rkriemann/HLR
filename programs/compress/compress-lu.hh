@@ -169,7 +169,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
 
@@ -207,14 +207,14 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *A );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        io::dot::print( dag, "LU.dot" );
+        // io::dot::print( dag, "LU.dot" );
 
         runtime.clear();
 
@@ -233,7 +233,7 @@ program_main ()
                 impl::matrix::copy_to( *A, *LU );
         }// for
 
-        io::hpro::write( *LU, "LU.hm" );
+        // io::hpro::write( *LU, "LU.hm" );
         
         if ( nbench > 1 )
             std::cout << "  runtime  = "
@@ -252,14 +252,14 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
 
         auto  LU                = seq::matrix::copy( *A );
         auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
-        io::dot::print( dag, "LUa.dot" );
+        // io::dot::print( dag, "LUa.dot" );
 
         runtime.clear();
 
@@ -331,14 +331,14 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", DAG)" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *zA );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        io::dot::print( dag, "zLU.dot" );
+        // io::dot::print( dag, "zLU.dot" );
 
         runtime.clear();
 
@@ -382,7 +382,7 @@ program_main ()
         auto  LU                = seq::matrix::copy( *zA );
         auto  [ dag, accu_map ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
 
-        io::dot::print( dag, "zLUa.dot" );
+        // io::dot::print( dag, "zLUa.dot" );
 
         runtime.clear();
 
