@@ -26,7 +26,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace hlr { namespace dag { namespace lu { namespace accu { namespace eager {
+namespace hlr { namespace dag { namespace lu { namespace accu { namespace lazy {
 
 // identifiers for memory blocks
 constexpr Hpro::id_t  ID_ACCU = 'X';
@@ -1149,6 +1149,6 @@ update_node< value_t, approx_t >::refine_  ( const size_t  min_size )
     return g;
 }
 
-}}}}}// namespace hlr::dag::lu::accu::eager
+}}}}}// namespace hlr::dag::lu::accu::lazy
 
 #endif // __HLR_DAG_DETAIL_LU_ACCU_HH

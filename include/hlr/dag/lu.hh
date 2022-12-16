@@ -15,7 +15,7 @@
 
 #include <hlr/dag/graph.hh>
 #include <hlr/dag/detail/lu.hh>
-#include <hlr/dag/detail/lu_accu.hh>
+#include <hlr/dag/detail/lu_accu_lazy.hh>
 #include <hlr/utils/tools.hh>
 
 namespace hlr { namespace dag {
@@ -44,20 +44,20 @@ gen_dag_lu ( Hpro::TMatrix< value_t > & A,
 template < typename value_t,
            typename approx_t >
 std::tuple< graph,
-            std::unique_ptr< dag::lu::accu::accumulator_map_t< value_t > >,
+            std::unique_ptr< dag::lu::accu::lazy::accumulator_map_t< value_t > >,
             std::unique_ptr< std::mutex > >
-gen_dag_lu_accu ( Hpro::TMatrix< value_t > & A,
-                  const size_t               min_size,
-                  refine_func_t              refine,
-                  const approx_t &           /* apx */ )
+gen_dag_lu_accu_lazy ( Hpro::TMatrix< value_t > & A,
+                       const size_t               min_size,
+                       refine_func_t              refine,
+                       const approx_t &           /* apx */ )
 {
     // generate DAG for shifting and applying updates
-    auto  accu_map                   = std::make_unique< dag::lu::accu::accumulator_map_t< value_t > >();
+    auto  accu_map                   = std::make_unique< dag::lu::accu::lazy::accumulator_map_t< value_t > >();
     auto  accu_mtx                   = std::make_unique< std::mutex >();
-    auto  [ apply_map, apply_nodes ] = lu::accu::build_apply_dag< value_t, approx_t >( & A, accu_map.get(), accu_mtx.get(), min_size );
+    auto  [ apply_map, apply_nodes ] = lu::accu::lazy::build_apply_dag< value_t, approx_t >( & A, accu_map.get(), accu_mtx.get(), min_size );
 
     // construct H-LU DAG
-    auto  dag = refine( new lu::accu::lu_node< value_t, approx_t >( & A, apply_map ), min_size, use_single_end_node );
+    auto  dag = refine( new lu::accu::lazy::lu_node< value_t, approx_t >( & A, apply_map ), min_size, use_single_end_node );
 
     //
     // add apply/shift nodes and set shift(A) as new start
@@ -87,7 +87,7 @@ gen_dag_lu_accu ( Hpro::TMatrix< value_t > & A,
 
     dag::node_list_t  work;
     node_set_t        deleted;
-    auto              is_apply_node = [] ( node * node ) { return ( dynamic_cast< lu::accu::apply_node< value_t, approx_t > * >( node ) != nullptr ); };
+    auto              is_apply_node = [] ( node * node ) { return ( dynamic_cast< lu::accu::lazy::apply_node< value_t, approx_t > * >( node ) != nullptr ); };
     
     work.push_back( apply_map[ A.id() ] );
 

@@ -256,8 +256,7 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
 
-        auto  LU                  = seq::matrix::copy( *A );
-        auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
+        auto  LU = seq::matrix::copy( *A );
 
         // io::dot::print( dag, "LUa.dot" );
 
@@ -265,6 +264,9 @@ program_main ()
 
         for ( int i = 0; i < nbench; ++i )
         {
+            // regenerate DAG to start with new accumulators
+            auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_lazy( *LU, nseq, impl::dag::refine, apx );
+            
             tic = timer::now();
 
             impl::dag::run( dag, acc );
@@ -295,7 +297,49 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (recursive, " << hlr::compress::provider << ")" << term::reset << std::endl;
+
+        auto  LU = seq::matrix::copy( *zA );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "zHLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        impl::matrix::decompress( *LU );
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }
+
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
         auto  LU = seq::matrix::copy( *zA );
                 
@@ -337,7 +381,7 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (DAG, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
         auto  LU  = seq::matrix::copy( *zA );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
@@ -382,17 +426,17 @@ program_main ()
 
     if ( true )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (" << hlr::compress::provider << ", accumulator, DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
-        auto  LU                  = seq::matrix::copy( *zA );
-        auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu( *LU, nseq, impl::dag::refine, apx );
-
-        // io::dot::print( dag, "zLUa.dot" );
+        auto  LU = seq::matrix::copy( *zA );
 
         runtime.clear();
 
         for ( int i = 0; i < nbench; ++i )
         {
+            // regenerate DAG to start with new accumulators
+            auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_lazy( *LU, nseq, impl::dag::refine, apx );
+            
             tic = timer::now();
 
             impl::dag::run( dag, acc );
