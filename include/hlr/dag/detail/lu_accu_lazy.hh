@@ -1,5 +1,5 @@
-#ifndef __HLR_DAG_DETAIL_LU_ACCU_HH
-#define __HLR_DAG_DETAIL_LU_ACCU_HH
+#ifndef __HLR_DAG_DETAIL_LU_ACCU_LAZY_HH
+#define __HLR_DAG_DETAIL_LU_ACCU_LAZY_HH
 //
 // Project     : HLib
 // Module      : dag/lu
@@ -1151,4 +1151,4 @@ update_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 
 }}}}}// namespace hlr::dag::lu::accu::lazy
 
-#endif // __HLR_DAG_DETAIL_LU_ACCU_HH
+#endif // __HLR_DAG_DETAIL_LU_ACCU_LAZY_HH

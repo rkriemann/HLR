@@ -86,6 +86,80 @@ convert_prec ( Hpro::TMatrix< T_value_src > &  M )
     return 0;
 }
 
+//
+// return copy of matrix in given value type
+//
+template < typename dest_value_t,
+           typename src_value_t >
+std::unique_ptr< Hpro::TMatrix< dest_value_t > >
+convert ( const Hpro::TMatrix< src_value_t > &  A )
+{
+    // if types are equal, just perform standard copy
+    if constexpr ( std::is_same< dest_value_t, src_value_t >::value )
+        return A.copy();
+
+    // to copy basic properties
+    auto  copy_struct = [] ( const auto &  A, auto &  B )
+    {
+        B.set_id( A.id() );
+        B.set_form( A.form() );
+        B.set_ofs( A.row_ofs(), A.col_ofs() );
+        B.set_size( A.rows(), A.cols() );
+        B.set_procs( A.procs() );
+    };
+    
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< src_value_t > );
+        auto  BC = std::make_unique< Hpro::TBlockMatrix< dest_value_t > >( BA->row_is(), BA->col_is() );
+
+        copy_struct( *BA, *BC );
+        BC->set_block_struct( BA->nblock_rows(), BA->nblock_cols() );
+
+        for ( uint  i = 0; i < BA->block_rows(); ++i )
+        {
+            for ( uint  j = 0; j < BA->block_cols(); ++j )
+            {
+                if ( ! is_null( BA->block( i, j ) ) )
+                {
+                    auto  BC_ij = convert< dest_value_t, src_value_t >( *BA->block( i, j ) );
+                    
+                    BC->set_block( i, j, BC_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        return BC;
+    }// if
+    else if ( is_lowrank( A ) )
+    {
+        HLR_ASSERT( ! is_compressible( A ) );
+        
+        auto  RA = cptrcast( &A, Hpro::TRkMatrix< src_value_t > );
+        auto  U  = blas::convert< dest_value_t >( RA->blas_mat_A() );
+        auto  V  = blas::convert< dest_value_t >( RA->blas_mat_B() );
+        auto  RC = std::make_unique< Hpro::TRkMatrix< dest_value_t > >( RA->row_is(), RA->col_is(), std::move( U ), std::move( V ) );
+
+        copy_struct( *RA, *RC );
+        
+        return RC;
+    }// if
+    else if ( is_dense( A ) )
+    {
+        HLR_ASSERT( ! is_compressible( A ) );
+        
+        auto  DA = cptrcast( &A, Hpro::TDenseMatrix< src_value_t > );
+        auto  D  = blas::convert< dest_value_t >( DA->blas_mat() );
+        auto  DC = std::make_unique< Hpro::TDenseMatrix< dest_value_t > >( DA->row_is(), DA->col_is(), std::move( D ) );
+
+        copy_struct( *DA, *DC );
+        
+        return DC;
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type " + A.typestr() );
+}
+
 }}}// namespace hlr::seq::matrix
 
 #endif // __HLR_SEQ_CONVERT_HH

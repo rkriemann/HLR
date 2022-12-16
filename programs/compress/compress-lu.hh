@@ -18,21 +18,6 @@
 
 using namespace hlr;
 
-using indexset = Hpro::TIndexSet;
-
-struct local_accuracy : public Hpro::TTruncAcc
-{
-    local_accuracy ( const double  abs_eps )
-            : Hpro::TTruncAcc( 0.0, abs_eps )
-    {}
-    
-    virtual const TTruncAcc  acc ( const indexset &  rowis,
-                                   const indexset &  colis ) const
-    {
-        return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
-    }
-};
-
 //
 // main function
 //
@@ -126,16 +111,29 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto    apx    = approx::SVD< value_t >();
-    size_t  mem_LU = 0;
+    auto       apx     = approx::SVD< value_t >();
+    size_t     mem_LU  = 0;
+
+    // define methods to execute
+    const auto methods = std::set< std::string >{
+        // "H+rec",
+        // "H+rec+accu",
+        "H+dag",
+        "H+dag+accu+lazy",
+        // "H+dag+accu+eager",
+        // "zH+rec",
+        // "zH+rec+accu",
+        "zH+dag",
+        "zH+dag+accu+lazy"
+    };
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
         
-    if ( true )
+    if ( methods.contains( "H+rec" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *A );
+        auto  LU = impl::matrix::copy( *A );
                 
         runtime.clear();
 
@@ -169,11 +167,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "H+rec+accu" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *A );
+        auto  LU = impl::matrix::copy( *A );
                 
         runtime.clear();
 
@@ -207,11 +205,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "H+dag" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
-        auto  LU  = seq::matrix::copy( *A );
+        auto  LU  = impl::matrix::copy( *A );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
         // io::dot::print( dag, "LU.dot" );
@@ -252,11 +250,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "H+dag+accu+lazy" ) )
     {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG)" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, lazy)" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *A );
+        auto  LU = impl::matrix::copy( *A );
 
         // io::dot::print( dag, "LUa.dot" );
 
@@ -295,11 +293,54 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "H+dag+accu+eager" ) )
+    {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, eager)" << term::reset << std::endl;
+
+        auto  LU = impl::matrix::copy( *A );
+
+        // io::dot::print( dag, "LUa.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            // regenerate DAG to start with new accumulators
+            auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_eager( *LU, nseq, impl::dag::refine, apx );
+            
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU2", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }
+
+    if ( methods.contains( "zH+rec" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (recursive, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *zA );
+        auto  LU = impl::matrix::copy( *zA );
                 
         runtime.clear();
 
@@ -337,11 +378,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "zH+rec+accu" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *zA );
+        auto  LU = impl::matrix::copy( *zA );
                 
         runtime.clear();
 
@@ -379,11 +420,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "zH+dag" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (DAG, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
-        auto  LU  = seq::matrix::copy( *zA );
+        auto  LU  = impl::matrix::copy( *zA );
         auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
         // io::dot::print( dag, "zLU.dot" );
@@ -424,11 +465,11 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 
-    if ( true )
+    if ( methods.contains( "zH+dag+accu+lazy" ) )
     {
-        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG, " << hlr::compress::provider << ")" << term::reset << std::endl;
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG, lazy, " << hlr::compress::provider << ")" << term::reset << std::endl;
 
-        auto  LU = seq::matrix::copy( *zA );
+        auto  LU = impl::matrix::copy( *zA );
 
         runtime.clear();
 

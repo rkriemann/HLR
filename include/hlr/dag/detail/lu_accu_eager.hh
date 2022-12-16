@@ -1,5 +1,5 @@
-#ifndef __HLR_DAG_DETAIL_LU_ACCU_HH
-#define __HLR_DAG_DETAIL_LU_ACCU_HH
+#ifndef __HLR_DAG_DETAIL_LU_ACCU_EAGER_HH
+#define __HLR_DAG_DETAIL_LU_ACCU_EAGER_HH
 //
 // Project     : HLib
 // Module      : dag/lu
@@ -119,51 +119,133 @@ struct accumulator
                  const Hpro::TMatrix< value_t > &  C,
                  const Hpro::TTruncAcc &           acc )
     {
-        // if ( is_blocked_all( A, B ) )
+        if ( is_blocked_all( A, B, C ) )
         {
             std::scoped_lock  lock( mtx_pending );
             
             pending.push_back( { op_A, &A, op_B, &B } );
         }// if
-        // else
-        // {
-        //     //
-        //     // determine if to prefer dense format
-        //     //
+        else
+        {
+            //
+            // determine if to prefer dense format
+            //
             
-        //     const bool  handle_dense = check_dense( C ) || ( ! is_blocked_all( A, B ) && ! is_lowrank_any( A, B ) );
+            const bool  handle_dense = check_dense( C ) || ( ! is_blocked_all( A, B ) && ! is_lowrank_any( A, B ) );
+
+            //
+            // compute update
+            //
+
+            auto            T = std::unique_ptr< Hpro::TMatrix< value_t > >();
+            const approx_t  apx;
+            
+            if ( is_blocked_all( A, B ) )
+            {
+                //
+                // create temporary block matrix to evaluate product
+                //
                 
-        //     //
-        //     // compute update (either A or B is a leaf)
-        //     //
+                // TODO: non low-rank M
+                HLR_ASSERT( is_lowrank( C ) );
+                
+                auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+                auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+                auto  BC = std::make_unique< Hpro::TBlockMatrix< value_t > >( BA->row_is( op_A ), BB->col_is( op_B ) );
 
-        //     auto  T = hlr::multiply( value_t(1), op_A, A, op_B, B );
+                BC->set_block_struct( BA->nblock_rows( op_A ), BB->nblock_cols( op_B ) );
 
-        //     if ( handle_dense && ! is_dense( *T ) )
-        //         T = matrix::convert_to_dense< value_t >( *T );
+                for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+                {
+                    for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                    {
+                        HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
+
+                        if ( handle_dense )
+                            BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                    BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                        else
+                            BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                 BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                    }// for
+                }// for
+
+                if constexpr ( true )
+                {
+                    //
+                    // compute using standard arithmetic
+                    //
+
+                    hlr::multiply( value_t(1), op_A, A, op_B, B, *BC, acc, apx );
+                }// if
+                else
+                {
+                    //
+                    // compute using accumulators starting with A×B
+                    //
+
+                    auto  accu_BC  = accumulator( *BC, { op_A, A, op_B, B } );
+                    auto  sub_accu = accu_BC.restrict( *BC );
+
+                    //
+                    // apply recursive updates
+                    //
+        
+                    for ( uint  i = 0; i < BC->nblock_rows(); ++i )
+                    {
+                        for ( uint  j = 0; j < BC->nblock_cols(); ++j )
+                        {
+                            sub_accu(i,j).eval( value_t(1), *BC->block(i,j), acc, apx );
+
+                            // replace block in BC by accumulator matrix for agglomeration below
+                            BC->delete_block( i, j );
+                            BC->set_block( i, j, sub_accu(i,j).release_matrix() );
+                        }// for
+                    }// for
+                }// else
+
+                //
+                // finally convert subblocks to single low-rank update
+                //
+
+                if ( handle_dense )
+                    T = std::move( seq::matrix::convert_to_dense< value_t >( *BC ) );
+                else
+                    T = std::move( seq::matrix::convert_to_lowrank( *BC, acc, apx ) );
+            }// if
+            else
+            {
+                //
+                // directly multiply as A/B is leaf
+                //
+
+                T = std::move( hlr::multiply( value_t(1), op_A, A, op_B, B ) );
+                
+                if ( handle_dense && ! is_dense( *T ) )
+                    T = matrix::convert_to_dense< value_t >( *T );
+            }// else
             
-        //     //
-        //     // apply update to accumulator
-        //     //
-
-        //     std::scoped_lock  lock( mtx_matrix );
-        //     const approx_t    apx;
+            //
+            // apply update to accumulator
+            //
             
-        //     if ( is_null( matrix ) )
-        //     {
-        //         matrix = std::move( T );
-        //     }// if
-        //     else if ( ! is_dense( *matrix ) && is_dense( *T ) )
-        //     {
-        //         // prefer dense format to avoid unnecessary truncations
-        //         hlr::add( value_t(1), *matrix, *T );
-        //         matrix = std::move( T );
-        //     }// if
-        //     else
-        //     {
-        //         hlr::add( value_t(1), *T, *matrix, acc, apx );
-        //     }// else
-        // }// else
+            std::scoped_lock  lock( mtx_matrix );
+            
+            if ( is_null( matrix ) )
+            {
+                matrix = std::move( T );
+            }// if
+            else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+            {
+                // prefer dense format to avoid unnecessary truncations
+                hlr::add( value_t(1), *matrix, *T );
+                matrix = std::move( T );
+            }// if
+            else
+            {
+                hlr::add( value_t(1), *T, *matrix, acc, apx );
+            }// else
+        }// else
     }
     
     //
@@ -412,14 +494,33 @@ struct accumulator
                     //
                     // already exists accumulator for M_ij
                     //
-                    
-                    if ( is_null( sub_accu->matrix ) )
-                        sub_accu->matrix = std::move( accu_ij.matrix );
-                    else
+
+                    Hpro::TMatrix< value_t > *  accu_matrix = nullptr;
+
                     {
-                        std::cout << "------------------" << std::endl;
-                        // TODO: check about "dense" status
+                        auto  lock = std::scoped_lock( sub_accu->mtx_matrix );
+                        
+                        if ( is_null( sub_accu->matrix ) )
+                            sub_accu->matrix = std::move( accu_ij.matrix );
+                        else
+                            accu_matrix = sub_accu->matrix.get();
+                    }
+                    
+                    if ( ! is_null( accu_matrix ) )
+                    {
+                        //
+                        // add update to existing accumulator
+                        //
+                        
                         hlr::add( value_t(1), *accu_ij.matrix, *sub_accu->matrix, acc, approx );
+                        // // TODO: check about "dense" status
+                        // if ( is_dense( *sub_accu->matrix ) || ! is_dense( *accu_ij.matrix ) )
+                        //     hlr::add( value_t(1), *accu_ij.matrix, *sub_accu->matrix, acc, approx );
+                        // else
+                        // {
+                        //     hlr::add( value_t(1), *sub_accu->matrix, *accu_ij.matrix, acc, approx );
+                        //     sub_accu->matrix = std::move( accu_ij.matrix );
+                        // }// else
                     }// else
 
                     for ( auto  [ op_A, A, op_B, B ] : accu_ij.pending )
@@ -732,8 +833,8 @@ private:
                 accu = & ( accu_map->at( M->id() ) );
         }
 
-        if ( ! is_null( accu ) )
-            accu->template eval< approx_t >( value_t(1), * M, acc, apx );
+        // if ( ! is_null( accu ) )
+        //     accu->template eval< approx_t >( value_t(1), * M, acc, apx );
         
         if ( is_blocked( M ) ) // && ! Hpro::is_small( M ) )
         {
@@ -1151,4 +1252,4 @@ update_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 
 }}}}}// namespace hlr::dag::lu::accu::eager
 
-#endif // __HLR_DAG_DETAIL_LU_ACCU_HH
+#endif // __HLR_DAG_DETAIL_LU_ACCU_EAGER_HH

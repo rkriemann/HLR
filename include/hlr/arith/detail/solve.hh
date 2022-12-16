@@ -736,7 +736,7 @@ solve_lower_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                /* acc */,
                   const approx_t &                       /* approx */ )
 {
-    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, B %d )", L.id(), M.id() ) );
+    // HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, B %d )", L.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;
@@ -1405,7 +1405,7 @@ solve_upper_tri ( const eval_side_t                      side,
                   const Hpro::TTruncAcc &                /* acc */,
                   const approx_t &                       /* approx */ )
 {
-    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
+    // HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
 
     if ( diag == unit_diag )
         return;

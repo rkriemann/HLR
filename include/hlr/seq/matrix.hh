@@ -661,7 +661,7 @@ copy_nearfield ( const Hpro::TMatrix< value_t > &  M )
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 copy_tiled ( const Hpro::TMatrix< value_t > &  M,
-             const size_t           ntile )
+             const size_t                      ntile )
 {
     if ( is_blocked( M ) )
     {
@@ -806,8 +806,8 @@ copy_diag ( const Hpro::TMatrix< value_t > &  M )
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-copy_ll ( const Hpro::TMatrix< value_t > &    M,
-          const Hpro::diag_type_t  diag = Hpro::general_diag )
+copy_ll ( const Hpro::TMatrix< value_t > &  M,
+          const Hpro::diag_type_t           diag = Hpro::general_diag )
 {
     if ( is_blocked( M ) )
     {
@@ -1126,9 +1126,9 @@ clear ( Hpro::TMatrix< value_t > &  M )
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-copy_uniform ( const Hpro::TMatrix< value_t > &       M,
-               cluster_basis< value_t > &  rowcb,
-               cluster_basis< value_t > &  colcb )
+copy_uniform ( const Hpro::TMatrix< value_t > &  M,
+               cluster_basis< value_t > &        rowcb,
+               cluster_basis< value_t > &        colcb )
 {
     if ( is_blocked( M ) )
     {
