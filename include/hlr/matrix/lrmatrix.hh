@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
+// #include <boost/format.hpp>
+
 #include <variant>
 
 #include <hpro/matrix/TMatrix.hh>
@@ -557,9 +559,9 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
             
     //     blas::add( value_t(-1), oU, dU );
     //     std::cout << "U " << this->block_is().to_string() << " : "
-    //               << blas::norm_F( dU ) / blas::norm_F(oU)
+    //               << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
     //               << " / "
-    //               << blas::max_abs_val( dU )
+    //               << boost::format( "%.4e" ) % blas::max_abs_val( dU )
     //               << std::endl;
 
     //     // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
@@ -585,9 +587,9 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
             
     //     blas::add( value_t(-1), oV, dV );
     //     std::cout << "V " << this->block_is().to_string() << " : "
-    //               << blas::norm_F( dV ) / blas::norm_F(oV)
+    //               << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
     //               << " / "
-    //               << blas::max_abs_val( dV )
+    //               << boost::format( "%.4e" ) % blas::max_abs_val( dV )
     //               << std::endl;
 
     //     // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )

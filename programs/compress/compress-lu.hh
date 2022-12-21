@@ -8,6 +8,7 @@
 
 #include <hlr/utils/io.hh>
 #include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
 #include "hlr/dag/lu.hh"
@@ -116,15 +117,15 @@ program_main ()
 
     // define methods to execute
     const auto methods = std::set< std::string >{
-        // "H+rec",
+        "H+rec",
         // "H+rec+accu",
-        "H+dag",
-        "H+dag+accu+lazy",
+        // "H+dag",
+        // "H+dag+accu+lazy",
         // "H+dag+accu+eager",
-        // "zH+rec",
+        "zH+rec",
         // "zH+rec+accu",
-        "zH+dag",
-        "zH+dag+accu+lazy"
+        // "zH+dag",
+        // "zH+dag+accu+lazy"
     };
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;

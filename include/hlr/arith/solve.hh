@@ -278,7 +278,7 @@ solve_lower_tri ( const eval_side_t                 side,
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
 
     // test data in result
-    M.check_data();
+    // M.check_data();
     
     // if ( is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->compress( acc );
@@ -484,7 +484,7 @@ solve_upper_tri ( const eval_side_t                 side,
         HLR_ERROR( "unsupported matrix type : " + U.typestr() );
 
     // test data in result
-    M.check_data();
+    // M.check_data();
     
     // if ( is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->compress( acc );

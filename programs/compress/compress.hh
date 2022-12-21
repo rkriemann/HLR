@@ -91,9 +91,13 @@ program_main ()
     auto  zA     = impl::matrix::copy_compressible( *A );
     auto  norm_A = norm::spectral( impl::arithmetic, *A );
     
-    std::cout << "  " << term::bullet << term::bold << "compression via "
-              << hlr::compress::provider
-              << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
+    std::cout << "  "
+              << term::bullet << term::bold
+              << "compression ("
+              << "ε = " << boost::format( "%.2e" ) % cmdline::eps
+              << ", "
+              << hlr::compress::provider << ')'
+              << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
@@ -134,7 +138,10 @@ program_main ()
     
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
-    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
+    std::cout << "  "
+              << term::bullet << term::bold
+              << "decompression "
+              << term::reset << std::endl;
 
     {
         runtime.clear();
@@ -166,6 +173,8 @@ program_main ()
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
+    std::exit( 0 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // try uniform format
@@ -292,7 +301,9 @@ program_main ()
 
     if ( nbench > 0 )
     {
-        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold
+                  << "mat-vec"
+                  << term::reset << std::endl;
 
         double  t_orig       = 0.0;
         double  t_compressed = 0.0;
@@ -301,7 +312,10 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "uncompressed"
+                      << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -337,7 +351,10 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "compressed"
+                      << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
