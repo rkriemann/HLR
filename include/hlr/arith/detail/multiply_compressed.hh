@@ -26,6 +26,15 @@ multiply ( const value_t                     alpha,
            const Hpro::TTruncAcc &           acc,
            const approx_t &                  approx );
 
+template < typename value_t >
+void
+multiply ( const value_t                     alpha,
+           const Hpro::matop_t               op_A,
+           const Hpro::TMatrix< value_t > &  A,
+           const Hpro::matop_t               op_B,
+           const Hpro::TMatrix< value_t > &  B,
+           Hpro::TMatrix< value_t > &        C );
+
 //
 // blocked x blocked = dense
 //
@@ -102,7 +111,7 @@ multiply ( const value_t                                   alpha,
     }// for
 
     // apply update
-    hlr::add< value_t >( value_t(1), *BC, C, acc, approx );
+    hlr::add( value_t(1), *BC, C, acc, approx );
 }
 
 template < typename value_t,
@@ -150,7 +159,7 @@ multiply ( const value_t                                   alpha,
     }// for
 
     // apply update
-    hlr::add< value_t >( value_t(1), *BC, C, acc, approx );
+    hlr::add( value_t(1), *BC, C, acc, approx );
 }
 
 //
@@ -196,7 +205,42 @@ multiply ( const value_t                                   alpha,
            matrix::dense_matrix< value_t > &               C,
            const Hpro::TTruncAcc &                         acc )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  DB = B.mat_decompressed();
+    auto  T  = Hpro::TDenseMatrix< value_t >( C.row_is(), C.col_is() );
+            
+    for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
+    {
+        HLR_ASSERT( ! is_null( A.block( i, 0 ) ) );
+        
+        auto  T_i = Hpro::TDenseMatrix< value_t >( A.block( i, 0, op_A )->row_is( op_A ), C.col_is() );
+        
+        for ( uint  j = 0; j < A.nblock_cols( op_A ); ++j )
+        {
+            auto  A_ij = A.block( i, j, op_A );
+            auto  is_j = A_ij->col_is( op_A );
+
+            if ( op_B == Hpro::apply_normal )
+            {
+                auto  DB_j = blas::matrix< value_t >( DB, is_j - B.row_ofs(), blas::range::all );
+                auto  B_j  = Hpro::TDenseMatrix< value_t >( is_j, B.col_is( op_B ), DB_j );
+            
+                multiply( value_t(1), op_A, * A_ij, op_B, B_j, T_i );
+            }// if
+            else
+            {
+                auto  DB_j = blas::matrix< value_t >( DB, blas::range::all, is_j - B.col_ofs() );
+                auto  B_j  = Hpro::TDenseMatrix< value_t >( is_j, B.col_is( op_B ), DB_j );
+            
+                multiply( value_t(1), op_A, * A_ij, op_B, B_j, T_i );
+            }// else
+        }// for
+
+        T.add_block( value_t(1), value_t(1), &T_i );
+    }// for
+
+    hlr::add( alpha, T, C, acc );
 }
 
 template < typename value_t >
@@ -270,7 +314,7 @@ multiply ( const value_t                                   alpha,
 
     auto  RC = Hpro::TRkMatrix< value_t >( C.row_is(), C.col_is(), UC, VB );
     
-    hlr::add< value_t >( value_t(1), RC, C, acc, approx );
+    hlr::add( value_t(1), RC, C, acc, approx );
 }
 
 //
@@ -422,7 +466,42 @@ multiply ( const value_t                                   alpha,
            matrix::dense_matrix< value_t > &               C,
            const Hpro::TTruncAcc &                         acc )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    auto  DA = A.mat_decompressed();
+    auto  T  = Hpro::TDenseMatrix< value_t >( C.row_is(), C.col_is() );
+    
+    for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
+    {
+        HLR_ASSERT( ! is_null( B.block( 0, j, op_B ) ) );
+        
+        auto  T_j = Hpro::TDenseMatrix< value_t >( C.row_is(), B.block( 0, j, op_B )->col_is( op_B ) );
+        
+        for ( uint  i = 0; i < B.nblock_rows( op_B ); ++i )
+        {
+            auto  B_ij = B.block( i, j, op_B );
+            auto  is_i = B_ij->row_is( op_B );
+
+            if ( op_A == Hpro::apply_normal )
+            {
+                auto  DA_i = blas::matrix< value_t >( DA, blas::range::all, is_i - A.col_ofs() );
+                auto  A_i  = Hpro::TDenseMatrix< value_t >( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( value_t(1), op_A, A_i, op_B, *B_ij, T_j );
+            }// if
+            else
+            {
+                auto  DA_i = blas::matrix< value_t >( DA, is_i - A.row_ofs(), blas::range::all );
+                auto  A_i  = Hpro::TDenseMatrix< value_t >( A.row_is( op_A ), is_i, DA_i );
+            
+                multiply( value_t(1), op_A, A_i, op_B, *B_ij, T_j );
+            }// else
+        }// for
+
+        T.add_block( value_t(1), value_t(1), &T_j );
+    }// for
+
+    hlr::add( alpha, T, C, acc );
 }
 
 template < typename value_t >
@@ -762,7 +841,14 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    // C = C + ( A U(B) ) V(B)^H
+    auto  DA = A.mat_decompressed();
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
+    auto  RC = Hpro::TRkMatrix< value_t >( C.row_is(), C.col_is(), AU, VB );
+
+    hlr::add( alpha, RC, C, acc, approx );
 }
 
 //
@@ -851,7 +937,17 @@ multiply ( const value_t                                   alpha,
            const matrix::lrmatrix< value_t > &             B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+    
+    // C = C + ( A U(B) ) V(B)^H
+    auto  DA = blas::mat( A );
+    auto  UB = B.U_decompressed( op_B );
+    auto  VB = B.V_decompressed( op_B );
+    auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
+
+    std::scoped_lock  lock( C.mutex() );
+
+    blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), blas::mat( C ) );
 }
 
 template < typename value_t >
@@ -1094,7 +1190,15 @@ multiply ( const value_t                                   alpha,
            const Hpro::TTruncAcc &                         acc,
            const approx_t &                                approx )
 {
-    HLR_ERROR( "todo" );
+    // C = C + U(A) ( B^H V(A) )^H
+    auto  UA = A.U_decompressed( op_A );
+    auto  VA = A.V_decompressed( op_A );
+    auto  DB = B.mat_decompressed();
+    auto  VB = blas::prod( blas::adjoint( blas::mat_view( op_B, DB ) ), VA );
+
+    auto  RC = Hpro::TRkMatrix< value_t >( C.row_is(), C.col_is(), UA, VB );
+
+    hlr::add( alpha, RC, C, acc, approx );
 }
 
 //
