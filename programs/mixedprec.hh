@@ -179,7 +179,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             auto  D = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
             auto  A = blas::copy( blas::mat( D ) );
             
-            blas::sv( A, S );
+            blas::sv( A, S ); for ( uint  i = 0; i < S.length(); ++i ) S(i) = 1.0;
         }// if
         else if ( is_lowrank( M ) )
         {
@@ -190,51 +190,58 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             blas::sv( U, V, S );
         }// if
 
-        int  i      = S.length()-1;
-        int  n_bf16 = 0;
-        int  n_fp32 = 0;
-        int  n_fp64 = 0;
+        const uint  rank = S.length();
+        int         i    = rank-1;
 
-        // test bf16
-        while ( i >= 0 )
+        auto  test_prec = [&i,&S,tol] ( double  u )
         {
-            if ( S(i) <= tol / 4e-3 ) n_bf16++;
-            else                      break;
-            --i;
-        }// while
-        
-        // test fp32
-        while ( i >= 0 )
-        {
-            if ( S(i) <= tol / 6e-8 ) n_fp32++;
-            else                      break;
-            --i;
-        }// while
-        
-        // test fp64
-        n_fp64 = i;
-
-        std::cout << n_bf16 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
-        
-        if ( n_bf16 > 0 )
-        {
-            if ( n_fp32 > 0 )
+            uint  nprec = 0;
+            
+            while ( i >= 0 )
             {
-                if ( n_fp64 > 0 ) prn.set_rgb(  196,160,0 ); // bf16 + fp32 + fp64
-                else              prn.set_rgb(  237,212,0 );  // bf16 + fp32
-            }// if
-            else
-                prn.set_rgb( 252,233,79 ); // bf16
-        }// if
-        else if ( n_fp32 > 0 )
-        {
-            if ( n_fp64 > 0 ) prn.set_rgb(  115,210,22 );  // fp32 + fp64
-            else              prn.set_rgb(  138,226,52 );  // fp32
-        }// if
-        else
-            prn.set_rgb( 32, 74, 135 );
+                if ( S(i) <= tol / u ) nprec++;
+                else                   break;
+                --i;
+            }// while
 
-        // prn.set_rgb( 85,87,83 );
+            return nprec;
+        };
+            
+        const uint  n_fp8  = test_prec( 1.2e-1 );
+        const uint  n_bf16 = test_prec( 7.8e-3 );
+        const uint  n_tf32 = test_prec( 9.8e-4 );
+        const uint  n_fp32 = test_prec( 1.2e-7 );
+        const uint  n_fp64 = std::max< int >( i, 0 );
+
+        if ( is_lowrank( M ) )
+            std::cout << n_fp8 << " / " << n_bf16 << " / " << n_tf32 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
+
+        uint    col_fp8[3]  = { 252,255,255 }; // white
+        uint    col_bf16[3] = { 252,255,255 };  // yellow
+        uint    col_tf32[3] = { 252,233,79 };  // green
+        uint    col_fp32[3] = { 114,159,207 }; // blue
+        uint    col_fp64[3] = { 239,41,41 };     // red
+        uint    col_bg[3]   = { 0, 0, 0 };
+
+        for ( int  c = 0; c < 3; ++c )
+            col_bg[c] = std::min< uint >( 255, uint( ( n_fp8  * col_fp8[c]  +
+                                                       n_bf16 * col_bf16[c] +
+                                                       n_tf32 * col_tf32[c] +
+                                                       n_fp32 * col_fp32[c] +
+                                                       n_fp64 * col_fp64[c] ) / double(rank) ) );
+
+        prn.set_rgb( col_bg[0], col_bg[1], col_bg[2] );
+        
+        // if      ( n_bf16 >  0 && n_tf32 >  0 && n_fp32 >  0 && n_fp64 >  0 ) prn.set_rgb( 206,92,0 );
+        // else if ( n_bf16 >  0 && n_tf32 >  0 && n_fp32 >  0                ) prn.set_rgb( 196,160,0 );
+        // else if ( n_bf16 >  0 && n_tf32 >  0                               ) prn.set_rgb( 252,175,62 );
+        // else if ( n_bf16 >  0                                              ) prn.set_rgb( 252,233,79 );
+        // else if ( n_bf16 == 0 && n_tf32 >  0 && n_fp32 >  0 && n_fp64 >  0 ) prn.set_rgb( 173,127,168 );
+        // else if ( n_bf16 == 0 && n_tf32 >  0 && n_fp32 >  0                ) prn.set_rgb( 117,80,123 );
+        // else if ( n_bf16 == 0 && n_tf32 >  0                               ) prn.set_rgb( 173,127,168 );
+        // else if ( n_bf16 == 0 && n_tf32 == 0 && n_fp32 >  0 && n_fp64 >  0 ) prn.set_rgb( 78,154,6 );
+        // else if ( n_bf16 == 0 && n_tf32 == 0 && n_fp32 >  0                ) prn.set_rgb( 138,226,52 );
+        // else                                                                 prn.set_rgb( 204,0,0 );
         
         prn.fill_rect( M.col_ofs(),
                        M.row_ofs(),

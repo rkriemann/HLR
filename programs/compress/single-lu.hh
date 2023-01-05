@@ -8,6 +8,8 @@
 
 #include <hlr/utils/io.hh>
 #include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/randsvd.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
 #include "hlr/dag/lu.hh"
@@ -63,235 +65,242 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto    apx    = approx::SVD< float >();
-    size_t  mem_LU = 0;
-
-    // define methods to execute
-    const auto methods = std::set< std::string >{
-        // "H+rec",
-        // "H+rec+accu",
-        "H+dag",
-        "H+dag+accu+lazy",
-        // "H+dag+accu+eager"
-    };
-
-    std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
-        
-    if ( methods.contains( "H+rec" ) )
-    {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
-
-        auto  B  = impl::matrix::convert< float >( *A );
-        auto  LU = impl::matrix::copy( *B );
-                
-        runtime.clear();
-
-        for ( int i = 0; i < nbench; ++i )
+    auto  comp_lu =
+        [&] ( const auto  apx, const std::string &  apxname )
         {
-            tic = timer::now();
+            size_t  mem_LU = 0;
+
+            // define methods to execute
+            const auto methods = std::set< std::string >{
+                // "H+rec",
+                // "H+rec+accu",
+                "H+dag",
+                "H+dag+accu+lazy",
+                // "H+dag+accu+eager"
+            };
+
+            std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
+        
+            if ( methods.contains( "H+rec" ) )
+            {
+                std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
+
+                auto  B  = impl::matrix::convert< float >( *A );
+                auto  LU = impl::matrix::copy( *B );
                 
-            impl::lu( *LU, acc, apx );
+                runtime.clear();
+
+                for ( int i = 0; i < nbench; ++i )
+                {
+                    tic = timer::now();
                 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                    impl::lu( *LU, acc, apx );
+                
+                    toc = timer::since( tic );
+                    runtime.push_back( toc.seconds() );
             
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                impl::matrix::copy_to( *B, *LU );
-        }// for
+                    if ( i < nbench-1 )
+                        impl::matrix::copy_to( *B, *LU );
+                }// for
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                if ( nbench > 1 )
+                    std::cout << "  runtime  = "
+                              << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                              << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU", prnopt );
+                if ( hpro::verbose( 3 ) )
+                    io::eps::print( *LU, "HLU", prnopt );
 
-        auto  LU2   = impl::matrix::convert< value_t >( *LU );
-        auto  A_inv = matrix::luinv_eval( *LU2 );
+                auto  LU2   = impl::matrix::convert< value_t >( *LU );
+                auto  A_inv = matrix::luinv_eval( *LU2 );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
-    }
+                std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+            }
 
-    if ( methods.contains( "H+rec+accu" ) )
-    {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
+            if ( methods.contains( "H+rec+accu" ) )
+            {
+                std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
 
-        auto  B  = impl::matrix::convert< float >( *A );
-        auto  LU = impl::matrix::copy( *B );
+                auto  B  = impl::matrix::convert< float >( *A );
+                auto  LU = impl::matrix::copy( *B );
                 
-        runtime.clear();
+                runtime.clear();
 
-        for ( int i = 0; i < nbench; ++i )
-        {
-            tic = timer::now();
+                for ( int i = 0; i < nbench; ++i )
+                {
+                    tic = timer::now();
                 
-            impl::accu::lu( *LU, acc, apx );
+                    impl::accu::lu( *LU, acc, apx );
                 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                    toc = timer::since( tic );
+                    runtime.push_back( toc.seconds() );
             
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                impl::matrix::copy_to( *B, *LU );
-        }// for
+                    if ( i < nbench-1 )
+                        impl::matrix::copy_to( *B, *LU );
+                }// for
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                if ( nbench > 1 )
+                    std::cout << "  runtime  = "
+                              << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                              << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU", prnopt );
+                if ( hpro::verbose( 3 ) )
+                    io::eps::print( *LU, "HLU", prnopt );
                 
-        auto  LU2   = impl::matrix::convert< value_t >( *LU );
-        auto  A_inv = matrix::luinv_eval( *LU2 );
+                auto  LU2   = impl::matrix::convert< value_t >( *LU );
+                auto  A_inv = matrix::luinv_eval( *LU2 );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
-    }
+                std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+            }
 
-    if ( methods.contains( "H+dag" ) )
-    {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
+            if ( methods.contains( "H+dag" ) )
+            {
+                std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
-        auto  B   = impl::matrix::convert< float >( *A );
-        auto  LU  = impl::matrix::copy( *B );
-        auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
+                auto  B   = impl::matrix::convert< float >( *A );
+                auto  LU  = impl::matrix::copy( *B );
+                auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
 
-        // io::dot::print( dag, "LU.dot" );
+                // io::dot::print( dag, "LU.dot" );
 
-        runtime.clear();
+                runtime.clear();
 
-        for ( int i = 0; i < nbench; ++i )
-        {
-            tic = timer::now();
+                for ( int i = 0; i < nbench; ++i )
+                {
+                    tic = timer::now();
 
-            impl::dag::run( dag, acc );
+                    impl::dag::run( dag, acc );
                 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                    toc = timer::since( tic );
+                    runtime.push_back( toc.seconds() );
             
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                impl::matrix::copy_to( *B, *LU );
-        }// for
+                    if ( i < nbench-1 )
+                        impl::matrix::copy_to( *B, *LU );
+                }// for
 
-        // io::hpro::write( *LU, "LU.hm" );
+                // io::hpro::write( *LU, "LU.hm" );
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                if ( nbench > 1 )
+                    std::cout << "  runtime  = "
+                              << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                              << std::endl;
 
-        mem_LU = LU->byte_size();
+                mem_LU = LU->byte_size();
         
-        std::cout << "    mem    = " << format_mem( mem_LU ) << std::endl;
+                std::cout << "    mem    = " << format_mem( mem_LU ) << std::endl;
 
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU2", prnopt );
+                if ( hpro::verbose( 3 ) )
+                    io::eps::print( *LU, "HLU2", prnopt );
                 
-        auto  LU2   = impl::matrix::convert< value_t >( *LU );
-        auto  A_inv = matrix::luinv_eval( *LU2 );
+                auto  LU2   = impl::matrix::convert< value_t >( *LU );
+                auto  A_inv = matrix::luinv_eval( *LU2 );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
-    }
+                std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+            }
 
-    if ( methods.contains( "H+dag+accu+lazy" ) )
-    {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, lazy)" << term::reset << std::endl;
+            if ( methods.contains( "H+dag+accu+lazy" ) )
+            {
+                std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, lazy)" << term::reset << std::endl;
 
-        auto  B  = impl::matrix::convert< float >( *A );
-        auto  LU = impl::matrix::copy( *B );
+                auto  B  = impl::matrix::convert< float >( *A );
+                auto  LU = impl::matrix::copy( *B );
 
-        // io::dot::print( dag, "LUa.dot" );
+                // io::dot::print( dag, "LUa.dot" );
 
-        runtime.clear();
+                runtime.clear();
 
-        for ( int i = 0; i < nbench; ++i )
-        {
-            // regenerate DAG to start with new accumulators
-            auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_lazy( *LU, nseq, impl::dag::refine, apx );
+                for ( int i = 0; i < nbench; ++i )
+                {
+                    // regenerate DAG to start with new accumulators
+                    auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_lazy( *LU, nseq, impl::dag::refine, apx );
             
-            tic = timer::now();
+                    tic = timer::now();
 
-            impl::dag::run( dag, acc );
+                    impl::dag::run( dag, acc );
                 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                    toc = timer::since( tic );
+                    runtime.push_back( toc.seconds() );
             
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                impl::matrix::copy_to( *B, *LU );
-        }// for
+                    if ( i < nbench-1 )
+                        impl::matrix::copy_to( *B, *LU );
+                }// for
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                if ( nbench > 1 )
+                    std::cout << "  runtime  = "
+                              << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                              << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU2", prnopt );
+                if ( hpro::verbose( 3 ) )
+                    io::eps::print( *LU, "HLU2", prnopt );
                 
-        auto  LU2   = impl::matrix::convert< value_t >( *LU );
-        auto  A_inv = matrix::luinv_eval( *LU2 );
+                auto  LU2   = impl::matrix::convert< value_t >( *LU );
+                auto  A_inv = matrix::luinv_eval( *LU2 );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
-    }
+                std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+            }
 
-    if ( methods.contains( "H+dag+accu+eager" ) )
-    {
-        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, eager)" << term::reset << std::endl;
+            if ( methods.contains( "H+dag+accu+eager" ) )
+            {
+                std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, eager)" << term::reset << std::endl;
 
-        auto  B  = impl::matrix::convert< float >( *A );
-        auto  LU = impl::matrix::copy( *B );
+                auto  B  = impl::matrix::convert< float >( *A );
+                auto  LU = impl::matrix::copy( *B );
 
-        // io::dot::print( dag, "LUa.dot" );
+                // io::dot::print( dag, "LUa.dot" );
 
-        runtime.clear();
+                runtime.clear();
 
-        for ( int i = 0; i < nbench; ++i )
-        {
-            // regenerate DAG to start with new accumulators
-            auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_eager( *LU, nseq, impl::dag::refine, apx );
+                for ( int i = 0; i < nbench; ++i )
+                {
+                    // regenerate DAG to start with new accumulators
+                    auto  [ dag, amap, amtx ] = hlr::dag::gen_dag_lu_accu_eager( *LU, nseq, impl::dag::refine, apx );
             
-            tic = timer::now();
+                    tic = timer::now();
 
-            impl::dag::run( dag, acc );
+                    impl::dag::run( dag, acc );
                 
-            toc = timer::since( tic );
-            runtime.push_back( toc.seconds() );
+                    toc = timer::since( tic );
+                    runtime.push_back( toc.seconds() );
             
-            std::cout << "    done in  " << format_time( toc ) << std::endl;
+                    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                impl::matrix::copy_to( *B, *LU );
-        }// for
+                    if ( i < nbench-1 )
+                        impl::matrix::copy_to( *B, *LU );
+                }// for
         
-        if ( nbench > 1 )
-            std::cout << "  runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                if ( nbench > 1 )
+                    std::cout << "  runtime  = "
+                              << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                              << std::endl;
         
-        std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
 
-        if ( hpro::verbose( 3 ) )
-            io::eps::print( *LU, "HLU2", prnopt );
+                if ( hpro::verbose( 3 ) )
+                    io::eps::print( *LU, "HLU2", prnopt );
                 
-        auto  LU2   = impl::matrix::convert< value_t >( *LU );
-        auto  A_inv = matrix::luinv_eval( *LU2 );
+                auto  LU2   = impl::matrix::convert< value_t >( *LU );
+                auto  A_inv = matrix::luinv_eval( *LU2 );
                     
-        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
-    }
+                std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+            }
+        };
+
+    if      ( cmdline::approx == "svd"     ) comp_lu( approx::SVD< float >(),  "SVD" );
+    else if ( cmdline::approx == "rrqr"    ) comp_lu( approx::RRQR< float >(), "RRQR" );
+    else if ( cmdline::approx == "randsvd" ) comp_lu( approx::RandSVD< float >(), "RandSVD" );
 }
     
