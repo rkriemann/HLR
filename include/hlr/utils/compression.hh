@@ -5,7 +5,7 @@
 // Module      : utils/compression
 // Description : compression related functions and types
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/utils/log.hh>
@@ -19,6 +19,7 @@
 #include <hlr/utils/detail/tf32.hh>
 #include <hlr/utils/detail/bf24.hh>
 #include <hlr/utils/detail/fp32.hh>
+#include <hlr/utils/detail/ieee754.hh>
 #include <hlr/utils/detail/lz4.hh>
 #include <hlr/utils/detail/zlib.hh>
 #include <hlr/utils/detail/zstd.hh>
@@ -328,6 +329,23 @@ using hlr::compress::bfloat::compress;
 using hlr::compress::bfloat::decompress;
 using hlr::compress::bfloat::get_config;
 using hlr::compress::bfloat::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 16
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "ieee754";
+
+using  zconfig_t = hlr::compress::ieee754::config;
+using  zarray    = hlr::compress::ieee754::zarray;
+
+using hlr::compress::ieee754::compress;
+using hlr::compress::ieee754::decompress;
+using hlr::compress::ieee754::get_config;
+using hlr::compress::ieee754::byte_size;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////

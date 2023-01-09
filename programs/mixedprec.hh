@@ -98,7 +98,7 @@ program_main ()
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
     
-    print_prec( *A, acc2.abs_eps() );
+    print_prec( *A, delta ); // acc2.abs_eps() );
 
     // std::cout << "  " << term::bullet << term::bold << "exact matrix" << term::reset << std::endl;
 
@@ -157,6 +157,13 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
              eps_printer &                     prn,
              const double                      tol )
 {
+    const uint  col_fp8[3]  = { 255,255,255 }; // white
+    const uint  col_fp16[3] = { 252,233,79 }; // yellow
+    const uint  col_bf16[3] = { 252,233,79 }; // yellow
+    const uint  col_tf32[3] = { 252,233,79 };  // yellow
+    const uint  col_fp32[3] = { 114,159,207 }; // blue
+    const uint  col_fp64[3] = { 239,41,41 };   // red
+    
     if ( is_blocked( M ) )
     {
         auto  B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
@@ -179,7 +186,9 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             auto  D = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
             auto  A = blas::copy( blas::mat( D ) );
             
-            blas::sv( A, S ); for ( uint  i = 0; i < S.length(); ++i ) S(i) = 1.0;
+            blas::sv( A, S );
+            for ( uint  i = 0; i < S.length(); ++i ) S(i) = 1.0;
+            // for ( uint  i = 1; i < S.length(); ++i ) S(i) = 0.0;
         }// if
         else if ( is_lowrank( M ) )
         {
@@ -191,7 +200,18 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
         }// if
 
         const uint  rank = S.length();
-        int         i    = rank-1;
+        
+        #if 0
+
+        if      ( S(rank-1) / S(0) >= 6.2e-2 ) { prn.set_rgb( col_fp8[0],  col_fp8[1],  col_fp8[2]  ); std::cout << "FP8"  << std::endl; }
+        else if ( S(rank-1) / S(0) >= 3.9e-3 ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
+        else if ( S(rank-1) / S(0) >= 4.9e-4 ) { prn.set_rgb( col_tf32[0], col_tf32[1], col_tf32[2] ); std::cout << "TF32" << std::endl; }
+        else if ( S(rank-1) / S(0) >= 6.0e-8 ) { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
+        else                                   { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+        
+        #else
+        
+        int  i = rank-1;
 
         auto  test_prec = [&i,&S,tol] ( double  u )
         {
@@ -207,20 +227,15 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             return nprec;
         };
             
-        const uint  n_fp8  = test_prec( 1.2e-1 );
-        const uint  n_bf16 = test_prec( 7.8e-3 );
-        const uint  n_tf32 = test_prec( 9.8e-4 );
-        const uint  n_fp32 = test_prec( 1.2e-7 );
+        const uint  n_fp8  = test_prec( 6.2e-2 );
+        const uint  n_bf16 = test_prec( 3.9e-3 );
+        const uint  n_tf32 = test_prec( 4.9e-4 );
+        const uint  n_fp32 = test_prec( 6.0e-8 );
         const uint  n_fp64 = std::max< int >( i, 0 );
 
         if ( is_lowrank( M ) )
             std::cout << n_fp8 << " / " << n_bf16 << " / " << n_tf32 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
 
-        uint    col_fp8[3]  = { 252,255,255 }; // white
-        uint    col_bf16[3] = { 252,255,255 };  // yellow
-        uint    col_tf32[3] = { 252,233,79 };  // green
-        uint    col_fp32[3] = { 114,159,207 }; // blue
-        uint    col_fp64[3] = { 239,41,41 };     // red
         uint    col_bg[3]   = { 0, 0, 0 };
 
         for ( int  c = 0; c < 3; ++c )
@@ -231,7 +246,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
                                                        n_fp64 * col_fp64[c] ) / double(rank) ) );
 
         prn.set_rgb( col_bg[0], col_bg[1], col_bg[2] );
-        
+
         // if      ( n_bf16 >  0 && n_tf32 >  0 && n_fp32 >  0 && n_fp64 >  0 ) prn.set_rgb( 206,92,0 );
         // else if ( n_bf16 >  0 && n_tf32 >  0 && n_fp32 >  0                ) prn.set_rgb( 196,160,0 );
         // else if ( n_bf16 >  0 && n_tf32 >  0                               ) prn.set_rgb( 252,175,62 );
@@ -242,13 +257,15 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
         // else if ( n_bf16 == 0 && n_tf32 == 0 && n_fp32 >  0 && n_fp64 >  0 ) prn.set_rgb( 78,154,6 );
         // else if ( n_bf16 == 0 && n_tf32 == 0 && n_fp32 >  0                ) prn.set_rgb( 138,226,52 );
         // else                                                                 prn.set_rgb( 204,0,0 );
+
+        #endif
         
         prn.fill_rect( M.col_ofs(),
                        M.row_ofs(),
                        M.col_ofs() + M.ncols(),
                        M.row_ofs() + M.nrows() );
 
-        // draw frame
+        // // draw frame
         prn.set_gray( 0 );
         prn.draw_rect( M.col_ofs(),
                        M.row_ofs(),

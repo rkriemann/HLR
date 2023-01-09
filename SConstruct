@@ -105,6 +105,7 @@ COMPRESSORS   = [ 'none',
                   'bf16',
                   'tf32',
                   'bf24',
+                  'ieee754',
                   'zfp',
                   'posits',
                   'sz',
@@ -567,6 +568,7 @@ elif compressor == 'bf24'    : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
 elif compressor == 'afloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
 elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
 elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=15' )
+elif compressor == 'ieee754' : env.Append( CPPDEFINES = 'COMPRESSOR=16' )
 
 ######################################################################
 #
