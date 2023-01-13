@@ -201,13 +201,22 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
 
         const uint  rank = S.length();
         
-        #if 0
+        #if 1
 
-        if      ( S(rank-1) / S(0) >= 6.2e-2 ) { prn.set_rgb( col_fp8[0],  col_fp8[1],  col_fp8[2]  ); std::cout << "FP8"  << std::endl; }
-        else if ( S(rank-1) / S(0) >= 3.9e-3 ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
-        else if ( S(rank-1) / S(0) >= 4.9e-4 ) { prn.set_rgb( col_tf32[0], col_tf32[1], col_tf32[2] ); std::cout << "TF32" << std::endl; }
-        else if ( S(rank-1) / S(0) >= 6.0e-8 ) { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
-        else                                   { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+        // if      ( S(rank-1) / S(0) >= 6.2e-2 ) { prn.set_rgb( col_fp8[0],  col_fp8[1],  col_fp8[2]  ); std::cout << "FP8"  << std::endl; }
+        // else if ( S(rank-1) / S(0) >= 3.9e-3 ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
+        // else if ( S(rank-1) / S(0) >= 4.9e-4 ) { prn.set_rgb( col_tf32[0], col_tf32[1], col_tf32[2] ); std::cout << "TF32" << std::endl; }
+        // else if ( S(rank-1) / S(0) >= 6.0e-8 ) { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
+        // else                                   { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+
+        if ( is_dense( M ) )
+        { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+        else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 1000 )
+        { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
+        else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 350 )
+        { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
+        else
+        { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
         
         #else
         
