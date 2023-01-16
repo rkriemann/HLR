@@ -9,6 +9,8 @@
 #include <fstream>
 #include <limits>
 
+#include <half.hpp>
+
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
@@ -29,6 +31,10 @@ void
 print_prec ( const hpro::TMatrix< value_t > &  M,
              const double                      tol );
 
+template < typename value_t >
+size_t
+convert_mp ( const hpro::TMatrix< value_t > &  M,
+             const double                      tol );
 
 struct local_accuracy : public hpro::TTruncAcc
 {
@@ -56,6 +62,9 @@ program_main ()
     auto  coord   = problem->coordinates();
     auto  ct      = gen_ct( *coord );
     auto  bct     = gen_bct( *ct, *ct );
+
+    if ( hpro::verbose( 3 ) )
+        io::eps::print( *bct->root(), "bct" );
     
     auto  acc     = gen_accuracy();
     auto  coeff   = problem->coeff_func();
@@ -76,7 +85,7 @@ program_main ()
 
     std::cout << "    |A_nf| = " << format_norm( norm_nf ) << std::endl;
 
-    auto  delta   = norm_nf * hlr::cmdline::eps; //  / A_nf->nrows();
+    auto  delta   = norm_nf * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
     // auto  acc2    = hpro::absolute_prec( delta );
     auto  acc2    = local_accuracy( delta );
 
@@ -87,12 +96,19 @@ program_main ()
 
     tic = timer::now();
     
-    auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc2, nseq );
+    auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+    // auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc2, nseq );
     
     toc = timer::since( tic );
-    
+
+    auto  mem_A  = A->byte_size();
+    auto  norm_A = norm::frobenius( *A );
+
+    // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
+    delta = hlr::cmdline::eps * norm_A / (A_nf->nrows());
+        
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+    std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
@@ -100,6 +116,17 @@ program_main ()
     
     print_prec( *A, delta ); // acc2.abs_eps() );
 
+    auto  Amp     = impl::matrix::copy( *A );
+    auto  mem_Amp = convert_mp( *Amp, delta );
+    
+    std::cout << "    mp mem = " << format_mem( mem_Amp ) << std::endl;
+    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_Amp) / double(mem_A) ) << std::endl;
+    std::cout << "    |Amp|  = " << format_norm( norm::frobenius( *Amp ) ) << std::endl;
+    
+    auto  error   = hlr::norm::frobenius( 1.0, *A, -1.0, *Amp );
+
+    std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_A ) << std::endl;
+    
     // std::cout << "  " << term::bullet << term::bold << "exact matrix" << term::reset << std::endl;
 
     // auto  acc3    = hpro::fixed_prec( 1e-12 );
@@ -179,7 +206,8 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
     }// if
     else
     {
-        auto  S = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
+        auto  norm_M = norm::frobenius( M );
+        auto  S      = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
 
         if ( is_dense( M ) )
         {
@@ -187,7 +215,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             auto  A = blas::copy( blas::mat( D ) );
             
             blas::sv( A, S );
-            for ( uint  i = 0; i < S.length(); ++i ) S(i) = 1.0;
+            for ( uint  i = 0; i < S.length(); ++i ) S(i) = 1e10;
             // for ( uint  i = 1; i < S.length(); ++i ) S(i) = 0.0;
         }// if
         else if ( is_lowrank( M ) )
@@ -201,7 +229,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
 
         const uint  rank = S.length();
         
-        #if 1
+        #if 0
 
         // if      ( S(rank-1) / S(0) >= 6.2e-2 ) { prn.set_rgb( col_fp8[0],  col_fp8[1],  col_fp8[2]  ); std::cout << "FP8"  << std::endl; }
         // else if ( S(rank-1) / S(0) >= 3.9e-3 ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
@@ -209,14 +237,20 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
         // else if ( S(rank-1) / S(0) >= 6.0e-8 ) { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
         // else                                   { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
 
-        if ( is_dense( M ) )
-        { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
-        else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 1000 )
-        { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
-        else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 350 )
-        { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
-        else
-        { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+        std::cout << norm_M << " / " << norm_M * 4.9e-4 << " / " << norm_M * 6.0e-8 << " / " << tol << std::endl;
+        
+        if      ( norm_M * 4.9e-4 < tol ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); }
+        else if ( norm_M * 6.0e-8 < tol ) { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); }
+        else                              { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); }
+            
+        // if ( is_dense( M ) )
+        // { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
+        // else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 1000 )
+        // { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); std::cout << "BF16" << std::endl; }
+        // else if ( std::max( M.row_is().first(), M.col_is().first() ) - std::min( M.row_is().first(), M.col_is().first() ) > 350 )
+        // { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); std::cout << "FP32" << std::endl; }
+        // else
+        // { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); std::cout << "FP64" << std::endl; }
         
         #else
         
@@ -236,23 +270,32 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
             return nprec;
         };
             
-        const uint  n_fp8  = test_prec( 6.2e-2 );
-        const uint  n_bf16 = test_prec( 3.9e-3 );
-        const uint  n_tf32 = test_prec( 4.9e-4 );
+        // const uint  n_fp8  = test_prec( 6.2e-2 );
+        // const uint  n_bf16 = test_prec( 3.9e-3 );
+        // const uint  n_tf32 = test_prec( 4.9e-4 );
+        const uint  n_fp16 = test_prec( 4.9e-4 );
         const uint  n_fp32 = test_prec( 6.0e-8 );
         const uint  n_fp64 = std::max< int >( i, 0 );
 
-        if ( is_lowrank( M ) )
-            std::cout << n_fp8 << " / " << n_bf16 << " / " << n_tf32 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
+        if ( hpro::verbose( 3 ) && is_lowrank( M ) )
+            std::cout << norm_M << " / " << n_fp16 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
+            // std::cout << n_fp8 << " / " << n_bf16 << " / " << n_tf32 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
 
         uint    col_bg[3]   = { 0, 0, 0 };
 
+        // if      ( n_tf32 + n_bf16 + n_fp8 > n_fp32 ) { prn.set_rgb( col_bf16[0], col_bf16[1], col_bf16[2] ); }
+        // else if ( n_fp32 > n_fp64 )                  { prn.set_rgb( col_fp32[0], col_fp32[1], col_fp32[2] ); }
+        // else                                         { prn.set_rgb( col_fp64[0], col_fp64[1], col_fp64[2] ); }
+        
         for ( int  c = 0; c < 3; ++c )
-            col_bg[c] = std::min< uint >( 255, uint( ( n_fp8  * col_fp8[c]  +
-                                                       n_bf16 * col_bf16[c] +
-                                                       n_tf32 * col_tf32[c] +
+            col_bg[c] = std::min< uint >( 255, uint( ( n_fp16 * col_fp16[c] +
                                                        n_fp32 * col_fp32[c] +
                                                        n_fp64 * col_fp64[c] ) / double(rank) ) );
+            // col_bg[c] = std::min< uint >( 255, uint( ( n_fp8  * col_fp8[c]  +
+            //                                            n_bf16 * col_bf16[c] +
+            //                                            n_tf32 * col_tf32[c] +
+            //                                            n_fp32 * col_fp32[c] +
+            //                                            n_fp64 * col_fp64[c] ) / double(rank) ) );
 
         prn.set_rgb( col_bg[0], col_bg[1], col_bg[2] );
 
@@ -309,3 +352,118 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
     prn.end();
 }
     
+//
+// return memory of mixed precision storage
+//
+template < typename value_t >
+size_t
+convert_mp ( const hpro::TMatrix< value_t > &  M,
+             const double                      tol )
+{
+    if ( is_blocked( M ) )
+    {
+        auto    B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
+        size_t  s = 4+8+8+8 + sizeof(Hpro::TProcSet) + sizeof(Hpro::matform_t);
+
+        s += 8 + 8 + 4 + 4 + sizeof( std::vector< Hpro::TMatrix< value_t > * > );
+        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t >*);
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                    s += convert_mp( * B->block( i, j ), tol );
+            }// for
+        }// for
+
+        return s;
+    }// if
+    else
+    {
+        auto  S  = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
+        auto  RU = blas::matrix< value_t >();
+        auto  RV = blas::matrix< value_t >();
+
+        if ( is_dense( M ) )
+        {
+            return M.byte_size();
+        }// if
+        else if ( is_lowrank( M ) )
+        {
+            auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+            auto  U = blas::copy( blas::mat_U( R ) );
+            auto  V = blas::copy( blas::mat_V( R ) );
+
+            RU = blas::mat_U( R );
+            RV = blas::mat_V( R );
+            
+            blas::sv( U, V, S );
+        }// if
+
+        const uint  rank = S.length();
+        
+        #if 0
+
+        if      ( norm_M * 4.9e-4 < tol ) { s /= 4; }
+        else if ( norm_M * 6.0e-8 < tol ) { s /= 2; }
+            
+        #else
+        
+        int  i = rank-1;
+
+        auto  test_prec = [&i,&S,tol] ( double  u )
+        {
+            uint  nprec = 0;
+            
+            while ( i >= 0 )
+            {
+                if ( S(i) <= tol / u ) nprec++;
+                else                   break;
+                --i;
+            }// while
+
+            return nprec;
+        };
+            
+        const uint  n_fp16 = test_prec( 4.9e-4 );
+        const uint  n_fp32 = test_prec( 6.0e-8 );
+        const uint  n_fp64 = std::max< int >( i, 0 );
+        size_t      s      = 0;
+
+        s  = M.byte_size();
+        s -= sizeof(double) * rank * ( M.nrows() + M.ncols() );
+        s += 2 * n_fp16 * ( M.nrows() + M.ncols() );
+        s += 4 * n_fp32 * ( M.nrows() + M.ncols() );
+        s += 8 * n_fp64 * ( M.nrows() + M.ncols() );
+        
+        auto  nrows = M.nrows();
+        auto  ncols = M.ncols();
+
+        using half = half_float::half;
+
+        i = n_fp64;
+        
+        for ( uint  pos = 0; pos < n_fp32; ++pos, ++i )
+        {
+            for ( uint  j = 0; j < nrows; ++j )
+                RU(j,i) = double( float( RU(j,i) ) );
+            for ( uint  j = 0; j < ncols; ++j )
+                RV(j,i) = double( float( RV(j,i) ) );
+        }// for
+                  
+        for ( uint  pos = 0; pos < n_fp16; ++pos, ++i )
+        {
+            for ( uint  j = 0; j < nrows; ++j )
+                RU(j,i) = double( half( RU(j,i) ) );
+            for ( uint  j = 0; j < ncols; ++j )
+                RV(j,i) = double( half( RV(j,i) ) );
+        }// for
+                  
+        return s;
+        #endif
+    }// if
+
+    return 0;
+}
+
