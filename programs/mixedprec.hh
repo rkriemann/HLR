@@ -32,7 +32,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
              const double                      tol );
 
 template < typename value_t >
-size_t
+std::tuple< size_t, size_t, size_t >
 convert_mp ( const hpro::TMatrix< value_t > &  M,
              const double                      tol );
 
@@ -109,18 +109,24 @@ program_main ()
         
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
+    std::cout << "      idx  = " << format_mem( mem_A / A->nrows() ) << std::endl;
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
-    
-    print_prec( *A, delta ); // acc2.abs_eps() );
+
+    if ( hpro::verbose( 2 ) )
+        print_prec( *A, delta ); // acc2.abs_eps() );
 
     auto  Amp     = impl::matrix::copy( *A );
-    auto  mem_Amp = convert_mp( *Amp, delta );
+    auto  mem_mp  = convert_mp( *Amp, delta );
+    auto  mem_Amp = std::get<0>( mem_mp ) + std::get<1>( mem_mp ) + std::get<2>( mem_mp );
     
     std::cout << "    mp mem = " << format_mem( mem_Amp ) << std::endl;
     std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_Amp) / double(mem_A) ) << std::endl;
+    std::cout << "      FP16   " << boost::format( "%.3f" ) % ( double(std::get<0>( mem_mp )) / double(mem_A) ) << std::endl;
+    std::cout << "      FP32   " << boost::format( "%.3f" ) % ( double(std::get<1>( mem_mp )) / double(mem_A) ) << std::endl;
+    std::cout << "      FP64   " << boost::format( "%.3f" ) % ( double(std::get<2>( mem_mp )) / double(mem_A) ) << std::endl;
     std::cout << "    |Amp|  = " << format_norm( norm::frobenius( *Amp ) ) << std::endl;
     
     auto  error   = hlr::norm::frobenius( 1.0, *A, -1.0, *Amp );
@@ -275,7 +281,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
         // const uint  n_tf32 = test_prec( 4.9e-4 );
         const uint  n_fp16 = test_prec( 4.9e-4 );
         const uint  n_fp32 = test_prec( 6.0e-8 );
-        const uint  n_fp64 = std::max< int >( i, 0 );
+        const uint  n_fp64 = i+1; // std::max< int >( i, 0 );
 
         if ( hpro::verbose( 3 ) && is_lowrank( M ) )
             std::cout << norm_M << " / " << n_fp16 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
@@ -356,24 +362,31 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
 // return memory of mixed precision storage
 //
 template < typename value_t >
-size_t
+std::tuple< size_t, size_t, size_t >
 convert_mp ( const hpro::TMatrix< value_t > &  M,
              const double                      tol )
 {
     if ( is_blocked( M ) )
     {
         auto    B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
-        size_t  s = 4+8+8+8 + sizeof(Hpro::TProcSet) + sizeof(Hpro::matform_t);
+        auto    s = std::tuple< size_t, size_t, size_t >( 0, 0, 0 );
+        // size_t  s = 4+8+8+8 + sizeof(Hpro::TProcSet) + sizeof(Hpro::matform_t);
 
-        s += 8 + 8 + 4 + 4 + sizeof( std::vector< Hpro::TMatrix< value_t > * > );
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t >*);
+        // s += 8 + 8 + 4 + 4 + sizeof( std::vector< Hpro::TMatrix< value_t > * > );
+        // s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< value_t >*);
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 if ( ! is_null( B->block( i, j ) ) )
-                    s += convert_mp( * B->block( i, j ), tol );
+                {
+                    auto  s_ij = convert_mp( * B->block( i, j ), tol );
+
+                    std::get<0>( s ) += std::get<0>( s_ij );
+                    std::get<1>( s ) += std::get<1>( s_ij );
+                    std::get<2>( s ) += std::get<2>( s_ij );
+                }// if
             }// for
         }// for
 
@@ -387,7 +400,8 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
 
         if ( is_dense( M ) )
         {
-            return M.byte_size();
+            return { 0, 0, sizeof(double) * M.nrows() * M.ncols() };
+            // return M.byte_size();
         }// if
         else if ( is_lowrank( M ) )
         {
@@ -428,14 +442,17 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
             
         const uint  n_fp16 = test_prec( 4.9e-4 );
         const uint  n_fp32 = test_prec( 6.0e-8 );
-        const uint  n_fp64 = std::max< int >( i, 0 );
+        const uint  n_fp64 = i+1; // std::max< int >( i+1, 0 );
         size_t      s      = 0;
 
-        s  = M.byte_size();
-        s -= sizeof(double) * rank * ( M.nrows() + M.ncols() );
-        s += 2 * n_fp16 * ( M.nrows() + M.ncols() );
-        s += 4 * n_fp32 * ( M.nrows() + M.ncols() );
-        s += 8 * n_fp64 * ( M.nrows() + M.ncols() );
+        HLR_ASSERT( n_fp64 >= 0 );
+        HLR_ASSERT( n_fp16 + n_fp32 + n_fp64 == rank );
+        
+        // s  = M.byte_size();
+        // s -= sizeof(double) * rank * ( M.nrows() + M.ncols() );
+        // s += 2 * n_fp16 * ( M.nrows() + M.ncols() );
+        // s += 4 * n_fp32 * ( M.nrows() + M.ncols() );
+        // s += 8 * n_fp64 * ( M.nrows() + M.ncols() );
         
         auto  nrows = M.nrows();
         auto  ncols = M.ncols();
@@ -459,11 +476,16 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
             for ( uint  j = 0; j < ncols; ++j )
                 RV(j,i) = double( half( RV(j,i) ) );
         }// for
-                  
-        return s;
+
+        return { 2 * n_fp16 * ( M.nrows() + M.ncols() ),
+                 4 * n_fp32 * ( M.nrows() + M.ncols() ),
+                 8 * n_fp64 * ( M.nrows() + M.ncols() ) };
+
+        // return s;
+        
         #endif
     }// if
 
-    return 0;
+    return { 0, 0, 0 };
 }
 
