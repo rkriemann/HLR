@@ -19,23 +19,62 @@ namespace hlr { namespace norm {
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Frobenius norm
+// forwards
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+namespace detail {
 
 template < typename value_t >
 Hpro::real_type_t< value_t >
 frobenius ( const Hpro::TMatrix< value_t > &  A );
 
-//
-// return Frobenius norm of αA+βB, e.g. |αA+βB|_F
-//
 template < typename value_t >
 Hpro::real_type_t< value_t >
 frobenius ( const value_t                     alpha,
             const Hpro::TMatrix< value_t > &  A,
             const value_t                     beta,
             const Hpro::TMatrix< value_t > &  B );
+
+template < typename arithmetic_t,
+           typename operator_t >
+requires provides_arithmetic< arithmetic_t >
+Hpro::real_type_t< Hpro::value_type_t< operator_t > >
+spectral ( arithmetic_t &&     arithmetic,
+           const operator_t &  A,
+           const double        atol,
+           const size_t        amax_it,
+           const bool          squared );
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Frobenius norm
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+Hpro::real_type_t< value_t >
+frobenius ( const Hpro::TMatrix< value_t > &  A )
+{
+    return detail::frobenius( A );
+}
+
+//
+// return Frobenius norm of αA+βB, e.g. |αA+βB|_F
+//
+template < typename alpha_t,
+           typename beta_t,
+           typename value_t >
+Hpro::real_type_t< value_t >
+frobenius ( const alpha_t                     alpha,
+            const Hpro::TMatrix< value_t > &  A,
+            const beta_t                      beta,
+            const Hpro::TMatrix< value_t > &  B )
+{
+    return detail::frobenius( value_t(alpha), A, value_t(beta), B );
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -54,7 +93,10 @@ spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
            const double        atol    = 1e-3,
            const size_t        amax_it = 50,
-           const bool          squared = true );
+           const bool          squared = true )
+{
+    return detail::spectral( arithmetic, A, atol, amax_it, squared );
+}
 
 template < typename operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >

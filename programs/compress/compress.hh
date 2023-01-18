@@ -135,6 +135,11 @@ program_main ()
     
     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );
+
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    
+    norm_A = norm::frobenius( *A );
+    error  = norm::frobenius( 1, *A, -1, *zA );
     
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
@@ -173,8 +178,6 @@ program_main ()
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
-    std::exit( 0 );
-    
     //////////////////////////////////////////////////////////////////////
     //
     // try uniform format

@@ -41,7 +41,16 @@ eps_to_rate ( const double eps )
     // else if ( eps >= 1e-8 ) return 28;
     // else if ( eps >= 1e-9 ) return 30;
     // else if ( eps >= 1e-9 ) return 30;
+
+    #if defined(HLR_COMPRESS_RATE_ARITH)
+    
     return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 8;
+
+    #else
+
+    return uint( std::ceil( std::abs( std::log2( eps ) ) ) );
+
+    #endif
 }
 
 //

@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+// define for arithmetic specific compression bit rates 
+// #define HLR_COMPRESS_RATE_ARITH
+
 #include <hlr/utils/log.hh>
 
 #include <hlr/utils/detail/zfp.hh>

@@ -25,33 +25,38 @@ inline
 byte_t
 eps_to_rate ( const double eps )
 {
-    if      ( eps >= 1e-2  ) return 7;
-    else if ( eps >= 1e-3  ) return 14;
-    else if ( eps >= 1e-4  ) return 23;
-    else if ( eps >= 1e-6  ) return 23;
-    else if ( eps >= 1e-7  ) return 31;
-    else if ( eps >= 1e-8  ) return 31;
-    else if ( eps >= 1e-9  ) return 39;
-    else if ( eps >= 1e-10 ) return 39;
-    else if ( eps >= 1e-12 ) return 44;
-    else if ( eps >= 1e-14 ) return 54;
-    else                     return 64;
-}
+    #if defined(HLR_COMPRESS_RATE_ARITH)
 
-// inline
-// byte_t
-// eps_to_rate ( const double eps )
-// {
-//     if      ( eps >= 1e-2  ) return 7;
-//     else if ( eps >= 1e-4  ) return 15;
-//     else if ( eps >= 1e-7  ) return 23;
-//     else if ( eps >= 1e-8  ) return 24;
-//     else if ( eps >= 1e-9  ) return 28;
-//     else if ( eps >= 1e-10 ) return 32;
-//     else if ( eps >= 1e-12 ) return 44;
-//     else if ( eps >= 1e-14 ) return 54;
-//     else                     return 64;
-// }
+    if      ( eps >= 1e-2  ) return 12;
+    else if ( eps >= 1e-3  ) return 14;
+    else if ( eps >= 1e-4  ) return 18;
+    else if ( eps >= 1e-5  ) return 22;
+    else if ( eps >= 1e-6  ) return 24;
+    else if ( eps >= 1e-7  ) return 28;
+    else if ( eps >= 1e-8  ) return 32;
+    else if ( eps >= 1e-9  ) return 34;
+    else if ( eps >= 1e-10 ) return 38;
+    else if ( eps >= 1e-12 ) return 38;
+    else if ( eps >= 1e-14 ) return 42;
+    else                     return 64;
+
+    #else
+
+    if      ( eps >= 1e-2  ) return 10;
+    else if ( eps >= 1e-3  ) return 12;
+    else if ( eps >= 1e-4  ) return 14;
+    else if ( eps >= 1e-5  ) return 16;
+    else if ( eps >= 1e-6  ) return 20;
+    else if ( eps >= 1e-7  ) return 22;
+    else if ( eps >= 1e-8  ) return 26;
+    else if ( eps >= 1e-9  ) return 30;
+    else if ( eps >= 1e-10 ) return 34;
+    else if ( eps >= 1e-12 ) return 38;
+    else if ( eps >= 1e-14 ) return 42;
+    else                     return 64;
+
+    #endif
+}
 
 struct config
 {
@@ -241,11 +246,11 @@ compress< double > ( const config &   config,
             const ulong   ival = (*reinterpret_cast< const ulong * >( & fval ) ) >> ((8-5)*8);
             const size_t  zpos = 5*i + bf_header_ofs;
 
-            zdata[zpos+4] = (ival & 0xff000000) >> 32;
-            zdata[zpos+3] = (ival & 0xff000000) >> 24;
-            zdata[zpos+2] = (ival & 0x00ff0000) >> 16;
-            zdata[zpos+1] = (ival & 0x0000ff00) >> 8;
-            zdata[zpos]   = (ival & 0x000000ff);
+            zdata[zpos+4] = (ival & 0xff00000000) >> 32;
+            zdata[zpos+3] = (ival & 0x00ff000000) >> 24;
+            zdata[zpos+2] = (ival & 0x0000ff0000) >> 16;
+            zdata[zpos+1] = (ival & 0x000000ff00) >> 8;
+            zdata[zpos]   = (ival & 0x00000000ff);
         }// for
     }// if
     else if ( nbyte == 6 )
@@ -263,12 +268,12 @@ compress< double > ( const config &   config,
             const ulong   ival = (*reinterpret_cast< const ulong * >( & fval ) ) >> ((8-6)*8);
             const size_t  zpos = 6*i + bf_header_ofs;
 
-            zdata[zpos+5] = (ival & 0xff000000) >> 40;
-            zdata[zpos+4] = (ival & 0xff000000) >> 32;
-            zdata[zpos+3] = (ival & 0xff000000) >> 24;
-            zdata[zpos+2] = (ival & 0x00ff0000) >> 16;
-            zdata[zpos+1] = (ival & 0x0000ff00) >> 8;
-            zdata[zpos]   = (ival & 0x000000ff);
+            zdata[zpos+5] = (ival & 0xff0000000000) >> 40;
+            zdata[zpos+4] = (ival & 0x00ff00000000) >> 32;
+            zdata[zpos+3] = (ival & 0x0000ff000000) >> 24;
+            zdata[zpos+2] = (ival & 0x000000ff0000) >> 16;
+            zdata[zpos+1] = (ival & 0x00000000ff00) >> 8;
+            zdata[zpos]   = (ival & 0x0000000000ff);
         }// for
     }// if
     else if ( nbyte == 7 )
@@ -286,13 +291,13 @@ compress< double > ( const config &   config,
             const ulong   ival = (*reinterpret_cast< const ulong * >( & fval ) ) >> ((8-7)*8);
             const size_t  zpos = 7*i + bf_header_ofs;
 
-            zdata[zpos+6] = (ival & 0xff000000) >> 48;
-            zdata[zpos+5] = (ival & 0xff000000) >> 40;
-            zdata[zpos+4] = (ival & 0xff000000) >> 32;
-            zdata[zpos+3] = (ival & 0xff000000) >> 24;
-            zdata[zpos+2] = (ival & 0x00ff0000) >> 16;
-            zdata[zpos+1] = (ival & 0x0000ff00) >> 8;
-            zdata[zpos]   = (ival & 0x000000ff);
+            zdata[zpos+6] = (ival & 0xff000000000000) >> 48;
+            zdata[zpos+5] = (ival & 0x00ff0000000000) >> 40;
+            zdata[zpos+4] = (ival & 0x0000ff00000000) >> 32;
+            zdata[zpos+3] = (ival & 0x000000ff000000) >> 24;
+            zdata[zpos+2] = (ival & 0x00000000ff0000) >> 16;
+            zdata[zpos+1] = (ival & 0x0000000000ff00) >> 8;
+            zdata[zpos]   = (ival & 0x000000000000ff);
         }// for
     }// if
     else if ( nbyte == 8 )

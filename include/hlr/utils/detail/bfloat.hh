@@ -32,33 +32,38 @@ inline
 byte_t
 eps_to_rate ( const double eps )
 {
-    if      ( eps >= 1e-2  ) return 7;
-    else if ( eps >= 1e-3  ) return 14;
-    else if ( eps >= 1e-4  ) return 23;
-    else if ( eps >= 1e-6  ) return 23;
-    else if ( eps >= 1e-7  ) return 31;
-    else if ( eps >= 1e-8  ) return 31;
-    else if ( eps >= 1e-9  ) return 39;
-    else if ( eps >= 1e-10 ) return 39;
-    else if ( eps >= 1e-12 ) return 44;
-    else if ( eps >= 1e-14 ) return 54;
-    else                     return 64;
-}
+    #if defined(HLR_COMPRESS_RATE_ARITH)
 
-// inline
-// byte_t
-// eps_to_rate ( const double eps )
-// {
-//     if      ( eps >= 1e-2  ) return 7;
-//     else if ( eps >= 1e-4  ) return 15;
-//     else if ( eps >= 1e-7  ) return 23;
-//     else if ( eps >= 1e-8  ) return 24;
-//     else if ( eps >= 1e-9  ) return 28;
-//     else if ( eps >= 1e-10 ) return 32;
-//     else if ( eps >= 1e-12 ) return 44;
-//     else if ( eps >= 1e-14 ) return 54;
-//     else                     return 64;
-// }
+    if      ( eps >= 1e-2  ) return 12;
+    else if ( eps >= 1e-3  ) return 14;
+    else if ( eps >= 1e-4  ) return 18;
+    else if ( eps >= 1e-5  ) return 22;
+    else if ( eps >= 1e-6  ) return 24;
+    else if ( eps >= 1e-7  ) return 28;
+    else if ( eps >= 1e-8  ) return 32;
+    else if ( eps >= 1e-9  ) return 34;
+    else if ( eps >= 1e-10 ) return 38;
+    else if ( eps >= 1e-12 ) return 38;
+    else if ( eps >= 1e-14 ) return 42;
+    else                     return 64;
+
+    #else
+
+    if      ( eps >= 1e-2  ) return 10;
+    else if ( eps >= 1e-3  ) return 12;
+    else if ( eps >= 1e-4  ) return 14;
+    else if ( eps >= 1e-5  ) return 16;
+    else if ( eps >= 1e-6  ) return 20;
+    else if ( eps >= 1e-7  ) return 22;
+    else if ( eps >= 1e-8  ) return 26;
+    else if ( eps >= 1e-9  ) return 30;
+    else if ( eps >= 1e-10 ) return 34;
+    else if ( eps >= 1e-12 ) return 38;
+    else if ( eps >= 1e-14 ) return 42;
+    else                     return 64;
+
+    #endif
+}
 
 struct config
 {

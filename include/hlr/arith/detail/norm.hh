@@ -23,7 +23,7 @@
 #include "hlr/utils/text.hh"
 #include "hlr/utils/math.hh"
 
-namespace hlr { namespace norm {
+namespace hlr { namespace norm { namespace detail {
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -638,6 +638,6 @@ spectral ( arithmetic_t &&     arithmetic,
 //     return Math::abs( Math::sqrt( lambda ) );
 // }
 
-}}// namespace hlr::norm
+}}}// namespace hlr::norm::detail
 
 #endif // __HLR_ARITH_DETAIL_NORM_HH
