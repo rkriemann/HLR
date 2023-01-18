@@ -291,8 +291,8 @@ public:
 
         size += hlr::compress::byte_size( _zM );
 
-        if ( is_compressed() )
-            size -= this->nrows() * this->ncols() * sizeof(value_t);
+        // if ( is_compressed() )
+        //     size -= this->nrows() * this->ncols() * sizeof(value_t);
     
         #endif
         

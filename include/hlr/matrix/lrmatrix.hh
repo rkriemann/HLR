@@ -388,8 +388,8 @@ public:
         size += hlr::compress::byte_size( _zdata.U );
         size += hlr::compress::byte_size( _zdata.V );
 
-        if ( is_compressed() )
-            size -= this->rank() * ( this->nrows() + this->ncols() ) * sizeof(value_t);
+        // if ( is_compressed() )
+        //     size -= this->rank() * ( this->nrows() + this->ncols() ) * sizeof(value_t);
     
         #endif
         
