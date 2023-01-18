@@ -26,6 +26,7 @@
 #include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/detail/apfloat.hh>
 #include <hlr/utils/detail/bfloat.hh>
+#include <hlr/utils/detail/dfloat.hh>
 
 #include <hlr/arith/blas.hh>
 
@@ -346,6 +347,23 @@ using hlr::compress::ieee754::compress;
 using hlr::compress::ieee754::decompress;
 using hlr::compress::ieee754::get_config;
 using hlr::compress::ieee754::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 17
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "dfloat";
+
+using  zconfig_t = hlr::compress::dfloat::config;
+using  zarray    = hlr::compress::dfloat::zarray;
+
+using hlr::compress::dfloat::compress;
+using hlr::compress::dfloat::decompress;
+using hlr::compress::dfloat::get_config;
+using hlr::compress::dfloat::byte_size;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
