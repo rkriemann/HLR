@@ -36,6 +36,9 @@ constexpr uint   fp64_sign_bit    = 63;
 constexpr ulong  fp64_exp_highbit = 1 << (fp64_exp_bits-1);
 constexpr ulong  fp64_zero_val    = 0xffffffffffffffff;
 
+// define for testing for zero values
+// #define AFLOAT_CHECK_ZERO
+
 inline
 byte_t
 eps_to_rate ( const double eps )
@@ -243,6 +246,8 @@ compress< double > ( const config &   config,
     // look for min/max value (> 0!)
     //
     
+    #if defined(AFLOAT_CHECK_ZERO)
+    
     double  vmin = 0;
     double  vmax = 0;
 
@@ -272,6 +277,19 @@ compress< double > ( const config &   config,
             }// if
         }// for
     }
+
+    #else
+
+    double  vmin = std::abs( data[0] );
+    double  vmax = std::abs( data[0] );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        vmin = std::min( vmin, std::abs( data[i] ) );
+        vmax = std::max( vmax, std::abs( data[i] ) );
+    }// for
+
+    #endif
 
     HLR_DBG_ASSERT( vmin > double(0) );
     
@@ -322,7 +340,9 @@ compress< double > ( const config &   config,
             const float  val  = data[i];
             uint         zval = zero_val;
             
+            #if defined(AFLOAT_CHECK_ZERO)
             if ( std::abs( val ) >= fmin )
+            #endif
             {
                 const bool   zsign = ( val < 0 );
                 
@@ -398,7 +418,9 @@ compress< double > ( const config &   config,
             // lowest <exp_bits> exponent bits
             //
         
+            #if defined(AFLOAT_CHECK_ZERO)
             if ( std::abs( val ) >= vmin )
+            #endif
             {
                 const bool    zsign = ( val < 0 );
                 const double  sval  = scale * std::abs(val) + 1;
@@ -536,9 +558,11 @@ decompress< float > ( const zarray &  zdata,
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
 
+        #if defined(AFLOAT_CHECK_ZERO)
         if ( zval == zero_val )
             dest[i] = 0;
         else
+        #endif
         {
             const uint   mant  = zval & prec_mask;
             const uint   exp   = (zval >> prec_bits) & exp_mask;
@@ -639,9 +663,11 @@ decompress< double > ( const zarray &  zdata,
             {
                 const uint  zval = zval_buf[lpos];
 
+                #if defined(AFLOAT_CHECK_ZERO)
                 if ( zval == zero_val )
                     dest[i+lpos] = 0;
                 else
+                #endif
                 {
                     const uint   mant  = zval & prec_mask;
                     const uint   exp   = (zval >> prec_bits) & exp_mask;
@@ -678,9 +704,11 @@ decompress< double > ( const zarray &  zdata,
                 else                  { bpos += zrest; }
             } while ( sbits < nbits );
 
+            #if defined(AFLOAT_CHECK_ZERO)
             if ( zval == zero_val )
                 dest[i] = 0;
             else
+            #endif
             {
                 const uint   mant  = zval & prec_mask;
                 const uint   exp   = (zval >> prec_bits) & exp_mask;
@@ -760,9 +788,11 @@ decompress< double > ( const zarray &  zdata,
             {
                 const ulong   zval  = zval_buf[lpos];
 
+                #if defined(AFLOAT_CHECK_ZERO)
                 if ( zval == zero_val )
                     dest[i+lpos] = 0;
                 else
+                #endif
                 {
                     const ulong   mant  = zval & prec_mask;
                     const ulong   exp   = (zval >> prec_bits) & exp_mask;
@@ -801,9 +831,11 @@ decompress< double > ( const zarray &  zdata,
                 else                  { bpos += zrest; }
             } while ( sbits < nbits );
 
+            #if defined(AFLOAT_CHECK_ZERO)
             if ( zval == zero_val )
                 dest[i] = 0;
             else
+            #endif
             {
                 const ulong   mant  = zval & prec_mask;
                 const ulong   exp   = (zval >> prec_bits) & exp_mask;

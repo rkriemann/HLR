@@ -37,6 +37,9 @@ constexpr uint    fp64_sign_bit    = 63;
 constexpr ulong   fp64_exp_highbit = 0b10000000000;
 constexpr ulong   fp64_zero_val    = 0xffffffffffffffff;
 
+// define for testing for zero values
+// #define APFLOAT_CHECK_ZERO
+
 inline
 byte_t
 eps_to_rate ( const double eps )
@@ -222,6 +225,8 @@ compress< double > ( const config &   config,
     // look for min/max value (> 0!)
     //
     
+    #if defined(APFLOAT_CHECK_ZERO)
+    
     double  vmin = 0;
     double  vmax = 0;
 
@@ -251,6 +256,19 @@ compress< double > ( const config &   config,
             }// if
         }// for
     }
+
+    #else
+
+    double  vmin = std::abs( data[0] );
+    double  vmax = std::abs( data[0] );
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        vmin = std::min( vmin, std::abs( data[i] ) );
+        vmax = std::max( vmax, std::abs( data[i] ) );
+    }// for
+
+    #endif
 
     HLR_DBG_ASSERT( vmin > double(0) );
     
@@ -299,8 +317,10 @@ compress< double > ( const config &   config,
         
             const float  val  = data[i];
             uint         zval = zero_val;
-            
+
+            #if defined(APFLOAT_CHECK_ZERO)
             if ( std::abs( val ) >= fmin )
+            #endif
             {
                 const bool    zsign = ( val < 0 );
 
@@ -353,7 +373,9 @@ compress< double > ( const config &   config,
             const double  val  = data[i];
             uint          zval = zero_val;
             
+            #if defined(APFLOAT_CHECK_ZERO)
             if ( std::abs( val ) >= vmin )
+            #endif
             {
                 //
                 // Use absolute value and scale v_i and add 1 such that v_i >= 2.
@@ -408,7 +430,9 @@ compress< double > ( const config &   config,
             const double  val  = data[i];
             ulong         zval = zero_val;
             
+            #if defined(APFLOAT_CHECK_ZERO)
             if ( std::abs( val ) >= vmin )
+            #endif
             {
                 //
                 // Use absolute value and scale v_i and add 1 such that v_i >= 2.
@@ -693,9 +717,11 @@ decompress< double > ( const zarray &  zdata,
                 {
                     const byte_t  zval  = zval_buf[lpos];
 
+                    #if defined(APFLOAT_CHECK_ZERO)
                     if ( zval == zero_val )
                         dest[i+lpos] = 0;
                     else
+                    #endif
                     {
                         const byte_t  mant  = zval & prec_mask;
                         const byte_t  exp   = (zval >> prec_bits) & exp_mask;
@@ -728,9 +754,11 @@ decompress< double > ( const zarray &  zdata,
                 {
                     const ushort  zval = zval_buf[lpos];
 
+                    #if defined(APFLOAT_CHECK_ZERO)
                     if ( zval == zero_val )
                         dest[i+lpos] = 0;
                     else
+                    #endif
                     {
                         const ushort  mant  = zval & prec_mask;
                         const ushort  exp   = (zval >> prec_bits) & exp_mask;
@@ -776,9 +804,11 @@ decompress< double > ( const zarray &  zdata,
                 {
                     const uint  zval  = zval_buf[lpos];
 
+                    #if defined(APFLOAT_CHECK_ZERO)
                     if ( zval == zero_val )
                         dest[i+lpos] = 0;
                     else
+                    #endif
                     {
                         const uint  mant  = zval & prec_mask;
                         const uint  exp   = (zval >> prec_bits) & exp_mask;
@@ -806,9 +836,11 @@ decompress< double > ( const zarray &  zdata,
                     HLR_ERROR( "unsupported storage size" );
             }// switch
 
+            #if defined(APFLOAT_CHECK_ZERO)
             if ( zval == zero_val )
                 dest[i] = 0;
             else
+            #endif
             {
                 const uint   mant  = zval & prec_mask;
                 const uint   exp   = (zval >> prec_bits) & exp_mask;
@@ -861,9 +893,11 @@ decompress< double > ( const zarray &  zdata,
                 {
                     const uint  zval = zval_buf[lpos];
 
+                    #if defined(APFLOAT_CHECK_ZERO)
                     if ( zval == uint(zero_val) )
                         dest[i+lpos] = 0;
                     else
+                    #endif
                     {
                         const uint   mant  = zval & prec_mask;
                         const uint   exp   = (zval >> prec_bits) & exp_mask;
@@ -946,9 +980,11 @@ decompress< double > ( const zarray &  zdata,
                 {
                     const ulong  zval = zval_buf[lpos];
 
+                    #if defined(APFLOAT_CHECK_ZERO)
                     if ( zval == zero_val )
                         dest[i+lpos] = 0;
                     else
+                    #endif
                     {
                         const ulong   mant  = zval & prec_mask;
                         const ulong   exp   = (zval >> prec_bits) & exp_mask;
@@ -983,9 +1019,11 @@ decompress< double > ( const zarray &  zdata,
                     HLR_ERROR( "unsupported byte size" );
             }// switch
 
+            #if defined(APFLOAT_CHECK_ZERO)
             if ( zval == zero_val )
                 dest[i] = 0;
             else
+            #endif
             {
                 const ulong   mant  = zval & prec_mask;
                 const ulong   exp   = (zval >> prec_bits) & exp_mask;
