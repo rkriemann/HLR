@@ -617,7 +617,7 @@ decompress< double > ( const zarray &  zdata,
         const uint  zero_val   = fp32_zero_val & (( 1 << nbits) - 1 );
 
         // number of values to read before decoding
-        constexpr size_t  nchunk = 128;
+        constexpr size_t  nchunk = 64;
     
         size_t  pos    = 6;
         uint    bpos   = 0;                          // bit position in current byte

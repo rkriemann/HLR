@@ -692,7 +692,7 @@ decompress< double > ( const zarray &  zdata,
         memcpy( & scale, zdata.data() + 2, 4 );
 
         // number of values to read before decoding
-        constexpr size_t  nchunk = 1024;
+        constexpr size_t  nchunk = 64;
         const size_t      ncsize = nsize - nsize % nchunk;  // largest multiple of <nchunk> below <nsize>
         size_t            i      = 0;
 
@@ -857,7 +857,7 @@ decompress< double > ( const zarray &  zdata,
         const uint        prec_ofs   = fp64_mant_bits - prec_bits;
         const uint        sign_shift = exp_bits + prec_bits;
         const ulong       zero_val   = fp64_zero_val & (( 1ul << nbits) - 1 );
-        constexpr size_t  nchunk     = 8;
+        constexpr size_t  nchunk     = 32;
         size_t            i          = 0;
         double            scale;
 
