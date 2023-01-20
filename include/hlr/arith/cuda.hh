@@ -45,7 +45,8 @@ template < typename T > struct cuda_type_ptr                        { using  typ
 #define HLR_CUSOLVER_CHECK( func, args )                 \
     {                                                    \
         auto  result = func args ;                       \
-        HLR_ASSERT( result == CUSOLVER_STATUS_SUCCESS ); \
+        if ( result != CUSOLVER_STATUS_SUCCESS )         \
+            HLR_ERROR( "cusolver result = " + Hpro::to_string( int(result) ) ); \
     }
 
 //
@@ -689,7 +690,7 @@ template < typename value_t >
 void
 svd ( handle               handle,
       matrix< value_t > &  M,
-      vector< typename hpro::real_type< value_t >::type_t > &  S,
+      vector< typename Hpro::real_type< value_t >::type_t > &  S,
       matrix< value_t > &  VH )
 {
     using cuda_t = typename cuda_type< value_t >::type_t;
@@ -851,7 +852,7 @@ std::pair< blas::matrix< value_t >,
 svd ( handle                           handle,
       const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
-      const hpro::TTruncAcc &          acc )
+      const Hpro::TTruncAcc &          acc )
 {
     using  cuda_t = typename cuda_type< value_t >::type_t;
     using  real_t = typename cuda::real_type< cuda_t >::type_t;
@@ -881,8 +882,8 @@ svd ( handle                           handle,
 
     if ( inrank <= acc_rank )
     {
-        OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
-        OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
+        OU = std::move( blas::matrix< value_t >( U, Hpro::copy_value ) );
+        OV = std::move( blas::matrix< value_t >( V, Hpro::copy_value ) );
 
         return { std::move( OU ), std::move( OV ) };
     }// if
@@ -919,8 +920,8 @@ svd ( handle                           handle,
         //     from_device( dev_QU, nrows_U, QU );
         //     from_device( dev_RU, inrank,  RU );
 
-        //     hpro::DBG::write( QU, "QU.mat", "QU" );
-        //     hpro::DBG::write( RU, "RU.mat", "RU" );
+        //     Hpro::DBG::write( QU, "QU.mat", "QU" );
+        //     Hpro::DBG::write( RU, "RU.mat", "RU" );
         // }
         
         auto  dev_QV = device_alloc< cuda_t >( nrows_V * inrank );
@@ -937,8 +938,8 @@ svd ( handle                           handle,
         //     from_device( dev_QV, nrows_V, QV );
         //     from_device( dev_RV, inrank,  RV );
 
-        //     hpro::DBG::write( QV, "QV.mat", "QV" );
-        //     hpro::DBG::write( RV, "RV.mat", "RV" );
+        //     Hpro::DBG::write( QV, "QV.mat", "QV" );
+        //     Hpro::DBG::write( RV, "RV.mat", "RV" );
         // }
         
         //
@@ -956,7 +957,7 @@ svd ( handle                           handle,
 
         //     from_device( dev_R, inrank,  R );
 
-        //     hpro::DBG::write( R, "R.mat", "R" );
+        //     Hpro::DBG::write( R, "R.mat", "R" );
         // }
         
         //
@@ -978,9 +979,9 @@ svd ( handle                           handle,
         //     from_device< real_t >( dev_Ss, 1, Ss );
         //     from_device( dev_Vs, inrank,  Vs );
 
-        //     hpro::DBG::write( Us, "Us.mat", "Us" );
-        //     hpro::DBG::write( Ss, "Ss.mat", "Ss" );
-        //     hpro::DBG::write( Vs, "Vs.mat", "Vs" );
+        //     Hpro::DBG::write( Us, "Us.mat", "Us" );
+        //     Hpro::DBG::write( Ss, "Ss.mat", "Ss" );
+        //     Hpro::DBG::write( Vs, "Vs.mat", "Vs" );
         // }
         
         // determine truncated rank based on singular values
@@ -1025,8 +1026,8 @@ svd ( handle                           handle,
         }// if
         else
         {
-            OU = std::move( blas::matrix< value_t >( U, hpro::copy_value ) );
-            OV = std::move( blas::matrix< value_t >( V, hpro::copy_value ) );
+            OU = std::move( blas::matrix< value_t >( U, Hpro::copy_value ) );
+            OV = std::move( blas::matrix< value_t >( V, Hpro::copy_value ) );
         }// else
 
         device_free( dev_Ss );
@@ -1054,7 +1055,7 @@ svd_dev ( handle                   handle,
           const int                rank,
           value_t * &              dev_U,
           value_t * &              dev_V,
-          const hpro::TTruncAcc &  acc )
+          const Hpro::TTruncAcc &  acc )
 {
     using  cuda_t = value_t;
     using  real_t = typename cuda::real_type< cuda_t >::type_t;
@@ -1187,7 +1188,7 @@ svd_dev2 ( handle                   handle,
            const int                rank,
            value_t * &              dev_U,
            value_t * &              dev_V,
-           const hpro::TTruncAcc &  acc,
+           const Hpro::TTruncAcc &  acc,
            int &                    new_rank )
 {
     using  cuda_t = value_t;

@@ -21,9 +21,7 @@ namespace hlr
 
 namespace hpro = HLIB;
 
-using hpro::real;
-using hpro::complex;
-using hpro::idx_t;
+using Hpro::idx_t;
 
 // local vector type
 DECLARE_TYPE( tiled_scalarvector );
@@ -41,7 +39,7 @@ namespace vector
 // with v_i of size ntile and r = #size / ntile.
 //
 template < typename T_value >
-class tiled_scalarvector : public hpro::TVector
+class tiled_scalarvector : public Hpro::TVector< T_value >
 {
 public:
     //
@@ -50,6 +48,7 @@ public:
 
     // value type
     using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     using  mutex_map_t = std::unordered_map< indexset, std::mutex, indexset_hash >;
 
@@ -73,14 +72,14 @@ public:
     //
 
     tiled_scalarvector ()
-            : TVector( 0, hpro::value_type_v< value_t > )
+            : Hpro::TVector< value_t >( 0 )
             , _is( 0, 0 )
             , _ntile( 0 )
     {}
     
     tiled_scalarvector ( const indexset &  ais,
                          tile_is_map_t &   atile_is_map )
-            : TVector( ais.first(), hpro::value_type_v< value_t > )
+            : Hpro::TVector< value_t >( ais.first() )
             , _is( ais )
             , _ntile( 0 )
     {
@@ -89,7 +88,7 @@ public:
 
     tiled_scalarvector ( const indexset  ais,
                          const size_t    antile )
-            : TVector( ais.first(), hpro::value_type_v< value_t > )
+            : Hpro::TVector< value_t >( ais.first() )
             , _is( ais )
             , _ntile( antile )
     {
@@ -99,7 +98,7 @@ public:
     tiled_scalarvector ( const indexset                   ais,
                          const size_t                     antile,
                          const blas::Vector< value_t > &  av )
-            : TVector( ais.first(), hpro::value_type_v< value_t > )
+            : Hpro::TVector< value_t >( ais.first() )
             , _is( ais )
             , _ntile( antile )
     {
@@ -153,7 +152,7 @@ public:
     //
 
     // fill with constant
-    virtual void fill ( const real  a )
+    virtual void fill ( const value_t  a )
     {
         for ( auto [ is, v_is ] : _tiles )
             blas::fill( v_is, value_t(a) );
@@ -166,29 +165,29 @@ public:
     }
 
     // scale vector by constant factor
-    virtual void scale ( const real  a )
+    virtual void scale ( const value_t  a )
     {
         for ( auto [ is, v_is ] : _tiles )
             blas::scale( a, v_is );
     }
 
     // this ≔ a · vector
-    virtual void assign ( const real             /* a */,
-                          const hpro::TVector *  /* v */ )
+    virtual void assign ( const value_t          /* a */,
+                          const Hpro::TVector< value_t > *  /* v */ )
     {
         assert( false );
     }
 
     // copy operator for all vectors
-    hpro::TVector &
-    operator = ( const hpro::TVector &  v )
+    Hpro::TVector< value_t > &
+    operator = ( const Hpro::TVector< value_t > &  v )
     {
-        assign( real(1), & v );
+        assign( value_t(1), & v );
         return *this;
     }
     
     // return euclidean norm
-    virtual real norm2 () const
+    virtual real_t  norm2 () const
     {
         value_t  f = 0;
         
@@ -199,24 +198,19 @@ public:
     }
 
     // return infimum norm
-    virtual real norm_inf () const
+    virtual real_t  norm_inf () const
     {
         assert( false );
-        return real(0);
+        return real_t(0);
     }
     
     // this ≔ this + α·x
-    virtual void axpy ( const real             /* a */,
-                        const hpro::TVector *  /* x */ )
+    virtual void axpy ( const value_t          /* a */,
+                        const Hpro::TVector< value_t > *  /* x */ )
     {
         assert( false );
     }
     
-    ////////////////////////////////////////////////
-    //
-    // BLAS functionality (complex valued)
-    //
-
     // conjugate entries
     virtual void conjugate ()
     {
@@ -224,54 +218,43 @@ public:
             blas::conj( v_is );
     }
         
-    // fill with constant
-    virtual void cfill ( const complex & )
-    { assert( false ); }
-
-    // scale vector by constant factor
-    virtual void cscale ( const complex & )
-    { assert( false ); }
-
-    // this ≔ f · vector
-    virtual void cassign ( const complex &, const TVector * )
-    { assert( false ); }
-
     // return dot-product, <x,y> = x^H · y, where x = this
-    virtual complex dot  ( const TVector *  ) const
+    virtual value_t  dot  ( const Hpro::TVector< value_t > *  ) const
     {
         assert( false );
-        return complex(0);
+        return value_t(0);
     }
 
     // return dot-product, <x,y> = x^T · y, where x = this
-    virtual complex dotu ( const TVector *  ) const
+    virtual value_t  dotu ( const Hpro::TVector< value_t > *  ) const
     {
         assert( false );
-        return complex(0);
+        return value_t(0);
     }
-
-    // this ≔ this + α·x
-    virtual void caxpy ( const complex &, const TVector * )
-    { assert( false ); }
 
     //
     // RTTI
     //
 
-    HLIB_RTTI_DERIVED( tiled_scalarvector, TVector )
+    virtual Hpro::typeid_t  type    () const { return TYPE_ID( tiled_scalarvector ); }
+    
+    virtual bool            is_type ( const Hpro::typeid_t  t ) const
+    {
+        return (t == TYPE_ID( tiled_scalarvector )) || Hpro::TVector< value_t >::is_type( t );
+    }
 
     //
     // virtual constructor
     //
 
     // return vector of same class (but no content)
-    virtual auto   create       () const -> std::unique_ptr< hpro::TVector > { return std::make_unique< tiled_scalarvector >(); }
+    virtual auto   create       () const -> std::unique_ptr< Hpro::TVector< value_t > > { return std::make_unique< tiled_scalarvector >(); }
 
     // return copy of vector
-    virtual auto   copy         () const -> std::unique_ptr< hpro::TVector >;
+    virtual auto   copy         () const -> std::unique_ptr< Hpro::TVector< value_t > >;
 
     // copy vector data to A
-    virtual void   copy_to      ( hpro::TVector *  v ) const;
+    virtual void   copy_to      ( Hpro::TVector< value_t > *  v ) const;
     
     //
     // misc.
@@ -279,14 +262,6 @@ public:
 
     // return size in bytes used by this object
     virtual size_t byte_size  () const;
-
-protected:
-    //
-    // change field type 
-    //
-    
-    virtual void  to_real     () { assert( false ); }
-    virtual void  to_complex  () { assert( false ); }
 };
 
 //
@@ -337,7 +312,7 @@ tiled_scalarvector< value_t >::copy_tiles ( const blas::Vector< value_t > &  v )
         const indexset         is_i( i, std::min< idx_t >( i + _ntile - 1, _is.last() ) );
         const tile< value_t >  v_i( v, is_i - _is.first() );
 
-        _tiles[ is_i ] = tile< value_t >( v_i, hpro::copy_value );
+        _tiles[ is_i ] = tile< value_t >( v_i, Hpro::copy_value );
         _tile_mutices[ is_i ].lock();
         _tile_mutices[ is_i ].unlock();
     }// for
@@ -347,7 +322,7 @@ tiled_scalarvector< value_t >::copy_tiles ( const blas::Vector< value_t > &  v )
 // return copy of vector
 //
 template < typename value_t >
-std::unique_ptr< hpro::TVector >
+std::unique_ptr< Hpro::TVector< value_t > >
 tiled_scalarvector< value_t >::copy () const
 {
     auto  v = std::make_unique< tiled_scalarvector >( _is, _ntile );
@@ -363,9 +338,9 @@ tiled_scalarvector< value_t >::copy () const
 //
 template < typename value_t >
 void
-tiled_scalarvector< value_t >::copy_to ( hpro::TVector *  v ) const
+tiled_scalarvector< value_t >::copy_to ( Hpro::TVector< value_t > *  v ) const
 {
-    hpro::TVector::copy_to( v );
+    Hpro::TVector< value_t >::copy_to( v );
     
     assert( IS_TYPE( v, tiled_scalarvector ) );
 
@@ -386,7 +361,7 @@ template < typename value_t >
 size_t
 tiled_scalarvector< value_t >::byte_size () const
 {
-    size_t  size = hpro::TVector::byte_size();
+    size_t  size = Hpro::TVector< value_t >::byte_size();
 
     size += sizeof(_is);
     size += sizeof(_tiles);
@@ -400,9 +375,9 @@ tiled_scalarvector< value_t >::byte_size () const
 
 //
 // type test
-inline
+template < typename value_t >
 bool
-is_tiled_scalar ( const hpro::TVector *  M )
+is_tiled_scalar ( const Hpro::TVector< value_t > *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, tiled_scalarvector );
 }

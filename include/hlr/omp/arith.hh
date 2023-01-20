@@ -22,10 +22,6 @@
 
 namespace hlr { namespace omp {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 ///////////////////////////////////////////////////////////////////////
 //
 // general arithmetic functions
@@ -43,9 +39,9 @@ mul_vec ( const value_t                    alpha,
           const blas::vector< value_t > &  x,
           blas::vector< value_t > &        y )
 {
-    // assert( ! is_null( M ) );
-    // assert( M->ncols( op_M ) == x.length() );
-    // assert( M->nrows( op_M ) == y.length() );
+    // HLR_ASSERT( ! is_null( M ) );
+    // HLR_ASSERT( M->ncols( op_M ) == x.length() );
+    // HLR_ASSERT( M->nrows( op_M ) == y.length() );
 
     if ( alpha == value_t(0) )
         return;
@@ -90,7 +86,7 @@ mul_vec ( const value_t                    alpha,
         }// if
         else if ( op_M == apply_transposed )
         {
-            assert( is_complex_type< value_t >::value == false );
+            HLR_ASSERT( is_complex_type< value_t >::value == false );
             
             auto  t = blas::mulvec( value_t(1), blas::transposed( blas_mat_A< value_t >( R ) ), x );
 
@@ -104,7 +100,7 @@ mul_vec ( const value_t                    alpha,
         }// if
     }// if
     else
-        assert( false );
+        HLR_ASSERT( false );
 }
 
 namespace detail
@@ -130,7 +126,8 @@ multiply_task ( const value_t            alpha,
         auto  BA = cptrcast( &A, TBlockMatrix );
         auto  BB = cptrcast( &B, TBlockMatrix );
         auto  BC = ptrcast(  &C, TBlockMatrix );
-        
+
+        #pragma omp taskloop collapse(3) default(shared) firstprivate(alpha,op_A,op_B)
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
@@ -146,13 +143,10 @@ multiply_task ( const value_t            alpha,
                     
                     HLR_ASSERT( ! is_null( C_ij ) );
             
-                    #pragma omp task
-                    {
-                        multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
-                    }// omp task
+                    multiply_task< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij, acc, approx );
                 }// for
             }// for
-        }// for
+        }// omp taskloop for
     }// if
     else
         hlr::multiply( alpha, op_A, A, op_B, B, C, acc, approx );
@@ -176,7 +170,7 @@ multiply_parfor ( const value_t            alpha,
         auto  BB = cptrcast( &B, TBlockMatrix );
         auto  BC = ptrcast(  &C, TBlockMatrix );
 
-        #pragma omp for collapse(3)
+        #pragma omp for collapse(3) firstprivate(alpha,op_A,op_B)
         for ( uint  i = 0; i < BC->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < BC->nblock_cols(); ++j )
@@ -237,13 +231,15 @@ multiply ( const value_t            alpha,
 namespace detail
 {
 
-inline void
-gauss_elim_helper ( hpro::TMatrix &          A,
-                    hpro::TMatrix &          T,
-                    const hpro::TTruncAcc &  acc )
+template < typename approx_t >
+void
+gauss_elim_task ( hpro::TMatrix &          A,
+                  hpro::TMatrix &          T,
+                  const hpro::TTruncAcc &  acc,
+                  const approx_t &         approx )
 {
-    assert( ! is_null_any( &A, &T ) );
-    assert( A.type() == T.type() );
+    HLR_ASSERT( ! is_null_any( &A, &T ) );
+    HLR_ASSERT( A.type() == T.type() );
 
     HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
     
@@ -255,38 +251,50 @@ gauss_elim_helper ( hpro::TMatrix &          A,
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        hlr::seq::gauss_elim( *MA(0,0), *MT(0,0), acc );
+        gauss_elim_task( *MA(0,0), *MT(0,0), acc, approx );
 
         // T_01 = A_00⁻¹ · A_01
         #pragma omp taskgroup
         {
             #pragma omp task
-            hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+            {
+                MT(0,1)->scale( 0.0 );
+                hlr::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), MT(0,1), acc, approx );
+            }// omp task
         
             // T_10 = A_10 · A_00⁻¹
             #pragma omp task
-            hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+            {
+                MT(1,0)->scale( 0.0 );
+                hlr::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), MT(1,0), acc, approx );
+            }// omp task
         }// taskgroup
         
         // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), MA(1,1), acc, approx );
     
         // A_11 = A_11⁻¹
-        hlr::seq::gauss_elim( *MA(1,1), *MT(1,1), acc );
+        gauss_elim_task( *MA(1,1), *MT(1,1), acc, approx );
 
         #pragma omp taskgroup
         {
             // A_01 = - T_01 · A_11
             #pragma omp task
-            hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+            {
+                MA(0,1)->scale( 0.0 );
+                hlr::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), MA(0,1), acc, approx );
+            }// omp task
             
             // A_10 = - A_11 · T_10
             #pragma omp task
-            hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+            {
+                MA(1,0)->scale( 0.0 );
+                hlr::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), MA(1,0), acc, approx );
+            }// omp task
         }// taskgroup
 
         // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), MA(0,0), acc, approx );
     }// if
     else if ( is_dense( A ) )
     {
@@ -296,17 +304,19 @@ gauss_elim_helper ( hpro::TMatrix &          A,
         else                  blas::invert( DA->blas_rmat() );
     }// if
     else
-        assert( false );
+        HLR_ASSERT( false );
 
     HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
 }
 
 }// namespace detail
 
-inline void
+template < typename approx_t >
+void
 gauss_elim ( hpro::TMatrix &          A,
              hpro::TMatrix &          T,
-             const hpro::TTruncAcc &  acc )
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
 {
     #pragma omp parallel
     {
@@ -314,7 +324,7 @@ gauss_elim ( hpro::TMatrix &          A,
         {
             #pragma omp task
             {
-                detail::gauss_elim_helper( A, T, acc );
+                detail::gauss_elim_task( A, T, acc, approx );
             }// # task
         }// single 
     }// omp
@@ -341,7 +351,7 @@ lu ( hpro::TMatrix &          A,
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
-    assert( is_blocked( A ) );
+    HLR_ASSERT( is_blocked( A ) );
 
     auto  BA  = ptrcast( &A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -515,7 +525,7 @@ lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx )
 {
-    assert( is_blocked( A ) );
+    HLR_ASSERT( is_blocked( A ) );
 
     auto  BA  = ptrcast( &A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();

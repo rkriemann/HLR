@@ -22,17 +22,10 @@
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_tiled_v2.hh"
-#include "hlr/tbb/arith_tiled_v2.hh"
 
 namespace hlr { namespace dag {
 
-// map HLIB namespaces to HLR
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 using hpro::id_t;
-using hpro::real;
 
 // import matrix types
 using hlr::matrix::indexset;
@@ -141,28 +134,28 @@ struct matrix_info
 };
 
 template <>
-matrix_info< blas::matrix< real > >::~matrix_info ()
+matrix_info< blas::matrix< double > >::~matrix_info ()
 {}
 
 template <>
-matrix_info< tile_storage< real > * >::~matrix_info ()
+matrix_info< tile_storage< double > * >::~matrix_info ()
 {}
 
 template <>
-matrix_info< std::shared_ptr< blas::matrix< real > > >::~matrix_info ()
+matrix_info< std::shared_ptr< blas::matrix< double > > >::~matrix_info ()
 {
 //    std::cout << "matrix : " << data.get() << ", #" << data.use_count() << std::endl;
 }
 
 template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::~matrix_info ()
+matrix_info< std::shared_ptr< tile_storage< double > > >::~matrix_info ()
 {
 //    std::cout << "matrix : " << data.get() << ", #" << data.use_count() << std::endl;
 }
 
 template <>
-matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const indexset                           ais,
-                                                                      std::shared_ptr< tile_storage< real > >  adata )
+matrix_info< std::shared_ptr< tile_storage< double > > >::matrix_info ( const indexset                           ais,
+                                                                      std::shared_ptr< tile_storage< double > >  adata )
         : name( id_t(adata.get()) )
         , id( -1 )
         , is( ais )
@@ -170,7 +163,7 @@ matrix_info< std::shared_ptr< tile_storage< real > > >::matrix_info ( const inde
 {}
 
 template <>
-matrix_info< std::shared_ptr< blas::matrix< real > > >::matrix_info ( std::shared_ptr< blas::matrix< real > >  adata )
+matrix_info< std::shared_ptr< blas::matrix< double > > >::matrix_info ( std::shared_ptr< blas::matrix< double > >  adata )
         : name( id_t(adata.get()) )
         , id( -1  )
         , is( IS_ONE )
@@ -180,30 +173,30 @@ matrix_info< std::shared_ptr< blas::matrix< real > > >::matrix_info ( std::share
 //  { return { name, block_is() }; }
 template <>
 const mem_block_t
-matrix_info< tile_storage< real > * >::mem_block () const
+matrix_info< tile_storage< double > * >::mem_block () const
 {
     return { id_t(data), block_is() };
 }
 
 template <>
 const mem_block_t
-matrix_info< std::shared_ptr< tile_storage< real > > >::mem_block () const
+matrix_info< std::shared_ptr< tile_storage< double > > >::mem_block () const
 {
     return { id_t(data.get()), block_is() };
 }
 
 template <>
 const mem_block_t
-matrix_info< std::shared_ptr< blas::matrix< real > > >::mem_block () const
+matrix_info< std::shared_ptr< blas::matrix< double > > >::mem_block () const
 {
     return { id_t(data.get()), block_is() };
 }
 
 
-using dense_matrix        = matrix_info< blas::matrix< real > >;
-using tiled_matrix        = matrix_info< tile_storage< real > * >;
-using shared_matrix       = matrix_info< std::shared_ptr< blas::matrix< real > > >;
-using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< real > > >;
+using dense_matrix        = matrix_info< blas::matrix< double > >;
+using tiled_matrix        = matrix_info< tile_storage< double > * >;
+using shared_matrix       = matrix_info< std::shared_ptr< blas::matrix< double > > >;
+using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< double > > >;
 
 //
 // update U·T·V^H to low-rank matrix
@@ -267,11 +260,11 @@ constexpr id_t  NAME_NONE = '0';
 //
 struct lu_node : public node
 {
-    TMatrix *       A;
+    Hpro::TMatrix< double > *       A;
     update_map_t &  update_map;
     const size_t    ntile;
     
-    lu_node ( TMatrix *       aA,
+    lu_node ( Hpro::TMatrix< double > *       aA,
               update_map_t &  aupdate_map,
               const size_t    antile )
             : A( aA )
@@ -283,7 +276,7 @@ struct lu_node : public node
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { NAME_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { NAME_L, A->block_is() }, { NAME_U, A->block_is() } }; }
@@ -295,13 +288,13 @@ private:
 //
 struct trsmu_node : public node
 {
-    const TMatrix *  U;
+    const Hpro::TMatrix< double > *  U;
     tiled_matrix     X;
     tiled_matrix     M;
     update_map_t &   update_map;
     const size_t     ntile;
     
-    trsmu_node ( const TMatrix *  aU,
+    trsmu_node ( const Hpro::TMatrix< double > *  aU,
                  tiled_matrix     aX,
                  tiled_matrix     aM,
                  update_map_t &   aupdate_map,
@@ -320,7 +313,7 @@ struct trsmu_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { NAME_U, U->block_is() }, M.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
@@ -332,13 +325,13 @@ private:
 //
 struct trsml_node : public node
 {
-    const TMatrix *  L;
+    const Hpro::TMatrix< double > *  L;
     tiled_matrix     X;
     tiled_matrix     M;
     update_map_t &   update_map;
     const size_t     ntile;
 
-    trsml_node ( const TMatrix *  aL,
+    trsml_node ( const Hpro::TMatrix< double > *  aL,
                  tiled_matrix     aX,
                  tiled_matrix     aM,
                  update_map_t &   aupdate_map,
@@ -357,7 +350,7 @@ struct trsml_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { { NAME_L, L->block_is() }, M.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
@@ -372,14 +365,14 @@ struct addlr_node : public node
     tiled_matrix    U;
     shared_matrix   T;
     tiled_matrix    V;
-    TMatrix *       A;
+    Hpro::TMatrix< double > *       A;
     update_map_t &  update_map;
     const size_t    ntile;
 
     addlr_node ( tiled_matrix    aU,
                  shared_matrix   aT,
                  tiled_matrix    aV,
-                 TMatrix *       aA,
+                 Hpro::TMatrix< double > *       aA,
                  update_map_t &  aupdate_map,
                  const size_t    antile )
             : U( aU )
@@ -398,7 +391,7 @@ struct addlr_node : public node
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U.mem_block(), V.mem_block(), T.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { { NAME_A, A->block_is() } }; }
@@ -432,7 +425,7 @@ struct dot_node : public node
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { A.mem_block(), B.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { T.mem_block() }; }
@@ -445,17 +438,17 @@ private:
 template < typename matrixX_t, typename matrixY_t >
 struct tprod_node : public node
 {
-    const real     alpha;
+    const double     alpha;
     matrixX_t      X;
     shared_matrix  T;
-    const real     beta;
+    const double     beta;
     matrixY_t      Y;
     const size_t   ntile;
 
-    tprod_node ( const real     aalpha,
+    tprod_node ( const double     aalpha,
                  matrixX_t      aX,
                  shared_matrix  aT,
-                 const real     abeta,
+                 const double     abeta,
                  matrixY_t      aY,
                  const size_t   antile )
             : alpha( aalpha )
@@ -473,11 +466,11 @@ struct tprod_node : public node
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
-        if ( beta == real(0) ) return { X.mem_block(), T.mem_block() };
+        if ( beta == double(0) ) return { X.mem_block(), T.mem_block() };
         else                   return { X.mem_block(), T.mem_block(), Y.mem_block() };
     }
     virtual const block_list_t  out_blocks_  () const { return { Y.mem_block() }; }
@@ -487,12 +480,12 @@ private:
 template < typename matrix_t >
 struct tprod_ip_node : public node
 {
-    const real     alpha;
+    const double     alpha;
     matrix_t       X;
     shared_matrix  T;
     const size_t   ntile;
 
-    tprod_ip_node ( const real     aalpha,
+    tprod_ip_node ( const double     aalpha,
                     matrix_t       aX,
                     shared_matrix  aT,
                     const size_t   antile )
@@ -506,7 +499,7 @@ struct tprod_ip_node : public node
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), T.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { X.mem_block() }; }
@@ -534,7 +527,7 @@ struct tadd_node : public node
     virtual std::string  color     () const { return "8ae234"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { T0.mem_block(), T1.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { T.mem_block() }; }
@@ -546,22 +539,22 @@ private:
 //
 struct truncate_node : public node
 {
-    const real                alpha;
+    const double                alpha;
     tiled_matrix              X;
     shared_matrix             T;
     tiled_matrix              Y;
     tiled_matrix              U;
     tiled_matrix              V;
-    tiled_lrmatrix< real > *  A;
+    tiled_lrmatrix< double > *  A;
     const size_t              ntile;
 
-    truncate_node ( const real                aalpha,
+    truncate_node ( const double                aalpha,
                     tiled_matrix              aX,
                     shared_matrix             aT,
                     tiled_matrix              aY,
                     tiled_matrix              aU,
                     tiled_matrix              aV,
-                    tiled_lrmatrix< real > *  aA,
+                    tiled_lrmatrix< double > *  aA,
                     const size_t              antile )
             : alpha( aalpha )
             , X( aX )
@@ -581,7 +574,7 @@ struct truncate_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), T.mem_block(), Y.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -627,7 +620,7 @@ struct truncate2_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
+    virtual void                run_         ( const Hpro::TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), V1.mem_block(), U2.mem_block(), V2.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -679,7 +672,7 @@ struct truncate3_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
+    virtual void                run_         ( const Hpro::TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block(),
                                                                  U2.mem_block(), T2.mem_block(), V2.mem_block() }; }
@@ -722,7 +715,7 @@ struct truncate4_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
+    virtual void                run_         ( const Hpro::TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { U1.mem_block(), T1.mem_block(), V1.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -734,20 +727,20 @@ private:
 //
 struct truncate5_node : public node
 {
-    const real                alpha;
+    const double                alpha;
     shared_tiled_matrix       X;
     shared_tiled_matrix       Y;
     tiled_matrix              U;
     tiled_matrix              V;
-    tiled_lrmatrix< real > *  A;
+    tiled_lrmatrix< double > *  A;
     const size_t              ntile;
 
-    truncate5_node ( const real                aalpha,
+    truncate5_node ( const double                aalpha,
                      shared_tiled_matrix       aX,
                      shared_tiled_matrix       aY,
                      tiled_matrix              aU,
                      tiled_matrix              aV,
-                     tiled_lrmatrix< real > *  aA,
+                     tiled_lrmatrix< double > *  aA,
                      const size_t              antile )
             : alpha( aalpha )
             , X( aX )
@@ -766,7 +759,7 @@ struct truncate5_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc & ) { assert( false ); }
+    virtual void                run_         ( const Hpro::TTruncAcc & ) { assert( false ); }
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const { return { X.mem_block(), Y.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { U.mem_block(), V.mem_block() }; }
@@ -780,7 +773,7 @@ template < typename  matrixX_t,
            typename  matrixU_t >
 struct tsqr_node : public node
 {
-    const real           alpha;
+    const double           alpha;
     matrixX_t            X;
     shared_matrix        T;
     matrixU_t            U;
@@ -788,7 +781,7 @@ struct tsqr_node : public node
     shared_matrix        R;
     const size_t         ntile;
 
-    tsqr_node ( const real           aalpha,
+    tsqr_node ( const double           aalpha,
                 matrixX_t            aX,
                 shared_matrix        aT,
                 matrixU_t            aU,
@@ -804,7 +797,7 @@ struct tsqr_node : public node
             , ntile( antile )
     { init(); }
 
-    tsqr_node ( const real           aalpha,
+    tsqr_node ( const double           aalpha,
                 matrixX_t            aX,
                 matrixU_t            aU,
                 shared_tiled_matrix  aQ,
@@ -812,7 +805,7 @@ struct tsqr_node : public node
                 const size_t         antile )
             : alpha( aalpha )
             , X( aX )
-            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< real > >() ) ) // T = 0
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< double > >() ) ) // T = 0
             , U( aU )
             , Q( aQ )
             , R( aR )
@@ -829,7 +822,7 @@ struct tsqr_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
@@ -843,14 +836,14 @@ private:
 template < typename  matrixX_t >
 struct tsqr1_node : public node
 {
-    const real           alpha;
+    const double           alpha;
     matrixX_t            X;
     shared_matrix        T;
     shared_tiled_matrix  Q;
     shared_matrix        R;
     const size_t         ntile;
 
-    tsqr1_node ( const real           aalpha,
+    tsqr1_node ( const double           aalpha,
                  matrixX_t            aX,
                  shared_matrix        aT,
                  shared_tiled_matrix  aQ,
@@ -864,14 +857,14 @@ struct tsqr1_node : public node
             , ntile( antile )
     { init(); }
 
-    tsqr1_node ( const real           aalpha,
+    tsqr1_node ( const double           aalpha,
                  matrixX_t            aX,
                  shared_tiled_matrix  aQ,
                  shared_matrix        aR,
                  const size_t         antile )
             : alpha( aalpha )
             , X( aX )
-            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< real > >() ) ) // T = 0
+            , T( shared_matrix( NAME_NONE, std::shared_ptr< blas::matrix< double > >() ) ) // T = 0
             , Q( aQ )
             , R( aR )
             , ntile( antile )
@@ -887,7 +880,7 @@ struct tsqr1_node : public node
     virtual std::string  color     () const { return "e9b96e"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t  min_size );
     virtual const block_list_t  in_blocks_   () const
     {
@@ -922,7 +915,7 @@ struct qr_node : public node
     virtual std::string  color     () const { return "c17d11"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { R0.mem_block(), R1.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { R0.mem_block(), R1.mem_block(), R.mem_block() }; }
@@ -953,7 +946,7 @@ struct svd_node : public node
     virtual std::string  color     () const { return "ad7fa8"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return { R0.mem_block(), R1.mem_block() }; }
     virtual const block_list_t  out_blocks_  () const { return { Uk.mem_block(), Vk.mem_block() }; }
@@ -965,11 +958,11 @@ private:
 //
 struct apply_node : public node
 {
-    tiled_lrmatrix< real > *  M;
+    tiled_lrmatrix< double > *  M;
     lr_update_t               upd;
     size_t                    ntile;
 
-    apply_node ( tiled_lrmatrix< real > *  aM,
+    apply_node ( tiled_lrmatrix< double > *  aM,
                  tiled_matrix              aU,
                  shared_matrix             aT,
                  tiled_matrix              aV,
@@ -983,7 +976,7 @@ struct apply_node : public node
     virtual std::string  color     () const { return "c4a000"; }
 
 private:
-    virtual void                run_         ( const TTruncAcc & ) {}
+    virtual void                run_         ( const Hpro::TTruncAcc & ) {}
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const
     {
@@ -1008,7 +1001,7 @@ std::tuple< node *,
             shared_tiled_matrix,
             shared_tiled_matrix >
 build_upd_nodes_pairwise_svd ( local_graph &    g,
-                               TMatrix *        M,
+                               Hpro::TMatrix< double > *        M,
                                update_list_t &  upds,
                                const size_t     ntile )
 {
@@ -1030,8 +1023,8 @@ build_upd_nodes_pairwise_svd ( local_graph &    g,
         auto  [ upd2, U2, V2 ] = build_upd_nodes_pairwise_svd( g, M, upds2, ntile );
 
         auto  first = ptrcast( upds.front(), apply_node );
-        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< real > >() );
-        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< double > >() );
+        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< double > >() );
         auto  sum   = g.alloc_node< truncate2_node >( U1, V1, U2, V2,
                                                       U, V, ntile );
 
@@ -1043,8 +1036,8 @@ build_upd_nodes_pairwise_svd ( local_graph &    g,
     {
         auto  first = ptrcast( upds.front(), apply_node );
         auto  last  = ptrcast( upds.back(),  apply_node );
-        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< real > >() );
-        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  U     = shared_tiled_matrix( first->upd.U.is, std::make_shared< tile_storage< double > >() );
+        auto  V     = shared_tiled_matrix( first->upd.V.is, std::make_shared< tile_storage< double > >() );
         auto  trunc = g.alloc_node< truncate3_node >( first->upd.U, first->upd.T, first->upd.V,
                                                       last->upd.U,  last->upd.T,  last->upd.V,
                                                       U, V, ntile );
@@ -1056,8 +1049,8 @@ build_upd_nodes_pairwise_svd ( local_graph &    g,
     else if ( nupds == 1 )
     {
         auto  upd   = ptrcast( upds.front(), apply_node );
-        auto  U     = shared_tiled_matrix( upd->upd.U.is, std::make_shared< tile_storage< real > >() );
-        auto  V     = shared_tiled_matrix( upd->upd.V.is, std::make_shared< tile_storage< real > >() );
+        auto  U     = shared_tiled_matrix( upd->upd.U.is, std::make_shared< tile_storage< double > >() );
+        auto  V     = shared_tiled_matrix( upd->upd.V.is, std::make_shared< tile_storage< double > >() );
         auto  trunc = g.alloc_node< truncate4_node >( upd->upd.U, upd->upd.T, upd->upd.V,
                                                       U, V, ntile );
 
@@ -1078,11 +1071,11 @@ lu_node::refine_ ( const size_t  tile_size )
 
     if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< double > );
         auto  BL  = BA;
         auto  BU  = BA;
-        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< real > );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< double > );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< double > );
 
         assert(( BA->nblock_rows() == 2 ) && ( BA->nblock_cols() == 2 ));
         assert( is_tiled_lowrank( A10 ));
@@ -1110,7 +1103,7 @@ lu_node::refine_ ( const size_t  tile_size )
         if ( update_map[ A10->id() ].size() > 0 )
         {
             auto  [ sum_10, U10, V10 ] = build_upd_nodes_pairwise_svd( g, A10, update_map[ A10->id() ], ntile );
-            auto  upd_10               = g.alloc_node< truncate5_node >( real(-1),
+            auto  upd_10               = g.alloc_node< truncate5_node >( double(-1),
                                                                          U10, V10,
                                                                          tiled_matrix( NAME_A, A10->id(), A10->row_is(), & A10->U() ),
                                                                          tiled_matrix( NAME_A, A10->id(), A10->col_is(), & A10->V() ),
@@ -1124,7 +1117,7 @@ lu_node::refine_ ( const size_t  tile_size )
         if ( update_map[ A01->id() ].size() > 0 )
         {
             auto  [ sum_01, U01, V01 ] = build_upd_nodes_pairwise_svd( g, A01, update_map[ A01->id() ], ntile );
-            auto  upd_01               = g.alloc_node< truncate5_node >( real(-1),
+            auto  upd_01               = g.alloc_node< truncate5_node >( double(-1),
                                                                          U01, V01,
                                                                          tiled_matrix( NAME_A, A01->id(), A01->row_is(), & A01->U() ),
                                                                          tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
@@ -1135,7 +1128,7 @@ lu_node::refine_ ( const size_t  tile_size )
             solve_01->after( upd_01 );
         }// if
 
-        auto  T        = std::make_shared< blas::matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< double > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, A10->id(), A10->col_is(), & A10->V() ),
                                                    tiled_matrix( NAME_U, A01->id(), A01->row_is(), & A01->U() ),
                                                    shared_matrix( T ),
@@ -1163,9 +1156,9 @@ lu_node::refine_ ( const size_t  tile_size )
 }
 
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    hlr::seq::tiled2::hodlr::lu< real >( A, acc, ntile );
+    hlr::seq::tiled2::hodlr::lu< double >( A, acc, ntile );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1187,9 +1180,9 @@ trsmu_node::refine_ ( const size_t  tile_size )
         //  ⎣ R_01^T │ R_11^T ⎦ ⎣X_1⎦   ⎣ V(R_01) U(R_01)^T │ R_11^T ⎦ ⎣X_1⎦   ⎣M_1⎦
         //
         
-        auto  BU  = cptrcast( U, TBlockMatrix );
+        auto  BU  = cptrcast( U, Hpro::TBlockMatrix< double > );
         auto  U00 = BU->block( 0, 0 );
-        auto  U01 = ptrcast( const_cast< TBlockMatrix * >( BU )->block( 0, 1 ), tiled_lrmatrix< real > );
+        auto  U01 = ptrcast( const_cast< Hpro::TBlockMatrix< double > * >( BU )->block( 0, 1 ), tiled_lrmatrix< double > );
         auto  U11 = BU->block( 1, 1 );
 
         assert( is_tiled_lowrank( U01 ) );
@@ -1201,15 +1194,15 @@ trsmu_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( is0, X ),
                                                      tiled_matrix( is0, M ),
                                                      update_map, ntile );
-        auto  T        = std::make_shared< blas::matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< double > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_U, U01->id(), U01->row_is(), & U01->U() ),
                                                    tiled_matrix( is0, X ),
                                                    shared_matrix( T ),
                                                    ntile );
-        auto  tprod    = new tprod_node( real(-1),
+        auto  tprod    = new tprod_node( double(-1),
                                          tiled_matrix( NAME_U, U01->id(), U01->col_is(), & U01->V() ),
                                          shared_matrix( T ),
-                                         real(1),
+                                         double(1),
                                          tiled_matrix( is1, M ),
                                          ntile );
         auto  solve_11 = g.alloc_node< trsmu_node >( U11,
@@ -1230,7 +1223,7 @@ trsmu_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsmu_node::run_ ( const TTruncAcc & )
+trsmu_node::run_ ( const Hpro::TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsmuh( U, *(X.data), ntile );
 }
@@ -1254,9 +1247,9 @@ trsml_node::refine_ ( const size_t  tile_size )
         //  ⎣ L_10 │ L_11 ⎦ ⎣X_1⎦   ⎣ U(L_01) V(L_01)^T │ L_11 ⎦ ⎣X_1⎦   ⎣M_1⎦
         //
         
-        auto  BL  = cptrcast( L, TBlockMatrix );
+        auto  BL  = cptrcast( L, Hpro::TBlockMatrix< double > );
         auto  L00 = BL->block( 0, 0 );
-        auto  L10 = ptrcast( const_cast< TBlockMatrix * >( BL )->block( 1, 0 ), tiled_lrmatrix< real > );
+        auto  L10 = ptrcast( const_cast< Hpro::TBlockMatrix< double > * >( BL )->block( 1, 0 ), tiled_lrmatrix< double > );
         auto  L11 = BL->block( 1, 1 );
 
         assert( is_tiled_lowrank( L10 ) );
@@ -1268,15 +1261,15 @@ trsml_node::refine_ ( const size_t  tile_size )
                                                      tiled_matrix( is0, X ),
                                                      tiled_matrix( is0, M ),
                                                      update_map, ntile );
-        auto  T        = std::make_shared< blas::matrix< real > >();
+        auto  T        = std::make_shared< blas::matrix< double > >();
         auto  tsmul    = g.alloc_node< dot_node >( tiled_matrix( NAME_L, L10->id(), L10->col_is(), & L10->V() ),
                                                    tiled_matrix( is0, X ),
                                                    shared_matrix( T ),
                                                    ntile );
-        auto  tprod    = new tprod_node( real(-1),
+        auto  tprod    = new tprod_node( double(-1),
                                          tiled_matrix( NAME_L, L10->id(), L10->row_is(), & L10->U() ),
                                          shared_matrix( T ),
-                                         real(1),
+                                         double(1),
                                          tiled_matrix( is1, M ),
                                          ntile );
         auto  solve_11 = g.alloc_node< trsml_node >( L11,
@@ -1297,7 +1290,7 @@ trsml_node::refine_ ( const size_t  tile_size )
 }
 
 void
-trsml_node::run_ ( const TTruncAcc & )
+trsml_node::run_ ( const Hpro::TTruncAcc & )
 {
     hlr::seq::tiled2::hodlr::trsml( L, *(X.data), ntile );
 }
@@ -1320,8 +1313,8 @@ dot_node::refine_ ( const size_t  tile_size )
         const auto  sis_A = split( A.is, 2 );
         const auto  sis_B = split( B.is, 2 );
 
-        auto  T0     = std::make_shared< blas::matrix< real > >();
-        auto  T1     = std::make_shared< blas::matrix< real > >();
+        auto  T0     = std::make_shared< blas::matrix< double > >();
+        auto  T1     = std::make_shared< blas::matrix< double > >();
         auto  tsmul0 = g.alloc_node< dot_node  >( tiled_matrix( sis_A[0], A ),
                                                   tiled_matrix( sis_B[0], B ),
                                                   shared_matrix( T0 ),
@@ -1344,7 +1337,7 @@ dot_node::refine_ ( const size_t  tile_size )
 }
 
 void
-dot_node::run_ ( const TTruncAcc & )
+dot_node::run_ ( const Hpro::TTruncAcc & )
 {
     *(T.data) = hlr::seq::tiled2::dot( A.is, *(A.data), *(B.data), ntile );
 
@@ -1381,7 +1374,7 @@ tprod_node< matrixX_t, matrixY_t >::refine_ ( const size_t  tile_size )
 
 template < typename matrixX_t, typename matrixY_t >
 void
-tprod_node< matrixX_t, matrixY_t >::run_ ( const TTruncAcc & )
+tprod_node< matrixX_t, matrixY_t >::run_ ( const Hpro::TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), beta, *(Y.data), ntile );
 }
@@ -1407,7 +1400,7 @@ tprod_ip_node< matrix_t >::refine_ ( const size_t  tile_size )
 
 template <>
 void
-tprod_ip_node< shared_tiled_matrix >::run_ ( const TTruncAcc & )
+tprod_ip_node< shared_tiled_matrix >::run_ ( const Hpro::TTruncAcc & )
 {
     hlr::seq::tiled2::tprod( X.is, alpha, *(X.data), *(T.data), ntile );
 }
@@ -1425,10 +1418,10 @@ addlr_node::refine_ ( const size_t  tile_size )
 
     if ( is_blocked( A ) && ! is_small( tile_size, A ) )
     {
-        auto  BA  = ptrcast( A, TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< double > );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< real > );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< double > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< double > );
         auto  A11 = BA->block( 1, 1 );
         
         assert( is_tiled_lowrank( A01 ) );
@@ -1465,7 +1458,7 @@ addlr_node::refine_ ( const size_t  tile_size )
             update_map[ A10->id() ].push_back( apply_10 );
         }
         
-        // g.alloc_node< truncate_node >( real(-1),
+        // g.alloc_node< truncate_node >( double(-1),
         //                                tiled_matrix( A01->row_is(), U ),
         //                                T,
         //                                tiled_matrix( A01->col_is(), V ),
@@ -1473,7 +1466,7 @@ addlr_node::refine_ ( const size_t  tile_size )
         //                                tiled_matrix( NAME_A, A01->id(), A01->col_is(), & A01->V() ),
         //                                A01,
         //                                ntile );
-        // g.alloc_node< truncate_node >( real(-1),
+        // g.alloc_node< truncate_node >( double(-1),
         //                                tiled_matrix( A10->row_is(), U ),
         //                                T,
         //                                tiled_matrix( A10->col_is(), V ),
@@ -1495,7 +1488,7 @@ addlr_node::refine_ ( const size_t  tile_size )
 }
 
 void
-addlr_node::run_ ( const TTruncAcc &  acc )
+addlr_node::run_ ( const Hpro::TTruncAcc &  acc )
 {
     hpro::TScopedLock  lock( *A );
     
@@ -1509,15 +1502,15 @@ addlr_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-tadd_node::run_ ( const TTruncAcc & )
+tadd_node::run_ ( const Hpro::TTruncAcc & )
 {
     assert(( T0.data->nrows() == T1.data->nrows() ) && ( T0.data->ncols() == T1.data->ncols() ));
     
     if (( T.data->nrows() != T0.data->nrows() ) || ( T.data->ncols() != T0.data->ncols() ))
-        *(T.data) = blas::matrix< real >( T0.data->nrows(), T0.data->ncols() );
+        *(T.data) = blas::matrix< double >( T0.data->nrows(), T0.data->ncols() );
     
-    blas::add( real(1), *(T0.data), *(T.data) );
-    blas::add( real(1), *(T1.data), *(T.data) );
+    blas::add( double(1), *(T0.data), *(T.data) );
+    blas::add( double(1), *(T1.data), *(T.data) );
 
     HLR_LOG( 5, "        tadd :             = " + hlr::seq::tiled2::normstr( blas::normF( *(T.data) ) ) );
 }
@@ -1536,27 +1529,27 @@ truncate_node::refine_ ( const size_t )
     assert( X.is == U.is );
     assert( Y.is == V.is );
 
-    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
-    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
+    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< double > >() );
+    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< double > >() );
+    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< double > >() );
+    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< double > >() );
 
     // perform QR for U/V
     auto  qr_U   = new tsqr_node( alpha,   X, T, U, Q0, R0, ntile );
-    auto  qr_V   = new tsqr_node( real(1), Y,    V, Q1, R1, ntile );
+    auto  qr_V   = new tsqr_node( double(1), Y,    V, Q1, R1, ntile );
 
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
 
     // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+    auto  mul_U  = new tprod_node( double(1), Q0, Uk, double(0), U, ntile );
+    auto  mul_V  = new tprod_node( double(1), Q1, Vk, double(0), V, ntile );
 
     g.add_node( mul_U );
     g.add_node( mul_V );
@@ -1579,27 +1572,27 @@ truncate2_node::refine_ ( const size_t )
     assert( V1.is == V2.is );
     assert( V1.is == V.is );
 
-    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
-    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
+    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< double > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
+    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< double > >() );
+    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
 
     // perform QR for U/V
-    auto  qr_U   = new tsqr_node( real(1), U1, U2, Q1, R1, ntile );
-    auto  qr_V   = new tsqr_node( real(1), V1, V2, Q2, R2, ntile );
+    auto  qr_U   = new tsqr_node( double(1), U1, U2, Q1, R1, ntile );
+    auto  qr_V   = new tsqr_node( double(1), V1, V2, Q2, R2, ntile );
 
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
     auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
 
     svd->after( qr_U, qr_V );
 
     // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q1, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q2, Vk, real(0), V, ntile );
+    auto  mul_U  = new tprod_node( double(1), Q1, Uk, double(0), U, ntile );
+    auto  mul_V  = new tprod_node( double(1), Q2, Vk, double(0), V, ntile );
 
     g.add_node( mul_U, mul_V );
     
@@ -1621,27 +1614,27 @@ truncate3_node::refine_ ( const size_t )
     assert( V1.is == V2.is );
     assert( V1.is == V.is );
 
-    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
-    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
+    auto  Q1 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< double > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
+    auto  Q2 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< double > >() );
+    auto  R2 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
 
     // perform QR for U/V
-    auto  qr_U   = new tsqr_node( real(1), U1, T1, U2, Q1, R1, ntile ); // TODO: check if order is correct
-    auto  qr_V   = new tsqr_node( real(1), V2, T2, V1, Q2, R2, ntile );
+    auto  qr_U   = new tsqr_node( double(1), U1, T1, U2, Q1, R1, ntile ); // TODO: check if order is correct
+    auto  qr_V   = new tsqr_node( double(1), V2, T2, V1, Q2, R2, ntile );
 
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
     auto  svd    = g.alloc_node< svd_node >( R1, R2, Uk, Vk );
 
     svd->after( qr_U, qr_V );
 
     // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q1, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q2, Vk, real(0), V, ntile );
+    auto  mul_U  = new tprod_node( double(1), Q1, Uk, double(0), U, ntile );
+    auto  mul_V  = new tprod_node( double(1), Q2, Vk, double(0), V, ntile );
 
     g.add_node( mul_U, mul_V );
     
@@ -1658,27 +1651,27 @@ truncate4_node::refine_ ( const size_t )
 {
     local_graph  g;
 
-    auto  Q0 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
-    auto  Q1 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< real > >() );
+    auto  Q0 = shared_tiled_matrix( U1.is, std::make_shared< tile_storage< double > >() );
+    auto  R0 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
+    auto  Q1 = shared_tiled_matrix( V1.is, std::make_shared< tile_storage< double > >() );
+    auto  R1 = shared_matrix(              std::make_shared< blas::matrix< double > >() );
 
     // perform QR for U/V
-    auto  qr_U   = new tsqr1_node( real(1), U1, T1, Q0, R0, ntile );
-    auto  qr_V   = new tsqr1_node( real(1), V1,     Q1, R1, ntile );
+    auto  qr_U   = new tsqr1_node( double(1), U1, T1, Q0, R0, ntile );
+    auto  qr_V   = new tsqr1_node( double(1), V1,     Q1, R1, ntile );
 
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
 
     // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+    auto  mul_U  = new tprod_node( double(1), Q0, Uk, double(0), U, ntile );
+    auto  mul_V  = new tprod_node( double(1), Q1, Vk, double(0), V, ntile );
 
     g.add_node( mul_U );
     g.add_node( mul_V );
@@ -1699,27 +1692,27 @@ truncate5_node::refine_ ( const size_t )
     assert( X.is == U.is );
     assert( Y.is == V.is );
 
-    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< real > >() );
-    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
-    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< real > >() );
-    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< real > >() );
+    auto  Q0 = shared_tiled_matrix( X.is, std::make_shared< tile_storage< double > >() );
+    auto  R0 = shared_matrix(             std::make_shared< blas::matrix< double > >() );
+    auto  Q1 = shared_tiled_matrix( Y.is, std::make_shared< tile_storage< double > >() );
+    auto  R1 = shared_matrix(             std::make_shared< blas::matrix< double > >() );
 
     // perform QR for U/V
-    auto  qr_U   = new tsqr_node( real(1), X, U, Q0, R0, ntile );
-    auto  qr_V   = new tsqr_node( real(1), Y, V, Q1, R1, ntile );
+    auto  qr_U   = new tsqr_node( double(1), X, U, Q0, R0, ntile );
+    auto  qr_V   = new tsqr_node( double(1), Y, V, Q1, R1, ntile );
 
     g.add_node( qr_U, qr_V );
     
     // determine truncated rank and allocate destination matrices
-    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
-    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< real > >() );
+    auto  Uk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
+    auto  Vk     = shared_matrix( std::make_shared< blas::matrix< double > >() );
     auto  svd    = g.alloc_node< svd_node >( R0, R1, Uk, Vk );
 
     svd->after( qr_U, qr_V );
 
     // compute final result
-    auto  mul_U  = new tprod_node( real(1), Q0, Uk, real(0), U, ntile );
-    auto  mul_V  = new tprod_node( real(1), Q1, Vk, real(0), V, ntile );
+    auto  mul_U  = new tprod_node( double(1), Q0, Uk, double(0), U, ntile );
+    auto  mul_V  = new tprod_node( double(1), Q1, Vk, double(0), V, ntile );
 
     g.add_node( mul_U );
     g.add_node( mul_V );
@@ -1733,7 +1726,7 @@ truncate5_node::refine_ ( const size_t )
 }
 
 void
-truncate_node::run_ ( const TTruncAcc & )
+truncate_node::run_ ( const Hpro::TTruncAcc & )
 {
     // hpro::TScopedLock  lock( *A );
     
@@ -1768,8 +1761,8 @@ tsqr_node< matrixX_t, matrixU_t >::refine_ ( const size_t  tile_size )
         const auto  sis_Q = split( Q.is, 2 );
         auto        Q0    = matrix_info( sis_Q[0], Q );
         auto        Q1    = matrix_info( sis_Q[1], Q );
-        auto        R0    = matrix_info( std::make_shared< blas::matrix< real > >() );
-        auto        R1    = matrix_info( std::make_shared< blas::matrix< real > >() );
+        auto        R0    = matrix_info( std::make_shared< blas::matrix< double > >() );
+        auto        R1    = matrix_info( std::make_shared< blas::matrix< double > >() );
 
         // std::cout << "R0 = " << R0.data.get() << std::endl;
         // std::cout << "R1 = " << R1.data.get() << std::endl;
@@ -1781,8 +1774,8 @@ tsqr_node< matrixX_t, matrixU_t >::refine_ ( const size_t  tile_size )
         qr01->after( tsqr0 );
         qr01->after( tsqr1 );
         
-        auto  mul0 = new tprod_ip_node( real(1), matrix_info( sis_Q[0], Q ), R0, ntile );
-        auto  mul1 = new tprod_ip_node( real(1), matrix_info( sis_Q[1], Q ), R1, ntile );
+        auto  mul0 = new tprod_ip_node( double(1), matrix_info( sis_Q[0], Q ), R0, ntile );
+        auto  mul1 = new tprod_ip_node( double(1), matrix_info( sis_Q[1], Q ), R1, ntile );
 
         g.add_node( mul0 );
         g.add_node( mul1 );
@@ -1801,7 +1794,7 @@ tsqr_node< matrixX_t, matrixU_t >::refine_ ( const size_t  tile_size )
 template < typename  matrixX_t,
            typename  matrixU_t >
 void
-tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
+tsqr_node< matrixX_t, matrixU_t >::run_ ( const Hpro::TTruncAcc & )
 {
     // DBG::write( Xi, "X1.mat", "X1" );
     // DBG::write( *T, "T1.mat", "T1" );
@@ -1821,9 +1814,9 @@ tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
 
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
-        blas::matrix< real >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
-        blas::matrix< real >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
-        blas::matrix< real >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
+        blas::matrix< double >  XU( X_is.nrows(), X_is.ncols() + U_is.ncols () );
+        blas::matrix< double >  XU_X( XU, blas::range::all, blas::range( 0, X_is.ncols()-1 ) );
+        blas::matrix< double >  XU_U( XU, blas::range::all, blas::range( X_is.ncols(), XU.ncols()-1 ) );
 
         blas::copy( X_is, XU_X );
         blas::copy( U_is, XU_U );
@@ -1851,9 +1844,9 @@ tsqr_node< matrixX_t, matrixU_t >::run_ ( const TTruncAcc & )
         const auto      X_is = X.data->at( X.is );
         const auto      U_is = U.data->at( U.is );
         auto            W    = blas::prod( alpha, X_is, *(T.data) );
-        blas::matrix< real >  WU( W.nrows(), W.ncols() + U_is.ncols () );
-        blas::matrix< real >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
-        blas::matrix< real >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
+        blas::matrix< double >  WU( W.nrows(), W.ncols() + U_is.ncols () );
+        blas::matrix< double >  WU_W( WU, blas::range::all, blas::range( 0, W.ncols()-1 ) );
+        blas::matrix< double >  WU_U( WU, blas::range::all, blas::range( W.ncols(), WU.ncols()-1 ) );
 
         blas::copy( W,    WU_W );
         blas::copy( U_is, WU_U );
@@ -1884,8 +1877,8 @@ tsqr1_node< matrixX_t >::refine_ ( const size_t  tile_size )
         const auto  sis_Q = split( Q.is, 2 );
         auto        Q0    = matrix_info( sis_Q[0], Q );
         auto        Q1    = matrix_info( sis_Q[1], Q );
-        auto        R0    = matrix_info( std::make_shared< blas::matrix< real > >() );
-        auto        R1    = matrix_info( std::make_shared< blas::matrix< real > >() );
+        auto        R0    = matrix_info( std::make_shared< blas::matrix< double > >() );
+        auto        R1    = matrix_info( std::make_shared< blas::matrix< double > >() );
 
         // std::cout << "R0 = " << R0.data.get() << std::endl;
         // std::cout << "R1 = " << R1.data.get() << std::endl;
@@ -1897,8 +1890,8 @@ tsqr1_node< matrixX_t >::refine_ ( const size_t  tile_size )
         qr01->after( tsqr0 );
         qr01->after( tsqr1 );
         
-        auto  mul0 = new tprod_ip_node( real(1), matrix_info( sis_Q[0], Q ), R0, ntile );
-        auto  mul1 = new tprod_ip_node( real(1), matrix_info( sis_Q[1], Q ), R1, ntile );
+        auto  mul0 = new tprod_ip_node( double(1), matrix_info( sis_Q[0], Q ), R0, ntile );
+        auto  mul1 = new tprod_ip_node( double(1), matrix_info( sis_Q[1], Q ), R1, ntile );
 
         g.add_node( mul0 );
         g.add_node( mul1 );
@@ -1916,7 +1909,7 @@ tsqr1_node< matrixX_t >::refine_ ( const size_t  tile_size )
 
 template < typename  matrixX_t >
 void
-tsqr1_node< matrixX_t >::run_ ( const TTruncAcc & )
+tsqr1_node< matrixX_t >::run_ ( const Hpro::TTruncAcc & )
 {
     if ( is_null( T.data ) )
     {
@@ -1954,13 +1947,13 @@ tsqr1_node< matrixX_t >::run_ ( const TTruncAcc & )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-qr_node::run_ ( const TTruncAcc & )
+qr_node::run_ ( const Hpro::TTruncAcc & )
 {
     // Q = | R0 |
     //     | R1 |
-    blas::matrix< real >  Q(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
-    blas::matrix< real >  Q_0( Q, blas::range(                0, R0.data->nrows()-1 ), blas::range::all );
-    blas::matrix< real >  Q_1( Q, blas::range( R0.data->nrows(), Q.nrows()-1        ), blas::range::all );
+    blas::matrix< double >  Q(   R0.data->nrows() + R1.data->nrows(), R0.data->ncols() );
+    blas::matrix< double >  Q_0( Q, blas::range(                0, R0.data->nrows()-1 ), blas::range::all );
+    blas::matrix< double >  Q_1( Q, blas::range( R0.data->nrows(), Q.nrows()-1        ), blas::range::all );
         
     blas::copy( *(R0.data), Q_0 );
     blas::copy( *(R1.data), Q_1 );
@@ -1982,11 +1975,11 @@ qr_node::run_ ( const TTruncAcc & )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void
-svd_node::run_ ( const TTruncAcc &  acc )
+svd_node::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    auto            Us = blas::prod( real(1), *(R0.data), blas::adjoint( *(R1.data) ) );
-    blas::matrix< real >  Vs;
-    blas::vector< real >  Ss;
+    auto            Us = blas::prod( double(1), *(R0.data), blas::adjoint( *(R1.data) ) );
+    blas::matrix< double >  Vs;
+    blas::vector< double >  Ss;
         
     blas::svd( Us, Ss, Vs );
         
@@ -1995,13 +1988,13 @@ svd_node::run_ ( const TTruncAcc &  acc )
     // for ( size_t  i = 0; i < k; ++i )
     //     std::cout << Ss(i) << std::endl;
     
-    blas::matrix< real >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
-    blas::matrix< real >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
+    blas::matrix< double >  Usk( Us, blas::range::all, blas::range( 0, k-1 ) );
+    blas::matrix< double >  Vsk( Vs, blas::range::all, blas::range( 0, k-1 ) );
         
     blas::prod_diag( Usk, Ss, k );
 
-    *(Uk.data) = std::move( blas::matrix< real >( Usk.nrows(), Usk.ncols() ) );
-    *(Vk.data) = std::move( blas::matrix< real >( Vsk.nrows(), Vsk.ncols() ) );
+    *(Uk.data) = std::move( blas::matrix< double >( Usk.nrows(), Usk.ncols() ) );
+    *(Vk.data) = std::move( blas::matrix< double >( Vsk.nrows(), Vsk.ncols() ) );
 
     blas::copy( Usk, *(Uk.data) );
     blas::copy( Vsk, *(Vk.data) );
@@ -2016,7 +2009,7 @@ svd_node::run_ ( const TTruncAcc &  acc )
 ///////////////////////////////////////////////////////////////////////////////////////
 
 graph
-gen_dag_lu_hodlr_tiled_lazy ( TMatrix &      A,
+gen_dag_lu_hodlr_tiled_lazy ( Hpro::TMatrix< double > &      A,
                               const size_t   ntile,
                               refine_func_t  refine )
 {

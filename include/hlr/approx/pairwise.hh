@@ -32,7 +32,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 pairwise ( const std::list< blas::matrix< value_t > > &  U,
            const std::list< blas::matrix< value_t > > &  V,
-           const hpro::TTruncAcc &                       acc,
+           const Hpro::TTruncAcc &                       acc,
            const approx_t &                              approx )
 {
     //

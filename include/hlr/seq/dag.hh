@@ -12,14 +12,7 @@
 
 #include "hlr/dag/graph.hh"
 
-namespace hlr
-{
-
-namespace seq
-{
-
-namespace dag
-{
+namespace hlr { namespace seq { namespace dag {
 
 //
 // construct DAG using refinement of given node
@@ -34,12 +27,8 @@ refine ( hlr::dag::node *                  root,
 //
 void
 run ( hlr::dag::graph &        dag,
-      const HLIB::TTruncAcc &  acc );
+      const Hpro::TTruncAcc &  acc );
 
-}// namespace dag
-
-}// namespace seq
-
-}// namespace hlr
+}}}// namespace hlr::seq::dag
 
 #endif // __HLR_SEQ_DAG_HH

@@ -15,12 +15,10 @@
 
 namespace hlr { namespace cluster { namespace h {
 
-namespace  hpro = HLIB;
-
-using  coordinates       = hpro::TCoordinate;
-using  cluster_tree      = hpro::TClusterTree;
-using  blockcluster_tree = hpro::TBlockClusterTree;
-using  admissibility     = hpro::TAdmCondition;
+using  coordinates       = Hpro::TCoordinate;
+using  cluster_tree      = Hpro::TClusterTree;
+using  blockcluster_tree = Hpro::TBlockClusterTree;
+using  admissibility     = Hpro::TAdmCondition;
 
 //
 // cluster set of coordinates with minimal block size <ntile>

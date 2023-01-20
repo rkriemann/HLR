@@ -52,10 +52,18 @@ struct eps_printer
     void translate    ( const double  x,
                         const double  y );
     
+    // rotate output
+    void rotate       ( const double  angle );
+    
     //
     // 2D - drawing
     //
 
+    void draw_line    ( const double  x1,
+                        const double  y1,
+                        const double  x2,
+                        const double  y2 );
+    
     void draw_rect    ( const double  x1,
                         const double  y1,
                         const double  x2,
@@ -80,6 +88,7 @@ struct eps_printer
     void set_rgb         ( const int  r,
                            const int  g,
                            const int  b );
+    void set_rgb         ( const uint rgb );
 
     void set_line_width  ( const double         width );
     

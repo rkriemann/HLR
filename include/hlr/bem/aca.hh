@@ -21,10 +21,8 @@
 
 namespace hlr { namespace bem {
 
-namespace hpro = HLIB;
-
 // represents array of pivot elements
-using  pivot_arr_t    = std::vector< std::pair< idx_t, idx_t > >;
+using  pivot_arr_t    = std::vector< std::pair< Hpro::idx_t, Hpro::idx_t > >;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -33,7 +31,7 @@ using  pivot_arr_t    = std::vector< std::pair< idx_t, idx_t > >;
 //////////////////////////////////////////////////////////////////////
 
 template < typename coeff_fn_t >
-class aca_lrapx : public hpro::TLowRankApx
+class aca_lrapx : public Hpro::TLowRankApx< typename coeff_fn_t::value_t >
 {
 public:
     using  value_t = typename coeff_fn_t::value_t;
@@ -56,14 +54,18 @@ public:
     //
 
     // build low rank matrix for block cluster bct with rank defined by accuracy acc
-    virtual hpro::TMatrix * build ( const hpro::TBlockCluster *   bc,
-                                    const hpro::TTruncAcc &       acc ) const
+    virtual
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockCluster *   bc,
+            const Hpro::TTruncAcc &       acc ) const
     {
         return build( bc->is(), acc );
     }
 
-    virtual hpro::TMatrix * build ( const hpro::TBlockIndexSet &  bis,
-                                    const hpro::TTruncAcc &       acc ) const
+    virtual
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockIndexSet &  bis,
+            const Hpro::TTruncAcc &       acc ) const
     {
         const auto  op           = coefffn_operator( bis, _coeff_fn );
         auto        pivot_search = approx::aca_pivot< decltype(op) >( op );
@@ -75,21 +77,21 @@ public:
         //     auto  M = _coeff_fn.build( bis.row_is(), bis.col_is() );
         //     auto  UV = blas::prod( value_t(1), U, blas::adjoint(V) );
 
-        //     blas::add( value_t(-1), hpro::blas_mat< value_t >( cptrcast( M.get(), hpro::TDenseMatrix ) ), UV );
+        //     blas::add( value_t(-1), Hpro::blas_mat< value_t >( cptrcast( M.get(), Hpro::TDenseMatrix< value_t > ) ), UV );
 
-        //     std::cout << blas::norm_F( UV ) / blas::norm_F( hpro::blas_mat< value_t >( cptrcast( M.get(), hpro::TDenseMatrix ) ) ) << std::endl;
+        //     std::cout << blas::norm_F( UV ) / blas::norm_F( Hpro::blas_mat< value_t >( cptrcast( M.get(), Hpro::TDenseMatrix< value_t > ) ) ) << std::endl;
             
-        //     hpro::DBG::write( U, "U.mat", "U" );
-        //     hpro::DBG::write( V, "V.mat", "V" );
-        //     hpro::DBG::write( M.get(), "M.mat", "M" );
+        //     Hpro::DBG::write( U, "U.mat", "U" );
+        //     Hpro::DBG::write( V, "V.mat", "V" );
+        //     Hpro::DBG::write( M.get(), "M.mat", "M" );
         //     std::exit( 0 );
         // }
         
-        auto  R = std::make_unique< hpro::TRkMatrix >( bis.row_is(), bis.col_is(), std::move( U ), std::move( V ) );
+        auto  R = std::make_unique< Hpro::TRkMatrix< value_t > >( bis.row_is(), bis.col_is(), std::move( U ), std::move( V ) );
 
         R->truncate( acc );
 
-        return R.release();
+        return R;
     }
 };
 
@@ -105,10 +107,10 @@ public:
 //
 template < typename value_t >
 pivot_arr_t
-aca_full_pivots  ( blas::matrix< value_t > &                          M,
-                   const typename hpro::real_type< value_t >::type_t  eps )
+aca_full_pivots  ( blas::matrix< value_t > &                    M,
+                   const typename Hpro::real_type_t< value_t >  eps )
 {
-    using  real_t = typename hpro::real_type< value_t >::type_t;
+    using  real_t = typename Hpro::real_type_t< value_t >;
 
     //
     // perform ACA-Full on matrix, e.g. choosing maximal element of matrix
@@ -131,7 +133,7 @@ aca_full_pivots  ( blas::matrix< value_t > &                          M,
         // look for maximal element
         //
 
-        idx_t  pivot_row, pivot_col;
+        Hpro::idx_t  pivot_row, pivot_col;
 
         blas::max_idx( M, pivot_row, pivot_col );
 

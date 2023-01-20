@@ -9,13 +9,18 @@
 //
 
 #include <hlr/arith/blas.hh>
-#include <hlr/arith/norm.hh> // DEBUG
+#include <hlr/arith/norm.hh>
+#include <hlr/arith/multiply.hh>
+#include <hlr/arith/solve.hh>
+#include <hlr/arith/invert.hh>
 #include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/matrix/convert.hh> // DEBUG
+#include <hlr/matrix/convert.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
+
+#include <hlr/arith/detail/uniform_basis.hh>
 
 namespace hlr { namespace uniform { namespace detail {
 
@@ -31,6 +36,8 @@ using matrix::is_uniform_lowrank;
 using vector::scalar_vector;
 using vector::uniform_vector;
 
+using indexset = Hpro::TIndexSet;
+
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
 // For dense blocks of M, the actual result is directly updated.
@@ -38,8 +45,8 @@ using vector::uniform_vector;
 template < typename value_t >
 void
 mul_vec ( const value_t                                       alpha,
-          const hpro::matop_t                                 op_M,
-          const hpro::TMatrix &                               M,
+          const Hpro::matop_t                                 op_M,
+          const Hpro::TMatrix< value_t > &                    M,
           const uniform_vector< cluster_basis< value_t > > &  x,
           uniform_vector< cluster_basis< value_t > > &        y,
           const scalar_vector< value_t > &                    sx,
@@ -47,7 +54,7 @@ mul_vec ( const value_t                                       alpha,
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         if ( ! (( B->nblock_rows( op_M ) == y.nblocks() ) &&
                 ( B->nblock_cols( op_M ) == x.nblocks() )) )
@@ -71,28 +78,35 @@ mul_vec ( const value_t                                       alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D   = cptrcast( &M, hpro::TDenseMatrix );
-        auto  x_i = blas::vector< value_t >( blas::vec< value_t >( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas::vec< value_t >( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  D   = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat< value_t >( D ) ), x_i, value_t(1), y_j );
+        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
     }// if
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
-        
-        if ( op_M == hpro::apply_normal )
+
+        switch ( op_M )
         {
-            blas::mulvec( value_t(1), R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
-        else if ( op_M == hpro::apply_transposed )
-        {
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == hpro::apply_adjoint )
-        {
-            blas::mulvec( value_t(1), blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
+            case Hpro::apply_normal :
+                blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+                break;
+
+            case Hpro::apply_conjugate :
+                HLR_ASSERT( false );
+
+            case Hpro::apply_transposed :
+                HLR_ASSERT( false );
+
+            case Hpro::apply_adjoint :
+                blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
+                break;
+
+            default:
+                HLR_ERROR( "unsupported matrix operator" );
+        }// switch
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -106,11 +120,11 @@ std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
                     const scalar_vector< value_t > &  v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.rank() > 0 )
     {
-        auto  v_cb = blas::vector< value_t >( blas::vec< value_t >( v ), cb.cluster() - v.ofs() );
+        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
         auto  s    = cb.transform_forward( v_cb );
 
         u->set_coeffs( std::move( s ) );
@@ -125,6 +139,30 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
     return u;
 }
 
+template < typename value_t >
+using  is_veccoeff_map_t  = std::unordered_map< indexset, blas::vector< value_t >, indexset_hash >;
+
+template < typename value_t >
+void
+scalar_to_uniform ( const cluster_basis< value_t > &  cb,
+                    const scalar_vector< value_t > &  v,
+                    is_veccoeff_map_t< value_t > &    coeffmap )
+{
+    if ( cb.rank() > 0 )
+    {
+        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
+        auto  s    = cb.transform_forward( v_cb );
+
+        coeffmap[ cb.is() ] = std::move( s );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            scalar_to_uniform( *cb.son(i), v, coeffmap );
+    }// if
+}
+
 //
 // create empty uniform vector for given cluster basis
 //
@@ -132,7 +170,7 @@ template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 make_uniform ( const cluster_basis< value_t > &  cb )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.cluster(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
 
     if ( cb.nsons() > 0 )
     {
@@ -154,7 +192,7 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
     if ( u.basis().rank() > 0 )
     {
         auto  x   = u.basis().transform_backward( u.coeffs() );
-        auto  v_u = blas::vector< value_t >( blas::vec< value_t >( v ), u.is() - v.ofs() );
+        auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
             
         blas::add( value_t(1), x, v_u );
     }// if
@@ -166,6 +204,98 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
     }// if
 }
 
+template < typename value_t >
+void
+mul_vec2 ( const value_t                         alpha,
+           const Hpro::matop_t                   op_M,
+           const Hpro::TMatrix< value_t > &      M,
+           const is_veccoeff_map_t< value_t > &  x_cmap,
+           const scalar_vector< value_t > &      x,
+           scalar_vector< value_t > &            y,
+           const is_matrix_cmap_t< value_t > &   matmap )
+{
+    //
+    // go over all clusters in <matmap> and compute local update to y
+    //
+
+    for ( auto  entry : matmap )
+    {
+        const auto                        is    = entry.first;
+        auto                              y_j   = blas::vector< value_t >();
+        auto                              ly    = blas::vector< value_t >();
+        auto                              sy    = blas::vector< value_t >();
+        const cluster_basis< value_t > *  rowcb = nullptr;
+        
+        for ( auto  M : matmap.at( is ) )
+        {
+            if ( is_uniform_lowrank( M ) )
+            {
+                auto  R   = cptrcast( M, uniform_lrmatrix< value_t > );
+                auto  x_i = x_cmap.at( R->col_is( op_M ) );
+
+                if ( sy.length() == 0 )
+                    sy = std::move( blas::vector< value_t >( R->row_cb( op_M ).rank() ) );
+
+                if ( is_null( rowcb ) )
+                    rowcb = & R->row_cb( op_M );
+
+                if ( y_j.length() == 0 )
+                    y_j = std::move( blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() ) );
+                
+                switch ( op_M )
+                {
+                    case Hpro::apply_normal :
+                        blas::mulvec( alpha, R->coeff(), x_i, value_t(1), sy );
+                        break;
+
+                    case Hpro::apply_conjugate :
+                        HLR_ASSERT( false );
+
+                    case Hpro::apply_transposed :
+                        HLR_ASSERT( false );
+
+                    case Hpro::apply_adjoint :
+                        blas::mulvec( alpha, blas::adjoint(R->coeff()), x_i, value_t(1), sy );
+                        break;
+
+                    default:
+                        HLR_ERROR( "unsupported matrix operator" );
+                }// switch
+            }// if
+            else if ( Hpro::is_dense( M ) )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+
+                if ( ly.length() == 0 )
+                    ly = std::move( blas::vector< value_t >( M->row_is( op_M ).size() ) );
+                
+                if ( y_j.length() == 0 )
+                    y_j = std::move( blas::vector< value_t >( blas::vec( y ), M->row_is( op_M ) - y.ofs() ) );
+                
+                M->apply_add( alpha, x_i, ly, op_M );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+
+        //
+        // apply updates to y
+        //
+
+        if ( ly.length() > 0 )
+            blas::add( value_t(1), ly, y_j );
+            
+        if ( ! is_null( rowcb ) )
+        {
+            HLR_ASSERT( sy.length() > 0 );
+            
+            auto  t = rowcb->transform_backward( sy );
+
+            blas::add( value_t(1), t, y_j );
+        }// if
+    }// for
+}
+
 }// namespace detail
 
 
@@ -175,12 +305,8 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 //
 ////////////////////////////////////////////////////////////
 
-using  indexset = hpro::TIndexSet;
-
 namespace detail
 {
-
-using  uniform_map_t = std::unordered_map< indexset, std::list< hpro::TMatrix * >, indexset_hash >;
 
 //
 // compute M=U·S·V' + W·T·X' = (U W)⎛S  ⎞(V X)'
@@ -197,7 +323,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
       const blas::matrix< value_t > &      W,
       const blas::matrix< value_t > &      T,
       const blas::matrix< value_t > &      X,
-      const hpro::TTruncAcc &              acc,
+      const Hpro::TTruncAcc &              acc,
       const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -318,18 +444,52 @@ add ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
+// compute M = U·S·V' + W·T·V' = (U W)·⎛S⎞·V'
+//                                     ⎝T⎠
+//
+// - return orthogonal row basis and new coefficients
+// - no approximation
+// - W does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,  // new row basis
+            blas::matrix< value_t > > // new coupling
+add_row ( const uniform_lrmatrix< value_t > &  M,
+          const blas::matrix< value_t > &      W,
+          const blas::matrix< value_t > &      T )
+{
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
+    
+    //
+    // new row basis is orthogonalized (U W) with updated coupling
+    //
+
+    auto  Ue = blas::join_row< value_t >( { U, W } );
+    auto  R  = blas::matrix< value_t >();
+    
+    blas::qr( Ue, R ); // Ue is orthogonal afterwards
+                
+    auto  Se = blas::join_col< value_t >( { S, T } );
+    auto  Sn = blas::prod( R, Se );
+
+    return { std::move( Ue ), std::move( Sn ) };
+}
+
+//
 // compute M=U·S·V' + W·T·V' = (U W)·⎛S⎞·V'
 //                                   ⎝T⎠
 // - ASSUMPTION: W is orthogonal
 //
 template < typename value_t,
            typename approx_t >
-std::tuple< blas::matrix< value_t >,
-            blas::matrix< value_t > >
+std::tuple< blas::matrix< value_t >,   // new row basis
+            blas::matrix< value_t > >  // new coupling
 add_row ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      W,
           const blas::matrix< value_t > &      T,
-          const hpro::TTruncAcc &              acc,
+          const Hpro::TTruncAcc &              acc,
           const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -396,17 +556,50 @@ add_row ( const uniform_lrmatrix< value_t > &  M,
 }
       
 //
+// compute M = U·S·V' + U·T·X', M = U·(S T)·(V X)'
+//
+// - return new coefficients and orthogonal column basis
+// - no approximation
+// - X does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
+add_col ( const uniform_lrmatrix< value_t > &  M,
+          const blas::matrix< value_t > &      T,
+          const blas::matrix< value_t > &      X )
+{
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
+
+    //
+    // new column basis is orthogonalized (V X) with updated coupling
+    //
+
+    auto  Ve = blas::join_row< value_t >( { V, X } );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( Ve, R ); // Ve is orthogonal afterwards
+    
+    auto  Se = blas::join_row< value_t >( { S, T } );
+    auto  Sn = blas::prod( Se, blas::adjoint( R ) );
+
+    return { std::move( Sn ), std::move( Ve ) };
+}
+
+//
 // compute M=U·S·V' + U·T·X', M=U·(S T)·(V X)'
 // - ASSUMPTION: X is orthogonal
 //
 template < typename value_t,
            typename approx_t >
-std::tuple< blas::matrix< value_t >,
-            blas::matrix< value_t > >
+std::tuple< blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
 add_col ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      T,
           const blas::matrix< value_t > &      X,
-          const hpro::TTruncAcc &              acc,
+          const Hpro::TTruncAcc &              acc,
           const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -453,8 +646,7 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     auto  TV = blas::prod( blas::adjoint( Ve ), Vn );
     auto  Sn = blas::prod( Se, TV );
     
-    // // DEBUG {
-    // {
+    // { // DEBUG {
     //     auto  US1 = blas::prod( U, Se );
     //     auto  M1  = blas::prod( US1, blas::adjoint( Ve ) );
 
@@ -473,600 +665,49 @@ add_col ( const uniform_lrmatrix< value_t > &  M,
     //         blas::add( value_t(-1), M1, M2 );
     //         std::cout << "          add_col     : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
     //     }
-    // }
-    // // DEBUG }
+    // } // DEBUG }
 
     return { std::move( Sn ), std::move( Vn ) };
 }
 
 //
-// compute new row basis for block row of M with M being replaced by W·T·X'
-// assuming all involved bases are orthogonal (X is not needed for computation)
+// compute M = U·S·V' + W·T·X' = (U W)·⎛S  ⎞·(V X)'
+//                                     ⎝  T⎠
 //
-template < typename value_t,
-           typename approx_t >
-blas::matrix< value_t >
-compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
-                            const blas::matrix< value_t > &      W,
-                            const blas::matrix< value_t > &      T,
-                            const hpro::TTruncAcc &              acc,
-                            const approx_t &                     approx,
-                            const uniform_map_t &                rowmap )
+// - return orthogonal row/column basis and new coefficients
+// - no approximation
+// - W does not need to be orthogonal
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,   // new row basis
+            blas::matrix< value_t >,   // new coupling
+            blas::matrix< value_t > >  // new column basis
+add_row_col ( const uniform_lrmatrix< value_t > &  M,
+              const blas::matrix< value_t > &      W,
+              const blas::matrix< value_t > &      T,
+              const blas::matrix< value_t > &      X )
 {
-    using  real_t = hpro::real_type_t< value_t >;
-
-    //
-    // compute new row basis of
-    //
-    //   (U·S_1· V_1'  U·S_2·V_2'  ...  U·S_j·V_j'  W·T·X')
-    //
-    //    = (U W) ⎛S_1·V_1'  S_2·V_2' ... S_j·V_j'  0  ⎞
-    //            ⎝   0         0            0     T·X'⎠
-    //
-    //    = (U W) ⎛V_1·S_1'  0  ⎞'
-    //            ⎜V_2·S_2'  0  ⎟
-    //            ⎜      ...    ⎟
-    //            ⎜V_j·S_j'  0  ⎟
-    //            ⎝   0     X·T'⎠
-    //
-    //    = (U W) ⎛⎛V_1              ⎞ ⎛S_1'  0 ⎞⎞'
-    //            ⎜⎜    V_2          ⎟ ⎜S_2'  0 ⎟⎟
-    //            ⎜⎜        ...      ⎟·⎜   ...  ⎟⎟
-    //            ⎜⎜            V_j  ⎟ ⎜S_j'  0 ⎟⎟
-    //            ⎝⎝                X⎠ ⎝ 0    T'⎠⎠
-    //
-    // Since V_i and X are orthogonal, one can skip those for bases computation.
-    // Compute QR factorization
-    //
-    //   Q·R = ⎛S_1' 0 ⎞ = S
-    //         ⎜S_2' 0 ⎟
-    //         ⎜  ...  ⎟
-    //         ⎜S_j' 0 ⎟
-    //         ⎝ 0   T'⎠
-    //
-    // of which also Q is omitted, which leaves to compute the column basis of
-    //
-    //   (U W) R' = U_e R'
-    //
-    // The S_i and T are scaled by the (spectral) norm of the corresponding block
-    // U_i·S_i·V' and W·T·X' to achieve the relative precision for all blocks.
-    //
-
-    // determine number of rows of matrix S below (sum of column ranks)
-    size_t  nrows_S = T.ncols();  // known apriori
+    auto  U = M.row_cb().basis();
+    auto  S = M.coeff();
+    auto  V = M.col_cb().basis();
     
-    for ( auto  M_ik : rowmap.at( M.row_is() ) )
-    {
-        if ( matrix::is_uniform_lowrank( M_ik ) && ( M_ik != &M ))
-            nrows_S += cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > )->col_rank();
-    }// for
+    auto  Ue = blas::join_row< value_t >( { U, W } );
+    auto  RU = blas::matrix< value_t >();
 
-    if ( nrows_S == T.ncols() )
-    {
-        //
-        // since there is no other low-rank block, new row basis is W
-        //
-
-        return std::move( blas::copy( W ) );
-    }// if
-    else
-    {
-        // extended row basis
-        auto  U  = M.row_cb().basis();
-        auto  Ue = blas::join_row< value_t >( { U, W } );
-
-        // compute QR of column basis for each block in row and assemble
-        // all results into common matrix Q
-        auto    S   = blas::matrix< value_t >( nrows_S, Ue.ncols() );
-        size_t  pos = 0;
-
-        for ( auto  M_ik : rowmap.at( M.row_is() ) )
-        {
-            if ( ! matrix::is_uniform_lowrank( M_ik ) )
-                continue;
-        
-            if ( M_ik == &M )
-            {
-                // R_ik = W T X' with W/X being orthogonal, hence |R_ik| = |T|
-                const auto  rank = T.ncols();
-                auto        S_ik = blas::copy( T );
-
-                blas::scale( value_t(1) / norm::spectral( T ), S_ik );
-
-                auto  S_k = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + rank-1 ),
-                                                     blas::range( U.ncols(), Ue.ncols() - 1 ) );
-
-                blas::copy( blas::adjoint( S_ik ), S_k );
-                pos += rank;
-            }// if
-            else
-            {
-                // R_ik = U_i S_ik V_k' with U_i/V_k being orthogonal, hence |R_ik| = |S_ik|
-                const auto  R_ik    = cptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
-                const auto  rank    = R_ik->col_rank();
-                auto        S_ik    = blas::copy( R_ik->coeff() );
-                auto        norm_ik = norm::spectral( S_ik );
-
-                if ( norm_ik != real_t(0) )
-                    blas::scale( value_t(1) / norm_ik, S_ik );
-            
-                auto  S_k = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + rank-1 ),
-                                                     blas::range( 0, U.ncols() - 1 ) );
-
-                blas::copy( blas::adjoint( S_ik ), S_k );
-                pos += rank;
-            }// else
-        }// for
-
-        // compute QR of assembled matrix, and compute SVD of
-        // product with extended column basis
-        auto  R = blas::matrix< value_t >();
-        
-        blas::qr( S, R, false );
-
-        auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
-        auto  Un  = approx.column_basis( UeR, acc );
-
-        return  Un;
-        
-        // auto  Ss  = blas::vector< real_t >();
-
-        // blas::svd( UeR, Ss );
-
-        // const auto  rank   = acc.trunc_rank( Ss );
-        // const auto  U_rank = blas::matrix< value_t >( UeR, blas::range::all, blas::range( 0, rank-1 ) );
-
-        // return std::move( blas::copy( U_rank ) );
-    }// else
-}
-
-//
-// compute new column basis for block column of M with M being replaced by W·T·X'
-// assuming all involved bases are orthogonal (W is not needed for computation)
-//
-template < typename value_t,
-           typename approx_t >
-blas::matrix< value_t >
-compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
-                            const blas::matrix< value_t > &      T,
-                            const blas::matrix< value_t > &      X,
-                            const hpro::TTruncAcc &              acc,
-                            const approx_t &                     approx,
-                            const uniform_map_t &                colmap )
-{
-    using  real_t = hpro::real_type_t< value_t >;
-
-    //
-    // compute new column basis
-    //
-    //   ⎛U_1 S_1 V'⎞' 
-    //   ⎜U_2 S_2 V'⎟
-    //   ⎜  ...     ⎟ = (V X) ⎛S_1'·U_1' S_2'·U_2' ... S_j'·U_j'   0  ⎞
-    //   ⎜U_j S_j V'⎟         ⎝    0         0             0     T'·W'⎠
-    //   ⎝  W T X'  ⎠
-    //
-    //                = (V X) ⎛U_1·S_1⎞'   (V X) ⎛⎛U_1           ⎞⎛S_1⎞⎞'
-    //                        ⎜U_2·S_2⎟          ⎜⎜   U_2        ⎟⎜S_2⎟⎟
-    //                        ⎜  ...  ⎟  =       ⎜⎜      ...     ⎟⎜...⎟⎟
-    //                        ⎜U_j·S_j⎟          ⎜⎜         U_j  ⎟⎜S_j⎟⎟
-    //                        ⎝  W·T  ⎠          ⎝⎝             W⎠⎝ T ⎠⎠
-    //
-    // Since U_* and W are orthogonal, one can skip those for bases computation.
-    // Compute QR factorization
-    //
-    //   Q·R = ⎛S_1  0⎞ = S
-    //         ⎜S_2  0⎟
-    //         ⎜ ...  ⎟
-    //         ⎜S_j  0⎟
-    //         ⎝ 0   T⎠
-    //
-    // and finally column basis of
-    //
-    //   (V X) R' = V_e R'
-    //
-    // Please note, that the S_i and T are scaled by the (spectral) norm of the
-    // corresponding block U_i·S_i·V' and W·T·X'
-    //
-                                  
-    // determine number of rows of matrix S below (sum of row ranks)
-    size_t  nrows_S = T.nrows(); // known apriori
-    
-    for ( auto  M_kj : colmap.at( M.col_is() ) )
-    {
-        if ( matrix::is_uniform_lowrank( M_kj ) && ( M_kj != &M ))
-            nrows_S += cptrcast( M_kj, matrix::uniform_lrmatrix< value_t > )->row_rank();
-    }// for
-
-    if ( nrows_S == T.nrows() )
-    {
-        //
-        // since there is no other low-rank block, new basis is X
-        //
-
-        return std::move( blas::copy( X ) );
-    }// if
-    else
-    {
-        //
-        // otherwise compute new basis
-        //
-            
-        auto  V  = M.col_cb().basis();
-        auto  Ve = blas::join_row< value_t >( { V, X } );
-    
-        // assemble normalized coefficient matrices into common matrix S
-        auto    S   = blas::matrix< value_t >( nrows_S, Ve.ncols() );
-        size_t  pos = 0;
-
-        for ( auto  M_kj : colmap.at( M.col_is() ) )
-        {
-            if ( ! matrix::is_uniform_lowrank( M_kj ) )
-                continue;
-
-            if ( M_kj == &M )
-            {
-                // R_kj = W T X' with W/X being orthogonal, hence |R_kj| = |T|
-                const auto  rank = T.nrows();
-                auto        S_kj = blas::copy( T );
-                    
-                blas::scale( value_t(1) / norm::spectral( T ), S_kj );
+    blas::qr( Ue, RU ); // Ue is orthogonal afterwards
                 
-                auto  S_k = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + rank-1 ),
-                                                     blas::range( V.ncols(), Ve.ncols() - 1 ) );
+    auto  Ve = blas::join_row< value_t >( { V, X } );
+    auto  RV = blas::matrix< value_t >();
 
-                blas::copy( S_kj, S_k );
-                pos += rank;
-            }// if
-            else
-            {
-                // R_kj = U_k S_kj V_j' and U_k/V_j are orthogonal, hence |R_kj| = |S_kj|
-                const auto  R_kj    = cptrcast( M_kj, matrix::uniform_lrmatrix< value_t > );
-                const auto  rank    = R_kj->row_rank();
-                auto        S_kj    = blas::copy( R_kj->coeff() );
-                auto        norm_kj = norm::spectral( S_kj );
+    blas::qr( Ve, RV ); // Ve is orthogonal afterwards
+    
+    auto  Se = blas::diag< value_t >( { S, T } );
+    auto  S1 = blas::prod( RU, Se );
+    auto  Sn = blas::prod( S1, blas::adjoint( RV ) );
 
-                if ( norm_kj != real_t(0) )
-                    blas::scale( value_t(1) / norm_kj, S_kj );
-
-                auto  S_k = blas::matrix< value_t >( S,
-                                                     blas::range( pos, pos + rank-1 ),
-                                                     blas::range( 0, V.ncols() - 1 ) );
-
-                blas::copy( S_kj, S_k );
-                pos += rank;
-            }// else
-        }// for
-
-        // compute QR of assembled matrix, and compute SVD of
-        // product with extended column basis
-        auto  R = blas::matrix< value_t >();
-
-        blas::qr( S, R, false );
-
-        auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
-        auto  Vn  = approx.column_basis( VeR, acc );
-        
-        return  Vn;
-        
-        // auto  Ss  = blas::vector< real_t >();
-
-        // blas::svd( VeR, Ss );
-
-        // const auto  rank   = acc.trunc_rank( Ss );
-        // const auto  V_rank = blas::matrix< value_t >( VeR, blas::range::all, blas::range( 0, rank-1 ) );
-
-        // return std::move( blas::copy( V_rank ) );
-    }// else
+    return { std::move( Ue ), std::move( Sn ), std::move( Ve ) };
 }
-
-//
-// replace U·S·V' of M by W·T·X' and update row/column bases
-// - ASSUMPTION: W and X are orthogonal
-//
-template < typename value_t,
-           typename approx_t >
-void
-update_row_col_basis ( uniform_lrmatrix< value_t > &    M,
-                       const blas::matrix< value_t > &  W,
-                       const blas::matrix< value_t > &  T,
-                       const blas::matrix< value_t > &  X,
-                       const hpro::TTruncAcc &          acc,
-                       const approx_t &                 approx,
-                       const uniform_map_t &            rowmap,
-                       const uniform_map_t &            colmap )
-{
-    // io::matlab::write( W, "W" );
-    // io::matlab::write( T, "T" );
-    // io::matlab::write( X, "X" );
-
-    auto  Vn = compute_updated_col_basis( M, T, X, acc, approx, colmap );
-    auto  Un = compute_updated_row_basis( M, W, T, acc, approx, rowmap );
-
-    {
-        //
-        // transform coupling matrix for blocks in current block column as
-        //
-        //   S_kj V' Vn = S_kj·TV' with TV = Vn'·V
-        //
-
-        auto  V  = M.col_cb().basis();
-        auto  TV = blas::prod( blas::adjoint( Vn ), V );
-
-        for ( auto  M_kj : colmap.at( M.col_is() ) )
-        {
-            if ( ! matrix::is_uniform_lowrank( M_kj ) )
-                continue;
-                    
-            if ( M_kj != &M )
-            {
-                auto  R_kj  = ptrcast( M_kj, matrix::uniform_lrmatrix< value_t > );
-                auto  Sn_kj = blas::prod( R_kj->coeff(), blas::adjoint( TV ) );
-
-                // // DEBUG {
-                // {
-                //     auto  US1   = blas::prod( R_kj->row_cb().basis(), R_kj->coeff() );
-                //     auto  M1    = blas::prod( US1, blas::adjoint( R_kj->col_cb().basis() ) );
-                //     auto  US2   = blas::prod( R_kj->row_cb().basis(), Sn_kj );
-                //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
-                        
-                //     blas::add( value_t(-1), M1, M2 );
-                //     std::cout << "    ext col/row : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
-                // }
-                // // DEBUG }
-
-                R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
-            }// if
-        }// for
-    }
-
-    {
-        //
-        // transform coupling matrix for blocks in current block column as
-        //
-        //   Un'·U·S_i = TU·S_i  with TU = Un'·U
-        //
-
-        auto  U  = M.row_cb().basis();
-        auto  TU = blas::prod( blas::adjoint( Un ), U );
-
-        for ( auto  M_ik : rowmap.at( M.row_is() ) )
-        {
-            if ( ! matrix::is_uniform_lowrank( M_ik ) )
-                continue;
-                    
-            if ( M_ik != &M )
-            {
-                auto  R_ik  = ptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
-                auto  Sn_ik = blas::prod( TU, R_ik->coeff() );
-
-                // // DEBUG {
-                // {
-                //     auto  US1   = blas::prod( R_ik->row_cb().basis(), R_ik->coeff() );
-                //     auto  M1    = blas::prod( US1, blas::adjoint( R_ik->col_cb().basis() ) );
-                //     auto  US2   = blas::prod( Un, Sn_ik );
-                //     auto  M2    = blas::prod( US2, blas::adjoint( R_ik->col_cb().basis() ) );
-                        
-                //     blas::add( value_t(-1), M1, M2 );
-                //     std::cout << "    ext row/col : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
-                // }
-                // // DEBUG }
-
-                R_ik->set_coeff_unsafe( std::move( Sn_ik ) );
-            }// if
-        }// for
-    }
-
-    //
-    // compute coupling of M_ij as Un' W T X' Vn
-    //
-
-    auto  TW = blas::prod( blas::adjoint( Un ), W );
-    auto  TX = blas::prod( blas::adjoint( Vn ), X );
-    auto  S1 = blas::prod( TW, T );
-    auto  Sn = blas::prod( S1, blas::adjoint( TX ) );
-
-    // // DEBUG {
-    // {
-    //     // io::matlab::write( Un, "Un" );
-    //     // io::matlab::write( Sn, "Sn" );
-    //     // io::matlab::write( Vn, "Vn" );
-        
-    //     auto  US1   = blas::prod( W, T );
-    //     auto  M1    = blas::prod( US1, blas::adjoint( X ) );
-    //     auto  US2   = blas::prod( Un, Sn );
-    //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
-                        
-    //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext    /    : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
-    // }
-    // // DEBUG }
     
-    M.set_coeff_unsafe( std::move( Sn ) );
-
-    //
-    // finally adjust cluster bases
-    //
-
-    const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
-    const_cast< matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
-}
-
-//
-// replace M=U·S·V' by W·T·V' and update row bases of
-// all other blocks in block row
-// - ASSUMPTION: W is orthogonal
-//
-template < typename value_t,
-           typename approx_t >
-void
-update_row_basis ( uniform_lrmatrix< value_t > &    M,
-                   const blas::matrix< value_t > &  W,
-                   const blas::matrix< value_t > &  T,
-                   const hpro::TTruncAcc &          acc,
-                   const approx_t &                 approx,
-                   const uniform_map_t &            rowmap )
-{
-    auto  Un = compute_updated_row_basis( M, W, T, acc, approx, rowmap );
-
-    // io::matlab::write( Un, "Un" );
-    
-    //
-    // transform coupling matrix for blocks in current block column as
-    //
-    //   TU ⎛S_kj⎞  or  TU ⎛  0 ⎞
-    //      ⎝ 0  ⎠         ⎝S_kj⎠
-    //
-
-    auto  U  = M.row_cb().basis();
-    auto  TU = blas::prod( blas::adjoint( Un ), U );
-
-    for ( auto  M_ik : rowmap.at( M.row_is() ) )
-    {
-        if ( ! matrix::is_uniform_lowrank( M_ik ) )
-            continue;
-                    
-        if ( M_ik != &M )
-        {
-            auto  R_ik  = ptrcast( M_ik, matrix::uniform_lrmatrix< value_t > );
-            auto  Sn_ik = blas::prod( TU, R_ik->coeff() );
-
-            // // DEBUG {
-            // {
-            //     auto  US1   = blas::prod( R_ik->row_cb().basis(), R_ik->coeff() );
-            //     auto  M1    = blas::prod( US1, blas::adjoint( R_ik->col_cb().basis() ) );
-            //     auto  US2   = blas::prod( Un, Sn_ik );
-            //     auto  M2    = blas::prod( US2, blas::adjoint( R_ik->col_cb().basis() ) );
-                        
-            //     blas::add( value_t(-1), M1, M2 );
-            //     std::cout << "    ext row     : " << R_ik->id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
-            // }
-            // // DEBUG }
-
-            R_ik->set_coeff_unsafe( std::move( Sn_ik ) );
-        }// if
-    }// for
-
-    //
-    // compute coupling of M_ij as Un' W T
-    //
-
-    auto  TW = blas::prod( blas::adjoint( Un ), W );
-    auto  Sn = blas::prod( TW, T );
-
-    // // DEBUG {
-    // {
-    //     // io::matlab::write( Un, "Un" );
-    //     // io::matlab::write( Sn, "Sn" );
-    
-    //     auto  V     = M.col_cb().basis();
-    //     auto  US1   = blas::prod( W, T );
-    //     auto  M1    = blas::prod( US1, blas::adjoint( V ) );
-    //     auto  US2   = blas::prod( Un, Sn );
-    //     auto  M2    = blas::prod( US2, blas::adjoint( V ) );
-                        
-    //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext row     : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
-    // }
-    // // DEBUG }
-    
-    M.set_coeff_unsafe( std::move( Sn ) );
-
-    //
-    // finally adjust cluster bases
-    //
-
-    const_cast< matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
-}
-
-//
-// replace M=U·S·V' by U·T·X' and update row bases of
-// all other blocks in block column
-// - ASSUMPTION: X is orthogonal
-//
-template < typename value_t,
-           typename approx_t >
-void
-update_col_basis ( uniform_lrmatrix< value_t > &    M,
-                   const blas::matrix< value_t > &  T,
-                   const blas::matrix< value_t > &  X,
-                   const hpro::TTruncAcc &          acc,
-                   const approx_t &                 approx,
-                   const uniform_map_t &            colmap )
-{
-    auto  Vn = compute_updated_col_basis( M, T, X, acc, approx, colmap );
-
-    {
-        //
-        // transform coupling matrix for blocks in current block column as
-        //
-        //   S_kj V' Vn = S_kj·TV' with TV = Vn'·V
-        //
-
-        auto  V  = M.col_cb().basis();
-        auto  TV = blas::prod( blas::adjoint( Vn ), V );
-
-        for ( auto  M_kj : colmap.at( M.col_is() ) )
-        {
-            if ( ! matrix::is_uniform_lowrank( M_kj ) )
-                continue;
-                    
-            if ( M_kj != &M )
-            {
-                auto  R_kj  = ptrcast( M_kj, matrix::uniform_lrmatrix< value_t > );
-                auto  Sn_kj = blas::prod( R_kj->coeff(), blas::adjoint( TV ) );
-
-                // // DEBUG {
-                // {
-                //     auto  US1   = blas::prod( R_kj->row_cb().basis(), R_kj->coeff() );
-                //     auto  M1    = blas::prod( US1, blas::adjoint( R_kj->col_cb().basis() ) );
-                //     auto  US2   = blas::prod( R_kj->row_cb().basis(), Sn_kj );
-                //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
-                        
-                //     blas::add( value_t(-1), M1, M2 );
-                //     std::cout << "    ext col     : " << R_kj->id() << " : " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
-                // }
-                // // DEBUG }
-
-                R_kj->set_coeff_unsafe( std::move( Sn_kj ) );
-            }// if
-        }// for
-    }
-
-    //
-    // compute coupling of M as T X' Vn
-    //
-
-    auto  TX = blas::prod( T,  blas::adjoint( X ) );
-    auto  Sn = blas::prod( TX, Vn );
-
-    // // DEBUG {
-    // {
-    //     // io::matlab::write( Sn, "Sn" );
-    //     // io::matlab::write( Vn, "Vn" );
-    
-    //     auto  U     = M.row_cb().basis();
-    //     auto  US1   = blas::prod( U, T );
-    //     auto  M1    = blas::prod( US1, blas::adjoint( X ) );
-    //     auto  US2   = blas::prod( U, Sn );
-    //     auto  M2    = blas::prod( US2, blas::adjoint( Vn ) );
-                        
-    //     blas::add( value_t(-1), M1, M2 );
-    //     std::cout << "    ext col     : " << M.id() << " : " << blas::norm_F( M2 ) / blas::norm_F( M1 ) << std::endl;
-    // }
-    // // DEBUG }
-    
-    M.set_coeff_unsafe( std::move( Sn ) );
-
-    //
-    // finally adjust cluster bases
-    //
-
-    const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
-}
-
 //
 // add U·S·V' to M
 // - ASSUMPTION: U and V are orthogonal
@@ -1074,18 +715,18 @@ update_col_basis ( uniform_lrmatrix< value_t > &    M,
 template < typename value_t,
            typename approx_t >
 void
-add ( hpro::TMatrix &                  M,
-      const blas::matrix< value_t > &  U,
-      const blas::matrix< value_t > &  S,
-      const blas::matrix< value_t > &  V,
-      const hpro::TTruncAcc &          acc,
-      const approx_t &                 approx,
-      const uniform_map_t &            rowmap,
-      const uniform_map_t &            colmap )
+add ( Hpro::TMatrix< value_t > &          M,
+      const blas::matrix< value_t > &     U,
+      const blas::matrix< value_t > &     S,
+      const blas::matrix< value_t > &     V,
+      const Hpro::TTruncAcc &             acc,
+      const approx_t &                    approx,
+      const is_matrix_map_t< value_t > &  rowmap,
+      const is_matrix_map_t< value_t > &  colmap )
 {
     if ( is_blocked( M ) )
     {
-        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -1122,10 +763,10 @@ add ( hpro::TMatrix &                  M,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D  = ptrcast( &M, hpro::TDenseMatrix );
+        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  US = blas::prod( U, S );
 
-        blas::prod( value_t(1), US, blas::adjoint( V ), value_t(1), blas::mat< value_t >( D ) );
+        blas::prod( value_t(1), US, blas::adjoint( V ), value_t(1), blas::mat( D ) );
     }// if
 }
 
@@ -1135,16 +776,16 @@ add ( hpro::TMatrix &                  M,
 template < typename value_t,
            typename approx_t >
 void
-add ( hpro::TMatrix &                  M,
-      const blas::matrix< value_t > &  D,
-      const hpro::TTruncAcc &          acc,
-      const approx_t &                 approx,
-      const uniform_map_t &            rowmap,
-      const uniform_map_t &            colmap )
+add ( Hpro::TMatrix< value_t > &          M,
+      const blas::matrix< value_t > &     D,
+      const Hpro::TTruncAcc &             acc,
+      const approx_t &                    approx,
+      const is_matrix_map_t< value_t > &  rowmap,
+      const is_matrix_map_t< value_t > &  colmap )
 {
     if ( is_blocked( M ) )
     {
-        auto  B = ptrcast( &M, hpro::TBlockMatrix );
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -1182,45 +823,46 @@ add ( hpro::TMatrix &                  M,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  DM = ptrcast( &M, hpro::TDenseMatrix );
+        auto  DM = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
 
-        blas::add( value_t(1), D, blas::mat< value_t >( DM ) );
+        blas::add( value_t(1), D, blas::mat( DM ) );
     }// if
 }
 
 //
-// forward decl. of general version
+// matrix multiplication C := α·A·B + C
+// (forward decl.)
 //
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
-           const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx,
-           const uniform_map_t &    rowmap,
-           const uniform_map_t &    colmap );
+multiply ( const value_t                       alpha,
+           const Hpro::matop_t                 op_A,
+           const Hpro::TMatrix< value_t > &    A,
+           const Hpro::matop_t                 op_B,
+           const Hpro::TMatrix< value_t > &    B,
+           Hpro::TMatrix< value_t > &          C,
+           const Hpro::TTruncAcc &             acc,
+           const approx_t &                    approx,
+           const is_matrix_map_t< value_t > &  rowmap,
+           const is_matrix_map_t< value_t > &  colmap );
 
 //
-// matrix multiplication C := α·A·B + C
+// blocked x blocked = blocked
 //
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t               alpha,
-           const hpro::matop_t         op_A,
-           const hpro::TBlockMatrix &  A,
-           const hpro::matop_t         op_B,
-           const hpro::TBlockMatrix &  B,
-           hpro::TBlockMatrix &        C,
-           const hpro::TTruncAcc &     acc,
-           const approx_t &            approx,
-           const uniform_map_t &       rowmap,
-           const uniform_map_t &       colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TBlockMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TBlockMatrix< value_t > & B,
+           Hpro::TBlockMatrix< value_t > &       C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     for ( uint  i = 0; i < C.nblock_rows(); ++i )
     {
@@ -1231,7 +873,7 @@ multiply ( const value_t               alpha,
             for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
             {
                 if ( ! is_null_any( A.block( i, l, op_A ), B.block( l, j, op_B ) ) )
-                    multiply< value_t >( alpha,
+                    multiply( alpha,
                                          op_A, *A.block( i, l, op_A ),
                                          op_B, *B.block( l, j, op_B ),
                                          *C.block( i, j ), acc, approx,
@@ -1241,19 +883,22 @@ multiply ( const value_t               alpha,
     }// for
 }
 
+//
+// blocked x blocked = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                  alpha,
-           const hpro::matop_t            op_A,
-           const hpro::TBlockMatrix &     A,
-           const hpro::matop_t            op_B,
-           const hpro::TBlockMatrix &     B,
-           uniform_lrmatrix< value_t > &  C,
-           const hpro::TTruncAcc &        acc,
-           const approx_t &               approx,
-           const uniform_map_t &          rowmap,
-           const uniform_map_t &          colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TBlockMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TBlockMatrix< value_t > & B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     //
     // compute temporary standard low-rank block matrix BC
@@ -1261,7 +906,7 @@ multiply ( const value_t                  alpha,
     // and combine all for update of C
     //
 
-    auto  BC = std::make_unique< hpro::TBlockMatrix >( C.row_is(), C.col_is() );
+    auto  BC = std::make_unique< Hpro::TBlockMatrix< value_t > >( C.row_is(), C.col_is() );
 
     BC->set_block_struct( A.nblock_rows( op_A ), B.nblock_cols( op_B ) );
     
@@ -1277,10 +922,9 @@ multiply ( const value_t                  alpha,
                     auto  B_lj = B.block( l, j, op_B );
 
                     if ( is_null( BC->block( i, j ) ) )
-                        BC->set_block( i, j, new hpro::TRkMatrix( A_il->row_is( op_A ), B_lj->col_is( op_B ),
-                                                                  hpro::value_type_v< value_t > ) );
+                        BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( A_il->row_is( op_A ), B_lj->col_is( op_B ) ) );
                     
-                    hlr::multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
+                    hlr::multiply( alpha, op_A, *A_il, op_B, *B_lj, *BC->block( i, j ), acc, approx );
                 }// if
             }// if       
         }// for
@@ -1294,8 +938,8 @@ multiply ( const value_t                  alpha,
     //
     
     auto  R  = hlr::matrix::convert_to_lowrank( *BC, acc, approx );
-    auto  U  = blas::mat_U< value_t >( R );
-    auto  V  = blas::mat_V< value_t >( R );
+    auto  U  = blas::mat_U( R );
+    auto  V  = blas::mat_V( R );
     auto  RU = blas::matrix< value_t >();
     auto  RV = blas::matrix< value_t >();
 
@@ -1309,48 +953,86 @@ multiply ( const value_t                  alpha,
     update_row_col_basis( C, Un, Sn, Vn, acc, approx, rowmap, colmap );
 }
 
+//
+// blocked x dense = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const hpro::TBlockMatrix &           A,
-           const hpro::matop_t                  op_B,
-           const uniform_lrmatrix< value_t > &  B,
-           hpro::TBlockMatrix &                 C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TBlockMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TDenseMatrix< value_t > & B,
+           matrix::uniform_lrmatrix< value_t > & C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
+{
+    auto  D = matrix::convert_to_dense( C );
+
+    hlr::multiply( alpha, op_A, A, op_B, B, *D );
+    
+    auto  [ U, V ] = approx( blas::mat( *D ), acc );
+    auto  RU       = blas::matrix< value_t >();
+    auto  RV       = blas::matrix< value_t >();
+
+    blas::qr( U, RU );
+    blas::qr( V, RV );
+
+    auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+    detail::update_row_col_basis( C, U, S, V, acc, approx, rowmap, colmap );
+}
+
+//
+// blocked x uniform = blocked
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TBlockMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const uniform_lrmatrix< value_t > &   B,
+           Hpro::TBlockMatrix< value_t > &       C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     // (A·U)·S·V' + C
     auto  U  = B.row_cb( op_B ).basis();
     auto  AU = blas::matrix< value_t >( C.nrows(), U.ncols() );
 
-    hlr::multiply< value_t >( alpha, op_A, A, U, AU );
+    hlr::multiply( alpha, op_A, A, U, AU );
 
     add( C, AU, B.coeff(), B.col_cb().basis(), acc, approx, rowmap, colmap );
 }
 
+//
+// blocked x uniform = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const hpro::TBlockMatrix &           A,
-           const hpro::matop_t                  op_B,
-           const uniform_lrmatrix< value_t > &  B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                /* colmap */ )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TBlockMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const uniform_lrmatrix< value_t > &   B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap )
 {
     // A·B + C = (A·U)·S·V' + W·T·V'
     auto  U  = B.row_cb( op_B ).basis();
     auto  AU = blas::matrix< value_t >( C.nrows(), U.ncols() );
 
-    hlr::multiply< value_t >( alpha, op_A, A, U, AU );
+    hlr::multiply( alpha, op_A, A, U, AU );
 
     auto  R = blas::matrix< value_t >();
 
@@ -1362,48 +1044,86 @@ multiply ( const value_t                        alpha,
     detail::update_row_basis( C, Un, Sn, acc, approx, rowmap );
 }
 
+//
+// dense x blocked = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const uniform_lrmatrix< value_t > &  A,
-           const hpro::matop_t                  op_B,
-           const hpro::TBlockMatrix &           B,
-           hpro::TBlockMatrix &                 C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TDenseMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TBlockMatrix< value_t > & B,
+           matrix::uniform_lrmatrix< value_t > & C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
+{
+    auto  D = matrix::convert_to_dense( C );
+
+    hlr::multiply( alpha, op_A, A, op_B, B, *D );
+    
+    auto  [ U, V ] = approx( blas::mat( *D ), acc );
+    auto  RU       = blas::matrix< value_t >();
+    auto  RV       = blas::matrix< value_t >();
+
+    blas::qr( U, RU );
+    blas::qr( V, RV );
+
+    auto  S = blas::prod( RU, blas::adjoint( RV ) );
+
+    detail::update_row_col_basis( C, U, S, V, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x blocked = blocked
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const uniform_lrmatrix< value_t > &   A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TBlockMatrix< value_t > & B,
+           Hpro::TBlockMatrix< value_t > &       C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     // U·S·(V'·B) + C with V'·B computed as B'·V
     auto  V  = A.col_cb( op_A ).basis();
     auto  BV = blas::matrix< value_t >( C.ncols(), V.ncols() );
 
-    hlr::multiply< value_t >( alpha, blas::adjoint( op_B ), B, V, BV );
+    hlr::multiply( alpha, blas::adjoint( op_B ), B, V, BV );
 
     add( C, A.row_cb().basis(), A.coeff(), BV, acc, approx, rowmap, colmap );
 }
 
+//
+// uniform x blocked = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const uniform_lrmatrix< value_t > &  A,
-           const hpro::matop_t                  op_B,
-           const hpro::TBlockMatrix &           B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                /* rowmap */,
-           const uniform_map_t &                colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const uniform_lrmatrix< value_t > &   A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TBlockMatrix< value_t > & B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     // U·S·(V'·B) + U·T·X' with V'·B computed as B'·V
     auto  V  = A.col_cb( op_A ).basis();
     auto  BV = blas::matrix< value_t >( C.ncols(), V.ncols() );
 
-    hlr::multiply< value_t >( alpha, blas::adjoint( op_B ), B, V, BV );
+    hlr::multiply( alpha, blas::adjoint( op_B ), B, V, BV );
 
     auto  R = blas::matrix< value_t >();
 
@@ -1415,19 +1135,53 @@ multiply ( const value_t                        alpha,
     detail::update_col_basis( C, Sn, Vn, acc, approx, colmap );
 }
 
+//
+// dense x uniform = blocked
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                                   alpha,
+           const Hpro::matop_t                             op_A,
+           const Hpro::TDenseMatrix< value_t > &           A,
+           const Hpro::matop_t                             op_B,
+           const matrix::uniform_lrmatrix< value_t > &     B,
+           Hpro::TBlockMatrix< value_t > &                 C,
+           const Hpro::TTruncAcc &                         acc,
+           const approx_t &                                approx,
+           const is_matrix_map_t< value_t > &              rowmap,
+           const is_matrix_map_t< value_t > &              colmap )
+{
+    auto  U = B.row_basis( op_B );
+    auto  S = B.coeff();
+    auto  V = B.col_basis( op_B );
+
+    auto  AU = blas::prod( alpha, blas::mat_view( op_A, blas::mat( A ) ), U );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( AU, R );
+
+    auto  SR = blas::prod( R, blas::mat_view( op_B, S ) );
+    
+    add( C, AU, SR, V, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x uniform = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
 multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
+           const Hpro::matop_t                  op_A,
            const uniform_lrmatrix< value_t > &  A,
-           const hpro::matop_t                  op_B,
+           const Hpro::matop_t                  op_B,
            const uniform_lrmatrix< value_t > &  B,
-           hpro::TBlockMatrix &                 C,
-           const hpro::TTruncAcc &              acc,
+           Hpro::TBlockMatrix< value_t > &      C,
+           const Hpro::TTruncAcc &              acc,
            const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                colmap )
+           const is_matrix_map_t< value_t > &   rowmap,
+           const is_matrix_map_t< value_t > &   colmap )
 {
     // U·(S·V' × W·T)·X' + C = U·R·X' + C
     auto  R = blas::matrix< value_t >();
@@ -1442,17 +1196,17 @@ multiply ( const value_t                        alpha,
     add( C, A.row_cb().basis(), R, B.col_cb().basis(), acc, approx, rowmap, colmap );
 }
 
+//
+// uniform x uniform = uniform
+//
 template < typename value_t >
 void
 multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
+           const Hpro::matop_t                  op_A,
            const uniform_lrmatrix< value_t > &  A,
-           const hpro::matop_t                  op_B,
+           const Hpro::matop_t                  op_B,
            const uniform_lrmatrix< value_t > &  B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              /* acc */,
-           const uniform_map_t &                /* rowmap */,
-           const uniform_map_t &                /* colmap */ )
+           uniform_lrmatrix< value_t > &        C )
 {
     // A·B + C = U·(S·V' × W·T)·X' + U·R·X'
     auto  VW   = blas::prod( blas::adjoint( A.col_cb( op_A ).basis() ), B.row_cb( op_B ).basis() );
@@ -1461,23 +1215,56 @@ multiply ( const value_t                        alpha,
     blas::prod( alpha, SVW, blas::mat_view( op_B, B.coeff() ), value_t(1), C.coeff() );
 }
 
+//
+// uniform x dense = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const uniform_lrmatrix< value_t > &  A,
-           const hpro::matop_t                  op_B,
-           const hpro::TDenseMatrix &           B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                /* rowmap */,
-           const uniform_map_t &                colmap )
+multiply ( const value_t                               alpha,
+           const Hpro::matop_t                         op_A,
+           const matrix::uniform_lrmatrix< value_t > & A,
+           const Hpro::matop_t                         op_B,
+           const Hpro::TDenseMatrix< value_t > &       B,
+           Hpro::TBlockMatrix< value_t > &             C,
+           const Hpro::TTruncAcc &                     acc,
+           const approx_t &                            approx,
+           const is_matrix_map_t< value_t > &          rowmap,
+           const is_matrix_map_t< value_t > &          colmap )
+{
+    auto  U = A.row_basis( op_A );
+    auto  S = A.coeff();
+    auto  V = A.col_basis( op_A );
+
+    auto  VB = blas::prod( alpha, blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ), V );
+    auto  R  = blas::matrix< value_t >();
+
+    blas::qr( VB, R );
+
+    auto  SR = blas::prod( blas::mat_view( op_A, S ), blas::adjoint( R ) );
+    
+    add( C, U, SR, VB, acc, approx, rowmap, colmap );
+}
+
+//
+// uniform x dense = uniform
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const uniform_lrmatrix< value_t > &   A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TDenseMatrix< value_t > & B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     // A×B + C = U·S·(V' × B) + U·T·X' = U·S·(B' × V)' + U·T·X'
     auto  BV = blas::prod( alpha,
-                           blas::mat_view( blas::adjoint( op_B ), blas::mat< value_t >( B ) ),
+                           blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ),
                            A.col_cb( op_A ).basis() );
 
     auto  R = blas::matrix< value_t >();
@@ -1490,23 +1277,25 @@ multiply ( const value_t                        alpha,
     detail::update_col_basis( C, Sn, Vn, acc, approx, colmap );
 }
 
+//
+// dense x uniform = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                        alpha,
-           const hpro::matop_t                  op_A,
-           const hpro::TDenseMatrix &           A,
-           const hpro::matop_t                  op_B,
-           const uniform_lrmatrix< value_t > &  B,
-           uniform_lrmatrix< value_t > &        C,
-           const hpro::TTruncAcc &              acc,
-           const approx_t &                     approx,
-           const uniform_map_t &                rowmap,
-           const uniform_map_t &                /* colmap */ )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TDenseMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const uniform_lrmatrix< value_t > &   B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap )
 {
     // A×B + C = (A × U)·T·V' + W·S·V'
     auto  AU = blas::prod( alpha,
-                           blas::mat_view( op_A, blas::mat< value_t >( A ) ),
+                           blas::mat_view( op_A, blas::mat( A ) ),
                            B.row_cb( op_B ).basis() );
 
     auto  R = blas::matrix< value_t >();
@@ -1519,44 +1308,50 @@ multiply ( const value_t                        alpha,
     detail::update_row_basis( C, Un, Sn, acc, approx, rowmap );
 }
 
+//
+// dense x dense = blocked
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t               alpha,
-           const hpro::matop_t         op_A,
-           const hpro::TDenseMatrix &  A,
-           const hpro::matop_t         op_B,
-           const hpro::TDenseMatrix &  B,
-           hpro::TBlockMatrix &        C,
-           const hpro::TTruncAcc &     acc,
-           const approx_t &            approx,
-           const uniform_map_t &       rowmap,
-           const uniform_map_t &       colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TDenseMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TDenseMatrix< value_t > & B,
+           Hpro::TBlockMatrix< value_t > &       C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     auto  AB = blas::prod( alpha,
-                           blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
-                           blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+                           blas::mat_view( op_A, Hpro::blas_mat( A ) ),
+                           blas::mat_view( op_B, Hpro::blas_mat( B ) ) );
 
     add( C, AB, acc, approx, rowmap, colmap );
 }
 
+//
+// dense x dense = uniform
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                  alpha,
-           const hpro::matop_t            op_A,
-           const hpro::TDenseMatrix &     A,
-           const hpro::matop_t            op_B,
-           const hpro::TDenseMatrix &     B,
-           uniform_lrmatrix< value_t > &  C,
-           const hpro::TTruncAcc &        acc,
-           const approx_t &               approx,
-           const uniform_map_t &          rowmap,
-           const uniform_map_t &          colmap )
+multiply ( const value_t                         alpha,
+           const Hpro::matop_t                   op_A,
+           const Hpro::TDenseMatrix< value_t > & A,
+           const Hpro::matop_t                   op_B,
+           const Hpro::TDenseMatrix< value_t > & B,
+           uniform_lrmatrix< value_t > &         C,
+           const Hpro::TTruncAcc &               acc,
+           const approx_t &                      approx,
+           const is_matrix_map_t< value_t > &    rowmap,
+           const is_matrix_map_t< value_t > &    colmap )
 {
     auto  AB       = blas::prod( alpha,
-                                 blas::mat_view( op_A, hpro::blas_mat< value_t >( A ) ),
-                                 blas::mat_view( op_B, hpro::blas_mat< value_t >( B ) ) );
+                                 blas::mat_view( op_A, Hpro::blas_mat( A ) ),
+                                 blas::mat_view( op_B, Hpro::blas_mat( B ) ) );
     auto  [ U, V ] = approx( AB, acc );
     auto  RU       = blas::matrix< value_t >();
     auto  RV       = blas::matrix< value_t >();
@@ -1571,28 +1366,29 @@ multiply ( const value_t                  alpha,
     detail::update_row_col_basis( C, Un, Sn, Vn, acc, approx, rowmap, colmap );
 }
 
-
-
+//
+// general function
+//
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t            alpha,
-           const hpro::matop_t      op_A,
-           const hpro::TMatrix &    A,
-           const hpro::matop_t      op_B,
-           const hpro::TMatrix &    B,
-           hpro::TMatrix &          C,
-           const hpro::TTruncAcc &  acc,
-           const approx_t &         approx,
-           const uniform_map_t &    rowmap,
-           const uniform_map_t &    colmap )
+multiply ( const value_t                       alpha,
+           const Hpro::matop_t                 op_A,
+           const Hpro::TMatrix< value_t > &    A,
+           const Hpro::matop_t                 op_B,
+           const Hpro::TMatrix< value_t > &    B,
+           Hpro::TMatrix< value_t > &          C,
+           const Hpro::TTruncAcc &             acc,
+           const approx_t &                    approx,
+           const is_matrix_map_t< value_t > &  rowmap,
+           const is_matrix_map_t< value_t > &  colmap )
 {
     // // DEBUG {
-    // auto  DA = hlr::seq::matrix::copy_nonuniform< value_t >( A );
-    // auto  DB = hlr::seq::matrix::copy_nonuniform< value_t >( B );
-    // auto  DC = hlr::seq::matrix::copy_nonuniform< value_t >( C );
+    // auto  DA = hlr::seq::matrix::copy_nonuniform( A );
+    // auto  DB = hlr::seq::matrix::copy_nonuniform( B );
+    // auto  DC = hlr::seq::matrix::copy_nonuniform( C );
 
-    // hlr::multiply< value_t >( alpha, op_A, *DA, op_B, *DB, *DC, acc, approx::SVD< value_t >() );
+    // hlr::multiply( alpha, op_A, *DA, op_B, *DB, *DC, acc, approx::SVD< value_t >() );
     // // DEBUG }
     
     if ( is_blocked( A ) )
@@ -1600,66 +1396,66 @@ multiply ( const value_t            alpha,
         if ( is_blocked( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha, 
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                multiply( alpha, 
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                          op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, rowmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TBlockMatrix ),
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                           op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_dense(   B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TBlockMatrix ),
-                                          op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
+                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -1671,66 +1467,65 @@ multiply ( const value_t            alpha,
         if ( is_blocked( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
+                hlr::multiply( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                          op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, rowmap, colmap );
+                                     * ptrcast( &C, uniform_lrmatrix< value_t > ) );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
+                hlr::multiply( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
                                           op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_dense(   B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
+                multiply( alpha,
                                      op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
+                hlr::multiply( alpha,
                                           op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                          op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -1742,66 +1537,66 @@ multiply ( const value_t            alpha,
         if ( is_blocked( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                          op_B, * cptrcast( &B, hpro::TBlockMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                      op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
+                                     acc, approx, rowmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TDenseMatrix ),
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                           op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_dense(   B ) )
         {
             if ( is_blocked( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                     * ptrcast( &C, hpro::TBlockMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_uniform_lowrank( C ) )
-                multiply< value_t >( alpha,
-                                     op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                     op_B, * cptrcast( &B, hpro::TDenseMatrix ),
+                multiply( alpha,
+                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
                                      * ptrcast( &C, uniform_lrmatrix< value_t > ),
                                      acc, approx, rowmap, colmap );
             else if ( is_dense(   C ) )
-                hlr::multiply< value_t >( alpha,
-                                          op_A, * cptrcast( &A, hpro::TDenseMatrix ),
-                                          op_B, * cptrcast( &B, hpro::TDenseMatrix ),
-                                          * ptrcast( &C, hpro::TDenseMatrix ) );
+                hlr::multiply( alpha,
+                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
+                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
+                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -1812,9 +1607,9 @@ multiply ( const value_t            alpha,
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
     // // DEBUG {
-    // auto  DD = hlr::seq::matrix::copy_nonuniform< value_t >( C );
-    // auto  TC = matrix::convert_to_dense< value_t >( *DC );
-    // auto  TD = matrix::convert_to_dense< value_t >( *DD );
+    // auto  DD = hlr::seq::matrix::copy_nonuniform( C );
+    // auto  TC = matrix::convert_to_dense( *DC );
+    // auto  TD = matrix::convert_to_dense( *DD );
 
     // hlr::add( value_t(-1), *TC, *TD );
 
@@ -1829,28 +1624,28 @@ multiply ( const value_t            alpha,
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    L,
-                  hpro::TMatrix &          M,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap );
+solve_lower_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    L,
+                  Hpro::TMatrix< value_t > &          M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  rowmap,
+                  const is_matrix_map_t< value_t > &  colmap );
 
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t           side,
-                  const diag_type_t           diag,
-                  const hpro::TBlockMatrix &  L,
-                  hpro::TBlockMatrix &        M,
-                  const hpro::TTruncAcc &     acc,
-                  const approx_t &            approx,
-                  const uniform_map_t &       rowmap,
-                  const uniform_map_t &       colmap )
+solve_lower_tri ( const eval_side_t                     side,
+                  const diag_type_t                     diag,
+                  const Hpro::TBlockMatrix< value_t > & L,
+                  Hpro::TBlockMatrix< value_t > &       M,
+                  const Hpro::TTruncAcc &               acc,
+                  const approx_t &                      approx,
+                  const is_matrix_map_t< value_t > &    rowmap,
+                  const is_matrix_map_t< value_t > &    colmap )
 {
-    HLR_LOG( 4, hpro::to_string( "svltr( B %d, B %d )", L.id(), M.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "svltr( B %d, B %d )", L.id(), M.id() ) );
 
     if ( side == from_left )
     {
@@ -1871,7 +1666,7 @@ solve_lower_tri ( const eval_side_t           side,
                 auto  M_ij = M.block( i, j );
                 
                 if ( ! is_null( M_ij ) )
-                    solve_lower_tri< value_t >( side, diag, *L_ii, *M_ij, acc, approx, rowmap, colmap );
+                    solve_lower_tri( side, diag, *L_ii, *M_ij, acc, approx, rowmap, colmap );
             }// for
 
             for ( uint  k = i+1; k < M.nblock_rows(); ++k )
@@ -1882,7 +1677,7 @@ solve_lower_tri ( const eval_side_t           side,
                     {
                         HLR_ASSERT( ! is_null( M.block(k,j) ) );
                         
-                        multiply< value_t >( value_t(-1),
+                        multiply( value_t(-1),
                                              apply_normal, *L.block(k,i),
                                              apply_normal, *M.block(i,j),
                                              *M.block(k,j),
@@ -1901,14 +1696,14 @@ solve_lower_tri ( const eval_side_t           side,
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t              side,
-                  const diag_type_t              diag,
-                  const hpro::TMatrix &          L,
-                  uniform_lrmatrix< value_t > &  M,
-                  const hpro::TTruncAcc &        acc,
-                  const approx_t &               approx,
-                  const uniform_map_t &          rowmap,
-                  const uniform_map_t &          /* colmap */ )
+solve_lower_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    L,
+                  uniform_lrmatrix< value_t > &       M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  rowmap,
+                  const is_matrix_map_t< value_t > &  /* colmap */ )
 {
     if ( is_dense( L ) && ( diag == unit_diag ))
         return;
@@ -1920,9 +1715,9 @@ solve_lower_tri ( const eval_side_t              side,
         //
 
         auto  W = blas::copy( M.row_cb().basis() );
-        auto  D = hpro::TDenseMatrix( M.row_is(), hpro::is( 0, W.ncols()-1 ), W );
+        auto  D = Hpro::TDenseMatrix< value_t >( M.row_is(), Hpro::is( 0, W.ncols()-1 ), W );
 
-        hlr::solve_lower_tri< value_t >( side, diag, L, D );
+        hlr::solve_lower_tri( side, diag, L, D );
 
         // orthogonalise W, compute T and update row basis
         auto  R = blas::matrix< value_t >();
@@ -1942,39 +1737,39 @@ solve_lower_tri ( const eval_side_t              side,
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    L,
-                  hpro::TMatrix &          M,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap )
+solve_lower_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    L,
+                  Hpro::TMatrix< value_t > &          M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  rowmap,
+                  const is_matrix_map_t< value_t > &  colmap )
 {
     // // DEBUG {
-    // auto  DL = hlr::seq::matrix::copy_nonuniform< value_t >( L );
-    // auto  DM = hlr::seq::matrix::copy_nonuniform< value_t >( M );
+    // auto  DL = hlr::seq::matrix::copy_nonuniform( L );
+    // auto  DM = hlr::seq::matrix::copy_nonuniform( M );
 
-    // hlr::solve_lower_tri< value_t >( side, diag, *DL, *DM, acc, approx::SVD< value_t >() );
+    // hlr::solve_lower_tri( side, diag, *DL, *DM, acc, approx::SVD< value_t >() );
     // // DEBUG }
     
     if ( is_blocked( L ) )
     {
         if ( is_blocked( M ) )
-            solve_lower_tri< value_t >( side, diag, * cptrcast( & L, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TBlockMatrix ), acc, approx, rowmap, colmap );
+            solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_uniform_lowrank( M ) )
-            solve_lower_tri< value_t >( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_dense( M ) )
-            hlr::solve_lower_tri< value_t >( side, diag, * cptrcast( & L, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+            hlr::solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
     }// if
     else if ( is_dense( L ) )
     {
         if ( is_uniform_lowrank( M ) )
-            solve_lower_tri< value_t >( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_dense( M ) )
-            hlr::solve_lower_tri< value_t >( side, diag, * cptrcast( & L, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+            hlr::solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
     }// if
@@ -1982,9 +1777,9 @@ solve_lower_tri ( const eval_side_t        side,
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
 
     // // DEBUG {
-    // auto  DX = hlr::seq::matrix::copy_nonuniform< value_t >( M );
-    // auto  TM = matrix::convert_to_dense< value_t >( *DM );
-    // auto  TX = matrix::convert_to_dense< value_t >( *DX );
+    // auto  DX = hlr::seq::matrix::copy_nonuniform( M );
+    // auto  TM = matrix::convert_to_dense( *DM );
+    // auto  TX = matrix::convert_to_dense( *DX );
     
     // hlr::add( value_t(-1), *TM, *TX );
     // std::cout << "solve_lower: " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *TX ) / norm::frobenius( *TM ) ) << std::endl;
@@ -1998,28 +1793,28 @@ solve_lower_tri ( const eval_side_t        side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    U,
-                  hpro::TMatrix &          M,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap );
+solve_upper_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    U,
+                  Hpro::TMatrix< value_t > &          M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  rowmap,
+                  const is_matrix_map_t< value_t > &  colmap );
 
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t           side,
-                  const diag_type_t           diag,
-                  const hpro::TBlockMatrix &  U,
-                  hpro::TBlockMatrix &        M,
-                  const hpro::TTruncAcc &     acc,
-                  const approx_t &            approx,
-                  const uniform_map_t &       rowmap,
-                  const uniform_map_t &       colmap )
+solve_upper_tri ( const eval_side_t                     side,
+                  const diag_type_t                     diag,
+                  const Hpro::TBlockMatrix< value_t > & U,
+                  Hpro::TBlockMatrix< value_t > &       M,
+                  const Hpro::TTruncAcc &               acc,
+                  const approx_t &                      approx,
+                  const is_matrix_map_t< value_t > &    rowmap,
+                  const is_matrix_map_t< value_t > &    colmap )
 {
-    HLR_LOG( 4, hpro::to_string( "svutr( B %d, B %d )", U.id(), M.id() ) );
+    HLR_LOG( 4, Hpro::to_string( "svutr( B %d, B %d )", U.id(), M.id() ) );
     
     if ( side == from_left )
     {
@@ -2038,7 +1833,7 @@ solve_upper_tri ( const eval_side_t           side,
                 auto  M_ij = M.block( i, j );
                 
                 if ( ! is_null( M_ij ) )
-                    solve_upper_tri< value_t >( side, diag, *U_jj, *M_ij, acc, approx, rowmap, colmap );
+                    solve_upper_tri( side, diag, *U_jj, *M_ij, acc, approx, rowmap, colmap );
             }// for
             
             for ( uint  k = j+1; k < M.nblock_cols(); ++k )
@@ -2049,7 +1844,7 @@ solve_upper_tri ( const eval_side_t           side,
                     {
                         HLR_ASSERT( ! is_null( M.block(i,k) ) );
                         
-                        multiply< value_t >( value_t(-1),
+                        multiply( value_t(-1),
                                              apply_normal, *M.block(i,j),
                                              apply_normal, *U.block(j,k),
                                              *M.block(i,k),
@@ -2064,14 +1859,14 @@ solve_upper_tri ( const eval_side_t           side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t              side,
-                  const diag_type_t              diag,
-                  const hpro::TMatrix &          U,
-                  uniform_lrmatrix< value_t > &  M,
-                  const hpro::TTruncAcc &        acc,
-                  const approx_t &               approx,
-                  const uniform_map_t &          /* rowmap */,
-                  const uniform_map_t &          colmap )
+solve_upper_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    U,
+                  uniform_lrmatrix< value_t > &       M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  /* rowmap */,
+                  const is_matrix_map_t< value_t > &  colmap )
 {
     if ( is_dense( U ) && ( diag == unit_diag ))
         return;
@@ -2087,9 +1882,9 @@ solve_upper_tri ( const eval_side_t              side,
         //
 
         auto  X = blas::copy( M.col_cb().basis() );
-        auto  D = hpro::TDenseMatrix( M.col_is(), hpro::is( 0, X.ncols()-1 ), X );
+        auto  D = Hpro::TDenseMatrix< value_t >( M.col_is(), Hpro::is( 0, X.ncols()-1 ), X );
 
-        hlr::solve_upper_tri< value_t >( from_left, diag, U, D );
+        hlr::solve_upper_tri( from_left, diag, U, D );
 
         // orthogonalise X, compute T and update column basis
         auto  R = blas::matrix< value_t >();
@@ -2105,39 +1900,39 @@ solve_upper_tri ( const eval_side_t              side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix &    U,
-                  hpro::TMatrix &          M,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx,
-                  const uniform_map_t &    rowmap,
-                  const uniform_map_t &    colmap )
+solve_upper_tri ( const eval_side_t                   side,
+                  const diag_type_t                   diag,
+                  const Hpro::TMatrix< value_t > &    U,
+                  Hpro::TMatrix< value_t > &          M,
+                  const Hpro::TTruncAcc &             acc,
+                  const approx_t &                    approx,
+                  const is_matrix_map_t< value_t > &  rowmap,
+                  const is_matrix_map_t< value_t > &  colmap )
 {
     // // DEBUG {
-    // auto  DU = hlr::seq::matrix::copy_nonuniform< value_t >( U );
-    // auto  DM = hlr::seq::matrix::copy_nonuniform< value_t >( M );
+    // auto  DU = hlr::seq::matrix::copy_nonuniform( U );
+    // auto  DM = hlr::seq::matrix::copy_nonuniform( M );
 
-    // hlr::solve_upper_tri< value_t >( side, diag, *DU, *DM, acc, approx::SVD< value_t >() );
+    // hlr::solve_upper_tri( side, diag, *DU, *DM, acc, approx::SVD< value_t >() );
     // // DEBUG }
     
     if ( is_blocked( U ) )
     {
         if ( is_blocked( M ) )
-            solve_upper_tri< value_t >( side, diag, * cptrcast( & U, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TBlockMatrix ), acc, approx, rowmap, colmap );
+            solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_uniform_lowrank( M ) )
-            solve_upper_tri< value_t >( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_dense( M ) )
-            hlr::solve_upper_tri< value_t >( side, diag, * cptrcast( & U, hpro::TBlockMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+            hlr::solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
     else if ( is_dense( U ) )
     {
         if ( is_uniform_lowrank( M ) )
-            solve_upper_tri< value_t >( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
         else if ( is_dense( M ) )
-            hlr::solve_upper_tri< value_t >( side, diag, * cptrcast( & U, hpro::TDenseMatrix ), * ptrcast( & M, hpro::TDenseMatrix ) );
+            hlr::solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
@@ -2145,9 +1940,9 @@ solve_upper_tri ( const eval_side_t        side,
         HLR_ERROR( "unsupported matrix type for U : " + U.typestr() );
 
     // // DEBUG {
-    // auto  DX = hlr::seq::matrix::copy_nonuniform< value_t >( M );
-    // auto  TM = matrix::convert_to_dense< value_t >( *DM );
-    // auto  TX = matrix::convert_to_dense< value_t >( *DX );
+    // auto  DX = hlr::seq::matrix::copy_nonuniform( M );
+    // auto  TM = matrix::convert_to_dense( *DM );
+    // auto  TX = matrix::convert_to_dense( *DX );
     
     // hlr::add( value_t(-1), *TM, *TX );
     // std::cout << "solve_upper: " << M.id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *TX ) / norm::frobenius( *TM ) ) << std::endl;
@@ -2160,29 +1955,29 @@ solve_upper_tri ( const eval_side_t        side,
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix &          A,
-     const hpro::TTruncAcc &  acc,
-     const approx_t &         approx,
-     const uniform_map_t &    rowmap,
-     const uniform_map_t &    colmap )
-// hpro::TMatrix &          REF )
+lu ( Hpro::TMatrix< value_t > &          A,
+     const Hpro::TTruncAcc &             acc,
+     const approx_t &                    approx,
+     const is_matrix_map_t< value_t > &  rowmap,
+     const is_matrix_map_t< value_t > &  colmap )
+// Hpro::TMatrix< value_t > &              REF )
 {
     if ( is_blocked( A ) )
     {
-        auto  BA   = ptrcast( &A,   hpro::TBlockMatrix );
-        // auto  BREF = ptrcast( &REF, hpro::TBlockMatrix );
+        auto  BA   = ptrcast( &A,   Hpro::TBlockMatrix< value_t > );
+        // auto  BREF = ptrcast( &REF, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < std::min( BA->nblock_rows(), BA->nblock_cols() ); ++i )
         {
             HLR_ASSERT( ! is_null( BA->block( i, i ) ) );
             
-            // lu< value_t >( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
-            lu< value_t >( * BA->block( i, i ), acc, approx, rowmap, colmap );
+            // lu( * BA->block( i, i ), acc, rowmap, colmap, *BREF->block( i, i ) );
+            lu( * BA->block( i, i ), acc, approx, rowmap, colmap );
 
             // // DEBUG {
             // {
-            //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,i) );
-            //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,i) );
+            //     auto  D1 = matrix::convert_to_dense( *BA->block(i,i) );
+            //     auto  D2 = matrix::convert_to_dense( *BREF->block(i,i) );
 
             //     hlr::add( value_t(-1), *D2, *D1 );
             //     std::cout << "ref error " << BA->block(i,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
@@ -2192,14 +1987,14 @@ lu ( hpro::TMatrix &          A,
             for ( uint  j = i+1; j < BA->nblock_rows(); ++j )
             {
                 if ( ! is_null( BA->block( j, i ) ) )
-                    solve_upper_tri< value_t >( from_right, general_diag,
+                    solve_upper_tri( from_right, general_diag,
                                                 *BA->block( i, i ), *BA->block( j, i ),
                                                 acc, approx, rowmap, colmap );
 
                 // // DEBUG {
                 // {
-                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(j,i) );
-                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(j,i) );
+                //     auto  D1 = matrix::convert_to_dense( *BA->block(j,i) );
+                //     auto  D2 = matrix::convert_to_dense( *BREF->block(j,i) );
                     
                 //     hlr::add( value_t(-1), *D2, *D1 );
                 //     std::cout << "ref error " << BA->block(j,i)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
@@ -2210,14 +2005,14 @@ lu ( hpro::TMatrix &          A,
             for ( uint  j = i+1; j < BA->nblock_cols(); ++j )
             {
                 if ( ! is_null( BA->block( i, j ) ) )
-                    solve_lower_tri< value_t >( from_left, unit_diag,
+                    solve_lower_tri( from_left, unit_diag,
                                                 *BA->block( i, i ), *BA->block( i, j ),
                                                 acc, approx, rowmap, colmap );
 
                 // DEBUG {
                 // {
-                //     auto  D1 = matrix::convert_to_dense< value_t >( *BA->block(i,j) );
-                //     auto  D2 = matrix::convert_to_dense< value_t >( *BREF->block(i,j) );
+                //     auto  D1 = matrix::convert_to_dense( *BA->block(i,j) );
+                //     auto  D2 = matrix::convert_to_dense( *BREF->block(i,j) );
                     
                 //     hlr::add( value_t(-1), *D2, *D1 );
                 //     std::cout << "ref error " << BA->block(i,j)->id() << " : " << boost::format( "%.4e" ) % ( norm::frobenius( *D1 ) / norm::frobenius( *D2 ) ) << std::endl;
@@ -2245,9 +2040,9 @@ lu ( hpro::TMatrix &          A,
     }// if
     else if ( is_dense( A ) )
     {
-        auto  D = ptrcast( &A, hpro::TDenseMatrix );
+        auto  D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
 
-        invert< value_t >( *D );
+        invert( *D );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );

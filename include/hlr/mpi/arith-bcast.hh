@@ -31,8 +31,6 @@
 namespace hlr
 {
 
-using namespace HLIB;
-
 namespace mpi
 {
 

@@ -11,7 +11,6 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/mat_norm.hh>
 
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
@@ -27,7 +26,7 @@ namespace hlr { namespace seq { namespace tiled2 {
 namespace hpro = HLIB;
 
 // cluster
-using  cluster = hpro::TCluster;
+using  cluster = Hpro::TCluster;
 
 // import matrix/vector types
 using hlr::matrix::indexset;
@@ -38,9 +37,9 @@ using hlr::vector::tiled_scalarvector;
 
 inline
 std::string
-idstr ( hpro::id_t    id )
+idstr ( Hpro::id_t    id )
 {
-    return hpro::to_string( "%3d", id );
+    return Hpro::to_string( "%3d", id );
 }
 
 inline
@@ -48,15 +47,15 @@ std::string
 isstr ( indexset      is,
         const size_t  ntile )
 {
-    if ( is.size() <= ntile ) return hpro::to_string( "[%d]  ",    is.first() / ntile );
-    else                      return hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+    if ( is.size() <= ntile ) return Hpro::to_string( "[%d]  ",    is.first() / ntile );
+    else                      return Hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
 }
 
 inline
 std::string
 normstr ( double   f )
 {
-    return hpro::to_string( "%.4e", f );
+    return Hpro::to_string( "%.4e", f );
 }
 
 
@@ -91,7 +90,7 @@ dot ( const indexset &                 is,
       const tile_storage< value_t > &  B,
       const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "dot( %d )", is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "dot( %d )", is.size() ) );
     
     if ( is.size() > ntile )
     {
@@ -124,7 +123,7 @@ tprod ( const indexset &                 is,
         tile_storage< value_t > &        B,
         const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tprod( %d )", is.size() ) );
     
     if ( is.size() > ntile )
     {
@@ -166,7 +165,7 @@ tprod ( const indexset &                 is,
         const blas::matrix< value_t > &  T,
         const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tprod( %d )", is.size() ) );
     
     if ( is.size() > ntile )
     {
@@ -196,7 +195,7 @@ tprod ( const cluster &                  cl,
         const blas::matrix< value_t > &  T,
         tile_storage< value_t > &        B )
 {
-    HLR_LOG( 4, hpro::to_string( "tprod( %d )", cl.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tprod( %d )", cl.size() ) );
     
     if ( cl.is_leaf() )
     {
@@ -226,7 +225,7 @@ tsqr ( const indexset &                 is,
        const tile_storage< value_t > &  U,
        const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", is.size() ) );
     
     if ( is.size() > ntile )
     {
@@ -304,7 +303,7 @@ tsqr ( const indexset &                 is,
        const tile_storage< value_t > &  U,
        const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", is.size() ) );
     
     if ( is.size() > ntile )
     {
@@ -378,7 +377,7 @@ std::pair< tile_storage< value_t >,
 tsqr ( const cluster &                  cl,
        const tile_storage< value_t > &  X )
 {
-    HLR_LOG( 4, hpro::to_string( "tsqr( %d )", cl.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "tsqr( %d )", cl.size() ) );
     
     if ( cl.is_leaf() )
     {
@@ -443,9 +442,9 @@ truncate ( const cluster &                  row_cl,
            const cluster &                  col_cl,
            const tile_storage< value_t > &  U,
            const tile_storage< value_t > &  V,
-           const hpro::TTruncAcc &          acc )
+           const Hpro::TTruncAcc &          acc )
 {
-    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_cl.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "truncate( %d )", row_cl.size() ) );
     
     auto [ Q0, R0 ] = tsqr( row_cl, U );
     auto [ Q1, R1 ] = tsqr( col_cl, V );
@@ -486,10 +485,10 @@ truncate ( const indexset &                 row_is,
            const tile_storage< value_t > &  Y,
            const tile_storage< value_t > &  U,
            const tile_storage< value_t > &  V,
-           const hpro::TTruncAcc &          acc,
+           const Hpro::TTruncAcc &          acc,
            const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "truncate( %d )", row_is.size() ) );
+    HLR_LOG( 4, Hpro::to_string( "truncate( %d )", row_is.size() ) );
     
     // if ( Y.ncols() + V.ncols() > X.nrows() / 2 )
     // {
@@ -575,15 +574,15 @@ void
 addlr ( const tile_storage< value_t > &  U,
         const blas::matrix< value_t > &  T,
         const tile_storage< value_t > &  V,
-        hpro::TMatrix *                  A,
-        const hpro::TTruncAcc &          acc,
+        Hpro::TMatrix< value_t > *                  A,
+        const Hpro::TTruncAcc &          acc,
         const size_t                     ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "addlr( %d )", A->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "addlr( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
@@ -613,18 +612,18 @@ addlr ( const tile_storage< value_t > &  U,
     {
         assert( U.contains( A->row_is() ) && V.contains( A->col_is() ) );
         
-        auto        D = ptrcast( A, hpro::TDenseMatrix );
+        auto        D = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         const auto  W = blas::prod( value_t(1), U.at( A->row_is() ), T );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( norm::frobenius( *D ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     U = " + normstr( blas::norm_F( U.at( A->row_is() ) ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     T = " + normstr( blas::norm_F( T ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     W = " + normstr( blas::norm_F( W ) ) );
 
         blas::prod( value_t(-1), W, blas::adjoint( V.at( A->col_is() ) ),
-                    value_t(1), hpro::blas_mat< value_t >( D ) );
+                    value_t(1), Hpro::blas_mat< value_t >( D ) );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( norm::frobenius( *D ) ) );
     }// else
 }
 
@@ -634,15 +633,15 @@ addlr ( const tile_storage< value_t > &  U,
 //
 template < typename value_t >
 void
-trsmuh ( const hpro::TMatrix *      U,
+trsmuh ( const Hpro::TMatrix< value_t > *      U,
          tile_storage< value_t > &  X,
          const size_t               ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "trsmuh( %d )", U->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "trsmuh( %d )", U->id() ) );
     
     if ( is_blocked( U ) )
     {
-        auto  BU  = cptrcast( U, hpro::TBlockMatrix );
+        auto  BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
         auto  U00 = BU->block( 0, 0 );
         auto  U01 = cptrcast( BU->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  U11 = BU->block( 1, 1 );
@@ -661,12 +660,12 @@ trsmuh ( const hpro::TMatrix *      U,
     {
         assert( X.contains( U->row_is() ) );
         
-        auto  DU = cptrcast( U, hpro::TDenseMatrix );
+        auto  DU = cptrcast( U, Hpro::TDenseMatrix< value_t > );
 
         auto                     X_is = X.at( U->row_is() );
-        blas::matrix< value_t >  Y( X_is, hpro::copy_value );
+        blas::matrix< value_t >  Y( X_is, Hpro::copy_value );
 
-        blas::prod( value_t(1), blas::adjoint( hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
+        blas::prod( value_t(1), blas::adjoint( Hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X_is );
 
         HLR_LOG( 5, "trsmu :         " + idstr( U->id() ) + "        = " + normstr( blas::normF( X_is ) ) );
     }// else
@@ -678,15 +677,15 @@ trsmuh ( const hpro::TMatrix *      U,
 //
 template < typename value_t >
 void
-trsml ( const hpro::TMatrix *      L,
+trsml ( const Hpro::TMatrix< value_t > *      L,
         tile_storage< value_t > &  X,
         const size_t               ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "trsml( %d )", L->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "trsml( %d )", L->id() ) );
     
     if ( is_blocked( L ) )
     {
-        auto  BL  = cptrcast( L, hpro::TBlockMatrix );
+        auto  BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
         auto  L00 = BL->block( 0, 0 );
         auto  L10 = cptrcast( BL->block( 1, 0 ), tiled_lrmatrix< value_t > );
         auto  L11 = BL->block( 1, 1 );
@@ -716,15 +715,15 @@ trsml ( const hpro::TMatrix *      L,
 //
 template < typename value_t >
 void
-lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc,
+lu ( Hpro::TMatrix< value_t > *          A,
+     const Hpro::TTruncAcc &  acc,
      const size_t             ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< value_t > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< value_t > );
@@ -746,11 +745,11 @@ lu ( hpro::TMatrix *          A,
     }// if
     else
     {
-        auto  DA = ptrcast( A, hpro::TDenseMatrix );
+        auto  DA = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         
-        blas::invert( hpro::blas_mat< value_t >( DA ) );
+        blas::invert( Hpro::blas_mat< value_t >( DA ) );
 
-        HLR_LOG( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
+        HLR_LOG( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm::frobenius( *A ) ) );
     }// else
 }
 
@@ -768,8 +767,8 @@ lu ( hpro::TMatrix *          A,
 template < typename value_t >
 void
 mul_vec ( const value_t                          alpha,
-          const hpro::matop_t                    op_M,
-          const hpro::TMatrix &                  M,
+          const Hpro::matop_t                    op_M,
+          const Hpro::TMatrix< value_t > &                  M,
           const tiled_scalarvector< value_t > &  x,
           tiled_scalarvector< value_t > &        y )
 {
@@ -781,7 +780,7 @@ mul_vec ( const value_t                          alpha,
 
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -796,10 +795,10 @@ mul_vec ( const value_t                          alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D = cptrcast( &M, hpro::TDenseMatrix );
+        auto  D = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         
         blas::mulvec( alpha,
-                      blas::mat_view( op_M, hpro::blas_mat< value_t >( D ) ),
+                      blas::mat_view( op_M, Hpro::blas_mat< value_t >( D ) ),
                       x.at( D->col_is( op_M ) ),
                       value_t(1),
                       y.at( D->row_is( op_M ) ) );
@@ -809,7 +808,7 @@ mul_vec ( const value_t                          alpha,
         auto                     R = cptrcast( &M, tiled_lrmatrix< value_t > );
         blas::vector< value_t >  t( R->rank() );
 
-        if ( op_M == hpro::apply_normal )
+        if ( op_M == Hpro::apply_normal )
         {
             for ( auto  [ is, V_is ] : R->V() )
                 blas::mulvec( value_t(1), blas::adjoint( V_is ), x.at( is ), value_t(1), t );
@@ -817,9 +816,9 @@ mul_vec ( const value_t                          alpha,
             for ( auto  [ is, U_is ] : R->U() )
                 blas::mulvec( alpha, U_is, t, value_t(1), y.at( is ) );
         }// if
-        else if ( op_M == hpro::apply_transposed )
+        else if ( op_M == Hpro::apply_transposed )
         {
-            assert( hpro::is_complex_type< value_t >::value == false );
+            assert( Hpro::is_complex_type< value_t >::value == false );
             
             for ( auto  [ is, U_is ] : R->U() )
                 blas::mulvec( value_t(1), blas::transposed( U_is ), x.at( is ), value_t(1), t );
@@ -827,7 +826,7 @@ mul_vec ( const value_t                          alpha,
             for ( auto  [ is, V_is ] : R->V() )
                 blas::mulvec( alpha, V_is, t, value_t(1), y.at( is ) );
         }// if
-        else if ( op_M == hpro::apply_adjoint )
+        else if ( op_M == Hpro::apply_adjoint )
         {
             for ( auto  [ is, U_is ] : R->U() )
                 blas::mulvec( value_t(1), blas::adjoint( U_is ), x.at( is ), value_t(1), t );

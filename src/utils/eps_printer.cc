@@ -63,6 +63,11 @@ eps_printer::begin ( const double  width,
             << "/R    { roll } bind def" << std::endl
             << std::endl
         
+            << "/DL   { 4 2 roll" << std::endl
+            << "        newpath" << std::endl
+            << "        moveto lineto" << std::endl
+            << "        closepath" << std::endl
+            << "        stroke } bind def" << std::endl
             << "/DR   { newpath" << std::endl
             << "        4 2 roll" << std::endl
             << "        moveto exch dup 0 rlineto" << std::endl
@@ -157,7 +162,7 @@ eps_printer::restore ()
 //
 void
 eps_printer::scale ( const double  x,
-                    const double  y )
+                     const double  y )
 {
     _output << x << " " << y << " scale" << std::endl;
 }
@@ -166,14 +171,33 @@ eps_printer::scale ( const double  x,
 // translate output
 //
 void
-eps_printer::translate ( const double x, const double y )
+eps_printer::translate ( const double  x,
+                         const double  y )
 {
     _output << x << " " << y << " translate" << std::endl;
 }
 
 //
+// rotate output
+//
+void
+eps_printer::rotate ( const double  angle )
+{
+    _output << angle << " rotate" << std::endl;
+}
+
+//
 // 2D - drawing
 //
+
+void
+eps_printer::draw_line ( const double  x1,
+                         const double  y1,
+                         const double  x2,
+                         const double  y2 )
+{
+    _output << x1 << ' ' << y1 << ' ' << x2 << ' ' << y2 << " DL" << std::endl;
+}
 
 void
 eps_printer::draw_rect ( const double  x1,
@@ -192,9 +216,9 @@ eps_printer::fill_rect ( const double x1, const double y1, const double x2, cons
 
 void
 eps_printer::draw_text ( const double         x,
-                        const double         y,
-                        const std::string &  text,
-                        const char           justification )
+                         const double         y,
+                         const std::string &  text,
+                         const char           justification )
 {
     _output << x << ' ' << y << " (" << text << ") ";
 
@@ -223,6 +247,16 @@ eps_printer::set_rgb ( const int r, const int g, const int b )
             << std::max( 0, std::min( 255, g ) ) / 256.0 << ' '
             << std::max( 0, std::min( 255, b ) ) / 256.0 << ' '
             << "SRGB" << std::endl;
+}
+
+void
+eps_printer::set_rgb ( const uint rgb )
+{
+    const auto  r = ( rgb & 0xFF0000 ) >> 16;
+    const auto  g = ( rgb & 0x00FF00 ) >> 8;
+    const auto  b =   rgb & 0x0000FF;
+
+    set_rgb( r, g, b );
 }
 
 void

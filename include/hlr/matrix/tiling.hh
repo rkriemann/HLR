@@ -18,10 +18,8 @@
 
 namespace hlr { namespace matrix {
 
-namespace hpro = HLIB;
-
 // map HLIB types to HLR 
-using  indexset = hpro::TIndexSet;
+using  indexset = Hpro::TIndexSet;
 
 // mapping of clusters (indexsets) to tile indexsets
 using  tile_is_map_t = std::unordered_map< indexset, std::deque< indexset >, indexset_hash >;
@@ -36,7 +34,7 @@ namespace detail
 
 inline
 void
-setup_tiling ( const hpro::TCluster &  cl,
+setup_tiling ( const Hpro::TCluster &  cl,
                tile_is_map_t &         tile_map )
 {
     if ( cl.nsons() > 0 )
@@ -70,7 +68,7 @@ setup_tiling ( const hpro::TCluster &  cl,
 
 inline
 tile_is_map_t
-setup_tiling ( const hpro::TCluster &  cl )
+setup_tiling ( const Hpro::TCluster &  cl )
 {
     tile_is_map_t  tile_map;
 

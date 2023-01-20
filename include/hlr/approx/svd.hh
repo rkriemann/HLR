@@ -18,7 +18,7 @@ namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
-using hpro::idx_t;
+using Hpro::idx_t;
 
 //
 // return low-rank approximation of M with accuracy <acc>
@@ -27,9 +27,9 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 svd ( blas::matrix< value_t > &  M,
-      const hpro::TTruncAcc &    acc )
+      const Hpro::TTruncAcc &    acc )
 {
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     //
     // perform SVD of M
@@ -75,9 +75,9 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 svd ( const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
-      const hpro::TTruncAcc &          acc )
+      const Hpro::TTruncAcc &          acc )
 {
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -109,7 +109,7 @@ svd ( const blas::matrix< value_t > &  U,
         //
             
         auto  M    = blas::prod( value_t(1), U, adjoint(V) );
-        auto  lacc = hpro::TTruncAcc( acc );
+        auto  lacc = Hpro::TTruncAcc( acc );
 
         if ( acc_rank > 0 )
             lacc.set_max_rank( acc_rank );
@@ -252,7 +252,7 @@ svd ( const blas::matrix< value_t > &  U,
             auto  OU_sub = blas::matrix< value_t >( OU, in_rank_is, orank_is );
 
             blas::copy( Urank, OU_sub );
-            blas::prod_Q( blas::from_left, hpro::apply_normal, QU, TU, OU );
+            blas::prod_Q( blas::from_left, Hpro::apply_normal, QU, TU, OU );
 
             // V := Q_V · conj(V)
             auto  Vrank  = blas::matrix< value_t >( Vs, in_rank_is, orank_is );
@@ -260,7 +260,7 @@ svd ( const blas::matrix< value_t > &  U,
             auto  OV_sub = blas::matrix< value_t >( OV, in_rank_is, orank_is );
 
             blas::copy( Vrank, OV_sub );
-            blas::prod_Q( blas::from_left, hpro::apply_normal, QV, TV, OV );
+            blas::prod_Q( blas::from_left, Hpro::apply_normal, QV, TV, OV );
 
             return { std::move( OU ), std::move( OV ) };
         }// if
@@ -282,7 +282,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 svd ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  V,
-      const hpro::TTruncAcc &                       acc )
+      const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == V.size() );
 
@@ -372,7 +372,7 @@ std::pair< blas::matrix< value_t >,
 svd ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  T,
       const std::list< blas::matrix< value_t > > &  V,
-      const hpro::TTruncAcc &                       acc )
+      const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -460,7 +460,7 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -472,7 +472,7 @@ struct SVD
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::svd( M, acc );
     }
@@ -481,7 +481,7 @@ struct SVD
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -490,7 +490,7 @@ struct SVD
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -500,18 +500,9 @@ struct SVD
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::svd( U, T, V, acc );
-    }
-
-    template < typename operator_t >
-    std::pair< blas::matrix< typename operator_t::value_t >,
-               blas::matrix< typename operator_t::value_t > >
-    operator () ( const operator_t &       /* op */,
-                  const hpro::TTruncAcc &  /* acc */ ) const
-    {
-        HLR_ERROR( "general operator not supported" );
     }
 
     //
@@ -520,18 +511,46 @@ struct SVD
     
     blas::matrix< value_t >
     column_basis ( blas::matrix< value_t > &  M,
-                   const hpro::TTruncAcc &    acc ) const
+                   const Hpro::TTruncAcc &    acc ) const
     {
-        auto  S = blas::vector< real_t >();
+        if ( M.ncols() > M.nrows() / 2 )
+        {
+            //
+            // directly use first k column of U from M = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  S = blas::vector< real_t >();
 
-        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
         
-        blas::svd( M, S );
+            blas::svd( M, S );
 
-        const auto  k  = acc.trunc_rank( S );
-        const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
-        return  blas::copy( Uk );
+            return  blas::copy( Uk );
+        }// if
+        else
+        {
+            //
+            // M = Q·R = Q·U·S·V' with R = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  R = blas::matrix< value_t >();
+
+            blas::qr( M, R );
+
+            auto  S = blas::vector< real_t >();
+
+            blas::svd( R, S );
+            
+            const auto  k  = acc.trunc_rank( S );
+            const auto  Uk = blas::matrix< value_t >( R, blas::range::all, blas::range( 0, k-1 ) );
+
+            return  blas::prod( M, Uk );
+        }// else
     }
 };
 
@@ -546,7 +565,7 @@ struct PairSVD
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::svd( M, acc );
     }
@@ -555,7 +574,7 @@ struct PairSVD
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -564,7 +583,7 @@ struct PairSVD
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         auto  approx = SVD< value_t >();
         
@@ -576,7 +595,7 @@ struct PairSVD
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::svd( U, T, V, acc );
     }

@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "hlr/apps/log_kernel.hh"
-#include "hlr/apps/matern_cov.hh"
+#include "hlr/apps/radial.hh"
 #include "hlr/apps/laplace.hh"
 #include "hlr/apps/helmholtz.hh"
 #include "hlr/apps/exp.hh"
@@ -44,26 +44,14 @@ gen_problem< hlr::apps::log_kernel > ()
 }
 
 template <>
-std::unique_ptr< hlr::apps::matern_cov >
-gen_problem< hlr::apps::matern_cov > ()
+std::unique_ptr< hlr::apps::matern_covariance >
+gen_problem< hlr::apps::matern_covariance > ()
 {
     print_problem_desc( "Matern Covariance" );
 
-    const auto  dashpos = gridfile.find( '-' );
+    HLR_ASSERT( gridfile != "" );
 
-    if ( dashpos != std::string::npos )
-    {
-        const auto  basename = gridfile.substr( 0, dashpos );
-        const auto  size     = gridfile.substr( dashpos+1, gridfile.length() );
-        const auto  nsize    = std::atoi( size.c_str() );
-
-        if (( basename == "randsphere" ) || ( basename == "randcube" ))
-            return std::make_unique< hlr::apps::matern_cov >( basename, nsize );
-        else
-            return std::make_unique< hlr::apps::matern_cov >( gridfile );
-    }// if
-    else
-        return std::make_unique< hlr::apps::matern_cov >( gridfile );
+    return std::make_unique< hlr::apps::matern_covariance >( sigma, gridfile );
 }
 
 template <>
@@ -72,7 +60,7 @@ gen_problem< hlr::apps::laplace_slp > ()
 {
     print_problem_desc( "Laplace SLP" );
 
-    assert( gridfile != "" );
+    HLR_ASSERT( gridfile != "" );
     
     return std::make_unique< hlr::apps::laplace_slp >( gridfile );
 }
@@ -83,7 +71,7 @@ gen_problem< hlr::apps::helmholtz_slp > ()
 {
     print_problem_desc( "Helmholtz SLP" );
 
-    assert( gridfile != "" );
+    HLR_ASSERT( gridfile != "" );
     
     return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile );
 }
@@ -94,9 +82,20 @@ gen_problem< hlr::apps::exp > ()
 {
     print_problem_desc( "Exp" );
 
-    assert( gridfile != "" );
+    HLR_ASSERT( gridfile != "" );
     
     return std::make_unique< hlr::apps::exp >( gridfile );
+}
+
+template <>
+std::unique_ptr< hlr::apps::gaussian >
+gen_problem< hlr::apps::gaussian > ()
+{
+    print_problem_desc( "Gaussian" );
+
+    HLR_ASSERT( gridfile != "" );
+
+    return std::make_unique< hlr::apps::gaussian >( sigma, gridfile );
 }
 
 }// namespace hlr

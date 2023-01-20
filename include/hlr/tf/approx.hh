@@ -13,10 +13,6 @@
 
 namespace hlr { namespace tf {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //

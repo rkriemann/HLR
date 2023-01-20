@@ -429,6 +429,8 @@ node::run ( const TTruncAcc & acc )
     
     run_( acc );
     reset_dep_cnt();
+
+    // HLR_LOG( 4, term::bold( term::green( "end( " ) ) + term::bold( this->to_string() ) + term::bold( term::green( " )" ) ) );
 }
 
 //
@@ -466,18 +468,6 @@ node::refine ( const size_t  min_size )
     //
 
     _sub_nodes = std::move( g );
-}
-
-//
-// finalize node data (if internal data will not change)
-//
-void
-node::finalize ()
-{
-    _ndeps = _dep_cnt;
-    
-    _in_blk_deps.resize( 0 );
-    _out_blk_deps.resize( 0 );
 }
 
 //

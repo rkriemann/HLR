@@ -20,36 +20,40 @@ namespace hlr
 //
 // simplifies test if <val> is in <cont>
 //
-template < typename value_t >
+template < typename cont_t,
+           typename arg_t >
 bool
-contains ( const std::vector< value_t > &  cont,
-           const value_t &                 val )
+contains ( const std::vector< cont_t > &  cont,
+           const arg_t &                  val )
 {
-    return std::find( cont.begin(), cont.end(), val ) != cont.end();
+    return std::find( cont.begin(), cont.end(), cont_t( val ) ) != cont.end();
 }
 
-template < typename value_t >
+template < typename cont_t,
+           typename arg_t >
 bool
-contains ( const std::list< value_t > &  cont,
-           const value_t &               val )
+contains ( const std::list< cont_t > &  cont,
+           const arg_t &                val )
 {
-    return std::find( cont.begin(), cont.end(), val ) != cont.end();
+    return std::find( cont.begin(), cont.end(), cont_t( val ) ) != cont.end();
 }
 
-template < typename value_t >
+template < typename cont_t,
+           typename arg_t >
 bool
-contains ( const std::set< value_t > &  cont,
-           const value_t &              val )
+contains ( const std::set< cont_t > &  cont,
+           const arg_t &               val )
 {
-    return cont.find( val ) != cont.end();
+    return cont.find( cont_t( val ) ) != cont.end();
 }
 
-template < typename value_t >
+template < typename cont_t,
+           typename arg_t >
 bool
-contains ( const std::unordered_set< value_t > &  cont,
-           const value_t &                        val )
+contains ( const std::unordered_set< cont_t > &  cont,
+           const arg_t &                         val )
 {
-    return cont.find( val ) != cont.end();
+    return cont.find( cont_t( val ) ) != cont.end();
 }
 
 //

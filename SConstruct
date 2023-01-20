@@ -4,6 +4,9 @@
 from __future__ import print_function
 
 import os, sys
+import re
+
+from datetime import datetime
 
 ######################################################################
 #
@@ -22,11 +25,11 @@ color        = True
 opts_file    = '.scons.options'
 
 CXX          = 'g++'
-CXXFLAGS     = '-std=c++17'
+CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -march=native'
-WARNFLAGS    = '-Wall'
+WARNFLAGS    = '' # '-Wall'
 LINKFLAGS    = ''
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
 
@@ -37,36 +40,32 @@ TBB_DIR      = '/'
 TASKFLOW_DIR = '/'
 HPX_DIR      = '/'
 GPI2_DIR     = '/'
+CUDA_DIR     = '/'
 
 JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
-likwid       = False
-LIKWID_DIR   = '/opt/local/likwid'
-
-CUDA_DIR     = '/'
-
-# set of programs to build: dag-*, tlr, hodlr, tileh (or 'all')
-PROGRAMS     = [ 'tlr',
-                 'hodlr',
-                 'tileh',
-                 'tiled-h',
-                 'tiled-hca',
-                 'tiled-hodlr',
-                 'dag-lu',
-                 'dag-gauss',
-                 'dag-inv',
-                 'dag-waz',
-                 'dag-hodlr',
-                 'uniform',
-                 'uniform-mm',
-                 'uniform-lu',
-                 'approx-mm',
-                 'approx-lu',
-                 'dpt',
-                 'polykern',
-                 'cuda' ]
+likwid        = False
+LIKWID_DIR    = '/'
+scorep        = False
+SCOREP_DIR    = '/'
+half          = False
+HALF_DIR      = '/'
+zfp           = False
+ZFP_DIR       = '/'
+sz            = False
+SZ_DIR        = '/'
+sz3           = False
+SZ3_DIR       = '/'
+lz4           = False
+LZ4_DIR       = '/'
+zlib          = False
+ZLIB_DIR      = '/'
+zstd          = False
+ZSTD_DIR      = '/'
+universal     = False
+UNIVERSAL_DIR = '/'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -81,11 +80,15 @@ FRAMEWORKS   = [ 'seq',
 # supported lapack libraries
 LAPACKLIBS   = [ 'default',     # default system implementation, e.g., -llapack -lblas
                  'none',        # do not use any LAPACK library
+                 'user',        # use user defined LAPACK library (see "--lapack-flags")
                  'mkl',         # use parallel Intel MKL (should be OpenMP version)
                  'mklomp',      # use OpenMP based Intel MKL
                  'mkltbb',      # use TBB based Intel MKL
                  'mklseq',      # use sequential Intel MKL
                  'accelerate' ] # Accelerate framework on MacOS
+
+# user defined linking flags for LAPACK
+LAPACK_FLAGS = '-llapack -lblas'
                  
 # malloc libraries (also depends on directories above)
 MALLOCS      = [ 'default',
@@ -95,26 +98,25 @@ MALLOCS      = [ 'default',
                  'tbbmalloc',
                  'tcmalloc' ]
 
-# mapping of programs to subdirs
-SUBDIRS      = { 'tlr'         : 'tlr',
-                 'hodlr'       : 'hodlr',
-                 'tileh'       : 'tileh',
-                 'tiled-h'     : 'tiled',
-                 'tiled-hca'   : 'tiled',
-                 'tiled-hodlr' : 'tiled',
-                 'dag-lu'      : 'dag',
-                 'dag-gauss'   : 'dag',
-                 'dag-inv'     : 'dag',
-                 'dag-waz'     : 'dag',
-                 'dag-hodlr'   : 'dag',
-                 'uniform'     : 'uniform',
-                 'uniform-mm'  : 'uniform',
-                 'uniform-lu'  : 'uniform',
-                 'approx-mm'   : 'approx',
-                 'approx-lu'   : 'approx',
-                 'dpt'         : '',
-                 'polykern'    : '',
-                 'cuda'        : '' }
+# supported and active compressor
+COMPRESSORS   = [ 'none',
+                  'fp32',
+                  'fp16',
+                  'bf16',
+                  'tf32',
+                  'bf24',
+                  'zfp',
+                  'posits',
+                  'sz',
+                  'sz3',
+                  'lz4',
+                  'zlib',
+                  'zstd',
+                  'afloat',
+                  'apfloat',
+                  'bfloat',
+                  'dfloat' ]
+compressor    = 'none'
 
 ######################################################################
 #
@@ -160,6 +162,44 @@ def path ( program, source ) :
 
 ######################################################################
 #
+# collect all programs from "programs" sub directory
+#
+######################################################################
+
+def scan_programs () :
+    cc_file = re.compile( '.*\.(cc|CC|cpp|c\+\+)\Z' )
+
+    scanned_programs = []
+    scanned_subdirs  = {}
+
+    for root, dirs, files in os.walk( "programs", topdown = False ) :
+        for filename in files :
+            if cc_file.search( filename ) != None :
+                # look for any framework
+                for fwork in FRAMEWORKS :
+                    fstr = '-' + fwork
+                    pos  = filename.find( fstr )
+                    if pos != -1 :
+                        prog = filename[:pos]
+                        if not prog in scanned_programs :
+                            scanned_programs.append( prog )
+                            if root == 'programs' : scanned_subdirs[prog] = ''
+                            else :                  scanned_subdirs[prog] = root.replace( 'programs/', '' )
+
+                        # print( root, filename[:pos], fwork )
+
+    return scanned_programs, scanned_subdirs
+
+tic = datetime.now()
+
+PROGRAMS, SUBDIRS = scan_programs()
+
+toc = datetime.now()
+
+# print( "scanned programs in %.3es" % ( toc - tic ).total_seconds() )
+
+######################################################################
+#
 # eval options
 #
 ######################################################################
@@ -173,33 +213,54 @@ opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'a
 opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
 opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
-opts.Add(               'cxx',      'C++ compiler to use',           CXX )
-opts.Add(               'cxxflags', 'C++ compiler flags',            CXXFLAGS )
-opts.Add(               'cpuflags', 'path to cpuflags',              CPUFLAGS )
-opts.Add(               'defines',  'preprocessor defines',          DEFINES )
+opts.Add(               'cxx',       'C++ compiler to use',           CXX )
+opts.Add(               'cxxflags',  'C++ compiler flags',            CXXFLAGS )
+opts.Add(               'optflags',  'compiler optimization flags',   OPTFLAGS )
+opts.Add(               'cpuflags',  'path to cpuflags',              CPUFLAGS )
+opts.Add(               'defines',   'preprocessor defines',          DEFINES )
 
-opts.Add( PathVariable( 'hpro',     'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tbb',      'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tf',       'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'hpx',      'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'gpi2',     'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mkl',      'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'cuda',     'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpro',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tbb',       'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tf',        'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpx',       'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'gpi2',      'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mkl',       'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda',      'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
-opts.Add( PathVariable( 'jemalloc', 'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mimalloc', 'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tcmalloc', 'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'jemalloc',  'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mimalloc',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'lapack',   'lapack library to use',         'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
-opts.Add( EnumVariable( 'malloc',   'malloc library to use',         'default', allowed_values = MALLOCS, ignorecase = 2 ) )
-opts.Add( BoolVariable( 'likwid',   'use likwid library',            likwid ) )
+opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
+opts.Add(               'lapackflags',   'user defined link flags for lapack', default = LAPACK_FLAGS )
+opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
+opts.Add( BoolVariable( 'likwid',        'use likwid library',                 likwid ) )
+opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',      LIKWID_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'scorep',        'use Score-P library',                scorep ) )
+opts.Add( PathVariable( 'scorep_dir',    'Score-P installation directory',     SCOREP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'half',          'use half precision library',         half ) )
+opts.Add( PathVariable( 'half_dir',      'half installation directory',        HALF_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',        zfp ) )
+opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',         ZFP_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'sz',            'use SZ compression library',         sz ) )
+opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',          SZ_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        sz3 ) )
+opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
+opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
+opts.Add( PathVariable( 'zlib_dir',      'ZLIB installation directory',        ZLIB_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       zstd ) )
+opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
+opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
+opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS, ignorecase = 2 ) )
 
-opts.Add( BoolVariable( 'fullmsg',  'enable full command line output',           fullmsg ) )
-opts.Add( BoolVariable( 'debug',    'enable building with debug informations',   debug ) )
-# opts.Add( BoolVariable( 'profile',  'enable building with profile informations', profile ) )
-opts.Add( BoolVariable( 'optimise', 'enable building with optimisation',         optimise ) )
-opts.Add( BoolVariable( 'warn',     'enable building with compiler warnings',    warn ) )
-opts.Add( BoolVariable( 'color',    'use colored output during compilation',     color ) )
+opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
+opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
+opts.Add( BoolVariable( 'optimise',  'enable building with optimisation',         optimise ) )
+opts.Add( BoolVariable( 'warn',      'enable building with compiler warnings',    warn ) )
+opts.Add( BoolVariable( 'color',     'use colored output during compilation',     color ) )
 
 # read options from options file
 opt_env = Environment( options = opts )
@@ -227,6 +288,7 @@ if 'all' in frameworks : frameworks = FRAMEWORKS
 
 CXX          = opt_env['cxx']
 CXXFLAGS     = opt_env['cxxflags']
+OPTFLAGS     = opt_env['optflags']
 CPUFLAGS     = opt_env['cpuflags']
 DEFINES      = opt_env['defines']
 
@@ -243,13 +305,33 @@ JEMALLOC_DIR = opt_env['jemalloc']
 MIMALLOC_DIR = opt_env['mimalloc']
 TCMALLOC_DIR = opt_env['tcmalloc']
 
-lapack       = opt_env['lapack']
-malloc       = opt_env['malloc']
-likwid       = opt_env['likwid']
+lapack        = opt_env['lapack']
+LAPACK_FLAGS  = opt_env['lapackflags']
+malloc        = opt_env['malloc']
+likwid        = opt_env['likwid']
+LIKWID_DIR    = opt_env['likwid_dir']
+scorep        = opt_env['scorep']
+SCOREP_DIR    = opt_env['scorep_dir']
+half          = opt_env['half']
+HALF_DIR      = opt_env['half_dir']
+zfp           = opt_env['zfp']
+ZFP_DIR       = opt_env['zfp_dir']
+sz            = opt_env['sz']
+SZ_DIR        = opt_env['sz_dir']
+sz3           = opt_env['sz3']
+SZ3_DIR       = opt_env['sz3_dir']
+lz4           = opt_env['lz4']
+LZ4_DIR       = opt_env['lz4_dir']
+zlib          = opt_env['zlib']
+ZLIB_DIR      = opt_env['zlib_dir']
+zstd          = opt_env['zstd']
+ZSTD_DIR      = opt_env['zstd_dir']
+universal     = opt_env['universal']
+UNIVERSAL_DIR = opt_env['universal_dir']
+compressor    = opt_env['compressor']
 
 fullmsg      = opt_env['fullmsg']
 debug        = opt_env['debug']
-# profile      = opt_env['profile']
 optimise     = opt_env['optimise']
 warn         = opt_env['warn']
 color        = opt_env['color']
@@ -326,14 +408,13 @@ if debug :
     LINKFLAGS = '-g'
     DEFINES   = ''
 
-if profile :
-    OPTFLAGS  = '-g -pg -O3 -march=native'
-    LINKFLAGS = '-g -pg'
-    DEFINES   = ''
-
 if warn :
     WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
-    
+
+# Thread Sanitizer
+# CXXFLAGS  = CXXFLAGS  + ' -fsanitize=thread'
+# LINKFLAGS = LINKFLAGS + ' -fsanitize=thread'
+
 env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,
@@ -342,7 +423,7 @@ env = Environment( options    = opts, # TODO: <- check without
                    CPPDEFINES = Split( DEFINES ) )
 
 # include HLIBpro library
-env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hlib-config' ) + ' --cflags --lflags' )
+env.ParseConfig( os.path.join( HPRO_DIR, 'bin', 'hpro-config' ) + ' --cflags --lflags' )
 
 # decative full compiler/linker output
 if not fullmsg :
@@ -365,20 +446,25 @@ env.Prepend( LIBPATH = [ '.' ] )
 # add LAPACK library
 if lapack == 'default' :
     env.Append( LIBS = [ 'lapack', 'blas' ] )
+elif lapack == 'user' :
+    env.MergeFlags( LAPACK_FLAGS )
 elif lapack == 'mkl' or lapack == 'mklomp' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
-    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
 elif lapack == 'mkltbb' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
-    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
 elif lapack == 'mklseq' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
-    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) )
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
+    env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
 elif lapack == 'accelerate' :
     env.MergeFlags( '-Wl,-framework,Accelerate' )
@@ -403,11 +489,86 @@ if likwid and LIKWID_DIR != None :
     env.Append( LIBPATH    = os.path.join( LIKWID_DIR, 'lib' ) )
     env.Append( LIBS       = 'likwid' )
 
+# include Score-P tracing library
+if scorep and SCOREP_DIR != None :
+    env.Replace( CXX = os.path.join( SCOREP_DIR, 'bin', 'scorep' ) + ' --user --thread=pthread --mpp=none ' + CXX )
+    env.Append( LIBPATH    = os.path.join( SCOREP_DIR, 'lib' ) )
+    env.Append( CPPDEFINES = 'HAS_SCOREP' )
+
 # add CUDA
 if 'cuda' in frameworks :
     env.Append( CPPPATH = os.path.join( CUDA_DIR, 'include' ) )
     env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64' ) )
-    env.Append( LIBS = [ 'cudart', 'cublas' ] ) # cusolver
+    env.Append( LIBS = [ 'cudart', 'cublasLt', 'cublas', 'cusolver' ] )
+
+# support for half precision
+if half :
+    env.Append( CPPDEFINES = 'HAS_HALF' )
+    env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
+        
+# support for ZFP compression
+if zfp :
+    env.Append( CPPDEFINES = 'HAS_ZFP' )
+    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zfp' ] )
+        
+# support for SZ compression
+if sz :
+    env.Append( CPPDEFINES = 'HAS_SZ' )
+    env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'SZ' ] )
+        
+# support for SZ3 compression
+if sz3 :
+    env.Append( CPPDEFINES = 'HAS_SZ3' )
+    env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zstd' ] )
+        
+# support for LZ4 compression
+if lz4 :
+    env.Append( CPPDEFINES = 'HAS_LZ4' )
+    env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'lz4' ] )
+        
+# support for ZLIB compression
+if zlib :
+    env.Append( CPPDEFINES = 'HAS_ZLIB' )
+    env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'z' ] )
+        
+# support for Zstd compression
+if zstd :
+    env.Append( CPPDEFINES = 'HAS_ZSTD' )
+    env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zstd' ] )
+        
+# support for universal number library
+if universal :
+    env.Append( CPPDEFINES = 'HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+
+if   compressor == 'fp32'    : env.Append( CPPDEFINES = 'COMPRESSOR=1' )
+elif compressor == 'fp16'    : env.Append( CPPDEFINES = 'COMPRESSOR=2' )
+elif compressor == 'zfp'     : env.Append( CPPDEFINES = 'COMPRESSOR=3' )
+elif compressor == 'posits'  : env.Append( CPPDEFINES = 'COMPRESSOR=4' )
+elif compressor == 'sz'      : env.Append( CPPDEFINES = 'COMPRESSOR=5' )
+elif compressor == 'sz3'     : env.Append( CPPDEFINES = 'COMPRESSOR=6' )
+elif compressor == 'lz4'     : env.Append( CPPDEFINES = 'COMPRESSOR=7' )
+elif compressor == 'zlib'    : env.Append( CPPDEFINES = 'COMPRESSOR=8' )
+elif compressor == 'zstd'    : env.Append( CPPDEFINES = 'COMPRESSOR=9' )
+elif compressor == 'bf16'    : env.Append( CPPDEFINES = 'COMPRESSOR=10' )
+elif compressor == 'tf32'    : env.Append( CPPDEFINES = 'COMPRESSOR=11' )
+elif compressor == 'bf24'    : env.Append( CPPDEFINES = 'COMPRESSOR=12' )
+elif compressor == 'afloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
+elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
+elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=15' )
+elif compressor == 'dfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=16' )
 
 ######################################################################
 #
@@ -415,6 +576,9 @@ if 'cuda' in frameworks :
 #
 ######################################################################
 
+#
+# split array of strings for pretty printing in table
+#
 def split_str_array ( arr, n ) :
     parts = []
     line  = ''
@@ -430,7 +594,17 @@ def split_str_array ( arr, n ) :
         parts.append( line )
 
     return parts
-    
+
+#
+# helper for printing paths
+#
+def pathstr ( path ) :
+    if path != '' : return '(' + path + ')'
+    else          : return ''
+
+#
+# show output of "scons help"
+#
 def show_help ( target, source, env ):
     bool_str = { False : colors['bold'] + colors['red']   + '✘' + colors['reset'],
                  True  : colors['bold'] + colors['green'] + '✔'  + colors['reset'] }
@@ -455,16 +629,21 @@ def show_help ( target, source, env ):
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mkl{1}        │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( LAPACKLIBS ) )
+    print( '  {0}lapackflags{1}│ user provided link flags      │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
     print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -499,6 +678,10 @@ def show_options ( target, source, env ):
     print()
     print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}cxx{1}        │ C++ compiler                  │'.format( colors['bold'], colors['reset'] ), CXX )
+    print( '  {0}cxxflags{1}   │ C++ compiler flags            │'.format( colors['bold'], colors['reset'] ), CXXFLAGS )
+    print( '  {0}optflags{1}   │ compiler optimization flags   │'.format( colors['bold'], colors['reset'] ), OPTFLAGS )
+    print( ' ────────────┼───────────────────────────────┼──────────' )
 
     # split "programs" into smaller pieces
     parts = split_str_array( programs, 40 )
@@ -515,16 +698,25 @@ def show_options ( target, source, env ):
     print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
     print( '  {0}mkl{1}        │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
     print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
-    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ), JEMALLOC_DIR )
-    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ), MIMALLOC_DIR )
-    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ), TCMALLOC_DIR )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), malloc )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), bool_str[ likwid ] )
+    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), lapack )
+    if lapack == 'user' :
+        print( '  {0}lapackflags{1}│ user provided link flags      │ {2}'.format( colors['bold'], colors['reset'], LAPACK_FLAGS ) )
+    print( '  {0}malloc{1}     │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
+           pathstr( JEMALLOC_DIR if malloc == 'jemalloc' else MIMALLOC_DIR if malloc == 'mimalloc' else TCMALLOC_DIR if malloc == 'tcmalloc' else '' ) )
+    print( '  {0}compressor{1} │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
+    print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
+    print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
+    print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
+    print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
+    print( '  {0}half{1}       │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
+    print( '  {0}lz4{1}        │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
+    print( '  {0}zlib{1}       │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
+    print( '  {0}zstd{1}       │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
+    print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
     print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
-    # print( '  {0}profile{1}    │ enable profile information    │'.format( colors['bold'], colors['reset'] ), bool_str[ profile ] )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
@@ -544,40 +736,42 @@ sources = [ 'src/apps/exp.cc',
             'src/apps/helmholtz.cc',
             'src/apps/laplace.cc',
             'src/apps/log_kernel.cc',
-            'src/apps/matern_cov.cc',
+            'src/apps/radial.cc',
             'src/cluster/distr.cc',
             'src/cluster/h.cc',
             'src/cluster/hodlr.cc',
             'src/cluster/mblr.cc',
             'src/cluster/tileh.cc',
             'src/cluster/tlr.cc',
-            'src/dag/gauss_elim.cc',
             'src/dag/graph.cc',
-            'src/dag/invert.cc',
             'src/dag/local_graph.cc',
-            'src/dag/lu.cc',
-            'src/dag/lu_coarse.cc',
-            'src/dag/lu_hodlr_tiled.cc',
-            'src/dag/lu_hodlr_tiled_lazy.cc',
-            'src/dag/lu_lvl.cc',
-            'src/dag/lu_oop.cc',
-            'src/dag/lu_oop_accu.cc',
-            'src/dag/lu_oop_accu_sep.cc',
-            'src/dag/lu_oop_auto.cc',
-            'src/dag/lu_tileh.cc',
             'src/dag/node.cc',
-            'src/dag/solve.cc',
-            'src/matrix/level_matrix.cc',
-            'src/matrix/luinv_eval.cc',
+            # 'src/dag/solve.cc',
+            # 'src/matrix/level_matrix.cc',
             'src/matrix/print.cc',
             'src/seq/dag.cc',
-            'src/seq/solve.cc',
+            # 'src/seq/solve.cc',
             'src/utils/compare.cc',
             'src/utils/eps_printer.cc',
             'src/utils/log.cc',
             'src/utils/mach.cc',
             'src/utils/term.cc',
             'src/utils/text.cc' ]
+
+# add when needed
+if 'dag-lu' in programs :
+    sources += [ 'src/dag/gauss_elim.cc',
+                 'src/dag/invert.cc',
+                 'src/dag/lu.cc',
+                 'src/dag/lu_coarse.cc',
+                 'src/dag/lu_hodlr_tiled.cc',
+                 'src/dag/lu_hodlr_tiled_lazy.cc',
+                 'src/dag/lu_lvl.cc',
+                 'src/dag/lu_oop.cc',
+                 'src/dag/lu_oop_accu.cc',
+                 'src/dag/lu_oop_accu_sep.cc',
+                 'src/dag/lu_oop_auto.cc',
+                 'src/dag/lu_tileh.cc' ]
 
 libhlr = env.StaticLibrary( 'hlr', sources )
 
@@ -619,8 +813,11 @@ if 'omp' in frameworks :
 
 if 'tbb' in frameworks :
     tbb = env.Clone()
+    # tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
+    # tbb.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   tbb' % os.path.join( TBB_DIR, 'lib', 'pkgconfig' ) )
     tbb.Append( CPPPATH = os.path.join( TBB_DIR, 'include' ) )
     tbb.Append( LIBPATH = os.path.join( TBB_DIR, 'lib' ) )
+    tbb.Append( LIBS    = [ 'tbb' ] )
 
     for program in programs :
         name   = program + '-tbb'

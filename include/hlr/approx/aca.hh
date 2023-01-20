@@ -18,9 +18,7 @@
 
 namespace hlr { namespace approx {
 
-namespace hpro = HLIB;
-
-using hpro::idx_t;
+using Hpro::idx_t;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -36,11 +34,11 @@ struct aca_pivot_next
 {
     using  operator_t    = T_operator;
     using  value_t       = typename operator_t::value_t;
-    using  real_t        = typename hpro::real_type< value_t >::type_t;
+    using  real_t        = Hpro::real_type_t< value_t >;
     using  vector_list_t = std::deque< blas::vector< value_t > >;
 
     // value considered zero to avoid division by small values
-    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon() * std::numeric_limits< real_t >::epsilon();
         
     
     int                  next_col = 0;
@@ -84,7 +82,7 @@ struct aca_pivot_next
         const auto  max_val   = column( pivot_row );
 
         // stop and signal no pivot found if remainder is "zero"
-        if ( hpro::Math::abs( max_val ) <= zero_val )
+        if ( Hpro::Math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         // scale <col> by inverse of maximal element in u
@@ -93,6 +91,9 @@ struct aca_pivot_next
         used_rows[ pivot_row ] = true;
         
         auto  row = get_row( M, pivot_row );
+        
+        // stored as column, hence conjugate
+        blas::conj( row );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
@@ -115,11 +116,11 @@ struct aca_pivot_max
 {
     using  operator_t    = T_operator;
     using  value_t       = typename operator_t::value_t;
-    using  real_t        = typename hpro::real_type< value_t >::type_t;
+    using  real_t        = Hpro::real_type_t< value_t >;
     using  vector_list_t = std::deque< blas::vector< value_t > >;
 
     // value considered zero to avoid division by small values
-    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon();
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon() * std::numeric_limits< real_t >::epsilon();
         
     
     int                  next_col = 0;
@@ -163,7 +164,7 @@ struct aca_pivot_max
         const auto  max_val   = column( pivot_row );
 
         // stop and signal no pivot found if remainder is "zero"
-        if ( hpro::Math::abs( max_val ) <= zero_val )
+        if ( Hpro::Math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         // scale <col> by inverse of maximal element in u
@@ -172,6 +173,9 @@ struct aca_pivot_max
         used_rows[ pivot_row ] = true;
         
         auto  row = get_row( M, pivot_row );
+
+        // stored as column, hence conjugate
+        blas::conj( row );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
@@ -202,6 +206,89 @@ struct aca_pivot_max
 };
 
 //
+// determine maximal entry in matrix for next pivot element
+//
+template < typename T_operator >
+struct aca_pivot_full
+{
+    using  operator_t    = T_operator;
+    using  value_t       = typename operator_t::value_t;
+    using  real_t        = Hpro::real_type_t< value_t >;
+    using  vector_list_t = std::deque< blas::vector< value_t > >;
+
+    // value considered zero to avoid division by small values
+    static constexpr real_t  zero_val = std::numeric_limits< real_t >::epsilon() * std::numeric_limits< real_t >::epsilon();
+        
+    //
+    // initialise pivot search
+    //
+    aca_pivot_full ( const operator_t &  M )
+    {}
+    
+    //
+    // return position of next pivot of (M - U·V^H)
+    // - row/col hold the corresponding row/column data
+    //
+    std::tuple< int,
+                int,
+                blas::vector< value_t >,
+                blas::vector< value_t > >
+    next ( const operator_t &     M,
+           const vector_list_t &  U,
+           const vector_list_t &  V )
+    {
+        //
+        // loop over full M for maximal element
+        //
+
+        const auto  ncols_M   = ncols( M );
+        value_t     max_val   = value_t(0);
+        int         pivot_col = 0;
+        int         pivot_row = 0;
+            
+        for ( size_t  j = 0; j < ncols_M; ++j )
+        {
+            auto  column = get_column( M, j );
+
+            for ( uint  l = 0; l < U.size(); ++l )
+                blas::add( -math::conj( V[l]( j ) ), U[l], column );
+
+            const auto  max_row = blas::max_idx( column );
+            const auto  val     = column( max_row );
+
+            if ( math::abs( val ) > math::abs( max_val ) )
+            {
+                pivot_col = j;
+                pivot_row = max_row;
+                max_val   = val;
+            }// if
+        }// for
+        
+        // stop and signal no pivot found if remainder is "zero"
+        if ( Hpro::Math::abs( max_val ) <= zero_val )
+            return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
+
+        auto  column = get_column( M, pivot_col );
+        
+        for ( uint  l = 0; l < U.size(); ++l )
+            blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
+        
+        // scale <col> by inverse of maximal element in u
+        blas::scale( value_t(1) / max_val, column );
+        
+        auto  row = get_row( M, pivot_row );
+
+        // stored as column, hence conjugate
+        blas::conj( row );
+        
+        for ( uint  l = 0; l < U.size(); ++l )
+            blas::add( -math::conj( U[l]( pivot_row ) ), V[l], row );
+
+        return { pivot_row, pivot_col, std::move( column ), std::move( row ) };
+    }
+};
+
+//
 // default pivot search strategie
 //
 template < typename operator_t >
@@ -222,28 +309,26 @@ std::pair< blas::matrix< typename pivotsearch_t::operator_t::value_t >,
            blas::matrix< typename pivotsearch_t::operator_t::value_t > >
 aca  ( const typename pivotsearch_t::operator_t &  M,
        pivotsearch_t &                             pivot_search,
-       const hpro::TTruncAcc &                     acc,
+       const Hpro::TTruncAcc &                     acc,
        std::list< std::pair< idx_t, idx_t > > *    pivots )
 {
     using  value_t = typename pivotsearch_t::operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
     // operator data
     const auto  nrows_M  = nrows( M );
     const auto  ncols_M  = ncols( M );
+    const auto  min_dim  = std::min( nrows_M, ncols_M );
     
     // maximal rank either defined by accuracy or dimension of matrix
     const auto  max_rank = ( acc.is_fixed_rank()
-                             ? ( acc.has_max_rank()
-                                 ? std::min( acc.rank(), acc.max_rank() )
-                                 : acc.rank() )
-                             : std::min( nrows_M, ncols_M ));
+                             ? ( acc.has_max_rank() ? std::min( acc.rank(), acc.max_rank() ) : acc.rank() )
+                             : ( acc.has_max_rank() ? std::min( min_dim, acc.max_rank() ) : min_dim ) );
     
     // precision defined by accuracy or by machine precision
     // (to be corrected by operator norm)
-    real_t      eps      = ( acc.is_fixed_prec()
-                             ? acc.rel_eps()
-                             : real_t(10 * std::numeric_limits< real_t >::epsilon() ));
+    real_t      rel_eps  = ( acc.is_fixed_prec() ? acc.rel_eps() : real_t(10 * std::numeric_limits< real_t >::epsilon() ));
+    real_t      abs_eps  = acc.abs_eps();
     
     // approximation of |M|
     real_t      norm_M   = real_t(0);
@@ -266,7 +351,7 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
         
         const auto  norm_i = blas::norm2( column ) * blas::norm2( row );
 
-        if ( norm_i < eps * norm_M )
+        if (( norm_i < rel_eps * norm_M ) || ( norm_i < abs_eps ))
         {
             U.push_back( std::move( column ) );
             V.push_back( std::move( row ) );
@@ -331,7 +416,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( blas::matrix< value_t > &  M,
-      const hpro::TTruncAcc &    acc )
+      const Hpro::TTruncAcc &    acc )
 {
     auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
 
@@ -342,11 +427,27 @@ aca ( blas::matrix< value_t > &  M,
 }
 
 template < typename value_t >
+std::list< std::pair< idx_t, idx_t > >
+aca_pivots ( blas::matrix< value_t > &  M,
+             const Hpro::TTruncAcc &    acc )
+{
+    auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
+
+    // for update statistics
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+
+    auto  pivots   = std::list< std::pair< idx_t, idx_t > >();
+    auto  [ U, V ] = aca( M, pivot_search, acc, & pivots );
+
+    return pivots;
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
-      const hpro::TTruncAcc &          acc )
+      const Hpro::TTruncAcc &          acc )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -399,7 +500,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  V,
-      const hpro::TTruncAcc &                       acc )
+      const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == V.size() );
 
@@ -451,7 +552,7 @@ std::pair< blas::matrix< value_t >,
 aca ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  T,
       const std::list< blas::matrix< value_t > > &  V,
-      const hpro::TTruncAcc &                       acc )
+      const Hpro::TTruncAcc &                       acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -520,7 +621,7 @@ struct ACA
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::aca( M, acc );
     }
@@ -529,7 +630,7 @@ struct ACA
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         return hlr::approx::aca( U, V, acc );
     }
@@ -538,7 +639,7 @@ struct ACA
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::aca( U, V, acc );
     }
@@ -548,7 +649,7 @@ struct ACA
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::aca( U, T, V, acc );
     }
@@ -557,7 +658,125 @@ struct ACA
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const hpro::TTruncAcc &  acc ) const
+                  const Hpro::TTruncAcc &  acc ) const
+    {
+        auto  pivot_search = aca_pivot< operator_t >( op );
+
+        return std::move( aca( op, pivot_search, acc, nullptr ) );
+    }
+};
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+aca_full ( blas::matrix< value_t > &  M,
+           const Hpro::TTruncAcc &    acc )
+{
+    auto  pivot_search = aca_pivot_full< blas::matrix< value_t > >( M );
+
+    // for update statistics
+    HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+    
+    return std::move( aca( M, pivot_search, acc, nullptr ) );
+}
+
+template < typename T_value >
+struct ACAFull
+{
+    using  value_t = T_value;
+    
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+    
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( blas::matrix< value_t > &  M,
+                  const Hpro::TTruncAcc &    acc ) const
+    {
+        auto  pivot_search = aca_pivot_full< blas::matrix< value_t > >( M );
+
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+
+        return std::move( aca( M, pivot_search, acc, nullptr ) );
+    }
+
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const blas::matrix< value_t > &  U,
+                  const blas::matrix< value_t > &  V,
+                  const Hpro::TTruncAcc &          acc ) const 
+    {
+        HLR_ASSERT( U.ncols() == V.ncols() );
+
+        const idx_t  nrows_U = idx_t( U.nrows() );
+        const idx_t  nrows_V = idx_t( V.nrows() );
+        const idx_t  in_rank = idx_t( V.ncols() );
+
+        //
+        // don't increase rank
+        //
+
+        if ( in_rank == 0 )
+        {
+            return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
+        }// if
+
+        if ( in_rank <= idx_t(acc.rank()) )
+        {
+            return { std::move( blas::copy( U ) ),
+                std::move( blas::copy( V ) ) };
+        }// if
+
+        //
+        // if k is bigger than the possible rank,
+        // we create a dense-matrix and do truncation
+        // via full SVD
+        //
+
+        if ( in_rank >= std::min( nrows_U, nrows_V ) )
+        {
+            auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
+
+            return (*this)( M, acc );
+        }// if
+        else
+        {
+            // for update statistics
+            HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+
+            auto  op           = operator_wrapper( U, V );
+            auto  pivot_search = aca_pivot_full< decltype(op) >( op );
+    
+            return aca( op, pivot_search, acc, nullptr );
+        }// else
+    }
+    
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const std::list< blas::matrix< value_t > > &  U,
+                  const std::list< blas::matrix< value_t > > &  V,
+                  const Hpro::TTruncAcc &                       acc ) const
+    {
+        return hlr::approx::aca( U, V, acc );
+    }
+
+    std::pair< blas::matrix< value_t >,
+               blas::matrix< value_t > >
+    operator () ( const std::list< blas::matrix< value_t > > &  U,
+                  const std::list< blas::matrix< value_t > > &  T,
+                  const std::list< blas::matrix< value_t > > &  V,
+                  const Hpro::TTruncAcc &                       acc ) const
+    {
+        return hlr::approx::aca( U, T, V, acc );
+    }
+
+    template < typename operator_t >
+    std::pair< blas::matrix< typename operator_t::value_t >,
+               blas::matrix< typename operator_t::value_t > >
+    operator () ( const operator_t &       op,
+                  const Hpro::TTruncAcc &  acc ) const
     {
         auto  pivot_search = aca_pivot< operator_t >( op );
 

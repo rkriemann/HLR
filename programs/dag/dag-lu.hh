@@ -8,6 +8,8 @@
 
 #include "common.hh"
 #include "common-main.hh"
+
+#include "hlr/bem/aca.hh"
 #include "hlr/cluster/h.hh"
 #include "hlr/cluster/hodlr.hh"
 #include "hlr/cluster/tlr.hh"
@@ -18,9 +20,11 @@
 #include "hlr/dag/lu.hh"
 #include "hlr/dag/solve.hh"
 #include "hlr/arith/lu.hh"
+#include "hlr/arith/norm.hh"
 #include "hlr/seq/dag.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/utils/likwid.hh"
+#include "hlr/utils/io.hh"
 
 using namespace hlr;
 
@@ -35,7 +39,7 @@ program_main ()
     
     auto  tic = timer::now();
     auto  acc = gen_accuracy();
-    auto  A   = std::unique_ptr< hpro::TMatrix >();
+    auto  A   = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
     if ( matrixfile == "" && sparsefile == "" )
     {
@@ -44,20 +48,17 @@ program_main ()
         auto  ct      = gen_ct( *coord );
         auto  bct     = gen_bct( *ct, *ct );
     
-        if ( hpro::verbose( 3 ) )
+        if ( Hpro::verbose( 3 ) )
         {
-            hpro::TPSClusterVis       cl_vis;
-            hpro::TPSBlockClusterVis  bc_vis;
-        
-            cl_vis.print( ct->root(), "ct" );
-            bc_vis.id( false ).print( bct->root(), "bct" );
+            io::eps::print( *ct->root(), "ct" );
+            io::eps::print( *bct->root(), "ct" );
         }// if
     
         auto  coeff  = problem->coeff_func();
-        auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
+        auto  pcoeff = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-        A = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
     }// if
     else if ( matrixfile != "" )
     {
@@ -65,33 +66,50 @@ program_main ()
                   << "    matrix = " << matrixfile
                   << std::endl;
 
-        A = hpro::read_matrix( matrixfile );
+        A = Hpro::read_matrix< value_t >( matrixfile );
 
         // for spreading memory usage
         if ( docopy )
             A = impl::matrix::realloc( A.release() );
     }// if
-    else if ( sparsefile != "" )
-    {
-        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
-                  << "    sparse matrix = " << sparsefile
-                  << std::endl;
+    // else if ( sparsefile != "" )
+    // {
+    //     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+    //               << "    sparse matrix = " << sparsefile
+    //               << std::endl;
 
-        auto  M = hpro::read_matrix( sparsefile );
-        auto  S = ptrcast( M.get(), hpro::TSparseMatrix );
+    //     auto  M = Hpro::read_matrix< value_t >( sparsefile );
+    //     auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
 
-        // convert to H
-        hpro::TMETISAlgPartStrat  part_strat;
-        hpro::TAlgCTBuilder       ct_builder( & part_strat, ntile );
-        hpro::TAlgNDCTBuilder     nd_ct_builder( & ct_builder, ntile );
-        auto                      cl = nd_ct_builder.build( S );
-        hpro::TWeakAlgAdmCond     adm_cond( S, cl->perm_i2e() );
-        hpro::TBCBuilder          bct_builder;
-        auto                      bcl = bct_builder.build( cl.get(), cl.get(), & adm_cond );
-        hpro::TSparseMatBuilder   h_builder( S, cl->perm_i2e(), cl->perm_e2i() );
+    //     // convert to H
+    //     auto  part_strat    = Hpro::TMongooseAlgPartStrat();
+    //     auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
+    //     auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+    //     auto  cl            = nd_ct_builder.build( S );
 
-        A = h_builder.build( bcl.get(), acc );
-    }// else
+    //     S->permute( *cl->perm_e2i(), *cl->perm_e2i() );
+
+    //     if ( Hpro::verbose( 3 ) )
+    //         io::eps::print( *S, "S", "noid,pattern" );
+        
+    //     auto  adm_cond      = Hpro::TWeakAlgAdmCond( S );
+    //     auto  bct_builder   = Hpro::TBCBuilder();
+    //     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
+    //     // auto  h_builder     = Hpro::TSparseMatBuilder( S, cl->perm_i2e(), cl->perm_e2i() );
+
+    //     if ( Hpro::verbose( 3 ) )
+    //     {
+    //         io::eps::print( * cl->root(), "ct" );
+    //         io::eps::print( * bcl->root(), "bct" );
+    //     }// if
+        
+    //     // h_builder.set_use_zero_mat( true );
+    //     // A = h_builder.build( bcl.get(), acc );
+
+    //     approx::SVD  apx;
+            
+    //     A = impl::matrix::build( bcl->root(), *S, acc, apx, nseq );
+    // }// else
 
     auto  toc    = timer::since( tic );
     
@@ -99,12 +117,8 @@ program_main ()
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
     
-    if ( hpro::verbose( 3 ) )
-    {
-        hpro::TPSMatrixVis  mvis;
-        
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
-    }// if
+    if ( Hpro::verbose( 3 ) )
+        io::eps::print( *A, "A" );
 
     const size_t  ncoarse = ( coarse > 0 ? A->nrows() / coarse : A->nrows() / 50 );
     
@@ -149,7 +163,7 @@ program_main ()
         }// if
         else if ( oop_lu )
         {
-            if ( hpro::CFG::Arith::use_accu )
+            if ( Hpro::CFG::Arith::use_accu )
             {
                 hlr::dag::sparsify_mode = hlr::dag::sparsify_sub_all;
                 hlr::dag::def_path_len  = 10;
@@ -170,8 +184,8 @@ program_main ()
     //
     // benchmark DAG generation
     //
-    
-    std::vector< double >  runtime;
+
+    auto  runtime = std::vector< double >();
     
     LIKWID_MARKER_INIT;
         
@@ -187,7 +201,7 @@ program_main ()
             dag = std::move( hlr::dag::gen_dag_lu_oop_coarse( *C, ncoarse, impl::dag::refine, impl::dag::run ) );
         else if ( oop_lu )
         {
-            if ( hpro::CFG::Arith::use_accu )
+            if ( Hpro::CFG::Arith::use_accu )
                 if ( fused )
                     dag = std::move( hlr::dag::gen_dag_lu_oop_accu( *C, nseq, impl::dag::refine ) );
                 else
@@ -202,7 +216,7 @@ program_main ()
         
         toc = timer::since( tic );
         
-        if ( hpro::verbose( 1 ) )
+        if ( Hpro::verbose( 1 ) )
         {
             std::cout << "  DAG in     " << format_time( toc ) << std::endl;
             
@@ -217,7 +231,7 @@ program_main ()
 
     LIKWID_MARKER_CLOSE;
         
-    if ( hpro::verbose( 1 ) )
+    if ( Hpro::verbose( 1 ) )
     {
         if ( nbench > 1 )
             std::cout << "  runtime  = "
@@ -228,7 +242,7 @@ program_main ()
         std::cout << "    mem    = " << format_mem( dag.mem_size() ) << std::endl;
     }// if
 
-    if ( hpro::verbose( 3 ) )
+    if ( Hpro::verbose( 3 ) )
         dag.print_dot( "lu.dot" );
     
     if ( onlydag )
@@ -265,10 +279,9 @@ program_main ()
         
     std::cout << "    mem    = " << format_mem( C->byte_size() ) << std::endl;
         
-    // matrix::luinv_eval  A_inv( C, impl::dag::refine, impl::dag::run );
-    hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+    auto  A_inv = matrix::luinv_eval( *C );
         
-    std::cout << "    error  = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+    std::cout << "    error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -277,7 +290,7 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     // {
-    //     TScalarVector *        x_ptr;
+    //     TScalarVector< value_t > *        x_ptr;
     //     hlr::dag::mutex_map_t  map_row_mtx;
         
     //     auto  dag_trsml = gen_dag_solve_lower( apply_normal, C.get(), & x_ptr, map_row_mtx, impl::dag::refine );
@@ -289,7 +302,7 @@ program_main ()
     {
         std::cout << term::bullet << term::bold << "Vector Solves" << term::reset << std::endl;
     
-        hpro::CFG::Arith::vector_solve_method = 1;
+        Hpro::CFG::Arith::vector_solve_method = 1;
 
         auto   mtx_map = std::map< idx_t, std::unique_ptr< std::mutex > >();
         idx_t  last    = -1;
@@ -306,12 +319,12 @@ program_main ()
         }// for
         
         {
-            hpro::TScalarVector  x( A->col_is(), A->value_type() );
+            Hpro::TScalarVector< value_t >  x( A->col_is() );
 
             x.fill_rand( 1 );
 
-            const hpro::TScalarVector  xcopy( x );
-            hpro::TScalarVector        xref( x );
+            const Hpro::TScalarVector< value_t >  xcopy( x );
+            Hpro::TScalarVector< value_t >        xref( x );
 
             runtime.clear();
                 
@@ -319,8 +332,8 @@ program_main ()
             {
                 tic = timer::now();
         
-                hlr::trsvu( hpro::apply_trans, *C, xref, hpro::general_diag );
-                hlr::trsvl( hpro::apply_trans, *C, xref, hpro::unit_diag );
+                hlr::trsvu( Hpro::apply_trans, *C, xref, Hpro::general_diag );
+                hlr::trsvl( Hpro::apply_trans, *C, xref, Hpro::unit_diag );
         
                 toc = timer::since( tic );
 
@@ -337,8 +350,8 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            matrix::luinv_eval   A_inv2( C, impl::dag::refine, impl::dag::run );
-            hpro::TScalarVector  v( x );
+            matrix::luinv_eval              A_inv2( *C ); // , impl::dag::refine, impl::dag::run );
+            Hpro::TScalarVector< value_t >  v( x );
         
             runtime.clear();
             
@@ -346,7 +359,7 @@ program_main ()
             {
                 tic = timer::now();
 
-                A_inv2.apply( & x, & v, hpro::apply_trans );
+                A_inv2.apply( & x, & v, Hpro::apply_trans );
 
                 toc = timer::since( tic );
 

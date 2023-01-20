@@ -217,7 +217,13 @@ public:
     bool  refine_deps  ( const bool  do_lock );
 
     // finalize node data (if internal data will not change)
-    void  finalize ();
+    void  finalize ()
+    {
+        _ndeps = _dep_cnt;
+    
+        _in_blk_deps.resize( 0 );
+        _out_blk_deps.resize( 0 );
+    }
     
     // remove direct edges of node to descendants if path of length <max_path_len> exists
     void  sparsify ( const uint  max_path_len = def_path_len );

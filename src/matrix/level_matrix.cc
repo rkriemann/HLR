@@ -17,18 +17,18 @@
 #include "hlr/matrix/level_matrix.hh"
 
 //
-// hash function for HLIB::TIndexSet
+// hash function for Hpro::TIndexSet
 //
 namespace std
 {
 
 template <>
-struct hash< HLIB::TIndexSet >
+struct hash< Hpro::TIndexSet >
 {
-    size_t operator () ( const HLIB::TIndexSet &  is ) const
+    size_t operator () ( const Hpro::TIndexSet &  is ) const
     {
-        return ( std::hash< HLIB::idx_t >()( is.first() ) +
-                 std::hash< HLIB::idx_t >()( is.last()  ) );
+        return ( std::hash< Hpro::idx_t >()( is.first() ) +
+                 std::hash< Hpro::idx_t >()( is.last()  ) );
     }
 };
 
@@ -39,18 +39,18 @@ namespace hlr { namespace matrix {
 using std::list;
 using std::unordered_map;
 
-using namespace HLIB;
+using indexset = Hpro::TIndexSet;
 
 namespace
 {
 
 //
-// compare function for TIndexSet
+// compare function for indexset
 // - only works for sets of disjoint index sets
 //
 bool
-cmp_is ( const TIndexSet &  is1,
-         const TIndexSet &  is2 )
+cmp_is ( const indexset &  is1,
+         const indexset &  is2 )
 {
     return is1.is_strictly_left_of( is2 );
 }
@@ -60,29 +60,30 @@ cmp_is ( const TIndexSet &  is1,
 //
 // ctor
 //
-
-level_matrix::level_matrix ( const uint         nrows,
+template < typename value_t >
+level_matrix< value_t >::level_matrix ( const uint         nrows,
                              const uint         ncols,
-                             const TIndexSet &  rowis,
-                             const TIndexSet &  colis )
-        : TBlockMatrix( bis( rowis, colis ) )
+                             const indexset &  rowis,
+                             const indexset &  colis )
+        : Hpro::TBlockMatrix< value_t >( bis( rowis, colis ) )
         , _above( nullptr )
         , _below( nullptr )
 {
-    set_block_struct( nrows, ncols );
+    this->set_block_struct( nrows, ncols );
 }
 
 //
 // construct set of level matrices for given H-matrix
 // - do BFS in A and create level matrices (INACTIVE: starting at first level with leaves)
 //
-std::vector< std::shared_ptr< level_matrix > >
-construct_lvlhier ( TMatrix &  A )
+template < typename value_t >
+std::vector< std::shared_ptr< level_matrix< value_t > > >
+construct_lvlhier ( Hpro::TMatrix< value_t > &  A )
 {
-    list< TMatrix * >  matrices{ & A };
+    list< Hpro::TMatrix< value_t > * >  matrices{ & A };
     // bool               reached_leaves = ! is_blocked( A );
-    auto               L_hier = list< std::shared_ptr< level_matrix > >{};
-    auto               L_prev = std::shared_ptr< level_matrix >{};
+    auto               L_hier = list< std::shared_ptr< level_matrix< value_t > > >{};
+    auto               L_prev = std::shared_ptr< level_matrix< value_t > >{};
 
     while ( ! matrices.empty() )
     {
@@ -98,7 +99,7 @@ construct_lvlhier ( TMatrix &  A )
             // collect all row/column indexsets to determine number of rows/columns
             //
 
-            list< TIndexSet >  rowis, colis;
+            list< indexset >  rowis, colis;
             uint               nrowis = 0, ncolis = 0;
 
             for ( auto  M : matrices )
@@ -120,7 +121,7 @@ construct_lvlhier ( TMatrix &  A )
             // set up index positions of row/col indexsets
             //
             
-            unordered_map< TIndexSet, uint >  rowmap, colmap;
+            unordered_map< indexset, uint >  rowmap, colmap;
             
             rowis.sort( cmp_is );
             colis.sort( cmp_is );
@@ -142,7 +143,7 @@ construct_lvlhier ( TMatrix &  A )
             // construct level matrix
             //
 
-            auto  L = std::make_shared< level_matrix >( nrowis, ncolis, A.row_is(), A.col_is() );
+            auto  L = std::make_shared< level_matrix< value_t > >( nrowis, ncolis, A.row_is(), A.col_is() );
 
             for ( auto  M : matrices )
             {
@@ -168,7 +169,7 @@ construct_lvlhier ( TMatrix &  A )
         //
         ////////////////////////////////////////////////////
         
-        list< TMatrix * >  subs;
+        list< Hpro::TMatrix< value_t > * >  subs;
 
         while ( ! matrices.empty() )
         {
@@ -176,7 +177,7 @@ construct_lvlhier ( TMatrix &  A )
             
             if ( is_blocked( M ) )
             {
-                auto  B = ptrcast( M, TBlockMatrix );
+                auto  B = ptrcast( M, Hpro::TBlockMatrix< value_t > );
 
                 for ( uint  i = 0; i < B->nblock_rows(); ++i )
                 {
@@ -203,7 +204,7 @@ construct_lvlhier ( TMatrix &  A )
     // convert list to vector
     //
 
-    std::vector< std::shared_ptr< level_matrix > >  L_vec;
+    std::vector< std::shared_ptr< level_matrix< value_t > > >  L_vec;
 
     L_vec.reserve( L_hier.size() );
 

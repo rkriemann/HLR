@@ -19,6 +19,8 @@ using namespace boost::program_options;
 
 namespace hpro = HLIB;
 
+#include <hlr/utils/log.hh>
+
 namespace hlr { namespace cmdline {
 
 size_t  n          = 1024;         // problem size
@@ -39,6 +41,7 @@ string  sparsefile = "";           // sparse matrix instead of application
 bool    onlydag    = false;        // only compute task graph, no DAG execution
 bool    docopy     = true;         // copy matrix before further comp. to distr. memory
 bool    levelwise  = false;        // use levelwise task graph construction
+bool    ip_lu      = false;        // use in-place task graph
 bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
@@ -46,11 +49,14 @@ int     coarse     = 0;            // use coarse sparse graph
 int     nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
-auto    kappa      = hpro::complex( 2, 0 ); // wave number for helmholtz problems
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
+double  eta        = 2.0;          // admissibility parameter
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  arith      = "std";        // which kind of arithmetic to use
+double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
+auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
+double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 
 void
 read_config ( const std::string &  filename )
@@ -68,9 +74,11 @@ read_config ( const std::string &  filename )
     appl       = cfg.get( "app.appl",    appl );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
+    eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
+    sigma      = cfg.get( "app.sigma",   sigma );
     matrixfile = cfg.get( "app.matrix",  matrixfile );
     sparsefile = cfg.get( "app.sparse",  sparsefile );
         
@@ -118,11 +126,14 @@ parse ( int argc, char ** argv )
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
+        ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
+        ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
         ;
 
     ari_opts.add_options()
@@ -143,6 +154,7 @@ parse ( int argc, char ** argv )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "nosparsify",                   ": do not sparsify DAG" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
+        ( "ip",                           ": do in-place LU" )
         ( "oop",                          ": do out-of-place LU" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
@@ -207,6 +219,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "onlydag"    ) ) onlydag    = true;
     if ( vm.count( "nocopy"     ) ) docopy     = false;
     if ( vm.count( "lvl"        ) ) levelwise  = true;
+    if ( vm.count( "ip"         ) ) ip_lu      = true;
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
@@ -215,8 +228,11 @@ parse ( int argc, char ** argv )
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
+    if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
+    if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
+    if ( vm.count( "compress"   ) ) compress   = vm["compress"].as<double>();
 
     if ( appl == "help" )
     {
@@ -251,11 +267,11 @@ parse ( int argc, char ** argv )
     if ( arith == "help" )
     {
         std::cout << "Arithmetic to use:" << std::endl
-                  << "  - std     : standard H-arithmetic (immediate updates)" << std::endl
-                  << "  - accu    : accumulator based H-arithmetic" << std::endl
-                  << "  - lazy    : lazy evaluation in H-arithmetic" << std::endl
-                  << "  - all     : use all types" << std::endl
-                  << "  - default : use default arithmetic (std)" << std::endl;
+                  << "  - (dag)std  : standard H-arithmetic (immediate updates)" << std::endl
+                  << "  - (dag)accu : accumulator based H-arithmetic" << std::endl
+                  << "  - (dag)lazy : lazy evaluation in H-arithmetic" << std::endl
+                  << "  - all       : use all types" << std::endl
+                  << "  - default   : use default arithmetic (std)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -297,10 +313,18 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( ! ( ( appl == "logkernel" ) || ( appl == "materncov" ) || ( appl == "laplaceslp" ) || ( appl == "helmholtzslp" ) || ( appl == "exp" ) ) )
+    if ( ! ( ( appl == "logkernel" )    ||
+             ( appl == "log" )          ||
+             ( appl == "laplaceslp" )   ||
+             ( appl == "helmholtzslp" ) ||
+             ( appl == "exp" )          ||
+             ( appl == "materncov" )    ||  
+             ( appl == "gaussian" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
-    if ( ! ( ( distr == "cyclic2d" ) || ( distr == "cyclic1d" ) || ( distr == "shiftcycrow" ) ) )
+    if ( ! ( ( distr == "cyclic2d" ) ||
+             ( distr == "cyclic1d" ) ||
+             ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
     if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||
@@ -308,8 +332,10 @@ parse ( int argc, char ** argv )
              ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
         HLR_ERROR( "unknown approximation : " + approx );
 
-    if ( ! ( ( arith == "std" ) || ( arith == "accu" ) || ( arith == "lazy" ) ||
-             ( arith == "all" ) || ( arith == "default" ) ) )
+    if ( ! ( ( arith == "std" )  || ( arith == "dagstd" )  ||
+             ( arith == "accu" ) || ( arith == "dagaccu" ) ||
+             ( arith == "lazy" ) || ( arith == "daglazy" ) ||
+             ( arith == "all" )  || ( arith == "default" ) ) )
         HLR_ERROR( "unknown arithmetic : " + arith );
 }
 

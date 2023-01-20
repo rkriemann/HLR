@@ -12,9 +12,7 @@
 
 namespace hlr { namespace blas {
 
-namespace hpro = HLIB;
-
-using hpro::blas_int_t;
+using Hpro::blas_int_t;
 
 extern "C"
 {
@@ -152,7 +150,7 @@ HLR_BLAS_LARF( double,                 dlarf_ )
 HLR_BLAS_LARF( std::complex< float >,  clarf_ )
 HLR_BLAS_LARF( std::complex< double >, zlarf_ )
 
-#undef HLIB_LARF_FUNC
+#undef HLR_BLAS_LARF
 
 
 extern "C"
@@ -1000,10 +998,10 @@ zheev_   ( const char *             jobz,
                 const blas_int_t    n,                  \
                 type *              A,                  \
                 const blas_int_t    ldA,                \
-                hpro::real_type< type >::type_t *  w,   \
+                Hpro::real_type< type >::type_t *  w,   \
                 type *              work,               \
                 const blas_int_t    lwork,              \
-                hpro::real_type< type >::type_t *,      \
+                Hpro::real_type< type >::type_t *,      \
                 blas_int_t &        info )              \
     {                                                   \
         func( & jobz, & uplo, & n, A, & ldA, w, work,   \
@@ -1022,10 +1020,10 @@ HLR_BLAS_HEEV( double,                 dsyev_ )
                 const blas_int_t    n,                  \
                 type *              A,                  \
                 const blas_int_t    ldA,                \
-                hpro::real_type< type >::type_t *  w,   \
+                Hpro::real_type< type >::type_t *  w,   \
                 type *              work,               \
                 const blas_int_t    lwork,              \
-                hpro::real_type< type >::type_t *  rwork,   \
+                Hpro::real_type< type >::type_t *  rwork,   \
                 blas_int_t &        info )              \
     {                                                   \
         func( & jobz, & uplo, & n, A, & ldA, w, work,   \

@@ -21,11 +21,8 @@
 
 namespace hlr { namespace seq { namespace tiled3 {
 
-// map HLIB namespaces to HLR
-namespace hpro = HLIB;
-
-using HLIB::id_t;
-using HLIB::real;
+using Hpro::id_t;
+using Hpro::real;
 
 // import matrix types
 using hlr::matrix::indexset;
@@ -35,7 +32,7 @@ using hlr::matrix::tiled_lrmatrix;
 
 // dummy indexset for T operations (rank/size unknown during DAG and only object is of interest)
 const auto  IS_ONE  = indexset( -1, -1 );
-const auto  BIS_ONE = hpro::TBlockIndexSet( IS_ONE, IS_ONE );
+const auto  BIS_ONE = Hpro::TBlockIndexSet( IS_ONE, IS_ONE );
 
 //
 // structure to address matrix
@@ -108,7 +105,7 @@ struct matrix_info
 
     operator matrix_t () { return data; }
     
-    const hpro::TBlockIndexSet block_is  () const { return hpro::TBlockIndexSet( is, IS_ONE ); }
+    const Hpro::TBlockIndexSet block_is  () const { return Hpro::TBlockIndexSet( is, IS_ONE ); }
 
     std::string
     to_string ( const size_t  ntile = 0 ) const
@@ -122,8 +119,8 @@ struct matrix_info
 
         if (( is != IS_ONE ) && ( ntile != 0 ))
         {
-            if ( is.size() <= ntile ) os << HLIB::to_string( "[%d]", is.first() / ntile );
-            else                      os << HLIB::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+            if ( is.size() <= ntile ) os << Hpro::to_string( "[%d]", is.first() / ntile );
+            else                      os << Hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
         }// if
 
         return os.str();
@@ -198,9 +195,9 @@ using shared_tiled_matrix = matrix_info< std::shared_ptr< tile_storage< real > >
 
 inline
 std::string
-idstr ( hpro::id_t    id )
+idstr ( Hpro::id_t    id )
 {
-    return hpro::to_string( "%3d", id );
+    return Hpro::to_string( "%3d", id );
 }
 
 inline
@@ -208,15 +205,15 @@ std::string
 isstr ( indexset      is,
         const size_t  ntile )
 {
-    if ( is.size() <= ntile ) return hpro::to_string( "[%d]  ",    is.first() / ntile );
-    else                      return hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
+    if ( is.size() <= ntile ) return Hpro::to_string( "[%d]  ",    is.first() / ntile );
+    else                      return Hpro::to_string( "[%d:%d]", is.first() / ntile, is.last() / ntile );
 }
 
 inline
 std::string
 normstr ( double   f )
 {
-    return hpro::to_string( "%.4e", f );
+    return Hpro::to_string( "%.4e", f );
 }
 
 //
@@ -349,7 +346,7 @@ tprod ( const real     alpha,
     {
         HLR_ASSERT( A.data->contains( A.is ) );
         
-        blas::matrix< real >  Ac( A.data->at( A.is ), hpro::copy_value );
+        blas::matrix< real >  Ac( A.data->at( A.is ), Hpro::copy_value );
         
         blas::prod( alpha, Ac, *(T.data), real(0), A.data->at( A.is ) );
     }// else
@@ -396,13 +393,13 @@ tsqr ( const real     alpha,
 
         tiled_matrix  Q( X.is, new tile_storage< real > );
 
-        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, hpro::copy_value ) );
-        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, hpro::copy_value ) );
+        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, Hpro::copy_value ) );
+        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, Hpro::copy_value ) );
         
         tprod( real(1), Q0, dQ01_0, real(0), tiled_matrix( sis[0], Q ), ntile );
         tprod( real(1), Q1, dQ01_1, real(0), tiled_matrix( sis[1], Q ), ntile );
 
-        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, Hpro::copy_value ) };
     }// if
     else
     {
@@ -433,7 +430,7 @@ tsqr ( const real     alpha,
         HLR_LOG( 5, "tsqr  :          Q , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( Q.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          R , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
-        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, Hpro::copy_value ) };
     }// else
 }
 
@@ -477,13 +474,13 @@ tsqr ( const real    alpha,
 
         tiled_matrix  Q( X.is, new tile_storage< real > );
         
-        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, hpro::copy_value ) );
-        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, hpro::copy_value ) );
+        shared_matrix  dQ01_0( std::make_shared< blas::matrix< real > >( Q01_0, Hpro::copy_value ) );
+        shared_matrix  dQ01_1( std::make_shared< blas::matrix< real > >( Q01_1, Hpro::copy_value ) );
         
         tprod( real(1), Q0, dQ01_0, real(0), tiled_matrix( sis[0], Q ), ntile );
         tprod( real(1), Q1, dQ01_1, real(0), tiled_matrix( sis[1], Q ), ntile );
 
-        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, Hpro::copy_value ) };
     }// if
     else
     {
@@ -512,7 +509,7 @@ tsqr ( const real    alpha,
         HLR_LOG( 5, "tsqr  :          Q , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( Q.data->at( X.is ) ) ) );
         HLR_LOG( 5, "tsqr  :          R , " + isstr( X.is, ntile ) + " = " + normstr( blas::normF( R ) ) );
         
-        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, hpro::copy_value ) };
+        return { std::move( Q ), std::make_shared< blas::matrix< real > >( R, Hpro::copy_value ) };
     }// else
 }
 
@@ -528,7 +525,7 @@ truncate ( const real               alpha,
            tiled_matrix             Y,
            tiled_matrix             U,
            tiled_matrix             V,
-           const hpro::TTruncAcc &  acc,
+           const Hpro::TTruncAcc &  acc,
            const size_t             ntile )
 {
     HLR_LOG( 4,
@@ -586,8 +583,8 @@ truncate ( const real               alpha,
         tiled_matrix  Uk( U.is, new tile_storage< real > );
         tiled_matrix  Vk( V.is, new tile_storage< real > );
 
-        shared_matrix  dUsk( std::make_unique< blas::matrix< real > >( Usk, hpro::copy_value ) );
-        shared_matrix  dVsk( std::make_unique< blas::matrix< real > >( Vsk, hpro::copy_value ) );
+        shared_matrix  dUsk( std::make_unique< blas::matrix< real > >( Usk, Hpro::copy_value ) );
+        shared_matrix  dVsk( std::make_unique< blas::matrix< real > >( Vsk, Hpro::copy_value ) );
         
         tprod( real(1), Q0, dUsk, real(0), Uk, ntile );
         tprod( real(1), Q1, dVsk, real(0), Vk, ntile );
@@ -613,12 +610,12 @@ void
 addlr ( tiled_matrix             U,
         shared_matrix            T,
         tiled_matrix             V,
-        hpro::TMatrix *          A,
-        const hpro::TTruncAcc &  acc,
+        Hpro::TMatrix< value_t > *          A,
+        const Hpro::TTruncAcc &  acc,
         const size_t             ntile )
 {
     HLR_LOG( 4,
-             "addlr(" + HLIB::to_string( "A%d, ", A->id() ) +
+             "addlr(" + Hpro::to_string( "A%d, ", A->id() ) +
              U.to_string( ntile ) + "×" + T.to_string() + "×" + V.to_string( ntile ) + ")" );
     
     HLR_ASSERT( U.is == A->row_is() );
@@ -626,7 +623,7 @@ addlr ( tiled_matrix             U,
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< real > );
@@ -666,18 +663,18 @@ addlr ( tiled_matrix             U,
     {
         HLR_ASSERT( U.data->contains( A->row_is() ) && V.data->contains( A->col_is() ) );
         
-        auto        D = ptrcast( A, hpro::TDenseMatrix );
+        auto        D = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         const auto  W = blas::prod( real(1), U.data->at( A->row_is() ), *(T.data) );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( Hpro::norm_F( D ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     U = " + normstr( blas::norm_F( U.data->at( A->row_is() )) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     T = " + normstr( blas::norm_F( *(T.data) ) ) );
         HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     W = " + normstr( blas::norm_F( W ) ) );
 
         blas::prod( real(-1), W, blas::adjoint( V.data->at( A->col_is() ) ),
-                    real(1), hpro::blas_mat< real >( D ) );
+                    real(1), Hpro::blas_mat< real >( D ) );
 
-        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( hpro::norm_F( D ) ) );
+        HLR_LOG( 5, "addlr :         " + idstr( A->id() ) + ",     D = " + normstr( Hpro::norm_F( D ) ) );
     }// else
 }
 
@@ -687,15 +684,15 @@ addlr ( tiled_matrix             U,
 //
 inline
 void
-trsmuh ( hpro::TMatrix *  U,
+trsmuh ( Hpro::TMatrix< value_t > *  U,
          tiled_matrix     X,
          const size_t     ntile )
 {
-    HLR_LOG( 4, X.to_string( ntile ) + HLIB::to_string( " = trsmu( U%d, ", U->id() ) + X.to_string( ntile ) + " )" );
+    HLR_LOG( 4, X.to_string( ntile ) + Hpro::to_string( " = trsmu( U%d, ", U->id() ) + X.to_string( ntile ) + " )" );
     
     if ( is_blocked( U ) )
     {
-        auto  BU  = ptrcast( U, hpro::TBlockMatrix );
+        auto  BU  = ptrcast( U, Hpro::TBlockMatrix< value_t > );
         auto  U00 = BU->block( 0, 0 );
         auto  U01 = ptrcast( BU->block( 0, 1 ), tiled_lrmatrix< real > );
         auto  U11 = BU->block( 1, 1 );
@@ -724,12 +721,12 @@ trsmuh ( hpro::TMatrix *  U,
     {
         HLR_ASSERT( X.data->contains( U->row_is() ) );
         
-        auto  DU = ptrcast( U, hpro::TDenseMatrix );
+        auto  DU = ptrcast( U, Hpro::TDenseMatrix< value_t > );
 
         auto            X_is = X.data->at( U->row_is() );
-        blas::matrix< real >  Y( X_is, hpro::copy_value );
+        blas::matrix< real >  Y( X_is, Hpro::copy_value );
 
-        blas::prod( real(1), blas::adjoint( hpro::blas_mat< real >( DU ) ), Y, real(0), X_is );
+        blas::prod( real(1), blas::adjoint( Hpro::blas_mat< real >( DU ) ), Y, real(0), X_is );
 
         HLR_LOG( 5, "trsmu :         " + idstr( U->id() ) + "        = " + normstr( blas::normF( X.data->at( X.is ) ) ) );
     }// else
@@ -741,15 +738,15 @@ trsmuh ( hpro::TMatrix *  U,
 //
 inline
 void
-trsml ( hpro::TMatrix *  L,
+trsml ( Hpro::TMatrix< value_t > *  L,
         tiled_matrix     X,
         const size_t     ntile )
 {
-    HLR_LOG( 4, X.to_string( ntile ) + HLIB::to_string( " = trsml( A%d, ", L->id() ) + X.to_string( ntile ) + " )" );
+    HLR_LOG( 4, X.to_string( ntile ) + Hpro::to_string( " = trsml( A%d, ", L->id() ) + X.to_string( ntile ) + " )" );
     
     if ( is_blocked( L ) )
     {
-        auto  BL  = ptrcast( L, hpro::TBlockMatrix );
+        auto  BL  = ptrcast( L, Hpro::TBlockMatrix< value_t > );
         auto  L00 = BL->block( 0, 0 );
         auto  L10 = ptrcast( BL->block( 1, 0 ), tiled_lrmatrix< real > );
         auto  L11 = BL->block( 1, 1 );
@@ -798,15 +795,15 @@ trsml ( hpro::TMatrix *  L,
 //
 inline
 void
-lu ( hpro::TMatrix *          A,
-     const hpro::TTruncAcc &  acc,
+lu ( Hpro::TMatrix< value_t > *          A,
+     const Hpro::TTruncAcc &  acc,
      const size_t             ntile )
 {
-    HLR_LOG( 4, hpro::to_string( "lu( %d )", A->id() ) );
+    HLR_LOG( 4, Hpro::to_string( "lu( %d )", A->id() ) );
     
     if ( is_blocked( A ) )
     {
-        auto  BA  = ptrcast( A, hpro::TBlockMatrix );
+        auto  BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
         auto  A01 = ptrcast( BA->block( 0, 1 ), tiled_lrmatrix< real > );
         auto  A10 = ptrcast( BA->block( 1, 0 ), tiled_lrmatrix< real > );
@@ -833,9 +830,9 @@ lu ( hpro::TMatrix *          A,
     }// if
     else
     {
-        auto  DA = ptrcast( A, hpro::TDenseMatrix );
+        auto  DA = ptrcast( A, Hpro::TDenseMatrix< value_t > );
         
-        blas::invert( hpro::blas_mat< real >( DA ) );
+        blas::invert( Hpro::blas_mat< real >( DA ) );
 
         HLR_LOG( 5, "lu    :         " + idstr( A->id() ) + "        = " + normstr( norm_F( A ) ) );
     }// else

@@ -2,10 +2,10 @@
 #define __HLR_APPS_LAPLACE_HH
 //
 // Project     : HLib
-// File        : Laplace.hh
+// Module      : apps/laplace
 // Description : functions for Laplace SLP/DLP BEM application
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2018. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include <memory>
@@ -16,56 +16,36 @@
 
 #include "hlr/apps/application.hh"
 
-namespace hlr
-{
+namespace hlr { namespace apps {
 
-namespace hpro = HLIB;
-
-namespace apps
-{
-
-class laplace_slp : public application< hpro::real >
+class laplace_slp : public application< double >
 {
 public:
-    //
     // public types
-    //
-    
-    using  value_t = hpro::real;
+    using  value_t = double;
 
 private:
     // BEM data
-    std::unique_ptr< hpro::TGrid >                     _grid;
-    std::unique_ptr< hpro::TFnSpace >                  _fnspace;
-    std::unique_ptr< hpro::TBilinearForm< value_t > >  _bf;
+    std::unique_ptr< Hpro::TGrid >                     _grid;
+    std::unique_ptr< Hpro::TFnSpace< double > >        _fnspace;
+    std::unique_ptr< Hpro::TBilinearForm< value_t > >  _bf;
 
 public:
-    //
     // ctor with grid name (plus refinement levels)
-    //
     laplace_slp ( const std::string &  grid );
     
-    //
     // dtor
-    //
-    
     virtual ~laplace_slp () {}
     
-    //
     // return coordinates for problem indices
-    //
-    std::unique_ptr< hpro::TCoordinate >
+    std::unique_ptr< Hpro::TCoordinate >
     coordinates () const;
     
-    //
     // return coefficient function to evaluate matrix entries
-    //
-    std::unique_ptr< hpro::TCoeffFn< value_t > >
+    std::unique_ptr< Hpro::TCoeffFn< value_t > >
     coeff_func  () const;
 };
 
-}//namespace apps
-
-}//namespace hlr
+}}//namespace hlr::apps
 
 #endif  // __HLR_APPS_LAPLACE_HH

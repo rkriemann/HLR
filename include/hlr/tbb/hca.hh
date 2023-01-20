@@ -8,15 +8,14 @@
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
 //
 
+#include <tbb/parallel_invoke.h>
+
 #include <hlr/bem/hca.hh>
 #include <hlr/bem/tiled_hca.hh>
 
+#include <hlr/tbb/arith_tiled_v2.hh>
+
 namespace hlr { namespace tbb { namespace bem {
-
-namespace hpro = HLIB;
-namespace blas = hpro::BLAS;
-
-using namespace hpro;
 
 using hlr::bem::pivot_arr_t;
 using hlr::bem::tensor_grid;

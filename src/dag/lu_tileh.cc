@@ -7,9 +7,6 @@
 //
 
 #include <hpro/matrix/structure.hh>
-#include <hpro/algebra/solve_tri.hh>
-#include <hpro/algebra/mat_mul.hh>
-#include <hpro/algebra/mat_fac.hh>
 
 #include "hlr/utils/tensor.hh"
 #include "hlr/utils/checks.hh"
@@ -18,20 +15,17 @@
 
 namespace hlr { namespace dag {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 namespace
 {
 
+template < typename value_t >
 struct lu_node : public node
 {
-    TMatrix *      A;
+    Hpro::TMatrix< value_t > *      A;
     refine_func_t  refine;
     exec_func_t    exec;
     
-    lu_node ( TMatrix *      aA,
+    lu_node ( Hpro::TMatrix< value_t > *      aA,
               refine_func_t  arefine,
               exec_func_t    aexec )
             : A( aA )
@@ -43,21 +37,22 @@ struct lu_node : public node
     virtual std::string  color     () const { return "ef2929"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
+template < typename value_t >
 struct trsmu_node : public node
 {
-    const TMatrix *  U;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  U;
+    Hpro::TMatrix< value_t > *        A;
     refine_func_t    refine;
     exec_func_t      exec;
     
-    trsmu_node ( const TMatrix *  aU,
-                 TMatrix *        aA,
+    trsmu_node ( const Hpro::TMatrix< value_t > *  aU,
+                 Hpro::TMatrix< value_t > *        aA,
                  refine_func_t    arefine,
                  exec_func_t      aexec )
             : U( aU )
@@ -70,21 +65,22 @@ struct trsmu_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
 
+template < typename value_t >
 struct trsml_node : public node
 {
-    const TMatrix *  L;
-    TMatrix *        A;
+    const Hpro::TMatrix< value_t > *  L;
+    Hpro::TMatrix< value_t > *        A;
     refine_func_t    refine;
     exec_func_t      exec;
 
-    trsml_node ( const TMatrix *  aL,
-                 TMatrix *        aA,
+    trsml_node ( const Hpro::TMatrix< value_t > *  aL,
+                 Hpro::TMatrix< value_t > *        aA,
                  refine_func_t    arefine,
                  exec_func_t      aexec )
             : L( aL )
@@ -97,21 +93,22 @@ struct trsml_node : public node
     virtual std::string  color     () const { return "729fcf"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
 };
     
+template < typename value_t >
 struct update_node : public node
 {
-    const TMatrix *  A;
-    const TMatrix *  B;
-    TMatrix *        C;
+    const Hpro::TMatrix< value_t > *  A;
+    const Hpro::TMatrix< value_t > *  B;
+    Hpro::TMatrix< value_t > *        C;
 
-    update_node ( const TMatrix *  aA,
-                  const TMatrix *  aB,
-                  TMatrix *        aC )
+    update_node ( const Hpro::TMatrix< value_t > *  aA,
+                  const Hpro::TMatrix< value_t > *  aB,
+                  Hpro::TMatrix< value_t > *        aC )
             : A( aA )
             , B( aB )
             , C( aC )
@@ -121,7 +118,7 @@ struct update_node : public node
     virtual std::string  color     () const { return "8ae234"; }
     
 private:
-    virtual void                run_         ( const TTruncAcc &  acc );
+    virtual void                run_         ( const Hpro::TTruncAcc &  acc );
     virtual local_graph         refine_      ( const size_t ) { return {}; }
     virtual const block_list_t  in_blocks_   () const { return {}; }
     virtual const block_list_t  out_blocks_  () const { return {}; }
@@ -133,8 +130,9 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-lu_node::run_ ( const TTruncAcc &  acc )
+lu_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
     auto  dag = std::move( hlr::dag::gen_dag_lu_oop_auto( *A, 128, refine ) );
     
@@ -147,8 +145,9 @@ lu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-trsml_node::run_ ( const TTruncAcc &  acc )
+trsml_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
     auto  dag = std::move( hlr::dag::gen_dag_solve_lower( *L, *A, 128, refine ) );
     
@@ -161,8 +160,9 @@ trsml_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-trsmu_node::run_ ( const TTruncAcc &  acc )
+trsmu_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
     auto  dag = std::move( hlr::dag::gen_dag_solve_upper( *U, *A, 128, refine ) );
     
@@ -175,10 +175,12 @@ trsmu_node::run_ ( const TTruncAcc &  acc )
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template < typename value_t >
 void
-update_node::run_ ( const TTruncAcc &  acc )
+update_node< value_t >::run_ ( const Hpro::TTruncAcc &  acc )
 {
-    multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
+    HLR_ERROR( "todo" );
+    // multiply( real(-1), apply_normal, A, apply_normal, B, real(1), C, acc );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -190,8 +192,9 @@ update_node::run_ ( const TTruncAcc &  acc )
 //
 // generate nodes for level-wise LU
 //
+template < typename value_t >
 graph
-dag_lu_tileh ( TMatrix *      A,
+dag_lu_tileh ( Hpro::TMatrix< value_t > *      A,
                const size_t   /* min_size */,
                refine_func_t  refine,
                exec_func_t    exec )
@@ -213,7 +216,7 @@ dag_lu_tileh ( TMatrix *      A,
         //
 
         node_list_t  nodes, start, end;
-        auto         BA  = ptrcast( A, TBlockMatrix );
+        auto         BA  = ptrcast( A, Hpro::TBlockMatrix< value_t > );
         auto         BL  = BA;
         auto         BU  = BA;
         const auto   nbr = BA->nblock_rows();
@@ -295,8 +298,9 @@ dag_lu_tileh ( TMatrix *      A,
 
 }// namespace anonymous
 
+template < typename value_t >
 graph
-gen_dag_lu_tileh ( TMatrix &      A,
+gen_dag_lu_tileh ( Hpro::TMatrix< value_t > &      A,
                    const size_t   min_size,
                    refine_func_t  refine,
                    exec_func_t    exec )

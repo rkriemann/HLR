@@ -9,7 +9,7 @@
 //
 
 #include <hpx/parallel/task_block.hpp>
-#include <hpx/include/async.hpp>
+#include <hpx/async_combinators/when_all.hpp>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
@@ -24,10 +24,6 @@
 #include <hlr/hpx/dag.hh>
 
 namespace hlr { namespace hpx {
-
-namespace hpro = HLIB;
-
-using namespace hpro;
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -46,9 +42,9 @@ mul_vec ( const value_t                    alpha,
           const blas::vector< value_t > &  x,
           blas::vector< value_t > &        y )
 {
-    // assert( ! is_null( M ) );
-    // assert( M->ncols( op_M ) == x.length() );
-    // assert( M->nrows( op_M ) == y.length() );
+    // HLR_ASSERT( ! is_null( M ) );
+    // HLR_ASSERT( M->ncols( op_M ) == x.length() );
+    // HLR_ASSERT( M->nrows( op_M ) == y.length() );
 
     if ( alpha == value_t(0) )
         return;
@@ -93,7 +89,7 @@ mul_vec ( const value_t                    alpha,
         }// if
         else if ( op_M == apply_transposed )
         {
-            assert( is_complex_type< value_t >::value == false );
+            HLR_ASSERT( is_complex_type< value_t >::value == false );
             
             auto  t = blas::mulvec( value_t(1), blas::transposed( blas_mat_A< value_t >( R ) ), x );
 
@@ -107,7 +103,7 @@ mul_vec ( const value_t                    alpha,
         }// if
     }// if
     else
-        assert( false );
+        HLR_ASSERT( false );
 }
 
 //
@@ -165,13 +161,15 @@ multiply ( const value_t            alpha,
 // - T is used as temporary space and has to have the same
 //   structure as A
 //
-inline void
+template < typename approx_t >
+void
 gauss_elim ( hpro::TMatrix &          A,
              hpro::TMatrix &          T,
-             const hpro::TTruncAcc &  acc )
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
 {
-    assert( ! is_null_any( &A, &T ) );
-    assert( A.type() == T.type() );
+    HLR_ASSERT( ! is_null_any( &A, &T ) );
+    HLR_ASSERT( A.type() == T.type() );
 
     HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
     
@@ -183,36 +181,50 @@ gauss_elim ( hpro::TMatrix &          A,
         auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        hlr::hpx::gauss_elim( *MA(0,0), *MT(0,0), acc );
+        hlr::hpx::gauss_elim( *MA(0,0), *MT(0,0), acc, approx );
 
         ::hpx::parallel::v2::define_task_block(
             [&] ( auto &  tb )
             {
                 // T_01 = A_00⁻¹ · A_01
-                tb.run( [&] () { hpro::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc ); } );
+                tb.run( [&] () {
+                    MT(0,1)->scale( 0.0 );
+                    hlr::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), MT(0,1), acc, approx );
+                } );
         
                 // T_10 = A_10 · A_00⁻¹
-                tb.run( [&] () { hpro::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc ); } );
+                tb.run( [&] () {
+                    MT(1,0)->scale( 0.0 );
+                    hlr::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), MT(1,0), acc, approx );
+                } );
             } );
 
         // A_11 = A_11 - T_10 · A_01
-        hpro::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), MA(1,1), acc, approx );
     
         // A_11 = A_11⁻¹
-        hlr::hpx::gauss_elim( *MA(1,1), *MT(1,1), acc );
+        hlr::hpx::gauss_elim( *MA(1,1), *MT(1,1), acc, approx );
 
         ::hpx::parallel::v2::define_task_block(
             [&] ( auto &  tb )
             {
                 // A_01 = - T_01 · A_11
-                tb.run( [&] () { hpro::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc ); } );
+                tb.run( [&] ()
+                {
+                    MA(0,1)->scale( 0.0 );
+                    hlr::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), MA(0,1), acc, approx );
+                } );
             
                 // A_10 = - A_11 · T_10
-                tb.run( [&] () { hpro::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc ); } );
+                tb.run( [&] ()
+                {
+                    MA(1,0)->scale( 0.0 );
+                    hlr::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), MA(1,0), acc, approx );
+                } );
             } );
         
         // A_00 = T_00 - A_01 · T_10
-        hpro::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        hlr::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), MA(0,0), acc, approx );
     }// if
     else if ( is_dense( A ) )
     {
@@ -222,7 +234,7 @@ gauss_elim ( hpro::TMatrix &          A,
         else                  blas::invert( DA->blas_rmat() );
     }// if
     else
-        assert( false );
+        HLR_ASSERT( false );
 
     HLR_LOG( 4, hpro::to_string( "gauss_elim( %d )", A.id() ) );
 }
@@ -246,7 +258,7 @@ lu ( hpro::TMatrix &          A,
      const hpro::TTruncAcc &  acc,
      const approx_t &         approx )
 {
-    assert( is_blocked( A ) );
+    HLR_ASSERT( is_blocked( A ) );
     
     auto  BA  = ptrcast( &A, hpro::TBlockMatrix );
     auto  nbr = BA->nblock_rows();
@@ -419,7 +431,7 @@ lu ( TMatrix &          A,
 {
     HLR_LOG( 4, hpro::to_string( "lu( %d )", A.id() ) );
     
-    assert( is_blocked( A ) );
+    HLR_ASSERT( is_blocked( A ) );
 
     auto  BA  = ptrcast( &A, TBlockMatrix );
     auto  nbr = BA->nblock_rows();

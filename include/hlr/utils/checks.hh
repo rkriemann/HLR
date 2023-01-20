@@ -15,15 +15,35 @@
 namespace hlr
 {
 
-namespace hpro = HLIB;
-
 //
-// import HLIBpro tests
+// extend standard test to "all" and "any" of the arguments
 //
-using hpro::is_blocked;
-using hpro::is_dense;
-using hpro::is_lowrank;
-
+#define HLR_TEST_ALL( name, type )                                      \
+    template < typename value_t >                                       \
+    bool name ## _all  ( const type *  p ) noexcept { return name( p ); } \
+                                                                        \
+    template < typename value_t, typename... T >                        \
+    bool name ## _all  ( const type *  p, T&&...  args ) noexcept { return name( p ) && name ## _all( std::forward< T >( args )... ); } \
+                                                                        \
+    template < typename value_t >                                       \
+    bool name ## _all  ( const type &  p ) noexcept { return name( p ); } \
+                                                                        \
+    template < typename value_t, typename... T >                        \
+    bool name ## _all  ( const type &  p, T&&...  args ) noexcept { return name( p ) && name ## _all( std::forward< T >( args )... ); }
+    
+#define HLR_TEST_ANY( name, type )                                      \
+    template < typename value_t >                                       \
+    bool name ## _any  ( const type *  p ) noexcept { return name( p ); } \
+                                                                        \
+    template < typename value_t, typename... T >                        \
+    bool name ## _any  ( const type *  p, T&&...  args ) noexcept { return name( p ) || name ## _any( std::forward< T >( args )... ); } \
+                                                                        \
+    template < typename value_t >                                       \
+    bool name ## _any  ( const type &  p ) noexcept { return name( p ); } \
+                                                                        \
+    template < typename value_t, typename... T >                        \
+    bool name ## _any  ( const type &  p, T&&...  args ) noexcept { return name( p ) || name ## _any( std::forward< T >( args )... ); }
+    
 //
 // return true, if pointer is null
 //
@@ -164,7 +184,7 @@ bool is_small_all  ( const size_t  n,
 
 
 template < typename T >
-bool is_small      ( T *           A )     noexcept { return ! is_null( A ) && hpro::is_small( A ); }
+bool is_small      ( T *           A )     noexcept { return ! is_null( A ) && Hpro::is_small( A ); }
 
 template < typename T >
 bool is_small_any  ( T *           A )     noexcept { return is_small( A ); }
@@ -181,7 +201,7 @@ bool is_small_all  ( T1 *          A,
                      T2...         mtrs )  noexcept { return is_small( A ) && is_small_all( mtrs... ); }
 
 template < typename T >
-bool is_small      ( T &           A )     noexcept { return hpro::is_small( & A ); }
+bool is_small      ( T &           A )     noexcept { return Hpro::is_small( & A ); }
 
 template < typename T >
 bool is_small_any  ( T &           A )     noexcept { return is_small( A ); }
@@ -202,129 +222,103 @@ bool is_small_all  ( T1 &          A,
 // return true if given matrix is a structured (blocked) matrix
 //
 
-inline
-bool is_blocked_any ( const hpro::TMatrix &  A )     noexcept { return is_blocked( A ); }
+// template < typename value_t > bool is_blocked      ( const Hpro::TMatrix< value_t > *  A ) noexcept { return (A != nullptr) && A->is_blocked(); }
+// template < typename value_t > bool is_blocked      ( const Hpro::TMatrix< value_t > &  A ) noexcept { return A.is_blocked(); }
 
-template < typename... T >
-bool is_blocked_any ( const hpro::TMatrix &  A,
-                      T...                   mtrs )  noexcept { return is_blocked( A ) || hlr::is_blocked_any( mtrs... ); }
+template < typename value_t > bool is_blocked_all  ( const Hpro::TMatrix< value_t > *  A ) noexcept { return is_blocked( A ); }
+template < typename value_t > bool is_blocked_all  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return is_blocked( A ); }
 
-inline
-bool is_blocked_all ( const hpro::TMatrix &  A )     noexcept { return is_blocked( A ); }
+template < typename value_t > bool is_blocked_any  ( const Hpro::TMatrix< value_t > *  A ) noexcept { return is_blocked( A ); }
+template < typename value_t > bool is_blocked_any  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return is_blocked( A ); }
 
-template < typename... T >
-bool is_blocked_all ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_blocked( A ) && hlr::is_blocked_all( std::forward< T >( mtrs )... ); }
+template < typename value_t, typename... T >
+bool is_blocked_all ( const Hpro::TMatrix< value_t > &  A,
+                      T&&...                            mtrs )  noexcept { return is_blocked( A ) && hlr::is_blocked_all( std::forward< T >( mtrs )... ); }
 
+template < typename value_t, typename... T >
+bool is_blocked_any ( const Hpro::TMatrix< value_t > &  A,
+                      T&&...                            mtrs )  noexcept { return is_blocked( A ) || hlr::is_blocked_any( std::forward< T >( mtrs )... ); }
+
+template < typename value_t, typename... T >
+bool is_blocked_any ( const Hpro::TMatrix< value_t > *  A,
+                      T&&...                            mtrs )  noexcept { return is_blocked( A ) || hlr::is_blocked_any( std::forward< T >( mtrs )... ); }
 
 //
 // return true if given matrix is a dense matrix
 //
 
-inline
-bool is_dense       ( const hpro::TMatrix &  A )     noexcept { return is_dense( & A ); }
+// template < typename value_t >
+// bool is_dense  ( const Hpro::TMatrix< value_t > *  A ) noexcept { return Hpro::is_dense( A ); }
 
-inline
-bool is_dense_any   ( const hpro::TMatrix &  A )     noexcept { return is_dense( A ); }
+// template < typename value_t >
+// bool is_dense  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_dense( & A ); }
 
-template < typename... T >
-bool is_dense_any   ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_dense( A ) || is_dense_any( std::forward< T >( mtrs )... ); }
-
-inline
-bool is_dense_all   ( const hpro::TMatrix &  A )     noexcept { return is_dense( A ); }
-
-template < typename... T >
-bool is_dense_all   ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
-
-inline
-bool is_dense_any   ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_dense( A ); }
-
-template < typename... T >
-bool is_dense_any   ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_dense( A ) || is_dense_any( std::forward< T >( mtrs )... ); }
-
-inline
-bool is_dense_all   ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_dense( A ); }
-
-template < typename... T >
-bool is_dense_all   ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_dense( A ) && is_dense_all( std::forward< T >( mtrs )... ); }
-
+HLR_TEST_ALL( is_dense, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_dense, Hpro::TMatrix< value_t > )
 
 //
 // return true if given matrix is a low-rank matrix
 //
 
-inline
-bool is_lowrank     ( const hpro::TMatrix &  A )     noexcept { return is_lowrank( & A ); }
+// template < typename value_t >
+// bool is_lowrank  ( const Hpro::TMatrix< value_t > *  A ) noexcept { return Hpro::is_lowrank( A ); }
 
-inline
-bool is_lowrank_any ( const hpro::TMatrix &  A )     noexcept { return is_lowrank( A ); }
+// template < typename value_t >
+// bool is_lowrank  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_lowrank( &A ); }
 
-template < typename... T >
-bool is_lowrank_any ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) || is_lowrank_any( std::forward< T >( mtrs )... ); }
+HLR_TEST_ALL( is_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_lowrank, Hpro::TMatrix< value_t > )
 
-inline
-bool is_lowrank_all ( const hpro::TMatrix &  A )     noexcept { return is_lowrank( A ); }
+//
+// return true if given matrix is a sparse matrix
+//
 
-template < typename... T >
-bool is_lowrank_all ( const hpro::TMatrix &  A,
-                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
+// template < typename value_t >
+// bool is_sparse  ( const Hpro::TMatrix< value_t > *  A ) noexcept { return Hpro::is_sparse( A ); }
 
-inline
-bool is_lowrank_any ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_lowrank( A ); }
+// template < typename value_t >
+// bool is_sparse  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_sparse( & A ); }
 
-template < typename... T >
-bool is_lowrank_any ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) || is_lowrank_any( std::forward< T >( mtrs )... ); }
+HLR_TEST_ALL( is_sparse, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_sparse, Hpro::TMatrix< value_t > )
 
-inline
-bool is_lowrank_all ( const hpro::TMatrix *  A )     noexcept { return ! is_null( A ) && is_lowrank( A ); }
+//
+// return true if given matrix has nested dissection structure
+//
 
-template < typename... T >
-bool is_lowrank_all ( const hpro::TMatrix *  A,
-                      T&&...                 mtrs )  noexcept { return is_lowrank( A ) && is_lowrank_all( std::forward< T >( mtrs )... ); }
+template < typename value_t >
+bool is_nd     ( const Hpro::TMatrix< value_t > &  A )     noexcept { return Hpro::is_dd( & A ); }
+
+template < typename value_t >
+bool is_nd     ( const Hpro::TMatrix< value_t > *  A )     noexcept { return Hpro::is_dd( A ); }
+
+HLR_TEST_ALL( is_nd, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_nd, Hpro::TMatrix< value_t > )
 
 //
 // return true if given vector is a scalar vector
 //
 
-inline
-bool is_scalar      ( const hpro::TVector &  v )     noexcept { return hpro::is_scalar( v ); }
+template < typename value_t >
+bool is_scalar      ( const Hpro::TVector< value_t > &  v )     noexcept { return Hpro::is_scalar( v ); }
 
-inline
-bool is_scalar_any  ( const hpro::TVector &  v )     noexcept { return hlr::is_scalar( v ); }
+template < typename value_t >
+bool is_scalar      ( const Hpro::TVector< value_t > *  v )     noexcept { return Hpro::is_scalar( v ); }
 
-template < typename... T >
-bool is_scalar_any  ( const hpro::TVector &  v,
-                      T&&...                 vecs )  noexcept { return hlr::is_scalar( v ) || is_scalar_any( std::forward< T >( vecs )... ); }
+template < typename value_t >
+bool is_scalar_all  ( const Hpro::TVector< value_t > *  p ) noexcept { return hlr::is_scalar( p ); } 
 
-inline
-bool is_scalar_all  ( const hpro::TVector &  v )     noexcept { return hlr::is_scalar( v ); }
+template < typename value_t, typename... T >
+bool is_scalar_all  ( const Hpro::TVector< value_t > *  p, T&&...  args ) noexcept { return hlr::is_scalar( p ) && hlr::is_scalar_all( std::forward< T >( args )... ); }
 
-template < typename... T >
-bool is_scalar_all  ( const hpro::TVector &  v,
-                      T&&...                 vecs )  noexcept { return hlr::is_scalar( v ) && is_scalar_all( std::forward< T >( vecs )... ); }
+template < typename value_t >
+bool is_scalar_all  ( const Hpro::TVector< value_t > &  p ) noexcept { return hlr::is_scalar( p ); }
 
-inline
-bool is_scalar      ( const hpro::TVector *  v )     noexcept { return hpro::is_scalar( v ); }
+template < typename value_t, typename... T >
+bool is_scalar_all  ( const Hpro::TVector< value_t > &  p, T&&...  args ) noexcept { return hlr::is_scalar( p ) && hlr::is_scalar_all( std::forward< T >( args )... ); }
 
-inline
-bool is_scalar_any  ( const hpro::TVector *  v )     noexcept { return hlr::is_scalar( v ); }
-
-template < typename... T >
-bool is_scalar_any  ( const hpro::TVector *  v,
-                      T&&...                 vecs )  noexcept { return hlr::is_scalar( v ) || is_scalar_any( std::forward< T >( vecs )... ); }
-
-inline
-bool is_scalar_all  ( const hpro::TVector *  v )     noexcept { return hlr::is_scalar( v ); }
-
-template < typename... T >
-bool is_scalar_all  ( const hpro::TVector *  v,
-                      T&&...                 vecs )  noexcept { return hlr::is_scalar( v ) && is_scalar_all( std::forward< T >( vecs )... ); }
+// HLR_TEST_ALL( is_scalar, Hpro::TVector< value_t > )
+// HLR_TEST_ANY( is_scalar, Hpro::TVector< value_t > )
 
 }// namespace hlr
 

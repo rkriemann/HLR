@@ -11,7 +11,7 @@
 #include <map>
 #include <functional>
 
-#include "hlr/dag/node.hh"
+#include <hlr/dag/node.hh>
 
 namespace hlr
 {

@@ -14,7 +14,7 @@ namespace hlr { namespace approx {
 
 namespace hpro = HLIB;
 
-using hpro::idx_t;
+using Hpro::idx_t;
 
 //
 // return low-rank approximation of M with accuracy <acc>
@@ -23,12 +23,12 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 randsvd ( const operator_t &       M,
-          const hpro::TTruncAcc &  acc,
+          const Hpro::TTruncAcc &  acc,
           const uint               power_steps,
           const uint               oversampling )
 {
     using  value_t = typename operator_t::value_t;
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     const auto  nrows_M = nrows( M );
     const auto  ncols_M = ncols( M );
@@ -43,7 +43,7 @@ randsvd ( const operator_t &       M,
     // B = Q^H · M  or B^H = M^H · Q
     auto  BT  = blas::matrix< value_t >( ncols_M, k );
 
-    prod( value_t(1), hpro::apply_adjoint, M, Q, BT );
+    prod( value_t(1), Hpro::apply_adjoint, M, Q, BT );
     
     auto  R_B = blas::matrix< value_t >( k, k );
     auto  V   = blas::matrix< value_t >( k, k );
@@ -81,11 +81,11 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randsvd ( const blas::matrix< value_t > &  U,
           const blas::matrix< value_t > &  V,
-          const hpro::TTruncAcc &          acc,
+          const Hpro::TTruncAcc &          acc,
           const uint                       power_steps,
           const uint                       oversampling )
 {
-    using  real_t  = typename hpro::real_type< value_t >::type_t;
+    using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -174,7 +174,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randsvd ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc,
+          const Hpro::TTruncAcc &                       acc,
           const uint                                    power_steps,
           const uint                                    oversampling )
 {
@@ -255,7 +255,7 @@ std::pair< blas::matrix< value_t >,
 randsvd ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  T,
           const std::list< blas::matrix< value_t > > &  V,
-          const hpro::TTruncAcc &                       acc,
+          const Hpro::TTruncAcc &                       acc,
           const uint                                    power_steps,
           const uint                                    oversampling )
 {
@@ -362,7 +362,7 @@ struct RandSVD
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const hpro::TTruncAcc &    acc ) const
+                  const Hpro::TTruncAcc &    acc ) const
     {
         return hlr::approx::randsvd( M, acc, power_steps, oversampling );
     }
@@ -371,7 +371,7 @@ struct RandSVD
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const hpro::TTruncAcc &          acc ) const 
+                  const Hpro::TTruncAcc &          acc ) const 
     {
         auto  Uc = blas::copy( U );
         auto  Vc = blas::copy( V );
@@ -383,7 +383,7 @@ struct RandSVD
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::randsvd( U, V, acc, power_steps, oversampling );
     }
@@ -393,7 +393,7 @@ struct RandSVD
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const hpro::TTruncAcc &                       acc ) const
+                  const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::randsvd( U, T, V, acc, power_steps, oversampling );
     }
@@ -402,7 +402,7 @@ struct RandSVD
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const hpro::TTruncAcc &  acc ) const
+                  const Hpro::TTruncAcc &  acc ) const
     {
         return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
     }
@@ -414,7 +414,7 @@ struct RandSVD
     template < typename operator_t >
     blas::matrix< typename operator_t::value_t >
     column_basis ( const operator_t &       op,
-                   const hpro::TTruncAcc &  acc ) const
+                   const Hpro::TTruncAcc &  acc ) const
     {
         return detail::rand_column_basis< operator_t >( op, acc, 4, power_steps, oversampling );
     }

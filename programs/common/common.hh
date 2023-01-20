@@ -1,5 +1,9 @@
 
+#include <hpro/config.h>
+
+#if USE_TBB == 1
 #include <tbb/global_control.h>
+#endif
 
 #include <iostream>
 #include <string>
@@ -14,25 +18,22 @@ using boost::format;
 #include <hpro/base/init.hh>
 #include <hpro/base/System.hh>
 #include <hpro/algebra/TLowRankApx.hh>
-#include <hpro/algebra/mat_norm.hh>
-#include <hpro/algebra/mat_conv.hh>
 #include <hpro/io/TMatrixIO.hh>
-#include <hpro/io/TMatrixVis.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/cluster/TBCBuilder.hh>
 #include <hpro/cluster/TGeomAdmCond.hh>
 #include <hpro/cluster/TAlgPartStrat.hh>
 #include <hpro/cluster/TAlgCTBuilder.hh>
 #include <hpro/cluster/TAlgAdmCond.hh>
-#include <hpro/matrix/TMatBuilder.hh>
 
 #include <hlr/cluster/tlr.hh>
 #include <hlr/cluster/mblr.hh>
 #include <hlr/cluster/tileh.hh>
 #include <hlr/cluster/h.hh>
 
+#include <hlr/utils/timer.hh>
+
 namespace hpro = HLIB;
-//namespace blas = HLIB::BLAS;
 
 #include "cmdline.hh"
 #include "gen_problem.hh"
@@ -56,7 +57,7 @@ inline
 std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + mem_usage();
+    return hlr::term::black( hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >
@@ -96,6 +97,13 @@ format_error ( const double  e )
     return hlr::term::red( str( boost::format( "%.4e" ) % e ) );
 }
 
+template < typename... T >
+std::string
+format_error ( const double  e, const T... es )
+{
+    return hlr::term::red( str( boost::format( "%.4e" ) % e ) ) + " / " + format_error( es... );
+}
+
 // return default formated norm string
 inline
 std::string
@@ -112,12 +120,6 @@ format_flops ( const double  f,
 {
     return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
 }
-
-//
-// timing
-//
-
-namespace timer = hpro::Time::Wall;
 
 //
 // return min/max/median of elements in container
@@ -205,7 +207,7 @@ gen_bct ( hpro::TClusterTree &  rowct,
 
     if ( hlr::cmdline::adm == "std" )
     {
-        hpro::TStdGeomAdmCond  adm_cond( 2.0, hpro::use_min_diam );
+        hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if

@@ -27,10 +27,6 @@
 
 namespace hlr { namespace tf {
 
-namespace hpro = HLIB;
-
-using namespace hpro;
-
 ///////////////////////////////////////////////////////////////////////
 //
 // general arithmetic functions
@@ -203,11 +199,13 @@ multiply ( const value_t            alpha,
 namespace detail
 {
 
-inline void
-gauss_elim ( ::tf::Subflow &         tf,
-             hpro::TMatrix &         A,
-             hpro::TMatrix &         T,
-             const TTruncAcc &       acc )
+template < typename approx_t >
+void
+gauss_elim ( ::tf::Subflow &          tf,
+             hpro::TMatrix &          A,
+             hpro::TMatrix &          T,
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
 {
     assert( ! is_null_any( &A, &T ) );
     assert( A.type() == T.type() );
@@ -218,40 +216,67 @@ gauss_elim ( ::tf::Subflow &         tf,
     {
         auto  BA = ptrcast( &A, TBlockMatrix );
         auto  BT = ptrcast( &T, TBlockMatrix );
+        auto  MA = [BA] ( const uint  i, const uint  j ) { return BA->block( i, j ); };
+        auto  MT = [BT] ( const uint  i, const uint  j ) { return BT->block( i, j ); };
 
         // A_00 = A_00⁻¹
-        auto  inv_a00 = tf.emplace( [BA,BT,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, *BA->block(0,0), *BT->block(0,0), acc ); } );
+        auto  inv_a00 = tf.emplace( [&,BA,BT] ( ::tf::Subflow &  sf )
+        {
+            detail::gauss_elim( sf, *BA->block(0,0), *BT->block(0,0), acc, approx );
+        } );
 
         // T_01 = A_00⁻¹ · A_01
-        auto  upd_t01 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( 1.0, apply_normal, BA->block(0,0), apply_normal, BA->block(0,1), 0.0, BT->block(0,1), acc ); } );
-        inv_a00.precede( upd_t01 );
+        auto  upd_t01 = tf.emplace( [&,BA,BT] ()
+        {
+            MT(0,1)->scale( 0.0 );
+            hlr::multiply( 1.0, hpro::apply_normal, MA(0,0), hpro::apply_normal, MA(0,1), MT(0,1), acc, approx );
+        } );
+        upd_t01.succeed( inv_a00 );
         
         // T_10 = A_10 · A_00⁻¹
-        auto  upd_t10 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( 1.0, apply_normal, BA->block(1,0), apply_normal, BA->block(0,0), 0.0, BT->block(1,0), acc ); } );
-        inv_a00.precede( upd_t10 );
+        auto  upd_t10 = tf.emplace( [&,BA,BT] ()
+        {
+            MT(1,0)->scale( 0.0 );
+            hlr::multiply( 1.0, hpro::apply_normal, MA(1,0), hpro::apply_normal, MA(0,0), MT(1,0), acc, approx );
+        } );
+        upd_t10.succeed( inv_a00 );
 
         // A_11 = A_11 - T_10 · A_01
-        auto  upd_a11 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( -1.0, apply_normal, BT->block(1,0), apply_normal, BA->block(0,1), 1.0, BA->block(1,1), acc ); } );
-        upd_t10.precede( upd_a11 );
+        auto  upd_a11 = tf.emplace( [&,BA,BT] ()
+        {
+            hlr::multiply( -1.0, hpro::apply_normal, MT(1,0), hpro::apply_normal, MA(0,1), MA(1,1), acc, approx );
+        } );
+        upd_a11.succeed( upd_t10 );
     
         // A_11 = A_11⁻¹
-        auto  inv_a11 = tf.emplace( [BA,BT,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, *BA->block(1,1), *BT->block(1,1), acc ); } );
-        upd_a11.precede( inv_a11 );
+        auto  inv_a11 = tf.emplace( [&,BA,BT] ( ::tf::Subflow &  sf )
+        {
+            detail::gauss_elim( sf, *BA->block(1,1), *BT->block(1,1), acc, approx );
+        } );
+        inv_a11.succeed( upd_a11 );
 
         // A_01 = - T_01 · A_11
-        auto  upd_a01 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( -1.0, apply_normal, BT->block(0,1), apply_normal, BA->block(1,1), 0.0, BA->block(0,1), acc ); } );
-        upd_t01.precede( upd_a01 );
-        inv_a11.precede( upd_a01 );
+        auto  upd_a01 = tf.emplace( [&,BA,BT] ()
+        {
+            MA(0,1)->scale( 0.0 );
+            hlr::multiply( -1.0, hpro::apply_normal, MT(0,1), hpro::apply_normal, MA(1,1), MA(0,1), acc, approx );
+        } );
+        upd_a01.succeed( upd_t01, inv_a11 );
             
         // A_10 = - A_11 · T_10
-        auto  upd_a10 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( -1.0, apply_normal, BA->block(1,1), apply_normal, BT->block(1,0), 0.0, BA->block(1,0), acc ); } );
-        upd_t10.precede( upd_a10 );
-        inv_a11.precede( upd_a10 );
+        auto  upd_a10 = tf.emplace( [&,BA,BT] ()
+        {
+            MA(1,0)->scale( 0.0 );
+            hlr::multiply( -1.0, hpro::apply_normal, MA(1,1), hpro::apply_normal, MT(1,0), MA(1,0), acc, approx );
+        } );
+        upd_a10.succeed( upd_t10, inv_a11 );
 
         // A_00 = T_00 - A_01 · T_10
-        auto  upd_a00 = tf.emplace( [BA,BT,&acc] () { hpro::multiply( -1.0, apply_normal, BA->block(0,1), apply_normal, BT->block(1,0), 1.0, BA->block(0,0), acc ); } );
-        upd_t10.precede( upd_a00 );
-        upd_a01.precede( upd_a00 );
+        auto  upd_a00 = tf.emplace( [&,BA,BT] ()
+        {
+            hlr::multiply( -1.0, hpro::apply_normal, MA(0,1), hpro::apply_normal, MT(1,0), MA(0,0), acc, approx );
+        } );
+        upd_a00.succeed( upd_t10, upd_a01 );
     }// if
     else if ( is_dense( A ) )
     {
@@ -268,14 +293,16 @@ gauss_elim ( ::tf::Subflow &         tf,
 
 }// namespace detail
 
-inline void
-gauss_elim ( hpro::TMatrix &    A,
-             hpro::TMatrix &    T,
-             const TTruncAcc &  acc )
+template < typename approx_t >
+void
+gauss_elim ( hpro::TMatrix &          A,
+             hpro::TMatrix &          T,
+             const hpro::TTruncAcc &  acc,
+             const approx_t &         approx )
 {
     ::tf::Taskflow  tf;
 
-    tf.emplace( [&A,&T,&acc] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, A, T, acc ); } );
+    tf.emplace( [&] ( ::tf::Subflow &  sf ) { detail::gauss_elim( sf, A, T, acc, approx ); } );
 
     ::tf::Executor  executor;
     

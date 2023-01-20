@@ -16,8 +16,6 @@ namespace hlr { namespace bem {
 
 namespace hpro = HLIB;
 
-using namespace hpro;
-
 //////////////////////////////////////////////////////////////////////
 //
 // implement hybrid cross approximation

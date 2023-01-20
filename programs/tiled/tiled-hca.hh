@@ -24,7 +24,6 @@
 #include "hlr/bem/tiled_hca.hh"
 
 using namespace hlr;
-using namespace hpro;
 
 using function_space = hpro::TConstFnSpace;
 

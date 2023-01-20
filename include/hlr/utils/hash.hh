@@ -12,13 +12,26 @@
 
 namespace hlr { 
 
+namespace hpro = HLIB;
+
+using indexset       = hpro::TIndexSet;
+using block_indexset = hpro::TBlockIndexSet;
+
 // hash function for index sets
 struct indexset_hash
 {
-    size_t operator () ( const HLIB::TIndexSet &  is ) const
+    size_t operator () ( const indexset &  is ) const
     {
-        return ( std::hash< HLIB::idx_t >()( is.first() ) ^
-                 std::hash< HLIB::idx_t >()( is.last()  ) );
+        return ( std::hash< hpro::idx_t >()( is.first() ) ^ std::hash< hpro::idx_t >()( is.last()  ) );
+    }
+};
+
+// hash function for index sets
+struct block_indexset_hash
+{
+    size_t operator () ( const block_indexset &  is ) const
+    {
+        return ( indexset_hash()( is.row_is() ) ^ indexset_hash()( is.col_is() ) );
     }
 };
 

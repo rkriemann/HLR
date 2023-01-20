@@ -113,6 +113,62 @@ struct accumulator : public hlr::matrix::accumulator_base
 
         return sub_accu;
     }
+
+    //
+    // compute updates by reduction
+    //
+    template < typename value_t,
+               typename approx_t >
+    std::unique_ptr< hpro::TMatrix >
+    compute_reduce ( std::deque< update > &   computable,
+                     const size_t             lb,
+                     const size_t             ub,
+                     const value_t            alpha,
+                     const hpro::TTruncAcc &  acc,
+                     const approx_t &         approx )
+    {
+        if ( ub - lb <= 1 )
+        {
+            auto  [ op_A, A, op_B, B ] = computable[ lb ];
+            auto  T                    = multiply< value_t >( alpha, op_A, A, op_B, B );
+
+            return T;
+        }// if
+        else
+        {
+            const size_t  mid = (ub + lb) / 2;
+            auto          T1  = std::unique_ptr< hpro::TMatrix >();
+            auto          T2  = std::unique_ptr< hpro::TMatrix >();
+
+            ::tbb::parallel_invoke( [&,alpha,lb,mid] { T1 = std::move( compute_reduce< value_t >( computable, lb, mid, alpha, acc, approx ) ); },
+                                    [&,alpha,mid,ub] { T2 = std::move( compute_reduce< value_t >( computable, mid, ub, alpha, acc, approx ) ); } );
+
+            // prefer dense format
+            if ( is_dense( *T1 ) )
+            {
+                hlr::add( value_t(1), *T2, *T1 );
+
+                return T1;
+            }// if
+            else if ( is_dense( *T2 ) )
+            {
+                hlr::add( value_t(1), *T1, *T2 );
+
+                return T2;
+            }// if
+            else
+            {
+                // has to be low-rank: truncate
+                auto  R1       = ptrcast( T1.get(), hpro::TRkMatrix );
+                auto  R2       = ptrcast( T2.get(), hpro::TRkMatrix );
+                auto  [ U, V ] = approx( { blas::mat_U< value_t >( R1 ), blas::mat_U< value_t >( R2 ) },
+                                         { blas::mat_V< value_t >( R1 ), blas::mat_V< value_t >( R2 ) },
+                                         acc );
+
+                return std::make_unique< hpro::TRkMatrix >( T1->row_is(), T1->col_is(), std::move( U ), std::move( V ) );
+            }// else
+        }// else
+    }// if
     
     //
     // evaluate all computable updates to matrix M
@@ -130,17 +186,20 @@ struct accumulator : public hlr::matrix::accumulator_base
         //
         // handle all, actually computable updates, i.e., one factor is a leaf block
         //
-    
+
+        std::deque< update >  computable;
+
+        // filter computable updates
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
-                continue;
-        
             if ( is_blocked_all( A, B ) )
             {
+                if ( is_blocked_all( *A, *B, M ) )
+                    continue;
+                
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
-                // is created for further recursive update handling
+                // is needed for further recursive update handling
                 //
 
                 if ( ! is_null( BC ) )
@@ -170,32 +229,30 @@ struct accumulator : public hlr::matrix::accumulator_base
             }// if
             else
             {
-                //
-                // compute update (either A or B is a leaf)
-                //
-
-                auto  T = multiply< value_t >( alpha, op_A, A, op_B, B );
-
-                //
-                // apply update to accumulator
-                //
-            
-                if ( is_null( matrix ) )
-                {
-                    matrix = std::move( T );
-                }// if
-                else if ( ! is_dense( *matrix ) && is_dense( *T ) )
-                {
-                    // prefer dense format to avoid unnecessary truncations
-                    hlr::add( value_t(1), *matrix, *T, acc, approx );
-                    matrix = std::move( T );
-                }// if
-                else
-                {
-                    hlr::add( value_t(1), *T, *matrix, acc, approx );
-                }// else
+                computable.push_back( { op_A, A, op_B, B } );
             }// else
         }// for
+
+        // handle computable updated in parallel
+        if ( ! computable.empty() )
+        {
+            auto  T = compute_reduce< value_t, approx_t >( computable, 0, computable.size(), alpha, acc, approx );
+
+            if ( is_null( matrix ) )
+            {
+                matrix = std::move( T );
+            }// if
+            else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+            {
+                // prefer dense format to avoid unnecessary truncations
+                hlr::add( value_t(1), *matrix, *T, acc, approx );
+                matrix = std::move( T );
+            }// if
+            else
+            {
+                hlr::add( value_t(1), *T, *matrix, acc, approx );
+            }// else
+        }// if
 
         //
         // now handle recursive updates if M is a leaf block

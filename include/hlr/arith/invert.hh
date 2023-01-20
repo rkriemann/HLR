@@ -2,7 +2,7 @@
 #define __HLR_ARITH_INVERT_HH
 //
 // Project     : HLib
-// File        : multiply.hh
+// Module      : arith/invert
 // Description : matrix inversion functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
@@ -20,7 +20,7 @@ namespace hlr
 //
 template < typename value_t >
 void
-invert ( hpro::TDenseMatrix &  M )
+invert ( hpro::TDenseMatrix< value_t > &  M )
 {
     blas::invert( hpro::blas_mat< value_t >( M ) );
 }
@@ -29,10 +29,10 @@ invert ( hpro::TDenseMatrix &  M )
 // return inverse of M
 //
 template < typename value_t >
-std::unique_ptr< hpro::TDenseMatrix >
-inverse ( const hpro::TDenseMatrix &  M )
+std::unique_ptr< hpro::TDenseMatrix< value_t > >
+inverse ( const hpro::TDenseMatrix< value_t > &  M )
 {
-    auto  I = std::unique_ptr< hpro::TDenseMatrix >( ptrcast( M.copy().release(), hpro::TDenseMatrix ) );
+    auto  I = std::unique_ptr< hpro::TDenseMatrix< value_t > >( ptrcast( M.copy().release(), hpro::TDenseMatrix< value_t > ) );
 
     invert< value_t >( *I );
 

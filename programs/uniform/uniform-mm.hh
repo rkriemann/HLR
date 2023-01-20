@@ -3,19 +3,19 @@
 // File        : uniform.hh
 // Description : program for testing uniform matrix arithmetic
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
-
-#include <hpro/cluster/TClusterBasisBuilder.hh>
-#include <hpro/matrix/TMatrixSum.hh>
-#include <hpro/matrix/TMatrixProduct.hh>
-#include <hpro/io/TClusterBasisVis.hh>
 
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith.hh>
 #include <hlr/seq/arith_uniform.hh>
+#include <hlr/matrix/sum.hh>
+#include <hlr/matrix/product.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/approx/rrqr.hh>
+#include <hlr/approx/randsvd.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -32,7 +32,7 @@ program_main ()
     using value_t = typename problem_t::value_t;
 
     auto  runtime = std::vector< double >();
-    auto  tic     = timer::now();
+    auto  prnopt  = "noid";
     auto  acc     = gen_accuracy();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -41,17 +41,17 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        hpro::TPSBlockClusterVis  bc_vis;
-        
-        print_ps( ct->root(), "ct" );
-        bc_vis.id( false ).print( bct->root(), "bct" );
+        io::eps::print( *ct->root(), "ct" );
+        io::eps::print( *bct->root(), "bct" );
     }// if
     
     auto  coeff  = problem->coeff_func();
     auto  pcoeff = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx  = bem::aca_lrapx( pcoeff );
+
+    auto  tic    = timer::now();
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A      = io::hpro::read( "A.hm" );
+    // auto  A      = io::hpro::read< value_t >( "A.hm" );
     auto  toc    = timer::since( tic );
 
     // io::hpro::write( *A, "A.hm" );
@@ -65,10 +65,13 @@ program_main ()
     
     if ( hpro::verbose( 3 ) )
     {
-        matrix::print_eps( *A, "A" );
-        matrix::print_lvl_eps( *A, "L" );
+        io::eps::print( *A, "A", prnopt );
+        io::eps::print_mem( *A, "Am" );
+        io::eps::print_lvl( *A, "L" );
     }// if
 
+    const auto  normA = hlr::norm::spectral( *A, 1e-4 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // conversion to uniform
@@ -77,106 +80,172 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
 
-    std::cout << "  " << term::bullet << term::bold << "build cluster bases" << term::reset << std::endl;
+    auto  apx = approx::SVD< value_t >();
     
     tic = timer::now();
     
-    auto  [ rowcb, colcb ] = impl::matrix::construct_from_H< value_t >( *ct->root(), *ct->root(), *A, acc );
+    auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc );
 
     toc = timer::since( tic );
 
     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size() ) << std::endl;
-
-
-    std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
-
-    tic = timer::now();
-    
-    auto  A2 = impl::matrix::copy_uniform< value_t >( *A, *rowcb, *colcb );
-    
-    toc = timer::since( tic );
-
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
+    std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
     {
-        auto  diff  = hpro::matrix_sum( value_t(1), A.get(), value_t(-1), A2.get() );
-        auto  error = hlr::seq::norm::spectral( *diff, true, 1e-4 );
+        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
+        auto  error = hlr::seq::norm::spectral( *diff, 1e-4 );
         
-        std::cout << "    error  = " << format_error( error ) << std::endl;
+        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }
-    
+
     if ( hpro::verbose( 3 ) )
-        matrix::print_eps( *A2, "A2" );
-
-    //////////////////////////////////////////////////////////////////////
-    //
-    // matrix multiplication
-    //
-    //////////////////////////////////////////////////////////////////////
-
-    std::cout << "  " << term::bullet << term::bold << "Multiplication" << term::reset << std::endl;
-
-    auto  AxA      = hpro::matrix_product( A.get(), A.get() );
-    auto  norm_AxA = hlr::norm::spectral( *AxA );
-    
-    if ( true )
     {
-        std::cout << "    " << term::bullet << "H" << term::reset << std::endl;
+        io::eps::print( *A2, "A2", prnopt );
+        io::eps::print_mem( *A2, "A2m", prnopt );
+    }// if
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // H matrix multiplication
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    std::cout << term::bullet << term::bold << "H-Multiplication" << term::reset << std::endl;
+
+    auto  AxA      = matrix::product( *A, *A );
+    auto  norm_AxA = norm::spectral( *AxA );
+    auto  mmapx    = approx::SVD< value_t >();
+    
+    if ( false )
+    {
+        std::cout << "  " << term::bullet << "eager" << term::reset << std::endl;
             
-        auto  apx = approx::SVD< value_t >();
-        auto  B   = impl::matrix::copy( *A );
+        auto  B = impl::matrix::copy( *A );
 
         B->scale( 0 );
 
         tic = timer::now();
                 
-        impl::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, apx );
+        impl::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
             
         toc = timer::since( tic );
-        std::cout << "      done in  " << format_time( toc ) << std::endl;
-        std::cout << "      mem    = " << format_mem( B->byte_size() ) << std::endl;
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
 
-        auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
+        auto  diff = matrix::sum( 1.0, *AxA, -1.0, *B );
 
-        std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
-    }// if
+        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
-    if ( cmdline::cluster == "tlr" )
-    {
-        if ( true )
+        if ( false )
         {
-            std::cout << "    " << term::bullet << "H²" << term::reset << std::endl;
-            
-            auto  B     = impl::matrix::copy( *A2 );
-            auto  rowcb2 = rowcb->copy();
-            auto  colcb2 = colcb->copy();
+            std::cout << "    " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
 
-            matrix::replace_cluster_basis( *B, *rowcb2, *colcb2 );
-            
-            B->scale( 0 );
-
-            tic = timer::now();
-                
-            impl::uniform::tlr::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc );
-            
-            toc = timer::since( tic );
-            std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( B->byte_size() ) << std::endl;
-
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
-
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            auto  B2    = impl::matrix::copy_uniform< value_t >( *B, *rowcb, *colcb );
+            auto  diff2 = matrix::sum( 1.0, *AxA, -1.0, *B2 );
+                    
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
     }// if
-    else
-    {
-        if ( true )
-        {
-            std::cout << "    " << term::bullet << "H²" << term::reset << std::endl;
 
-            auto  apx    = approx::SVD< value_t >();
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
+            
+        auto  B = impl::matrix::copy( *A );
+
+        B->scale( 0 );
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::accu::multiply( value_t(1), apply_normal, *A, apply_normal, *A, *B, acc, mmapx );
+            
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                B->scale( 0 );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
+
+        auto  diff = matrix::sum( 1.0, *AxA, -1.0, *B );
+
+        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+
+        if ( false )
+        {
+            std::cout << "    " << term::bullet << term::bold << "testing original bases" << term::reset << std::endl;
+
+            auto  B2    = impl::matrix::copy_uniform< value_t >( *B, *rowcb, *colcb );
+            auto  diff2 = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
+                    
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+        }// if
+
+        if ( false )
+        {
+            std::cout << "    " << term::bullet << term::bold << "converting to uniform-H" << term::reset << std::endl;
+    
+            auto  [ rowcb, colcb, B2 ] = impl::matrix::build_uniform_rec( *B, mmapx, acc, nseq );
+            auto  diff2                = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
+        
+            std::cout << "      mem    = " << format_mem( B2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+        }// if
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *B, "B", prnopt );
+
+        runtime.clear();
+    }// if
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // Uniform H matrix multiplication
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    std::cout << term::bullet << term::bold << "Uniform H-Multiplication" << term::reset << std::endl;
+    
+    {
+        // if ( false )
+        // {
+        //     std::cout << "  " << term::bullet << "eager" << term::reset << std::endl;
+
+        //     auto  B      = impl::matrix::copy( *A2 );
+        //     auto  rowcb2 = rowcb->copy();
+        //     auto  colcb2 = colcb->copy();
+
+        //     matrix::replace_cluster_basis( *B, *rowcb2, *colcb2 );
+            
+        //     B->scale( 0 );
+            
+        //     tic = timer::now();
+                
+        //     impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
+            
+        //     toc = timer::since( tic );
+        //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+        //     std::cout << "    mem    = " << format_mem( B->byte_size() ) << std::endl;
+
+        //     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
+
+        //     std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+        // }// if
+
+        if ( false )
+        {
+            std::cout << "  " << term::bullet << "accumulator" << term::reset << std::endl;
+
             auto  B      = impl::matrix::copy( *A2 );
             auto  rowcb2 = rowcb->copy();
             auto  colcb2 = colcb->copy();
@@ -187,15 +256,69 @@ program_main ()
             
             tic = timer::now();
                 
-            impl::uniform::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, apx );
+            impl::uniform::accu::multiply( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
             
             toc = timer::since( tic );
-            std::cout << "      done in  " << format_time( toc ) << std::endl;
-            std::cout << "      mem    = " << format_mem( B->byte_size() ) << std::endl;
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+            std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
 
-            auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
+            auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
 
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+
+            if ( hpro::verbose( 3 ) )
+            {
+                io::eps::print( *B, "B2", prnopt );
+                io::eps::print( *rowcb2, "rowcb2", "mem" );
+                io::eps::print( *colcb2, "colcb2", "mem" );
+            }// if
+        }// if
+
+        if ( true )
+        {
+            std::cout << "  " << term::bullet << "accumulator (cached)" << term::reset << std::endl;
+
+            auto  B      = impl::matrix::copy( *A2 );
+            auto  rowcb2 = rowcb->copy();
+            auto  colcb2 = colcb->copy();
+
+            matrix::replace_cluster_basis( *B, *rowcb2, *colcb2 );
+            
+            B->scale( 0 );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+                
+                impl::uniform::accu::multiply_cached( value_t(1), apply_normal, *A2, apply_normal, *A2, *B, acc, mmapx );
+            
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+                
+                std::cout << "    done in  " << format_time( toc ) << std::endl;
+                if ( i < nbench-1 )
+                    B->scale( 0 );
+            }// for
+            
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+            
+            std::cout << "    mem    = " << format_mem( B->byte_size(), rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
+
+            auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
+
+            std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+
+            if ( hpro::verbose( 3 ) )
+            {
+                io::eps::print( *B, "B3", prnopt );
+                io::eps::print( *rowcb2, "rowcb3", "mem" );
+                io::eps::print( *colcb2, "colcb3", "mem" );
+            }// if
+
+            runtime.clear();
         }// if
     }// else
 }

@@ -25,15 +25,15 @@ using namespace hlr::matrix;
 namespace detail
 {
 
-using hlr::seq::matrix::detail::matrix_map_t;
-using hlr::seq::matrix::detail::build_matrix_map;
+using hlr::seq::matrix::detail::lrmatrix_map_t;
+using hlr::seq::matrix::detail::build_lrmatrix_map;
 
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
-                  const accuracy &      acc,
-                  const bool            adjoint );
+construct_basis ( const cluster_tree &         ct,
+                  lrmatrix_map_t< value_t > &  mat_map,
+                  const accuracy &             acc,
+                  const bool                   adjoint );
 
 }// namespace detail
 
@@ -45,10 +45,10 @@ construct_basis ( const cluster_tree &  ct,
 template < typename value_t >
 std::pair< std::unique_ptr< cluster_basis< value_t > >,
            std::unique_ptr< cluster_basis< value_t > > >
-construct_from_H ( const cluster_tree &   rowct,
-                   const cluster_tree &   colct,
-                   const hpro::TMatrix &  M,
-                   const accuracy &       acc )
+construct_from_H ( const cluster_tree &              rowct,
+                   const cluster_tree &              colct,
+                   const Hpro::TMatrix< value_t > &  M,
+                   const accuracy &                  acc )
 {
     
     //
@@ -56,10 +56,10 @@ construct_from_H ( const cluster_tree &   rowct,
     // set of associated matrix blocks in H-matrix
     //
 
-    detail::matrix_map_t  row_map, col_map;
+    detail::lrmatrix_map_t< value_t >  row_map, col_map;
 
-    ::tbb::parallel_invoke( [&] { detail::build_matrix_map( rowct, M, row_map, false ); },
-                            [&] { detail::build_matrix_map( colct, M, col_map, true  ); } );
+    ::tbb::parallel_invoke( [&] { detail::build_lrmatrix_map( rowct, M, row_map, false ); },
+                            [&] { detail::build_lrmatrix_map( colct, M, col_map, true  ); } );
 
     //
     // next, construct cluster basis for each cluster in cluster tree
@@ -85,10 +85,10 @@ using hlr::seq::matrix::detail::V;
 //
 template < typename value_t >
 std::unique_ptr< cluster_basis< value_t > >
-construct_basis ( const cluster_tree &  ct,
-                  matrix_map_t &        mat_map,
-                  const accuracy &      acc,
-                  const bool            adjoint )
+construct_basis ( const cluster_tree &         ct,
+                  lrmatrix_map_t< value_t > &  mat_map,
+                  const accuracy &             acc,
+                  const bool                   adjoint )
 {
     auto  cb = std::make_unique< cluster_basis< value_t > >( ct );
 
@@ -100,11 +100,11 @@ construct_basis ( const cluster_tree &  ct,
     {
         //
         // first, construct column basis for each block and store coefficients, e.g.,
-        // for M, compute M = U·V^H = U·(P·C)^H with orthogonal P and store C
+        // for M, compute M = U·V' = U·(P·C)' with orthogonal P and store C
         //
 
-        std::list< blas::Matrix< value_t > >  condensed_mat;
-        uint                                  rank_sum = 0;
+        auto  condensed_mat = std::list< blas::matrix< value_t > >();
+        uint  rank_sum      = 0;
         
         for ( auto  M : mat_map[ ct ] )
         {
@@ -122,11 +122,10 @@ construct_basis ( const cluster_tree &  ct,
             //
             // build X_t, the total cluster basis
             //
-            //  X_t = [ U₀·C₀^H, U₁·C₁^H, ... ]
+            //  X_t = [ U₀·C₀', U₁·C₁', ... ]
             //
             
-            blas::Matrix< value_t >  Xt( ct.size(), rank_sum );
-
+            auto   Xt     = blas::matrix< value_t >( ct.size(), rank_sum );
             auto   iter_M = mat_map[ ct ].begin();
             auto   iter_C = condensed_mat.begin();
             idx_t  pos    = 0;
@@ -140,7 +139,7 @@ construct_basis ( const cluster_tree &  ct,
                 {
                     auto  X_i    = blas::prod( value_t(1), U< value_t >( M, adjoint ), blas::adjoint( C ) );
                     auto  cols_i = blas::range( pos, pos + X_i.ncols() - 1 );
-                    auto  X_sub  = blas::Matrix< value_t >( Xt, blas::range::all, cols_i );
+                    auto  X_sub  = blas::matrix< value_t >( Xt, blas::range::all, cols_i );
 
                     blas::copy( X_i, X_sub );
 
