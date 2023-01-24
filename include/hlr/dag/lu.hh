@@ -80,6 +80,8 @@ gen_dag_lu_accu_lazy ( Hpro::TMatrix< value_t > & A,
     dag.start().clear();
     dag.start().push_back( apply_map[ A.id() ] );
 
+    return  { std::move( dag ), std::move( accu_map ), std::move( accu_mtx ) };
+    
     //
     // loop over apply nodes from top to bottom and remove nodes without updates
     //

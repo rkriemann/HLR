@@ -115,7 +115,8 @@ COMPRESSORS   = [ 'none',
                   'afloat',
                   'apfloat',
                   'bfloat',
-                  'dfloat' ]
+                  'dfloat',
+                  'dummy' ]
 compressor    = 'none'
 
 ######################################################################
@@ -569,6 +570,7 @@ elif compressor == 'afloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
 elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
 elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=15' )
 elif compressor == 'dfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=16' )
+elif compressor == 'dummy'   : env.Append( CPPDEFINES = 'COMPRESSOR=17' )
 
 ######################################################################
 #

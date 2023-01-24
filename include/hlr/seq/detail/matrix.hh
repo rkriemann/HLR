@@ -991,7 +991,7 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                 auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
                 auto  DD = blas::copy( blas::mat( D ) );
 
-                return  M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+                M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
             }// if
         }// else
     }// if
@@ -1037,9 +1037,6 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                 }// if
             }// for
         }// for
-
-        // make value type consistent in block matrix and sub blocks
-        B->adjust_value_type();
     }// else
 
     // M->set_cluster_force( bct );

@@ -29,6 +29,7 @@
 #include <hlr/utils/detail/apfloat.hh>
 #include <hlr/utils/detail/bfloat.hh>
 #include <hlr/utils/detail/dfloat.hh>
+#include <hlr/utils/detail/dummy.hh>
 
 #include <hlr/arith/blas.hh>
 
@@ -349,6 +350,23 @@ using hlr::compress::dfloat::compress;
 using hlr::compress::dfloat::decompress;
 using hlr::compress::dfloat::get_config;
 using hlr::compress::dfloat::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 17
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "dummy";
+
+using  zconfig_t = hlr::compress::dummy::config;
+using  zarray    = hlr::compress::dummy::zarray;
+
+using hlr::compress::dummy::compress;
+using hlr::compress::dummy::decompress;
+using hlr::compress::dummy::get_config;
+using hlr::compress::dummy::byte_size;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////

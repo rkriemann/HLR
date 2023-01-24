@@ -1,6 +1,6 @@
 //
 // Project     : HLR
-// Program     : compress
+// Program     : compress-uniform
 // Description : construction and MVM with compressed data blocks
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
@@ -54,21 +54,14 @@ program_main ()
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
-    auto  A       = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  cbapx   = approx::SVD< value_t >();
 
-    if ( matrixfile == "" )
-    {
-        tic = timer::now();
-        A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
-        toc = timer::since( tic );
+    tic = timer::now();
 
-        // io::hpro::write< value_t >( *A, "A.hm" );
-    }// if
-    else
-    {
-        A = io::hpro::read< value_t >( matrixfile );
-    }// else
+    auto  [ rowcb, colcb, A ] = impl::matrix::build_uniform_rec( bct->root(), *pcoeff, *lrapx, cbapx, acc );
     
+    toc = timer::since( tic );
+
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
 
@@ -80,7 +73,7 @@ program_main ()
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
 
     // assign clusters since needed for cluster bases
-    seq::matrix::assign_cluster( *A, *bct->root() );
+    // seq::matrix::assign_cluster( *A, *bct->root() );
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -88,8 +81,12 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  zA     = impl::matrix::copy_compressible( *A );
+    auto  zA     = impl::matrix::copy( *A );
+    auto  zrowcb = rowcb->copy();
+    auto  zcolcb = colcb->copy();
     auto  norm_A = norm::spectral( impl::arithmetic, *A );
+
+    matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
     
     std::cout << "  "
               << term::bullet << term::bold
@@ -105,18 +102,28 @@ program_main ()
         
         for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
         {
-            auto  B = impl::matrix::copy( *zA );
+            auto  zA2     = impl::matrix::copy( *zA );
+            auto  zrowcb2 = zrowcb->copy();
+            auto  zcolcb2 = zcolcb->copy();
         
+            matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
+            
             tic = timer::now();
     
-            impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zrowcb2, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zcolcb2, Hpro::fixed_prec( acc.rel_eps() ) );
+            impl::matrix::compress( *zA2,     Hpro::fixed_prec( acc.rel_eps() ) );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
             if ( i == nbench-1 )
-                zA = std::move( B );
+            {
+                zA     = std::move( zA2 );
+                zrowcb = std::move( zrowcb2 );
+                zcolcb = std::move( zcolcb2 );
+            }// if
         }// for
 
         if ( nbench > 1 )
@@ -151,20 +158,34 @@ program_main ()
     {
         runtime.clear();
         
-        auto  zB = impl::matrix::copy( *zA );
+        auto  zA2     = impl::matrix::copy( *zA );
+        auto  zrowcb2 = zrowcb->copy();
+        auto  zcolcb2 = zcolcb->copy();
+        
+        matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
         
         for ( uint  i = 0; i < nbench; ++i )
         {
+            auto  zA3     = impl::matrix::copy( *zA2 );
+            auto  zrowcb3 = zrowcb->copy();
+            auto  zcolcb3 = zcolcb->copy();
+            
             tic = timer::now();
     
-            impl::matrix::decompress( *zB );
+            impl::matrix::decompress( *zrowcb3 );
+            impl::matrix::decompress( *zcolcb3 );
+            impl::matrix::decompress( *zA3 );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
-                zB = std::move( impl::matrix::copy( *zA ) );
+            if ( i == nbench-1 )
+            {
+                zA2     = std::move( zA3 );
+                zrowcb2 = std::move( zrowcb3 );
+                zcolcb2 = std::move( zcolcb3 );
+            }// if
         }// for
         
         if ( nbench > 1 )
@@ -172,7 +193,7 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
         error = norm::spectral( impl::arithmetic, *diffB );
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
@@ -212,7 +233,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
+                    impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -251,7 +272,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
+                    impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
