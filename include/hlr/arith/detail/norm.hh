@@ -71,7 +71,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
                              const blas::matrix< value_t > &  V )
         {
             const uint  rank = U.ncols();
-            real_t      val  = 0.0;
+            value_t     val  = 0.0;
     
             for ( size_t  l = 0; l < rank; l++ )
             {
@@ -156,14 +156,14 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
         auto          R   = cptrcast( & A, hlr::matrix::tiled_lrmatrix< value_t > );
         const auto &  U   = R->U();
         const auto &  V   = R->V();
-        real_t        val = 0.0;
+        value_t       val = 0.0;
         
         for ( size_t  l = 0; l < R->rank(); l++ )
         {
             for ( size_t  k = 0; k < R->rank(); k++ )
             {
-                real_t  dot_U = 0;
-                real_t  dot_V = 0;
+                value_t  dot_U = 0;
+                value_t  dot_V = 0;
 
                 auto  U_i = U.cbegin();
                 auto  V_i = V.cbegin();
@@ -232,9 +232,9 @@ frobenius ( const value_t                     alpha,
     
     if ( is_blocked_all( A, B ) )
     {
-        auto    BA   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        auto    BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
-        real_t  val = 0.0;
+        auto     BA   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto     BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+        value_t  val = 0.0;
 
         assert(( BA->nblock_rows() == BB->block_rows() ) &&
                ( BA->nblock_cols() == BB->block_cols() ));
@@ -261,7 +261,7 @@ frobenius ( const value_t                     alpha,
             }// for
         }// for
 
-        return std::sqrt( val );
+        return std::sqrt( std::abs( val ) );
     }// if
     else if ( is_lowrank_all( A, B ) )
     {
@@ -278,7 +278,7 @@ frobenius ( const value_t                     alpha,
                           {
                               const auto  rank1 = U1.ncols();
                               const auto  rank2 = U2.ncols();
-                              real_t      val   = 0.0;
+                              value_t     val   = 0.0;
                               
                               for ( size_t  l = 0; l < rank1; l++ )
                               {

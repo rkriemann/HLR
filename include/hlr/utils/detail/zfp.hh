@@ -140,6 +140,46 @@ compress ( const config &   config,
     return result;
 }
 
+template <>
+inline
+zarray
+compress< std::complex< float > > ( const config &           config,
+                                    std::complex< float > *  data,
+                                    const size_t             dim0,
+                                    const size_t             dim1,
+                                    const size_t             dim2,
+                                    const size_t             dim3 )
+{
+    if ( dim1 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
+    else
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
+}
+
+template <>
+inline
+zarray
+compress< std::complex< double > > ( const config &            config,
+                                     std::complex< double > *  data,
+                                     const size_t              dim0,
+                                     const size_t              dim1,
+                                     const size_t              dim2,
+                                     const size_t              dim3 )
+{
+    if ( dim1 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
+    else
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
+}
+
 //
 // decompression function
 //
@@ -203,6 +243,46 @@ decompress ( const zarray &  buffer,
     zfp_field_free( field );    
     zfp_stream_close( zfp );
     stream_close( stream );
+}
+
+template <>
+inline
+void
+decompress< std::complex< float > > ( const zarray &           zdata,
+                                      std::complex< float > *  dest,
+                                      const size_t             dim0,
+                                      const size_t             dim1,
+                                      const size_t             dim2,
+                                      const size_t             dim3 )
+{
+    if ( dim1 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
+    else
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+}
+    
+template <>
+inline
+void
+decompress< std::complex< double > > ( const zarray &            zdata,
+                                       std::complex< double > *  dest,
+                                       const size_t              dim0,
+                                       const size_t              dim1,
+                                       const size_t              dim2,
+                                       const size_t              dim3 )
+{
+    if ( dim1 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
+    else
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 }}}// namespace hlr::compress::zfp

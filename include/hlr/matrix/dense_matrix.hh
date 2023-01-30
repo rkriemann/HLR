@@ -437,7 +437,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
 
-    // DEBUG
+    // // DEBUG
     // {
     //     auto  dM = blas::matrix< value_t >( M.nrows(), M.ncols() );
 

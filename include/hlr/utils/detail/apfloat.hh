@@ -491,7 +491,14 @@ compress< std::complex< float > > ( const config &           config,
                                     const size_t             dim2,
                                     const size_t             dim3 )
 {
-    HLR_ERROR( "TODO" );
+    if ( dim1 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
+    else
+        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 template <>
@@ -504,7 +511,14 @@ compress< std::complex< double > > ( const config &            config,
                                      const size_t              dim2,
                                      const size_t              dim3 )
 {
-    HLR_ERROR( "TODO" );
+    if ( dim1 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
+    else
+        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 template < typename value_t >
@@ -514,8 +528,7 @@ decompress ( const zarray &  v,
              const size_t    dim0,
              const size_t    dim1 = 0,
              const size_t    dim2 = 0,
-             const size_t    dim3 = 0,
-             const size_t    dim4 = 0 );
+             const size_t    dim3 = 0 );
 
 template <>
 inline
@@ -525,8 +538,7 @@ decompress< float > ( const zarray &  zdata,
                       const size_t    dim0,
                       const size_t    dim1,
                       const size_t    dim2,
-                      const size_t    dim3,
-                      const size_t    dim4 )
+                      const size_t    dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
@@ -661,8 +673,7 @@ decompress< double > ( const zarray &  zdata,
                        const size_t    dim0,
                        const size_t    dim1,
                        const size_t    dim2,
-                       const size_t    dim3,
-                       const size_t    dim4 )
+                       const size_t    dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
@@ -1045,10 +1056,16 @@ decompress< std::complex< float > > ( const zarray &           zdata,
                                       const size_t             dim0,
                                       const size_t             dim1,
                                       const size_t             dim2,
-                                      const size_t             dim3,
-                                      const size_t             dim4 )
+                                      const size_t             dim3 )
 {
-    HLR_ERROR( "TODO" );
+    if ( dim1 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
+    else
+        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
     
 template <>
@@ -1059,10 +1076,16 @@ decompress< std::complex< double > > ( const zarray &            zdata,
                                        const size_t              dim0,
                                        const size_t              dim1,
                                        const size_t              dim2,
-                                       const size_t              dim3,
-                                       const size_t              dim4 )
+                                       const size_t              dim3 )
 {
-    HLR_ERROR( "TODO" );
+    if ( dim1 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 )
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
+    else
+        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
     
 }}}// namespace hlr::compress::apfloat
