@@ -207,6 +207,7 @@ toc = datetime.now()
 
 # set up command line parameters
 opts = Variables( opts_file )
+
 opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
 opts.Add( ListVariable( 'addprograms',   'programs to build',                 '',    PROGRAMS   ) )
 opts.Add( ListVariable( 'subprograms',   'programs to build',                 '',    PROGRAMS   ) )
@@ -287,24 +288,24 @@ frameworks = Split( opt_env['frameworks'] )
 if 'all' in programs   : programs   = PROGRAMS
 if 'all' in frameworks : frameworks = FRAMEWORKS
 
-CXX          = opt_env['cxx']
-CXXFLAGS     = opt_env['cxxflags']
-OPTFLAGS     = opt_env['optflags']
-CPUFLAGS     = opt_env['cpuflags']
-DEFINES      = opt_env['defines']
+CXX           = opt_env['cxx']
+CXXFLAGS      = opt_env['cxxflags']
+OPTFLAGS      = opt_env['optflags']
+CPUFLAGS      = opt_env['cpuflags']
+DEFINES       = opt_env['defines']
 
-HPRO_DIR     = opt_env['hpro']
-TBB_DIR      = opt_env['tbb']
-TASKFLOW_DIR = opt_env['tf']
-HPX_DIR      = opt_env['hpx']
-GPI2_DIR     = opt_env['gpi2']
+HPRO_DIR      = opt_env['hpro']
+TBB_DIR       = opt_env['tbb']
+TASKFLOW_DIR  = opt_env['tf']
+HPX_DIR       = opt_env['hpx']
+GPI2_DIR      = opt_env['gpi2']
 
-MKL_DIR      = opt_env['mkl']
-CUDA_DIR     = opt_env['cuda']
+MKL_DIR       = opt_env['mkl']
+CUDA_DIR      = opt_env['cuda']
 
-JEMALLOC_DIR = opt_env['jemalloc']
-MIMALLOC_DIR = opt_env['mimalloc']
-TCMALLOC_DIR = opt_env['tcmalloc']
+JEMALLOC_DIR  = opt_env['jemalloc']
+MIMALLOC_DIR  = opt_env['mimalloc']
+TCMALLOC_DIR  = opt_env['tcmalloc']
 
 lapack        = opt_env['lapack']
 LAPACK_FLAGS  = opt_env['lapackflags']
@@ -331,11 +332,11 @@ universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 compressor    = opt_env['compressor']
 
-fullmsg      = opt_env['fullmsg']
-debug        = opt_env['debug']
-optimise     = opt_env['optimise']
-warn         = opt_env['warn']
-color        = opt_env['color']
+debug         = opt_env['debug']
+optimise      = opt_env['optimise']
+fullmsg       = opt_env['fullmsg']
+warn          = opt_env['warn']
+color         = opt_env['color']
 
 # remove entries to prevent saving
 del opt_env['addprograms']

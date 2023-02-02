@@ -180,7 +180,7 @@ add ( const value_t                     alpha,
     
     HLR_ASSERT( is_dense( C ) );
 
-    if ( is_compressible( C ) )
+    if ( is_compressible( C ) && is_compressed( C ) )
         HLR_ERROR( "TODO" );
 
     if ( is_compressible( A ) )

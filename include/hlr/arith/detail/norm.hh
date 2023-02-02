@@ -265,11 +265,11 @@ frobenius ( const value_t                     alpha,
     }// if
     else if ( is_lowrank_all( A, B ) )
     {
-        if ( A.is_complex() )
-        {
-            HLR_ERROR( "TODO" );
-        }// if
-        else
+        // if ( A.is_complex() )
+        // {
+        //     HLR_ERROR( "TODO" );
+        // }// if
+        // else
         {
             auto  lrdot = [] ( const auto &  U1,
                                const auto &  V1,

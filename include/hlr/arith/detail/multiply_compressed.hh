@@ -342,7 +342,22 @@ multiply ( const value_t                                   alpha,
            matrix::dense_matrix< value_t > &               C,
            const Hpro::TTruncAcc &                         acc )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    // (A × U)·V' = W·V'
+    auto  UB = B.U_decompressed( op_B );
+    auto  W  = blas::matrix< value_t >( C.nrows(), B.rank() );
+
+    multiply< value_t >( alpha, op_A, A, UB, W );
+
+    std::scoped_lock  lock( C.mutex() );
+    
+    C.decompress();
+    
+    // W·V' + C
+    blas::prod( value_t(1), W, blas::adjoint( B.V_decompressed( op_B ) ), value_t(1), blas::mat( C ) );
+
+    C.compress( acc );
 }
 
 template < typename value_t >
@@ -1094,7 +1109,22 @@ multiply ( const value_t                                   alpha,
            matrix::dense_matrix< value_t > &               C,
            const Hpro::TTruncAcc &                         acc )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    // U·(V' × B) = U·X' with X = B'·V
+    auto  VA = A.V_decompressed( op_A );
+    auto  X  = blas::matrix< value_t >( C.ncols(), A.rank() );
+
+    multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, X );
+
+    std::scoped_lock  lock( C.mutex() );
+
+    C.decompress();
+    
+    // U·X' + C
+    blas::prod( value_t(1), A.U_decompressed( op_A ), blas::adjoint( X ), value_t(1), blas::mat( C ) );
+
+    C.compress( acc );
 }
 
 template < typename value_t >
