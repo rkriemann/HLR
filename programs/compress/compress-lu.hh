@@ -69,6 +69,12 @@ program_main ()
     if ( verbose( 3 ) )
         io::eps::print( *A, "A", "norank,nosize" );
 
+    // {
+    //     auto  D = coeff->build( A->row_is(), A->col_is() );
+
+    //     io::matlab::write( *D, "D" );
+    // }
+    
     // assign clusters since needed for cluster bases
     seq::matrix::assign_cluster( *A, *bct->root() );
     
@@ -123,12 +129,12 @@ program_main ()
                 // "H+rec",
                 // "H+rec+accu",
                 "H+dag",
-                "H+dag+accu+lazy",
+                // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
                 // "zH+rec",
                 // "zH+rec+accu",
                 "zH+dag",
-                "zH+dag+accu+lazy"
+                // "zH+dag+accu+lazy"
             };
 
             std::cout << term::bullet << term::bold << "H-LU (" << apxname << ")" << term::reset << std::endl;

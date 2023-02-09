@@ -21,9 +21,9 @@ print_problem_desc ( const std::string &  name )
 {
     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << name
-              << ( appl == "logkernel" ? hpro::to_string( ", n = %d", n ) : ", grid = " + gridfile )
+              << ( appl == "logkernel" ? Hpro::to_string( ", n = %d", n ) : ", grid = " + gridfile )
               << ", ntile = " << ntile
-              << ( eps > 0 ? hpro::to_string( ", ε = %.2e", eps ) : hpro::to_string( ", k = %d", k ) )
+              << ( eps > 0 ? Hpro::to_string( ", ε = %.2e", eps ) : Hpro::to_string( ", k = %d", k ) )
               << std::endl;
 }
 
@@ -47,11 +47,11 @@ template <>
 std::unique_ptr< hlr::apps::matern_covariance >
 gen_problem< hlr::apps::matern_covariance > ()
 {
-    print_problem_desc( "Matern Covariance" );
+    print_problem_desc( "Matern Covariance " + Hpro::to_string( "(σ=%.1f, ν=1/3, ℓ=1)", sigma ) );
 
     HLR_ASSERT( gridfile != "" );
 
-    return std::make_unique< hlr::apps::matern_covariance >( sigma, gridfile );
+    return std::make_unique< hlr::apps::matern_covariance >( sigma, 1.0/3.0, 1.0, gridfile );
 }
 
 template <>
@@ -69,7 +69,7 @@ template <>
 std::unique_ptr< hlr::apps::helmholtz_slp >
 gen_problem< hlr::apps::helmholtz_slp > ()
 {
-    print_problem_desc( "Helmholtz SLP" );
+    print_problem_desc( "Helmholtz SLP " + Hpro::to_string( "(κ=%.1f+%.1fi)", std::real(kappa), std::imag( kappa ) ) );
 
     HLR_ASSERT( gridfile != "" );
     

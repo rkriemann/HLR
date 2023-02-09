@@ -138,10 +138,10 @@ program_main ()
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     
-    norm_A = norm::frobenius( *A );
-    error  = norm::frobenius( 1, *A, -1, *zA );
+    // norm_A = norm::frobenius( *A );
+    // error  = norm::frobenius( 1, *A, -1, *zA );
     
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     std::cout << "  "
               << term::bullet << term::bold

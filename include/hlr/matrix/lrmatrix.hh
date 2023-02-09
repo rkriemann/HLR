@@ -10,8 +10,6 @@
 
 // #include <boost/format.hpp>
 
-#include <variant>
-
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/matrix/compressible.hh>

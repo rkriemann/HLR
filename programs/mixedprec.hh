@@ -14,6 +14,7 @@
 #include "hlr/arith/norm.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
+#include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/utils/io.hh>
 
 #include <hlr/utils/eps_printer.hh>
@@ -35,6 +36,10 @@ template < typename value_t >
 std::tuple< size_t, size_t, size_t >
 convert_mp ( const hpro::TMatrix< value_t > &  M,
              const double                      tol );
+
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_mixedprec ( const hpro::TMatrix< value_t > &  M );
 
 struct local_accuracy : public hpro::TTruncAcc
 {
@@ -58,6 +63,12 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    auto  tic     = timer::now();
+    auto  toc     = timer::since( tic );
+    auto  runtime = std::vector< double >();
+
+    blas::reset_flops();
+    
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = gen_ct( *coord );
@@ -72,9 +83,7 @@ program_main ()
 
     std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
     
-    auto  tic     = timer::now();
     auto  A_nf    = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
-    auto  toc     = timer::since( tic );
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A_nf->nrows() << " × " << A_nf->ncols() << std::endl;
@@ -115,23 +124,133 @@ program_main ()
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
 
-    if ( hpro::verbose( 2 ) )
-        print_prec( *A, delta ); // acc2.abs_eps() );
+    //////////////////////////////////////////////////////////////////////
+    //
+    // virtual mixedprec test (and output)
+    //
+    //////////////////////////////////////////////////////////////////////
 
-    auto  Amp     = impl::matrix::copy( *A );
-    auto  mem_mp  = convert_mp( *Amp, delta );
-    auto  mem_Amp = std::get<0>( mem_mp ) + std::get<1>( mem_mp ) + std::get<2>( mem_mp );
+    if ( false )
+    {
+        std::cout << "  "
+                  << term::bullet << term::bold
+                  << "compression ("
+                  << "ε = " << boost::format( "%.2e" ) % delta
+                  << ", "
+                  << "mixedprec )"
+                  << term::reset << std::endl;
+        std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
     
-    std::cout << "    mp mem = " << format_mem( mem_Amp ) << std::endl;
-    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_Amp) / double(mem_A) ) << std::endl;
-    std::cout << "      FP16   " << boost::format( "%.3f" ) % ( double(std::get<0>( mem_mp )) / double(mem_A) ) << std::endl;
-    std::cout << "      FP32   " << boost::format( "%.3f" ) % ( double(std::get<1>( mem_mp )) / double(mem_A) ) << std::endl;
-    std::cout << "      FP64   " << boost::format( "%.3f" ) % ( double(std::get<2>( mem_mp )) / double(mem_A) ) << std::endl;
-    std::cout << "    |Amp|  = " << format_norm( norm::frobenius( *Amp ) ) << std::endl;
-    
-    auto  error   = hlr::norm::frobenius( 1.0, *A, -1.0, *Amp );
+        if ( hpro::verbose( 2 ) )
+            print_prec( *A, delta ); // acc2.abs_eps() );
 
-    std::cout << "    error  = " << format_error( error ) << " / " << format_error( error / norm_A ) << std::endl;
+        auto  Amp     = impl::matrix::copy( *A );
+        auto  mem_mp  = convert_mp( *Amp, delta );
+        auto  mem_Amp = std::get<0>( mem_mp ) + std::get<1>( mem_mp ) + std::get<2>( mem_mp );
+    
+        std::cout << "    mem   = " << format_mem( mem_Amp ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Amp) / double(mem_A) ) << std::endl;
+        std::cout << "      FP16  " << boost::format( "%.3f" ) % ( double(std::get<0>( mem_mp )) / double(mem_A) ) << std::endl;
+        std::cout << "      FP32  " << boost::format( "%.3f" ) % ( double(std::get<1>( mem_mp )) / double(mem_A) ) << std::endl;
+        std::cout << "      FP64  " << boost::format( "%.3f" ) % ( double(std::get<2>( mem_mp )) / double(mem_A) ) << std::endl;
+        std::cout << "    |Amp| = " << format_norm( norm::frobenius( *Amp ) ) << std::endl;
+        
+        auto  error   = hlr::norm::frobenius( 1.0, *A, -1.0, *Amp );
+        
+        std::cout << "    error = " << format_error( error ) << " / " << format_error( error / norm_A ) << std::endl;
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    //
+    // convert to mixed precision format
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    auto  zA = copy_mixedprec( *A );
+
+    norm_A = norm::spectral( impl::arithmetic, *A );
+    
+    std::cout << "  "
+              << term::bullet << term::bold
+              << "compression ("
+              << "ε = " << boost::format( "%.2e" ) % delta
+              << ", mixedprec )"
+              << term::reset << std::endl;
+    std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
+
+    {
+        runtime.clear();
+        
+        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+        {
+            auto  B = impl::matrix::copy( *zA );
+        
+            tic = timer::now();
+    
+            impl::matrix::compress( *B, Hpro::fixed_prec( delta ) );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+
+            if ( i == nbench-1 )
+                zA = std::move( B );
+        }// for
+
+        if ( nbench > 1 )
+            std::cout << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+    }
+
+    const auto  mem_zA = zA->byte_size();
+    
+    std::cout << "    mem   = " << format_mem( zA->byte_size() ) << std::endl;
+    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
+
+    if ( verbose( 3 ) )
+        matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
+    
+    auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
+    auto  error = norm::spectral( impl::arithmetic, *diff );
+
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    
+    std::cout << "  "
+              << term::bullet << term::bold
+              << "decompression "
+              << term::reset << std::endl;
+
+    {
+        runtime.clear();
+        
+        auto  zB = impl::matrix::copy( *zA );
+        
+        for ( uint  i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            impl::matrix::decompress( *zB );
+            
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                zB = std::move( impl::matrix::copy( *zA ) );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+
+        error = norm::spectral( impl::arithmetic, *diffB );
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    }
+
     
     // std::cout << "  " << term::bullet << term::bold << "exact matrix" << term::reset << std::endl;
 
@@ -190,6 +309,8 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
              eps_printer &                     prn,
              const double                      tol )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+    
     const uint  col_fp8[3]  = { 255,255,255 }; // white
     const uint  col_fp16[3] = { 252,233,79 }; // yellow
     const uint  col_bf16[3] = { 252,233,79 }; // yellow
@@ -213,7 +334,7 @@ print_prec ( const hpro::TMatrix< value_t > &  M,
     else
     {
         auto  norm_M = norm::frobenius( M );
-        auto  S      = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
+        auto  S      = blas::vector< real_t >( std::min( M.nrows(), M.ncols() ) );
 
         if ( is_dense( M ) )
         {
@@ -366,6 +487,8 @@ std::tuple< size_t, size_t, size_t >
 convert_mp ( const hpro::TMatrix< value_t > &  M,
              const double                      tol )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+    
     if ( is_blocked( M ) )
     {
         auto    B = cptrcast( &M, hpro::TBlockMatrix< value_t > );
@@ -394,7 +517,7 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
     }// if
     else
     {
-        auto  S  = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
+        auto  S  = blas::vector< real_t >( std::min( M.nrows(), M.ncols() ) );
         auto  RU = blas::matrix< value_t >();
         auto  RV = blas::matrix< value_t >();
 
@@ -460,22 +583,25 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
         using half = half_float::half;
 
         i = n_fp64;
-        
-        for ( uint  pos = 0; pos < n_fp32; ++pos, ++i )
+
+        if constexpr ( ! Hpro::is_complex_type_v< value_t > )
         {
-            for ( uint  j = 0; j < nrows; ++j )
-                RU(j,i) = double( float( RU(j,i) ) );
-            for ( uint  j = 0; j < ncols; ++j )
-                RV(j,i) = double( float( RV(j,i) ) );
-        }// for
+            for ( uint  pos = 0; pos < n_fp32; ++pos, ++i )
+            {
+                for ( uint  j = 0; j < nrows; ++j )
+                    RU(j,i) = double( float( RU(j,i) ) );
+                for ( uint  j = 0; j < ncols; ++j )
+                    RV(j,i) = double( float( RV(j,i) ) );
+            }// for
                   
-        for ( uint  pos = 0; pos < n_fp16; ++pos, ++i )
-        {
-            for ( uint  j = 0; j < nrows; ++j )
-                RU(j,i) = double( half( RU(j,i) ) );
-            for ( uint  j = 0; j < ncols; ++j )
-                RV(j,i) = double( half( RV(j,i) ) );
-        }// for
+            for ( uint  pos = 0; pos < n_fp16; ++pos, ++i )
+            {
+                for ( uint  j = 0; j < nrows; ++j )
+                    RU(j,i) = double( half( RU(j,i) ) );
+                for ( uint  j = 0; j < ncols; ++j )
+                    RV(j,i) = double( half( RV(j,i) ) );
+            }// for
+        }// if
 
         return { 2 * n_fp16 * ( M.nrows() + M.ncols() ),
                  4 * n_fp32 * ( M.nrows() + M.ncols() ),
@@ -487,5 +613,52 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
     }// if
 
     return { 0, 0, 0 };
+}
+
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_mixedprec( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  U = blas::copy( blas::mat_U( R ) );
+        auto  V = blas::copy( blas::mat_V( R ) );
+        auto  N = std::make_unique< matrix::mplrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else
+        return M.copy();
 }
 

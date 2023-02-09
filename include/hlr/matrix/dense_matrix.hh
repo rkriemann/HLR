@@ -9,7 +9,6 @@
 //
 
 #include <vector>
-#include <variant>
 
 #include <hpro/matrix/TDenseMatrix.hh>
 

@@ -59,9 +59,11 @@ struct matern_covariance : public radial< matrix::matern_covariance_function< do
 {
     using  value_t = double;
 
-    matern_covariance ( const double     sigma,
+    matern_covariance ( const double         sigma,
+                        const double         nu,
+                        const double         l,
                         const std::string &  grid )
-            : radial( matrix::matern_covariance_function< double >( sigma, 0.5, 1.0 ),
+            : radial( matrix::matern_covariance_function< double >( sigma, nu, l ),
                       grid )
     {}
 };
