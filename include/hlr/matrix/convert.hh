@@ -66,22 +66,26 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
 
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D        = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
-        auto  T        = std::move( blas::copy( Hpro::blas_mat< value_t >( D ) ) );
-        auto  [ U, V ] = approx( T, acc );
-
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
     else if ( is_lowrank( M ) )
     {
-        auto  R        = cptrcast( &M, Hpro::TRkMatrix< value_t > );
-        auto  [ U, V ] = approx( blas::mat_U< value_t >( R ),
-                                 blas::mat_V< value_t >( R ),
-                                 acc );
+        if ( is_compressed( M ) )
+        {
+            auto  R        = cptrcast( &M, lrmatrix< value_t > );
+            auto  U        = R->U_decompressed();
+            auto  V        = R->V_decompressed();
+            auto  [ W, X ] = approx( U, V, acc );
         
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+            return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
+        }// if
+        else
+        {
+            auto  R        = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+            auto  [ U, V ] = approx( blas::mat_U< value_t >( R ),
+                                     blas::mat_V< value_t >( R ),
+                                     acc );
+        
+            return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// else
     }// if
     else if ( is_uniform_lowrank( M ) )
     {
@@ -90,6 +94,25 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         auto  [ U, V ] = approx( US, R->col_cb().basis(), acc );
         
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        if ( is_compressed( M ) )
+        {
+            auto  D        = cptrcast( &M, matrix::dense_matrix< value_t > );
+            auto  T        = std::move( D->mat_decompressed() ); // return value is newly created matrix
+            auto  [ U, V ] = approx( T, acc );
+            
+            return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// if
+        else
+        {
+            auto  D        = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+            auto  T        = std::move( blas::copy( Hpro::blas_mat< value_t >( D ) ) );
+            auto  [ U, V ] = approx( T, acc );
+            
+            return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        }// else
     }// if
     else if ( is_sparse( M ) )
     {

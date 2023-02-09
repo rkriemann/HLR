@@ -31,7 +31,7 @@ namespace hlr { namespace dag { namespace lu { namespace accu { namespace lazy {
 // identifiers for memory blocks
 constexpr Hpro::id_t  ID_ACCU = 'X';
 
-constexpr bool  use_compressed = false;
+constexpr bool  use_compressed = true;
 
 //
 // local version of accumulator per matrix
@@ -293,20 +293,20 @@ struct accumulator
                         if ( use_compressed )
                         {
                             if ( handle_dense )
-                                BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                                        BB->block( 0, j, op_B )->col_is( op_B ) ) );
-                            else
-                                BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                                     BB->block( 0, j, op_B )->col_is( op_B ) ) );
-                        }// if
-                        else
-                        {
-                            if ( handle_dense )
                                 BC->set_block( i, j, new matrix::dense_matrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
                                                                                           BB->block( 0, j, op_B )->col_is( op_B ) ) );
                             else
                                 BC->set_block( i, j, new matrix::lrmatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
                                                                                       BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                        }// if
+                        else
+                        {
+                            if ( handle_dense )
+                                BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                        BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                            else
+                                BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                     BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         }// if
                     }// for
                 }// for
@@ -408,7 +408,7 @@ struct accumulator
         // ensure that accumulator is compressed
         //
         
-        if ( false && use_compressed && matrix::is_compressible( *matrix ) && ! matrix::is_compressed( *matrix ) )
+        if ( use_compressed && ! matrix::is_compressed( *matrix ) )
         {
             if ( is_lowrank( *matrix ) )
             {
