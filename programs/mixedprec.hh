@@ -111,12 +111,13 @@ program_main ()
 
     // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
     // delta = hlr::cmdline::eps; //  * norm_A / (A_nf->nrows());
-    auto  delta   = hlr::cmdline::eps * norm_A; // / (A->nrows());
+    auto  delta  = 0.25 * hlr::cmdline::eps * norm_A; // / (A->nrows());
         
+    std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
-    std::cout << "      idx  = " << format_mem( mem_A / A->nrows() ) << std::endl;
-    std::cout << "    |A|    = " << format_norm( impl::norm::frobenius( *A ) ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
+    std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
+    std::cout << "    |A|   = " << format_norm( impl::norm::frobenius( *A ) ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
@@ -190,7 +191,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == nbench-1 )
+            if ( i == std::max( nbench, 1 )-1 )
                 zA = std::move( B );
         }// for
 
@@ -238,7 +239,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
+            if ( i < std::max( nbench, 1 )-1 )
                 zB = std::move( impl::matrix::copy( *zA ) );
         }// for
         
