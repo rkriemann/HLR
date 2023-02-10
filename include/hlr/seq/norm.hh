@@ -1,11 +1,11 @@
 #ifndef __HLR_SEQ_NORM_HH
 #define __HLR_SEQ_NORM_HH
 //
-// Project     : HLib
-// Module      : norm
+// Project     : HLR
+// Module      : seq/norm
 // Description : norm related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/arith/norm.hh"

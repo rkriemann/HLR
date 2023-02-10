@@ -58,6 +58,7 @@ private:
     //
     struct compressed_storage
     {
+        std::vector< double >   sv;
         std::vector< double >   U1, V1;
         std::vector< float >    U2, V2;
 
@@ -128,8 +129,10 @@ public:
                 
                 for ( uint  k1 = 0; k1 < n_fp64; ++k1, ++k )
                 {
+                    auto  s_k = _mpdata.sv[k];
+                    
                     for ( uint  i = 0; i < dU.nrows(); ++i )
-                        dU(i,k) = value_t( _mpdata.U1[ pos++ ] );
+                        dU(i,k) = s_k * value_t( _mpdata.U1[ pos++ ] );
                 }// for
 
                 const uint  n_fp32 = _mpdata.U2.size() / dU.nrows();
@@ -137,8 +140,10 @@ public:
                 pos = 0;
                 for ( uint  k2 = 0; k2 < n_fp32; ++k2, ++k )
                 {
+                    auto  s_k = _mpdata.sv[k];
+                    
                     for ( uint  i = 0; i < dU.nrows(); ++i )
-                        dU(i,k) = value_t( _mpdata.U2[ pos++ ] );
+                        dU(i,k) = s_k * value_t( _mpdata.U2[ pos++ ] );
                 }// for
                 
                 #if HAS_FLOAT16
@@ -147,8 +152,10 @@ public:
                 pos = 0;
                 for ( uint  k3 = 0; k3 < n_fp16; ++k3, ++k )
                 {
+                    auto  s_k = _mpdata.sv[k];
+                    
                     for ( uint  i = 0; i < dU.nrows(); ++i )
-                        dU(i,k) = value_t( _mpdata.U3[ pos++ ] );
+                        dU(i,k) = s_k * value_t( _mpdata.U3[ pos++ ] );
                 }// for
                 #endif
             }// else
@@ -344,6 +351,10 @@ public:
         
         if ( is_compressed() )
         {
+            R->_mpdata.sv = std::vector< double >( _mpdata.sv.size() );
+
+            std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
+            
             R->_mpdata.U1 = std::vector< double >( _mpdata.U1.size() );
             R->_mpdata.V1 = std::vector< double >( _mpdata.V1.size() );
 
@@ -400,6 +411,10 @@ public:
             
         if ( is_compressed() )
         {
+            R->_mpdata.sv = std::vector< double >( _mpdata.sv.size() );
+
+            std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
+            
             R->_mpdata.U1 = std::vector< double >( _mpdata.U1.size() );
             R->_mpdata.V1 = std::vector< double >( _mpdata.V1.size() );
 
@@ -464,6 +479,7 @@ public:
     {
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
+        size += sizeof(double)   * ( _mpdata.sv.size() );
         size += sizeof(double)   * ( _mpdata.U1.size() + _mpdata.V1.size() );
         size += sizeof(float)    * ( _mpdata.U2.size() + _mpdata.V2.size() );
         #if HAS_FLOAT16
@@ -609,28 +625,20 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //
     
     double      tol   = acc( this->row_is(), this->col_is() ).rel_eps();
-    auto        oU    = blas::copy( this->U() );
-    auto        oV    = blas::copy( this->V() );
-    const auto  orank = oU.ncols();
-    auto        S     = blas::vector< real_t >( std::min( this->nrows(), this->ncols() ) );
-
-    auto  QU = oU;
-    auto  RU = blas::matrix< value_t >( orank, orank );
+    auto        QU    = blas::copy( this->U() );
+    auto        QV    = blas::copy( this->V() );
+    const auto  orank = QU.ncols();
+    auto        RU    = blas::matrix< value_t >( orank, orank );
+    auto        RV    = blas::matrix< value_t >( orank, orank );
         
     blas::qr( QU, RU );
-        
-    auto  QV = oV;
-    auto  RV = std::move( blas::matrix< value_t >( orank, orank ) );
-        
     blas::qr( QV, RV );
 
-    auto  R = blas::prod( value_t(1), RU, adjoint(RV) );
-
-    auto  Ss = blas::vector< real_t >( orank );
-    auto  Us = R;
+    auto  Us = blas::prod( value_t(1), RU, adjoint(RV) );
+    auto  S  = blas::vector< real_t >( orank );
     auto  Vs = RV;
     
-    blas::svd( Us, Ss, Vs );
+    blas::svd( Us, S, Vs );
 
     //
     // determine corresponding parts for FP64, FP32 and FP16
@@ -664,9 +672,12 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     
     if ( n_fp64 < orank )
     {
-        // reset as changed during blas::sv
-        oU = this->U();
-        oV = this->V();
+        // compute _orthogonal_ lowrank factors
+        auto  oU = blas::prod( QU, Us );
+        auto  oV = blas::prod( QV, Vs );
+
+        _mpdata.sv = std::vector< double >( orank );
+        std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
         
         if constexpr ( Hpro::is_complex_type_v< value_t > )
         {
@@ -711,61 +722,17 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             #endif
         }// else
 
-        {
-            auto  dU = U_decompressed();
+        // {
+        //     auto  dU = U_decompressed();
+        //     auto  dV = V_decompressed();
 
-            io::matlab::write( oU, "U1" );
-            io::matlab::write( dU, "U2" );
-            
-            blas::add( value_t(-1), oU, dU );
-            std::cout << "U " << this->block_is().to_string() << " : "
-                      << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
-                      << " / "
-                      << boost::format( "%.4e" ) % blas::max_abs_val( dU )
-                      << std::endl;
-
-            // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
-            // {
-            //     const auto  error = std::abs( (oU.data()[i] - dU.data()[i]) / oU.data()[i] );
-
-            //     if ( error > 1e-6 )
-            //         std::cout << "U " << i << " : "
-            //                   << oU.data()[i] << " / "
-            //                   << dU.data()[i] << " / "
-            //                   << std::abs( error )
-            //                   << std::endl;
-            // }// for
-        }
-    
-        {
-            auto  dV = V_decompressed();
-
-            io::matlab::write( oV, "V1" );
-            io::matlab::write( dV, "V2" );
-            
-            blas::add( value_t(-1), oV, dV );
-            std::cout << "V " << this->block_is().to_string() << " : "
-                      << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
-                      << " / "
-                      << boost::format( "%.4e" ) % blas::max_abs_val( dV )
-                      << std::endl;
-
-            // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )
-            // {
-            //     const auto  error = std::abs( (oV.data()[i] - dV.data()[i]) / oV.data()[i] );
-
-            //     if ( error > 1e-6 )
-            //         std::cout << "V " << i << " : "
-            //                   << oV.data()[i] << " / "
-            //                   << dV.data()[i] << " / "
-            //                   << std::abs( error )
-            //                   << std::endl;
-            // }// for
-        }
+        //     io::matlab::write( *this, "R" );
+        //     io::matlab::write( dU, "U" );
+        //     io::matlab::write( dV, "V" );
+        // }
 
         this->U() = std::move( blas::matrix< value_t >( 0, 0 ) );
         this->V() = std::move( blas::matrix< value_t >( 0, 0 ) );
-
     }// if
     
     #endif

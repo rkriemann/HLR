@@ -31,7 +31,7 @@ namespace hlr { namespace dag { namespace lu { namespace accu { namespace lazy {
 // identifiers for memory blocks
 constexpr Hpro::id_t  ID_ACCU = 'X';
 
-constexpr bool  use_compressed = true;
+constexpr bool  use_compressed = false;
 
 //
 // local version of accumulator per matrix

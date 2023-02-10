@@ -37,10 +37,6 @@ std::tuple< size_t, size_t, size_t >
 convert_mp ( const hpro::TMatrix< value_t > &  M,
              const double                      tol );
 
-template < typename value_t >
-std::unique_ptr< Hpro::TMatrix< value_t > >
-copy_mixedprec ( const hpro::TMatrix< value_t > &  M );
-
 struct local_accuracy : public hpro::TTruncAcc
 {
     local_accuracy ( const double  abs_eps )
@@ -81,25 +77,25 @@ program_main ()
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
 
-    std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
+    // std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
     
-    auto  A_nf    = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
+    // auto  A_nf    = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
     
-    std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    dims   = " << A_nf->nrows() << " × " << A_nf->ncols() << std::endl;
-    std::cout << "    mem    = " << format_mem( A_nf->byte_size() ) << std::endl;
+    // std::cout << "    done in " << format_time( toc ) << std::endl;
+    // std::cout << "    dims   = " << A_nf->nrows() << " × " << A_nf->ncols() << std::endl;
+    // std::cout << "    mem    = " << format_mem( A_nf->byte_size() ) << std::endl;
 
-    // auto  norm_nf  = norm::spectral( *A_nf );
-    auto  norm_nf  = norm::frobenius( *A_nf );
+    // // auto  norm_nf  = norm::spectral( *A_nf );
+    // auto  norm_nf  = norm::frobenius( *A_nf );
 
-    std::cout << "    |A_nf| = " << format_norm( norm_nf ) << std::endl;
+    // std::cout << "    |A_nf| = " << format_norm( norm_nf ) << std::endl;
 
-    auto  delta   = norm_nf * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
-    // auto  acc2    = hpro::absolute_prec( delta );
-    auto  acc2    = local_accuracy( delta );
+    // auto  delta   = norm_nf * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
+    // // auto  acc2    = hpro::absolute_prec( delta );
+    // auto  acc2    = local_accuracy( delta );
 
-    std::cout << "  " << term::bullet << term::bold << "H-matrix, ε = " << delta << term::reset << std::endl;
-    
+    // std::cout << "  " << term::bullet << term::bold << "H-matrix, ε = " << delta << term::reset << std::endl;
+
     auto  lrapx   = bem::aca_lrapx< hpro::TPermCoeffFn< value_t > >( pcoeff );
     // auto  lrapx   = hpro::TDenseLRApx< value_t >( & pcoeff );
 
@@ -114,7 +110,8 @@ program_main ()
     auto  norm_A = norm::frobenius( *A );
 
     // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
-    delta = hlr::cmdline::eps * norm_A / (A_nf->nrows());
+    // delta = hlr::cmdline::eps; //  * norm_A / (A_nf->nrows());
+    auto  delta   = 1e4 * hlr::cmdline::eps * norm_A / (A->nrows());
         
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
@@ -166,7 +163,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  zA = copy_mixedprec( *A );
+    auto  zA = impl::matrix::copy_mixedprec( *A );
 
     norm_A = norm::spectral( impl::arithmetic, *A );
     
@@ -213,6 +210,11 @@ program_main ()
     
     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );
+
+    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+    norm_A = norm::frobenius( *A );
+    error  = norm::frobenius( 1, *A, -1, *zA );
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     
@@ -613,52 +615,5 @@ convert_mp ( const hpro::TMatrix< value_t > &  M,
     }// if
 
     return { 0, 0, 0 };
-}
-
-template < typename value_t >
-std::unique_ptr< Hpro::TMatrix< value_t > >
-copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
-{
-    using  real_t = Hpro::real_type_t< value_t >;
-    
-    if ( is_blocked( M ) )
-    {
-        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
-        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
-        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
-
-        B->copy_struct_from( BM );
-        
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                if ( BM->block( i, j ) != nullptr )
-                {
-                    auto  B_ij = copy_mixedprec( * BM->block( i, j ) );
-                    
-                    B_ij->set_parent( B );
-                    B->set_block( i, j, B_ij.release() );
-                }// if
-            }// for
-        }// for
-
-        N->set_id( M.id() );
-        
-        return N;
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
-        auto  U = blas::copy( blas::mat_U( R ) );
-        auto  V = blas::copy( blas::mat_V( R ) );
-        auto  N = std::make_unique< matrix::mplrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
-            
-        N->set_id( M.id() );
-        
-        return N;
-    }// if
-    else
-        return M.copy();
 }
 

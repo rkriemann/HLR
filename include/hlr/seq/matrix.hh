@@ -21,6 +21,7 @@
 #include "hlr/matrix/cluster_basis.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/matrix/lrmatrix.hh"
+#include "hlr/matrix/mplrmatrix.hh"
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/convert.hh"
 #include "hlr/matrix/restrict.hh"
@@ -604,6 +605,53 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 
     return 0;
+}
+
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = copy_mixedprec( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  U = blas::copy( blas::mat_U( R ) );
+        auto  V = blas::copy( blas::mat_V( R ) );
+        auto  N = std::make_unique< matrix::mplrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else
+        return M.copy();
 }
 
 //

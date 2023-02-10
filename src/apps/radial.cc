@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : matern.cc
-// Description : use matern kernel to fill matrix
+// Project     : HLR
+// Module      : apps/radial
+// Description : use radial kernel functions to fill matrix
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cmath>

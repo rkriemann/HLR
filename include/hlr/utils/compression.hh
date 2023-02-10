@@ -9,7 +9,7 @@
 //
 
 // define for arithmetic specific compression bit rates 
-// #define HLR_COMPRESS_RATE_ARITH
+#define HLR_COMPRESS_RATE_ARITH
 
 #include <hlr/utils/log.hh>
 

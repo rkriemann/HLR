@@ -14,9 +14,10 @@
 #include "hlr/arith/operator_wrapper.hh"
 
 #include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/mplrmatrix.hh>
 #include "hlr/matrix/tiled_lrmatrix.hh"
 #include "hlr/matrix/uniform_lrmatrix.hh"
+#include <hlr/matrix/dense_matrix.hh>
 
 #include "hlr/utils/log.hh"
 #include "hlr/utils/checks.hh"
@@ -90,7 +91,12 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
             return std::sqrt( std::abs( val ) );
         };
 
-        if ( matrix::is_compressed( A ) )
+        if ( matrix::is_mixedprec_lowrank( A ) )
+        {
+            return comp_lr( cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed(),
+                            cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed() );
+        }// if
+        else if ( matrix::is_compressed( A ) )
         {
             return comp_lr( cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed(),
                             cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed() );
@@ -228,7 +234,7 @@ frobenius ( const value_t                     alpha,
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
-    assert( A.block_is()   == B.block_is() );
+    HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked_all( A, B ) )
     {
@@ -236,8 +242,8 @@ frobenius ( const value_t                     alpha,
         auto     BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
         value_t  val = 0.0;
 
-        assert(( BA->nblock_rows() == BB->block_rows() ) &&
-               ( BA->nblock_cols() == BB->block_cols() ));
+        HLR_ASSERT(( BA->nblock_rows() == BB->block_rows() ) &&
+                   ( BA->nblock_cols() == BB->block_cols() ));
         
         for ( uint  i = 0; i < BA->nblock_rows(); ++i )
         {
@@ -302,64 +308,44 @@ frobenius ( const value_t                     alpha,
             auto  UB = blas::matrix< value_t >();
             auto  VB = blas::matrix< value_t >();
             
-            if ( matrix::is_compressed( A )  )
+            if ( matrix::is_mixedprec_lowrank( A ) )
             {
-                if ( matrix::is_compressed( B ) )
-                {
-                    const auto  UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed();
-                    const auto  VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed();
-                    const auto  UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U_decompressed();
-                    const auto  VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V_decompressed();
-                    const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                                        alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                                        alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                                        beta  * beta  * lrdot( UB, VB, UB, VB ) );
-
-                    return std::sqrt( std::abs( sqn ) );
-                }// if
-                else
-                {
-                    const auto  UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed();
-                    const auto  VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed();
-                    const auto  UB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                    const auto  VB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-                    const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                                        alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                                        alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                                        beta  * beta  * lrdot( UB, VB, UB, VB ) );
-
-                    return std::sqrt( std::abs( sqn ) );
-                }// else
+                UA = cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed();
+                VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed();
+            }// if
+            else if ( matrix::is_compressed( A )  )
+            {
+                UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed();
+                VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed();
             }// if
             else
             {
-                if ( matrix::is_compressed( B ) )
-                {
-                    const auto  UA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                    const auto  VA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-                    const auto  UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U_decompressed();
-                    const auto  VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V_decompressed();
-                    const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                                        alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                                        alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                                        beta  * beta  * lrdot( UB, VB, UB, VB ) );
-
-                    return std::sqrt( std::abs( sqn ) );
-                }// if
-                else
-                {
-                    const auto  UA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                    const auto  VA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-                    const auto  UB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                    const auto  VB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-                    const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                                        alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                                        alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                                        beta  * beta  * lrdot( UB, VB, UB, VB ) );
-
-                    return std::sqrt( std::abs( sqn ) );
-                }// else
+                UA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_A();
+                VA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B();
             }// else
+            
+            if ( matrix::is_mixedprec_lowrank( B ) )
+            {
+                UB = cptrcast( &B, matrix::mplrmatrix< value_t > )->U_decompressed();
+                VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V_decompressed();
+            }// if
+            else if ( matrix::is_compressed( B )  )
+            {
+                UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U_decompressed();
+                VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V_decompressed();
+            }// if
+            else
+            {
+                UB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_A();
+                VB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_B();
+            }// else
+            
+            const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
+                                alpha * beta  * lrdot( UA, VA, UB, VB ) +
+                                alpha * beta  * lrdot( UB, VB, UA, VA ) +
+                                beta  * beta  * lrdot( UB, VB, UB, VB ) );
+
+            return std::sqrt( std::abs( sqn ) );
         }// else
     }// if
     else if ( is_dense_all( A, B ) )
