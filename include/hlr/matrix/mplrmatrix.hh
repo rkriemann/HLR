@@ -40,6 +40,62 @@ namespace matrix
 #  define HAS_FLOAT16  0
 #endif
 
+struct bf16
+{
+    unsigned short  data;
+    
+public:
+    bf16 () : data{ 0 }      {}
+    bf16 ( const float   f ) { *this = f; }
+    bf16 ( const double  f ) { *this = f; }
+    
+    // cast to float/double
+    operator float () const
+    {
+        const uint  ival = data << 16;
+
+        return * reinterpret_cast< const float * >( & ival );
+    }
+    
+    operator double () const { return float(*this); }
+    
+    // cast to bf16
+    bf16 &
+    operator = ( const float  val )
+    {
+        data = (* reinterpret_cast< const uint * >( & val ) ) >> 16;
+        
+        return *this;
+    }
+
+    bf16 &
+    operator = ( const double  val )
+    {
+        return *this = float(val);
+    }
+
+    bf16 operator + ( bf16  f ) { return float(*this) + float(f); }
+    bf16 operator - ( bf16  f ) { return float(*this) - float(f); }
+    bf16 operator * ( bf16  f ) { return float(*this) * float(f); }
+    bf16 operator / ( bf16  f ) { return float(*this) / float(f); }
+};
+
+//
+// floating point types used for mplrmatrix
+//
+using  mptype1_t = double;
+using  mptype2_t = float;
+
+#if HAS_FLOAT16
+using  mptype3_t = _Float16;
+constexpr double  mpprec3 = 4.9e-4;
+#else
+using  mptype3_t = bf16;
+constexpr double  mpprec3 = 3.9e-3;
+#endif
+
+constexpr double  mpprec2 = 6.0e-8;
+
 //
 // Represents a low-rank matrix in factorised form: U·S·V^H
 // with U and V represented as row/column cluster bases for
@@ -56,18 +112,16 @@ private:
     //
     // compressed storage based on underlying floating point type
     //
-    struct compressed_storage
+    struct mp_storage
     {
-        std::vector< double >   sv;
-        std::vector< double >   U1, V1;
-        std::vector< float >    U2, V2;
-
-        #if HAS_FLOAT16
-        std::vector< _Float16 > U3, V3;
+        std::vector< mptype1_t >  sv;
+        std::vector< mptype1_t >  U1, V1;
+        std::vector< mptype2_t >  U2, V2;
+        std::vector< mptype3_t >  U3, V3;
     };
 
 private:
-    compressed_storage    _mpdata;
+    mp_storage    _mpdata;
 
 public:
     //
@@ -125,9 +179,9 @@ public:
             else
             {
                 size_t      pos    = 0;
-                const uint  n_fp64 = _mpdata.U1.size() / dU.nrows();
+                const uint  n_mp1 = _mpdata.U1.size() / dU.nrows();
                 
-                for ( uint  k1 = 0; k1 < n_fp64; ++k1, ++k )
+                for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
                 {
                     auto  s_k = _mpdata.sv[k];
                     
@@ -135,10 +189,10 @@ public:
                         dU(i,k) = s_k * value_t( _mpdata.U1[ pos++ ] );
                 }// for
 
-                const uint  n_fp32 = _mpdata.U2.size() / dU.nrows();
+                const uint  n_mp2 = _mpdata.U2.size() / dU.nrows();
 
                 pos = 0;
-                for ( uint  k2 = 0; k2 < n_fp32; ++k2, ++k )
+                for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
                 {
                     auto  s_k = _mpdata.sv[k];
                     
@@ -146,18 +200,16 @@ public:
                         dU(i,k) = s_k * value_t( _mpdata.U2[ pos++ ] );
                 }// for
                 
-                #if HAS_FLOAT16
-                const uint  n_fp16 = _mpdata.U3.size() / dU.nrows();
+                const uint  n_mp3 = _mpdata.U3.size() / dU.nrows();
 
                 pos = 0;
-                for ( uint  k3 = 0; k3 < n_fp16; ++k3, ++k )
+                for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
                 {
                     auto  s_k = _mpdata.sv[k];
                     
                     for ( uint  i = 0; i < dU.nrows(); ++i )
                         dU(i,k) = s_k * value_t( _mpdata.U3[ pos++ ] );
                 }// for
-                #endif
             }// else
             
             return dU;
@@ -180,33 +232,31 @@ public:
             else
             {
                 size_t      pos    = 0;
-                const uint  n_fp64 = _mpdata.V1.size() / dV.nrows();
+                const uint  n_mp1 = _mpdata.V1.size() / dV.nrows();
                 
-                for ( uint  k1 = 0; k1 < n_fp64; ++k1, ++k )
+                for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
                 {
                     for ( uint  i = 0; i < dV.nrows(); ++i )
                         dV(i,k) = value_t( _mpdata.V1[ pos++ ] );
                 }// for
 
-                const uint  n_fp32 = _mpdata.V2.size() / dV.nrows();
+                const uint  n_mp2 = _mpdata.V2.size() / dV.nrows();
 
                 pos = 0;
-                for ( uint  k2 = 0; k2 < n_fp32; ++k2, ++k )
+                for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
                 {
                     for ( uint  i = 0; i < dV.nrows(); ++i )
                         dV(i,k) = value_t( _mpdata.V2[ pos++ ] );
                 }// for
                 
-                #if HAS_FLOAT16
-                const uint  n_fp16 = _mpdata.V3.size() / dV.nrows();
+                const uint  n_mp3 = _mpdata.V3.size() / dV.nrows();
 
                 pos = 0;
-                for ( uint  k3 = 0; k3 < n_fp16; ++k3, ++k )
+                for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
                 {
                     for ( uint  i = 0; i < dV.nrows(); ++i )
                         dV(i,k) = value_t( _mpdata.V3[ pos++ ] );
                 }// for
-                #endif
             }// else
             
             return dV;
@@ -351,31 +401,27 @@ public:
         
         if ( is_compressed() )
         {
-            R->_mpdata.sv = std::vector< double >( _mpdata.sv.size() );
+            R->_mpdata.sv = std::vector< mptype1_t >( _mpdata.sv.size() );
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
             
-            R->_mpdata.U1 = std::vector< double >( _mpdata.U1.size() );
-            R->_mpdata.V1 = std::vector< double >( _mpdata.V1.size() );
+            R->_mpdata.U1 = std::vector< mptype1_t >( _mpdata.U1.size() );
+            R->_mpdata.V1 = std::vector< mptype1_t >( _mpdata.V1.size() );
 
             std::copy( _mpdata.U1.begin(), _mpdata.U1.end(), R->_mpdata.U1.begin() );
             std::copy( _mpdata.V1.begin(), _mpdata.V1.end(), R->_mpdata.V1.begin() );
 
-            R->_mpdata.U2 = std::vector< float >( _mpdata.U2.size() );
-            R->_mpdata.V2 = std::vector< float >( _mpdata.V2.size() );
+            R->_mpdata.U2 = std::vector< mptype2_t >( _mpdata.U2.size() );
+            R->_mpdata.V2 = std::vector< mptype2_t >( _mpdata.V2.size() );
 
             std::copy( _mpdata.U2.begin(), _mpdata.U2.end(), R->_mpdata.U2.begin() );
             std::copy( _mpdata.V2.begin(), _mpdata.V2.end(), R->_mpdata.V2.begin() );
 
-            #if HAS_FLOAT16
-            
-            R->_mpdata.U3 = std::vector< _Float16 >( _mpdata.U3.size() );
-            R->_mpdata.V3 = std::vector< _Float16 >( _mpdata.V3.size() );
+            R->_mpdata.U3 = std::vector< mptype3_t >( _mpdata.U3.size() );
+            R->_mpdata.V3 = std::vector< mptype3_t >( _mpdata.V3.size() );
 
             std::copy( _mpdata.U3.begin(), _mpdata.U3.end(), R->_mpdata.U3.begin() );
             std::copy( _mpdata.V3.begin(), _mpdata.V3.end(), R->_mpdata.V3.begin() );
-
-            #endif
         }// if
 
         return M;
@@ -411,31 +457,27 @@ public:
             
         if ( is_compressed() )
         {
-            R->_mpdata.sv = std::vector< double >( _mpdata.sv.size() );
+            R->_mpdata.sv = std::vector< mptype1_t >( _mpdata.sv.size() );
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
             
-            R->_mpdata.U1 = std::vector< double >( _mpdata.U1.size() );
-            R->_mpdata.V1 = std::vector< double >( _mpdata.V1.size() );
+            R->_mpdata.U1 = std::vector< mptype1_t >( _mpdata.U1.size() );
+            R->_mpdata.V1 = std::vector< mptype1_t >( _mpdata.V1.size() );
 
             std::copy( _mpdata.U1.begin(), _mpdata.U1.end(), R->_mpdata.U1.begin() );
             std::copy( _mpdata.V1.begin(), _mpdata.V1.end(), R->_mpdata.V1.begin() );
 
-            R->_mpdata.U2 = std::vector< float >( _mpdata.U2.size() );
-            R->_mpdata.V2 = std::vector< float >( _mpdata.V2.size() );
+            R->_mpdata.U2 = std::vector< mptype2_t >( _mpdata.U2.size() );
+            R->_mpdata.V2 = std::vector< mptype2_t >( _mpdata.V2.size() );
 
             std::copy( _mpdata.U2.begin(), _mpdata.U2.end(), R->_mpdata.U2.begin() );
             std::copy( _mpdata.V2.begin(), _mpdata.V2.end(), R->_mpdata.V2.begin() );
 
-            #if HAS_FLOAT16
-            
-            R->_mpdata.U3 = std::vector< _Float16 >( _mpdata.U3.size() );
-            R->_mpdata.V3 = std::vector< _Float16 >( _mpdata.V3.size() );
+            R->_mpdata.U3 = std::vector< mptype3_t >( _mpdata.U3.size() );
+            R->_mpdata.V3 = std::vector< mptype3_t >( _mpdata.V3.size() );
 
             std::copy( _mpdata.U3.begin(), _mpdata.U3.end(), R->_mpdata.U3.begin() );
             std::copy( _mpdata.V3.begin(), _mpdata.V3.end(), R->_mpdata.V3.begin() );
-
-            #endif
         }// if
     }
         
@@ -463,13 +505,12 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HAS_FLOAT16
         return _mpdata.U1.size() + _mpdata.U2.size() + _mpdata.U3.size() > 0;
-        #else
-        return _mpdata.U1.size() + _mpdata.U2.size()                     > 0;
-        #endif   
     }
 
+    // access multiprecision data
+    const mp_storage &  mp_data () const { return _mpdata; }
+    
     //
     // misc.
     //
@@ -479,12 +520,10 @@ public:
     {
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
-        size += sizeof(double)   * ( _mpdata.sv.size() );
-        size += sizeof(double)   * ( _mpdata.U1.size() + _mpdata.V1.size() );
-        size += sizeof(float)    * ( _mpdata.U2.size() + _mpdata.V2.size() );
-        #if HAS_FLOAT16
-        size += sizeof(_Float16) * ( _mpdata.U3.size() + _mpdata.V3.size() );
-        #endif
+        size += sizeof(mptype1_t) * ( _mpdata.sv.size() );
+        size += sizeof(mptype1_t) * ( _mpdata.U1.size() + _mpdata.V1.size() );
+        size += sizeof(mptype2_t) * ( _mpdata.U2.size() + _mpdata.V2.size() );
+        size += sizeof(mptype3_t) * ( _mpdata.U3.size() + _mpdata.V3.size() );
         
         return size;
     }
@@ -511,14 +550,13 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _mpdata.U1 = std::vector< double >();
-        _mpdata.V1 = std::vector< double >();
-        _mpdata.U2 = std::vector< float >();
-        _mpdata.V2 = std::vector< float >();
-        #if HAS_FLOAT16
-        _mpdata.U3 = std::vector< _Float16 >();
-        _mpdata.V3 = std::vector< _Float16 >();
-        #endif
+        _mpdata.sv = std::vector< mptype1_t >();
+        _mpdata.U1 = std::vector< mptype1_t >();
+        _mpdata.V1 = std::vector< mptype1_t >();
+        _mpdata.U2 = std::vector< mptype2_t >();
+        _mpdata.V2 = std::vector< mptype2_t >();
+        _mpdata.U3 = std::vector< mptype3_t >();
+        _mpdata.V3 = std::vector< mptype3_t >();
     }
 };
 
@@ -660,23 +698,23 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         return nprec;
     };
 
-    #if HAS_FLOAT16
-    const uint  n_fp16 = test_prec( 4.9e-4 );
-    #endif
-    const uint  n_fp32 = test_prec( 6.0e-8 );
-    const uint  n_fp64 = i+1;
-    size_t      s      = 0;
+    const uint  n_mp3 = test_prec( mpprec3 );
+    const uint  n_mp2 = test_prec( mpprec2 );
+    const uint  n_mp1 = i+1;
+    size_t      s     = 0;
 
-    HLR_ASSERT( n_fp64 >= 0 );
-    HLR_ASSERT( n_fp16 + n_fp32 + n_fp64 == orank );
+    // std::cout << n_mp3 << " / " << n_mp2 << " / " << n_mp1 << std::endl;
     
-    if ( n_fp64 < orank )
+    HLR_ASSERT( n_mp1 >= 0 );
+    HLR_ASSERT( n_mp3 + n_mp2 + n_mp1 == orank );
+    
+    if ( n_mp1 < orank )
     {
         // compute _orthogonal_ lowrank factors
         auto  oU = blas::prod( QU, Us );
         auto  oV = blas::prod( QV, Vs );
 
-        _mpdata.sv = std::vector< double >( orank );
+        _mpdata.sv = std::vector< mptype1_t >( orank );
         std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
         
         if constexpr ( Hpro::is_complex_type_v< value_t > )
@@ -689,53 +727,55 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             size_t  pos_U = 0;
             size_t  pos_V = 0;
 
-            _mpdata.U1 = std::vector< double >( n_fp64 * oU.nrows() );
-            _mpdata.V1 = std::vector< double >( n_fp64 * oV.nrows() );
+            _mpdata.U1 = std::vector< mptype1_t >( n_mp1 * oU.nrows() );
+            _mpdata.V1 = std::vector< mptype1_t >( n_mp1 * oV.nrows() );
             
             pos_U = pos_V = 0;
-            for ( uint  k1 = 0; k1 < n_fp64; ++k1, ++k )
+            for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
             {
-                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U1[pos_U] = double( oU(i,k) );
-                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V1[pos_V] = double( oV(i,k) );
+                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U1[pos_U] = mptype1_t( oU(i,k) );
+                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V1[pos_V] = mptype1_t( oV(i,k) );
             }// for
 
-            _mpdata.U2 = std::vector< float >( n_fp32 * oU.nrows() );
-            _mpdata.V2 = std::vector< float >( n_fp32 * oV.nrows() );
+            _mpdata.U2 = std::vector< mptype2_t >( n_mp2 * oU.nrows() );
+            _mpdata.V2 = std::vector< mptype2_t >( n_mp2 * oV.nrows() );
 
             pos_U = pos_V = 0;
-            for ( uint  k2 = 0; k2 < n_fp32; ++k2, ++k )
+            for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
             {
-                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U2[pos_U] = float( oU(i,k) );
-                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V2[pos_V] = float( oV(i,k) );
+                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U2[pos_U] = mptype2_t( oU(i,k) );
+                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V2[pos_V] = mptype2_t( oV(i,k) );
             }// for
 
-            #if HAS_FLOAT16
-            _mpdata.U3 = std::vector< _Float16 >( n_fp16 * oU.nrows() );
-            _mpdata.V3 = std::vector< _Float16 >( n_fp16 * oV.nrows() );
+            _mpdata.U3 = std::vector< mptype3_t >( n_mp3 * oU.nrows() );
+            _mpdata.V3 = std::vector< mptype3_t >( n_mp3 * oV.nrows() );
             
             pos_U = pos_V = 0;
-            for ( uint  k3 = 0; k3 < n_fp16; ++k3, ++k )
+            for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
             {
-                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U3[pos_U] = _Float16( oU(i,k) );
-                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V3[pos_V] = _Float16( oV(i,k) );
+                for ( uint  i = 0; i < oU.nrows(); ++i, ++pos_U ) _mpdata.U3[pos_U] = mptype3_t( oU(i,k) );
+                for ( uint  i = 0; i < oV.nrows(); ++i, ++pos_V ) _mpdata.V3[pos_V] = mptype3_t( oV(i,k) );
             }// for
-            #endif
         }// else
 
         // {
+        //     auto  M1 = blas::prod( this->U(), blas::adjoint( this->V() ) );
         //     auto  dU = U_decompressed();
         //     auto  dV = V_decompressed();
+        //     auto  M2 = blas::prod( dU, blas::adjoint( dV ) );
 
-        //     io::matlab::write( *this, "R" );
-        //     io::matlab::write( dU, "U" );
-        //     io::matlab::write( dV, "V" );
+        //     blas::add( value_t(-1), M1, M2 );
+
+        //     std::cout << boost::format( "%.4e / %.4e" ) % blas::norm_F( M2 ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+                
+        //     // io::matlab::write( *this, "R" );
+        //     // io::matlab::write( dU, "U" );
+        //     // io::matlab::write( dV, "V" );
         // }
 
         this->U() = std::move( blas::matrix< value_t >( 0, 0 ) );
         this->V() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
-    
-    #endif
 }
 
 // decompress internal data

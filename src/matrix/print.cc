@@ -23,8 +23,9 @@
 #endif
 
 #include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/utils/eps_printer.hh>
 #include <hlr/utils/tools.hh>
 
@@ -138,6 +139,45 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                     prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                    double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                    Hpro::to_string( "%d", M.nrows() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        else if ( is_mixedprec_lowrank( M ) && is_compressed( M ) )
+        {
+            auto        R          = cptrcast( &M, matrix::mplrmatrix< value_t > );
+            const auto  rank       = R->rank();
+            auto        mpdata     = R->mp_data();
+            uint        col_bg[3]  = { 0, 0, 0 };
+
+            const uint  col_mp3[3] = { 252, 233,  79 }; // yellow
+            const uint  col_mp2[3] = { 114, 159, 207 }; // blue
+            const uint  col_mp1[3] = { 239,  41,  41 }; // red
+
+            const uint  nmp1       = mpdata.U1.size() / R->nrows();
+            const uint  nmp2       = mpdata.U2.size() / R->nrows();
+            const uint  nmp3       = mpdata.U3.size() / R->nrows();
+
+            for ( uint  c = 0; c < 3; c++ )
+                col_bg[c] = std::min< uint >( 255, uint( ( nmp3 * col_mp3[c] +
+                                                           nmp2 * col_mp2[c] +
+                                                           nmp1 * col_mp1[c] ) / double(rank) ) );
+            
+            prn.set_rgb( (col_bg[0] << 16) + (col_bg[1] << 8) + col_bg[2] );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               Hpro::to_string( "%d", rank ) );
                 
                 prn.restore();
             }// if

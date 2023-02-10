@@ -107,16 +107,16 @@ program_main ()
     toc = timer::since( tic );
 
     auto  mem_A  = A->byte_size();
-    auto  norm_A = norm::frobenius( *A );
+    auto  norm_A = impl::norm::frobenius( *A );
 
     // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
     // delta = hlr::cmdline::eps; //  * norm_A / (A_nf->nrows());
-    auto  delta   = 1e4 * hlr::cmdline::eps * norm_A / (A->nrows());
+    auto  delta   = hlr::cmdline::eps * norm_A; // / (A->nrows());
         
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem    = " << format_mem( mem_A ) << std::endl;
     std::cout << "      idx  = " << format_mem( mem_A / A->nrows() ) << std::endl;
-    std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
+    std::cout << "    |A|    = " << format_norm( impl::norm::frobenius( *A ) ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
@@ -134,7 +134,7 @@ program_main ()
                   << "compression ("
                   << "ε = " << boost::format( "%.2e" ) % delta
                   << ", "
-                  << "mixedprec )"
+                  << "mixedprec)"
                   << term::reset << std::endl;
         std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
     
@@ -150,9 +150,9 @@ program_main ()
         std::cout << "      FP16  " << boost::format( "%.3f" ) % ( double(std::get<0>( mem_mp )) / double(mem_A) ) << std::endl;
         std::cout << "      FP32  " << boost::format( "%.3f" ) % ( double(std::get<1>( mem_mp )) / double(mem_A) ) << std::endl;
         std::cout << "      FP64  " << boost::format( "%.3f" ) % ( double(std::get<2>( mem_mp )) / double(mem_A) ) << std::endl;
-        std::cout << "    |Amp| = " << format_norm( norm::frobenius( *Amp ) ) << std::endl;
+        std::cout << "    |Amp| = " << format_norm( impl::norm::frobenius( *Amp ) ) << std::endl;
         
-        auto  error   = hlr::norm::frobenius( 1.0, *A, -1.0, *Amp );
+        auto  error   = impl::norm::frobenius( 1.0, *A, -1.0, *Amp );
         
         std::cout << "    error = " << format_error( error ) << " / " << format_error( error / norm_A ) << std::endl;
     }
@@ -213,8 +213,8 @@ program_main ()
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
-    norm_A = norm::frobenius( *A );
-    error  = norm::frobenius( 1, *A, -1, *zA );
+    norm_A = impl::norm::frobenius( *A );
+    error  = impl::norm::frobenius( 1, *A, -1, *zA );
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     
@@ -253,6 +253,108 @@ program_main ()
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // H-matrix matrix vector multiplication
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    if ( nbench > 0 )
+    {
+        std::cout << term::bullet << term::bold
+                  << "mat-vec"
+                  << term::reset << std::endl;
+
+        double  t_orig       = 0.0;
+        double  t_compressed = 0.0;
+        auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
+        
+        {
+            runtime.clear();
+            
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "uncompressed"
+                      << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < 50; ++j )
+                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            t_orig = min( runtime );
+            
+            y_ref = std::move( y );
+        }
+
+        {
+            runtime.clear();
+            
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "compressed"
+                      << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < 50; ++j )
+                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+        
+            t_compressed = min( runtime );
+
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+    }// if
     
     // std::cout << "  " << term::bullet << term::bold << "exact matrix" << term::reset << std::endl;
 
