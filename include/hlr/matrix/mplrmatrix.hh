@@ -14,6 +14,7 @@
 
 #include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -29,6 +30,8 @@ DECLARE_TYPE( mplrmatrix );
 
 namespace matrix
 {
+
+#define USE_AFLOAT
 
 //
 // GCC >= 12 and Clang >= 15 support _Float16
@@ -115,9 +118,14 @@ private:
     struct mp_storage
     {
         std::vector< mptype1_t >  sv;
+
+        #if defined(USE_AFLOAT)
+        hlr::compress::afloat::zarray  zU, zV;
+        #else
         std::vector< mptype1_t >  U1, V1;
         std::vector< mptype2_t >  U2, V2;
         std::vector< mptype3_t >  U3, V3;
+        #endif
     };
 
 private:
@@ -172,45 +180,87 @@ public:
             auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
             uint  k  = 0;
 
+            #if defined(USE_AFLOAT)
+            
+            hlr::compress::afloat::decompress_lr( _mpdata.zU, dU );
+
+            for ( uint  l = 0; l < dU.ncols(); ++l )
+            {
+                auto  u_l = dU.column( l );
+
+                blas::scale( _mpdata.sv[l], u_l );
+            }// for
+            
+            #else
+            
             if constexpr ( Hpro::is_complex_type_v< value_t > )
             {
-                HLR_ERROR( "TODO" );
-            }// if
-            else
-            {
-                size_t      pos    = 0;
-                const uint  n_mp1 = _mpdata.U1.size() / dU.nrows();
+                size_t      pos   = 0;
+                const uint  n_mp1 = _mpdata.U1.size() / (2 * dU.nrows());
+                const uint  n_mp2 = _mpdata.U2.size() / (2 * dU.nrows());
+                const uint  n_mp3 = _mpdata.U3.size() / (2 * dU.nrows());
                 
                 for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
                 {
-                    auto  s_k = _mpdata.sv[k];
+                    const auto  s_k = _mpdata.sv[k];
+                    
+                    for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+                        dU(i,k) = s_k * value_t( _mpdata.U1[ pos ], _mpdata.U1[ pos+1 ] );
+                }// for
+
+                pos = 0;
+                for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
+                {
+                    const auto  s_k = _mpdata.sv[k];
+                    
+                    for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+                        dU(i,k) = s_k * value_t( _mpdata.U2[ pos ], _mpdata.U2[ pos+1 ] );
+                }// for
+                
+                pos = 0;
+                for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
+                {
+                    const auto  s_k = _mpdata.sv[k];
+                    
+                    for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+                        dU(i,k) = s_k * value_t( _mpdata.U3[ pos ], _mpdata.U3[ pos+1 ] );
+                }// for
+            }// if
+            else
+            {
+                size_t      pos   = 0;
+                const uint  n_mp1 = _mpdata.U1.size() / dU.nrows();
+                const uint  n_mp2 = _mpdata.U2.size() / dU.nrows();
+                const uint  n_mp3 = _mpdata.U3.size() / dU.nrows();
+                
+                for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
+                {
+                    const auto  s_k = _mpdata.sv[k];
                     
                     for ( uint  i = 0; i < dU.nrows(); ++i )
                         dU(i,k) = s_k * value_t( _mpdata.U1[ pos++ ] );
                 }// for
 
-                const uint  n_mp2 = _mpdata.U2.size() / dU.nrows();
-
                 pos = 0;
                 for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
                 {
-                    auto  s_k = _mpdata.sv[k];
+                    const auto  s_k = _mpdata.sv[k];
                     
                     for ( uint  i = 0; i < dU.nrows(); ++i )
                         dU(i,k) = s_k * value_t( _mpdata.U2[ pos++ ] );
                 }// for
                 
-                const uint  n_mp3 = _mpdata.U3.size() / dU.nrows();
-
                 pos = 0;
                 for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
                 {
-                    auto  s_k = _mpdata.sv[k];
+                    const auto  s_k = _mpdata.sv[k];
                     
                     for ( uint  i = 0; i < dU.nrows(); ++i )
                         dU(i,k) = s_k * value_t( _mpdata.U3[ pos++ ] );
                 }// for
             }// else
+            
+            #endif
             
             return dU;
         }// if
@@ -222,42 +272,37 @@ public:
     {
         if ( is_compressed() )
         {
-            auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
-            uint  k  = 0;
+            auto        dV  = blas::matrix< value_t >( this->ncols(), this->rank() );
+
+            #if defined(USE_AFLOAT)
+            
+            hlr::compress::afloat::decompress_lr( _mpdata.zV, dV );
+            
+            #else
+            
+            size_t      pos = 0;
+            value_t *   ptr = dV.data();
+            const auto  n1  = _mpdata.V1.size();
+            const auto  n2  = _mpdata.V2.size();
+            const auto  n3  = _mpdata.V3.size();
 
             if constexpr ( Hpro::is_complex_type_v< value_t > )
             {
-                HLR_ERROR( "TODO" );
+                for ( size_t  i = 0; i < n1; i += 2 ) ptr[pos++] = value_t( _mpdata.V1[i], _mpdata.V1[i+1] );
+                for ( size_t  i = 0; i < n2; i += 2 ) ptr[pos++] = value_t( _mpdata.V2[i], _mpdata.V2[i+1] );
+                for ( size_t  i = 0; i < n3; i += 2 ) ptr[pos++] = value_t( _mpdata.V3[i], _mpdata.V3[i+1] );
             }// if
             else
             {
-                size_t      pos    = 0;
-                const uint  n_mp1 = _mpdata.V1.size() / dV.nrows();
-                
-                for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
-                {
-                    for ( uint  i = 0; i < dV.nrows(); ++i )
-                        dV(i,k) = value_t( _mpdata.V1[ pos++ ] );
-                }// for
-
-                const uint  n_mp2 = _mpdata.V2.size() / dV.nrows();
-
-                pos = 0;
-                for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
-                {
-                    for ( uint  i = 0; i < dV.nrows(); ++i )
-                        dV(i,k) = value_t( _mpdata.V2[ pos++ ] );
-                }// for
-                
-                const uint  n_mp3 = _mpdata.V3.size() / dV.nrows();
-
-                pos = 0;
-                for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
-                {
-                    for ( uint  i = 0; i < dV.nrows(); ++i )
-                        dV(i,k) = value_t( _mpdata.V3[ pos++ ] );
-                }// for
+                // std::copy( _mpdata.V1.data(), _mpdata.V1.data() + n1, ptr + pos ); pos += n1;
+                // std::copy( _mpdata.V2.data(), _mpdata.V2.data() + n2, ptr + pos ); pos += n2;
+                // std::copy( _mpdata.V3.data(), _mpdata.V3.data() + n3, ptr + pos ); pos += n3;
+                for ( size_t  i = 0; i < n1; ++i ) ptr[pos++] = value_t( _mpdata.V1[ i ] );
+                for ( size_t  i = 0; i < n2; ++i ) ptr[pos++] = value_t( _mpdata.V2[ i ] );
+                for ( size_t  i = 0; i < n3; ++i ) ptr[pos++] = value_t( _mpdata.V3[ i ] );
             }// else
+            
+            #endif
             
             return dV;
         }// if
@@ -404,6 +449,16 @@ public:
             R->_mpdata.sv = std::vector< mptype1_t >( _mpdata.sv.size() );
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
+
+            #if defined(USE_AFLOAT)
+
+            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
+            
+            std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
+            std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
+            
+            #else
             
             R->_mpdata.U1 = std::vector< mptype1_t >( _mpdata.U1.size() );
             R->_mpdata.V1 = std::vector< mptype1_t >( _mpdata.V1.size() );
@@ -422,6 +477,8 @@ public:
 
             std::copy( _mpdata.U3.begin(), _mpdata.U3.end(), R->_mpdata.U3.begin() );
             std::copy( _mpdata.V3.begin(), _mpdata.V3.end(), R->_mpdata.V3.begin() );
+
+            #endif
         }// if
 
         return M;
@@ -461,6 +518,16 @@ public:
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
             
+            #if defined(USE_AFLOAT)
+
+            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
+            
+            std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
+            std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
+            
+            #else
+            
             R->_mpdata.U1 = std::vector< mptype1_t >( _mpdata.U1.size() );
             R->_mpdata.V1 = std::vector< mptype1_t >( _mpdata.V1.size() );
 
@@ -478,6 +545,8 @@ public:
 
             std::copy( _mpdata.U3.begin(), _mpdata.U3.end(), R->_mpdata.U3.begin() );
             std::copy( _mpdata.V3.begin(), _mpdata.V3.end(), R->_mpdata.V3.begin() );
+
+            #endif
         }// if
     }
         
@@ -505,7 +574,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return _mpdata.U1.size() + _mpdata.U2.size() + _mpdata.U3.size() > 0;
+        return _mpdata.sv.size() > 0;
     }
 
     // access multiprecision data
@@ -521,9 +590,19 @@ public:
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
         size += sizeof(mptype1_t) * ( _mpdata.sv.size() );
+
+        #if defined(USE_AFLOAT)
+
+        size += hlr::compress::afloat::byte_size( _mpdata.zU );
+        size += hlr::compress::afloat::byte_size( _mpdata.zV );
+        
+        #else
+        
         size += sizeof(mptype1_t) * ( _mpdata.U1.size() + _mpdata.V1.size() );
         size += sizeof(mptype2_t) * ( _mpdata.U2.size() + _mpdata.V2.size() );
         size += sizeof(mptype3_t) * ( _mpdata.U3.size() + _mpdata.V3.size() );
+
+        #endif
         
         return size;
     }
@@ -551,12 +630,22 @@ protected:
     virtual void   remove_compressed ()
     {
         _mpdata.sv = std::vector< mptype1_t >();
+
+        #if defined(USE_AFLOAT)
+
+        _mpdata.zU = hlr::compress::afloat::zarray();
+        _mpdata.zV = hlr::compress::afloat::zarray();
+        
+        #else
+        
         _mpdata.U1 = std::vector< mptype1_t >();
         _mpdata.V1 = std::vector< mptype1_t >();
         _mpdata.U2 = std::vector< mptype2_t >();
         _mpdata.V2 = std::vector< mptype2_t >();
         _mpdata.U3 = std::vector< mptype3_t >();
         _mpdata.V3 = std::vector< mptype3_t >();
+
+        #endif
     }
 };
 
@@ -661,13 +750,14 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //
     // determine singular values and W S X' representation with orthogonal W,X
     //
-    
-    double      tol   = acc( this->row_is(), this->col_is() ).rel_eps();
-    auto        QU    = blas::copy( this->U() );
-    auto        QV    = blas::copy( this->V() );
-    const auto  orank = QU.ncols();
-    auto        RU    = blas::matrix< value_t >( orank, orank );
-    auto        RV    = blas::matrix< value_t >( orank, orank );
+
+    const auto    norm  = blas::lr_normF( this->U(), this->V() );
+    double        tol   = acc( this->row_is(), this->col_is() ).rel_eps() * norm;
+    auto          QU    = blas::copy( this->U() );
+    auto          QV    = blas::copy( this->V() );
+    const auto    orank = QU.ncols();
+    auto          RU    = blas::matrix< value_t >( orank, orank );
+    auto          RV    = blas::matrix< value_t >( orank, orank );
         
     blas::qr( QU, RU );
     blas::qr( QV, RV );
@@ -678,6 +768,65 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     
     blas::svd( Us, S, Vs );
 
+    #if defined(USE_AFLOAT)
+
+    // compute _orthogonal_ lowrank factors
+    auto  oU = blas::prod( QU, Us );
+    auto  oV = blas::prod( QV, Vs );
+
+    // need tolerance divided by singular values for accuracy
+    auto  S_tol = blas::copy( S );
+
+    for ( uint  l = 0; l < orank; ++l )
+        S_tol(l) = tol / S(l);
+
+    auto          zU     = hlr::compress::afloat::compress_lr( oU, S_tol );
+    auto          zV     = hlr::compress::afloat::compress_lr( oV, S_tol );
+    const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
+    const size_t  mem_mp = hlr::compress::afloat::byte_size( zU ) + hlr::compress::afloat::byte_size( zV ) + sizeof(mptype1_t) * orank;
+
+    if ( mem_mp < mem_lr )
+    {
+        _mpdata.sv = std::vector< mptype1_t >( orank );
+        std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
+        
+        _mpdata.zU = std::move( zU );
+        _mpdata.zV = std::move( zV );
+
+        // {
+        //     auto  M1 = blas::prod( this->U(), blas::adjoint( this->V() ) );
+        //     auto  dU = U_decompressed();
+        //     auto  dV = V_decompressed();
+        //     auto  M2 = blas::prod( dU, blas::adjoint( dV ) );
+
+        //     io::matlab::write( M1, "M1" );
+        //     io::matlab::write( M2, "M2" );
+            
+        //     blas::add( value_t(-1), M1, M2 );
+
+        //     std::cout << boost::format( "%.4e / %.4e" ) % blas::norm_F( M2 ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
+        // }
+    
+        this->U()  = std::move( blas::matrix< value_t >( 0, 0 ) );
+        this->V()  = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
+
+    // {
+    //     io::matlab::write( oU, "U1" );
+    //     io::matlab::write( oV, "V1" );
+            
+    //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+    //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+            
+    //     hlr::compress::afloat::decompress_lr( zU, dU );
+    //     hlr::compress::afloat::decompress_lr( zV, dV );
+
+    //     io::matlab::write( dU, "U2" );
+    //     io::matlab::write( dV, "V2" );
+    // }
+        
+    #else
+    
     //
     // determine corresponding parts for FP64, FP32 and FP16
     //
@@ -719,7 +868,67 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
         if constexpr ( Hpro::is_complex_type_v< value_t > )
         {
-            HLR_ERROR( "TODO" );
+            uint    k     = 0;
+            size_t  pos_U = 0;
+            size_t  pos_V = 0;
+
+            _mpdata.U1 = std::vector< mptype1_t >( 2 * n_mp1 * oU.nrows() );
+            _mpdata.V1 = std::vector< mptype1_t >( 2 * n_mp1 * oV.nrows() );
+
+            for ( size_t  i = 0; i < _mpdata.U1.size(); i += 2 )
+            {
+                const auto  u_i = oU.data()[ pos_U++ ];
+
+                _mpdata.U1[i]   = mptype1_t( std::real( u_i ) );
+                _mpdata.U1[i+1] = mptype1_t( std::imag( u_i ) );
+            }// for
+
+            for ( size_t  i = 0; i < _mpdata.V1.size(); i += 2 )
+            {
+                const auto  v_i = oV.data()[ pos_V++ ];
+
+                _mpdata.V1[i]   = mptype1_t( std::real( v_i ) );
+                _mpdata.V1[i+1] = mptype1_t( std::imag( v_i ) );
+            }// for
+
+            _mpdata.U2 = std::vector< mptype2_t >( 2 * n_mp2 * oU.nrows() );
+            _mpdata.V2 = std::vector< mptype2_t >( 2 * n_mp2 * oV.nrows() );
+
+            for ( size_t  i = 0; i < _mpdata.U2.size(); i += 2 )
+            {
+                const auto  u_i = oU.data()[ pos_U++ ];
+
+                _mpdata.U2[i]   = mptype2_t( std::real( u_i ) );
+                _mpdata.U2[i+1] = mptype2_t( std::imag( u_i ) );
+            }// for
+
+            for ( size_t  i = 0; i < _mpdata.V2.size(); i += 2 )
+            {
+                const auto  v_i = oV.data()[ pos_V++ ];
+
+                _mpdata.V2[i]   = mptype2_t( std::real( v_i ) );
+                _mpdata.V2[i+1] = mptype2_t( std::imag( v_i ) );
+            }// for
+
+
+            _mpdata.U3 = std::vector< mptype3_t >( 2 * n_mp3 * oU.nrows() );
+            _mpdata.V3 = std::vector< mptype3_t >( 2 * n_mp3 * oV.nrows() );
+            
+            for ( size_t  i = 0; i < _mpdata.U3.size(); i += 2 )
+            {
+                const auto  u_i = oU.data()[ pos_U++ ];
+
+                _mpdata.U3[i]   = mptype3_t( std::real( u_i ) );
+                _mpdata.U3[i+1] = mptype3_t( std::imag( u_i ) );
+            }// for
+
+            for ( size_t  i = 0; i < _mpdata.V3.size(); i += 2 )
+            {
+                const auto  v_i = oV.data()[ pos_V++ ];
+
+                _mpdata.V3[i]   = mptype3_t( std::real( v_i ) );
+                _mpdata.V3[i+1] = mptype3_t( std::imag( v_i ) );
+            }// for
         }// if
         else
         {
@@ -764,6 +973,9 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         //     auto  dV = V_decompressed();
         //     auto  M2 = blas::prod( dU, blas::adjoint( dV ) );
 
+        //     io::matlab::write( M1, "M1" );
+        //     io::matlab::write( M2, "M2" );
+            
         //     blas::add( value_t(-1), M1, M2 );
 
         //     std::cout << boost::format( "%.4e / %.4e" ) % blas::norm_F( M2 ) % ( blas::norm_F( M2 ) / blas::norm_F( M1 ) ) << std::endl;
@@ -776,6 +988,8 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         this->U() = std::move( blas::matrix< value_t >( 0, 0 ) );
         this->V() = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
+
+    #endif
 }
 
 // decompress internal data

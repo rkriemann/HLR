@@ -701,6 +701,16 @@ copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
         
         return N;
     }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  DD = blas::copy( blas::mat( D ) );
+        auto  N  = std::make_unique< matrix::dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
     else
         return M.copy();
 }

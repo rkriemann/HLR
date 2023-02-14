@@ -111,7 +111,8 @@ program_main ()
 
     // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
     // delta = hlr::cmdline::eps; //  * norm_A / (A_nf->nrows());
-    auto  delta  = 0.25 * hlr::cmdline::eps * norm_A; // / (A->nrows());
+    // auto  delta  = 0.25 * hlr::cmdline::eps * norm_A; // / (A->nrows());
+    auto  delta  = hlr::cmdline::eps; // / (A->nrows());
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;

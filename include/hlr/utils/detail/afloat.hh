@@ -10,6 +10,8 @@
 
 #include <cstring>
 
+#include <hlr/arith/blas.hh>
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -74,6 +76,13 @@ eps_to_rate ( const double eps )
     else                     return 64;
 
     #endif
+}
+
+inline
+uint
+tol_to_rate ( const double  tol )
+{
+    return uint( std::max< double >( 1, -std::log2( tol ) ) ) + 1;
 }
 
 struct config
@@ -899,7 +908,386 @@ decompress< std::complex< double > > ( const zarray &            zdata,
     else
         decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// special version for lowrank matrices
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > &                        U,
+              const blas::vector< Hpro::real_type_t< value_t > > &   S );
+
+template < typename value_t >
+void
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U );
+
+template <>
+inline
+zarray
+compress_lr< double > ( const blas::matrix< double > &  U,
+                        const blas::vector< double > &  S )
+{
+    using  real_t = double;
     
+    //
+    // first, determine exponent bits and mantissa bits for all
+    // columns
+    //
+
+    const size_t  n = U.nrows();
+    const size_t  k = U.ncols();
+    auto          m = std::vector< uint >( k );
+    auto          e = std::vector< uint >( k );
+    auto          s = std::vector< real_t >( k );
+    size_t        zsize = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        auto  vmin = std::abs( U(0,l) );
+        auto  vmax = vmin;
+
+        for ( size_t  i = 1; i < n; ++i )
+        {
+            const auto  u_il = std::abs( U(i,l) );
+            
+            vmin = std::min( vmin, u_il );
+            vmax = std::max( vmax, u_il );
+        }// for
+
+        s[l] = real_t(1) / vmin;
+        e[l] = uint( std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
+        m[l] = tol_to_rate( S(l) );
+
+        // std::cout << m[l] << ", ";
+        
+        const size_t  nbits      = 1 + e[l] + m[l]; // number of bits per value
+        const size_t  n_tot_bits = n * nbits;       // number of bits for all values in column
+        
+        if (( m[l] <= 23 ) && ( nbits <= 32 ))
+            zsize += sizeof(float) + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
+        else
+            zsize += sizeof(double) + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
+    }// for
+
+    // std::cout << std::endl;
+
+    //
+    // convert each column to compressed form
+    //
+
+    auto    zdata = std::vector< byte_t >( zsize );
+    size_t  pos   = 0;
+        
+    for ( uint  l = 0; l < k; ++l )
+    {
+        const uint    exp_bits  = e[l];
+        const uint    exp_mask  = ( 1 << exp_bits ) - 1;
+        const uint    prec_bits = m[l];
+        const real_t  scale     = s[l];
+        const size_t  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+
+        if (( prec_bits <= 23 ) && ( nbits <= 32 ))
+        {
+            //
+            // store header (exponents and precision bits and scaling factor)
+            //
+    
+            const float  fscale = scale;
+        
+            zdata[pos]   = exp_bits;
+            zdata[pos+1] = prec_bits;
+            memcpy( zdata.data() + pos + 2, & fscale, 4 );
+
+            pos += 6;
+            
+            //
+            // store data
+            //
+        
+            const uint  prec_ofs = fp32_mant_bits - prec_bits;
+            const uint  zero_val = fp32_zero_val & (( 1 << nbits) - 1 );
+            uint        bpos     = 0; // start bit position in current byte
+
+            for ( size_t  i = 0; i < n; ++i )
+            {
+                //
+                // Use absolute value and scale v_i and add 1 such that v_i >= 2.
+                // With this, highest exponent bit is 1 and we only need to store
+                // lowest <exp_bits> exponent bits
+                //
+        
+                const float  val  = U(i,l);
+                uint         zval = zero_val;
+            
+                {
+                    const bool   zsign = ( val < 0 );
+                
+                    const float  sval  = std::max( fscale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
+                    const uint   isval = (*reinterpret_cast< const uint * >( & sval ) );
+                    const uint   sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
+                    const uint   smant = ( isval & ((1u << fp32_mant_bits) - 1) );
+                
+                    // exponent and mantissa reduced to stored size
+                    const uint   zexp  = sexp & exp_mask;
+                    const uint   zmant = smant >> prec_ofs;
+                
+                    zval = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+
+                    HLR_DBG_ASSERT( zval != zero_val );
+                }// if
+        
+                //
+                // copy bits of zval into data buffer
+                //
+        
+                uint  sbits = 0; // number of already stored bits of zval
+            
+                do
+                {
+                    const uint    crest = 8 - bpos;       // remaining bits in current byte
+                    const uint    zrest = nbits - sbits;  // remaining bits in zval
+                    const byte_t  zbyte = zval & 0xff;    // lowest byte of zval
+                
+                    HLR_DBG_ASSERT( pos < zsize );
+                
+                    zdata[pos] |= (zbyte << bpos);
+                    zval      >>= crest;
+                    sbits      += crest;
+                
+                    if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                    else                  { bpos += zrest; }
+                } while ( sbits < nbits );
+            }// for
+
+            // pad last entry with "zeroes" for next column
+            if ( bpos > 0 )
+                ++pos;
+        }// if
+        else
+        {
+            //
+            // store header (exponents and precision bits and scaling factor)
+            //
+    
+            zdata[pos]   = exp_bits;
+            zdata[pos+1] = prec_bits;
+            memcpy( zdata.data() + pos + 2, & scale, 8 );
+
+            pos += 10;
+            
+            //
+            // store data
+            //
+        
+            const uint   prec_ofs = fp64_mant_bits - prec_bits;
+            const ulong  zero_val = fp64_zero_val & (( 1ul << nbits) - 1 );
+            uint         bpos     = 0;  // start bit position in current byte
+
+            for ( size_t  i = 0; i < n; ++i )
+            {
+                const double  val  = U(i,l);
+                ulong         zval = zero_val;
+            
+                //
+                // Use absolute value and scale v_i and add 1 such that v_i >= 2.
+                // With this, highest exponent bit is 1 and we only need to store
+                // lowest <exp_bits> exponent bits
+                //
+        
+                {
+                    const bool    zsign = ( val < 0 );
+                    const double  sval  = scale * std::abs(val) + 1;
+                    const ulong   isval = (*reinterpret_cast< const ulong * >( & sval ) );
+                    const ulong   sexp  = ( isval >> fp64_mant_bits ) & ((1ul << fp64_exp_bits) - 1);
+                    const ulong   smant = ( isval & ((1ul << fp64_mant_bits) - 1) );
+
+                    // exponent and mantissa reduced to stored size
+                    const ulong   zexp  = sexp & exp_mask;
+                    const ulong   zmant = smant >> prec_ofs;
+
+                    zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
+
+                    HLR_DBG_ASSERT( zval != zero_val );
+                }// if
+        
+                //
+                // copy bits of zval into data buffer
+                //
+        
+                uint  sbits = 0; // number of already stored bits of zval
+            
+                do
+                {
+                    const uint    crest = 8 - bpos;       // remaining bits in current byte
+                    const uint    zrest = nbits - sbits;  // remaining bits in zval
+                    const byte_t  zbyte = zval & 0xff;    // lowest byte of zval
+
+                    HLR_DBG_ASSERT( pos < zsize );
+        
+                    zdata[pos] |= (zbyte << bpos);
+                    zval      >>= crest;
+                    sbits      += crest;
+            
+                    if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                    else                  { bpos += zrest; }
+                } while ( sbits < nbits );
+            }// for
+
+            // pad last entry with "zeroes" for next column
+            if ( bpos > 0 )
+                ++pos;
+        }// else
+    }// for
+
+    return zdata;
+}
+
+template <>
+inline
+void
+decompress_lr< double > ( const zarray &            zdata,
+                          blas::matrix< double > &  U )
+{
+    const size_t  n   = U.nrows();
+    const uint    k   = U.ncols();
+    size_t        pos = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        //
+        // read compression header (scaling, exponent and precision bits)
+        //
+    
+        const uint  exp_bits  = zdata[ pos ];
+        const uint  prec_bits = zdata[ pos+1 ];
+        const uint  nbits     = 1 + exp_bits + prec_bits;
+
+        pos += 2;
+        
+        if (( prec_bits <= 23 ) && ( nbits <= 32 ))
+        {
+            //
+            // read scaling factor
+            //
+        
+            float  scale;
+
+            memcpy( & scale, zdata.data() + pos, 4 );
+            pos += 4;
+            
+            //
+            // read and convert compressed data
+            //
+    
+            const uint  prec_mask  = ( 1 << prec_bits ) - 1;
+            const uint  prec_ofs   = fp32_mant_bits - prec_bits;
+            const uint  exp_mask   = ( 1 << exp_bits ) - 1;
+            const uint  sign_shift = exp_bits + prec_bits;
+            const uint  zero_val   = fp32_zero_val & (( 1 << nbits) - 1 );
+            uint        bpos       = 0; // bit position in current byte
+
+            for ( size_t  i = 0; i < n; ++i )
+            {
+                uint  zval  = 0;
+                uint  sbits = 0;
+            
+                do
+                {
+                    HLR_DBG_ASSERT( pos < zdata.size() );
+        
+                    const uint    crest = 8 - bpos;
+                    const uint    zrest = nbits - sbits;
+                    const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
+                    const byte_t  data  = (zdata[pos] >> bpos) & zmask;
+                
+                    zval  |= (uint(data) << sbits);
+                    sbits += crest;
+
+                    if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                    else                  { bpos += zrest; }
+                } while ( sbits < nbits );
+
+                {
+                    const uint   mant  = zval & prec_mask;
+                    const uint   exp   = (zval >> prec_bits) & exp_mask;
+                    const bool   sign  = zval >> sign_shift;
+                    const uint   irval = ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs);
+                    const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+                
+                    U(i,l) = double( rval );
+                }// else
+            }// for
+
+            // "read" padded zeros
+            if ( bpos > 0 )
+                ++pos;
+        }// if
+        else
+        {
+            //
+            // read scaling factor
+            //
+        
+            double  scale;
+
+            memcpy( & scale, zdata.data() + pos, 8 );
+            pos += 8;
+            
+            //
+            // read and convert compressed data
+            //
+    
+            const ulong  prec_mask  = ( 1ul << prec_bits ) - 1;
+            const uint   prec_ofs   = fp64_mant_bits - prec_bits;
+            const ulong  exp_mask   = ( 1ul << exp_bits ) - 1;
+            const uint   sign_shift = exp_bits + prec_bits;
+            const ulong  zero_val   = fp64_zero_val & (( 1ul << nbits) - 1 );
+            uint         bpos       = 0; // bit position in current byte
+
+            for ( size_t  i = 0; i < n; ++i )
+            {
+                ulong  zval  = 0;
+                uint   sbits = 0;
+            
+                do
+                {
+                    HLR_DBG_ASSERT( pos < zdata.size() );
+        
+                    const uint    crest = 8 - bpos;
+                    const uint    zrest = nbits - sbits;
+                    const byte_t  zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
+                    const byte_t  data  = (zdata[pos] >> bpos) & zmask;
+                
+                    zval  |= (ulong(data) << sbits);
+                    sbits += crest;
+
+                    if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                    else                  { bpos += zrest; }
+                } while ( sbits < nbits );
+
+                {
+                    const ulong   mant  = zval & prec_mask;
+                    const ulong   exp   = (zval >> prec_bits) & exp_mask;
+                    const bool    sign  = zval >> sign_shift;
+                    const ulong   irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
+                    const double  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+
+                    U(i,l) = rval;
+                }// else
+            }// for
+
+            // "read" padded zeros
+            if ( bpos > 0 )
+                ++pos;
+        }// else
+    }// for
+}
+
+
 }}}// namespace hlr::compress::afloat
 
 #endif // __HLR_UTILS_DETAIL_AFLOAT_HH
