@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# to enable print() syntax with python2
-from __future__ import print_function
-
 import os, sys
 import re
 
@@ -16,7 +13,6 @@ from datetime import datetime
 
 fullmsg      = False
 debug        = False
-profile      = False
 optimise     = True
 warn         = False
 color        = True
@@ -58,6 +54,8 @@ sz            = False
 SZ_DIR        = '/'
 sz3           = False
 SZ3_DIR       = '/'
+mgard         = False
+MGARD_DIR     = '/'
 lz4           = False
 LZ4_DIR       = '/'
 zlib          = False
@@ -109,6 +107,7 @@ COMPRESSORS   = [ 'none',
                   'posits',
                   'sz',
                   'sz3',
+                  'mgard',
                   'lz4',
                   'zlib',
                   'zstd',
@@ -248,6 +247,8 @@ opts.Add( BoolVariable( 'sz',            'use SZ compression library',         s
 opts.Add( PathVariable( 'sz_dir',        'SZ installation directory',          SZ_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        sz3 ) )
 opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'mgard',         'use MGARD compression library',      mgard ) )
+opts.Add( PathVariable( 'mgard_dir',     'MGARD installation directory',       MGARD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
 opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
@@ -322,6 +323,8 @@ sz            = opt_env['sz']
 SZ_DIR        = opt_env['sz_dir']
 sz3           = opt_env['sz3']
 SZ3_DIR       = opt_env['sz3_dir']
+mgard         = opt_env['mgard']
+MGARD_DIR     = opt_env['mgard_dir']
 lz4           = opt_env['lz4']
 LZ4_DIR       = opt_env['lz4_dir']
 zlib          = opt_env['zlib']
@@ -529,6 +532,13 @@ if sz3 :
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
         
+# support for MGARD compression
+if mgard :
+    env.Append( CPPDEFINES = 'HAS_MGARD' )
+    env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'mgard' ] )
+        
 # support for LZ4 compression
 if lz4 :
     env.Append( CPPDEFINES = 'HAS_LZ4' )
@@ -571,7 +581,8 @@ elif compressor == 'afloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=13' )
 elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'COMPRESSOR=14' )
 elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=15' )
 elif compressor == 'dfloat'  : env.Append( CPPDEFINES = 'COMPRESSOR=16' )
-elif compressor == 'dummy'   : env.Append( CPPDEFINES = 'COMPRESSOR=17' )
+elif compressor == 'mgard'   : env.Append( CPPDEFINES = 'COMPRESSOR=17' )
+elif compressor == 'dummy'   : env.Append( CPPDEFINES = 'COMPRESSOR=18' )
 
 ######################################################################
 #
@@ -711,6 +722,7 @@ def show_options ( target, source, env ):
     print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
     print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
     print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
+    print( '  {0}mgard{1}      │ use MGARD compression library │ {2}'.format( colors['bold'], colors['reset'], bool_str[ mgard ] ),      pathstr( MGARD_DIR     if mgard     else '' ) )
     print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
     print( '  {0}half{1}       │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
     print( '  {0}lz4{1}        │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )

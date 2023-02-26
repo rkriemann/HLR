@@ -16,6 +16,7 @@
 #include <hlr/utils/detail/zfp.hh>
 #include <hlr/utils/detail/sz.hh>
 #include <hlr/utils/detail/sz3.hh>
+#include <hlr/utils/detail/mgard.hh>
 #include <hlr/utils/detail/posits.hh>
 #include <hlr/utils/detail/fp16.hh>
 #include <hlr/utils/detail/bf16.hh>
@@ -355,6 +356,23 @@ using hlr::compress::dfloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 
 #elif COMPRESSOR == 17
+
+#  define HLR_HAS_COMPRESSION  1
+
+static const char provider[] = "mgard";
+
+using  zconfig_t = hlr::compress::mgard::config;
+using  zarray    = hlr::compress::mgard::zarray;
+
+using hlr::compress::mgard::compress;
+using hlr::compress::mgard::decompress;
+using hlr::compress::mgard::get_config;
+using hlr::compress::mgard::byte_size;
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif COMPRESSOR == 18
 
 #  define HLR_HAS_COMPRESSION  1
 
