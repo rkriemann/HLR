@@ -1,11 +1,11 @@
 #ifndef __HLR_APPS_RADIAL_HH
 #define __HLR_APPS_RADIAL_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : apps/radial
 // Description : functions for radial functions (Matérn, Gaussian, etc.)
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/base/TPoint.hh>

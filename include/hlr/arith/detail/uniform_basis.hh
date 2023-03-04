@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_DETAIL_UNIFORM_BASIS_HH
 #define __HLR_ARITH_DETAIL_UNIFORM_BASIS_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : arith/uniform
 // Description : functions for handling changes in basis for uniform matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 // #include <boost/format.hpp> // DEBUG

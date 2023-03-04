@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : dag-hodlr-tbb.cc
+// Module      : dag-hodlr-tbb.cc
 // Description : tiled HODLR-LU using DAG with TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tbb/matrix.hh"

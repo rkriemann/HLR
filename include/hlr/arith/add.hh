@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_ADD_HH
 #define __HLR_ARITH_ADD_HH
 //
-// Project     : HLib
-// File        : add.hh
+// Project     : HLR
+// Module      : add.hh
 // Description : matrix summation functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/arith/detail/add.hh"

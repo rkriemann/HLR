@@ -1,11 +1,11 @@
 #ifndef __HLR_APPS_LAPLACE_HH
 #define __HLR_APPS_LAPLACE_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : apps/laplace
 // Description : functions for Laplace SLP/DLP BEM application
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <memory>

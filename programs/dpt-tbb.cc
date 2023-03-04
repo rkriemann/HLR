@@ -3,7 +3,7 @@
 // Program     : dpt-tbb.cc
 // Description : testing DPT eigenvalue algorithmus
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tbb/matrix.hh"

@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : level_matrix.cc
+// Module      : level_matrix.cc
 // Description : block matrix for full level of H-matrix
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <iostream>

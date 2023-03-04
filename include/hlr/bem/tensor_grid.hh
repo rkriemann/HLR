@@ -2,10 +2,10 @@
 #define __HLR_BEM_TENSOR_GRID_HH
 //
 // Project     : HLR
-// File        : tensor_grid_hca.hh
+// Module      : tensor_grid_hca.hh
 // Description : grid defined via tensor product X × Y × Z
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <array>

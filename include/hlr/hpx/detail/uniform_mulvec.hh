@@ -1,11 +1,11 @@
 #ifndef __HLR_HPX_ARITH_DETAIL_UNIFORM_MULVEC_HH
 #define __HLR_HPX_ARITH_DETAIL_UNIFORM_MULVEC_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : hpx/detail/uniform_mulvec
 // Description : matrix-vector multiplication for uniform matrices with HPX
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/arith/blas.hh>

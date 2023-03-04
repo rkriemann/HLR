@@ -1,11 +1,11 @@
 #ifndef __HLR_DAG_SOLVE_HH
 #define __HLR_DAG_SOLVE_HH
 //
-// Project     : HLib
-// File        : SOLVE.hh
+// Project     : HLR
+// Module      : SOLVE.hh
 // Description : DAGs for matrix solve functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <map>

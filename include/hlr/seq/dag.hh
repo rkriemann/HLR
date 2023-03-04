@@ -1,11 +1,11 @@
 #ifndef __HLR_SEQ_DAG_HH
 #define __HLR_SEQ_DAG_HH
 //
-// Project     : HLib
-// File        : dag.hh
+// Project     : HLR
+// Module      : dag.hh
 // Description : DAG execution function
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/base/TTruncAcc.hh>

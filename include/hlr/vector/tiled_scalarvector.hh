@@ -2,10 +2,10 @@
 #define __HLR_VECTOR_TILED_SCALARVECTOR_HH
 //
 // Project     : HLR
-// File        : tiled_scalarvector.hh
+// Module      : tiled_scalarvector.hh
 // Description : scalar vector using tiled storage
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cassert>

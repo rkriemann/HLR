@@ -1,11 +1,11 @@
 #ifndef __HLR_SEQ_ARITH_LAZY_HH
 #define __HLR_SEQ_ARITH_LAZY_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : seq/arith_lazy.hh
 // Description : sequential arithmetic functions using lazy evaluation
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

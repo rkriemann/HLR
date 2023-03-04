@@ -1,11 +1,11 @@
 #ifndef __HLR_APPROX_ACA_HH
 #define __HLR_APPROX_ACA_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : approx/aca
 // Description : low-rank approximation functions using ACA
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <vector>

@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : tlr-hpx.cc
+// Module      : tlr-hpx.cc
 // Description : HODLR LU with HPX
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpx/hpx_init.hpp>

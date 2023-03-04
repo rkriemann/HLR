@@ -2,10 +2,10 @@
 #define __HLR_BEM_BASE_HCA_HH
 //
 // Project     : HLR
-// File        : base_hca.hh
+// Module      : base_hca.hh
 // Description : base class for various HCA algorithms
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <vector>

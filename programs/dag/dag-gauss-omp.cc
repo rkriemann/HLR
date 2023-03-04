@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : gauss-omp.cc
+// Module      : gauss-omp.cc
 // Description : DAG based Gaussian Elimination using OpenMP
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/omp/matrix.hh"

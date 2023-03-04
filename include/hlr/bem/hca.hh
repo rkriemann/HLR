@@ -2,10 +2,10 @@
 #define __HLR_BEM_HCA_HH
 //
 // Project     : HLR
-// File        : hca.hh
+// Module      : hca.hh
 // Description : HCA implementation using tiled low-rank matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <vector>

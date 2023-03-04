@@ -2,10 +2,10 @@
 #define __HLR_CLUSTER_TILEH_HH
 //
 // Project     : HLR
-// File        : tileh.hh
+// Module      : tileh.hh
 // Description : TileH related clustering functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/cluster/TCoordinate.hh>

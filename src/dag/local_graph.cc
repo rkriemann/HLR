@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : local_graph.cc
+// Project     : HLR
+// Module      : local_graph.cc
 // Description : represents a local graph during refinment
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <fstream>

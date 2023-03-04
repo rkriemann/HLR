@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_LU_HH
 #define __HLR_ARITH_LU_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : arith/lu
 // Description : LU factorization functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/arith/multiply.hh>

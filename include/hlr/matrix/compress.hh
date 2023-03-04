@@ -1,11 +1,11 @@
 #ifndef __HLR_MATRIX_COMPRESS_HH
 #define __HLR_MATRIX_COMPRESS_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : matrix/compress
 // Description : matrix compression functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

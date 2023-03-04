@@ -5,7 +5,7 @@
 // Module      : hpx/cluster_basis
 // Description : functions for cluster bases using HPX
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpx/parallel/task_block.hpp>

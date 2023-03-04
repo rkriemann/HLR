@@ -1,11 +1,11 @@
 #ifndef __HLR_TBB_ARITH_UNIFORM_MVM_HH
 #define __HLR_TBB_ARITH_UNIFORM_MVM_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : tbb/detail/uniform_mvm.hh
 // Description : matrix-vector product for uniform matrices with TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/arith/blas.hh>

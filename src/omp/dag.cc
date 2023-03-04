@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : dag.cc
+// Project     : HLR
+// Module      : dag.cc
 // Description : execute DAG using OpenMP
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <list>

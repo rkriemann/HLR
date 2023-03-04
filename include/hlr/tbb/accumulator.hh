@@ -2,10 +2,10 @@
 #define __HLR_TBB_ACCUMULATOR_HH
 //
 // Project     : HLR
-// File        : accumulator.hh
+// Module      : accumulator.hh
 // Description : implements update accumulator for H-arithmetic
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

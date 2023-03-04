@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : text.cc
+// Project     : HLR
+// Module      : text.cc
 // Description : text functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <string>

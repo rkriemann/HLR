@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_SOLVE_HH
 #define __HLR_ARITH_SOLVE_HH
 //
-// Project     : HLib
-// File        : solve.hh
+// Project     : HLR
+// Module      : solve.hh
 // Description : matrix solve functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>

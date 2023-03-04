@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : lu.cc
+// Project     : HLR
+// Module      : lu.cc
 // Description : generate DAG for Tile-H LU factorization
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/structure.hh>

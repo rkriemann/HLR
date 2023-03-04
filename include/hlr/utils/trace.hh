@@ -1,11 +1,11 @@
 #ifndef __HLR_UTILS_TRACE_HH
 #define __HLR_UTILS_TRACE_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : utils/trace
 // Description : tracing functions based on Score-P
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #if defined(HAS_SCOREP)

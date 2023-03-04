@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : hodlr-tf.cc
+// Module      : hodlr-tf.cc
 // Description : HODLR LU using cpp-taskflow
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tf/matrix.hh"

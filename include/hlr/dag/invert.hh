@@ -1,11 +1,11 @@
 #ifndef __HLR_DAG_INVERT_HH
 #define __HLR_DAG_INVERT_HH
 //
-// Project     : HLib
-// File        : invert.hh
+// Project     : HLR
+// Module      : invert.hh
 // Description : DAGs for matrix inversion
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>

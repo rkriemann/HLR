@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : lu_hodlr_tiled_laz.cc
+// Project     : HLR
+// Module      : lu_hodlr_tiled_laz.cc
 // Description : generate DAG for lazy, tiled LU factorization of HODLR matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <list>

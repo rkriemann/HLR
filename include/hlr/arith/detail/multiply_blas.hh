@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_DETAIL_MULTIPLY_BLAS_HH
 #define __HLR_ARITH_DETAIL_MULTIPLY_BLAS_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : multiply
 // Description : matrix multiplication functions for blas::matrix
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 namespace hlr {

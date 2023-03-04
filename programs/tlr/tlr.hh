@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : tlr.hh
+// Module      : tlr.hh
 // Description : TLR-LU
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <fstream>

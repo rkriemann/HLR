@@ -2,10 +2,10 @@
 #define __HLR_CLUSTER_HODLR_HH
 //
 // Project     : HLR
-// File        : hodlr.hh
+// Module      : hodlr.hh
 // Description : HODLR related clustering functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/cluster/TCoordinate.hh>

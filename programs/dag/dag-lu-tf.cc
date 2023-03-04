@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : dag-tf.cc
+// Module      : dag-tf.cc
 // Description : DAG based H-LU using TF
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tf/matrix.hh"

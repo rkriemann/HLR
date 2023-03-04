@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : dag.cc
+// Project     : HLR
+// Module      : dag.cc
 // Description : execute DAG using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <unordered_map>

@@ -2,10 +2,10 @@
 #define __HLR_MATRIX_TRIINV_EVAL_HH
 //
 // Project     : HLR
-// File        : triinv_eval.hh
+// Module      : triinv_eval.hh
 // Description : evaluation operator for the inverse of triangular matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <memory>

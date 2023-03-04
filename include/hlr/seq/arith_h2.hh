@@ -1,11 +1,11 @@
 #ifndef __HLR_SEQ_ARITH_H2_HH
 #define __HLR_SEQ_ARITH_H2_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : seq/arith_h2
 // Description : sequential arithmetic functions for H² matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/arith/h2.hh>

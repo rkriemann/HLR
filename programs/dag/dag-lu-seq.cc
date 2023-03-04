@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : dag-seq.cc
+// Module      : dag-seq.cc
 // Description : sequential H-LU using DAG
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/seq/matrix.hh"

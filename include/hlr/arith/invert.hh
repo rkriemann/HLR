@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_INVERT_HH
 #define __HLR_ARITH_INVERT_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : arith/invert
 // Description : matrix inversion functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TDenseMatrix.hh>

@@ -1,11 +1,11 @@
 #ifndef __HLR_UTILS_TOOLS_HH
 #define __HLR_UTILS_TOOLS_HH
 //
-// Project     : HLib
-// File        : tools.hh
+// Project     : HLR
+// Module      : tools.hh
 // Description : misc. functions to simplify life
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <algorithm>

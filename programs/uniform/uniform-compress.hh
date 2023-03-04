@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : uniform.hh
+// Module      : uniform.hh
 // Description : program for testing uniform matrix arithmetic
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlib-config.h>

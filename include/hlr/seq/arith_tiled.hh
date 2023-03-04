@@ -1,11 +1,11 @@
 #ifndef __HLR_SEQ_ARITH_TILED_HH
 #define __HLR_SEQ_ARITH_TILED_HH
 //
-// Project     : HLib
-// File        : arith.hh
+// Project     : HLR
+// Module      : arith.hh
 // Description : sequential tile-based arithmetic functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

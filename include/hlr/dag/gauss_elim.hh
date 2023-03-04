@@ -1,11 +1,11 @@
 #ifndef __HLR_DAG_GAUSS_ELIM_HH
 #define __HLR_DAG_GAUSS_ELIM_HH
 //
-// Project     : HLib
-// File        : gauss_elim.hh
+// Project     : HLR
+// Module      : gauss_elim.hh
 // Description : generate DAG for Gaussian elimination
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>

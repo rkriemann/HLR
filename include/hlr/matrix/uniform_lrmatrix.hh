@@ -2,10 +2,10 @@
 #define __HLR_MATRIX_UNIFORM_LRMATRIX_HH
 //
 // Project     : HLR
-// File        : uniform_lrmatrix.hh
+// Module      : uniform_lrmatrix.hh
 // Description : low-rank matrix with (joined) cluster basis
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cassert>

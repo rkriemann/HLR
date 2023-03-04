@@ -1,11 +1,11 @@
 #ifndef __HLR_MATRIX_CONVERT_HH
 #define __HLR_MATRIX_CONVERT_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : matrix/convert
 // Description : matrix conversion functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

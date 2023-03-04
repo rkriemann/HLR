@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_MULVEC_HH
 #define __HLR_ARITH_MULVEC_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : mul_vec
 // Description : matrix-vector multiplication functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/utils/log.hh"

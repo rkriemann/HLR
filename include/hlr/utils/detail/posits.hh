@@ -5,7 +5,7 @@
 // Module      : utils/detail/posits
 // Description : posits related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 ////////////////////////////////////////////////////////////

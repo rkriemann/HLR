@@ -1,11 +1,11 @@
 #ifndef __HLR_GASPI_HH
 #define __HLR_GASPI_HH
 //
-// Project     : HLib
-// File        : gaspi.hh
+// Project     : HLR
+// Module      : gaspi.hh
 // Description : C++ GASPI/GPI wrapper
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cassert>

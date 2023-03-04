@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : dag.hh
+// Module      : dag.hh
 // Description : main function for DAG examples
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "common.hh"

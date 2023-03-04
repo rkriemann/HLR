@@ -5,7 +5,7 @@
 // Module      : matrix/info
 // Description : functions returning specific information about matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/config.h>

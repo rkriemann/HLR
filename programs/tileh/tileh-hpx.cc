@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : tileh-hpx.cc
+// Module      : tileh-hpx.cc
 // Description : Tile-H arithmetic using HPX
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpx/hpx_init.hpp>

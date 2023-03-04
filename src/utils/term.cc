@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : term.cc
+// Module      : term.cc
 // Description : basic functions to handle/modify terminal output
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <iostream>

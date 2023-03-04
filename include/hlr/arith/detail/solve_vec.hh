@@ -1,11 +1,11 @@
 #ifndef __HLR_ARITH_DETAIL_SOLVE_VEC_HH
 #define __HLR_ARITH_DETAIL_SOLVE_VEC_HH
 //
-// Project     : HLib
-// File        : solve.hh
+// Project     : HLR
+// Module      : solve.hh
 // Description : vector solve functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hlr/arith/mulvec.hh>

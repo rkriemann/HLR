@@ -5,7 +5,7 @@
 // Module      : arith/blas_def
 // Description : definition of various BLAS/LAPACK functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/blas/lapack.hh>

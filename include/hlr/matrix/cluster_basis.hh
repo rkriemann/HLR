@@ -5,7 +5,7 @@
 // Module      : matrix/cluster_basis
 // Description : (non-nested) cluster basis
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/config.h>

@@ -2,10 +2,10 @@
 #define __HLR_MATRIX_LUINV_EVAL_HH
 //
 // Project     : HLR
-// File        : luinv_eval.hh
+// Module      : luinv_eval.hh
 // Description : evaluation operator for the inverse of LU factorizations
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <memory>

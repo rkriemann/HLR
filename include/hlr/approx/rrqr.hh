@@ -2,11 +2,11 @@
 #ifndef __HLR_APPROX_RRQR_HH
 #define __HLR_APPROX_RRQR_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : approx/rrqr
 // Description : low-rank approximation functions using rank revealing QR
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <list>

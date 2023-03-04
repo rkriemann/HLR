@@ -1,11 +1,11 @@
 #ifndef __HLR_APPS_PROBLEM_HH
 #define __HLR_APPS_PROBLEM_HH
 //
-// Project     : HLib
-// File        : problem.hh
+// Project     : HLR
+// Module      : problem.hh
 // Description : basic interface for applications
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <hpro/cluster/TCoordinate.hh>

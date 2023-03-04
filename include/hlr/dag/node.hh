@@ -1,11 +1,11 @@
 #ifndef __HLR_DAG_NODE_HH
 #define __HLR_DAG_NODE_HH
 //
-// Project     : HLib
-// File        : Node.hh
+// Project     : HLR
+// Module      : Node.hh
 // Description : node in a compute DAG
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <vector>

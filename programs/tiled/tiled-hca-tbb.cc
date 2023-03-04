@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : tiled-hca-tbb.cc
+// Module      : tiled-hca-tbb.cc
 // Description : tiled HCA based construction using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tbb/matrix.hh"

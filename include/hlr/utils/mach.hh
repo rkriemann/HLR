@@ -2,10 +2,10 @@
 #define __HLR_UTILS_MACH_HH
 //
 // Project     : HLR
-// File        : mach.hh
+// Module      : mach.hh
 // Description : machine related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <string>

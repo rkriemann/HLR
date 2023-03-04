@@ -2,10 +2,10 @@
 #define __HLR_UTILS_TERM_HH
 //
 // Project     : HLR
-// File        : term.hh
+// Module      : term.hh
 // Description : basic functions to handle/modify terminal output
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <ostream>

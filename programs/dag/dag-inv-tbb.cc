@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : dag-inv-tbb.cc
+// Module      : dag-inv-tbb.cc
 // Description : DAG based inversion using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/tbb/matrix.hh"

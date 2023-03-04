@@ -5,7 +5,7 @@
 // Module      : utils/detail/lz4
 // Description : LZ4 related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2022. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #if defined(HAS_LZ4)

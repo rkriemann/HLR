@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// File        : hodlr-seq.cc
+// Module      : hodlr-seq.cc
 // Description : sequential tile-based HODLR arithmetic
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include "hlr/seq/matrix.hh"

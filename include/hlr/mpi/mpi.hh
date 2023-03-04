@@ -1,11 +1,11 @@
 #ifndef  __HLR_MPI_HH
 #define  __HLR_MPI_HH
 //
-// Project     : HLib
-// File        : mpi.hh
+// Project     : HLR
+// Module      : mpi.hh
 // Description : C++ MPI wrapper
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 // prevent warnings MPI headers

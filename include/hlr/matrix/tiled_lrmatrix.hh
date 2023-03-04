@@ -2,10 +2,10 @@
 #define __HLR_MATRIX_TILED_LRMATRIX_HH
 //
 // Project     : HLR
-// File        : tiled_lrmatrix.hh
+// Module      : tiled_lrmatrix.hh
 // Description : low-rank matrix with tiled storage
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2020. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cassert>

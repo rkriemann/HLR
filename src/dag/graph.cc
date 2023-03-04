@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : graph.cc
+// Project     : HLR
+// Module      : graph.cc
 // Description : represents a graph in a DAG
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <fstream>

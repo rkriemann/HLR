@@ -1,11 +1,11 @@
 #ifndef __HLIB_TENSOR_HH
 #define __HLIB_TENSOR_HH
 //
-// Project     : HLib
-// File        : matrix.hh
+// Project     : HLR
+// Module      : matrix.hh
 // Description : tensor containers based on std::vector
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2018. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <vector>

@@ -1,9 +1,9 @@
 //
-// Project     : HLib
-// File        : Helmholtz.cc
+// Project     : HLR
+// Module      : Helmholtz.cc
 // Description : functions for logarithmic kernel function
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <cassert>

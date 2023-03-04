@@ -1,11 +1,11 @@
 #ifndef __HLR_DAG_GRAPH_HH
 #define __HLR_DAG_GRAPH_HH
 //
-// Project     : HLib
-// File        : graph.hh
+// Project     : HLR
+// Module      : graph.hh
 // Description : graph representing compute DAG
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2019. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <map>

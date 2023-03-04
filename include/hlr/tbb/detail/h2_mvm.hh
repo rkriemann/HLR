@@ -1,11 +1,11 @@
 #ifndef __HLR_TBB_DETAIL_ARITH_H2_HH
 #define __HLR_TBB_DETAIL_ARITH_H2_HH
 //
-// Project     : HLib
+// Project     : HLR
 // Module      : tbb/detail/h2_mvm.hh
 // Description : matrix-vector multiplication for H² matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 #include <tbb/parallel_for.h>
