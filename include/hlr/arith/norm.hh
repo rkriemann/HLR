@@ -10,10 +10,11 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
-#include "hlr/arith/defaults.hh"
-#include "hlr/matrix/product.hh"
-#include "hlr/matrix/sum.hh"
-#include "hlr/matrix/identity.hh"
+#include <hlr/arith/defaults.hh>
+#include <hlr/matrix/product.hh>
+#include <hlr/matrix/sum.hh>
+#include <hlr/matrix/identity.hh>
+#include <hlr/matrix/linop.hh>
 
 namespace hlr { namespace norm {
 
@@ -87,7 +88,9 @@ frobenius ( const alpha_t                     alpha,
 //
 template < typename arithmetic_t,
            typename operator_t >
-requires provides_arithmetic< arithmetic_t >
+requires ( provides_arithmetic< arithmetic_t > &&
+           has_value_type< operator_t > &&
+           is_linear_operator< operator_t > )
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
@@ -99,6 +102,7 @@ spectral ( arithmetic_t &&     arithmetic,
 }
 
 template < typename operator_t >
+requires ( is_linear_operator< operator_t > )
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( const operator_t &  A,
            const double        atol    = 1e-3,
@@ -109,13 +113,18 @@ spectral ( const operator_t &  A,
 }
 
 template < typename arithmetic_t,
-           typename value_t >
-requires provides_arithmetic< arithmetic_t >
-Hpro::real_type_t< value_t >
-inv_error_2 ( arithmetic_t &&                           arithmetic,
-              const Hpro::TLinearOperator< value_t > &  A,
-              const Hpro::TLinearOperator< value_t > &  A_inv )
+           typename operatorA_t,
+           typename operatorB_t >
+requires ( provides_arithmetic< arithmetic_t > &&
+           is_linear_operator< operatorA_t > &&
+           is_linear_operator< operatorB_t > )
+Hpro::real_type_t< Hpro::value_type_t< operatorA_t > >
+inv_error_2 ( arithmetic_t &&      arithmetic,
+              const operatorA_t &  A,
+              const operatorB_t &  A_inv )
 {
+    using value_t = Hpro::value_type_t< operatorA_t >;
+    
     auto  AxInv   = matrix::product( A, A_inv );
     auto  I       = matrix::identity< value_t >( A.block_is() );
     auto  inv_err = matrix::sum( 1.0, *I, -1.0, *AxInv );
@@ -123,10 +132,13 @@ inv_error_2 ( arithmetic_t &&                           arithmetic,
     return spectral( arithmetic, *inv_err );
 }
 
-template < typename value_t >
-Hpro::real_type_t< value_t >
-inv_error_2 ( const Hpro::TLinearOperator< value_t > &  A,
-              const Hpro::TLinearOperator< value_t > &  A_inv )
+template < typename operatorA_t,
+           typename operatorB_t >
+requires ( is_linear_operator< operatorA_t > &&
+           is_linear_operator< operatorB_t > )
+Hpro::real_type_t< Hpro::value_type_t< operatorA_t > >
+inv_error_2 ( const operatorA_t &  A,
+              const operatorB_t &  A_inv )
 {
     return inv_error_2( hlr::arithmetic, A, A_inv );
 }
