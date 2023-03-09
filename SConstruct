@@ -37,6 +37,9 @@ HPX_DIR      = '/'
 GPI2_DIR     = '/'
 CUDA_DIR     = '/'
 
+eigen        = 0
+EIGEN_DIR    = '/'
+
 JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
@@ -234,6 +237,8 @@ opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_D
 opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
 opts.Add(               'lapackflags',   'user defined link flags for lapack', default = LAPACK_FLAGS )
 opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
+opts.Add( BoolVariable( 'eigen',         'use Eigen library',                  eigen ) )
+opts.Add( PathVariable( 'eigen_dir',     'Eigen installation directory',       EIGEN_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'likwid',        'use likwid library',                 likwid ) )
 opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',      LIKWID_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'scorep',        'use Score-P library',                scorep ) )
@@ -309,6 +314,8 @@ TCMALLOC_DIR  = opt_env['tcmalloc']
 lapack        = opt_env['lapack']
 LAPACK_FLAGS  = opt_env['lapackflags']
 malloc        = opt_env['malloc']
+eigen         = opt_env['eigen']
+EIGEN_DIR     = opt_env['eigen_dir']
 likwid        = opt_env['likwid']
 LIKWID_DIR    = opt_env['likwid_dir']
 scorep        = opt_env['scorep']
@@ -483,6 +490,11 @@ elif malloc == 'tbbmalloc' :
 elif malloc == 'tcmalloc' :
     env.Append( LIBPATH = os.path.join( TCMALLOC_DIR, 'lib' ) )
     env.Append( LIBS    = 'tcmalloc' )
+
+# include Eigen
+if eigen and EIGEN_DIR != None :
+    env.Append( CPPDEFINES = 'HAS_EIGEN' )
+    env.Append( CPPPATH    = os.path.join( EIGEN_DIR, 'include/eigen3' ) )
 
 # include likwid performance monitoring library
 if likwid and LIKWID_DIR != None :
