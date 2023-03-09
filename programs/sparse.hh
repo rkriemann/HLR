@@ -9,6 +9,8 @@
 #include <common.hh>
 #include <common-main.hh>
 
+#include <hpro/io/TMatrixIO.hh>
+
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/io.hh>
 
@@ -23,5 +25,8 @@ program_main ()
 {
     using value_t = double;
 
-    matrix::sparse_matrix< value_t >  S;
+    auto  M1 = Hpro::read_matrix< value_t >( "S.mat" );
+    auto  S1 = ptrcast( M1.get(), Hpro::TSparseMatrix< value_t > );
+    
+    matrix::sparse_matrix< value_t >  S2( *S1 );
 }

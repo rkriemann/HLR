@@ -13,6 +13,7 @@
 #endif
 
 #include <hpro/matrix/TMatrix.hh>
+#include <hpro/matrix/TSparseMatrix.hh>
 
 namespace hlr
 { 
@@ -33,7 +34,7 @@ class sparse_matrix : public Hpro::TMatrix< T_value >
 public:
     using  value_t = T_value;
     using  real_t  = Hpro::real_type_t< value_t >;
-    using  spmat_t = Eigen::SparseMatrix< value_t >;
+    using  spmat_t = Eigen::SparseMatrix< value_t, Eigen::RowMajor >;
     
 private:
     // local index set of matrix
@@ -59,6 +60,8 @@ public:
             , _S( arow_is.size(), acol_is.size() )
     {}
 
+    sparse_matrix ( const Hpro::TSparseMatrix< value_t > &  S );
+    
     // dtor
     virtual ~sparse_matrix ()
     {}
@@ -222,6 +225,104 @@ HLR_TEST_ALL( is_sparse_eigen, Hpro::TMatrix< value_t > )
 HLR_TEST_ANY( is_sparse_eigen, Hpro::TMatrix< value_t > )
 
 //
+// ctors
+//
+template < typename value_t >
+struct crs_triplet
+{
+    size_t   r;
+    idx_t    c;
+    value_t  v;
+
+    size_t   row   () const { return r; }
+    idx_t    col   () const { return c; }
+    value_t  value () const { return v; }
+};
+
+template < typename value_t >
+struct crs_triplet_iterator
+{
+    using  value_type      = crs_triplet< value_t >;
+    using  difference_type = std::ptrdiff_t;
+    using  pointer         = value_type *;
+    using  reference       = value_type &;
+        
+    size_t                                  row;
+    size_t                                  pos;
+    const Hpro::TSparseMatrix< value_t > *  S;
+    mutable crs_triplet< value_t >          ref;
+    
+    crs_triplet_iterator () = delete;
+    crs_triplet_iterator ( const size_t                            arow,
+                           const size_t                            apos,
+                           const Hpro::TSparseMatrix< value_t > &  aS )
+            : row(arow)
+            , pos(apos)
+            , S(&aS)
+    {
+        HLR_ASSERT( S != nullptr );
+    }
+
+    crs_triplet_iterator  operator ++ ()
+    {
+        ++pos;
+        
+        if ( pos >= S->rowptr( row+1 ) )
+            ++row;
+
+        return crs_triplet_iterator( row, pos, *S );
+    }
+    crs_triplet_iterator  operator ++ (int)
+    {
+        auto  it = crs_triplet_iterator( row, pos++, *S );
+
+        if ( pos >= S->rowptr( row+1 ) )
+            ++row;
+
+        return it;
+    }
+
+    crs_triplet_iterator  operator -- ()
+    {
+        --pos;
+        
+        if ( pos < S->rowptr( row ) )
+            --row;
+
+        return crs_triplet_iterator( row, pos, *S );
+    }
+    crs_triplet_iterator  operator -- (int)
+    {
+        auto  it = crs_triplet_iterator( row, pos--, *S );
+
+        if ( pos < S->rowptr( row ) )
+            --row;
+
+        return it;
+    }
+
+    value_type    operator *  () const noexcept { return crs_triplet{ row, S->colind( pos ), S->coeff( pos ) }; }
+    pointer       operator -> () const noexcept { ref = crs_triplet{ row, S->colind( pos ), S->coeff( pos ) }; return &ref; }
+
+    bool      operator == ( const crs_triplet_iterator &  it ) const noexcept { return pos == it.pos; }
+    bool      operator != ( const crs_triplet_iterator &  it ) const noexcept { return pos != it.pos; }
+};
+
+template < typename value_t >
+sparse_matrix< value_t >::sparse_matrix ( const Hpro::TSparseMatrix< value_t > &  S )
+        : _row_is( S.row_is() )
+        , _col_is( S.col_is() )
+        , _S( S.nrows(), S.ncols() )
+{
+    auto  begin_S = crs_triplet_iterator( 0, 0, S );
+    auto  end_S   = crs_triplet_iterator( S.nrows(), S.n_non_zero(), S );
+
+    _S.setFromTriplets( begin_S, end_S );
+
+    std::cout << Eigen::MatrixXd( _S ) << std::endl;
+}
+
+//
 // matrix vector multiplication
 //
 template < typename value_t >
@@ -236,10 +337,10 @@ sparse_matrix< value_t >::mul_vec  ( const value_t                     alpha,
 
 template < typename value_t >
 void
-sparse_matrix< value_t >::apply_add ( const value_t                   alpha,
+sparse_matrix< value_t >::apply_add ( const value_t                    alpha,
                                       const blas::vector< value_t > &  x,
                                       blas::vector< value_t > &        y,
-                                      const matop_t                   op ) const
+                                      const matop_t                    op ) const
 {
 }
 
