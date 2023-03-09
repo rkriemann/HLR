@@ -17,6 +17,7 @@
 #include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
+#include <hlr/utils/detail/afloat.hh>
 
 #include <hlr/utils/io.hh> // DEBUG
 
@@ -708,10 +709,10 @@ mplrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
     
 template < typename value_t >
 void
-mplrmatrix< value_t >::apply_add ( const value_t                   alpha,
+mplrmatrix< value_t >::apply_add ( const value_t                    alpha,
                                    const blas::vector< value_t > &  x,
                                    blas::vector< value_t > &        y,
-                                   const matop_t                   op ) const
+                                   const matop_t                    op ) const
 {
     if ( is_compressed() )
     {

@@ -44,6 +44,26 @@ get_column ( const blas::matrix< value_t > &  M,
 
 template < typename value_t >
 void
+apply ( const blas::matrix< value_t > &  M,
+        const blas::vector< value_t > &  x,
+        blas::vector< value_t > &        y,
+        const matop_t                    op_M )
+{
+    blas::mulvec( value_t(1), blas::mat_view( op_M, M ), x, value_t(0), y );
+}
+
+template < typename value_t >
+void
+apply ( const blas::matrix< value_t > &  M,
+        const blas::matrix< value_t > &  X,
+        blas::matrix< value_t > &        Y,
+        const matop_t                    op_M )
+{
+    blas::prod( value_t(1), blas::mat_view( op_M, M ), X, value_t(0), Y );
+}
+
+template < typename value_t >
+void
 prod ( const value_t                    alpha,
        const matop_t                    op_M,
        const blas::matrix< value_t > &  M,

@@ -14,8 +14,7 @@
 #include <gsl/gsl_sf_bessel.h>
 #include <gsl/gsl_sf_gamma.h>
 #else
-#include <boost/math/special_functions/gamma.hpp>
-#include <boost/math/special_functions/bessel.hpp>
+#include <cmath>
 #endif
 
 #include <hpro/matrix/TCoeffFn.hh>
@@ -274,7 +273,7 @@ struct matern_covariance_function
         #if USE_GSL == 1
         const auto  bessel_r = gsl_sf_bessel_Knu( nu, nu_l_r );
         #else
-        const auto  bessel_r = boost::math::cyl_bessel_k( nu, nu_l_r );
+        const auto  bessel_r = std::cyl_bessel_k( nu, nu_l_r );
         #endif
         
         return gamma_nu * bessel_r * std::pow( nu_l_r, nu );
@@ -286,7 +285,7 @@ struct matern_covariance_function
         #if USE_GSL == 1
         const auto  gamma_nu = gsl_sf_gamma( anu );
         #else
-        const auto  gamma_nu = boost::math::tgamma( anu );
+        const auto  gamma_nu = std::tgamma( anu );
         #endif
         
         return math::sqrt( asigma ) * std::pow( value_t(2), value_t(1) - nu ) / gamma_nu;

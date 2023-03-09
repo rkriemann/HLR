@@ -11,6 +11,8 @@
 #include <hpro/matrix/TLinearOperator.hh>
 #include <hpro/vector/TVector.hh>
 
+#include <hlr/arith/operator_wrapper.hh>
+
 namespace hlr {
 
 //
@@ -25,12 +27,12 @@ template < typename T > concept has_value_type = requires
 // concept for types having apply functions
 //
 template < typename T > concept has_apply_func = 
-    requires ( T  linop,
-               const Hpro::TVector< Hpro::value_type_t< T > > *  x,
-               Hpro::TVector< Hpro::value_type_t< T > > *        y,
-               const Hpro::matop_t                               matop )
+    requires ( const T &                                        linop,
+               const blas::vector< Hpro::value_type_t< T > > &  x,
+               blas::vector< Hpro::value_type_t< T > > &        y,
+               const Hpro::matop_t                              matop )
     {
-        { linop.apply( x, y, matop ) };
+        { apply( linop, x, y, matop ) };
     };
     
 //

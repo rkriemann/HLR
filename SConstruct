@@ -12,8 +12,7 @@ from datetime import datetime
 ######################################################################
 
 fullmsg      = False
-debug        = False
-optimise     = True
+buildtype    = 'debug'
 warn         = False
 color        = True
 
@@ -260,8 +259,7 @@ opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   U
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS, ignorecase = 2 ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
-opts.Add( BoolVariable( 'debug',     'enable building with debug informations',   debug ) )
-opts.Add( BoolVariable( 'optimise',  'enable building with optimisation',         optimise ) )
+opts.Add( EnumVariable( 'buildtype', 'how to build the binaries (debug/release)', buildtype, allowed_values = [ 'debug', 'release' ], ignorecase = 2 ) )
 opts.Add( BoolVariable( 'warn',      'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',     'use colored output during compilation',     color ) )
 
@@ -335,8 +333,7 @@ universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 compressor    = opt_env['compressor']
 
-debug         = opt_env['debug']
-optimise      = opt_env['optimise']
+buildtype     = opt_env['buildtype']
 fullmsg       = opt_env['fullmsg']
 warn          = opt_env['warn']
 color         = opt_env['color']
@@ -408,7 +405,7 @@ else :
 #
 ######################################################################
 
-if debug :
+if buildtype == 'debug' :
     OPTFLAGS  = '-g -march=native'
     LINKFLAGS = '-g'
     DEFINES   = ''
@@ -439,7 +436,7 @@ if not fullmsg :
     env.Replace( RANLIBCOMSTR = ' %sIndex%s  %s$TARGET%s'  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
 
 # ensure NDEBUG is set in optimization mode
-if not debug :
+if buildtype == 'release' :
     env.Append(  CPPDEFINES = [ 'NDEBUG' ] )
 
 # add internal paths and libraries
@@ -656,8 +653,7 @@ def show_help ( target, source, env ):
     print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}buildtype{1}  │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), 'debug/release' )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -730,8 +726,7 @@ def show_options ( target, source, env ):
     print( '  {0}zstd{1}       │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
     print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}optimise{1}   │ enable compiler optimisations │'.format( colors['bold'], colors['reset'] ), bool_str[ optimise ] )
-    print( '  {0}debug{1}      │ enable debug information      │'.format( colors['bold'], colors['reset'] ), bool_str[ debug ] )
+    print( '  {0}buildtype{1}  │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
     print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
     print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
     print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )

@@ -141,7 +141,7 @@ write ( const blas::vector< value_t > &  v,
 }
 
 //
-// read matrix with given matrix name from given Matlab file
+// read matrix with given matrix name from given file
 // - if matrix name is empty, first matrix in file is returned
 //
 template < typename value_t >
@@ -169,7 +169,7 @@ namespace hdf5
 {
 
 //
-// write blas matrix/vector in Matlab format with given name
+// write blas matrix/vector in HDF5 format with given name
 // - if filename is empty, the matrix/vector name is used
 //
 template < typename value_t >
@@ -212,8 +212,7 @@ write ( const Hpro::TMatrix< value_t > *  M,
 }
 
 //
-// read matrix with given matrix name from given Matlab file
-// - if matrix name is empty, first matrix in file is returned
+// read matrix from given file
 //
 template < typename value_t >
 blas::matrix< value_t >
@@ -225,6 +224,29 @@ read ( const std::string &  filename )
     HLR_ASSERT( is_dense( *D ) );
     
     return std::move( blas::mat( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > ) ) );
+}
+
+}// namespace hdf5
+
+//////////////////////////////////////////////////////////////////////
+//
+// NetCDF format
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace h2lib
+{
+
+//
+// read matrix with given matrix name from given file
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+read ( const std::string &  filename )
+{
+    Hpro::TH2LibMatrixIO  mio;
+
+    return mio.read< value_t >( filename );
 }
 
 }// namespace hdf5

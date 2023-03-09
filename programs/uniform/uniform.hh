@@ -41,6 +41,37 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    if ( false )
+    {
+        auto  A = io::h2lib::read< value_t >( "V.cdf" );
+
+        std::cout << "    dims   = " << term::bold << A->nrows() << " × " << A->ncols() << term::reset << std::endl;
+        std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+        std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
+        
+        auto  acc = gen_accuracy();
+        auto  apx = approx::SVD< value_t >();
+        
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
+
+        std::cout << "    ranks  = "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
+
+        {
+            const auto  normA = hlr::norm::spectral( impl::arithmetic, *A, 1e-4 );
+            auto        diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto        error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+    }
+    
     auto  runtime = std::vector< double >();
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
@@ -92,7 +123,7 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
-    const auto  normA = hlr::norm::spectral( *A, 1e-4 );
+    const auto  normA = hlr::norm::spectral( impl::arithmetic, *A, 1e-4 );
 
     std::cout << "    |A|    = " << format_norm( norm::frobenius( *A ) ) << std::endl;
     
@@ -133,8 +164,8 @@ program_main ()
                   << col_min << " … " << col_avg << " … " << col_max << std::endl;
         
         {
-            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-            auto  error = hlr::norm::spectral( *diff, 1e-4 );
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
@@ -166,8 +197,8 @@ program_main ()
         }// if
         
         {
-            auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-            auto  error = hlr::norm::spectral( *diff, 1e-4 );
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
@@ -212,8 +243,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
 
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::norm::spectral( *diff, 1e-4 );
+        auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+        auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }// if
@@ -270,8 +301,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::norm::spectral( *diff, 1e-4 );
+        auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+        auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         

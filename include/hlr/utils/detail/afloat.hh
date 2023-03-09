@@ -917,8 +917,8 @@ decompress< std::complex< double > > ( const zarray &            zdata,
 
 template < typename value_t >
 zarray
-compress_lr ( const blas::matrix< value_t > &                        U,
-              const blas::vector< Hpro::real_type_t< value_t > > &   S );
+compress_lr ( const blas::matrix< value_t > &                       U,
+              const blas::vector< Hpro::real_type_t< value_t > > &  S );
 
 template < typename value_t >
 void
@@ -962,8 +962,6 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         e[l] = uint( std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
         m[l] = tol_to_rate( S(l) );
 
-        // std::cout << m[l] << ", ";
-        
         const size_t  nbits      = 1 + e[l] + m[l]; // number of bits per value
         const size_t  n_tot_bits = n * nbits;       // number of bits for all values in column
         
@@ -973,6 +971,8 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             zsize += sizeof(double) + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
     }// for
 
+    // for ( uint  l = 0; l < k; ++l )
+    //   std::cout << e[l] << '/' << m[l] << ", ";
     // std::cout << std::endl;
 
     //

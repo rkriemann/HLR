@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <concepts>
+
 #include <hpro/matrix/TLinearOperator.hh>
 
 // #include <hlr/matrix/arithmetic_support.hh>
@@ -274,6 +276,8 @@ sum ( const Hpro::TLinearOperator< value_t > &  A0,
 template < typename alpha0_t,
            typename alpha1_t,
            typename value_t >
+requires ( ( std::convertible_to< alpha0_t, value_t > ) &&
+           ( std::convertible_to< alpha1_t, value_t > ) )
 std::unique_ptr< linop_sum< value_t > >
 sum ( const alpha0_t                            alpha0,
       const Hpro::TLinearOperator< value_t > &  A0,
@@ -284,17 +288,21 @@ sum ( const alpha0_t                            alpha0,
                                                      value_t(alpha1), apply_normal, A1 );
 }
                  
-template < typename value_t >
+template < typename alpha0_t,
+           typename alpha1_t,
+           typename value_t >
+requires ( ( std::convertible_to< alpha0_t, value_t > ) &&
+           ( std::convertible_to< alpha1_t, value_t > ) )
 std::unique_ptr< linop_sum< value_t > >
-sum ( const value_t                             alpha0,
+sum ( const alpha0_t                            alpha0,
       const matop_t                             op0,
       const Hpro::TLinearOperator< value_t > &  A0,
-      const value_t                             alpha1,
+      const alpha1_t                            alpha1,
       const matop_t                             op1,
       const Hpro::TLinearOperator< value_t > &  A1 )
 {
-    return std::make_unique< linop_sum< value_t > >( alpha0, op0, A0,
-                                                     alpha1, op1, A1 );
+    return std::make_unique< linop_sum< value_t > >( value_t(alpha0), op0, A0,
+                                                     value_t(alpha1), op1, A1 );
 }
     
 
@@ -309,35 +317,47 @@ sum ( const Hpro::TLinearOperator< value_t > &  A0,
                                                      value_t(1), apply_normal, A2 );
 }
     
-template < typename value_t >
+template < typename alpha0_t,
+           typename alpha1_t,
+           typename alpha2_t,
+           typename value_t >
+requires ( ( std::convertible_to< alpha0_t, value_t > ) &&
+           ( std::convertible_to< alpha1_t, value_t > ) &&
+           ( std::convertible_to< alpha2_t, value_t > ) )
 std::unique_ptr< linop_sum< value_t > >
-sum ( const value_t                             alpha0,
+sum ( const alpha0_t                            alpha0,
       const Hpro::TLinearOperator< value_t > &  A0,
-      const value_t                             alpha1,
+      const alpha1_t                            alpha1,
       const Hpro::TLinearOperator< value_t > &  A1,
-      const value_t                             alpha2,
+      const alpha2_t                            alpha2,
       const Hpro::TLinearOperator< value_t > &  A2 )
 {
-    return std::make_unique< linop_sum< value_t > >( alpha0, apply_normal, A0,
-                                                     alpha1, apply_normal, A1,
-                                                     alpha2, apply_normal, A2 );
+    return std::make_unique< linop_sum< value_t > >( value_t(alpha0), apply_normal, A0,
+                                                     value_t(alpha1), apply_normal, A1,
+                                                     value_t(alpha2), apply_normal, A2 );
 }
                  
-template < typename value_t >
+template < typename alpha0_t,
+           typename alpha1_t,
+           typename alpha2_t,
+           typename value_t >
+requires ( ( std::convertible_to< alpha0_t, value_t > ) &&
+           ( std::convertible_to< alpha1_t, value_t > ) &&
+           ( std::convertible_to< alpha2_t, value_t > ) )
 std::unique_ptr< linop_sum< value_t > >
-sum ( const value_t                             alpha0,
+sum ( const alpha0_t                            alpha0,
       const matop_t                             op0,
       const Hpro::TLinearOperator< value_t > &  A0,
-      const value_t                             alpha1,
+      const alpha1_t                            alpha1,
       const matop_t                             op1,
       const Hpro::TLinearOperator< value_t > &  A1,
-      const value_t                             alpha2,
+      const alpha2_t                            alpha2,
       const matop_t                             op2,
       const Hpro::TLinearOperator< value_t > &  A2 )
 {
-    return std::make_unique< linop_sum< value_t > >( alpha0, op0, A0,
-                                                     alpha1, op1, A1,
-                                                     alpha2, op2, A2 );
+    return std::make_unique< linop_sum< value_t > >( value_t(alpha0), op0, A0,
+                                                     value_t(alpha1), op1, A1,
+                                                     value_t(alpha2), op2, A2 );
 }
 
 }} // namespace hlr::matrix

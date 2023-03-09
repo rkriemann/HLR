@@ -128,19 +128,19 @@ mul_vec ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    auto  tic = timer::now();
+    // auto  tic = timer::now();
     auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
     auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
-    auto  toc = timer::since( tic );
-    auto  t1  = toc.seconds();
+    // auto  toc = timer::since( tic );
+    // auto  t1  = toc.seconds();
 
-    tic = timer::now();
+    // tic = timer::now();
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y );
-    toc = timer::since( tic );
-    auto  t2  = toc.seconds();
+    // toc = timer::since( tic );
+    // auto  t2  = toc.seconds();
 
-    std::cout << t1 << " / " << t2 << std::endl;
+    // std::cout << t1 << " / " << t2 << std::endl;
 }
 
 template < typename value_t >
@@ -160,23 +160,23 @@ mul_vec2 ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    auto  tic = timer::now();
+    // auto  tic = timer::now();
     auto  cmap   = detail::is_veccoeff_map_t< value_t >();
     auto  rowmap = construct_indexset_to_block_map_rows( M, true );
     
     detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x, cmap );
-    auto  toc = timer::since( tic );
-    auto  t1  = toc.seconds();
+    // auto  toc = timer::since( tic );
+    // auto  t1  = toc.seconds();
     
-    tic = timer::now();
+    // tic = timer::now();
     if ( op_M == apply_normal )
         detail::mul_vec2( alpha, op_M, M, cmap, x, y, rowmap );
     else
         HLR_ERROR( "TO DO" );
-    toc = timer::since( tic );
-    auto  t2  = toc.seconds();
+    // toc = timer::since( tic );
+    // auto  t2  = toc.seconds();
 
-    std::cout << t1 << " / " << t2 << std::endl;
+    // std::cout << t1 << " / " << t2 << std::endl;
 }
 
 //
