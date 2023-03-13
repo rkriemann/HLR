@@ -15,6 +15,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/mulvec.hh>
 #include <hlr/matrix/lrsmatrix.hh>
+#include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/log.hh>
 
 #include <hlr/arith/detail/solve.hh>
@@ -274,6 +275,19 @@ solve_lower_tri ( const eval_side_t                 side,
                 HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
         }// else
     }// if
+    else if ( is_sparse_eigen( L ) )
+    {
+        if ( is_blocked( M ) )
+            solve_lower_tri( side, diag, * cptrcast( & L, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( is_lowrank( M ) )
+            solve_lower_tri( side, diag, * cptrcast( & L, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_lower_tri( side, diag, * cptrcast( & L, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        else if ( is_sparse_eigen( M ) )
+            solve_lower_tri( side, diag, * cptrcast( & L, matrix::sparse_matrix< value_t > ), * ptrcast( & M, matrix::sparse_matrix< value_t > ) );
+        else
+            HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
+    }// if
     else
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
 
@@ -479,6 +493,19 @@ solve_upper_tri ( const eval_side_t                 side,
             else
                 HLR_ERROR( "unsupported matrix type : " + M.typestr() );
         }// else
+    }//if
+    else if ( is_sparse_eigen( U ) )
+    {
+        if ( is_blocked( M ) )
+            solve_upper_tri( side, diag, * cptrcast( & U, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( is_lowrank( M ) )
+            solve_upper_tri( side, diag, * cptrcast( & U, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
+        else if ( is_dense( M ) )
+            solve_upper_tri( side, diag, * cptrcast( & U, matrix::sparse_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        else if ( is_sparse_eigen( M ) )
+            solve_upper_tri( side, diag, * cptrcast( & U, matrix::sparse_matrix< value_t > ), * ptrcast( & M, matrix::sparse_matrix< value_t > ) );
+        else
+            HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
     else
         HLR_ERROR( "unsupported matrix type : " + U.typestr() );

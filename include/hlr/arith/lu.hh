@@ -82,6 +82,22 @@ lu ( Hpro::TMatrix< value_t > &  A,
         if ( matrix::is_compressible( A ) )
             dynamic_cast< matrix::compressible * >( &A )->compress( acc );
     }// if
+    else if ( matrix::is_sparse_eigen( A ) )
+    {
+        auto  S = ptrcast( &A, matrix::sparse_matrix< value_t > );
+
+        S->factorize();
+
+        // auto  B = typename matrix::sparse_matrix< value_t >::spmat_t( S->nrows(), S->ncols() );
+
+        // B.setIdentity();
+
+        // std::cout << Eigen::MatrixXd( B ) << std::endl;
+        
+        // auto  X = S->solver().solve( B );
+
+        // std::cout << Eigen::MatrixXd( X ) << std::endl;
+    }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }

@@ -16,19 +16,20 @@
 #include <hpro/matrix/structure.hh>
 #include <hpro/base/TTruncAcc.hh>
 
-#include "hlr/arith/blas.hh"
-#include "hlr/approx/svd.hh" // DEBUG
-#include "hlr/matrix/cluster_basis.hh"
-#include "hlr/matrix/uniform_lrmatrix.hh"
-#include "hlr/matrix/lrmatrix.hh"
-#include "hlr/matrix/mplrmatrix.hh"
-#include "hlr/matrix/tiled_lrmatrix.hh"
-#include "hlr/matrix/convert.hh"
-#include "hlr/matrix/restrict.hh"
-#include "hlr/utils/checks.hh"
-#include "hlr/utils/tensor.hh"
+#include <hlr/arith/blas.hh>
+#include <hlr/approx/svd.hh> // DEBUG
+#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/sparse_matrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/mplrmatrix.hh>
+#include <hlr/matrix/tiled_lrmatrix.hh>
+#include <hlr/matrix/convert.hh>
+#include <hlr/matrix/restrict.hh>
+#include <hlr/utils/checks.hh>
+#include <hlr/utils/tensor.hh>
 
-#include "hlr/seq/detail/matrix.hh"
+#include <hlr/seq/detail/matrix.hh>
 
 namespace hlr { namespace seq { namespace matrix {
 
@@ -198,33 +199,27 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
 template < typename value_t,
            typename approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-build ( const Hpro::TBlockCluster *  bct,
+build ( const Hpro::TBlockCluster &             bct,
         const Hpro::TSparseMatrix< value_t > &  S,
-        const Hpro::TTruncAcc &      acc,
-        const approx_t &             apx,
-        const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+        const Hpro::TTruncAcc &                 acc,
+        const approx_t &                        apx,
+        const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    // static_assert( std::is_same< typename coeff_t::value_t,
-    //                              typename lrapx_t::value_t >::value,
-    //                "coefficient function and low-rank approximation must have equal value type" );
-    
-    HLR_ASSERT( bct != nullptr );
-    
     //
     // decide upon cluster type, how to construct matrix
     //
 
     std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
-    if ( bct->is_leaf() )
+    if ( bct.is_leaf() )
     {
         //
         // restrict to local cluster and convert to desired format
         //
 
-        auto  S_bct = hlr::matrix::restrict( S, bct->is() );
+        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
         
-        if ( bct->is_adm() )
+        if ( bct.is_adm() )
         {
             M = matrix::convert_to_lowrank( *S_bct, acc, apx );
         }// if
@@ -235,23 +230,23 @@ build ( const Hpro::TBlockCluster *  bct,
     }// if
     else
     {
-        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
         
         auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         // make sure, block structure is correct
-        if (( B->nblock_rows() != bct->nrows() ) ||
-            ( B->nblock_cols() != bct->ncols() ))
-            B->set_block_struct( bct->nrows(), bct->ncols() );
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
 
         // recurse
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
-                if ( bct->son( i, j ) != nullptr )
+                if ( ! is_null( bct.son( i, j ) ) )
                 {
-                    auto  B_ij = build( bct->son( i, j ), S, acc, apx, nseq );
+                    auto  B_ij = build( *bct.son( i, j ), S, acc, apx, nseq );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if
@@ -260,8 +255,173 @@ build ( const Hpro::TBlockCluster *  bct,
     }// else
 
     // M->set_cluster_force( bct );
-    M->set_id( bct->id() );
-    M->set_procs( bct->procs() );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
+
+    return M;
+}
+
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_nd ( const Hpro::TBlockCluster &             bct,
+           const Hpro::TSparseMatrix< value_t > &  S,
+           const Hpro::TTruncAcc &                 acc,
+           const approx_t &                        apx,
+           const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( bct.is_leaf() )
+    {
+        return build( bct, S, acc, apx, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
+
+        //
+        // recurse for diagonal
+        //
+        
+        const auto  nbr = B->nblock_rows();
+        const auto  nbc = B->nblock_cols();
+        
+        for ( uint  i = 0; i < std::min( nbr, nbc )-1; ++i )
+        {
+            if ( ! is_null( bct.son( i, i ) ) )
+            {
+                auto  B_ii = build_nd( *bct.son( i, i ), S, acc, apx, nseq );
+                
+                B->set_block( i, i, B_ii.release() );
+            }// if
+        }// for
+
+        //
+        // standard construction for interface-domain couplings
+        //
+
+        for ( uint  i = 0; i < nbr-1; ++i )
+        {
+            if ( ! is_null( bct.son( i, nbc-1 ) ) )
+            {
+                auto  B_ij = build( *bct.son( i, nbc-1 ), S, acc, apx, nseq );
+                
+                B->set_block( i, nbc-1, B_ij.release() );
+            }// if
+        }// for
+        
+        for ( uint  j = 0; j < nbc-1; ++j )
+        {
+            if ( ! is_null( bct.son( nbr-1, j ) ) )
+            {
+                auto  B_ij = build( *bct.son( nbr-1, j ), S, acc, apx, nseq );
+                
+                B->set_block( nbr-1, j, B_ij.release() );
+            }// if
+        }// for
+
+        //
+        // finally, the interface-interface block
+        //
+
+        if ( ! is_null( bct.son( nbr-1, nbc-1 ) ) )
+        {
+            auto  B_ij = build( *bct.son( nbr-1, nbc-1 ), S, acc, apx, nseq );
+                
+            B->set_block( nbr-1, nbc-1, B_ij.release() );
+        }// if
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
+
+    return M;
+}
+
+//
+// same as above but use sparse matrices instead of dense matrices
+// for non-admissible blocks
+//
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_sparse ( const Hpro::TBlockCluster &             bct,
+               const Hpro::TSparseMatrix< value_t > &  S,
+               const Hpro::TTruncAcc &                 acc,
+               const approx_t &                        apx,
+               const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( bct.is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
+        
+        if ( bct.is_adm() )
+        {
+            // M = matrix::convert_to_dense< value_t >( *S_bct );
+            M = matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else if ( is_sparse( *S_bct ) )
+        {
+            // M = std::make_unique< matrix::sparse_matrix< value_t > >( * ptrcast( S_bct.get(), Hpro::TSparseMatrix< value_t > ) );
+            M = std::move( S_bct );
+        }// else
+        else
+        {
+            M = matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
+
+        // recurse
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( ! is_null( bct.son( i, j ) ) )
+                {
+                    auto  B_ij = build_sparse( *bct.son( i, j ), S, acc, apx, nseq );
+
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
 
     return M;
 }

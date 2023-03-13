@@ -26,14 +26,14 @@ using boost::format;
 #include <hpro/cluster/TAlgCTBuilder.hh>
 #include <hpro/cluster/TAlgAdmCond.hh>
 
+using Hpro::verbose;
+
 #include <hlr/cluster/tlr.hh>
 #include <hlr/cluster/mblr.hh>
 #include <hlr/cluster/tileh.hh>
 #include <hlr/cluster/h.hh>
 
 #include <hlr/utils/timer.hh>
-
-namespace hpro = HLIB;
 
 #include "cmdline.hh"
 #include "gen_problem.hh"

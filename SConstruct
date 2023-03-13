@@ -23,7 +23,7 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
-OPTFLAGS     = '-O3 -march=native'
+OPTFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
 WARNFLAGS    = '' # '-Wall'
 LINKFLAGS    = ''
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
@@ -210,11 +210,11 @@ toc = datetime.now()
 opts = Variables( opts_file )
 
 opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
-opts.Add( ListVariable( 'addprograms',   'programs to build',                 '',    PROGRAMS   ) )
-opts.Add( ListVariable( 'subprograms',   'programs to build',                 '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'addprograms',   'add programs to build',             '',    PROGRAMS   ) )
+opts.Add( ListVariable( 'remprograms',   'remove programs to build',          '',    PROGRAMS   ) )
 opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'all', FRAMEWORKS ) )
 opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
-opts.Add( ListVariable( 'subframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
+opts.Add( ListVariable( 'remframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
 
 opts.Add(               'cxx',       'C++ compiler to use',           CXX )
 opts.Add(               'cxxflags',  'C++ compiler flags',            CXXFLAGS )
@@ -275,14 +275,14 @@ opt_env = Environment( options = opts )
 for opt in Split( opt_env['addprograms'] ) :
     if opt not in opt_env['programs'] :
         opt_env['programs'].append( opt )
-for opt in Split( opt_env['subprograms'] ) :
+for opt in Split( opt_env['remprograms'] ) :
     if opt in opt_env['programs'] :
         opt_env['programs'].remove( opt )
     
 for opt in Split( opt_env['addframeworks'] ) :
     if opt not in opt_env['frameworks'] :
         opt_env['frameworks'].append( opt )
-for opt in Split( opt_env['subframeworks'] ) :
+for opt in Split( opt_env['remframeworks'] ) :
     if opt in opt_env['frameworks'] :
         opt_env['frameworks'].remove( opt )
 
@@ -347,9 +347,9 @@ color         = opt_env['color']
 
 # remove entries to prevent saving
 del opt_env['addprograms']
-del opt_env['subprograms']
+del opt_env['remprograms']
 del opt_env['addframeworks']
-del opt_env['subframeworks']
+del opt_env['remframeworks']
 
 opts.Save( opts_file, opt_env )
 

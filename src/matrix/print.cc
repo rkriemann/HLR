@@ -26,6 +26,7 @@
 #include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/eps_printer.hh>
 #include <hlr/utils/tools.hh>
 
@@ -142,6 +143,22 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 
                 prn.restore();
             }// if
+
+            if ( contains( options, "pattern" ) )
+            {
+                auto  D = blas::matrix< value_t >();
+
+                if ( is_compressible_dense( M ) ) D = cptrcast( &M, dense_matrix< value_t > )->mat_decompressed();
+                else                              D = cptrcast( &M, Hpro::TDenseMatrix< value_t > )->blas_mat();
+
+                prn.set_gray( 0 );
+                
+                for ( uint  i = 0; i < D.nrows(); ++i )
+                    for ( uint  j = 0; j < D.ncols(); ++j )
+                        if ( D(i,j) != value_t(0) )
+                            prn.fill_rect( j     + M.col_ofs(), i     + M.row_ofs(),
+                                           j + 1 + M.col_ofs(), i + 1 + M.row_ofs() );
+            }// if
         }// if
         // else if ( is_mixedprec_lowrank( M ) && is_compressed( M ) )
         // {
@@ -186,27 +203,57 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         {
             auto  rank = cptrcast( &M, Hpro::TRkMatrix< value_t > )->rank();
 
-            if ( is_compressible_lowrank( M ) && cptrcast( &M, lrmatrix< value_t > )->is_compressed() )
-                prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
-            else
-                prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
-
-            prn.fill_rect( M.col_ofs(),
-                           M.row_ofs(),
-                           M.col_ofs() + M.ncols(),
-                           M.row_ofs() + M.nrows() );
-
-            if ( ! contains( options, "norank" ) )
+            if ( ! contains( options, "nonempty" ) || ( rank > 0 ))
             {
-                prn.save();
-                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                if ( is_compressible_lowrank( M ) && cptrcast( &M, lrmatrix< value_t > )->is_compressed() )
+                    prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+                else
+                    prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
+
+                prn.fill_rect( M.col_ofs(),
+                               M.row_ofs(),
+                               M.col_ofs() + M.ncols(),
+                               M.row_ofs() + M.nrows() );
+
+                if ( ! contains( options, "norank" ) )
+                {
+                    prn.save();
+                    prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                    
+                    prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   Hpro::to_string( "%d", rank ) );
+                    
+                    prn.restore();
+                }// if
+
+                if ( contains( options, "pattern" ) )
+                {
+                    auto  U = blas::matrix< value_t >();
+                    auto  V = blas::matrix< value_t >();
+
+                    if ( is_compressible_lowrank( M ) )
+                    {
+                        U = cptrcast( &M, lrmatrix< value_t > )->U_decompressed();
+                        V = cptrcast( &M, lrmatrix< value_t > )->V_decompressed();
+                    }// if
+                    else
+                    {
+                        U = cptrcast( &M, Hpro::TRkMatrix< value_t > )->blas_mat_A();
+                        V = cptrcast( &M, Hpro::TRkMatrix< value_t > )->blas_mat_B();
+                    }// else
+
+                    auto  D = blas::prod( U, blas::adjoint( V ) );
+                    
+                    prn.set_gray( 0 );
                 
-                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
-                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
-                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               Hpro::to_string( "%d", rank ) );
-                
-                prn.restore();
+                    for ( uint  i = 0; i < D.nrows(); ++i )
+                        for ( uint  j = 0; j < D.ncols(); ++j )
+                            if ( D(i,j) != value_t(0) )
+                                prn.fill_rect( j     + M.col_ofs(), i     + M.row_ofs(),
+                                               j + 1 + M.col_ofs(), i + 1 + M.row_ofs() );
+                }// if
             }// if
         }// if
         else if ( is_uniform_lowrank( M ) )
@@ -279,8 +326,39 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                     const auto  ub = S->rowptr( i+1 );
                     
                     for ( uint  l = lb; l < ub; ++l )
-                        prn.fill_rect( S->colind(l),   i,
-                                       S->colind(l)+1, i+1 );
+                        prn.fill_rect( S->colind(l)     + S->col_ofs(), i     + S->row_ofs(),
+                                       S->colind(l) + 1 + S->col_ofs(), i + 1 + S->row_ofs() );
+                }// for
+            }// if
+        }// if
+        else if ( is_sparse_eigen( M ) )
+        {
+            auto  S = cptrcast( &M, sparse_matrix< value_t > );
+            
+            // background
+            prn.set_rgb( colors[HLR_COLOR_BG_SPARSE] );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( contains( options, "pattern" ) )
+            {
+                using  iter_t = typename sparse_matrix< value_t >::spmat_t::InnerIterator;
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_PATTERN] );
+
+                for ( int k = 0; k < S->spmat().outerSize(); ++k )
+                {
+                    for ( iter_t  it( S->spmat(), k ); it; ++it )
+                    {
+                        const auto  val = it.value();
+                        const auto  row = it.row() + S->row_ofs();
+                        const auto  col = it.col() + S->col_ofs();
+                        
+                        prn.fill_rect( col,   row,
+                                       col+1, row+1 );
+                    }// for
                 }// for
             }// if
         }// else

@@ -47,7 +47,57 @@ multiply ( const value_t                                   alpha,
            const Hpro::TBlockMatrix< value_t > &           B,
            Hpro::TDenseMatrix< value_t > &                 C )
 {
-    HLR_ERROR( "todo" );
+    HLR_MULT_PRINT;
+
+    const uint  nbr_C = A.nblock_rows( op_A );
+    const uint  nbc_C = B.nblock_cols( op_B );
+
+    if (( nbr_C == 1 ) && ( nbc_C == 1 ))
+    {
+        //
+        // just multiple updates to C
+        //
+        
+        for ( uint  l = 0; l < A.nblock_cols( op_A ); l++ )
+        {
+            const auto A_l = A.block( 0, l, op_A );
+            const auto B_l = B.block( l, 0, op_B );
+            
+            if ( ! is_null_any( A_l, B_l ) )
+                multiply( alpha, op_A, *A_l, op_B, *B_l, C );
+        }// for
+    }// if
+    else
+    {
+        //
+        // use temporary dense matrix for each virtual sub-block of C
+        //
+        
+        for ( uint  i = 0; i < nbr_C; ++i )
+        {
+            for ( uint  j = 0; j < nbc_C; ++j )
+            {
+                auto  C_ij = std::unique_ptr< Hpro::TDenseMatrix< value_t > >();
+                
+                for ( uint  l = 0; l < A.nblock_cols( op_A ); ++l )
+                {
+                    const auto  A_il = A.block( i, l, op_A );
+                    const auto  B_lj = B.block( l, j, op_B );
+                    
+                    if ( ! is_null_any( A_il, B_lj ) )
+                    {
+                        if ( is_null( C_ij ) )
+                            C_ij = std::make_unique< Hpro::TDenseMatrix< value_t > >( A_il->row_is( op_A ), B_lj->col_is( op_B ) );
+                        
+                        multiply< value_t >( alpha, op_A, *A_il, op_B, *B_lj, *C_ij );
+                    }// if
+                }// if
+
+                if ( ! is_null( C_ij ) )
+                    C.add_block( value_t(1), value_t(1), C_ij.get() );
+            }// for
+        }// for
+    }// else
 }
 
 template < typename value_t >

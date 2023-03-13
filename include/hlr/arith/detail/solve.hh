@@ -1058,11 +1058,71 @@ solve_lower_tri ( const eval_side_t                      side,
     }// else
 }
 
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  L,
+                  Hpro::TDenseMatrix< value_t > &           M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  L,
+                  Hpro::TRkMatrix< value_t > &              M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  L,
+                  Hpro::TBlockMatrix< value_t > &           M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  L,
+                  matrix::sparse_matrix< value_t > &        M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // matrix solving with upper triangular matrix U
 //
-// solve U·X = M or X·U = M 
+// solve U·X = M (left) or X·U = M (right)
 // - on exit, M contains X
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1400,10 +1460,10 @@ template < typename value_t,
 void
 solve_upper_tri ( const eval_side_t                      side,
                   const diag_type_t                      diag,
-                  const Hpro::TDenseMatrix< value_t > &  /* U */,
-                  Hpro::TBlockMatrix< value_t > &        /* M */,
-                  const Hpro::TTruncAcc &                /* acc */,
-                  const approx_t &                       /* approx */ )
+                  const Hpro::TDenseMatrix< value_t > &  U,
+                  Hpro::TBlockMatrix< value_t > &        M,
+                  const Hpro::TTruncAcc &                acc,
+                  const approx_t &                       approx )
 {
     // HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
 
@@ -1416,6 +1476,7 @@ solve_upper_tri ( const eval_side_t                      side,
     }// if
     else
     {
+        // X U = M
         HLR_ERROR( "todo" );
     }// else
 }
@@ -1733,6 +1794,147 @@ solve_upper_tri ( const eval_side_t                      side,
         auto  V = Hpro::TDenseMatrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), M.V() );
 
         solve_upper_tri< value_t >( from_left, diag, U, V );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  U,
+                  Hpro::TDenseMatrix< value_t > &           M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    //
+    // blockwise evaluation and U is assumed to act as LU^-1
+    //
+
+    if ( side == from_left )
+    {
+        //
+        // solve U X = M => X = U^-1 M
+        //
+
+        auto  eM = Eigen::Map< Eigen::Matrix< value_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor > >( blas::mat( M ).data(), M.nrows(), M.ncols() );
+        auto  eX = U.solver().solve( eM );
+    }// if
+    else
+    {
+        //
+        // solve X U = M => X = M U^-1
+        // as X' = (U^-1)^H M'
+        //
+
+        using  nr_solve_t = std::decay< decltype(U.solver()) >::type;
+        using  nc_solve_t = std::remove_const< nr_solve_t >::type;
+        
+        auto  MH  = blas::copy( blas::adjoint( blas::mat( M ) ) );
+        auto  eMH = Eigen::Map< Eigen::Matrix< value_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor > >( MH.data(), MH.nrows(), MH.ncols() );
+        auto  UH  = const_cast< nc_solve_t * >( & U.solver() )->adjoint();
+        auto  eX  = Eigen::MatrixX< value_t >( UH.solve( eMH ) );
+
+        std::copy( eX.data(), eX.data() + ( MH.nrows() * MH.ncols() ), MH.data() );
+        
+        blas::copy( blas::adjoint( MH ), blas::mat( M ) );
+    }// else
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  U,
+                  Hpro::TRkMatrix< value_t > &              M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  U,
+                  Hpro::TBlockMatrix< value_t > &           M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t                         side,
+                  const diag_type_t                         diag,
+                  const matrix::sparse_matrix< value_t > &  U,
+                  matrix::sparse_matrix< value_t > &        M )
+{
+    HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
+    
+    if ( diag == unit_diag )
+        return;
+
+    //
+    // blockwise evaluation and U is assumed to act as LU^-1
+    //
+
+    if ( side == from_left )
+    {
+        //
+        // solve U X = M => X = U^-1 M
+        //
+
+        auto  eX = U.solver().solve( M.spmat() );
+
+        M.spmat() = eX;
+    }// if
+    else
+    {
+        //
+        // solve X U = M => X = M U^-1
+        // as X' = (U^-1)^H M'
+        //
+
+        using  nr_solve_t = std::decay< decltype(U.solver()) >::type;
+        using  nc_solve_t = std::remove_const< nr_solve_t >::type;
+        
+        auto  UH = const_cast< nc_solve_t * >( & U.solver() )->adjoint();
+        auto  MH = Eigen::SparseMatrix< value_t, Eigen::ColMajor >( M.spmat().adjoint() );
+
+        MH.makeCompressed();
+        
+        auto  eX = UH.solve( MH );
+        auto  XH = Eigen::SparseMatrix< value_t, Eigen::ColMajor >( eX );
+
+        XH.makeCompressed();
+
+        const auto  nfull = M.nrows() * M.ncols();
+        
+        if ( double(XH.nonZeros()) / double(nfull) < 0.3 )
+            std::cout << "keeping sparse" << std::endl;
+
+        auto  eDX = Eigen::MatrixX< value_t >( XH.adjoint() );
+        auto  DX  = blas::matrix< value_t >( M.nrows(), M.ncols() );
+
+        std::copy( eDX.data(), eDX.data() + nfull, DX.data() );
+
+        auto  D   = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( DX ) );
+
+        M.parent()->replace_block( &M, D.release() );
+
+        // NOT NICE!!!
+        delete &M;
     }// else
 }
 
