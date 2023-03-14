@@ -1813,34 +1813,7 @@ solve_upper_tri ( const eval_side_t                         side,
     // blockwise evaluation and U is assumed to act as LU^-1
     //
 
-    if ( side == from_left )
-    {
-        //
-        // solve U X = M => X = U^-1 M
-        //
-
-        auto  eM = Eigen::Map< Eigen::Matrix< value_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor > >( blas::mat( M ).data(), M.nrows(), M.ncols() );
-        auto  eX = U.solver().solve( eM );
-    }// if
-    else
-    {
-        //
-        // solve X U = M => X = M U^-1
-        // as X' = (U^-1)^H M'
-        //
-
-        using  nr_solve_t = std::decay< decltype(U.solver()) >::type;
-        using  nc_solve_t = std::remove_const< nr_solve_t >::type;
-        
-        auto  MH  = blas::copy( blas::adjoint( blas::mat( M ) ) );
-        auto  eMH = Eigen::Map< Eigen::Matrix< value_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor > >( MH.data(), MH.nrows(), MH.ncols() );
-        auto  UH  = const_cast< nc_solve_t * >( & U.solver() )->adjoint();
-        auto  eX  = Eigen::MatrixX< value_t >( UH.solve( eMH ) );
-
-        std::copy( eX.data(), eX.data() + ( MH.nrows() * MH.ncols() ), MH.data() );
-        
-        blas::copy( blas::adjoint( MH ), blas::mat( M ) );
-    }// else
+    U.solve( side, blas::mat( M ) );
 }
 
 template < typename value_t >
@@ -1889,53 +1862,20 @@ solve_upper_tri ( const eval_side_t                         side,
     // blockwise evaluation and U is assumed to act as LU^-1
     //
 
-    if ( side == from_left )
-    {
-        //
-        // solve U X = M => X = U^-1 M
-        //
-
-        auto  eX = U.solver().solve( M.spmat() );
-
-        M.spmat() = eX;
-    }// if
-    else
-    {
-        //
-        // solve X U = M => X = M U^-1
-        // as X' = (U^-1)^H M'
-        //
-
-        using  nr_solve_t = std::decay< decltype(U.solver()) >::type;
-        using  nc_solve_t = std::remove_const< nr_solve_t >::type;
+    U.solve( side, M );
+    
+    const auto  nfull = M.nrows() * M.ncols();
         
-        auto  UH = const_cast< nc_solve_t * >( & U.solver() )->adjoint();
-        auto  MH = Eigen::SparseMatrix< value_t, Eigen::ColMajor >( M.spmat().adjoint() );
+    if ( double(M.n_non_zero()) / double(nfull) < 0.3 )
+        std::cout << "keeping sparse" << std::endl;
 
-        MH.makeCompressed();
-        
-        auto  eX = UH.solve( MH );
-        auto  XH = Eigen::SparseMatrix< value_t, Eigen::ColMajor >( eX );
+    auto  DX = M.to_dense();
+    auto  D  = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( DX ) );
 
-        XH.makeCompressed();
+    M.parent()->replace_block( &M, D.release() );
 
-        const auto  nfull = M.nrows() * M.ncols();
-        
-        if ( double(XH.nonZeros()) / double(nfull) < 0.3 )
-            std::cout << "keeping sparse" << std::endl;
-
-        auto  eDX = Eigen::MatrixX< value_t >( XH.adjoint() );
-        auto  DX  = blas::matrix< value_t >( M.nrows(), M.ncols() );
-
-        std::copy( eDX.data(), eDX.data() + nfull, DX.data() );
-
-        auto  D   = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( DX ) );
-
-        M.parent()->replace_block( &M, D.release() );
-
-        // NOT NICE!!!
-        delete &M;
-    }// else
+    // NOT NICE!!!
+    delete &M;
 }
 
 }// namespace hlr

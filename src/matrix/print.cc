@@ -344,6 +344,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
 
             if ( contains( options, "pattern" ) )
             {
+                #if defined(HAS_EIGEN)
                 using  iter_t = typename sparse_matrix< value_t >::spmat_t::InnerIterator;
                 
                 prn.set_rgb( colors[HLR_COLOR_FG_PATTERN] );
@@ -360,6 +361,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                                        col+1, row+1 );
                     }// for
                 }// for
+                #endif
             }// if
         }// else
 
