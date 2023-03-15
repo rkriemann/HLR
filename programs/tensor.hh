@@ -14,6 +14,26 @@
 
 using namespace hlr;
 
+template < typename value_t >
+void
+print ( const tensor::dense_tensor< value_t, 3 > &  t )
+{
+    using midx = tensor::dense_tensor< value_t, 3 >::multiindex;
+    
+    for ( uint  k = 0; k < t.dim(2); ++k )
+    {
+        for ( uint  i = 0; i < t.dim(0); ++i )
+        {
+            for ( uint  j = 0; j < t.dim(1); ++j )
+                std::cout << t( midx{ i, j, k } ) << ", ";
+
+            std::cout << std::endl;
+        }// for
+
+        std::cout << std::endl;
+    }// for
+}
+
 //
 // main function
 //
@@ -32,18 +52,11 @@ program_main ()
     t( midx{ 0, 0, 1 } ) = 4;
     t( midx{ 1, 2, 2 } ) = 5;
 
-    for ( uint  k = 0; k < t.dim(2); ++k )
-    {
-        for ( uint  i = 0; i < t.dim(0); ++i )
-        {
-            for ( uint  j = 0; j < t.dim(1); ++j )
-                std::cout << t( midx{ i, j, k } ) << ", ";
-
-            std::cout << std::endl;
-        }// for
-
-        std::cout << std::endl;
-    }// for
+    print( t );
 
     io::hdf5::write( t, "t" );
+
+    auto  t2 = io::hdf5::read_tensor< value_t, 3 >( "t.h5" );
+
+    print( t2 );
 }

@@ -39,6 +39,9 @@ public:
     static constexpr uint  dimension = C_dim;
 
 private:
+    // globally unique id
+    int                                _id;
+
     // index sets per dimensions
     std::array< indexset, dimension >  _indexsets;
 
@@ -51,11 +54,13 @@ public:
     //
 
     dense_tensor ()
+            : _id(-1)
     {}
 
     template < typename index_t >
     requires std::integral< index_t >
     dense_tensor ( std::initializer_list< index_t >  adims )
+            : _id(-1)
     {
         HLR_ASSERT( adims.size() == dimension );
         
@@ -75,7 +80,8 @@ public:
     }
     
     dense_tensor ( std::initializer_list< indexset >  ais )
-            : _indexsets( ais )
+            : _id(-1)
+            , _indexsets( ais )
     {
         size_t  dim_prod = 1;
 
@@ -86,7 +92,8 @@ public:
     }
     
     dense_tensor ( std::array< indexset, dimension > &  ais )
-            : _indexsets( ais )
+            : _id(-1)
+            , _indexsets( ais )
     {
         size_t  dim_prod = 1;
 
@@ -97,7 +104,8 @@ public:
     }
 
     dense_tensor ( const dense_tensor &  t )
-            : _indexsets( t._indexsets )
+            : _id( t._id )
+            , _indexsets( t._indexsets )
             , _data( t._data.size() )
     {
         std::copy( t._data.begin(), t._data.end(), _data.begin() );
@@ -105,6 +113,7 @@ public:
 
     dense_tensor ( dense_tensor &&  t )
     {
+        std::swap( _id,        t._id );
         std::swap( _indexsets, t._indexsets );
         std::swap( _data,      t._data );
     }
@@ -133,6 +142,8 @@ public:
     // access internal data
     //
 
+    int              id   () const { return _id; }
+    
     value_t *        data ()       { return _data.data(); }
     const value_t *  data () const { return _data.data(); }
 
@@ -175,7 +186,7 @@ dense_tensor< value_t, dim >::coeff ( const multiindex &  idx ) const
     size_t  pos = idx[dimension-1];
 
     for ( int  d = dimension-2; d >= 0; --d )
-        pos = pos * this->_dims[d] + idx[d];
+        pos = pos * this->_indexsets[d].size() + idx[d];
             
     return this->_data[pos];
 }
