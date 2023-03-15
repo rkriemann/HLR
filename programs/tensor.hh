@@ -10,6 +10,7 @@
 #include <common-main.hh>
 
 #include <hlr/tensor/dense_tensor.hh>
+#include <hlr/utils/io.hh>
 
 using namespace hlr;
 
@@ -43,4 +44,6 @@ program_main ()
 
         std::cout << std::endl;
     }// for
+
+    io::hdf5::write( t, "t" );
 }

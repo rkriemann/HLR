@@ -10,10 +10,14 @@
 
 #include <string>
 
+#if defined(HAS_HDF5)
+#  include "H5Cpp.h"
+#endif
+
 #include <hpro/config.h>
 
 #if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-#define HAS_H2
+#  define HAS_H2
 #endif
 
 #include <hpro/io/TMatrixIO.hh>
@@ -21,14 +25,15 @@
 #include <hpro/io/TCoordVis.hh>
 
 #if defined(HAS_H2)
-#include <hpro/io/TClusterBasisVis.hh>
-#include <hpro/matrix/TUniformMatrix.hh>
+#  include <hpro/io/TClusterBasisVis.hh>
+#  include <hpro/matrix/TUniformMatrix.hh>
 #endif
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/dag/graph.hh>
+#include <hlr/tensor/dense_tensor.hh>
 
 namespace hlr { namespace io {
 
@@ -209,6 +214,68 @@ write ( const Hpro::TMatrix< value_t > *  M,
     HLR_ASSERT( ! is_null( M ) );
 
     write( *M, matname, filename );
+}
+
+namespace detail
+{
+
+#if defined(USE_HDF5)
+
+template < typename value_t, int dim >
+void
+h5_write_tensor ( H5::H5File &                                  file,
+                  const std::string &                           gname,
+                  const tensor::dense_tensor< value_t, dim > &  t )
+{
+    auto  group = std::make_unique< H5::Group >( file.createGroup( gname ) );
+
+    if ( Hpro::is_complex_type< value_t >::value )
+        HLR_ERROR( "complex not yet supported" );
+    
+    hsize_t    dims[ dim ];
+
+    for ( uint  i = 0; i < dim; ++i )
+        dims[i] = t.dim(i);
+    
+    H5::DataSpace  dataspace( dim, dims );
+
+    // define datatype
+    std::unique_ptr< H5::FloatType >  datatype;
+    
+    if ( Hpro::is_single_prec_v< value_t > )
+        datatype = std::make_unique< H5::FloatType >( H5::PredType::NATIVE_FLOAT );
+    else
+        datatype = std::make_unique< H5::FloatType >( H5::PredType::NATIVE_DOUBLE );
+
+    // create dataset for tensor data
+    H5::DataSet dataset = file.createDataSet( gname + "/" + tname, *datatype, dataspace );
+            
+    // write the data to the dataset using default memory space, file
+    // space, and transfer properties.
+    if ( Hpro::is_single_prec_v< value_t > )
+        dataset.write( t.data(), H5::PredType::NATIVE_FLOAT );
+    else
+        dataset.write( t.data(), H5::PredType::NATIVE_DOUBLE );
+}
+
+#endif
+
+}// namespace detail
+
+template < typename value_t, int dim >
+void
+write ( const tensor::dense_tensor< value_t, dim > &  t,
+        const std::string &                           tname,
+        const std::string &                           fname = "" )
+{
+    #if defined(USE_HDF5)
+
+    const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
+    H5::H5File         file( filename, H5F_ACC_TRUNC );
+    
+    detail::h5_write_tensor( file, "/" + tname, t );
+
+    #endif
 }
 
 //

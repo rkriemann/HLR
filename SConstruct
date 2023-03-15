@@ -40,14 +40,21 @@ CUDA_DIR     = '/'
 eigen        = 0
 EIGEN_DIR    = '/'
 
+hdf5         = 0
+hdf5_dir     = '/'
+
+# general allocators
 JEMALLOC_DIR = '/'
 MIMALLOC_DIR = '/'
 TCMALLOC_DIR = '/'
 
+# tracing
 likwid        = False
 LIKWID_DIR    = '/'
 scorep        = False
 SCOREP_DIR    = '/'
+
+# compressors
 half          = False
 HALF_DIR      = '/'
 zfp           = False
@@ -239,6 +246,8 @@ opts.Add(               'lapackflags',   'user defined link flags for lapack', d
 opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
 opts.Add( BoolVariable( 'eigen',         'use Eigen library',                  eigen ) )
 opts.Add( PathVariable( 'eigen_dir',     'Eigen installation directory',       EIGEN_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'hdf5',          'use HDF5 library',                   hdf5 ) )
+opts.Add( PathVariable( 'hdf5_dir',      'HDF5 installation directory',        hdf5_dir, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'likwid',        'use likwid library',                 likwid ) )
 opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',      LIKWID_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'scorep',        'use Score-P library',                scorep ) )
@@ -316,6 +325,8 @@ LAPACK_FLAGS  = opt_env['lapackflags']
 malloc        = opt_env['malloc']
 eigen         = opt_env['eigen']
 EIGEN_DIR     = opt_env['eigen_dir']
+hdf5          = opt_env['hdf5']
+HDF5_DIR      = opt_env['hdf5_dir']
 likwid        = opt_env['likwid']
 LIKWID_DIR    = opt_env['likwid_dir']
 scorep        = opt_env['scorep']
@@ -496,6 +507,12 @@ if eigen and EIGEN_DIR != None :
     env.Append( CPPDEFINES = 'HAS_EIGEN' )
     env.Append( CPPPATH    = os.path.join( EIGEN_DIR, 'include/eigen3' ) )
 
+# include HDF5
+if hdf5 and HDF5_DIR != None :
+    env.Append( CPPDEFINES = 'HAS_HDF5' )
+    env.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags hdf5-serial' % os.path.join( HDF5_DIR, 'lib', 'pkgconfig' ) )
+    env.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   hdf5-serial' % os.path.join( HDF5_DIR, 'lib', 'pkgconfig' ) )
+    
 # include likwid performance monitoring library
 if likwid and LIKWID_DIR != None :
     env.Append( CPPDEFINES = 'LIKWID_PERFMON' )
