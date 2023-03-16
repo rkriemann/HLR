@@ -22,9 +22,9 @@ print ( const tensor::dense_tensor< value_t, 3 > &  t )
     
     for ( uint  k = 0; k < t.dim(2); ++k )
     {
-        for ( uint  i = 0; i < t.dim(0); ++i )
+        for ( uint  j = 0; j < t.dim(1); ++j )
         {
-            for ( uint  j = 0; j < t.dim(1); ++j )
+            for ( uint  i = 0; i < t.dim(0); ++i )
                 std::cout << t( midx{ i, j, k } ) << ", ";
 
             std::cout << std::endl;
@@ -45,18 +45,18 @@ program_main ()
     using midx    = tensor::dense_tensor< value_t, 3 >::multiindex;
         
     tensor::dense_tensor< value_t, 3 >  t{ 3, 3, 3 };
+    double                              v = 1.0;
 
-    t( midx{ 0, 0, 0 } ) = 1;
-    t( midx{ 1, 0, 0 } ) = 2;
-    t( midx{ 0, 1, 0 } ) = 3;
-    t( midx{ 0, 0, 1 } ) = 4;
-    t( midx{ 1, 2, 2 } ) = 5;
+    for ( uint  k = 0; k < t.dim(2); ++k )
+        for ( uint  j = 0; j < t.dim(1); ++j )
+            for ( uint  i = 0; i < t.dim(0); ++i )
+                t( midx{ i, j, k } ) = v++;
 
     print( t );
 
     io::hdf5::write( t, "t" );
 
-    auto  t2 = io::hdf5::read_tensor< value_t, 3 >( "t.h5" );
+    auto  t2 = io::hdf5::read_tensor< value_t, 3 >( "u.h5" );
 
     print( t2 );
 }

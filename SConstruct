@@ -512,6 +512,7 @@ if hdf5 and HDF5_DIR != None :
     env.Append( CPPDEFINES = 'HAS_HDF5' )
     env.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --cflags hdf5-serial' % os.path.join( HDF5_DIR, 'lib', 'pkgconfig' ) )
     env.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   hdf5-serial' % os.path.join( HDF5_DIR, 'lib', 'pkgconfig' ) )
+    env.Append( LIBS = 'hdf5_cpp' )
     
 # include likwid performance monitoring library
 if likwid and LIKWID_DIR != None :

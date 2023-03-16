@@ -12,7 +12,7 @@
 #include <cstring>
 
 #if defined(HAS_HDF5)
-#  include "H5Cpp.h"
+#  include <H5Cpp.h>
 #endif
 
 #include <hpro/config.h>
@@ -254,19 +254,18 @@ h5_write_tensor ( H5::H5File &                                  file,
         std::memcpy( buf.data() + ofs,  & bdim, sizeof(bdim) );
         ofs += sizeof(bdim);
 
+        hsize_t  is_dims = 2*dim;
+        auto     is_type = H5::ArrayType( H5::PredType::NATIVE_LONG, 1, & is_dims );
+        
+        data_type.insertMember( "indexsets", ofs, is_type );
+
         for ( uint  d = 0; d < dim; ++d )
         {
-            const auto  is = t.is( d );
-            const long  first = is.first();
-            const long  last  = is.last();
+            const auto  is         = t.is( d );
+            const long  is_data[2] = { is.first(), is.last() };
         
-            data_type.insertMember( Hpro::to_string( "is%ds", d ), ofs, H5::PredType::NATIVE_LONG );
-            std::memcpy( buf.data() + ofs, & first, sizeof(first) );
-            ofs += sizeof(first);
-        
-            data_type.insertMember( Hpro::to_string( "is%de", d ), ofs, H5::PredType::NATIVE_LONG );
-            std::memcpy( buf.data() + ofs, & last, sizeof(last) );
-            ofs += sizeof(last);
+            std::memcpy( buf.data() + ofs, is_data, sizeof(is_data) );
+            ofs += sizeof(is_data);
         }// for
     
         auto  data_set = file.createDataSet( gname + "/structure", data_type, data_space );
@@ -373,12 +372,11 @@ h5_read_tensor ( H5::H5File &         file,
 
         data_type.insertMember( "id",  ofs, H5::PredType::NATIVE_INT ); ofs += sizeof(int);
         data_type.insertMember( "dim", ofs, H5::PredType::NATIVE_INT ); ofs += sizeof(int);
+
+        hsize_t  is_dims = 2*dim;
+        auto     is_type = H5::ArrayType( H5::PredType::NATIVE_LONG, 1, & is_dims );
         
-        for ( uint  d = 0; d < dim; ++d )
-        {
-            data_type.insertMember( Hpro::to_string( "is%ds", d ), ofs, H5::PredType::NATIVE_LONG ); ofs += sizeof(long);
-            data_type.insertMember( Hpro::to_string( "is%de", d ), ofs, H5::PredType::NATIVE_LONG ); ofs += sizeof(long);
-        }// for
+        data_type.insertMember( "indexsets", ofs, is_type );
 
         data_set.read( buf.data(), data_type );
 
@@ -391,15 +389,12 @@ h5_read_tensor ( H5::H5File &         file,
 
         HLR_ASSERT( dim == ddim );
 
+        long  is_data[2*dim];
+        
+        std::memcpy( is_data, buf.data() + ofs, sizeof(is_data) ); ofs += sizeof(is_data);
+        
         for ( uint  d = 0; d < dim; ++d )
-        {
-            long  first, last;
-
-            std::memcpy( &first, buf.data() + ofs, sizeof(long) ); ofs += sizeof(long);
-            std::memcpy( &last,  buf.data() + ofs, sizeof(long) ); ofs += sizeof(long);
-
-            is[d] = indexset( first, last );
-        }// for
+            is[d] = indexset( is_data[2*d], is_data[2*d+1] );
     }
 
     //
