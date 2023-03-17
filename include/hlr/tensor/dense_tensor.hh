@@ -125,7 +125,7 @@ public:
     const blas::tensor3< value_t > &  tensor () const { return _tensor; }
 
     uint             rank ()                const { return dimension; }
-    size_t           dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d].size(); }
+    size_t           dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _tensor.size(d); }
     indexset         is   ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d]; }
 
     value_t          coeff       ( const uint  i,

@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <fstream>
+
 namespace hlr { namespace io {
 
 namespace detail
@@ -240,6 +242,8 @@ void
 vtk_print_tensor ( const tensor::dense_tensor3< value_t > &  t,
                    const std::string &                       filename )
 {
+    std::ofstream  out( filename );
+    
     out << "# vtk DataFile Version 2.0" << std::endl
         << "HLIBpro coordinates" << std::endl
         << "ASCII" << std::endl
@@ -248,31 +252,36 @@ vtk_print_tensor ( const tensor::dense_tensor3< value_t > &  t,
     auto  T = t.tensor();
 
     //
-    // assuming tensor grid in [0,1]^d
+    // assuming tensor grid in equal step width in all dimensions
     //
 
-    const size_t  n    = t.size(0) * t.size(1) * t.size(2);
-    const double  h[3] = { 1.0 / t.size(0),
-                           1.0 / t.size(1),
-                           1.0 / t.size(2) };
+    const size_t  n = t.dim(0) * t.dim(1) * t.dim(2);
+    const double  h = 1.0 / std::min( t.dim(0), std::min( t.dim(1), t.dim(2) ) );
 
-    out << "POINTS " << coord->ncoord() << " FLOAT" << std::endl;
+    out << "POINTS " << n << " FLOAT" << std::endl;
 
-    for ( size_t  l = 0; l < t.size(2); ++l )
-        for ( size_t  j = 0; j < t.size(1); ++j )
-            for ( size_t  i = 0; i < t.size(0); ++i )
-                out << i * h[0] << ' ' << h[1] << ' ' << h[2] << std::endl;
+    for ( size_t  l = 0; l < t.dim(2); ++l )
+        for ( size_t  j = 0; j < t.dim(1); ++j )
+            for ( size_t  i = 0; i < t.dim(0); ++i )
+                out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
 
     out << "CELLS " << n << ' ' << 2 * n << std::endl;
 
     for ( size_t  i = 0; i < n; ++i )
-        out << "1 " << i;
+        out << "1 " << i << ' ';
     out << std::endl;
         
     out << "CELL_TYPES " << n << std::endl;
         
     for ( size_t  i = 0; i < n; ++i )
         out << "1 ";
+    out << std::endl;
+
+    out << "CELL_DATA " << n << std::endl
+        << "COLOR_SCALARS v" << " 1" << std::endl;
+        
+    for ( size_t  i = 0; i < n; ++i )
+        out << t.tensor().data()[i] << ' ';
     out << std::endl;
 }
 

@@ -330,12 +330,15 @@ public:
 
     ////////////////////////////////////////////////////
 
+    // d-mode unfolding
+    matrix< value_t > unfold ( const uint  d ) const;
     
-    // // return vector referencing part of column \a j defined by \a r
-    // Vector< value_t >  operator () ( const range & r, const idx_t  j ) const
-    // {
-    //     return Vector< value_t >( *this, r, j );
-    // }
+    // return i'th mod-d fiber
+    vector< value_t >  fiber ( const uint    d,
+                               const size_t  i ) const
+    {
+        return vector< value_t >( *this, r, j );
+    }
                           
     // // return vector referencing part of row \a i defined by \a r
     // Vector< value_t >  operator () ( const idx_t  i, const range & r ) const
@@ -393,6 +396,28 @@ copy ( const tensor3< value_t > &  t )
 // BLAS functions
 //
 
+//
+// d-mode unfolding
+//
+template < typename value_t >
+matrix< value_t >
+tensor3_base< value_t >::unfold ( const uint  d ) const
+{
+    HLR_ASSERT( d < dimension );
+    
+    if ( d == 0 )
+    {
+        auto  M = matrix< value_t >( size(0), size(1) * size(2) );
+
+        
+    }// if
+}
+
+////////////////////////////////////////////////////////////////
+//
+// BLAS functions
+//
+
 template < typename value_t >
 void
 copy ( const tensor3< value_t > &  src,
@@ -422,7 +447,7 @@ dot ( const tensor3< value_t > &  t1,
     for ( size_t  i = 0; i < n; ++i )
         d += t1.data()[i] * t2.data()[i];
 
-    return n2;
+    return d;
 }
 
 template < typename value_t >

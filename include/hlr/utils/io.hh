@@ -36,6 +36,8 @@
 #include <hlr/dag/graph.hh>
 #include <hlr/tensor/dense_tensor.hh>
 
+#include <hlr/utils/detail/io.hh>
+
 namespace hlr { namespace io {
 
 //////////////////////////////////////////////////////////////////////

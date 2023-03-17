@@ -6,6 +6,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <cmath>
+#include <numbers>
+
 #include <common.hh>
 #include <common-main.hh>
 
@@ -40,20 +43,25 @@ void
 program_main ()
 {
     using value_t = double;
-        
-    tensor::dense_tensor3< value_t >  t( is(0,2), is(0,2), is(0,2) );
+
+    const size_t                      n = 10;
+    const double                      h = std::numbers::pi / double(n-1);
+    tensor::dense_tensor3< value_t >  t( is(0,n-1), is(0,n-1), is(0,n-1) );
     double                            v = 1.0;
 
-    for ( uint  l = 0; l < t.dim(2); ++l )
-        for ( uint  j = 0; j < t.dim(1); ++j )
-            for ( uint  i = 0; i < t.dim(0); ++i )
-                t( i, j, l ) = v++;
+    for ( uint  l = 0; l < n; ++l )
+        for ( uint  j = 0; j < n; ++j )
+            for ( uint  i = 0; i < n; ++i )
+                t( i, j, l ) = std::sin( i * h ) + std::cos( j * h ) + std::sin( l * h );
 
-    print( t );
+    // print( t );
+    io::vtk::print( t, "t.vtk" );
 
     io::hdf5::write( t, "t" );
 
     auto  t2 = io::hdf5::read_tensor< value_t >( "u.h5" );
 
-    print( t2 );
+    io::vtk::print( t2, "u.vtk" );
+    
+    // print( t2 );
 }
