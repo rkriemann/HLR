@@ -12,6 +12,7 @@
 #include <array>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/tensor.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -19,123 +20,99 @@ namespace hlr
 { 
 
 using indexset = Hpro::TIndexSet;
+using Hpro::is;
 
 namespace tensor
 {
 
 //
-// implements dense (full) tensor
+// implements dense (full) 3D tensor
 // - storage layout is column-major
 //
-template < typename T_value, uint C_dim >
-class dense_tensor
+template < typename T_value >
+class dense_tensor3
 {
 public:
     using  value_t = T_value;
     using  real_t  = Hpro::real_type_t< value_t >;
 
-    using  multiindex = std::array< size_t, C_dim >;
-    
-    static constexpr uint  dimension = C_dim;
+    static constexpr uint  dimension = 3;
 
 private:
     // globally unique id
-    int                                _id;
+    int                        _id;
 
     // index sets per dimensions
-    std::array< indexset, dimension >  _indexsets;
+    std::array< indexset, 3 >  _indexsets;
 
     // tensor data
-    std::vector< value_t >             _data;
+    blas::tensor3< value_t >   _tensor;
 
 public:
     //
     // ctors
     //
 
-    dense_tensor ()
+    dense_tensor3 ()
             : _id(-1)
     {}
 
-    template < typename index_t >
-    requires std::integral< index_t >
-    dense_tensor ( std::initializer_list< index_t >  adims )
+    dense_tensor3 ( const indexset &  is0,
+                    const indexset &  is1,
+                    const indexset &  is2 )
             : _id(-1)
-    {
-        HLR_ASSERT( adims.size() == dimension );
-        
-        std::array< size_t, dimension >  vdims;
-
-        std::copy( adims.begin(), adims.end(), vdims.begin() );
-        
-        size_t  dim_prod = 1;
-
-        for ( uint  i = 0; i < dimension; ++i )
-        {
-            _indexsets[i] = indexset( 0, vdims[i]-1 );
-            dim_prod     *= vdims[i];
-        }// for
-        
-        _data.resize( dim_prod );
-    }
+            , _indexsets{ is0, is1, is2 }
+            , _tensor( is0.size(), is1.size(), is2.size() )
+    {}
     
-    dense_tensor ( std::initializer_list< indexset >  ais )
+    dense_tensor3 ( const std::array< indexset, 3 > &  ais )
             : _id(-1)
-            , _indexsets( ais )
-    {
-        size_t  dim_prod = 1;
-
-        for ( auto  is : _indexsets )
-            dim_prod *= is.size();
-
-        _data.resize( dim_prod );
-    }
+            , _indexsets{ ais[0], ais[1], ais[2] }
+            , _tensor( ais[0].size(), ais[1].size(), ais[2].size() )
+    {}
     
-    dense_tensor ( std::array< indexset, dimension > &  ais )
+    dense_tensor3 ( const indexset &             is0,
+                    const indexset &             is1,
+                    const indexset &             is2,
+                    blas::tensor3< value_t > &&  t )
             : _id(-1)
-            , _indexsets( ais )
-    {
-        size_t  dim_prod = 1;
-
-        for ( auto  is : _indexsets )
-            dim_prod *= is.size();
-
-        _data.resize( dim_prod );
-    }
-
-    dense_tensor ( const dense_tensor &  t )
+            , _indexsets{ is0, is1, is2 }
+            , _tensor( std::move( t ) )
+    {}
+    
+    dense_tensor3 ( const dense_tensor3 &  t )
             : _id( t._id )
             , _indexsets( t._indexsets )
-            , _data( t._data.size() )
+            , _tensor( t._tensor.size() )
     {
-        std::copy( t._data.begin(), t._data.end(), _data.begin() );
+        blas::copy( t._tensor, _tensor );
     }
 
-    dense_tensor ( dense_tensor &&  t )
+    dense_tensor3 ( dense_tensor3 &&  t )
     {
         std::swap( _id,        t._id );
         std::swap( _indexsets, t._indexsets );
-        std::swap( _data,      t._data );
+        std::swap( _tensor,    t._tensor );
     }
 
     // dtor
-    virtual ~dense_tensor ()
+    virtual ~dense_tensor3 ()
     {}
 
     // assignment
-    dense_tensor &  operator = ( const dense_tensor &  t )
+    dense_tensor3 &  operator = ( const dense_tensor3 &  t )
     {
+        _id        = t._id;
         _indexsets = t._indexsets;
-        _data.resize( t._data.size() );
-        std::copy( t._data.begin(), t._data.end(), _data.begin() );
+        _tensor    = blas::copy( t._tensor );
     }
 
-    dense_tensor &  operator = ( dense_tensor &&  t )
+    dense_tensor3 &  operator = ( dense_tensor3 &&  t )
     {
         _indexsets = std::move( t._indexsets );
-        _data      = std::move( t._data );
+        _tensor    = std::move( t._tensor );
 
-        t._indexsets.fill( 0 );
+        t._indexsets.fill( is( 0, -1 ) );
     }
 
     //
@@ -144,29 +121,26 @@ public:
 
     int              id   () const { return _id; }
     
-    value_t *        data ()       { return _data.data(); }
-    const value_t *  data () const { return _data.data(); }
+    blas::tensor3< value_t > &        tensor ()       { return _tensor; }
+    const blas::tensor3< value_t > &  tensor () const { return _tensor; }
 
-    uint             rank () const { return dimension; }
+    uint             rank ()                const { return dimension; }
+    size_t           dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d].size(); }
+    indexset         is   ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d]; }
 
-    size_t           dim  ( const uint  d ) const
-    {
-        HLR_DBG_ASSERT( d < dimension );
-        
-        return  _indexsets[d].size();
-    }
-
-    indexset         is   ( const uint  d ) const
-    {
-        HLR_DBG_ASSERT( d < dimension );
-        return _indexsets[d];
-    }
-
-    value_t          coeff       ( const multiindex &  idx ) const;
-    value_t &        coeff       ( const multiindex &  idx );
+    value_t          coeff       ( const uint  i,
+                                   const uint  j,
+                                   const uint  l ) const { return this->_tensor(i,j,l); }
+    value_t &        coeff       ( const uint  i,
+                                   const uint  j,
+                                   const uint  l )       { return this->_tensor(i,j,l); }
     
-    value_t          operator () ( const multiindex &  idx ) const { return coeff( idx ); }
-    value_t &        operator () ( const multiindex &  idx )       { return coeff( idx ); }
+    value_t          operator () ( const uint  i,
+                                   const uint  j,
+                                   const uint  l ) const { return coeff( i, j, l ); }
+    value_t &        operator () ( const uint  i,
+                                   const uint  j,
+                                   const uint  l )       { return coeff( i, j, l ); }
     
     //
     // misc
@@ -175,50 +149,10 @@ public:
     // return size in bytes used by this object
     size_t  byte_size () const
     {
-        return sizeof(_data) + sizeof(value_t) * _data.size() + sizeof(_indexsets);
+        return _tensor.byte_size() + sizeof(_indexsets) + sizeof(_id);
     }
 };
 
-template < typename value_t, uint dim >
-value_t
-dense_tensor< value_t, dim >::coeff ( const multiindex &  idx ) const
-{
-    size_t  pos = idx[dimension-1];
+}}// namespace hlr::tensor
 
-    for ( int  d = dimension-2; d >= 0; --d )
-        pos = pos * this->_indexsets[d].size() + idx[d];
-            
-    return this->_data[pos];
-}
-
-template < typename value_t, uint dim >
-value_t &
-dense_tensor< value_t, dim >::coeff ( const multiindex &  idx )
-{
-    size_t  pos = idx[dimension-1];
-
-    for ( int  d = dimension-2; d >= 0; --d )
-        pos = pos * this->_indexsets[d].size() + idx[d];
-            
-    return this->_data[pos];
-}
-
-// template < typename value_t >
-// struct dense_tensor< value_t, 3 >
-// {
-//     value_t
-//     coeff ( const std::array< size_t, 3 > &  idx ) const
-//     {
-//         return this->_data[ this->_dims[0] * ( this->_dims[1] * idx[2] + idx[1] ) + idx[0] ];
-//     }
-
-//     value_t &
-//     coeff ( const std::array< size_t, 3 > &  idx )
-//     {
-//         return this->_data[ this->_dims[0] * ( this->_dims[1] * idx[2] + idx[1] ) + idx[0] ];
-//     }
-// };
-
-}} // namespace hlr::tensor
-
-#endif // __HLR_TENSOR_DENSE_TENSOR_HH
+#endif // __HLR_TENSOR_DENSE_TENSOR3_HH

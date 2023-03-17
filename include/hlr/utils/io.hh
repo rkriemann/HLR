@@ -217,222 +217,11 @@ write ( const Hpro::TMatrix< value_t > *  M,
     write( *M, matname, filename );
 }
 
-namespace detail
-{
-
-#if defined(USE_HDF5)
-
-template < typename value_t, uint dim >
+template < typename value_t >
 void
-h5_write_tensor ( H5::H5File &                                  file,
-                  const std::string &                           gname,
-                  const tensor::dense_tensor< value_t, dim > &  t )
-{
-    auto  group = std::make_unique< H5::Group >( file.createGroup( gname ) );
-
-    if ( Hpro::is_complex_type< value_t >::value )
-        HLR_ERROR( "complex not yet supported" );
-
-    //
-    // indexset info
-    //
-
-    {
-        auto     buf         = std::vector< char >( sizeof(int) + sizeof(int) + dim * 2 * sizeof(long) );
-        hsize_t  data_dims[] = { 1 };
-        auto     data_space  = H5::DataSpace( 1, data_dims );
-        auto     data_type   = H5::CompType( buf.size() );
-        size_t   ofs         = 0;
-        int      id          = t.id();
-        int      bdim        = dim;
-        
-        data_type.insertMember( "id", ofs, H5::PredType::NATIVE_INT );
-        std::memcpy( buf.data() + ofs,  & id, sizeof(id) );
-        ofs += sizeof(id);
-
-        data_type.insertMember( "dim", ofs, H5::PredType::NATIVE_INT );
-        std::memcpy( buf.data() + ofs,  & bdim, sizeof(bdim) );
-        ofs += sizeof(bdim);
-
-        hsize_t  is_dims = 2*dim;
-        auto     is_type = H5::ArrayType( H5::PredType::NATIVE_LONG, 1, & is_dims );
-        
-        data_type.insertMember( "indexsets", ofs, is_type );
-
-        for ( uint  d = 0; d < dim; ++d )
-        {
-            const auto  is         = t.is( d );
-            const long  is_data[2] = { is.first(), is.last() };
-        
-            std::memcpy( buf.data() + ofs, is_data, sizeof(is_data) );
-            ofs += sizeof(is_data);
-        }// for
-    
-        auto  data_set = file.createDataSet( gname + "/structure", data_type, data_space );
-
-        data_set.write( buf.data(), data_type );
-
-        data_space.close();
-        data_type.close();
-        data_set.close();
-    }
-
-    //
-    // tensor data
-    //
-
-    {
-        hsize_t  data_dims[ dim ];
-
-        for ( uint  i = 0; i < dim; ++i )
-            data_dims[i] = t.dim(i);
-    
-        auto  data_space = H5::DataSpace( dim, data_dims );
-
-        // define datatype
-        auto  data_type = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
-
-        // create dataset for tensor data
-        auto  data_set = file.createDataSet( gname + "/data", data_type, data_space );
-            
-        data_set.write( t.data(), data_type );
-
-        data_space.close();
-        data_type.close();
-        data_set.close();
-    }
-}
-
-herr_t
-visit_func ( hid_t               /* loc_id */,
-             const char *        name,
-             const H5O_info_t *  info,
-             void *              operator_data )
-{
-    std::string *  dname = static_cast< std::string * >( operator_data );
-    std::string    oname = name;
-
-    if ( oname[0] != '.' )
-    {
-        if ( info->type == H5O_TYPE_GROUP )
-        {
-            // use first name encountered
-            if ( *dname == "" )
-                *dname = oname;
-        }// if
-        else if ( info->type == H5O_TYPE_DATASET )
-        {
-            if ( *dname != "" )
-            {
-                if ( oname == *dname + "/data" )     // actual dataset
-                    *dname = *dname;
-                else if ( oname == *dname + "/structure" )
-                    *dname = *dname;
-                else
-                    *dname = "";
-            }// if
-            else
-            {
-                *dname = oname;                       // directly use dataset
-            }// else
-        }// if
-    }// if
-    
-    return 0;
-}
-
-template < typename value_t, uint dim >
-tensor::dense_tensor< value_t, dim >
-h5_read_tensor ( H5::H5File &         file,
-                 const std::string &  gname )
-{
-    auto  data_name = std::string( "" );
-    auto  status    = H5Ovisit( file.getId(), H5_INDEX_NAME, H5_ITER_INC, visit_func, & data_name );
-
-    HLR_ASSERT( status == 0 );
-
-    // check if nothing compatible was found
-    if ( data_name == "" )
-        return tensor::dense_tensor< value_t, dim >();
-
-    //
-    // read structural info
-    //
-
-    int   id = -1;
-    auto  is = std::array< indexset, dim >();
-    
-    {
-        auto    data_set   = file.openDataSet( data_name + "/structure" );
-        auto    data_space = data_set.getSpace();
-
-        auto    buf        = std::vector< char >( sizeof(int) + sizeof(int) + dim * 2 * sizeof(long) );
-        auto    data_type  = H5::CompType( buf.size() );
-        size_t  ofs        = 0;
-
-        data_type.insertMember( "id",  ofs, H5::PredType::NATIVE_INT ); ofs += sizeof(int);
-        data_type.insertMember( "dim", ofs, H5::PredType::NATIVE_INT ); ofs += sizeof(int);
-
-        hsize_t  is_dims = 2*dim;
-        auto     is_type = H5::ArrayType( H5::PredType::NATIVE_LONG, 1, & is_dims );
-        
-        data_type.insertMember( "indexsets", ofs, is_type );
-
-        data_set.read( buf.data(), data_type );
-
-        // extract data
-        int  ddim = 0;
-        
-        ofs = 0;
-        std::memcpy( &id,   buf.data() + ofs, sizeof(int) ); ofs += sizeof(int);
-        std::memcpy( &ddim, buf.data() + ofs, sizeof(int) ); ofs += sizeof(int);
-
-        HLR_ASSERT( dim == ddim );
-
-        long  is_data[2*dim];
-        
-        std::memcpy( is_data, buf.data() + ofs, sizeof(is_data) ); ofs += sizeof(is_data);
-        
-        for ( uint  d = 0; d < dim; ++d )
-            is[d] = indexset( is_data[2*d], is_data[2*d+1] );
-    }
-
-    //
-    // read tensor data
-    //
-
-    auto  t = tensor::dense_tensor< value_t, dim >( is );
-    
-    {
-        auto  data_set   = file.openDataSet( data_name + "/data" );
-        auto  data_space = data_set.getSpace();
-        auto  data_type  = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
-        auto  dims       = std::vector< hsize_t >( dim );
-
-        HLR_ASSERT( dim == data_space.getSimpleExtentNdims() );
-
-        data_space.getSimpleExtentDims( dims.data() );
-
-        for ( uint  d = 0; d < dim; ++d )
-        {
-            HLR_ASSERT( dims[d] == is[d].size() );
-        }// for
-        
-        data_set.read( t.data(), data_type );
-    }
-    
-    return t;
-}
-
-#endif
-
-}// namespace detail
-
-template < typename value_t, uint dim >
-void
-write ( const tensor::dense_tensor< value_t, dim > &  t,
-        const std::string &                           tname,
-        const std::string &                           fname = "" )
+write ( const tensor::dense_tensor3< value_t > &  t,
+        const std::string &                       tname,
+        const std::string &                       fname = "" )
 {
     #if defined(USE_HDF5)
 
@@ -444,19 +233,19 @@ write ( const tensor::dense_tensor< value_t, dim > &  t,
     #endif
 }
 
-template < typename value_t, uint dim >
-tensor::dense_tensor< value_t, dim >
+template < typename value_t >
+tensor::dense_tensor3< value_t >
 read_tensor ( const std::string &  filename = "" )
 {
     #if defined(USE_HDF5)
 
     auto  file = H5::H5File( filename, H5F_ACC_RDONLY );
 
-    return  detail::h5_read_tensor< value_t, dim >( file, "" );
+    return  detail::h5_read_tensor< value_t >( file, "" );
 
     #else
 
-    return tensor::dense_tensor< value_t, dim >();
+    return tensor::dense_tensor3< value_t >();
     
     #endif
 }
@@ -619,6 +408,17 @@ print ( const Hpro::TCoordinate &  coord,
     Hpro::TVTKCoordVis  vis;
 
     vis.print( & coord, filename );
+}
+
+//
+// print tensor
+//
+template < typename value_t >
+void
+print ( const tensor::dense_tensor3< value_t > &  t,
+        const std::string &                       filename )
+{
+    detail::vtk_print_tensor( t, filename );
 }
 
 }// namespace vtk
