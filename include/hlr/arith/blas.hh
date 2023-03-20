@@ -68,6 +68,9 @@ template < typename value_t > using matrix = Hpro::BLAS::Matrix< value_t >;
 template < typename type_t > inline constexpr bool is_vector_v = is_vector< type_t >::value;
 template < typename type_t > inline constexpr bool is_matrix_v = is_matrix< type_t >::value;
 
+template < typename T > concept  vector_type = is_vector_v< T >;
+template < typename T > concept  matrix_type = is_matrix_v< T >;
+
 //
 // generic matrix type holding all different floating types
 // - just for storage, not for direct arithmetic!
@@ -454,6 +457,25 @@ mat_V ( const std::unique_ptr< Hpro::TRkMatrix< value_t > > &  A,
 // general helpers
 //
 //////////////////////////////////////////////////////////////////////
+
+//
+// print matrix
+//
+template < typename value_t >
+void
+print ( const blas::matrix< value_t > &  M,
+        std::ostream &                   out = std::cout )
+{
+    for ( uint  i = 0; i < M.nrows(); ++i )
+    {
+        for ( uint  j = 0; j < M.ncols(); ++j )
+            out << M( i, j ) << ", ";
+
+        out << std::endl;
+    }// for
+
+    out << std::endl;
+}
 
 //
 // create identity matrix
@@ -1911,6 +1933,27 @@ bdsvd ( const vector< value_t > &  D,
 }
 
 //
+// compute SVD of M
+//
+template < matrix_type  matrix_t >
+std::tuple< matrix< typename matrix_t::value_t >,
+            vector< Hpro::real_type_t< typename matrix_t::value_t > >,
+            matrix< typename matrix_t::value_t > >
+svd ( const matrix_t &  M )
+{
+    using  value_t = typename matrix_t::value_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
+    
+    auto  U = copy( M );
+    auto  S = vector< real_t >( std::min( U.nrows(), U.ncols() ) );
+    auto  V = matrix< value_t >( S.length(), M.ncols() );
+
+    svd( U, S, V );
+
+    return { std::move( U ), std::move( S ), std::move( V ) };
+}
+
+//
 // compute singular vectors of U·V'
 //
 template < typename value_t >
@@ -1951,5 +1994,17 @@ sv ( const matrix< value_t > &  U,
 using Hpro::BLAS::sv;
 
 }}// namespace hlr::blas
+
+//
+// stream output for matrices in global namespace
+//
+template < typename value_t >
+std::ostream &
+operator << ( std::ostream &                        os,
+              const hlr::blas::matrix< value_t > &  M )
+{
+    hlr::blas::print( M, os );
+    return os;
+}
 
 #endif // __HLR_ARITH_BLAS_HH

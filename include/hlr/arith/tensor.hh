@@ -13,7 +13,15 @@
 
 #include <hpro/blas/MemBlock.hh>
 
-namespace hlr { namespace blas {
+#include <hlr/arith/blas.hh>
+
+namespace hlr
+{
+
+using accuracy = Hpro::TTruncAcc;
+
+namespace blas
+{
 
 using Hpro::copy_policy_t;
 using Hpro::copy_reference;
@@ -328,35 +336,28 @@ public:
         return tensor3< value_t >( *this, r0, r1, r2 );
     }
 
-    ////////////////////////////////////////////////////
+    //
+    // sub-tensors
+    //
 
-    // d-mode unfolding
-    matrix< value_t > unfold ( const uint  d ) const;
-    
     // return i'th mod-d fiber
-    vector< value_t >  fiber ( const uint    d,
-                               const size_t  i ) const
+    vector< value_t >  fiber ( const uint    mode,
+                               const size_t  i,
+                               const size_t  j ) const
     {
-        return vector< value_t >( *this, r, j );
+        if      ( mode == 0 ) return vector< value_t >( data() + j * size(0) * size(1) + i * size(0), size(0), 1 );               // i = column, j = page
+        else if ( mode == 1 ) return vector< value_t >( data() + j * size(0) * size(1) + i,           size(1), size(0) );         // i = row,    j = page
+        else if ( mode == 2 ) return vector< value_t >( data() + j * size(0) + i,                     size(2), size(0)*size(1) ); // i = row,    j = column
+        else
+            HLR_ERROR( "wrong mode" );
     }
                           
-    // // return vector referencing part of row \a i defined by \a r
-    // Vector< value_t >  operator () ( const idx_t  i, const range & r ) const
-    // {
-    //     return Vector< value_t >( *this, i, r );
-    // }
-                          
-    // // return vector referencing column \a j
-    // Vector< value_t >  column   ( const idx_t  j ) const
-    // {
-    //     return (*this)( range( 0, idx_t(nrows())-1 ), j );
-    // }
+    // unfolding
+    matrix< value_t > unfold ( const uint  mode ) const;
     
-    // // return vector referencing row \a i
-    // Vector< value_t >  row      ( const idx_t  i ) const
-    // {
-    //     return (*this)( i, range( 0, idx_t(ncols())-1 ) );
-    // }
+    //
+    // misc.
+    //
     
     // return size in bytes used by this object
     size_t  byte_size () const
@@ -377,6 +378,8 @@ template < typename T > struct tensor_trait< tensor3< T > > { using  value_t = T
 
 // signals, that T is of tensor type
 template < typename T > struct is_tensor< tensor3< T > > { static const bool  value = true; };
+
+template < typename T > inline constexpr bool is_tensor_v = is_tensor< T >::value;
 
 // tensor type concept
 template < typename T > concept tensor_type = is_tensor< T >::value;
@@ -401,16 +404,64 @@ copy ( const tensor3< value_t > &  t )
 //
 template < typename value_t >
 matrix< value_t >
-tensor3_base< value_t >::unfold ( const uint  d ) const
+tensor3< value_t >::unfold ( const uint  d ) const
 {
-    HLR_ASSERT( d < dimension );
+    HLR_ASSERT( d < 3 );
     
     if ( d == 0 )
     {
-        auto  M = matrix< value_t >( size(0), size(1) * size(2) );
+        auto    M   = matrix< value_t >( size(0), size(1) * size(2) );
+        size_t  col = 0;
 
-        
+        for ( size_t  l = 0; l < size(2); ++l )
+        {
+            for ( size_t  j = 0; j < size(1); ++j )
+            {
+                auto  t_jl = fiber( d, j, l );
+                auto  m_c  = M.column( col++ );
+                    
+                blas::copy( t_jl, m_c );
+            }// for
+        }// for
+            
+        return M;
     }// if
+    else if ( d == 1 )
+    {
+        auto    M   = matrix< value_t >( size(1), size(0) * size(2) );
+        size_t  col = 0;
+
+        for ( size_t  l = 0; l < size(2); ++l )
+        {
+            for ( size_t  i = 0; i < size(0); ++i )
+            {
+                auto  t_il = fiber( d, i, l );
+                auto  m_c  = M.column( col++ );
+                
+                blas::copy( t_il, m_c );
+            }// for
+        }// for
+        
+        return M;
+    }// if
+    else
+    {
+        auto    M   = matrix< value_t >( size(2), size(0) * size(1) );
+        size_t  col = 0;
+        
+        for ( size_t  j = 0; j < size(1); ++j )
+        {
+            for ( size_t  i = 0; i < size(0); ++i )
+            {
+                auto  t_ij = fiber( d, i, j );
+                auto  m_c  = M.column( col++ );
+                
+                blas::copy( t_ij, m_c );
+            }// for
+        }// for
+        
+        return M;
+    }// else
 }
 
 ////////////////////////////////////////////////////////////////
@@ -455,6 +506,119 @@ real_type_t< value_t >
 norm_F ( const tensor3< value_t > &  t )
 {
     return std::sqrt( std::abs( dot( t, t ) ) );
+}
+
+template < typename value_t >
+tensor3< value_t >
+tensor_product ( const tensor3< value_t > &  X,
+                 const matrix< value_t > &   M,
+                 const uint                  mode )
+{
+    HLR_ASSERT( X.size(mode) == M.ncols() );
+
+    auto  Y = tensor3< value_t >( ( mode == 0 ? M.nrows() : X.size(0) ),
+                                  ( mode == 1 ? M.nrows() : X.size(1) ),
+                                  ( mode == 2 ? M.nrows() : X.size(2) ) );
+
+    if ( mode == 0 )
+    {
+        for ( size_t  l = 0; l < X.size(2); ++l )
+        {
+            for ( size_t  j = 0; j < X.size(1); ++j )
+            {
+                auto  x_ij = X.fiber( mode, j, l );
+                auto  y_ij = Y.fiber( mode, j, l );
+
+                mulvec( M, x_ij, y_ij );
+            }// for
+        }// for
+    }// if
+    else if ( mode == 1 )
+    {
+        for ( size_t  l = 0; l < X.size(2); ++l )
+        {
+            for ( size_t  i = 0; i < X.size(0); ++i )
+            {
+                auto  x_ij = X.fiber( mode, i, l );
+                auto  y_ij = Y.fiber( mode, i, l );
+
+                mulvec( M, x_ij, y_ij );
+            }// for
+        }// for
+    }// if
+    else if ( mode == 2 )
+    {
+        for ( size_t  j = 0; j < X.size(1); ++j )
+        {
+            for ( size_t  i = 0; i < X.size(0); ++i )
+            {
+                auto  x_ij = X.fiber( mode, i, j );
+                auto  y_ij = Y.fiber( mode, i, j );
+
+                mulvec( M, x_ij, y_ij );
+            }// for
+        }// for
+    }// if
+
+    return Y;
+}
+
+//
+// element-wise multiplication X2 := X1 * X2
+//
+template < typename value_t >
+tensor3< value_t >
+hadamard_product ( const tensor3< value_t > &  X1,
+                   tensor3< value_t > &        X2 )
+{
+    HLR_ASSERT( ( X1.size(0) == X2.size(0) ) &&
+                ( X1.size(1) == X2.size(1) ) &&
+                ( X1.size(2) == X2.size(2) ) );
+
+    const size_t  n = X1.size(0) * X1.size(1) * X1.size(2);
+
+    for ( size_t  i = 0; i < n; ++i )
+        X2.data()[i] *= X1.data()[i];
+}
+
+////////////////////////////////////////////////////////////////
+//
+// truncation
+//
+
+template < typename value_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+hosvd ( const tensor3< value_t > &  X,
+        const accuracy &            acc )
+{
+    auto  X0 = X.unfold( 0 );
+    auto  X1 = X.unfold( 1 );
+    auto  X2 = X.unfold( 2 );
+
+    auto  [ U0, S0, V0 ] = svd( X0 );
+    auto  [ U1, S1, V1 ] = svd( X1 );
+    auto  [ U2, S2, V2 ] = svd( X2 );
+
+    const auto  k0 = acc.trunc_rank( S0 );
+    const auto  k1 = acc.trunc_rank( S1 );
+    const auto  k2 = acc.trunc_rank( S2 );
+
+    auto  U0k = matrix( U0, range::all, range( 0, k0-1 ) );
+    auto  U1k = matrix( U1, range::all, range( 0, k1-1 ) );
+    auto  U2k = matrix( U2, range::all, range( 0, k2-1 ) );
+
+    auto  W0  = copy( U0 );
+    auto  W1  = copy( U1 );
+    auto  W2  = copy( U2 );
+
+    auto  Y0  = tensor_product( X,  W0, 0 );
+    auto  Y1  = tensor_product( Y0, W1, 1 );
+    auto  G   = tensor_product( Y1, W2, 2 );
+
+    return { std::move(G), std::move(W0), std::move(W1), std::move(W2) };
 }
 
 }}// namespace hlr::blas
