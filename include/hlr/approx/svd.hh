@@ -12,6 +12,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/traits.hh>
 #include <hlr/approx/pairwise.hh>
 
 namespace hlr { namespace approx {
@@ -600,6 +601,9 @@ struct PairSVD
         return hlr::approx::svd( U, T, V, acc );
     }
 };
+
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< SVD< T > > { static const bool  value = true; };
 
 }}// namespace hlr::approx
 

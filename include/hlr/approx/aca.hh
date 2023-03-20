@@ -784,6 +784,10 @@ struct ACAFull
     }
 };
 
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< ACA< T > >     { static const bool  value = true; };
+template < typename T > struct is_approximation< ACAFull< T > > { static const bool  value = true; };
+
 }}// namespace hlr::approx
 
 #endif // __HLR_APPROX_ACA_HH

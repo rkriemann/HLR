@@ -12,6 +12,7 @@
 #include <deque>
 #include <random>
 
+#include <hlr/approx/traits.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
 
@@ -732,6 +733,9 @@ struct RandLR
         return detail::rand_column_basis< operator_t >( op, acc, 2, 0, 0 );
     }
 };
+
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< RandLR< T > > { static const bool  value = true; };
 
 }}// namespace hlr::approx
 

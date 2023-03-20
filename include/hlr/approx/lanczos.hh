@@ -461,6 +461,9 @@ struct Lanczos
     }
 };
 
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< Lanczos< T > > { static const bool  value = true; };
+
 }}// namespace hlr::approx
 
 #endif // __HLR_APPROX_LANCZOS_HH

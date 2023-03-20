@@ -236,6 +236,22 @@ write ( const tensor::dense_tensor3< value_t > &  t,
 }
 
 template < typename value_t >
+void
+write ( const blas::tensor3< value_t > &  t,
+        const std::string &               tname,
+        const std::string &               fname = "" )
+{
+    #if defined(USE_HDF5)
+
+    const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
+    auto               file     = H5::H5File( filename, H5F_ACC_TRUNC );
+    
+    detail::h5_write_tensor( file, "/" + tname, t );
+
+    #endif
+}
+
+template < typename value_t >
 tensor::dense_tensor3< value_t >
 read_tensor ( const std::string &  filename = "" )
 {
@@ -419,6 +435,14 @@ template < typename value_t >
 void
 print ( const tensor::dense_tensor3< value_t > &  t,
         const std::string &                       filename )
+{
+    detail::vtk_print_tensor( t.tensor(), filename );
+}
+
+template < typename value_t >
+void
+print ( const blas::tensor3< value_t > &  t,
+        const std::string &               filename )
 {
     detail::vtk_print_tensor( t, filename );
 }

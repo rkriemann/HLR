@@ -13,6 +13,8 @@
 
 #include <hpro/blas/MemBlock.hh>
 
+#include <hlr/approx/traits.hh>
+#include <hlr/approx/svd.hh>
 #include <hlr/arith/blas.hh>
 
 namespace hlr
@@ -33,6 +35,11 @@ template < typename T_tensor > struct tensor_trait;
 
 // signals, that T is of tensor type
 template < typename T > struct is_tensor { static const bool  value = false; };
+
+template < typename T > inline constexpr bool is_tensor_v = is_tensor< T >::value;
+
+// tensor type concept
+template < typename T > concept tensor_type = is_tensor_v< T >;
 
 //
 // basic tensor interface
@@ -379,11 +386,6 @@ template < typename T > struct tensor_trait< tensor3< T > > { using  value_t = T
 // signals, that T is of tensor type
 template < typename T > struct is_tensor< tensor3< T > > { static const bool  value = true; };
 
-template < typename T > inline constexpr bool is_tensor_v = is_tensor< T >::value;
-
-// tensor type concept
-template < typename T > concept tensor_type = is_tensor< T >::value;
-
 //
 // return real copy of given tensor
 //
@@ -508,10 +510,38 @@ norm_F ( const tensor3< value_t > &  t )
     return std::sqrt( std::abs( dot( t, t ) ) );
 }
 
-template < typename value_t >
+//
+// compute B := α A + β B (element wise)
+//
+template < typename alpha_t,
+           typename beta_t,
+           typename value_t >
+requires ( std::convertible_to< alpha_t, value_t > &&
+           std::convertible_to< beta_t, value_t > )
+void
+add ( const alpha_t               alpha,
+      const tensor3< value_t > &  A,
+      const beta_t                beta,
+      tensor3< value_t > &        B )
+{
+    HLR_DBG_ASSERT( ( A.size(0) == B.size(0) ) &&
+                    ( A.size(1) == B.size(1) ) &&
+                    ( A.size(2) == B.size(2) ) );
+    
+    const size_t  n = A.size(0) * A.size(1) * A.size(2);
+
+    for ( size_t  i = 0; i < n; ++i )
+        B.data()[i] = value_t(alpha) * A.data()[i] + value_t(beta) * B.data()[i];
+}
+
+//
+// compute d-mode tensor product X×M
+//
+template < typename     value_t,
+           matrix_type  matrix_t >
 tensor3< value_t >
 tensor_product ( const tensor3< value_t > &  X,
-                 const matrix< value_t > &   M,
+                 const matrix_t &            M,
                  const uint                  mode )
 {
     HLR_ASSERT( X.size(mode) == M.ncols() );
@@ -586,7 +616,32 @@ hadamard_product ( const tensor3< value_t > &  X1,
 // truncation
 //
 
-template < typename value_t >
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+hosvd ( const tensor3< value_t > &  X,
+        const accuracy &            acc,
+        const approx_t &            apx )
+{
+    auto  X0 = X.unfold( 0 );
+    auto  X1 = X.unfold( 1 );
+    auto  X2 = X.unfold( 2 );
+
+    auto  U0 = apx.column_basis( X0, acc );
+    auto  U1 = apx.column_basis( X1, acc );
+    auto  U2 = apx.column_basis( X2, acc );
+
+    auto  Y0  = tensor_product( X,  adjoint( U0 ), 0 );
+    auto  Y1  = tensor_product( Y0, adjoint( U1 ), 1 );
+    auto  G   = tensor_product( Y1, adjoint( U2 ), 2 );
+
+    return { std::move(G), std::move(U0), std::move(U1), std::move(U2) };
+}
+
+template < typename  value_t >
 std::tuple< tensor3< value_t >,
             matrix< value_t >,
             matrix< value_t >,
@@ -594,31 +649,9 @@ std::tuple< tensor3< value_t >,
 hosvd ( const tensor3< value_t > &  X,
         const accuracy &            acc )
 {
-    auto  X0 = X.unfold( 0 );
-    auto  X1 = X.unfold( 1 );
-    auto  X2 = X.unfold( 2 );
+    const auto  apx = approx::SVD< value_t >();
 
-    auto  [ U0, S0, V0 ] = svd( X0 );
-    auto  [ U1, S1, V1 ] = svd( X1 );
-    auto  [ U2, S2, V2 ] = svd( X2 );
-
-    const auto  k0 = acc.trunc_rank( S0 );
-    const auto  k1 = acc.trunc_rank( S1 );
-    const auto  k2 = acc.trunc_rank( S2 );
-
-    auto  U0k = matrix( U0, range::all, range( 0, k0-1 ) );
-    auto  U1k = matrix( U1, range::all, range( 0, k1-1 ) );
-    auto  U2k = matrix( U2, range::all, range( 0, k2-1 ) );
-
-    auto  W0  = copy( U0 );
-    auto  W1  = copy( U1 );
-    auto  W2  = copy( U2 );
-
-    auto  Y0  = tensor_product( X,  W0, 0 );
-    auto  Y1  = tensor_product( Y0, W1, 1 );
-    auto  G   = tensor_product( Y1, W2, 2 );
-
-    return { std::move(G), std::move(W0), std::move(W1), std::move(W2) };
+    return hosvd( X, acc, apx );
 }
 
 }}// namespace hlr::blas

@@ -13,6 +13,9 @@
 #include <common-main.hh>
 
 #include <hlr/tensor/dense_tensor.hh>
+#include <hlr/approx/svd.hh>
+#include <hlr/approx/randsvd.hh>
+#include <hlr/approx/rrqr.hh>
 #include <hlr/utils/io.hh>
 
 using namespace hlr;
@@ -51,6 +54,10 @@ program_main ()
 {
     using value_t = double;
 
+    auto  tic     = timer::now();
+    auto  toc     = timer::since( tic );
+
+    if ( false )
     {
         auto  X = blas::tensor3< value_t >( 3, 4, 2 );
         uint  v = 1;
@@ -83,26 +90,71 @@ program_main ()
 
         print( Y );
 
-        auto  acc = Hpro::fixed_prec( 1e-4 );
-        auto  [ G, Y0, Y1, Y2 ] = hosvd( X, acc );
+        auto  acc               = Hpro::fixed_prec( 1e-4 );
+        auto  [ G, Y0, Y1, Y2 ] = blas::hosvd( X, acc );
+
+        print( G );
+        
+        std::cout << Y0 << std::endl;
+        std::cout << Y1 << std::endl;
+        std::cout << Y2 << std::endl;
+
+        auto  W0 = blas::tensor_product( G,  Y0, 0 );
+        auto  W1 = blas::tensor_product( W0, Y1, 1 );
+        auto  W  = blas::tensor_product( W1, Y2, 2 );
+
+        print( W );
     }
 
-    if ( false )
+    if ( true )
     {
-        const size_t                      n = 10;
-        const double                      h = std::numbers::pi / double(n-1);
-        tensor::dense_tensor3< value_t >  t( is(0,n-1), is(0,n-1), is(0,n-1) );
-        double                            v = 1.0;
+        const size_t              n = cmdline::n;
+        const double              h = std::numbers::pi / double(n-1);
+        blas::tensor3< value_t >  X( n, n, n );
+        double                    v = 1.0;
+        
+        std::cout << term::bullet << term::bold << "dense tensor" << term::reset << std::endl;
+
+        tic = timer::now();
         
         for ( uint  l = 0; l < n; ++l )
             for ( uint  j = 0; j < n; ++j )
                 for ( uint  i = 0; i < n; ++i )
-                    t( i, j, l ) = std::sin( i * h ) + std::cos( j * h ) + std::sin( l * h );
+                    X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+        
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
+        std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
         
         // print( t );
-        io::vtk::print( t, "t.vtk" );
+        if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
+        if ( verbose(2) ) io::hdf5::write( X, "X" );
+        
+        std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
 
-        io::hdf5::write( t, "t" );
+        tic = timer::now();
+        
+        auto  acc               = Hpro::fixed_prec( cmdline::eps );
+        auto  apx               = approx::SVD< value_t >();
+        auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+        std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
+
+        auto  T0 = blas::tensor_product( G,  X0, 0 );
+        auto  T1 = blas::tensor_product( T0, X1, 1 );
+        auto  Y  = blas::tensor_product( T1, X2, 2 );
+
+        if ( verbose(3) ) io::vtk::print( Y, "Y" );
+        if ( verbose(2) ) io::hdf5::write( Y, "Y" );
+
+        blas::add( -1, X, 1, Y );
+        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+
+        if ( verbose(3) ) io::vtk::print( Y, "error" );
     }
 
     if ( false )

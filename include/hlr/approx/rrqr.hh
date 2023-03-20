@@ -456,6 +456,9 @@ struct RRQR
     }
 };
 
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< RRQR< T > > { static const bool  value = true; };
+
 }}// namespace hlr::approx
 
 #endif // __HLR_APPROX_RRQR_HH

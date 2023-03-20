@@ -1953,6 +1953,9 @@ svd ( const matrix_t &  M )
     return { std::move( U ), std::move( S ), std::move( V ) };
 }
 
+// but use also all other SVD functions
+using Hpro::BLAS::svd;
+
 //
 // compute singular vectors of U·V'
 //

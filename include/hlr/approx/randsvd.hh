@@ -420,6 +420,9 @@ struct RandSVD
     }
 };
 
+// signals, that T is of approximation type
+template < typename T > struct is_approximation< RandSVD< T > > { static const bool  value = true; };
+
 }}// namespace hlr::approx
 
 #endif // __HLR_APPROX_RANDSVD_HH

@@ -9,6 +9,7 @@
 //
 
 #include <fstream>
+#include <filesystem>
 
 namespace hlr { namespace io {
 
@@ -99,6 +100,45 @@ h5_write_tensor ( H5::H5File &                              file,
         auto  data_set = file.createDataSet( gname + "/data", data_type, data_space );
             
         data_set.write( t.tensor().data(), data_type );
+
+        data_space.close();
+        data_type.close();
+        data_set.close();
+    }
+}
+
+template < typename value_t >
+void
+h5_write_tensor ( H5::H5File &                      file,
+                  const std::string &               gname,
+                  const blas::tensor3< value_t > &  t )
+{
+    constexpr uint  dim = 3;
+
+    auto  group = std::make_unique< H5::Group >( file.createGroup( gname ) );
+
+    if ( Hpro::is_complex_type< value_t >::value )
+        HLR_ERROR( "complex not yet supported" );
+
+    //
+    // just tensor data
+    //
+
+    {
+        hsize_t  data_dims[ dim ];
+
+        for ( uint  i = 0; i < dim; ++i )
+            data_dims[i] = t.size(i);
+    
+        auto  data_space = H5::DataSpace( dim, data_dims );
+
+        // define datatype
+        auto  data_type = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
+
+        // create dataset for tensor data
+        auto  data_set = file.createDataSet( gname + "/values", data_type, data_space );
+            
+        data_set.write( t.data(), data_type );
 
         data_space.close();
         data_type.close();
@@ -239,30 +279,29 @@ h5_read_tensor ( H5::H5File &         file,
 
 template < typename value_t >
 void
-vtk_print_tensor ( const tensor::dense_tensor3< value_t > &  t,
-                   const std::string &                       filename )
+vtk_print_tensor ( const blas::tensor3< value_t > &  t,
+                   const std::string &               filename )
 {
-    std::ofstream  out( filename );
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
     
     out << "# vtk DataFile Version 2.0" << std::endl
         << "HLIBpro coordinates" << std::endl
         << "ASCII" << std::endl
         << "DATASET UNSTRUCTURED_GRID" << std::endl;
 
-    auto  T = t.tensor();
-
     //
     // assuming tensor grid in equal step width in all dimensions
     //
 
-    const size_t  n = t.dim(0) * t.dim(1) * t.dim(2);
-    const double  h = 1.0 / std::min( t.dim(0), std::min( t.dim(1), t.dim(2) ) );
+    const size_t  n = t.size(0) * t.size(1) * t.size(2);
+    const double  h = 1.0 / std::min( t.size(0), std::min( t.size(1), t.size(2) ) );
 
     out << "POINTS " << n << " FLOAT" << std::endl;
 
-    for ( size_t  l = 0; l < t.dim(2); ++l )
-        for ( size_t  j = 0; j < t.dim(1); ++j )
-            for ( size_t  i = 0; i < t.dim(0); ++i )
+    for ( size_t  l = 0; l < t.size(2); ++l )
+        for ( size_t  j = 0; j < t.size(1); ++j )
+            for ( size_t  i = 0; i < t.size(0); ++i )
                 out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
 
     out << "CELLS " << n << ' ' << 2 * n << std::endl;
@@ -281,7 +320,7 @@ vtk_print_tensor ( const tensor::dense_tensor3< value_t > &  t,
         << "COLOR_SCALARS v" << " 1" << std::endl;
         
     for ( size_t  i = 0; i < n; ++i )
-        out << t.tensor().data()[i] << ' ';
+        out << t.data()[i] << ' ';
     out << std::endl;
 }
 
