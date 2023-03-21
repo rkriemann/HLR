@@ -13,6 +13,8 @@
 #include <common-main.hh>
 
 #include <hlr/tensor/dense_tensor.hh>
+#include <hlr/tensor/tucker_tensor.hh>
+#include <hlr/tensor/construct.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/randsvd.hh>
 #include <hlr/approx/rrqr.hh>
@@ -130,31 +132,62 @@ program_main ()
         // print( t );
         if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
         if ( verbose(2) ) io::hdf5::write( X, "X" );
+
+        {
+            std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
+
+            tic = timer::now();
         
-        std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
+            auto  acc               = Hpro::fixed_prec( cmdline::eps );
+            auto  apx               = approx::SVD< value_t >();
+            auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
+            
+            toc = timer::since( tic );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+            std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+            std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
+            
+            auto  Z  = tensor::tucker_tensor3< value_t >( is( 0,n-1 ), is( 0,n-1 ), is( 0,n-1 ),
+                                                          std::move( G ),
+                                                          std::move( X0 ),
+                                                          std::move( X1 ),
+                                                          std::move( X2 ) );
+            
+            std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+            
+            auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
+            auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
+            auto  Y  = blas::tensor_product( T1,    Z.X(2), 2 );
+            
+            if ( verbose(3) ) io::vtk::print( Y, "Y" );
+            if ( verbose(2) ) io::hdf5::write( Y, "Y" );
+            
+            blas::add( -1, X, 1, Y );
+            std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+            
+            if ( verbose(3) ) io::vtk::print( Y, "error" );
+        }
 
-        tic = timer::now();
+        {
+            std::cout << term::bullet << term::bold << "Hierarchical HOSVD" << term::reset << std::endl;
+
+            tic = timer::now();
         
-        auto  acc               = Hpro::fixed_prec( cmdline::eps );
-        auto  apx               = approx::SVD< value_t >();
-        auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
-
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
-        std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
-
-        auto  T0 = blas::tensor_product( G,  X0, 0 );
-        auto  T1 = blas::tensor_product( T0, X1, 1 );
-        auto  Y  = blas::tensor_product( T1, X2, 2 );
-
-        if ( verbose(3) ) io::vtk::print( Y, "Y" );
-        if ( verbose(2) ) io::hdf5::write( Y, "Y" );
-
-        blas::add( -1, X, 1, Y );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
-
-        if ( verbose(3) ) io::vtk::print( Y, "error" );
+            auto  acc = Hpro::fixed_prec( cmdline::eps );
+            auto  apx = approx::SVD< value_t >();
+            auto  H   = tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
+            
+            toc = timer::since( tic );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+            std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
+            
+            // blas::add( -1, X, 1, Y );
+            // std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+            
+            // if ( verbose(3) ) io::vtk::print( Y, "error" );
+        }
     }
 
     if ( false )

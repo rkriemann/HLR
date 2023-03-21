@@ -11,6 +11,9 @@
 #include <vector>
 #include <cstddef>
 
+namespace hlr
+{
+
 template < typename T >
 struct tensor2
 {
@@ -156,5 +159,7 @@ public:
     size_t  nrows  () const { return dim1; }
     size_t  ncols  () const { return dim2; }
 };
+
+}// namespace hlr
 
 #endif   // __HLIB_TENSOR_HH

@@ -3,48 +3,35 @@
 //
 // Project     : HLR
 // Module      : tensor/dense_tensor
-// Description : dense (full) tensor with dynamic value type
+// Description : dense (full) tensor
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
-
-#include <vector>
-#include <array>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
-namespace hlr
-{ 
+#include <hlr/tensor/base_tensor.hh>
 
-using indexset = Hpro::TIndexSet;
-using Hpro::is;
-
-namespace tensor
-{
+namespace hlr { namespace tensor {
 
 //
 // implements dense (full) 3D tensor
 // - storage layout is column-major
 //
 template < typename T_value >
-class dense_tensor3
+class dense_tensor3 : public base_tensor3< T_value >
 {
 public:
     using  value_t = T_value;
     using  real_t  = Hpro::real_type_t< value_t >;
+    using  super_t = base_tensor3< value_t >;
 
     static constexpr uint  dimension = 3;
 
 private:
-    // globally unique id
-    int                        _id;
-
-    // index sets per dimensions
-    std::array< indexset, 3 >  _indexsets;
-
     // tensor data
     blas::tensor3< value_t >   _tensor;
 
@@ -54,20 +41,30 @@ public:
     //
 
     dense_tensor3 ()
-            : _id(-1)
     {}
+
+    dense_tensor3 ( const dense_tensor3 &  t )
+            : super_t( t )
+            , _tensor( t._tensor.size() )
+    {
+        blas::copy( t._tensor, _tensor );
+    }
+
+    dense_tensor3 ( dense_tensor3 &&  t )
+            : super_t( std::forward< base_tensor3< value_t > >( t ) )
+    {
+        std::swap( _tensor, t._tensor );
+    }
 
     dense_tensor3 ( const indexset &  is0,
                     const indexset &  is1,
                     const indexset &  is2 )
-            : _id(-1)
-            , _indexsets{ is0, is1, is2 }
+            : super_t( is0, is1, is2 )
             , _tensor( is0.size(), is1.size(), is2.size() )
     {}
     
     dense_tensor3 ( const std::array< indexset, 3 > &  ais )
-            : _id(-1)
-            , _indexsets{ ais[0], ais[1], ais[2] }
+            : super_t{ ais[0], ais[1], ais[2] }
             , _tensor( ais[0].size(), ais[1].size(), ais[2].size() )
     {}
     
@@ -75,26 +72,10 @@ public:
                     const indexset &             is1,
                     const indexset &             is2,
                     blas::tensor3< value_t > &&  t )
-            : _id(-1)
-            , _indexsets{ is0, is1, is2 }
+            : super_t( is0, is1, is2 )
             , _tensor( std::move( t ) )
     {}
     
-    dense_tensor3 ( const dense_tensor3 &  t )
-            : _id( t._id )
-            , _indexsets( t._indexsets )
-            , _tensor( t._tensor.size() )
-    {
-        blas::copy( t._tensor, _tensor );
-    }
-
-    dense_tensor3 ( dense_tensor3 &&  t )
-    {
-        std::swap( _id,        t._id );
-        std::swap( _indexsets, t._indexsets );
-        std::swap( _tensor,    t._tensor );
-    }
-
     // dtor
     virtual ~dense_tensor3 ()
     {}
@@ -102,31 +83,26 @@ public:
     // assignment
     dense_tensor3 &  operator = ( const dense_tensor3 &  t )
     {
-        _id        = t._id;
-        _indexsets = t._indexsets;
-        _tensor    = blas::copy( t._tensor );
+        super_t::operator = ( t );
+
+        _tensor = blas::copy( t._tensor );
     }
 
     dense_tensor3 &  operator = ( dense_tensor3 &&  t )
     {
-        _indexsets = std::move( t._indexsets );
-        _tensor    = std::move( t._tensor );
+        super_t::operator = ( std::forward( t ) );
 
-        t._indexsets.fill( is( 0, -1 ) );
+        _tensor = std::move( t._tensor );
     }
 
     //
     // access internal data
     //
 
-    int              id   () const { return _id; }
-    
+    size_t  dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _tensor.size(d); }
+
     blas::tensor3< value_t > &        tensor ()       { return _tensor; }
     const blas::tensor3< value_t > &  tensor () const { return _tensor; }
-
-    uint             rank ()                const { return dimension; }
-    size_t           dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _tensor.size(d); }
-    indexset         is   ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d]; }
 
     value_t          coeff       ( const uint  i,
                                    const uint  j,
@@ -149,7 +125,7 @@ public:
     // return size in bytes used by this object
     size_t  byte_size () const
     {
-        return _tensor.byte_size() + sizeof(_indexsets) + sizeof(_id);
+        return super_t::byte_size() + _tensor.byte_size();
     }
 };
 
