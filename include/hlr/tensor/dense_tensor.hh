@@ -12,6 +12,7 @@
 #include <hlr/arith/tensor.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
+#include <hlr/utils/traits.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 
@@ -122,12 +123,44 @@ public:
     // misc
     //
     
+    // return copy of local object
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    copy () const
+    {
+        auto  T = super_t::copy();
+        auto  X = ptrcast( T.get(), dense_tensor3< value_t > );
+
+        X->_tensor = blas::copy( _tensor );
+        
+        return T;
+    }
+    
+    // create object of same type but without data
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    create () const
+    {
+        return std::make_unique< dense_tensor3< value_t > >();
+    }
+    
     // return size in bytes used by this object
-    size_t  byte_size () const
+    virtual size_t  byte_size () const
     {
         return super_t::byte_size() + _tensor.byte_size();
     }
 };
+
+//
+// type tests
+//
+bool
+is_dense ( const with_value_type auto &  t )
+{
+    using value_t = typename decltype(t)::value_t;
+    
+    return dynamic_cast< dense_tensor3< value_t > >( &t ) != nullptr;
+}
 
 }}// namespace hlr::tensor
 

@@ -51,7 +51,9 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
-                std::cout << "R: " << to_string( is0 ) << " x " << to_string( is1 ) << " x " << to_string( is2 ) << std::endl;
+                std::cout << "R: " << to_string( is0 ) << " x " << to_string( is1 ) << " x " << to_string( is2 )
+                          << " : " << X0.ncols() << " / " << X1.ncols() << " / " << X2.ncols()
+                          << std::endl;
 
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),

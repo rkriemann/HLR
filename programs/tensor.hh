@@ -15,6 +15,7 @@
 #include <hlr/tensor/dense_tensor.hh>
 #include <hlr/tensor/tucker_tensor.hh>
 #include <hlr/tensor/construct.hh>
+#include <hlr/tensor/convert.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/randsvd.hh>
 #include <hlr/approx/rrqr.hh>
@@ -182,6 +183,8 @@ program_main ()
             
             std::cout << "    done in  " << format_time( toc ) << std::endl;
             std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
+
+            auto  Y = tensor::to_dense( *H );
             
             // blas::add( -1, X, 1, Y );
             // std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;

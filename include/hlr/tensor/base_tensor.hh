@@ -103,9 +103,32 @@ public:
     //
     // misc
     //
+
+    // return copy of local object
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    copy () const
+    {
+        auto  T = create();
+
+        T->_id        = _id;
+        T->_indexsets = _indexsets;
+
+        return T;
+    }
+    
+    // create object of same type but without data
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    create () const
+    {
+        return std::make_unique< base_tensor3< value_t > >();
+    }
     
     // return size in bytes used by this object
-    size_t  byte_size () const
+    virtual
+    size_t
+    byte_size () const
     {
         return sizeof(_indexsets) + sizeof(_id);
     }

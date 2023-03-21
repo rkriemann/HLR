@@ -129,12 +129,47 @@ public:
     // misc
     //
     
+    // return copy of local object
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    copy () const
+    {
+        auto  T = super_t::copy();
+        auto  X = ptrcast( T.get(), tucker_tensor3< value_t > );
+
+        X->_G  = blas::copy( _G );
+        X->_X0 = blas::copy( _X0 );
+        X->_X1 = blas::copy( _X1 );
+        X->_X2 = blas::copy( _X2 );
+        
+        return T;
+    }
+    
+    // create object of same type but without data
+    virtual
+    std::unique_ptr< base_tensor3< value_t > >
+    create () const
+    {
+        return std::make_unique< tucker_tensor3< value_t > >();
+    }
+    
     // return size in bytes used by this object
-    size_t  byte_size () const
+    virtual size_t  byte_size () const
     {
         return super_t::byte_size() + _G.byte_size() + _X0.byte_size() + _X1.byte_size() + _X2.byte_size();
     }
 };
+
+//
+// type tests
+//
+bool
+is_tucker ( const with_value_type auto &  t )
+{
+    using value_t = typename decltype(t)::value_t;
+    
+    return dynamic_cast< tucker_tensor3< value_t > >( &t ) != nullptr;
+}
 
 }}// namespace hlr::tensor
 
