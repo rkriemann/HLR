@@ -396,6 +396,35 @@ copy ( const tensor3< value_t > &  t )
     return t.copy();
 }
 
+//
+// print tensor to (standard) output
+//
+void
+print ( const tensor_type auto &  t,
+        std::ostream &            out = std::cout )
+{
+    for ( uint  l = 0; l < t.size(2); ++l )
+    {
+        for ( uint  i = 0; i < t.size(0); ++i )
+        {
+            for ( uint  j = 0; j < t.size(1); ++j )
+                out << t( i, j, l ) << ", ";
+
+            out << std::endl;
+        }// for
+
+        out << std::endl;
+    }// for
+}
+
+std::ostream &
+operator << ( std::ostream &            os,
+              const tensor_type auto &  M )
+{
+    print( M, os );
+    return os;
+}
+
 ////////////////////////////////////////////////////////////////
 //
 // BLAS functions

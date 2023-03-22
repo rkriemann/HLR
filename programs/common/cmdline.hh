@@ -38,6 +38,7 @@ bool    noredir    = false;        // prevent stdout redirection in distributed 
 string  gridfile   = "sphere-4";   // gridfile for corresponding applications
 string  matrixfile = "";           // use matrix from file instead of application
 string  sparsefile = "";           // sparse matrix instead of application
+string  datafile   = "";           // general data file for different programs
 bool    onlydag    = false;        // only compute task graph, no DAG execution
 bool    docopy     = true;         // copy matrix before further comp. to distr. memory
 bool    levelwise  = false;        // use levelwise task graph construction
@@ -81,6 +82,7 @@ read_config ( const std::string &  filename )
     sigma      = cfg.get( "app.sigma",   sigma );
     matrixfile = cfg.get( "app.matrix",  matrixfile );
     sparsefile = cfg.get( "app.sparse",  sparsefile );
+    datafile   = cfg.get( "app.data",    datafile );
         
     ntile      = cfg.get( "arith.ntile",  ntile );
     nbench     = cfg.get( "arith.nbench", nbench );
@@ -126,6 +128,7 @@ parse ( int argc, char ** argv )
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
@@ -214,6 +217,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
+    if ( vm.count( "data"       ) ) datafile   = vm["data"].as<string>();
     if ( vm.count( "distr"      ) ) distr      = vm["distr"].as<string>();
     if ( vm.count( "noredir"    ) ) noredir    = true;
     if ( vm.count( "onlydag"    ) ) onlydag    = true;

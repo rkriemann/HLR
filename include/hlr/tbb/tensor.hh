@@ -1,23 +1,22 @@
-#ifndef __HLR_TENSOR_CONSTRUCT_HH
-#define __HLR_TENSOR_CONSTRUCT_HH
+#ifndef __HLR_TBB_TENSOR_HH
+#define __HLR_TBB_TENSOR_HH
 //
 // Project     : HLR
-// Module      : tensor/construct
-// Description : adaptive construction of an hierarchical tensor
+// Module      : tbb/tensor
+// Description : tensor algorithms using TBB
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hlr/arith/blas.hh>
-#include <hlr/arith/tensor.hh>
-#include <hlr/approx/traits.hh>
+#include <tbb/blocked_range3d.h>
+#include <tbb/parallel_for.h>
 
-#include <hlr/tensor/base_tensor.hh>
-#include <hlr/tensor/dense_tensor.hh>
-#include <hlr/tensor/tucker_tensor.hh>
-#include <hlr/tensor/structured_tensor.hh>
+#include <hlr/tensor/construct.hh>
+#include <hlr/tensor/convert.hh>
 
-namespace hlr { namespace tensor {
+namespace hlr { namespace tbb { namespace tensor {
+
+using namespace hlr::tensor;
 
 //
 // build hierarchical tensor representation from given dense tensor, starting
@@ -51,10 +50,6 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
-                // std::cout << "R: " << to_string( is0 ) << " x " << to_string( is1 ) << " x " << to_string( is2 )
-                //           << " : " << X0.ncols() << " / " << X1.ncols() << " / " << X2.ncols()
-                //           << std::endl;
-
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),
                                                                       std::move( X0 ),
@@ -62,8 +57,6 @@ build_hierarchical_tucker ( const indexset &                  is0,
                                                                       std::move( X2 ) );
             }// if
         }// if
-
-        // std::cout << "D: " << to_string( is0 ) << " x " << to_string( is1 ) << " x " << to_string( is2 ) << std::endl;
 
         return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
     }// if
@@ -82,29 +75,34 @@ build_hierarchical_tucker ( const indexset &                  is0,
         indexset    sub_is2[2] = { indexset( is2.first(), mid2-1 ), indexset( mid2, is2.last() ) };
         auto        sub_D      = hlr::tensor3< std::unique_ptr< base_tensor3< value_t > > >( 2, 2, 2 );
 
-        for ( uint  l = 0; l < 2; ++l )
-        {
-            for ( uint  j = 0; j < 2; ++j )
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< uint >( 0, 2,
+                                            0, 2,
+                                            0, 2 ),
+            [&,ntile] ( const auto &  r )
             {
-                for ( uint  i = 0; i < 2; ++i )
+                for ( auto  l = r.pages().begin(); l != r.pages().end(); ++l )
                 {
-                    const auto  D_sub = D( sub_is0[i] - is0.first(),
-                                           sub_is1[j] - is1.first(),
-                                           sub_is2[l] - is2.first() );
-                    
-                    sub_D(i,j,l) = build_hierarchical_tucker( sub_is0[i], sub_is1[j], sub_is2[l], D_sub, acc, approx, ntile );
-                    
-                    HLR_ASSERT( sub_D(i,j,l).get() != nullptr );
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                        {
+                            const auto  D_sub = D( sub_is0[i] - is0.first(),
+                                                   sub_is1[j] - is1.first(),
+                                                   sub_is2[l] - is2.first() );
+                            
+                            sub_D(i,j,l) = build_hierarchical_tucker( sub_is0[i], sub_is1[j], sub_is2[l], D_sub, acc, approx, ntile );
+                            
+                            HLR_ASSERT( sub_D(i,j,l).get() != nullptr );
+                        }// for
+                    }// for
                 }// for
-            }// for
-        }// for
+            } );
 
         //
         // construct structured tensor
         //
 
-        // std::cout << "B: " << to_string( is0 ) << " x " << to_string( is1 ) << " x " << to_string( is2 ) << std::endl;
-        
         auto  B = std::make_unique< structured_tensor3< value_t > >( is0, is1, is2 );
 
         B->set_structure( 2, 2, 2 );
@@ -155,6 +153,6 @@ build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
     return M;
 }
 
-}}// namespace hlr::tensor
+}}}// namespace hlr::tbb::tensor
 
-#endif // __HLR_TENSOR_CONSTRUCT_HH
+#endif // __HLR_TBB_TENSOR_HH

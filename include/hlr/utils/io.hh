@@ -246,14 +246,47 @@ write ( const blas::tensor3< value_t > &  t,
     const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
     auto               file     = H5::H5File( filename, H5F_ACC_TRUNC );
     
-    detail::h5_write_tensor( file, "/" + tname, t );
+    detail::h5_write_tensor( file, tname, t );
 
+    #endif
+}
+
+template < blas::matrix_type  T >
+T
+read ( const std::string &  filename )
+{
+    using  value_t = typename T::value_t;
+    
+    Hpro::THDF5MatrixIO  mio;
+    auto                 D = mio.read< value_t >( filename );
+
+    HLR_ASSERT( is_dense( *D ) );
+    
+    return std::move( blas::mat( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > ) ) );
+}
+
+template < blas::tensor_type  T >
+T
+read ( const std::string &  filename = "" )
+{
+    #if defined(USE_HDF5)
+
+    using  value_t = typename T::value_t;
+    
+    auto  file = H5::H5File( filename, H5F_ACC_RDONLY );
+
+    return  detail::h5_read_blas_tensor< value_t >( file, "" );
+
+    #else
+
+    return T();
+    
     #endif
 }
 
 template < typename value_t >
 tensor::dense_tensor3< value_t >
-read_tensor ( const std::string &  filename = "" )
+read ( const std::string &  filename = "" )
 {
     #if defined(USE_HDF5)
 
@@ -266,21 +299,6 @@ read_tensor ( const std::string &  filename = "" )
     return tensor::dense_tensor3< value_t >();
     
     #endif
-}
-
-//
-// read matrix from given file
-//
-template < typename value_t >
-blas::matrix< value_t >
-read ( const std::string &  filename )
-{
-    Hpro::THDF5MatrixIO  mio;
-    auto                 D = mio.read< value_t >( filename );
-
-    HLR_ASSERT( is_dense( *D ) );
-    
-    return std::move( blas::mat( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > ) ) );
 }
 
 }// namespace hdf5

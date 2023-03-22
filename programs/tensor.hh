@@ -25,24 +25,6 @@ using namespace hlr;
 
 template < typename value_t >
 void
-print ( const blas::tensor3< value_t > &  t )
-{
-    for ( uint  l = 0; l < t.size(2); ++l )
-    {
-        for ( uint  i = 0; i < t.size(0); ++i )
-        {
-            for ( uint  j = 0; j < t.size(1); ++j )
-                std::cout << t( i, j, l ) << ", ";
-
-            std::cout << std::endl;
-        }// for
-
-        std::cout << std::endl;
-    }// for
-}
-
-template < typename value_t >
-void
 print ( const tensor::dense_tensor3< value_t > &  t )
 {
     print( t.tensor() );
@@ -111,27 +93,42 @@ program_main ()
 
     if ( true )
     {
-        const size_t              n = cmdline::n;
-        const double              h = std::numbers::pi / double(n-1);
-        blas::tensor3< value_t >  X( n, n, n );
-        double                    v = 1.0;
+        blas::tensor3< value_t >  X;
         
         std::cout << term::bullet << term::bold << "dense tensor" << term::reset << std::endl;
 
-        tic = timer::now();
+        if ( cmdline::datafile != "" )
+        {
+            std::cout << "  " << term::bullet << term::bold << "reading from " << cmdline::datafile << term::reset << std::endl;
+
+            X = io::hdf5::read< blas::tensor3< value_t > >( cmdline::datafile );
+        }// if
+        else
+        {
+            std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
+            
+            const size_t  n = cmdline::n;
+            const double  h = std::numbers::pi / double(n-1);
+            // double        v = 1.0;
+            
+            X = std::move( blas::tensor3< value_t >( n, n, n ) );
+            
+            tic = timer::now();
         
-        for ( uint  l = 0; l < n; ++l )
-            for ( uint  j = 0; j < n; ++j )
-                for ( uint  i = 0; i < n; ++i )
-                    X( i, j, l ) = v++;
-                    // X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+            for ( uint  l = 0; l < n; ++l )
+                for ( uint  j = 0; j < n; ++j )
+                    for ( uint  i = 0; i < n; ++i )
+                        // X( i, j, l ) = v++;
+                        X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+            
+            toc = timer::since( tic );
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+        }// else
         
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
         std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
         
-        print( X );
+        // std::cout << X << std::endl;
         if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
         if ( verbose(2) ) io::hdf5::write( X, "X" );
 
@@ -178,14 +175,14 @@ program_main ()
         
             auto  acc = Hpro::fixed_prec( cmdline::eps );
             auto  apx = approx::SVD< value_t >();
-            auto  H   = tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
+            auto  H   = impl::tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
             
             toc = timer::since( tic );
             
             std::cout << "    done in  " << format_time( toc ) << std::endl;
             std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
 
-            auto  Y = tensor::to_dense( *H );
+            auto  Y = impl::tensor::to_dense( *H );
             
             if ( verbose(3) ) io::vtk::print( *Y, "Y2" );
             if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
@@ -199,7 +196,7 @@ program_main ()
 
     if ( false )
     {
-        auto  t2 = io::hdf5::read_tensor< value_t >( "u.h5" );
+        auto  t2 = io::hdf5::read< blas::tensor3< value_t > >( "u.h5" );
 
         io::vtk::print( t2, "u.vtk" );
     

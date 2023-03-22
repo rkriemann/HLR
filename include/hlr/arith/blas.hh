@@ -461,10 +461,9 @@ mat_V ( const std::unique_ptr< Hpro::TRkMatrix< value_t > > &  A,
 //
 // print matrix
 //
-template < typename value_t >
 void
-print ( const blas::matrix< value_t > &  M,
-        std::ostream &                   out = std::cout )
+print ( const matrix_type auto &  M,
+        std::ostream &            out = std::cout )
 {
     for ( uint  i = 0; i < M.nrows(); ++i )
     {

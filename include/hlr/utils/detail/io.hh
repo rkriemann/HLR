@@ -110,12 +110,10 @@ h5_write_tensor ( H5::H5File &                              file,
 template < typename value_t >
 void
 h5_write_tensor ( H5::H5File &                      file,
-                  const std::string &               gname,
+                  const std::string &               tname,
                   const blas::tensor3< value_t > &  t )
 {
     constexpr uint  dim = 3;
-
-    auto  group = std::make_unique< H5::Group >( file.createGroup( gname ) );
 
     if ( Hpro::is_complex_type< value_t >::value )
         HLR_ERROR( "complex not yet supported" );
@@ -124,26 +122,20 @@ h5_write_tensor ( H5::H5File &                      file,
     // just tensor data
     //
 
-    {
-        hsize_t  data_dims[ dim ];
+    hsize_t  data_dims[ dim ];
 
-        for ( uint  i = 0; i < dim; ++i )
-            data_dims[i] = t.size(i);
+    for ( uint  i = 0; i < dim; ++i )
+        data_dims[i] = t.size(i);
     
-        auto  data_space = H5::DataSpace( dim, data_dims );
+    auto  data_space = H5::DataSpace( dim, data_dims );
+    auto  data_type  = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
+    auto  data_set   = file.createDataSet( "/" + tname, data_type, data_space );
+    
+    data_set.write( t.data(), data_type );
 
-        // define datatype
-        auto  data_type = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
-
-        // create dataset for tensor data
-        auto  data_set = file.createDataSet( gname + "/values", data_type, data_space );
-            
-        data_set.write( t.data(), data_type );
-
-        data_space.close();
-        data_type.close();
-        data_set.close();
-    }
+    data_space.close();
+    data_type.close();
+    data_set.close();
 }
 
 herr_t
@@ -265,6 +257,42 @@ h5_read_tensor ( H5::H5File &         file,
         
         data_set.read( t.tensor().data(), data_type );
     }
+    
+    return t;
+}
+
+template < typename value_t >
+blas::tensor3< value_t >
+h5_read_blas_tensor ( H5::H5File &         file,
+                      const std::string &  tname )
+{
+    constexpr uint  dim = 3;
+
+    auto  data_name = std::string( "" );
+    auto  status    = H5Ovisit( file.getId(), H5_INDEX_NAME, H5_ITER_INC, visit_func, & data_name );
+
+    HLR_ASSERT( status == 0 );
+    
+    // check if nothing compatible was found
+    if ( data_name == "" )
+        return blas::tensor3< value_t >();
+
+    //
+    // read tensor data
+    //
+
+    auto  data_set   = file.openDataSet( data_name );
+    auto  data_space = data_set.getSpace();
+    auto  data_type  = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
+    auto  dims       = std::vector< hsize_t >( dim );
+
+    HLR_ASSERT( dim == data_space.getSimpleExtentNdims() );
+
+    data_space.getSimpleExtentDims( dims.data() );
+    
+    auto  t = blas::tensor3< value_t >( dims[0], dims[1], dims[2] );
+    
+    data_set.read( t.data(), data_type );
     
     return t;
 }
