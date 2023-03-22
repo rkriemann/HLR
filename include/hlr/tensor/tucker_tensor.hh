@@ -166,9 +166,10 @@ public:
 bool
 is_tucker ( const with_value_type auto &  t )
 {
-    using value_t = typename decltype(t)::value_t;
+    using type_t  = std::remove_cv_t< std::remove_reference_t< decltype( t ) > >;
+    using value_t = typename type_t::value_t;
     
-    return dynamic_cast< tucker_tensor3< value_t > >( &t ) != nullptr;
+    return dynamic_cast< const tucker_tensor3< value_t > * >( &t ) != nullptr;
 }
 
 }}// namespace hlr::tensor

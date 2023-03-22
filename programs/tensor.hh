@@ -123,14 +123,15 @@ program_main ()
         for ( uint  l = 0; l < n; ++l )
             for ( uint  j = 0; j < n; ++j )
                 for ( uint  i = 0; i < n; ++i )
-                    X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+                    X( i, j, l ) = v++;
+                    // X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
         
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
         std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
         
-        // print( t );
+        print( X );
         if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
         if ( verbose(2) ) io::hdf5::write( X, "X" );
 
@@ -161,13 +162,13 @@ program_main ()
             auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
             auto  Y  = blas::tensor_product( T1,    Z.X(2), 2 );
             
-            if ( verbose(3) ) io::vtk::print( Y, "Y" );
-            if ( verbose(2) ) io::hdf5::write( Y, "Y" );
+            if ( verbose(3) ) io::vtk::print( Y, "Y1" );
+            if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
             blas::add( -1, X, 1, Y );
             std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
             
-            if ( verbose(3) ) io::vtk::print( Y, "error" );
+            if ( verbose(3) ) io::vtk::print( Y, "error1" );
         }
 
         {
@@ -186,10 +187,13 @@ program_main ()
 
             auto  Y = tensor::to_dense( *H );
             
-            // blas::add( -1, X, 1, Y );
-            // std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+            if ( verbose(3) ) io::vtk::print( *Y, "Y2" );
+            if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
             
-            // if ( verbose(3) ) io::vtk::print( Y, "error" );
+            blas::add( -1, X, 1, Y->tensor() );
+            std::cout << "    error  = " << format_error( blas::norm_F( Y->tensor() ), blas::norm_F( Y->tensor() ) / blas::norm_F( X ) ) << std::endl;
+            
+            if ( verbose(3) ) io::vtk::print( *Y, "error2" );
         }
     }
 

@@ -116,10 +116,10 @@ public:
     
 private:
     // dimensions of tensor
-    size_t   _length[3];
+    size_t  _length[3];
     
     // strides of data in memory block (rows, columns and page)
-    size_t   _stride[3];
+    size_t  _stride[3];
     
 public:
     //
@@ -161,7 +161,7 @@ public:
                 _length[2] = t._length[2];
                 _stride[0] = 1;
                 _stride[1] = _length[0];
-                _stride[1] = _length[0]*_length[1];
+                _stride[2] = _length[0]*_length[1];
                 super_t::alloc_wo_value( _length[0] * _length[1] * _length[2] );
 
                 for ( idx_t p = 0; p < idx_t( _length[2] ); p++ )
@@ -479,8 +479,11 @@ copy ( const tensor3< value_t > &  src,
     HLR_DBG_ASSERT( ( src.size(0) == dest.size(0) ) &&
                     ( src.size(1) == dest.size(1) ) &&
                     ( src.size(2) == dest.size(2) ) );
-    
-    std::copy( src.data(), src.data() + src.size(), dest.data() );
+
+    for ( size_t  l = 0; l < src.size(2); l++ )
+        for ( size_t  j = 0; j < src.size(1); j++ )
+            for ( size_t  i = 0; i < src.size(0); i++ )
+                dest(i,j,l) = src(i,j,l);
 }
 
 template < typename value_t >
@@ -492,13 +495,12 @@ dot ( const tensor3< value_t > &  t1,
                     ( t1.size(1) == t2.size(1) ) &&
                     ( t1.size(2) == t2.size(2) ) );
 
-    using  real_t = real_type_t< value_t >;
+    auto  d = real_type_t< value_t >(0);
 
-    auto  d = real_t(0);
-    auto  n = t1.size(0) * t1.size(1) * t1.size(2);
-
-    for ( size_t  i = 0; i < n; ++i )
-        d += t1.data()[i] * t2.data()[i];
+    for ( size_t  l = 0; l < t1.size(2); l++ )
+        for ( size_t  j = 0; j < t1.size(1); j++ )
+            for ( size_t  i = 0; i < t1.size(0); i++ )
+                d += t1(i,j,l) * t2(i,j,l);
 
     return d;
 }
@@ -528,10 +530,10 @@ add ( const alpha_t               alpha,
                     ( A.size(1) == B.size(1) ) &&
                     ( A.size(2) == B.size(2) ) );
     
-    const size_t  n = A.size(0) * A.size(1) * A.size(2);
-
-    for ( size_t  i = 0; i < n; ++i )
-        B.data()[i] = value_t(alpha) * A.data()[i] + value_t(beta) * B.data()[i];
+    for ( size_t  l = 0; l < A.size(2); l++ )
+        for ( size_t  j = 0; j < A.size(1); j++ )
+            for ( size_t  i = 0; i < A.size(0); i++ )
+                B(i,j,l) = value_t(alpha) * A(i,j,l) + value_t(beta) * B(i,j,l);
 }
 
 //
@@ -605,10 +607,10 @@ hadamard_product ( const tensor3< value_t > &  X1,
                 ( X1.size(1) == X2.size(1) ) &&
                 ( X1.size(2) == X2.size(2) ) );
 
-    const size_t  n = X1.size(0) * X1.size(1) * X1.size(2);
-
-    for ( size_t  i = 0; i < n; ++i )
-        X2.data()[i] *= X1.data()[i];
+    for ( size_t  l = 0; l < X1.size(2); l++ )
+        for ( size_t  j = 0; j < X1.size(1); j++ )
+            for ( size_t  i = 0; i < X2.size(0); i++ )
+                X2(i,j,l) *= X1(i,j,l);
 }
 
 ////////////////////////////////////////////////////////////////
