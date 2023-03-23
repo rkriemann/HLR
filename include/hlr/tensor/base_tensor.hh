@@ -132,6 +132,9 @@ public:
     {
         return sizeof(_indexsets) + sizeof(_id);
     }
+
+    // return name of type
+    virtual std::string  typestr () const { return "base_tensor3"; }
 };
 
 }}// namespace hlr::tensor

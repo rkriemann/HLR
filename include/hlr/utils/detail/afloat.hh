@@ -39,7 +39,7 @@ constexpr ulong  fp64_exp_highbit = 1 << (fp64_exp_bits-1);
 constexpr ulong  fp64_zero_val    = 0xffffffffffffffff;
 
 // define for testing for zero values
-// #define AFLOAT_CHECK_ZERO
+#define AFLOAT_CHECK_ZERO
 
 inline
 byte_t

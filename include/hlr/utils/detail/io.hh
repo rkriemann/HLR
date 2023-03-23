@@ -10,6 +10,11 @@
 
 #include <fstream>
 #include <filesystem>
+#include <array>
+
+#include <hlr/tensor/structured_tensor.hh>
+
+#include <hlr/utils/tools.hh>
 
 namespace hlr { namespace io {
 
@@ -138,6 +143,7 @@ h5_write_tensor ( H5::H5File &                      file,
     data_set.close();
 }
 
+inline
 herr_t
 visit_func ( hid_t               /* loc_id */,
              const char *        name,
@@ -307,8 +313,8 @@ h5_read_blas_tensor ( H5::H5File &         file,
 
 template < typename value_t >
 void
-vtk_print_tensor ( const blas::tensor3< value_t > &  t,
-                   const std::string &               filename )
+vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
+                        const std::string &               filename )
 {
     auto  outname = std::filesystem::path( filename );
     auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
@@ -323,7 +329,7 @@ vtk_print_tensor ( const blas::tensor3< value_t > &  t,
     //
 
     const size_t  n = t.size(0) * t.size(1) * t.size(2);
-    const double  h = 1.0 / std::min( t.size(0), std::min( t.size(1), t.size(2) ) );
+    const double  h = 1.0 / std::min({ t.size(0), t.size(1), t.size(2) });
 
     out << "POINTS " << n << " FLOAT" << std::endl;
 
@@ -349,6 +355,98 @@ vtk_print_tensor ( const blas::tensor3< value_t > &  t,
         
     for ( size_t  i = 0; i < n; ++i )
         out << t.data()[i] << ' ';
+    out << std::endl;
+}
+
+template < typename value_t >
+void
+vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
+                   const std::string &                      filename )
+{
+    //
+    // go through tensor and collect vertices and cell indices
+    //
+
+    using  coord_t  = std::array< double, 3 >;
+    using  voxel_t  = std::array< size_t, 8 >;
+    using  tensor_t = tensor::base_tensor3< value_t >;
+    
+    const size_t  n = t.dim(0) * t.dim(1) * t.dim(2);
+    const double  h = 1.0 / std::min({ t.dim(0), t.dim(1), t.dim(2) });
+    
+    auto  coords = std::deque< coord_t >();
+    auto  voxels = std::deque< voxel_t >();
+    
+    size_t  ncoord = 0;
+    size_t  nvoxel = 0;
+
+    auto  tensors = std::list< const tensor_t * >{ &t };
+
+    while ( ! tensors.empty() )
+    {
+        auto  T = behead( tensors );
+        
+        if ( tensor::is_structured( *T ) )
+        {
+            auto  B = cptrcast( T, tensor::structured_tensor3< value_t > );
+
+            for ( uint  l = 0; l < B->nblocks(2); ++l )
+                for ( uint  j = 0; j < B->nblocks(1); ++j )
+                    for ( uint  i = 0; i < B->nblocks(0); ++i )
+                        if ( ! is_null( B->block(i,j,l) ) )
+                            tensors.push_back( B->block(i,j,l) );
+        }// if
+        else
+        {
+            //
+            //     6-------7
+            //    /|      /|
+            //   4-------5 |
+            //   | 2-----|-3
+            //   |/      |/
+            //   0 ----- 1
+            //
+            
+            coords.push_back( { T->is(0).first() * h, T->is(1).first() * h, T->is(2).first() * h } );
+            coords.push_back( { T->is(0).last()  * h, T->is(1).first() * h, T->is(2).first() * h } );
+            coords.push_back( { T->is(0).first() * h, T->is(1).last()  * h, T->is(2).first() * h } );
+            coords.push_back( { T->is(0).last()  * h, T->is(1).last()  * h, T->is(2).first() * h } );
+            coords.push_back( { T->is(0).first() * h, T->is(1).first() * h, T->is(2).last()  * h } );
+            coords.push_back( { T->is(0).last()  * h, T->is(1).first() * h, T->is(2).last()  * h } );
+            coords.push_back( { T->is(0).first() * h, T->is(1).last()  * h, T->is(2).last()  * h } );
+            coords.push_back( { T->is(0).last()  * h, T->is(1).last()  * h, T->is(2).last()  * h } );
+
+            voxels.push_back({ nvoxel, nvoxel+1, nvoxel+2, nvoxel+3, nvoxel+4, nvoxel+5, nvoxel+6, nvoxel+7 });
+            nvoxel += 8;
+        }// else
+    }// while
+
+    //
+    // write VTK file
+    //
+
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
+    
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLIBpro coordinates" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET UNSTRUCTURED_GRID" << std::endl;
+
+    out << "POINTS " << coords.size() << " FLOAT" << std::endl;
+
+    for ( auto  c : coords )
+        out << c[0] << ' ' << c[1] << ' ' << c[2] << std::endl;
+
+    out << "CELLS " << voxels.size() << ' ' << 9 * voxels.size() << std::endl;
+
+    for ( auto  v : voxels )
+        out << "8 " << v[0] << ' ' << v[1] << ' ' << v[2] << ' ' << v[3] << ' ' << v[4] << ' ' << v[5] << ' ' << v[6] << ' ' << v[7] << std::endl;
+        
+    out << "CELL_TYPES " << voxels.size() << std::endl;
+        
+    for ( size_t  i = 0; i < voxels.size(); ++i )
+        out << "11 ";
     out << std::endl;
 }
 

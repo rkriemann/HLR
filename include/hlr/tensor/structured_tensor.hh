@@ -204,6 +204,9 @@ public:
 
         return s;
     }
+
+    // return name of type
+    virtual std::string  typestr () const { return "structured_tensor3"; }
 };
 
 //

@@ -10,14 +10,19 @@
 
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
+#include <tbb/blocked_range3d.h>
 
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/tensor/structured_tensor.hh>
 #include <hlr/utils/tensor.hh>
 #include <hlr/approx/aca.hh>
 
-namespace hlr { namespace tbb { namespace matrix {
+namespace hlr { namespace tbb {
+
+namespace matrix
+{
 
 //
 // build H-matrix from given dense matrix without reording rows/columns
@@ -833,7 +838,7 @@ compress_ml ( const indexset &           rowis,
 }
 
 //
-// compress compressible sub-blocks withi H-matrix
+// compress compressible sub-blocks within H-matrix
 //
 template < typename value_t >
 void
@@ -894,7 +899,7 @@ compress ( matrix::cluster_basis< value_t > &  cb,
 }
 
 //
-// decompress matrix
+// decompress H-matrix
 //
 template < typename value_t >
 void
@@ -952,6 +957,93 @@ decompress ( matrix::cluster_basis< value_t > &  cb )
     }// if
 }
 
-}}}// namespace hlr::tbb::matrix
+}// namespace matrix
+
+namespace tensor
+{
+
+using namespace hlr::tensor;
+
+//
+// compress/decompress compressible sub-blocks within H-tensor
+//
+template < typename value_t >
+void
+compress ( tensor::base_tensor3< value_t > &  A,
+           const Hpro::TTruncAcc &            acc )
+{
+    using namespace hlr::tensor;
+
+    if ( is_structured( A ) )
+    {
+        auto  BA = ptrcast( &A, structured_tensor3< value_t > );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BA->nblocks(0),
+                                              0, BA->nblocks(1),
+                                              0, BA->nblocks(2) ),
+            [&] ( const auto &  r )
+            {
+                for ( auto  l = r.pages().begin(); l != r.pages().end(); ++l )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                        {
+                            if ( is_null( BA->block( i, j, l ) ) )
+                                continue;
+                            
+                            compress( *BA->block( i, j, l ), acc );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( matrix::is_compressible( A ) )
+    {
+        dynamic_cast< matrix::compressible * >( &A )->compress( acc );
+    }// if
+}
+
+template < typename value_t >
+void
+decompress ( tensor::base_tensor3< value_t > &  A )
+{
+    using namespace hlr::tensor;
+
+    if ( is_structured( A ) )
+    {
+        auto  BA = ptrcast( &A, structured_tensor3< value_t > );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< size_t >( 0, BA->nblocks(0),
+                                              0, BA->nblocks(1),
+                                              0, BA->nblocks(2) ),
+            [&] ( const auto &  r )
+            {
+                for ( auto  l = r.pages().begin(); l != r.pages().end(); ++l )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                        {
+                            if ( is_null( BA->block( i, j, l ) ) )
+                                continue;
+                            
+                            decompress( *BA->block( i, j, l ) );
+                        }// for
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( matrix::is_compressible( A ) )
+    {
+        dynamic_cast< matrix::compressible * >( &A )->decompress();
+    }// if
+}
+
+}// namespace tensor
+
+}}// namespace hlr::tbb
 
 #endif // __HLR_TBB_MATRIX_COMPRESS_HH

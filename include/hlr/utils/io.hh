@@ -34,6 +34,7 @@
 #include <hlr/utils/checks.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/dag/graph.hh>
+#include <hlr/tensor/base_tensor.hh>
 #include <hlr/tensor/dense_tensor.hh>
 
 #include <hlr/utils/detail/io.hh>
@@ -451,10 +452,13 @@ print ( const Hpro::TCoordinate &  coord,
 //
 template < typename value_t >
 void
-print ( const tensor::dense_tensor3< value_t > &  t,
-        const std::string &                       filename )
+print ( const tensor::base_tensor3< value_t > &  t,
+        const std::string &                      filename )
 {
-    detail::vtk_print_tensor( t.tensor(), filename );
+    if ( tensor::is_dense( t ) )
+        detail::vtk_print_full_tensor( cptrcast( &t, tensor::dense_tensor3< value_t > )->tensor(), filename );
+    else
+        detail::vtk_print_tensor( t, filename );
 }
 
 template < typename value_t >
@@ -462,7 +466,7 @@ void
 print ( const blas::tensor3< value_t > &  t,
         const std::string &               filename )
 {
-    detail::vtk_print_tensor( t, filename );
+    detail::vtk_print_full_tensor( t, filename );
 }
 
 }// namespace vtk

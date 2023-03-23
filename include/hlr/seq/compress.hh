@@ -10,10 +10,14 @@
 
 #include <hlr/matrix/compress.hh>
 #include <hlr/matrix/cluster_basis.hh>
+#include <hlr/tensor/compress.hh>
 #include <hlr/approx/aca.hh>
 #include <hlr/utils/io.hh>
 
-namespace hlr { namespace seq { namespace matrix {
+namespace hlr { namespace seq {
+
+namespace matrix
+{
 
 //
 // build H-matrix from given dense matrix without reording rows/columns
@@ -797,35 +801,10 @@ compress_ml ( const indexset &           rowis,
 }
 
 //
-// compress compressible sub-blocks within H-matrix
+// import default implementations
 //
-template < typename value_t >
-void
-compress ( Hpro::TMatrix< value_t > &  A,
-           const Hpro::TTruncAcc &     acc )
-{
-    using namespace hlr::matrix;
-
-    if ( is_blocked( A ) )
-    {
-        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        
-        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
-            {
-                if ( is_null( BA->block( i, j ) ) )
-                    continue;
-                
-                compress( *BA->block( i, j ), acc );
-            }// for
-        }// for
-    }// if
-    else if ( is_compressible( A ) )
-    {
-        dynamic_cast< compressible * >( &A )->compress( acc );
-    }// if
-}
+using hlr::matrix::compress;
+using hlr::matrix::decompress;
 
 //
 // compress cluster basis data
@@ -852,36 +831,6 @@ compress ( matrix::cluster_basis< value_t > &  cb,
 }
 
 //
-// decompress matrix
-//
-template < typename value_t >
-void
-decompress ( Hpro::TMatrix< value_t > &  A )
-{
-    using namespace hlr::matrix;
-
-    if ( is_blocked( A ) )
-    {
-        auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        
-        for ( uint  i = 0; i < BA->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < BA->nblock_cols(); ++j )
-            {
-                if ( is_null( BA->block( i, j ) ) )
-                    continue;
-                
-                decompress( *BA->block( i, j ) );
-            }// for
-        }// for
-    }// if
-    else if ( is_compressible( A ) )
-    {
-        dynamic_cast< compressible * >( &A )->decompress();
-    }// if
-}
-
-//
 // decompress cluster basis data
 //
 template < typename value_t >
@@ -904,6 +853,16 @@ decompress ( matrix::cluster_basis< value_t > &  cb )
     }// if
 }
 
-}}}// namespace hlr::seq::matrix
+}// namespace matrix
+
+namespace tensor
+{
+
+using hlr::tensor::compress;
+using hlr::tensor::decompress;
+
+}// namespace tensor
+
+}}// namespace hlr::seq
 
 #endif // __HLR_SEQ_COMPRESS_HH

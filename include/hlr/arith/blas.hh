@@ -657,9 +657,8 @@ diag ( const std::list< matrix< value_t > > &  matrices )
 //
 //////////////////////////////////////////////////////////////////////
 
-template < typename T_vector >
-typename std::enable_if_t< is_vector< T_vector >::value,
-                           vector< typename T_vector::value_t > >
+template < vector_type T_vector >
+vector< typename T_vector::value_t >
 copy ( const T_vector &  v )
 {
     using  value_t = typename T_vector::value_t;
@@ -673,6 +672,7 @@ copy ( const T_vector &  v )
 
 template < typename value_dest_t,
            typename value_src_t >
+requires ( std::convertible_to< value_src_t, value_dest_t > )
 vector< value_dest_t >
 copy ( const vector< value_src_t > &  v )
 {
@@ -685,8 +685,8 @@ copy ( const vector< value_src_t > &  v )
     return x;
 }
 
-template < typename T_matrix >
-typename std::enable_if_t< is_matrix_v< T_matrix >, matrix< typename T_matrix::value_t > >
+template < matrix_type T_matrix >
+matrix< typename T_matrix::value_t >
 copy ( const T_matrix &  A )
 {
     using  value_t = typename T_matrix::value_t;
@@ -700,6 +700,7 @@ copy ( const T_matrix &  A )
 
 template < typename value_dest_t,
            typename value_src_t >
+requires ( std::convertible_to< value_src_t, value_dest_t > )
 matrix< value_dest_t >
 copy ( const matrix< value_src_t > &  A )
 {
@@ -714,6 +715,7 @@ copy ( const matrix< value_src_t > &  A )
 
 template < typename value_src_t,
            typename value_dest_t >
+requires ( std::convertible_to< value_src_t, value_dest_t > )
 void
 copy ( const matrix< value_src_t > &   A,
        const matrix< value_dest_t > &  B )
@@ -783,9 +785,9 @@ fill_fn ( MatrixBase< T_matrix > &  M,
 //
 // determine maximal absolute value in M
 //
-template < typename T1 >
-std::enable_if_t< is_matrix_v< T1 >, typename T1::value_t >
-max_abs_val ( const T1 &  M )
+template < matrix_type  matrix_t >
+typename matrix_t::value_t
+max_abs_val ( const matrix_t &  M )
 {
     HLR_ASSERT( M.nrows() * M.ncols() > 0 );
 
@@ -801,9 +803,9 @@ max_abs_val ( const T1 &  M )
 //
 // determine minimal absolute value in M
 //
-template < typename T1 >
-std::enable_if_t< is_matrix_v< T1 >, typename T1::value_t >
-min_abs_val ( const T1 &  M )
+template < matrix_type  matrix_t >
+typename matrix_t::value_t
+min_abs_val ( const matrix_t &  M )
 {
     HLR_ASSERT( M.nrows() * M.ncols() > 0 );
 
@@ -811,7 +813,7 @@ min_abs_val ( const T1 &  M )
     HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
                ( M.row_stride() == 1 ));
 
-    using  value_t = typename T1::value_t;
+    using  value_t = typename matrix_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
     
     value_t *     ptr  = M.data();
@@ -931,40 +933,30 @@ using Hpro::BLAS::norm_F;
 //
 //////////////////////////////////////////////////////////////////////
 
-template < typename T_alpha,
-           typename T_vecX,
-           typename T_vecY >
-std::enable_if_t< is_vector_v< T_vecX > &&
-                  is_vector_v< T_vecY > &&
-                  std::is_same_v< typename T_vecX::value_t, typename T_vecY::value_t >,
-                  void >
-add ( const T_alpha   alpha,
-      const T_vecX &  x,
-      T_vecY &        y )
+void
+add ( const auto                alpha,
+      const vector_type auto &  x,
+      vector_type auto &        y )
 {
-    return Hpro::BLAS::add( typename T_vecX::value_t( alpha ), x, y );
+    using value_t = typename std::decay_t< decltype(x) >::value_t;
+    
+    Hpro::BLAS::add( value_t( alpha ), x, y );
 }
 
-template < typename T_alpha,
-           typename T_matA,
-           typename T_matB >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_matrix_v< T_matB > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
-                  void >
-add ( const T_alpha   alpha,
-      const T_matA &  A,
-      T_matB &        B )
+void
+add ( const auto                alpha,
+      const matrix_type auto &  A,
+      matrix_type auto &        B )
 {
-    return Hpro::BLAS::add( typename T_matA::value_t( alpha ), A, B );
+    using value_t = typename std::decay_t< decltype(A) >::value_t;
+    
+    Hpro::BLAS::add( value_t( alpha ), A, B );
 }
 
-template < typename T_matA,
-           typename T_vecX >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_vector_v< T_vecX > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t >,
-                  vector< typename T_matA::value_t > >
+template < matrix_type T_matA,
+           vector_type T_vecX >
+requires ( std::same_as< typename T_matA::value_t, typename T_vecX::value_t > )
+vector< typename T_matA::value_t >
 mulvec ( const T_matA &  A,
          const T_vecX &  x )
 {
@@ -973,14 +965,12 @@ mulvec ( const T_matA &  A,
     return Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
 }
 
-template < typename T_matA,
-           typename T_vecX,
-           typename T_vecY >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_vector_v< T_vecX > &&
-                  is_vector_v< T_vecY > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_vecX::value_t > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_vecY::value_t > >
+template < matrix_type T_matA,
+           vector_type T_vecX,
+           vector_type T_vecY >
+requires ( std::same_as< typename T_matA::value_t, typename T_vecX::value_t > &&
+           std::same_as< typename T_matA::value_t, typename T_vecY::value_t > )
+void
 mulvec ( const T_matA &  A,
          const T_vecX &  x,
          T_vecY &        y )
@@ -988,7 +978,7 @@ mulvec ( const T_matA &  A,
     HLR_DBG_ASSERT( A.ncols() == x.length() );
     HLR_DBG_ASSERT( A.nrows() == y.length() );
     
-    return Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
+    Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
 }
 
 using Hpro::BLAS::mulvec;
@@ -1137,15 +1127,13 @@ mulvec_lrs ( const T_alpha                    alpha,
 }
 
 template < typename T_beta,
-           typename T_matA,
-           typename T_matB,
-           typename T_matC >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_matrix_v< T_matB > &&
-                  is_matrix_v< T_matC > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
-                  void >
+           matrix_type T_matA,
+           matrix_type T_matB,
+           matrix_type T_matC >
+requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > &&
+           std::same_as< typename T_matA::value_t, typename T_matC::value_t > &&
+           std::convertible_to< T_beta, typename T_matC::value_t > )
+void
 prod ( const T_matA &  A,
        const T_matB &  B,
        const T_beta    beta,
@@ -1160,15 +1148,14 @@ prod ( const T_matA &  A,
 
 template < typename T_alpha,
            typename T_beta,
-           typename T_matA,
-           typename T_matB,
-           typename T_matC >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_matrix_v< T_matB > &&
-                  is_matrix_v< T_matC > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matC::value_t >,
-                  void >
+           matrix_type T_matA,
+           matrix_type T_matB,
+           matrix_type T_matC >
+requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > &&
+           std::same_as< typename T_matA::value_t, typename T_matC::value_t > &&
+           std::convertible_to< T_alpha, typename T_matA::value_t > &&
+           std::convertible_to< T_beta,  typename T_matC::value_t > )
+void
 prod ( const T_alpha   alpha,
        const T_matA &  A,
        const T_matB &  B,
@@ -1182,12 +1169,10 @@ prod ( const T_alpha   alpha,
     return prod( typename T_matC::value_t(alpha), A, B, typename T_matC::value_t(beta), C );
 }
 
-template < typename T_matA,
-           typename T_matB >
-std::enable_if_t< is_matrix_v< T_matA > &&
-                  is_matrix_v< T_matB > &&
-                  std::is_same_v< typename T_matA::value_t, typename T_matB::value_t >,
-                  matrix< typename T_matA::value_t > >
+template < matrix_type T_matA,
+           matrix_type T_matB >
+requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > )
+matrix< typename T_matA::value_t >
 prod ( const T_matA &  A,
        const T_matB &  B )
 {

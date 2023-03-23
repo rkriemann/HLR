@@ -515,6 +515,7 @@ copy ( const tensor3< value_t > &  src,
             for ( size_t  i = 0; i < src.size(0); i++ )
                 dest(i,j,l) = src(i,j,l);
 }
+using Hpro::BLAS::copy;
 
 template < typename value_t >
 real_type_t< value_t >
@@ -534,6 +535,7 @@ dot ( const tensor3< value_t > &  t1,
 
     return d;
 }
+using Hpro::BLAS::dot;
 
 template < typename value_t >
 real_type_t< value_t >
@@ -541,6 +543,7 @@ norm_F ( const tensor3< value_t > &  t )
 {
     return std::sqrt( std::abs( dot( t, t ) ) );
 }
+using Hpro::BLAS::norm_F;
 
 template < typename value_t >
 real_type_t< value_t >
@@ -597,6 +600,7 @@ add ( const alpha_t               alpha,
             for ( size_t  i = 0; i < A.size(0); i++ )
                 B(i,j,l) = value_t(alpha) * A(i,j,l) + value_t(beta) * B(i,j,l);
 }
+using Hpro::BLAS::add;
 
 //
 // compute d-mode tensor product X×M

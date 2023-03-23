@@ -51,9 +51,9 @@ to_dense ( const base_tensor3< value_t > &  X,
     else if ( is_tucker( X ) )
     {
         auto  TX    = cptrcast( &X, tucker_tensor3< value_t > );
-        auto  T0    = blas::tensor_product( TX->G(), TX->X(0), 0 );
-        auto  T1    = blas::tensor_product( T0,      TX->X(1), 1 );
-        auto  DX    = blas::tensor_product( T1,      TX->X(2), 2 );
+        auto  T0    = blas::tensor_product( TX->G_decompressed(), TX->X_decompressed(0), 0 );
+        auto  T1    = blas::tensor_product( T0,                   TX->X_decompressed(1), 1 );
+        auto  DX    = blas::tensor_product( T1,                   TX->X_decompressed(2), 2 );
         auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
         
         blas::copy( DX, D_sub );
@@ -63,7 +63,7 @@ to_dense ( const base_tensor3< value_t > &  X,
         auto  DX    = cptrcast( &X, dense_tensor3< value_t > );
         auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
 
-        blas::copy( DX->tensor(), D_sub );
+        blas::copy( DX->tensor_decompressed(), D_sub );
     }// if
     else
     {

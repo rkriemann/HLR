@@ -41,14 +41,18 @@ template < typename T >
 bool
 is_compressible ( const T &  ref )
 {
-    return ! is_null( dynamic_cast< const compressible * >( &ref ) );
+    const auto  C = dynamic_cast< const compressible * >( &ref );
+    
+    return ! is_null( C );
 }
 
 template < typename T >
 bool
 is_compressible ( const T *  ptr )
 {
-    return ! is_null( dynamic_cast< const compressible * >( ptr ) );
+    const auto  C = dynamic_cast< const compressible * >( ptr );
+
+    return ! is_null( C );
 }
 
 HLR_TEST_ALL( is_compressible, Hpro::TMatrix< value_t > )

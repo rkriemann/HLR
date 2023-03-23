@@ -40,7 +40,7 @@ private:
     blas::tensor3< value_t >   _tensor;
 
     #if HLR_HAS_COMPRESSION == 1
-    // stores compressed data
+    // compressed data
     compress::zarray           _ztensor;
     #endif
     
@@ -139,14 +139,10 @@ public:
             
             return dT;
         }// if
-        else
-            return _tensor;
-
-        #else
-
-        return _tensor;
 
         #endif
+
+        return _tensor;
     }
 
     value_t          coeff       ( const uint  i,
@@ -236,6 +232,9 @@ public:
         return super_t::byte_size() + _tensor.byte_size();
         #endif
     }
+
+    // return name of type
+    virtual std::string  typestr () const { return "dense_tensor3"; }
 
 protected:
     // remove compressed storage (standard storage not restored!)
