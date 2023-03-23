@@ -21,6 +21,7 @@ namespace hlr
 {
 
 using accuracy = Hpro::TTruncAcc;
+using Hpro::idx_t;
 
 namespace blas
 {
@@ -57,33 +58,33 @@ public:
     //
 
     // return size per dimension
-    size_t       size         ( const uint  d ) const noexcept { return derived().size( d ); }
+    size_t       size         ( const uint  d ) const { return derived().size( d ); }
 
     // return range per dimension
-    blas::range  range        ( const uint  d ) const noexcept { return blas::range( 0, idx_t(size(d))-1 ); }
+    blas::range  range        ( const uint  d ) const { return blas::range( 0, idx_t(size(d))-1 ); }
 
     // return stride of data per dimension
-    size_t       stride       ( const uint  d ) const noexcept { return derived().stride(d); }
+    size_t       stride       ( const uint  d ) const { return derived().stride(d); }
 
     // return coefficient (i,j,l)
-    value_t      operator ()  ( const idx_t i, const idx_t j, const idx_t l ) const noexcept
+    value_t      operator ()  ( const idx_t i, const idx_t j, const idx_t l ) const
     {
         return derived()(i,j,l);
     }
 
     // return reference to coefficient (i,j,l)
-    value_t &    operator ()  ( const idx_t i, const idx_t j, const idx_t l ) noexcept
+    value_t &    operator ()  ( const idx_t i, const idx_t j, const idx_t l )
     {
         return derived()(i,j,l);
     }
 
     // return pointer to internal data
-    value_t *    data         () const noexcept { return derived().data(); }
+    value_t *    data         () const { return derived().data(); }
 
 private:
     // convert to derived type
-    T_derived &        derived  ()       noexcept { return * static_cast<       T_derived * >( this ); }
-    const T_derived &  derived  () const noexcept { return * static_cast< const T_derived * >( this ); }
+    T_derived &        derived  ()       { return * static_cast<       T_derived * >( this ); }
+    const T_derived &  derived  () const { return * static_cast< const T_derived * >( this ); }
 };
 
 //
@@ -127,7 +128,7 @@ public:
     //
     
     // creates zero sized tensor
-    tensor3 () noexcept
+    tensor3 ()
             : super_t()
             , _length{ 0, 0, 0 }
             , _stride{ 0, 0, 0 }
@@ -174,7 +175,7 @@ public:
     }
 
     // move constructor
-    tensor3 ( tensor3 &&  t ) noexcept
+    tensor3 ( tensor3 &&  t )
             : super_t( std::move( t ) )
             , _length{ 0, 0, 0 }
             , _stride{ 0, 0, 0 }
@@ -246,7 +247,7 @@ public:
     }
 
     // move operator
-    tensor3 & operator = ( tensor3 &&  t ) noexcept
+    tensor3 & operator = ( tensor3 &&  t )
     {
         if ( this != & t ) // prohibit self-moving
         {
@@ -276,12 +277,12 @@ public:
     //
 
     // return size per dimension
-    size_t       size         ( const uint  d ) const noexcept { return _length[d]; }
+    size_t       size         ( const uint  d ) const { return _length[d]; }
 
     // return coefficient (i,j,p)
     value_t      operator ()  ( const idx_t i,
                                 const idx_t j,
-                                const idx_t l ) const noexcept
+                                const idx_t l ) const
     {
         HLR_DBG_ASSERT( i < idx_t(_length[0]) && j < idx_t(_length[1]) && l < idx_t(_length[2]) );
         return super_t::_data[ l * _stride[2] + j * _stride[1] + i * _stride[0] ];
@@ -290,17 +291,17 @@ public:
     // return reference to coefficient (i,j)
     value_t &    operator ()  ( const idx_t  i,
                                 const idx_t  j,
-                                const idx_t  l ) noexcept
+                                const idx_t  l )
     {
         HLR_DBG_ASSERT( i < idx_t(_length[0]) && j < idx_t(_length[1]) && l < idx_t(_length[2]) );
         return super_t::_data[ l * _stride[2] + j * _stride[1] + i * _stride[0] ];
     }
 
     // return pointer to internal data
-    value_t *    data         () const noexcept { return super_t::_data; }
+    value_t *    data         () const { return super_t::_data; }
 
     // return data stride per dimension
-    size_t       stride       ( const uint  d ) const noexcept { return _stride[d]; }
+    size_t       stride       ( const uint  d ) const { return _stride[d]; }
 
     // optimised resize: only change if dimension really changes
     void         resize       ( const size_t  n0,
@@ -541,9 +542,41 @@ norm_F ( const tensor3< value_t > &  t )
     return std::sqrt( std::abs( dot( t, t ) ) );
 }
 
+template < typename value_t >
+real_type_t< value_t >
+max_abs_val ( const tensor3< value_t > &  t )
+{
+    auto  v = real_type_t< value_t >(0);
+
+    for ( size_t  l = 0; l < t.size(2); l++ )
+        for ( size_t  j = 0; j < t.size(1); j++ )
+            for ( size_t  i = 0; i < t.size(0); i++ )
+                v += std::max( std::abs( t(i,j,l) ), v );
+
+    return v;
+}
+
 //
 // compute B := α A + β B (element wise)
 //
+template < typename alpha_t,
+           typename value_t >
+requires ( std::convertible_to< alpha_t, value_t > )
+void
+add ( const alpha_t               alpha,
+      const tensor3< value_t > &  A,
+      tensor3< value_t > &        B )
+{
+    HLR_DBG_ASSERT( ( A.size(0) == B.size(0) ) &&
+                    ( A.size(1) == B.size(1) ) &&
+                    ( A.size(2) == B.size(2) ) );
+    
+    for ( size_t  l = 0; l < A.size(2); l++ )
+        for ( size_t  j = 0; j < A.size(1); j++ )
+            for ( size_t  i = 0; i < A.size(0); i++ )
+                B(i,j,l) += value_t(alpha) * A(i,j,l);
+}
+
 template < typename alpha_t,
            typename beta_t,
            typename value_t >

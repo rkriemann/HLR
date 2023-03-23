@@ -9,10 +9,11 @@
 //
 
 // define for arithmetic specific compression bit rates 
-#define HLR_COMPRESS_RATE_ARITH
+// #define HLR_COMPRESS_RATE_ARITH
 
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/tensor.hh>
 
 ////////////////////////////////////////////////////////////
 //
@@ -511,6 +512,14 @@ namespace hlr { namespace compress {
 //
 template < typename value_t >
 zarray
+compress ( const zconfig_t &                 config,
+           const blas::tensor3< value_t > &  T )
+{
+    return compress< value_t >( config, T.data(), T.size(0), T.size(1), T.size(2) );
+}
+
+template < typename value_t >
+zarray
 compress ( const zconfig_t &                config,
            const blas::matrix< value_t > &  M )
 {
@@ -523,6 +532,14 @@ compress ( const zconfig_t &                config,
            const blas::vector< value_t > &  v )
 {
     return compress< value_t >( config, v.data(), v.length() );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &              zdata,
+             blas::tensor3< value_t > &  T )
+{
+    return decompress< value_t >( zdata, T.data(), T.size(0), T.size(1), T.size(2) );
 }
 
 template < typename value_t >
