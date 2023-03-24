@@ -90,7 +90,7 @@ multiply ( const value_t                     alpha,
                                                acc, approx );
             else if ( is_lowrank( C ) )
             {
-                if ( is_compressible( C ) )
+                if ( compress::is_compressible( C ) )
                     multiply< value_t, approx_t >( alpha,
                                                    op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                                    op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -105,7 +105,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( C ) )
             {
-                if ( is_compressible( C ) )
+                if ( compress::is_compressible( C ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -121,7 +121,7 @@ multiply ( const value_t                     alpha,
         }// if
         else if ( is_lowrank( B ) )
         {
-            if ( is_compressible( B ) )
+            if ( compress::is_compressible( B ) )
             {
                 if ( is_blocked( C ) )
                     multiply< value_t, approx_t >( alpha,
@@ -131,7 +131,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                                        op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -146,7 +146,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                              op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -171,7 +171,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -186,7 +186,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -226,7 +226,7 @@ multiply ( const value_t                     alpha,
         }// if
         else if ( is_dense( B ) )
         {
-            if ( is_compressible( B ) )
+            if ( compress::is_compressible( B ) )
             {
                 if ( is_blocked( C ) )
                     multiply< value_t, approx_t >( alpha,
@@ -236,7 +236,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                          multiply< value_t, approx_t >( alpha,
                                                         op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                                         op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -251,7 +251,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                              op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -276,7 +276,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -291,7 +291,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -312,7 +312,7 @@ multiply ( const value_t                     alpha,
     }// if
     else if ( is_lowrank( A ) )
     {
-        if ( is_compressible( A ) )
+        if ( compress::is_compressible( A ) )
         {
             if ( is_blocked( B ) )
             {
@@ -324,7 +324,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -339,7 +339,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -356,7 +356,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -366,7 +366,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                            op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -381,7 +381,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense(   C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                  op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -406,7 +406,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -421,7 +421,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -439,7 +439,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -449,7 +449,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                            op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -464,7 +464,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                  op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -489,7 +489,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -504,7 +504,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -535,7 +535,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -550,7 +550,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -567,7 +567,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -577,7 +577,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -592,7 +592,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -617,7 +617,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -632,7 +632,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -650,7 +650,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -660,7 +660,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -675,7 +675,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -700,7 +700,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -715,7 +715,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -787,7 +787,7 @@ multiply ( const value_t                     alpha,
     }// if
     else if ( is_dense( A ) )
     {
-        if ( is_compressible( A ) )
+        if ( compress::is_compressible( A ) )
         {
             if ( is_blocked( B ) )
             {
@@ -799,7 +799,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -814,7 +814,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -831,7 +831,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -841,7 +841,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                            op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -856,7 +856,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                  op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -881,7 +881,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -896,7 +896,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -930,7 +930,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -940,7 +940,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                            op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -955,7 +955,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                  op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -980,7 +980,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -995,7 +995,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -1026,7 +1026,7 @@ multiply ( const value_t                     alpha,
                                                    acc, approx );
                 else if ( is_lowrank( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t, approx_t >( alpha,
                                                        op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                        op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -1041,7 +1041,7 @@ multiply ( const value_t                     alpha,
                 }// if
                 else if ( is_dense( C ) )
                 {
-                    if ( is_compressible( C ) )
+                    if ( compress::is_compressible( C ) )
                         multiply< value_t >( alpha,
                                              op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                              op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
@@ -1058,7 +1058,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -1068,7 +1068,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1083,7 +1083,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1108,7 +1108,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -1123,7 +1123,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TRkMatrix< value_t > ),
@@ -1157,7 +1157,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                 {
                     if ( is_blocked( C ) )
                         multiply< value_t, approx_t >( alpha,
@@ -1167,7 +1167,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1182,7 +1182,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1207,7 +1207,7 @@ multiply ( const value_t                     alpha,
                                                        acc, approx );
                     else if ( is_lowrank( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t, approx_t >( alpha,
                                                            op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                            op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -1222,7 +1222,7 @@ multiply ( const value_t                     alpha,
                     }// if
                     else if ( is_dense( C ) )
                     {
-                        if ( is_compressible( C ) )
+                        if ( compress::is_compressible( C ) )
                             multiply< value_t >( alpha,
                                                  op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                                  op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
@@ -1263,7 +1263,7 @@ multiply ( const value_t                     alpha,
     #endif
 
     // // recompress after update
-    // if ( is_compressible( C ) )
+    // if ( compress::is_compressible( C ) )
     // {
     //     auto  lock = std::scoped_lock( C.mutex() );
         
@@ -1327,7 +1327,7 @@ multiply ( const value_t                     alpha,
         }// if
         else if ( is_lowrank( B ) )
         {
-            if ( is_compressible( B ) )
+            if ( compress::is_compressible( B ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                      op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1347,7 +1347,7 @@ multiply ( const value_t                     alpha,
         }// if
         else if ( is_dense( B ) )
         {
-            if ( is_compressible( B ) )
+            if ( compress::is_compressible( B ) )
                 multiply< value_t >( alpha,
                                      op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
                                      op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1363,7 +1363,7 @@ multiply ( const value_t                     alpha,
     }// if
     else if ( is_lowrank( A ) )
     {
-        if ( is_compressible( A ) )
+        if ( compress::is_compressible( A ) )
         {
             if ( is_blocked( B ) )
             {
@@ -1374,7 +1374,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                          op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1387,7 +1387,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, lrmatrix< value_t > ),
                                          op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1412,7 +1412,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                          op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1425,7 +1425,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, Hpro::TRkMatrix< value_t > ),
                                          op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1468,7 +1468,7 @@ multiply ( const value_t                     alpha,
     }// if
     else if ( is_dense( A ) )
     {
-        if ( is_compressible( A ) )
+        if ( compress::is_compressible( A ) )
         {
             if ( is_blocked( B ) )
             {
@@ -1479,7 +1479,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                          op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1492,7 +1492,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, dense_matrix< value_t > ),
                                          op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1517,7 +1517,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_lowrank( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                          op_B, * cptrcast( &B, lrmatrix< value_t > ),
@@ -1537,7 +1537,7 @@ multiply ( const value_t                     alpha,
             }// if
             else if ( is_dense( B ) )
             {
-                if ( is_compressible( B ) )
+                if ( compress::is_compressible( B ) )
                     multiply< value_t >( alpha,
                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
                                          op_B, * cptrcast( &B, dense_matrix< value_t > ),
@@ -1594,7 +1594,7 @@ multiply ( const value_t                     alpha,
         auto  V = blas::matrix< value_t >();
         auto  W = blas::matrix< value_t >();
         
-        if ( matrix::is_compressible( A ) )
+        if ( compress::is_compressible( A ) )
         {
             auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
 
@@ -1633,7 +1633,7 @@ multiply ( const value_t                     alpha,
         auto  U = blas::matrix< value_t >();
         auto  X = blas::matrix< value_t >();
         
-        if ( matrix::is_compressible( B ) )
+        if ( compress::is_compressible( B ) )
         {
             auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
             

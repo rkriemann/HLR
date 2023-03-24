@@ -31,7 +31,7 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
 {
     HLR_ASSERT( bis.is_subset_of( M.block_is() ) );
 
-    if ( is_compressible( M ) )
+    if ( compress::is_compressible( M ) )
     {
         if ( is_lowrank( M ) )
         {

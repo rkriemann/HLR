@@ -97,7 +97,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
             return comp_lr( cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed(),
                             cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed() );
         }// if
-        else if ( matrix::is_compressed( A ) )
+        else if ( compress::is_compressed( A ) )
         {
             return comp_lr( cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed(),
                             cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed() );
@@ -205,7 +205,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
     }// if
     else if ( is_dense( A ) )
     {
-        if ( matrix::is_compressed( A ) )
+        if ( compress::is_compressed( A ) )
             return blas::normF( cptrcast( &A, matrix::dense_matrix< value_t > )->mat_decompressed() );
         else
             return blas::normF( blas::mat( cptrcast( &A, Hpro::TDenseMatrix< value_t > ) ) );
@@ -314,7 +314,7 @@ frobenius ( const value_t                     alpha,
                 UA = cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed();
                 VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed();
             }// if
-            else if ( matrix::is_compressed( A )  )
+            else if ( compress::is_compressed( A )  )
             {
                 UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U_decompressed();
                 VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V_decompressed();
@@ -330,7 +330,7 @@ frobenius ( const value_t                     alpha,
                 UB = cptrcast( &B, matrix::mplrmatrix< value_t > )->U_decompressed();
                 VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V_decompressed();
             }// if
-            else if ( matrix::is_compressed( B )  )
+            else if ( compress::is_compressed( B )  )
             {
                 UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U_decompressed();
                 VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V_decompressed();
@@ -371,9 +371,9 @@ frobenius ( const value_t                     alpha,
             return std::sqrt( std::abs( val ) );
         };
 
-        if ( matrix::is_compressed( A ) )
+        if ( compress::is_compressed( A ) )
         {
-            if ( matrix::is_compressed( B ) )
+            if ( compress::is_compressed( B ) )
             {
                 return comp_dense( cptrcast( &A, matrix::dense_matrix< value_t > )->mat_decompressed(),
                                    cptrcast( &B, matrix::dense_matrix< value_t > )->mat_decompressed() );
@@ -386,7 +386,7 @@ frobenius ( const value_t                     alpha,
         }// if
         else
         {
-            if ( matrix::is_compressed( B ) )
+            if ( compress::is_compressed( B ) )
             {
                 return comp_dense( cptrcast( &A, Hpro::TDenseMatrix< value_t > )->blas_mat(),
                                    cptrcast( &B, matrix::dense_matrix< value_t > )->mat_decompressed() );

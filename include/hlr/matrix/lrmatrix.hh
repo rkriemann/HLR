@@ -12,8 +12,8 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
-#include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -36,7 +36,7 @@ namespace matrix
 // corresponding matrix block (maybe joined by more matrices).
 //
 template < typename T_value >
-class lrmatrix : public Hpro::TRkMatrix< T_value >, public compressible
+class lrmatrix : public Hpro::TRkMatrix< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;

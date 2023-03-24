@@ -202,7 +202,7 @@ solve_lower_tri ( const eval_side_t                 side,
     // else
     //     Hpro::solve_lower_right( Mc.get(), apply_normal, &L, nullptr, acc, { Hpro::block_wise, diag } );
             
-    // if ( is_compressible( M ) )
+    // if ( compress::is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->decompress();
     
     if ( is_blocked( L ) )
@@ -211,7 +211,7 @@ solve_lower_tri ( const eval_side_t                 side,
             solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
         else if ( is_lowrank( M ) )
         {
-            if ( is_compressible( M ) )
+            if ( compress::is_compressible( M ) )
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
             else
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -220,7 +220,7 @@ solve_lower_tri ( const eval_side_t                 side,
             solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, lrsmatrix< value_t > ) );
         else if ( is_dense( M ) )
         {
-            if ( is_compressible( M ) )
+            if ( compress::is_compressible( M ) )
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
             else
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -230,20 +230,20 @@ solve_lower_tri ( const eval_side_t                 side,
     }// if
     else if ( is_dense( L ) )
     {
-        if ( is_compressible( L ) )
+        if ( compress::is_compressible( L ) )
         {
             if ( is_blocked( M ) )
                 solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
             else if ( is_lowrank( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
                 else
                     solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
             }// if
             else if ( is_dense( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
                 else
                     solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -257,7 +257,7 @@ solve_lower_tri ( const eval_side_t                 side,
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
             else if ( is_lowrank( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
                 else
                     solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -266,7 +266,7 @@ solve_lower_tri ( const eval_side_t                 side,
                 solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, lrsmatrix< value_t > ) );
             else if ( is_dense( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
                 else
                     solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -294,7 +294,7 @@ solve_lower_tri ( const eval_side_t                 side,
     // test data in result
     // M.check_data();
     
-    // if ( is_compressible( M ) )
+    // if ( compress::is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->compress( acc );
     
     // auto  DX1 = Hpro::to_dense( &M );
@@ -324,7 +324,7 @@ solve_lower_tri ( const eval_side_t                 side,
     HLR_ASSERT( (( side == from_left  ) && ( L.col_is() == M.row_is() )) ||
                 (( side == from_right ) && ( M.col_is() == L.row_is() )) );
 
-    HLR_ASSERT( ! is_compressible( M ) );
+    HLR_ASSERT( ! compress::is_compressible( M ) );
     
     if ( is_blocked( L ) )
     {
@@ -339,7 +339,7 @@ solve_lower_tri ( const eval_side_t                 side,
     }// if
     else if ( is_dense( L ) )
     {
-        if ( is_compressible( L ) )
+        if ( compress::is_compressible( L ) )
         {
             if ( is_lowrank( M ) )
                 solve_lower_tri( side, diag, * cptrcast( & L, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -421,7 +421,7 @@ solve_upper_tri ( const eval_side_t                 side,
     // else
     //     Hpro::solve_upper_right( Mc.get(), &U, nullptr, acc, { Hpro::block_wise, diag } );
             
-    // if ( is_compressible( M ) )
+    // if ( compress::is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->decompress();
     
     if ( is_blocked( U ) )
@@ -430,7 +430,7 @@ solve_upper_tri ( const eval_side_t                 side,
             solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
         else if ( is_lowrank( M ) )
         {
-            if ( is_compressible( M ) )
+            if ( compress::is_compressible( M ) )
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
             else
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -439,7 +439,7 @@ solve_upper_tri ( const eval_side_t                 side,
             solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, lrsmatrix< value_t > ) );
         else if ( is_dense( M ) )
         {
-            if ( is_compressible( M ) )
+            if ( compress::is_compressible( M ) )
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
             else
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -449,20 +449,20 @@ solve_upper_tri ( const eval_side_t                 side,
     }//if
     else if ( is_dense( U ) )
     {
-        if ( is_compressible( U ) )
+        if ( compress::is_compressible( U ) )
         {
             if ( is_blocked( M ) )
                 solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
             else if ( is_lowrank( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
                 else
                     solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
             }// if
             else if ( is_dense( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
                 else
                     solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -476,7 +476,7 @@ solve_upper_tri ( const eval_side_t                 side,
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
             else if ( is_lowrank( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, lrmatrix< value_t > ), acc );
                 else
                     solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
@@ -485,7 +485,7 @@ solve_upper_tri ( const eval_side_t                 side,
                 solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, lrsmatrix< value_t > ) );
             else if ( is_dense( M ) )
             {
-                if ( is_compressible( M ) )
+                if ( compress::is_compressible( M ) )
                     solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, dense_matrix< value_t > ), acc );
                 else
                     solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
@@ -513,7 +513,7 @@ solve_upper_tri ( const eval_side_t                 side,
     // test data in result
     // M.check_data();
     
-    // if ( is_compressible( M ) )
+    // if ( compress::is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->compress( acc );
 
     // auto  DX1 = Hpro::to_dense( &M );
@@ -536,7 +536,7 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
     
-    HLR_ASSERT( ! is_compressible( M ) );
+    HLR_ASSERT( ! compress::is_compressible( M ) );
     
     if ( is_blocked( U ) )
     {
@@ -551,7 +551,7 @@ solve_upper_tri ( const eval_side_t                 side,
     }//if
     else if ( is_dense( U ) )
     {
-        if ( is_compressible( U ) )
+        if ( compress::is_compressible( U ) )
         {
             if ( is_lowrank( M ) )
                 solve_upper_tri( side, diag, * cptrcast( & U, dense_matrix< value_t > ), * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );

@@ -163,7 +163,7 @@ multiply ( const value_t                     alpha,
     using namespace hlr::matrix;
     
     if      ( is_blocked( A ) )             multiply( alpha, op_A, * cptrcast( & A, Hpro::TBlockMatrix< value_t > ), B, C );
-    else if ( is_compressible( A ) )
+    else if ( compress::is_compressible( A ) )
     {
         if      ( is_lowrank( A ) )         multiply( alpha, op_A, * cptrcast( & A, lrmatrix< value_t > ), B, C );
         else if ( is_uniform_lowrank( A ) ) multiply( alpha, op_A, * cptrcast( & A, uniform_lrmatrix< value_t > ), B, C );
@@ -347,7 +347,7 @@ multiply ( const value_t                     alpha,
     using namespace hlr::matrix;
     
     if      ( is_blocked( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TBlockMatrix< value_t > ), C );
-    else if ( is_compressible( B ) )
+    else if ( compress::is_compressible( B ) )
     {
         if      ( is_lowrank( B ) )         multiply( alpha, A, op_B, * cptrcast( & B, lrmatrix< value_t > ), C );
         else if ( is_uniform_lowrank( B ) ) multiply( alpha, A, op_B, * cptrcast( & B, uniform_lrmatrix< value_t > ), C );

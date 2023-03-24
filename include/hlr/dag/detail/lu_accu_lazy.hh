@@ -322,7 +322,7 @@ struct accumulator
                 if ( handle_dense && ! is_dense( *T ) )
                     T = matrix::convert_to_dense< value_t >( *T );
                 
-                if ( use_compressed && ! matrix::is_compressible( *T ) )
+                if ( use_compressed && ! compress::is_compressible( *T ) )
                 {
                     auto  T2 = matrix::convert_to_compressible( T.release() );
 
@@ -408,7 +408,7 @@ struct accumulator
         // ensure that accumulator is compressed
         //
         
-        if ( use_compressed && ! matrix::is_compressed( *matrix ) )
+        if ( use_compressed && ! compress::is_compressed( *matrix ) )
         {
             if ( is_lowrank( *matrix ) )
             {

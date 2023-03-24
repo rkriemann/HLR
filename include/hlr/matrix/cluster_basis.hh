@@ -43,7 +43,7 @@ namespace matrix
 // additional hierarchy
 //
 template < typename T_value >
-class cluster_basis
+class cluster_basis : public compress::compressible
 {
 public:
 

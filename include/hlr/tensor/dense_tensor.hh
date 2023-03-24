@@ -14,8 +14,7 @@
 #include <hlr/utils/log.hh>
 #include <hlr/utils/traits.hh>
 #include <hlr/utils/io.hh>
-
-#include <hlr/matrix/compressible.hh>
+#include <hlr/utils/compression.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 
@@ -26,7 +25,7 @@ namespace hlr { namespace tensor {
 // - storage layout is column-major
 //
 template < typename T_value >
-class dense_tensor3 : public base_tensor3< T_value >, public matrix::compressible
+class dense_tensor3 : public base_tensor3< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;

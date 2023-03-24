@@ -40,9 +40,9 @@ compress ( base_tensor3< value_t > &  T,
             }// for
         }// for
     }// if
-    else if ( matrix::is_compressible( T ) )
+    else if ( compress::is_compressible( T ) )
     {
-        dynamic_cast< matrix::compressible * >( &T )->compress( acc );
+        dynamic_cast< compress::compressible * >( &T )->compress( acc );
     }// if
 }
 
@@ -71,9 +71,9 @@ decompress ( base_tensor3< value_t > &  T )
             }// for
         }// for
     }// if
-    else if ( matrix::is_compressible( T ) )
+    else if ( compress::is_compressible( T ) )
     {
-        dynamic_cast< matrix::compressible * >( &T )->decompress();
+        dynamic_cast< compress::compressible * >( &T )->decompress();
     }// if
 }
 

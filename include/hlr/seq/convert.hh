@@ -133,7 +133,7 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
     }// if
     else if ( is_lowrank( A ) )
     {
-        HLR_ASSERT( ! is_compressible( A ) );
+        HLR_ASSERT( ! compress::is_compressible( A ) );
         
         auto  RA = cptrcast( &A, Hpro::TRkMatrix< src_value_t > );
         auto  U  = blas::convert< dest_value_t >( RA->blas_mat_A() );
@@ -146,7 +146,7 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
     }// if
     else if ( is_dense( A ) )
     {
-        HLR_ASSERT( ! is_compressible( A ) );
+        HLR_ASSERT( ! compress::is_compressible( A ) );
         
         auto  DA = cptrcast( &A, Hpro::TDenseMatrix< src_value_t > );
         auto  D  = blas::convert< dest_value_t >( DA->blas_mat() );

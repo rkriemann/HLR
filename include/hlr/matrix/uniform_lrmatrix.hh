@@ -15,8 +15,8 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
-#include <hlr/matrix/compressible.hh>
 #include <hlr/matrix/cluster_basis.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -37,7 +37,7 @@ namespace matrix
 // corresponding matrix block (maybe joined by more matrices).
 //
 template < typename T_value >
-class uniform_lrmatrix : public Hpro::TMatrix< T_value >, public compressible
+class uniform_lrmatrix : public Hpro::TMatrix< T_value >, public compress::compressible
 {
 public:
     //

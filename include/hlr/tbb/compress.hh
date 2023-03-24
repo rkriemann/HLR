@@ -868,9 +868,9 @@ compress ( Hpro::TMatrix< value_t > &  A,
                 }// for
             } );
     }// if
-    else if ( is_compressible( A ) )
+    else if ( compress::is_compressible( A ) )
     {
-        dynamic_cast< compressible * >( &A )->compress( acc );
+        dynamic_cast< compress::compressible * >( &A )->compress( acc );
     }// if
 }
 
@@ -928,9 +928,9 @@ decompress ( Hpro::TMatrix< value_t > &  A )
                 }// for
             } );
     }// if
-    else if ( is_compressible( A ) )
+    else if ( compress::is_compressible( A ) )
     {
-        dynamic_cast< compressible * >( &A )->decompress();
+        dynamic_cast< compress::compressible * >( &A )->decompress();
     }// if
 }
 
@@ -999,9 +999,9 @@ compress ( tensor::base_tensor3< value_t > &  A,
                 }// for
             } );
     }// if
-    else if ( matrix::is_compressible( A ) )
+    else if ( compress::is_compressible( A ) )
     {
-        dynamic_cast< matrix::compressible * >( &A )->compress( acc );
+        dynamic_cast< compress::compressible * >( &A )->compress( acc );
     }// if
 }
 
@@ -1036,9 +1036,9 @@ decompress ( tensor::base_tensor3< value_t > &  A )
                 }// for
             } );
     }// if
-    else if ( matrix::is_compressible( A ) )
+    else if ( compress::is_compressible( A ) )
     {
-        dynamic_cast< matrix::compressible * >( &A )->decompress();
+        dynamic_cast< compress::compressible * >( &A )->decompress();
     }// if
 }
 

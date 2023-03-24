@@ -38,9 +38,9 @@ compress ( Hpro::TMatrix< value_t > &  M,
             }// for
         }// for
     }// if
-    else if ( is_compressible( M ) )
+    else if ( compress::is_compressible( M ) )
     {
-        dynamic_cast< compressible * >( &M )->compress( acc );
+        dynamic_cast< compress::compressible * >( &M )->compress( acc );
     }// if
 }
 
@@ -65,9 +65,9 @@ decompress ( Hpro::TMatrix< value_t > &  M )
             }// for
         }// for
     }// if
-    else if ( is_compressible( M ) )
+    else if ( compress::is_compressible( M ) )
     {
-        dynamic_cast< compressible * >( &M )->decompress();
+        dynamic_cast< compress::compressible * >( &M )->decompress();
     }// if
 }
 

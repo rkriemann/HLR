@@ -12,9 +12,9 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
-#include <hlr/tensor/base_tensor.hh>
+#include <hlr/utils/compression.hh>
 
-#include <hlr/matrix/compressible.hh>
+#include <hlr/tensor/base_tensor.hh>
 
 namespace hlr { namespace tensor {
 
@@ -22,7 +22,7 @@ namespace hlr { namespace tensor {
 // implements tensor using Tucker decomposition
 //
 template < typename T_value >
-class tucker_tensor3 : public base_tensor3< T_value >, public matrix::compressible
+class tucker_tensor3 : public base_tensor3< T_value >, public compress::compressible
 {
 public:
     static constexpr uint  dimension = 3;

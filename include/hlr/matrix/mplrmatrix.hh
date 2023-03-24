@@ -12,12 +12,11 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
-#include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
-#include <hlr/utils/detail/afloat.hh>
 
 #include <hlr/utils/io.hh> // DEBUG
 
@@ -106,7 +105,7 @@ constexpr double  mpprec2 = 6.0e-8;
 // corresponding matrix block (maybe joined by more matrices).
 //
 template < typename T_value >
-class mplrmatrix : public Hpro::TRkMatrix< T_value >, public compressible
+class mplrmatrix : public Hpro::TRkMatrix< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;

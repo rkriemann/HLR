@@ -11,8 +11,8 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
-#include <hlr/matrix/compressible.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -36,7 +36,7 @@ namespace matrix
 // - compression for U, S and V is implemented
 //
 template < typename T_value >
-class lrsmatrix : public Hpro::TMatrix< T_value >, public compressible
+class lrsmatrix : public Hpro::TMatrix< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;

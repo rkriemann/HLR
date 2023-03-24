@@ -68,7 +68,7 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
     }// if
     else if ( is_lowrank( M ) )
     {
-        if ( is_compressed( M ) )
+        if ( compress::is_compressed( M ) )
         {
             auto  R        = cptrcast( &M, lrmatrix< value_t > );
             auto  U        = R->U_decompressed();
@@ -97,7 +97,7 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
     }// if
     else if ( is_dense( M ) )
     {
-        if ( is_compressed( M ) )
+        if ( compress::is_compressed( M ) )
         {
             auto  D        = cptrcast( &M, matrix::dense_matrix< value_t > );
             auto  T        = std::move( D->mat_decompressed() ); // return value is newly created matrix
