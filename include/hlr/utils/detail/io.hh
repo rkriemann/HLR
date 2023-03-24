@@ -27,7 +27,7 @@ namespace detail
 //
 //////////////////////////////////////////////////////////////////////
 
-#if defined(USE_HDF5)
+#if defined(HLR_USE_HDF5)
 
 template < typename value_t >
 void
@@ -303,7 +303,7 @@ h5_read_blas_tensor ( H5::H5File &         file,
     return t;
 }
 
-#endif
+#endif // HLR_USE_HDF5
 
 //////////////////////////////////////////////////////////////////////
 //

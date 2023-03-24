@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_MGARD)
+#if defined(HLR_HAS_MGARD)
 
 #include <mgard/compress_x.hpp>
 
@@ -195,6 +195,6 @@ decompress< std::complex< double > > ( const zarray &            zdata,
 
 }}}// namespace hlr::compress::mgard
 
-#endif // HAS_MGARD
+#endif // HLR_HAS_MGARD
 
 #endif // __HLR_UTILS_DETAIL_MGARD_HH

@@ -8,13 +8,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_SCOREP)
-#include <scorep/SCOREP_User.h>
+#if defined(HLR_USE_SCOREP)
+#  include <scorep/SCOREP_User.h>
 #endif
 
 namespace hlr { namespace trace {
 
-#if defined(HAS_SCOREP)
+#if defined(HLR_USE_SCOREP)
 
 inline
 void

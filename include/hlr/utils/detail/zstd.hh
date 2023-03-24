@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_ZSTD)
+#if defined(HLR_HAS_ZSTD)
 
 #include <zstd.h>
 
@@ -73,6 +73,6 @@ decompress ( const zarray &  zdata,
 
 }}}// namespace hlr::compress::zstd
 
-#endif // HAS_ZSTD
+#endif // HLR_HAS_ZSTD
 
 #endif // __HLR_UTILS_DETAIL_ZSTD_HH

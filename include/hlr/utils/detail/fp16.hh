@@ -15,7 +15,7 @@
 //
 ////////////////////////////////////////////////////////////
 
-#if defined(HAS_HALF)
+#if defined(HLR_HAS_HALF)
 
 #include <half.hpp>
 
@@ -125,6 +125,6 @@ decompress< double > ( const zarray &  zdata,
 
 }}}// namespace hlr::compress::fp16
 
-#endif // HAS_HALF
+#endif // HLR_HAS_HALF
 
 #endif // __HLR_UTILS_DETAIL_FP16_HH

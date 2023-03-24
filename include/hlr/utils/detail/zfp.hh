@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_ZFP)
+#if defined(HLR_HAS_ZFP)
 
 #include <zfp.h>
 
@@ -287,6 +287,6 @@ decompress< std::complex< double > > ( const zarray &            zdata,
 
 }}}// namespace hlr::compress::zfp
 
-#endif // HAS_ZFP
+#endif // HLR_HAS_ZFP
 
 #endif // __HLR_UTILS_DETAIL_ZFP_HH

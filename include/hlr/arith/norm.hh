@@ -37,9 +37,8 @@ frobenius ( const value_t                     alpha,
             const value_t                     beta,
             const Hpro::TMatrix< value_t > &  B );
 
-template < typename arithmetic_t,
+template < arithmetic_type arithmetic_t,
            typename operator_t >
-requires provides_arithmetic< arithmetic_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
@@ -86,11 +85,8 @@ frobenius ( const alpha_t                     alpha,
 //
 // compute spectral norm of A via power iteration
 //
-template < typename arithmetic_t,
-           typename operator_t >
-requires ( provides_arithmetic< arithmetic_t > &&
-           has_value_type< operator_t > &&
-           is_linear_operator< operator_t > )
+template < arithmetic_type      arithmetic_t,
+           linear_operator_type operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
@@ -101,8 +97,7 @@ spectral ( arithmetic_t &&     arithmetic,
     return detail::spectral( arithmetic, A, atol, amax_it, squared );
 }
 
-template < typename operator_t >
-requires ( is_linear_operator< operator_t > )
+template < linear_operator_type operator_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
 spectral ( const operator_t &  A,
            const double        atol    = 1e-3,
@@ -112,12 +107,9 @@ spectral ( const operator_t &  A,
     return spectral( hlr::arithmetic, A, atol, amax_it, squared );
 }
 
-template < typename arithmetic_t,
-           typename operatorA_t,
-           typename operatorB_t >
-requires ( provides_arithmetic< arithmetic_t > &&
-           is_linear_operator< operatorA_t > &&
-           is_linear_operator< operatorB_t > )
+template < arithmetic_type      arithmetic_t,
+           linear_operator_type operatorA_t,
+           linear_operator_type operatorB_t >
 Hpro::real_type_t< Hpro::value_type_t< operatorA_t > >
 inv_error_2 ( arithmetic_t &&      arithmetic,
               const operatorA_t &  A,
@@ -132,10 +124,8 @@ inv_error_2 ( arithmetic_t &&      arithmetic,
     return spectral( arithmetic, *inv_err );
 }
 
-template < typename operatorA_t,
-           typename operatorB_t >
-requires ( is_linear_operator< operatorA_t > &&
-           is_linear_operator< operatorB_t > )
+template < linear_operator_type operatorA_t,
+           linear_operator_type operatorB_t >
 Hpro::real_type_t< Hpro::value_type_t< operatorA_t > >
 inv_error_2 ( const operatorA_t &  A,
               const operatorB_t &  A_inv )

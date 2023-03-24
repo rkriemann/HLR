@@ -10,11 +10,11 @@
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
-#if defined(HAS_H2)
+#if defined(HLR_HAS_H2)
 
 #include <hlr/arith/h2.hh>
 #include <hlr/tbb/detail/h2_mvm.hh>
@@ -61,6 +61,6 @@ mul_vec ( const value_t                             alpha,
 
 }}}// namespace hlr::tbb::h2
 
-#endif // HAS_H2
+#endif // HLR_HAS_H2
 
 #endif // __HLR_ARITH_H2_HH

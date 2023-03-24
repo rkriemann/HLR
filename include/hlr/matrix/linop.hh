@@ -38,7 +38,7 @@ template < typename T > concept has_apply_func =
 //
 // concept for linear operators
 //
-template < typename T > concept is_linear_operator = requires
+template < typename T > concept linear_operator_type = requires
 {
     requires has_value_type< T >;
     requires has_apply_func< T >;

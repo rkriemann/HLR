@@ -14,11 +14,11 @@
 //
 ////////////////////////////////////////////////////////////
 
-#if defined(HAS_SZ3)
+#if defined(HLR_HAS_SZ3)
 
 #include <string.h>
 
-#if defined(HAS_SZ3)
+#if defined(HLR_HAS_SZ3)
 #include <SZ3/api/sz.hpp>
 #endif
 
@@ -349,6 +349,6 @@ decompress< std::complex< double > > ( const zarray &            v,
 
 }}}// namespace hlr::compress::sz
 
-#endif // HAS_SZ3
+#endif // HLR_HAS_SZ3
 
 #endif // __HLR_UTILS_DETAIL_SZ3_HH

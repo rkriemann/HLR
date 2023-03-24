@@ -21,7 +21,7 @@ template < typename T > struct is_arithmetic { static constexpr bool value = fal
 
 template < typename T > inline constexpr bool is_arithmetic_v = is_arithmetic< T >::value;
 
-template < typename T > concept provides_arithmetic = is_arithmetic_v< T >;
+template < typename T > concept arithmetic_type = is_arithmetic_v< T >;
 
 //
 // default collection of arithmetic functions

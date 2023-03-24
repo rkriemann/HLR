@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////
 
-#if defined(HAS_UNIVERSAL)
+#if defined(HLR_HAS_UNIVERSAL)
 
 #include <universal/number/posit/posit.hpp>
 
@@ -386,6 +386,6 @@ mulvec< double > ( const size_t         nrows,
     
 }}}// namespace hlr::compress::posits
 
-#endif // HAS_UNIVERSAL
+#endif // HLR_HAS_UNIVERSAL
 
 #endif // __HLR_UTILS_DETAIL_POSITS_HH

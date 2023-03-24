@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_ZLIB)
+#if defined(HLR_HAS_ZLIB)
 
 #include <zlib.h>
 
@@ -74,6 +74,6 @@ decompress ( const zarray &  zdata,
 
 }}}// namespace hlr::compress::zlib
 
-#endif // HAS_ZLIB
+#endif // HLR_HAS_ZLIB
 
 #endif // __HLR_UTILS_DETAIL_ZLIB_HH

@@ -10,12 +10,12 @@
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
 #include <hpro/cluster/TCluster.hh>
-#if defined(HAS_H2)
+#if defined(HLR_HAS_H2)
 #include <hpro/cluster/TClusterBasis.hh>
 #endif
 
@@ -433,7 +433,7 @@ rank_info ( const cluster_basis< value_t > &  cb )
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
 
-#if defined(HAS_H2)
+#if defined(HLR_HAS_H2)
 
 template < typename value_t >
 std::tuple< uint, uint, uint >

@@ -8,11 +8,11 @@
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
-#if defined( HAS_H2 )
+#if defined(HLR_HAS_H2)
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/convert.hh>
@@ -285,7 +285,7 @@ program_main ()
         //     std::cout << "      error  = " << format_error( norm::inv_error_2( *M1, A2_inv ) ) << std::endl;
         // }
 
-        #if defined( HAS_H2 )
+        #if defined(HLR_HAS_H2)
         if ( false )
         {
             std::cout << "    " << term::bullet << term::bold << "H² with sep. factors/bases" << term::reset << std::endl;

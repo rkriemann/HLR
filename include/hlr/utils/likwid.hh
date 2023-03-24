@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(LIKWID_PERFMON)
+#if defined(HLR_USE_LIKWID)
 
 #  include <likwid.h>
 
@@ -19,6 +19,6 @@
 #  define LIKWID_MARKER_START( t )
 #  define LIKWID_MARKER_STOP( t )
 
-#endif
+#endif // HLR_USE_LIKWID
 
 #endif // __HLR_UTILS_LIKWID_HH

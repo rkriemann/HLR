@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HAS_LZ4)
+#if defined(HLR_HAS_LZ4)
 
 #include <lz4.h>
 
@@ -69,6 +69,6 @@ decompress ( const zarray &  zdata,
 
 }}}// namespace hlr::compress::lz4
 
-#endif // HAS_LZ4
+#endif // HLR_HAS_LZ4
 
 #endif // __HLR_UTILS_DETAIL_LZ4_HH

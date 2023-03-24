@@ -11,21 +11,21 @@
 #include <string>
 #include <cstring>
 
-#if defined(HAS_HDF5)
+#if defined(HLR_USE_HDF5)
 #  include <H5Cpp.h>
 #endif
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-#  define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)  // hack to test for full HLIBpro
+#  define HLR_USE_H2
 #endif
 
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
 
-#if defined(HAS_H2)
+#if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
 #  include <hpro/matrix/TUniformMatrix.hh>
 #endif
@@ -226,7 +226,7 @@ write ( const tensor::dense_tensor3< value_t > &  t,
         const std::string &                       tname,
         const std::string &                       fname = "" )
 {
-    #if defined(USE_HDF5)
+    #if defined(HLR_USE_HDF5)
 
     const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
     auto               file     = H5::H5File( filename, H5F_ACC_TRUNC );
@@ -242,7 +242,7 @@ write ( const blas::tensor3< value_t > &  t,
         const std::string &               tname,
         const std::string &               fname = "" )
 {
-    #if defined(USE_HDF5)
+    #if defined(HLR_USE_HDF5)
 
     const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
     auto               file     = H5::H5File( filename, H5F_ACC_TRUNC );
@@ -270,7 +270,7 @@ template < blas::tensor_type  T >
 T
 read ( const std::string &  filename = "" )
 {
-    #if defined(USE_HDF5)
+    #if defined(HLR_USE_HDF5)
 
     using  value_t = typename T::value_t;
     
@@ -289,7 +289,7 @@ template < typename value_t >
 tensor::dense_tensor3< value_t >
 read ( const std::string &  filename = "" )
 {
-    #if defined(USE_HDF5)
+    #if defined(HLR_USE_HDF5)
 
     auto  file = H5::H5File( filename, H5F_ACC_RDONLY );
 
@@ -410,7 +410,7 @@ print ( const hlr::matrix::cluster_basis< value_t > &  cb,
     hlr::matrix::print_eps( cb, filename, options );
 }
 
-#if defined(HAS_H2)
+#if defined(HLR_USE_H2)
 template < typename value_t >
 void
 print ( const Hpro::TClusterBasis< value_t > &  cb,

@@ -14,11 +14,11 @@
 //
 ////////////////////////////////////////////////////////////
 
-#if defined(HAS_SZ)
+#if defined(HLR_HAS_SZ)
 
 #include <string.h>
 
-#if defined(HAS_SZ)
+#if defined(HLR_HAS_SZ)
 #include <sz.h>
 #include <zlib.h>
 #endif
@@ -264,6 +264,6 @@ decompress< std::complex< double > > ( const zarray &            v,
 
 }}}// namespace hlr::compress::sz
 
-#endif // HAS_SZ
+#endif // HLR_HAS_SZ
 
 #endif // __HLR_UTILS_DETAIL_SZ_HH

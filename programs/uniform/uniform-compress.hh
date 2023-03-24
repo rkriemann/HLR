@@ -8,11 +8,11 @@
 
 #include <hlib-config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
-#if defined( HAS_H2 )
+#if defined(HLR_HAS_H2)
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/algebra/mat_conv.hh>
@@ -37,7 +37,7 @@ bool within ( double  arg, double ul, double ll )
     return ( arg >= ll ) && ( arg <= ul );
 }
 
-#if defined(HAS_UNIVERSAL)
+#if defined(HLR_HAS_UNIVERSAL)
 template < uint bitsize,
            uint expsize >
 void
@@ -173,7 +173,7 @@ program_main ()
 
         auto  acc = hpro::fixed_prec( eps );
         
-        #if defined(HAS_ZFP)
+        #if defined(HLR_HAS_ZFP)
         const uint  zfp_ub = (   eps <= 1e-10 ? 40
                                : eps <= 1e-8 ? 34
                                : eps <= 1e-6 ? 28
@@ -231,7 +231,7 @@ program_main ()
                 }
             }// if
     
-            #if defined(HAS_ZFP)
+            #if defined(HLR_HAS_ZFP)
             const uint  zfp_ub = (   eps <= 1e-10 ? 40
                                      : eps <= 1e-8 ? 34
                                      : eps <= 1e-6 ? 28
@@ -265,7 +265,7 @@ program_main ()
             }// if
             #endif
         
-            #if defined(HAS_UNIVERSAL)
+            #if defined(HLR_HAS_UNIVERSAL)
             if ( true )
             {
                 std::cout << "  " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
@@ -352,7 +352,7 @@ program_main ()
                 }
             }
 
-            #if defined(HAS_HALF)
+            #if defined(HLR_HAS_HALF)
             if ( true )
             {
                 std::cout << "    " << term::bullet << term::bold << "half precision" << term::reset << std::endl;
@@ -382,7 +382,7 @@ program_main ()
             }
             #endif
 
-            #if defined(HAS_ZFP)
+            #if defined(HLR_HAS_ZFP)
             if ( true )
             {
                 std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
@@ -410,7 +410,7 @@ program_main ()
             }// if
             #endif
         
-            #if defined(HAS_UNIVERSAL)
+            #if defined(HLR_HAS_UNIVERSAL)
             if ( true )
             {
                 std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;
@@ -443,7 +443,7 @@ program_main ()
         //
         //////////////////////////////////////////////////////////////////////
 
-        #if defined( HAS_H2 )
+        #if defined( HLR_HAS_H2 )
     
         if ( false )
         {
@@ -490,7 +490,7 @@ program_main ()
             // try lower precisions
             //
         
-            #if defined(HAS_ZFP)
+            #if defined(HLR_HAS_ZFP)
             if ( true )
             {
                 std::cout << "    " << term::bullet << term::bold << "ZFP compression" << term::reset << std::endl;
@@ -519,7 +519,7 @@ program_main ()
             }// if
             #endif
         
-            #if defined(HAS_UNIVERSAL)
+            #if defined(HLR_HAS_UNIVERSAL)
             if ( true )
             {
                 std::cout << "    " << term::bullet << term::bold << "using posits" << term::reset << std::endl;

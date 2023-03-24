@@ -39,9 +39,9 @@ namespace matrix
 // check some of the default defines for this
 //
 #if defined(__FLT16_EPSILON__)
-#  define HAS_FLOAT16  1
+#  define HLR_HAS_FLOAT16  1
 #else
-#  define HAS_FLOAT16  0
+#  define HLR_HAS_FLOAT16  0
 #endif
 
 struct bf16
@@ -90,7 +90,7 @@ public:
 using  mptype1_t = double;
 using  mptype2_t = float;
 
-#if HAS_FLOAT16
+#if HLR_HAS_FLOAT16
 using  mptype3_t = _Float16;
 constexpr double  mpprec3 = 4.9e-4;
 #else

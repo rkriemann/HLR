@@ -10,19 +10,20 @@
 
 #include <random>
 
-#include "hlr/arith/blas.hh"
-#include "hlr/arith/operator_wrapper.hh"
+#include <hlr/arith/blas.hh>
+#include <hlr/arith/defaults.hh>
+#include <hlr/arith/operator_wrapper.hh>
 
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/mplrmatrix.hh>
-#include "hlr/matrix/tiled_lrmatrix.hh"
-#include "hlr/matrix/uniform_lrmatrix.hh"
+#include <hlr/matrix/tiled_lrmatrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 
-#include "hlr/utils/log.hh"
-#include "hlr/utils/checks.hh"
-#include "hlr/utils/text.hh"
-#include "hlr/utils/math.hh"
+#include <hlr/utils/log.hh>
+#include <hlr/utils/checks.hh>
+#include <hlr/utils/text.hh>
+#include <hlr/utils/math.hh>
 
 namespace hlr { namespace norm { namespace detail {
 
@@ -414,11 +415,9 @@ frobenius ( const value_t                     alpha,
 //
 // compute spectral norm of A via power iteration
 //
-template < typename arithmetic_t,
+template < arithmetic_type arithmetic_t,
            typename operator_t >
-requires provides_arithmetic< arithmetic_t >
 Hpro::real_type_t< Hpro::value_type_t< operator_t > >
-//std::enable_if_t< hlr::is_arithmetic_v< arithmetic_t >, Hpro::real_type_t< Hpro::value_type_t< operator_t > > >
 spectral ( arithmetic_t &&     arithmetic,
            const operator_t &  A,
            const double        atol,

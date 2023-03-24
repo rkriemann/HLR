@@ -8,11 +8,11 @@
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
-#if defined( HAS_H2 )
+#if defined(HLR_HAS_H2)
 #include <hpro/cluster/TClusterBasisBuilder.hh>
 #include <hpro/matrix/TMatrixSum.hh>
 #include <hpro/matrix/convert.hh>
@@ -255,7 +255,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined( HAS_H2 )
+    #if defined(HLR_HAS_H2)
     
     auto  rowcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
     auto  colcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
@@ -473,7 +473,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined( HAS_H2 )
+    #if defined(HLR_HAS_H2)
     
     if ( true )
     {

@@ -10,13 +10,13 @@
 
 #include <hpro/config.h>
 
-#if defined(USE_LIC_CHECK)
-#define HAS_H2
+#if defined(HPRO_USE_LIC_CHECK)
+#define HLR_HAS_H2
 #endif
 
 #include <hpro/matrix/TRkMatrix.hh>
 
-#if defined(HAS_H2)
+#if defined(HLR_HAS_H2)
 #include <hpro/matrix/TUniformMatrix.hh>
 #endif
 
@@ -66,7 +66,7 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if
-    #if defined(HAS_H2)
+    #if defined(HLR_HAS_H2)
     else if ( is_uniform( &M ) )
     {
         auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
