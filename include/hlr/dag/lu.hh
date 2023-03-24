@@ -29,8 +29,7 @@ template < typename value_t,
 graph
 gen_dag_lu ( Hpro::TMatrix< value_t > & A,
              const size_t               min_size,
-             refine_func_t              refine,
-             const approx_t &           /* apx */ )
+             refine_func_t              refine )
 {
     auto  dag = refine( new lu::lu_node< value_t, approx_t >( & A ), min_size, use_single_end_node );
 
@@ -49,8 +48,7 @@ std::tuple< graph,
             std::unique_ptr< std::mutex > >
 gen_dag_lu_accu_lazy ( Hpro::TMatrix< value_t > & A,
                        const size_t               min_size,
-                       refine_func_t              refine,
-                       const approx_t &           /* apx */ )
+                       refine_func_t              refine )
 {
     // generate DAG for shifting and applying updates
     auto  accu_map                   = std::make_unique< dag::lu::accu::lazy::accumulator_map_t< value_t > >();
@@ -154,8 +152,7 @@ std::tuple< graph,
             std::unique_ptr< std::mutex > >
 gen_dag_lu_accu_eager ( Hpro::TMatrix< value_t > & A,
                         const size_t               min_size,
-                        refine_func_t              refine,
-                        const approx_t &           /* apx */ )
+                        refine_func_t              refine )
 {
     // generate DAG for shifting and applying updates
     auto  accu_map                   = std::make_unique< dag::lu::accu::eager::accumulator_map_t< value_t > >();
