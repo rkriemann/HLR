@@ -232,7 +232,7 @@ lu_accu_dag ( const Hpro::TMatrix< value_t > &  A,
     auto  toc    = timer::since( tic );
     auto  C      = impl::matrix::copy( A );
 
-    auto  [ lu_dag, accu_map ] = hlr::dag::gen_dag_lu_accu< value_t, approx_t >( *C, nseq, impl::dag::refine );
+    auto  [ lu_dag, accu_map, accu_mtx ] = hlr::dag::gen_dag_lu_accu_lazy< value_t, approx_t >( *C, nseq, impl::dag::refine );
 
     if ( Hpro::verbose( 3 ) )
         lu_dag.print_dot( "lu.dot" );
