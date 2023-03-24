@@ -184,6 +184,58 @@ program_main ()
             std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
         }
 
+        // if ( std::max({ X.size(0), X.size(1), X.size(2) }) < 256 )
+        {
+            std::cout << term::bullet << term::bold << "ST-HOSVD" << term::reset << std::endl;
+
+            tic = timer::now();
+        
+            auto  acc               = Hpro::fixed_prec( cmdline::eps );
+            auto  apx               = approx::SVD< value_t >();
+            auto  [ G, X0, X1, X2 ] = blas::sthosvd( X, acc, apx );
+            
+            toc = timer::since( tic );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+            std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+            // std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
+            
+            auto  Z  = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
+                                                          std::move( G ),
+                                                          std::move( X0 ),
+                                                          std::move( X1 ),
+                                                          std::move( X2 ) );
+            
+            std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+            std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+            
+            auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
+            auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
+            auto  Y  = blas::tensor_product( T1,    Z.X(2), 2 );
+            
+            if ( verbose(3) ) io::vtk::print( Y, "Y1" );
+            if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
+            
+            blas::add( -1, X, Y );
+            std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+            
+            if ( verbose(3) ) io::vtk::print( Y, "error1" );
+
+            std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
+
+            Z.compress( acc );
+
+            std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+            std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+
+            T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
+            T1 = std::move( blas::tensor_product( T0,    Z.X_decompressed(1), 1 ) );
+            Y  = std::move( blas::tensor_product( T1,    Z.X_decompressed(2), 2 ) );
+
+            blas::add( -1, X, Y );
+            std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+        }
+
         {
             std::cout << term::bullet << term::bold << "Hierarchical HOSVD" << term::reset << std::endl;
 

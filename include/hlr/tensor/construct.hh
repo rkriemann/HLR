@@ -47,7 +47,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
         if ( ! acc.is_exact() )
         {
             auto  Dc                = blas::copy( D );  // do not modify D (!)
-            auto  [ G, X0, X1, X2 ] = blas::hosvd( Dc, acc, approx );
+            auto  [ G, X0, X1, X2 ] = blas::sthosvd( Dc, acc, approx );
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {

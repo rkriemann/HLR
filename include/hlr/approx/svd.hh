@@ -514,7 +514,38 @@ struct SVD
     column_basis ( blas::matrix< value_t > &  M,
                    const Hpro::TTruncAcc &    acc ) const
     {
-        if ( M.ncols() > M.nrows() / 2 )
+        if ( M.ncols() > 2 * M.nrows() )
+        {
+            //
+            // compute eigenvalues and eigenvectors of M·M'
+            //
+            
+            auto  G        = blas::prod( M, blas::adjoint( M ) );
+            auto  [ V, E ] = blas::eigen_herm( G );
+            auto  perm     = std::vector< std::pair< value_t, uint > >( E.length() );
+            
+            for ( uint  i = 0; i < E.length(); ++i )
+                perm.push_back({ E(i), i });
+            
+            std::sort( perm.begin(), perm.end(), [] ( auto  a, auto b ) { return a.first > b.first; } );
+            
+            for ( uint  i = 0; i < E.length(); ++i )
+                E(i) = perm[i].first;
+            
+            const auto  k  = acc.trunc_rank( E );
+            auto        Vk = blas::matrix< value_t >( V.nrows(), k );
+            
+            for ( uint  i = 0; i < k; ++i )
+            {
+                auto  v1 = V.column( perm[i].second );
+                auto  v2 = Vk.column( i );
+                
+                copy( v1, v2 );
+            }// for
+
+            return Vk;
+        }// if
+        else if ( M.ncols() > M.nrows() / 2 )
         {
             //
             // directly use first k column of U from M = U·S·V'

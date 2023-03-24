@@ -1980,6 +1980,44 @@ sv ( const matrix< value_t > &  U,
 
 using Hpro::BLAS::sv;
 
+//
+// compute eigenvalues of M
+//
+template < matrix_type matrix_t >
+std::pair< matrix< typename matrix_t::value_t >,
+           vector< typename matrix_t::value_t > >
+eigen ( matrix_t &  M )
+{
+    using value_t = typename matrix_t::value_t;
+    
+    auto  E = vector< value_t >();
+    auto  V = matrix< value_t >();
+
+    Hpro::BLAS::eigen( M, E, V );
+
+    return { std::move( V ), std::move( E ) };
+}
+using Hpro::BLAS::eigen;
+
+//
+// compute eigenvalues of hermitian M
+//
+template < matrix_type matrix_t >
+std::pair< matrix< typename matrix_t::value_t >,
+           vector< typename matrix_t::value_t > >
+eigen_herm ( matrix_t &  M )
+{
+    using value_t = typename matrix_t::value_t;
+    
+    auto  E = vector< value_t >();
+    auto  V = matrix< value_t >();
+
+    Hpro::BLAS::eigen_herm( M, E, V );
+
+    return { std::move( V ), std::move( E ) };
+}
+using Hpro::BLAS::eigen_herm;
+
 }}// namespace hlr::blas
 
 //

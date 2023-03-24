@@ -695,16 +695,17 @@ hosvd ( const tensor3< value_t > &  X,
         const approx_t &            apx )
 {
     auto  X0 = X.unfold( 0 );
-    auto  X1 = X.unfold( 1 );
-    auto  X2 = X.unfold( 2 );
-
     auto  U0 = apx.column_basis( X0, acc );
+
+    auto  X1 = X.unfold( 1 );
     auto  U1 = apx.column_basis( X1, acc );
+
+    auto  X2 = X.unfold( 2 );
     auto  U2 = apx.column_basis( X2, acc );
 
-    auto  Y0  = tensor_product( X,  adjoint( U0 ), 0 );
-    auto  Y1  = tensor_product( Y0, adjoint( U1 ), 1 );
-    auto  G   = tensor_product( Y1, adjoint( U2 ), 2 );
+    auto  Y0 = tensor_product( X,  adjoint( U0 ), 0 );
+    auto  Y1 = tensor_product( Y0, adjoint( U1 ), 1 );
+    auto  G  = tensor_product( Y1, adjoint( U2 ), 2 );
 
     return { std::move(G), std::move(U0), std::move(U1), std::move(U2) };
 }
@@ -720,6 +721,53 @@ hosvd ( const tensor3< value_t > &  X,
     const auto  apx = approx::SVD< value_t >();
 
     return hosvd( X, acc, apx );
+}
+
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+sthosvd ( const tensor3< value_t > &  X,
+          const accuracy &            acc,
+          const approx_t &            apx )
+{
+    auto  Y  = copy( X );
+    auto  U0 = blas::matrix< value_t >();
+    auto  U1 = blas::matrix< value_t >();
+    auto  U2 = blas::matrix< value_t >();
+    
+    for ( uint  d = 0; d < 3; ++d )
+    {
+        auto  Yd = Y.unfold( d );
+        auto  Ud = apx.column_basis( Yd, acc );
+        auto  T  = tensor_product( Y, adjoint( Ud ), d );
+
+        Y = std::move( T );
+
+        switch ( d )
+        {
+            case 0 : U0 = std::move( Ud ); break;
+            case 1 : U1 = std::move( Ud ); break;
+            case 2 : U2 = std::move( Ud ); break;
+        }// switch
+    }// for
+
+    return { std::move(Y), std::move(U0), std::move(U1), std::move(U2) };
+}
+
+template < typename  value_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+sthosvd ( const tensor3< value_t > &  X,
+        const accuracy &            acc )
+{
+    const auto  apx = approx::SVD< value_t >();
+
+    return sthosvd( X, acc, apx );
 }
 
 }}// namespace hlr::blas
