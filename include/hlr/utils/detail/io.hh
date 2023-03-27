@@ -318,9 +318,35 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
 {
     auto  outname = std::filesystem::path( filename );
     auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
+
+    #if 1
+    
+    //
+    // assuming tensor grid in equal step width in all dimensions
+    //
+
+    const double  h = 1.0 / ( std::max({ t.size(0), t.size(1), t.size(2) }) - 1 );
+
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLR full tensor" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET STRUCTURED_POINTS" << std::endl
+        << "DIMENSIONS " << t.size(0) << ' ' << t.size(1) << ' ' << t.size(2) << std::endl
+        << "SPACING " << h << ' ' << h << ' ' << h << std::endl
+        << "ORIGIN 0 0 0" << std::endl
+        << "POINT_DATA " << t.size(0) * t.size(1) * t.size(2) << std::endl
+        << "SCALARS v float 1" << std::endl
+        << "LOOKUP_TABLE default" << std::endl;
+        
+    for ( size_t  l = 0; l < t.size(2); ++l )
+        for ( size_t  j = 0; j < t.size(1); ++j )
+            for ( size_t  i = 0; i < t.size(0); ++i )
+                out << t( i, j, l ) << std::endl;
+                                                                         
+    #else
     
     out << "# vtk DataFile Version 2.0" << std::endl
-        << "HLIBpro coordinates" << std::endl
+        << "HLR full tensor" << std::endl
         << "ASCII" << std::endl
         << "DATASET UNSTRUCTURED_GRID" << std::endl;
 
@@ -328,15 +354,18 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
     // assuming tensor grid in equal step width in all dimensions
     //
 
-    const size_t  nc = t.size(0) * t.size(1) * t.size(2);
-    const size_t  nv = (t.size(0)+1) * (t.size(1)+1) * (t.size(2)+1);
-    const double  h  = 1.0 / ( std::min({ t.size(0), t.size(1), t.size(2) }) + 1 );
+    const size_t  nc  = t.size(0) * t.size(1) * t.size(2);
+    const size_t  nv0 = t.size(0)+1;
+    const size_t  nv1 = t.size(1)+1;
+    const size_t  nv2 = t.size(2)+1;
+    const size_t  nv  = nv0 * nv1 * nv2;
+    const double  h   = 1.0 / std::min({ t.size(0), t.size(1), t.size(2) });
 
     out << "POINTS " << nv << " FLOAT" << std::endl;
 
-    for ( size_t  l = 0; l <= t.size(2); ++l )
-        for ( size_t  j = 0; j <= t.size(1); ++j )
-            for ( size_t  i = 0; i <= t.size(0); ++i )
+    for ( size_t  l = 0; l < nv2; ++l )
+        for ( size_t  j = 0; j < nv1; ++j )
+            for ( size_t  i = 0; i < nv0; ++i )
                 out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
 
     //
@@ -354,23 +383,22 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
         for ( size_t  j = 0; j < t.size(1); ++j )
             for ( size_t  i = 0; i < t.size(0); ++i )
                 out << "8 "
-                    << ( l * t.size(1) + j ) * t.size(0) + i
+                    << ( l * nv1 + j ) * nv0 + i
                     << ' '
-                    << ( l * t.size(1) + j ) * t.size(0) + (i + 1)
+                    << ( l * nv1 + j ) * nv0 + (i + 1)
                     << ' '
-                    << ( l * t.size(1) + (j+1) ) * t.size(0) + i
+                    << ( l * nv1 + (j+1) ) * nv0 + i
                     << ' '
-                    << ( l * t.size(1) + (j+1) ) * t.size(0) + (i+1)
+                    << ( l * nv1 + (j+1) ) * nv0 + (i+1)
                     << ' '
-                    << ( (l+1) * t.size(1) + j ) * t.size(0) + i
+                    << ( (l+1) * nv1 + j ) * nv0 + i
                     << ' '
-                    << ( (l+1) * t.size(1) + j ) * t.size(0) + (i+1)
+                    << ( (l+1) * nv1 + j ) * nv0 + (i+1)
                     << ' '
-                    << ( (l+1) * t.size(1) + (j+1) ) * t.size(0) + i
+                    << ( (l+1) * nv1 + (j+1) ) * nv0 + i
                     << ' '
-                    << ( (l+1) * t.size(1) + (j+1) ) * t.size(0) + (i+1)
+                    << ( (l+1) * nv1 + (j+1) ) * nv0 + (i+1)
                     << std::endl;
-    out << std::endl;
         
     out << "CELL_TYPES " << nc << std::endl;
         
@@ -378,28 +406,20 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
         out << "11 ";
     out << std::endl;
 
+    //
+    // associate entry in tensor with cell in grid
+    //
+
     out << "CELL_DATA " << nc << std::endl
         << "COLOR_SCALARS v" << " 1" << std::endl;
         
-    for ( size_t  i = 0; i < n; ++i )
-    {
-        //
-        // average of vertex values
-        //
-        
-        auto  v = ( t(   i,   j,   l ) +
-                    t( i+1,   j,   l ) +
-                    t(   i, j+1,   l ) +
-                    t( i+1, j+1,   l ) +
-                    t(   i,   j, l+1 ) +
-                    t( i+1,   j, l+1 ) +
-                    t(   i, j+1, l+1 ) +
-                    t( i+1, j+1, l+1 ) );
-            
-        out << v / 8.0 << ' ';
-    }// for
-    
+    for ( size_t  l = 0; l < t.size(2); ++l )
+        for ( size_t  j = 0; j < t.size(1); ++j )
+            for ( size_t  i = 0; i < t.size(0); ++i )
+                out << t( i, j, l ) << ' ';
     out << std::endl;
+
+    #endif
 }
 
 template < typename value_t >
@@ -473,7 +493,7 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
     auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
     
     out << "# vtk DataFile Version 2.0" << std::endl
-        << "HLIBpro coordinates" << std::endl
+        << "HLR hierarchical tensor" << std::endl
         << "ASCII" << std::endl
         << "DATASET UNSTRUCTURED_GRID" << std::endl;
 

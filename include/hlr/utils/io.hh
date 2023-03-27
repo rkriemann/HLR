@@ -233,6 +233,10 @@ write ( const tensor::dense_tensor3< value_t > &  t,
     
     detail::h5_write_tensor( file, "/" + tname, t );
 
+    #else
+
+    HLR_ERROR( "no HDF5 support available" );
+    
     #endif
 }
 
@@ -249,6 +253,10 @@ write ( const blas::tensor3< value_t > &  t,
     
     detail::h5_write_tensor( file, tname, t );
 
+    #else
+
+    HLR_ERROR( "no HDF5 support available" );
+    
     #endif
 }
 
@@ -280,6 +288,8 @@ read ( const std::string &  filename = "" )
 
     #else
 
+    HLR_ERROR( "no HDF5 support available" );
+    
     return T();
     
     #endif
@@ -297,6 +307,8 @@ read ( const std::string &  filename = "" )
 
     #else
 
+    HLR_ERROR( "no HDF5 support available" );
+    
     return tensor::dense_tensor3< value_t >();
     
     #endif

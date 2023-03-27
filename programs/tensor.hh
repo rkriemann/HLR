@@ -111,18 +111,21 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
             
         const size_t  n = cmdline::n;
-        const double  h = std::numbers::pi / double(n-1);
+        const auto    π = std::numbers::pi;
+        const double  h = π / double(n-1);
         // double        v = 1.0;
             
         X = std::move( blas::tensor3< value_t >( n, n, n ) );
             
         tic = timer::now();
-        
+
         for ( uint  l = 0; l < n; ++l )
             for ( uint  j = 0; j < n; ++j )
                 for ( uint  i = 0; i < n; ++i )
+                {
                     // X( i, j, l ) = v++;
                     X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+                }// for
             
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -248,7 +251,7 @@ program_main ()
     //
     
     {
-        std::cout << term::bullet << term::bold << "Hierarchical HOSVD" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "Hierarchical HOSVD (" << "ntile = " << cmdline::ntile << ")" << term::reset << std::endl;
 
         tic = timer::now();
         
