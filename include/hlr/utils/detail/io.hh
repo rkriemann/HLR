@@ -328,33 +328,77 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
     // assuming tensor grid in equal step width in all dimensions
     //
 
-    const size_t  n = t.size(0) * t.size(1) * t.size(2);
-    const double  h = 1.0 / std::min({ t.size(0), t.size(1), t.size(2) });
+    const size_t  nc = t.size(0) * t.size(1) * t.size(2);
+    const size_t  nv = (t.size(0)+1) * (t.size(1)+1) * (t.size(2)+1);
+    const double  h  = 1.0 / ( std::min({ t.size(0), t.size(1), t.size(2) }) + 1 );
 
-    out << "POINTS " << n << " FLOAT" << std::endl;
+    out << "POINTS " << nv << " FLOAT" << std::endl;
+
+    for ( size_t  l = 0; l <= t.size(2); ++l )
+        for ( size_t  j = 0; j <= t.size(1); ++j )
+            for ( size_t  i = 0; i <= t.size(0); ++i )
+                out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
+
+    //
+    //     6-------7
+    //    /|      /|
+    //   4-------5 |
+    //   | 2-----|-3
+    //   |/      |/
+    //   0 ----- 1
+    //
+            
+    out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
 
     for ( size_t  l = 0; l < t.size(2); ++l )
         for ( size_t  j = 0; j < t.size(1); ++j )
             for ( size_t  i = 0; i < t.size(0); ++i )
-                out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
-
-    out << "CELLS " << n << ' ' << 2 * n << std::endl;
-
-    for ( size_t  i = 0; i < n; ++i )
-        out << "1 " << i << ' ';
+                out << "8 "
+                    << ( l * t.size(1) + j ) * t.size(0) + i
+                    << ' '
+                    << ( l * t.size(1) + j ) * t.size(0) + (i + 1)
+                    << ' '
+                    << ( l * t.size(1) + (j+1) ) * t.size(0) + i
+                    << ' '
+                    << ( l * t.size(1) + (j+1) ) * t.size(0) + (i+1)
+                    << ' '
+                    << ( (l+1) * t.size(1) + j ) * t.size(0) + i
+                    << ' '
+                    << ( (l+1) * t.size(1) + j ) * t.size(0) + (i+1)
+                    << ' '
+                    << ( (l+1) * t.size(1) + (j+1) ) * t.size(0) + i
+                    << ' '
+                    << ( (l+1) * t.size(1) + (j+1) ) * t.size(0) + (i+1)
+                    << std::endl;
     out << std::endl;
         
-    out << "CELL_TYPES " << n << std::endl;
+    out << "CELL_TYPES " << nc << std::endl;
         
-    for ( size_t  i = 0; i < n; ++i )
-        out << "1 ";
+    for ( size_t  i = 0; i < nc; ++i )
+        out << "11 ";
     out << std::endl;
 
-    out << "CELL_DATA " << n << std::endl
+    out << "CELL_DATA " << nc << std::endl
         << "COLOR_SCALARS v" << " 1" << std::endl;
         
     for ( size_t  i = 0; i < n; ++i )
-        out << t.data()[i] << ' ';
+    {
+        //
+        // average of vertex values
+        //
+        
+        auto  v = ( t(   i,   j,   l ) +
+                    t( i+1,   j,   l ) +
+                    t(   i, j+1,   l ) +
+                    t( i+1, j+1,   l ) +
+                    t(   i,   j, l+1 ) +
+                    t( i+1,   j, l+1 ) +
+                    t(   i, j+1, l+1 ) +
+                    t( i+1, j+1, l+1 ) );
+            
+        out << v / 8.0 << ' ';
+    }// for
+    
     out << std::endl;
 }
 
