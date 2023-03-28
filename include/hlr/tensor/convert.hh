@@ -14,13 +14,6 @@
 
 namespace hlr { namespace tensor {
 
-//
-// forward decl. as used within detail::to_dense
-//
-template < typename value_t >
-std::unique_ptr< dense_tensor3< value_t > >
-to_dense ( const base_tensor3< value_t > &  X );
-
 namespace detail
 {
 

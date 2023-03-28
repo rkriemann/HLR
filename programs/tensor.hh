@@ -142,6 +142,7 @@ program_main ()
     // HOSVD
     //
     
+    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 256 )
     {
         std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
 
@@ -164,11 +165,11 @@ program_main ()
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
-            
+
         auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
         auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
         auto  Y  = blas::tensor_product( T1,    Z.X(2), 2 );
-            
+        
         if ( verbose(3) ) io::vtk::print( Y, "Y1" );
         if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
@@ -195,7 +196,8 @@ program_main ()
     //
     // ST-HOSVD
     //
-    
+
+    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 256 )
     {
         std::cout << term::bullet << term::bold << "ST-HOSVD" << term::reset << std::endl;
 
@@ -271,20 +273,36 @@ program_main ()
         if ( verbose(3) ) io::vtk::print( *Y, "Y2" );
         if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
             
-        impl::blas::add( -1, X, 1, Y->tensor() );
+        impl::blas::add( -1, X, Y->tensor() );
         std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( *Y, "error2" );
 
         std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
 
+        tic = timer::now();
+
         impl::tensor::compress( *H, acc );
 
+        toc = timer::since( tic );
+        
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
+        tic = timer::now();
+        
         Y = impl::tensor::to_dense( *H );
-        impl::blas::add( -1, X, 1, Y->tensor() );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        
+        tic = timer::now();
+
+        impl::blas::add( -1, X, Y->tensor() );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
     }
 }

@@ -153,6 +153,94 @@ build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
     return M;
 }
 
+namespace detail
+{
+
+//
+// copy given tensor into D
+//
+template < typename value_t >
+void
+to_dense ( const base_tensor3< value_t > &  X,
+           blas::tensor3< value_t > &       D )
+{
+    if ( is_structured( X ) )
+    {
+        auto  BX    = cptrcast( &X, structured_tensor3< value_t > );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range3d< uint >( 0, BX->nblocks(0),
+                                            0, BX->nblocks(1),
+                                            0, BX->nblocks(2) ),
+            [BX,&D] ( const auto &  r )
+            {
+                for ( auto  l = r.pages().begin(); l != r.pages().end(); ++l )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                        {
+                            if ( ! is_null( BX->block(i,j,l) ) )
+                                to_dense( *BX->block(i,j,l), D );
+                        }// for
+                    }// for
+                }// for
+            }
+        );
+    }// if
+    else if ( is_tucker( X ) )
+    {
+        auto  TX    = cptrcast( &X, tucker_tensor3< value_t > );
+        auto  T0    = blas::tensor_product( TX->G_decompressed(), TX->X_decompressed(0), 0 );
+        auto  T1    = blas::tensor_product( T0,                   TX->X_decompressed(1), 1 );
+        auto  DX    = blas::tensor_product( T1,                   TX->X_decompressed(2), 2 );
+        auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
+        
+        blas::copy( DX, D_sub );
+    }// if
+    else if ( is_dense( X ) )
+    {
+        auto  DX    = cptrcast( &X, dense_tensor3< value_t > );
+        auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
+
+        blas::copy( DX->tensor_decompressed(), D_sub );
+    }// if
+    else
+    {
+        HLR_ERROR( "unknown tensor type" );
+    }// if
+}
+
+}// namespace detail
+
+//
+// convert to dense tensor
+//
+template < typename value_t >
+std::unique_ptr< dense_tensor3< value_t > >
+to_dense ( const base_tensor3< value_t > &  X )
+{
+    // only zero offsets for now
+    HLR_ASSERT( ( X.is(0).first() == 0 ) &&
+                ( X.is(1).first() == 0 ) &&
+                ( X.is(2).first() == 0 ) )
+        
+    if ( is_dense( X ) )
+    {
+        auto  D = X.copy();
+
+        return std::unique_ptr< dense_tensor3< value_t > >( ptrcast( D.release(), dense_tensor3< value_t > ) );
+    }// if
+    else
+    {
+        auto  D = std::make_unique< dense_tensor3< value_t > >( X.is(0), X.is(1), X.is(2) );
+        
+        detail::to_dense( X, D->tensor() );
+
+        return D;
+    }// if
+}
+
 }}}// namespace hlr::tbb::tensor
 
 #endif // __HLR_TBB_TENSOR_HH
