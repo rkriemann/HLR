@@ -104,7 +104,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "reading from " << cmdline::datafile << term::reset << std::endl;
 
+        tic = timer::now();
+
         X = io::hdf5::read< blas::tensor3< value_t > >( cmdline::datafile );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
     }// if
     else
     {
@@ -135,8 +140,14 @@ program_main ()
     std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
         
     // std::cout << X << std::endl;
+    tic = timer::now();
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
+    toc = timer::since( tic );
+    tic = timer::now();
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
     if ( verbose(2) ) io::hdf5::write( X, "X" );
+    toc = timer::since( tic );
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
     //
     // HOSVD

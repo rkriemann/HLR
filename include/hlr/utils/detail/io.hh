@@ -317,7 +317,7 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
                         const std::string &               filename )
 {
     auto  outname = std::filesystem::path( filename );
-    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk" );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk", std::ios::binary );
 
     #if 1
     
@@ -337,12 +337,44 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
         << "POINT_DATA " << t.size(0) * t.size(1) * t.size(2) << std::endl
         << "SCALARS v float 1" << std::endl
         << "LOOKUP_TABLE default" << std::endl;
-        
+
+    constexpr size_t  bufsize = 65536;
+    std::string       buffer;
+
+    buffer.reserve( bufsize );
+    
     for ( size_t  l = 0; l < t.size(2); ++l )
         for ( size_t  j = 0; j < t.size(1); ++j )
             for ( size_t  i = 0; i < t.size(0); ++i )
-                out << t( i, j, l ) << std::endl;
+            {
+                std::ostringstream  oss;
+                
+                oss << t( i, j, l ) << ' ';
+
+                if ( buffer.length() + oss.str().length() >= bufsize )
+                {
+                    out << buffer;
+                    buffer.resize( 0 );
+                }// if
+
+                buffer.append( oss.str() );
+            }// for
+
+    out << buffer << std::endl;
                                                                          
+    // out << "# vtk DataFile Version 2.0" << std::endl
+    //     << "HLR full tensor" << std::endl
+    //     << "BINARY" << std::endl
+    //     << "DATASET STRUCTURED_POINTS" << std::endl
+    //     << "DIMENSIONS " << t.size(0) << ' ' << t.size(1) << ' ' << t.size(2) << std::endl
+    //     << "ORIGIN 0 0 0" << std::endl
+    //     << "SPACING " << h << ' ' << h << ' ' << h << std::endl
+    //     << "POINT_DATA " << t.size(0) * t.size(1) * t.size(2) << std::endl
+    //     << "SCALARS v float 1" << std::endl
+    //     << "LOOKUP_TABLE default" << std::endl;
+
+    // out.write( reinterpret_cast< const char * >( t.data() ), t.size(0) * t.size(1) * t.size(2) * sizeof(value_t) );
+    
     #else
     
     out << "# vtk DataFile Version 2.0" << std::endl
