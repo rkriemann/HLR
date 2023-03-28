@@ -172,8 +172,8 @@ program_main ()
         if ( verbose(3) ) io::vtk::print( Y, "Y1" );
         if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
-        blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, Y );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( Y, "error1" );
 
@@ -188,8 +188,8 @@ program_main ()
         T1 = std::move( blas::tensor_product( T0,    Z.X_decompressed(1), 1 ) );
         Y  = std::move( blas::tensor_product( T1,    Z.X_decompressed(2), 2 ) );
 
-        blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, Y );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
     }
 
     //
@@ -226,8 +226,8 @@ program_main ()
         if ( verbose(3) ) io::vtk::print( Y, "Y1" );
         if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
-        blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, Y );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( Y, "error1" );
 
@@ -242,8 +242,8 @@ program_main ()
         T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
         Y  = std::move( blas::tensor_product( T1, Z.X_decompressed(2), 2 ) );
 
-        blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y ), blas::norm_F( Y ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, Y );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
     }
 
     //
@@ -271,8 +271,8 @@ program_main ()
         if ( verbose(3) ) io::vtk::print( *Y, "Y2" );
         if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
             
-        blas::add( -1, X, 1, Y->tensor() );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y->tensor() ), blas::norm_F( Y->tensor() ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, 1, Y->tensor() );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( *Y, "error2" );
 
@@ -284,7 +284,7 @@ program_main ()
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
         Y = impl::tensor::to_dense( *H );
-        blas::add( -1, X, 1, Y->tensor() );
-        std::cout << "    error  = " << format_error( blas::norm_F( Y->tensor() ), blas::norm_F( Y->tensor() ) / blas::norm_F( X ) ) << std::endl;
+        impl::blas::add( -1, X, 1, Y->tensor() );
+        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
     }
 }

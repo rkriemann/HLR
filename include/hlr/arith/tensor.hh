@@ -518,7 +518,7 @@ copy ( const tensor3< value_t > &  src,
 using Hpro::BLAS::copy;
 
 template < typename value_t >
-real_type_t< value_t >
+value_t
 dot ( const tensor3< value_t > &  t1,
       const tensor3< value_t > &  t2 )
 {
@@ -526,7 +526,7 @@ dot ( const tensor3< value_t > &  t1,
                     ( t1.size(1) == t2.size(1) ) &&
                     ( t1.size(2) == t2.size(2) ) );
 
-    auto  d = real_type_t< value_t >(0);
+    auto  d = value_t(0);
 
     for ( size_t  l = 0; l < t1.size(2); l++ )
         for ( size_t  j = 0; j < t1.size(1); j++ )
