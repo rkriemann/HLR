@@ -39,67 +39,14 @@ program_main ()
 {
     using value_t = double;
 
-    auto  tic     = timer::now();
-    auto  toc     = timer::since( tic );
-
-    if ( false )
-    {
-        //
-        // some basic testing/debugging
-        //
-        
-        auto  X = blas::tensor3< value_t >( 3, 4, 2 );
-        uint  v = 1;
-
-        for ( uint  l = 0; l < X.size(2); ++l )
-            for ( uint  j = 0; j < X.size(1); ++j )
-                for ( uint  i = 0; i < X.size(0); ++i )
-                    X(i,j,l) = v++;
-
-        print( X );
-
-        auto  X0 = X.unfold( 0 );
-        auto  X1 = X.unfold( 1 );
-        auto  X2 = X.unfold( 2 );
-
-        std::cout << X0 << std::endl;
-        std::cout << X1 << std::endl;
-        std::cout << X2 << std::endl;
-
-        auto  M = blas::matrix< value_t >( 2, 3 );
-
-        v = 1;
-        for ( uint  j = 0; j < M.ncols(); ++j )
-            for ( uint  i = 0; i < M.nrows(); ++i )
-                M(i,j) = v++;
-
-        std::cout << M << std::endl;
-
-        auto  Y = blas::tensor_product( X, M, 0 );
-
-        print( Y );
-
-        auto  acc               = Hpro::fixed_prec( 1e-4 );
-        auto  [ G, Y0, Y1, Y2 ] = blas::hosvd( X, acc );
-
-        print( G );
-        
-        std::cout << Y0 << std::endl;
-        std::cout << Y1 << std::endl;
-        std::cout << Y2 << std::endl;
-
-        auto  W0 = blas::tensor_product( G,  Y0, 0 );
-        auto  W1 = blas::tensor_product( W0, Y1, 1 );
-        auto  W  = blas::tensor_product( W1, Y2, 2 );
-
-        print( W );
-    }
-
-    auto  apx = approx::SVD< value_t >();
-    auto  X   = blas::tensor3< value_t >();
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  apx = approx::RRQR< value_t >();
         
     std::cout << term::bullet << term::bold << "dense tensor" << term::reset << std::endl;
 
+    auto  X = blas::tensor3< value_t >();
+    
     if ( cmdline::datafile != "" )
     {
         std::cout << "  " << term::bullet << term::bold << "reading from " << cmdline::datafile << term::reset << std::endl;
@@ -129,7 +76,7 @@ program_main ()
                 for ( uint  i = 0; i < n; ++i )
                 {
                     // X( i, j, l ) = v++;
-                    X( i, j, l ) = std::sin( 4.0 * i * h ) + std::cos( 2.0 * j * h ) + std::sin( l * h );
+                    X( i, j, l ) = std::sin( 32.0 * i * h ) + std::cos( 16.0 * j * h ) + std::sin( 8.0 * l * h );
                 }// for
             
         toc = timer::since( tic );
@@ -140,14 +87,8 @@ program_main ()
     std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
         
     // std::cout << X << std::endl;
-    tic = timer::now();
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
-    toc = timer::since( tic );
-    tic = timer::now();
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
     if ( verbose(2) ) io::hdf5::write( X, "X" );
-    toc = timer::since( tic );
-    std::cout << "    done in  " << format_time( toc ) << std::endl;
 
     //
     // HOSVD
@@ -166,7 +107,6 @@ program_main ()
             
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
-        // std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
             
         auto  Z  = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
                                                       std::move( G ),
@@ -197,8 +137,8 @@ program_main ()
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
-        T1 = std::move( blas::tensor_product( T0,    Z.X_decompressed(1), 1 ) );
-        Y  = std::move( blas::tensor_product( T1,    Z.X_decompressed(2), 2 ) );
+        T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
+        Y  = std::move( blas::tensor_product( T1, Z.X_decompressed(2), 2 ) );
 
         impl::blas::add( -1, X, Y );
         std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
@@ -221,7 +161,6 @@ program_main ()
             
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
-        // std::cout << "    mem    = " << format_mem( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() ) << std::endl;
             
         auto  Z  = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
                                                       std::move( G ),
