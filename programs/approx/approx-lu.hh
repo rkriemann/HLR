@@ -109,10 +109,11 @@ lu_std_dag ( const Hpro::TMatrix< value_t > &  A,
     
     std::vector< double >  runtime, flops;
 
+    auto  apx    = approx_t();
     auto  tic    = timer::now();
     auto  toc    = timer::since( tic );
     auto  C      = impl::matrix::copy( A );
-    auto  lu_dag = hlr::dag::gen_dag_lu< value_t, approx_t >( *C, nseq, impl::dag::refine );
+    auto  lu_dag = hlr::dag::gen_dag_lu( *C, nseq, impl::dag::refine, apx );
 
     if ( Hpro::verbose( 3 ) )
         lu_dag.print_dot( "lu.dot" );
@@ -228,11 +229,12 @@ lu_accu_dag ( const Hpro::TMatrix< value_t > &  A,
     
     std::vector< double >  runtime, flops;
 
-    auto  tic    = timer::now();
-    auto  toc    = timer::since( tic );
-    auto  C      = impl::matrix::copy( A );
+    auto  apx = approx_t();
+    auto  tic = timer::now();
+    auto  toc = timer::since( tic );
+    auto  C   = impl::matrix::copy( A );
 
-    auto  [ lu_dag, accu_map, accu_mtx ] = hlr::dag::gen_dag_lu_accu_lazy< value_t, approx_t >( *C, nseq, impl::dag::refine );
+    auto  [ lu_dag, accu_map, accu_mtx ] = hlr::dag::gen_dag_lu_accu_lazy( *C, nseq, impl::dag::refine, apx );
 
     if ( Hpro::verbose( 3 ) )
         lu_dag.print_dot( "lu.dot" );

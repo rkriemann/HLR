@@ -50,9 +50,9 @@ mm_error ( const hpro::TLinearOperator< value_t > &  A,
     blas::fill_fn( T, fill_rand );
     blas::scale( value_t(0), S );
     
-    auto  diff  = hpro::matrix_sum( value_t(1), &A, value_t(-1), &B );
+    auto  diff = matrix::sum( 1, A, -1, B );
 
-    diff->apply_add( value_t(1), T, S, apply_normal );
+    diff.apply_add( value_t(1), T, S, apply_normal );
 
     return hlr::norm::spectral( S ) / hlr::norm::spectral( T );
 }
@@ -112,7 +112,7 @@ mm_std ( const hpro::TMatrix< value_t >  &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
+    auto  diff = matrix::sum( 1, *AxA, -1, *C );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -173,7 +173,7 @@ mm_accu ( const hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
+    auto  diff = matrix::sum( 1, *AxA, -1, *C );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
@@ -234,7 +234,7 @@ mm_lazy ( const hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
-    auto  diff = hpro::matrix_sum( value_t(1), AxA.get(), value_t(-1), C.get() );
+    auto  diff = matrix::sum( 1, *AxA, -1, *C );
 
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
     std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
