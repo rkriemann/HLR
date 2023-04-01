@@ -467,7 +467,8 @@ env.Prepend( LIBPATH = [ '.' ] )
 if lapack == 'default' :
     env.Append( LIBS = [ 'lapack', 'blas' ] )
 elif lapack == 'user' :
-    env.MergeFlags( LAPACK_FLAGS )
+    flags = env.ParseFlags( LAPACK_FLAGS )
+    env.MergeFlags( flags )
 elif lapack == 'mkl' or lapack == 'mklomp' :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )

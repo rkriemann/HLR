@@ -68,7 +68,7 @@ lu_std ( const Hpro::TMatrix< value_t > &  A,
         
         LIKWID_MARKER_START( "hlustd" );
             
-        hlr::seq::lu< value_t >( *C, acc, approx );
+        impl::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hlustd" );
             
@@ -188,7 +188,7 @@ lu_accu ( const Hpro::TMatrix< value_t > &  A,
         
         LIKWID_MARKER_START( "hluaccu" );
             
-        hlr::seq::accu::lu< value_t >( *C, acc, approx );
+        impl::accu::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hluaccu" );
             
@@ -309,7 +309,7 @@ lu_lazy ( const Hpro::TMatrix< value_t > &  A,
         
         LIKWID_MARKER_START( "hluaccu" );
             
-        hlr::seq::lazy::lu< value_t >( *C, acc, approx );
+        impl::lazy::lu< value_t >( *C, acc, approx );
 
         LIKWID_MARKER_STOP( "hluaccu" );
             
