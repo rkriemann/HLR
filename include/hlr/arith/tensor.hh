@@ -763,7 +763,7 @@ std::tuple< tensor3< value_t >,
             matrix< value_t >,
             matrix< value_t > >
 sthosvd ( const tensor3< value_t > &  X,
-        const accuracy &            acc )
+          const accuracy &            acc )
 {
     const auto  apx = approx::SVD< value_t >();
 

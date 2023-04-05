@@ -782,32 +782,32 @@ add ( const auto                alpha,
     Hpro::BLAS::add( value_t( alpha ), A, B );
 }
 
-template < matrix_type T_matA,
-           vector_type T_vecX >
-requires ( std::same_as< typename T_matA::value_t, typename T_vecX::value_t > )
-vector< typename T_matA::value_t >
-mulvec ( const T_matA &  A,
-         const T_vecX &  x )
+template < matrix_type matrixA_t,
+           vector_type vectorX_t >
+requires ( std::same_as< typename matrixA_t::value_t, typename vectorX_t::value_t > )
+vector< typename matrixA_t::value_t >
+mulvec ( const matrixA_t &  A,
+         const vectorX_t &  x )
 {
     HLR_DBG_ASSERT( A.ncols() == x.length() );
     
-    return Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x );
+    return Hpro::BLAS::mulvec( typename matrixA_t::value_t(1), A, x );
 }
 
-template < matrix_type T_matA,
-           vector_type T_vecX,
-           vector_type T_vecY >
-requires ( std::same_as< typename T_matA::value_t, typename T_vecX::value_t > &&
-           std::same_as< typename T_matA::value_t, typename T_vecY::value_t > )
+template < matrix_type matrixA_t,
+           vector_type vectorX_t,
+           vector_type vectorY_t >
+requires ( std::same_as< typename matrixA_t::value_t, typename vectorX_t::value_t > &&
+           std::same_as< typename matrixA_t::value_t, typename vectorY_t::value_t > )
 void
-mulvec ( const T_matA &  A,
-         const T_vecX &  x,
-         T_vecY &        y )
+mulvec ( const matrixA_t &  A,
+         const vectorX_t &  x,
+         vectorY_t &        y )
 {
     HLR_DBG_ASSERT( A.ncols() == x.length() );
     HLR_DBG_ASSERT( A.nrows() == y.length() );
     
-    Hpro::BLAS::mulvec( typename T_matA::value_t(1), A, x, typename T_matA::value_t(1), y );
+    Hpro::BLAS::mulvec( typename matrixA_t::value_t(1), A, x, typename matrixA_t::value_t(1), y );
 }
 
 using Hpro::BLAS::mulvec;
@@ -956,58 +956,58 @@ mulvec_lrs ( const T_alpha                    alpha,
 }
 
 template < typename T_beta,
-           matrix_type T_matA,
-           matrix_type T_matB,
-           matrix_type T_matC >
-requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > &&
-           std::same_as< typename T_matA::value_t, typename T_matC::value_t > &&
-           std::convertible_to< T_beta, typename T_matC::value_t > )
+           matrix_type matrixA_t,
+           matrix_type matrixB_t,
+           matrix_type matrixC_t >
+requires ( std::same_as< typename matrixA_t::value_t, typename matrixB_t::value_t > &&
+           std::same_as< typename matrixA_t::value_t, typename matrixC_t::value_t > &&
+           std::convertible_to< T_beta, typename matrixC_t::value_t > )
 void
-prod ( const T_matA &  A,
-       const T_matB &  B,
+prod ( const matrixA_t &  A,
+       const matrixB_t &  B,
        const T_beta    beta,
-       T_matC &        C )
+       matrixC_t &        C )
 {
     HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
                    ( A.nrows() == C.nrows() ) &&
                    ( B.ncols() == C.ncols() ));
     
-    return Hpro::BLAS::prod( typename T_matC::value_t(1), A, B, typename T_matC::value_t(beta), C );
+    return Hpro::BLAS::prod( typename matrixC_t::value_t(1), A, B, typename matrixC_t::value_t(beta), C );
 }
 
 template < typename T_alpha,
            typename T_beta,
-           matrix_type T_matA,
-           matrix_type T_matB,
-           matrix_type T_matC >
-requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > &&
-           std::same_as< typename T_matA::value_t, typename T_matC::value_t > &&
-           std::convertible_to< T_alpha, typename T_matA::value_t > &&
-           std::convertible_to< T_beta,  typename T_matC::value_t > )
+           matrix_type matrixA_t,
+           matrix_type matrixB_t,
+           matrix_type matrixC_t >
+requires ( std::same_as< typename matrixA_t::value_t, typename matrixB_t::value_t > &&
+           std::same_as< typename matrixA_t::value_t, typename matrixC_t::value_t > &&
+           std::convertible_to< T_alpha, typename matrixA_t::value_t > &&
+           std::convertible_to< T_beta,  typename matrixC_t::value_t > )
 void
 prod ( const T_alpha   alpha,
-       const T_matA &  A,
-       const T_matB &  B,
+       const matrixA_t &  A,
+       const matrixB_t &  B,
        const T_beta    beta,
-       T_matC &        C )
+       matrixC_t &        C )
 {
     HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
                    ( A.nrows() == C.nrows() ) &&
                    ( B.ncols() == C.ncols() ));
     
-    return prod( typename T_matC::value_t(alpha), A, B, typename T_matC::value_t(beta), C );
+    return prod( typename matrixC_t::value_t(alpha), A, B, typename matrixC_t::value_t(beta), C );
 }
 
-template < matrix_type T_matA,
-           matrix_type T_matB >
-requires ( std::same_as< typename T_matA::value_t, typename T_matB::value_t > )
-matrix< typename T_matA::value_t >
-prod ( const T_matA &  A,
-       const T_matB &  B )
+template < matrix_type matrixA_t,
+           matrix_type matrixB_t >
+requires ( std::same_as< typename matrixA_t::value_t, typename matrixB_t::value_t > )
+matrix< typename matrixA_t::value_t >
+prod ( const matrixA_t &  A,
+       const matrixB_t &  B )
 {
     HLR_DBG_ASSERT( A.ncols() == B.nrows() );
     
-    return prod( typename T_matA::value_t(1), A, B );
+    return prod( typename matrixA_t::value_t(1), A, B );
 }
 
 using Hpro::BLAS::mulvec;

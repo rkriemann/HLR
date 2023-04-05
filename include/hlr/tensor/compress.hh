@@ -11,6 +11,7 @@
 #include <hlr/tensor/dense_tensor.hh>
 #include <hlr/tensor/tucker_tensor.hh>
 #include <hlr/tensor/structured_tensor.hh>
+#include <hlr/approx/accuracy.hh>
 
 namespace hlr { namespace tensor {
 

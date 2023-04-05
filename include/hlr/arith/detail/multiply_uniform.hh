@@ -21,7 +21,7 @@ multiply ( const value_t                                alpha,
     HLR_ASSERT(( op_A == apply_normal ) || ( op_A == apply_adjoint ));
     
     auto  VB  = blas::prod( blas::adjoint( A.col_basis( op_A ) ), B );
-    auto  SVB = blas::prod( blas::mat_view( op_A, A.coeff() ), VB );
+    auto  SVB = blas::prod( blas::mat_view( op_A, A.coupling() ), VB );
     
     blas::prod( alpha, A.row_basis( op_A ), SVB, value_t(1), C );
 }
@@ -38,7 +38,7 @@ multiply ( const value_t                                alpha,
 
     // A × U·S·V'
     auto  AU  = blas::prod( A, B.row_basis( op_B ) );
-    auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coeff() ) );
+    auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coupling() ) );
     
     blas::prod( alpha, AUS, B.col_basis( op_B ), value_t(1), C );
 }
@@ -66,7 +66,7 @@ multiply ( const value_t                                   alpha,
 
     multiply< value_t >( alpha, op_A, A, UB, UC );
 
-    auto  S  = blas::copy( blas::mat_view( op_B, B.coeff() ) );
+    auto  S  = blas::copy( blas::mat_view( op_B, B.coupling() ) );
     auto  RC = matrix::lrsmatrix< value_t >( C.row_is(), C.col_is(), UC, S, B.col_basis( op_B ) );
     
     hlr::add< value_t >( value_t(1), RC, C, acc, approx );
@@ -92,7 +92,7 @@ multiply ( const value_t                                   alpha,
 
     multiply< value_t >( alpha, op_A, A, UB, UC );
 
-    auto  UxS = blas::prod( UC, blas::mat_view( op_B, B.coeff() ) );
+    auto  UxS = blas::prod( UC, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
 
@@ -122,7 +122,7 @@ multiply ( const value_t                                   alpha,
 
     multiply< value_t >( alpha, op_A, A, UB, UC );
 
-    auto  US      = blas::prod( UC, blas::mat_view( op_B, B.coeff() ) );
+    auto  US      = blas::prod( UC, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -167,7 +167,7 @@ multiply ( const value_t                                   alpha,
     
     // C = C + (( A U ) S) V'
     auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat( A ) ), B.row_basis( op_B ) );
-    auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coeff() ) );
+    auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -193,7 +193,7 @@ multiply ( const value_t                                   alpha,
 
     // C + A × B = C + ((A × U)·S)·V'
     auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat( A ) ), B.row_basis( op_B ) );
-    auto  AUS = blas::prod( alpha, AU, blas::mat_view( op_B, B.coeff() ) );
+    auto  AUS = blas::prod( alpha, AU, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -293,7 +293,7 @@ multiply ( const value_t                                   alpha,
 
     multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
 
-    auto  UxS = blas::prod( A.row_basis( op_A ), blas::mat_view( op_A, A.coeff() ) );
+    auto  UxS = blas::prod( A.row_basis( op_A ), blas::mat_view( op_A, A.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
 
@@ -323,7 +323,7 @@ multiply ( const value_t                                   alpha,
 
     multiply< value_t >( alpha, blas::adjoint( op_B ), B, VA, VC );
 
-    auto  VxS     = blas::prod( VC, blas::mat_view( blas::adjoint( op_A ), A.coeff() ) );
+    auto  VxS     = blas::prod( VC, blas::mat_view( blas::adjoint( op_A ), A.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -368,7 +368,7 @@ multiply ( const value_t                                   alpha,
     
     // C = C + U·(S·(V'×B))
     auto  VB  = blas::prod( blas::adjoint( A.col_basis( op_A ) ), blas::mat_view( op_B, blas::mat( B ) ) );
-    auto  SVB = blas::prod( blas::mat_view( op_A, A.coeff() ), VB );
+    auto  SVB = blas::prod( blas::mat_view( op_A, A.coupling() ), VB );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -394,7 +394,7 @@ multiply ( const value_t                                   alpha,
 
     // C + A × B = C + U·(S·(V' × B)) -> (B' × V)·S'
     auto  BV  = blas::prod( blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ), A.col_basis( op_A ) );
-    auto  BVS = blas::prod( alpha, BV, blas::mat_view( blas::adjoint( op_A ), A.coeff() ) );
+    auto  BVS = blas::prod( alpha, BV, blas::mat_view( blas::adjoint( op_A ), A.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
     
@@ -490,8 +490,8 @@ multiply ( const value_t                                   alpha,
     
     // C = C + A×B = C + (U·((S·(V' × W))·T))·X'
     auto  VW    = blas::prod( blas::adjoint( A.col_basis( op_A ) ), B.row_basis( op_B ) );
-    auto  SVW   = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
-    auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coeff() ) );
+    auto  SVW   = blas::prod( blas::mat_view( op_A, A.coupling() ), VW );
+    auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coupling() ) );
     auto  USVWT = blas::prod( A.row_basis( op_A ), SVWT );
 
     std::scoped_lock  lock( C.mutex() );
@@ -521,8 +521,8 @@ multiply ( const value_t                                   alpha,
 
     {
         auto  VW    = blas::prod( blas::adjoint( A.col_basis( op_A ) ), B.row_basis( op_B ) );
-        auto  SVW   = blas::prod( blas::mat_view( op_A, A.coeff() ), VW );
-        auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coeff() ) );
+        auto  SVW   = blas::prod( blas::mat_view( op_A, A.coupling() ), VW );
+        auto  SVWT  = blas::prod( SVW, blas::mat_view( op_B, B.coupling() ) );
 
         T = std::move( blas::prod( alpha, A.row_basis( op_A ), SVWT ) );
     }

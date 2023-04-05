@@ -104,7 +104,7 @@ public:
         #endif
     }
 
-        void
+    void
     set_matrix ( const blas::matrix< value_t > &  aM )
     {
         HLR_ASSERT(( this->nrows() == aM.nrows() ) && ( this->ncols() == aM.ncols() ));

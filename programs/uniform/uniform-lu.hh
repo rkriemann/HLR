@@ -197,7 +197,7 @@ program_main ()
         runtime.clear();
     }// if
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
                 

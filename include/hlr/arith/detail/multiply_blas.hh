@@ -128,6 +128,15 @@ multiply ( const value_t                        alpha,
     multiply( alpha, op_A, U, V, B, C );
 }
 
+// defined in multiply_uniform but referenced here
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const Hpro::matop_t                          op_A,
+           const matrix::uniform_lrmatrix< value_t > &  A,
+           const blas::matrix< value_t > &              B,
+           blas::matrix< value_t > &                    C );
+
 template < typename value_t >
 void
 multiply ( const value_t                          alpha,
@@ -311,6 +320,15 @@ multiply ( const value_t                        alpha,
 
     multiply( alpha, A, op_B, U, V, C );
 }
+
+// defined in multiply_uniform but referenced here
+template < typename value_t >
+void
+multiply ( const value_t                                alpha,
+           const blas::matrix< value_t > &              A,
+           const Hpro::matop_t                          op_B,
+           const matrix::uniform_lrmatrix< value_t > &  B,
+           blas::matrix< value_t > &                    C );
 
 template < typename value_t >
 void

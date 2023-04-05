@@ -201,6 +201,15 @@ public:
         _S = std::move( aS );
     }
 
+    // rename coeff by coupling
+    blas::matrix< value_t > &        coupling ()       { return _S; }
+    const blas::matrix< value_t > &  coupling () const { return _S; }
+    hlr::blas::matrix< value_t >     coupling_decompressed () const { return coeff_decompressed(); }
+
+    void set_coupling ( const blas::matrix< value_t > &  aS ) { set_coeff( aS ); }
+    void set_coupling ( blas::matrix< value_t > &&       aS ) { set_coeff( std::move( aS ) ); }
+    
+
     // set coupling matrix without bases consistency check
     // (because cluster bases need to be adjusted later)
     void

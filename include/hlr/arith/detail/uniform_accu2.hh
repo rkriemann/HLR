@@ -263,7 +263,7 @@ struct accumulator
             }// for
         
             //
-            // first uniform x uniform only as only coefficients need to be added without
+            // first uniform x uniform as only coefficients need to be added without
             // truncation due to shared bases:
             //
             //   U ( Σ_i S_i X_i' W_i T_i ) V' = U R V'  with R = Σ_i S_i X_i' W_i T_i
@@ -383,15 +383,14 @@ struct accumulator
                     //
                     if ( is_null( matrix ) )
                         matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                      std::move( blas::prod( alpha, U, R ) ),
-                                                                      std::move( blas::copy( V ) ) );
+                                                                                 std::move( blas::prod( alpha, U, R ) ),
+                                                                                 std::move( blas::copy( V ) ) );
                     else
                     {
                         auto  US = blas::prod( alpha, U, R );
                         auto  T  = Hpro::TRkMatrix( M.row_is(), M.col_is(), US, V );
                 
                         hlr::add( alpha, T, *matrix, acc, approx );
-
                     }// else
                 }// else
             }// if

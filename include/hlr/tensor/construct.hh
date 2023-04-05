@@ -11,6 +11,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
 #include <hlr/approx/traits.hh>
+#include <hlr/approx/accuracy.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 #include <hlr/tensor/dense_tensor.hh>
@@ -34,7 +35,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                             const indexset &                  is1,
                             const indexset &                  is2,
                             const blas::tensor3< value_t > &  D,
-                            const accuracy &                  acc,
+                            const tensor_accuracy &           acc,
                             const approx_t &                  approx,
                             const size_t                      ntile )
 {
@@ -44,10 +45,12 @@ build_hierarchical_tucker ( const indexset &                  is0,
         // build leaf
         //
 
-        if ( ! acc.is_exact() )
+        const auto  lacc = acc( is0, is1, is2 );
+
+        if ( ! lacc.is_exact() )
         {
             auto  Dc                = blas::copy( D );  // do not modify D (!)
-            auto  [ G, X0, X1, X2 ] = blas::sthosvd( Dc, acc, approx );
+            auto  [ G, X0, X1, X2 ] = blas::sthosvd( Dc, lacc, approx );
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
@@ -127,7 +130,7 @@ template < typename                    value_t,
            approx::approximation_type  approx_t >
 std::unique_ptr< base_tensor3< value_t > >
 build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
-                            const accuracy &                  acc,
+                            const tensor_accuracy &           acc,
                             const approx_t &                  approx,
                             const size_t                      ntile )
 {

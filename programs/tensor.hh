@@ -23,12 +23,22 @@
 
 using namespace hlr;
 
-template < typename value_t >
-void
-print ( const tensor::dense_tensor3< value_t > &  t )
+struct local_accuracy : public hlr::tensor_accuracy
 {
-    print( t.tensor() );
-}
+    local_accuracy ( const double  abs_eps )
+            : tensor_accuracy( hlr::frobenius_norm, abs_eps )
+    {}
+    
+    virtual
+    const hlr::tensor_accuracy
+    acc ( const indexset &  is0,
+          const indexset &  is1,
+          const indexset &  is2 ) const
+    {
+        return Hpro::absolute_prec( abs_eps() * std::pow( double(is0.size()) * double(is1.size()) * double(is2.size()), 0.333 ) );
+    }
+    using accuracy::acc;
+};
 
 //
 // main function
@@ -41,7 +51,7 @@ program_main ()
 
     auto  tic = timer::now();
     auto  toc = timer::since( tic );
-    auto  apx = approx::RRQR< value_t >();
+    auto  apx = approx::SVD< value_t >();
         
     std::cout << term::bullet << term::bold << "dense tensor" << term::reset << std::endl;
 
@@ -85,6 +95,10 @@ program_main ()
         
     std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
     std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
+
+    const auto  norm_X = impl::blas::norm_F( X );
+    
+    std::cout << "    |X|_F  = " << format_norm( norm_X ) << std::endl;
         
     // std::cout << X << std::endl;
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
@@ -100,7 +114,7 @@ program_main ()
 
         tic = timer::now();
         
-        auto  acc               = Hpro::fixed_prec( cmdline::eps );
+        auto  acc               = Hpro::fixed_prec( Hpro::frobenius_norm, cmdline::eps );
         auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
             
         toc = timer::since( tic );
@@ -125,13 +139,16 @@ program_main ()
         if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
         impl::blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
+
+        auto  norm_Y = impl::blas::norm_F( Y );
+        
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( Y, "error1" );
 
         std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
 
-        Z.compress( acc );
+        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -141,7 +158,8 @@ program_main ()
         Y  = std::move( blas::tensor_product( T1, Z.X_decompressed(2), 2 ) );
 
         impl::blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
+        norm_Y = impl::blas::norm_F( Y );
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
     }
 
     //
@@ -154,7 +172,7 @@ program_main ()
 
         tic = timer::now();
         
-        auto  acc               = Hpro::fixed_prec( cmdline::eps );
+        auto  acc               = Hpro::fixed_prec( Hpro::frobenius_norm, cmdline::eps );
         auto  [ G, X0, X1, X2 ] = blas::sthosvd( X, acc, apx );
             
         toc = timer::since( tic );
@@ -179,7 +197,10 @@ program_main ()
         if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
             
         impl::blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
+
+        auto  norm_Y = impl::blas::norm_F( Y );
+        
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( Y, "error1" );
 
@@ -195,7 +216,8 @@ program_main ()
         Y  = std::move( blas::tensor_product( T1, Z.X_decompressed(2), 2 ) );
 
         impl::blas::add( -1, X, Y );
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y ), impl::blas::norm_F( Y ) / impl::blas::norm_F( X ) ) << std::endl;
+        norm_Y = impl::blas::norm_F( Y );
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
     }
 
     //
@@ -207,7 +229,8 @@ program_main ()
 
         tic = timer::now();
         
-        auto  acc = Hpro::fixed_prec( cmdline::eps );
+        // auto  acc = local_accuracy( norm_X * cmdline::eps / double( std::max({ X.size(0), X.size(1), X.size(2) }) ) );
+        auto  acc = fixed_prec( cmdline::eps * norm_X / 3.0 ) );
         auto  H   = impl::tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
             
         toc = timer::since( tic );
@@ -224,7 +247,10 @@ program_main ()
         if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
             
         impl::blas::add( -1, X, Y->tensor() );
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
+
+        auto  norm_Y = impl::blas::norm_F( Y->tensor() );
+        
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
             
         if ( verbose(3) ) io::vtk::print( *Y, "error2" );
 
@@ -232,7 +258,7 @@ program_main ()
 
         tic = timer::now();
 
-        impl::tensor::compress( *H, acc );
+        impl::tensor::compress( *H, Hpro::fixed_prec( cmdline::eps ) );
 
         toc = timer::since( tic );
         
@@ -240,19 +266,9 @@ program_main ()
         std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
-        tic = timer::now();
-        
         Y = impl::tensor::to_dense( *H );
-
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        
-        tic = timer::now();
-
         impl::blas::add( -1, X, Y->tensor() );
-
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    error  = " << format_error( impl::blas::norm_F( Y->tensor() ), impl::blas::norm_F( Y->tensor() ) / impl::blas::norm_F( X ) ) << std::endl;
+        norm_Y = impl::blas::norm_F( Y->tensor() );
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
     }
 }
