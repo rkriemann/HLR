@@ -1797,13 +1797,13 @@ struct rec_uniform_construction
             {
                 M = coeff.build( bct->is().row_is(), bct->is().col_is() );
 
-                if ( is_dense( *M ) )
-                {
-                    auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                    auto  DD = blas::copy( blas::mat( D ) );
+                // if ( is_dense( *M ) )
+                // {
+                //     auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                //     auto  DD = blas::copy( blas::mat( D ) );
 
-                    return  M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
-                }// if
+                //     return  M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+                // }// if
             }// else
         }// if
         else
@@ -1963,10 +1963,14 @@ struct rec_uniform_construction
         }// if
         else if ( is_dense( A ) )
         {
-            auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
-            auto  DD = blas::copy( blas::mat( D ) );
+            HLR_ASSERT( ! compress::is_compressible( A ) );
 
-            return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+            M = A.copy();
+
+            // auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
+            // auto  DD = blas::copy( blas::mat( D ) );
+
+            // return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
         }// if
         else
         {
