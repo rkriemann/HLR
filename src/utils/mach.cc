@@ -19,6 +19,12 @@
 #include <fstream>
 #include <sstream>
 
+//
+// in case of MKL: make it think an Intel CPU is running
+// (for AMD processors)
+//
+extern "C" { int mkl_serv_intel_cpu_true () { return 1; } }
+
 namespace hlr { namespace mach
 {
 
