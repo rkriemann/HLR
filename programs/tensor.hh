@@ -41,6 +41,43 @@ struct local_accuracy : public hlr::tensor_accuracy
 };
 
 //
+// construct X as
+//                                        1
+//    X_ijl = V(x^ijl) =    Σ    ───────────────────
+//                       0≤i<j<3 |x^ijl_i - x^ijl_j|
+//
+template < typename value_t >
+blas::tensor3< value_t >
+coulomb_cost ( const size_t  n )
+{
+    // Ω = [0,1]³
+    const double  h = 1.0 / (n-1);
+    auto          X = blas::tensor3< value_t >( n, n, n );
+
+    for ( size_t  l = 0; l < n; ++l )
+    {
+        const double  x_2 = l * h;
+        
+        for ( size_t  j = 0; j < n; ++j )
+        {
+            const double  x_1 = j * h;
+        
+            for ( size_t  i = 0; i < n; ++i )
+            {
+                const double  x_0 = i * h;
+
+                if (( i != j ) && ( j != l ) && ( i != l ))
+                    X(i,j,l) = ( 1.0 / std::abs( x_0 - x_1 ) +
+                                 1.0 / std::abs( x_0 - x_2 ) +
+                                 1.0 / std::abs( x_1 - x_2 ) );
+            }// for
+        }// for
+    }// for
+    
+    return X;
+}
+
+//
 // main function
 //
 template < typename problem_t >
@@ -70,28 +107,34 @@ program_main ()
     }// if
     else
     {
-        std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
-            
-        const size_t  n = cmdline::n;
-        const auto    π = std::numbers::pi;
-        const double  h = π / double(n-1);
-        // double        v = 1.0;
-            
-        X = std::move( blas::tensor3< value_t >( n, n, n ) );
-            
-        tic = timer::now();
+        std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
 
-        for ( uint  l = 0; l < n; ++l )
-            for ( uint  j = 0; j < n; ++j )
-                for ( uint  i = 0; i < n; ++i )
-                {
-                    // X( i, j, l ) = v++;
-                    X( i, j, l ) = std::sin( 32.0 * i * h ) + std::cos( 16.0 * j * h ) + std::sin( 8.0 * l * h );
-                }// for
+        X = std::move( coulomb_cost< value_t >( n ) );
+    }// if
+    // else
+    // {
+    //     std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
             
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-    }// else
+    //     const size_t  n = cmdline::n;
+    //     const auto    π = std::numbers::pi;
+    //     const double  h = π / double(n-1);
+    //     // double        v = 1.0;
+            
+    //     X = std::move( blas::tensor3< value_t >( n, n, n ) );
+            
+    //     tic = timer::now();
+
+    //     for ( uint  l = 0; l < n; ++l )
+    //         for ( uint  j = 0; j < n; ++j )
+    //             for ( uint  i = 0; i < n; ++i )
+    //             {
+    //                 // X( i, j, l ) = v++;
+    //                 X( i, j, l ) = std::sin( 32.0 * i * h ) + std::cos( 16.0 * j * h ) + std::sin( 8.0 * l * h );
+    //             }// for
+            
+    //     toc = timer::since( tic );
+    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
+    // }// else
         
     std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
     std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
@@ -100,7 +143,6 @@ program_main ()
     
     std::cout << "    |X|_F  = " << format_norm( norm_X ) << std::endl;
         
-    // std::cout << X << std::endl;
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
     if ( verbose(2) ) io::hdf5::write( X, "X" );
 

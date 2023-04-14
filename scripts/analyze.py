@@ -3,6 +3,7 @@
 import pdb
 import sys, os
 import re
+import getopt
 
 ######################################################################
 #
@@ -144,10 +145,31 @@ def read_data ( filename ) :
 
 ######################################################################
 ##
-## read all logs
+## eval command line
 ##
 
-logfiles = sys.argv[1:]
+opts, args = getopt.getopt( sys.argv[1:], 'ho:', [ 'help', 'output=' ] )
+for o, a in opts:
+    if o in ( '-o', '--output' ):
+        if a not in [ 'text', 'html', 'pdf' ] :
+            print( 'unsupported output format: ', a )
+            print( 'supported formats: text, html, pdf' )
+            sys.exit( 1 )
+        output_format = a
+    elif o in ( '-h', '--help' ):
+        print( 'analyze: [options] logfile1 logfile2 ...' )
+        print( 'options:' )
+        print( '   -h, --help   : show this info' )
+        print( '   -o, --output : output format (text,html,pdf)' )
+        sys.exit( 0 )
+
+# rest are logfiles
+logfiles = args
+
+######################################################################
+##
+## read all logs
+##
 
 DB = {}
 
@@ -287,6 +309,12 @@ for app in applications :
 ##
 ######################################################################
 
+##################################################
+#
+# text output
+#
+##################################################
+
 if output_format == 'text' :
     min_time_style = colors['bold'] + colors['red']
 
@@ -386,7 +414,13 @@ if output_format == 'text' :
             if prog != programs[-1] :
                 print()
 
-elif output_format == 'html' :
+##################################################
+#
+# HTML output
+#
+##################################################
+
+if output_format == 'html' :
 
     for app in applications :
 
@@ -451,7 +485,13 @@ elif output_format == 'html' :
 
             print( '</table>' )
 
-elif output_format == 'matplotlib' :
+##################################################
+#
+# PDF output via matplotlib
+#
+##################################################
+
+if output_format == 'pdf' :
 
     import matplotlib as mpl
 
@@ -482,12 +522,16 @@ elif output_format == 'matplotlib' :
     import matplotlib.pyplot as plt
     from   matplotlib.backends.backend_pdf import PdfPages
 
-    colorscheme = [ '#7c6f64',  # gray
-                    '#cc241d',  # red
-                    '#458588',  # blue
-                    '#98971a',  # green
-                    '#b16286',  # orange
-                    '#d3869b' ] # purple
+    colorscheme = [ '#000000', # black
+                    '#cc0000', # scarletred2
+                    '#3465a4', # skyblue2
+                    '#4e9a06', # chameleon3
+                    '#f57900', # orange2
+                    '#75507b', # plum2
+                    '#c17d11', # chocolate2
+                    '#edd400', # butter2
+                    '#83a598', # faded aqua
+                   ]
     blas_colors = { 'mkl'      : colorscheme[1],
                     'blis'     : colorscheme[2],
                     'openblas' : colorscheme[3],

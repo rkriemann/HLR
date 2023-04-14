@@ -148,6 +148,8 @@ cpu ()
         else if (( pos + 5  <= nlen) && (model_name.substr( pos,   5 ) == " Core"      )) pos += 4;
         else if (( pos + 4  <= nlen) && (model_name.substr( pos,   4 ) == " CPU"       )) pos += 3;
         else if (( pos + 10 <= nlen) && (model_name.substr( pos,  10 ) == " Processor" )) pos += 9;
+        else if (( pos + 4  <= nlen) && (model_name.substr( pos,   4 ) == " PRO"       )) pos += 3;
+        else if (( pos + 21 <= nlen) && (model_name.substr( pos,  21 ) == " with Radeon Graphics" )) pos += 20;
         else if (( pos + 2  <= nlen) && (model_name.substr( pos,   2 ) == " @"         )) pos = nlen;
         else
             cpu += model_name[ pos ];
