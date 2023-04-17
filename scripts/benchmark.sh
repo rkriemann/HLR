@@ -436,6 +436,10 @@ fi
 
 if [[ $DRY_RUN == 0 ]]; then
 
+    echo
+    echo "updating HLR"
+    echo
+    
     git pull
 
     if [ "$?" != "0" ]; then
@@ -507,6 +511,9 @@ if [[ $DRY_RUN == 0 ]]; then
     fi
     
 fi
+
+# stop if only building required
+[[ $JUST_BUILD == 1 ]] && ( exit 0 )
 
 ######################################################################
 ##

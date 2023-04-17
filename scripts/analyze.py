@@ -451,6 +451,9 @@ if output_format == 'html' :
                 old_proc = ''
                 for proc in processors :
 
+                    if fwork not in DB[proc][app][prog].keys() :
+                        continue
+                    
                     if (( old_prog  != '' and prog  != old_prog  ) or
                         ( old_fwork != '' and fwork != old_fwork )) :
                         print( '  <tr style="border-top: 3px solid #888a85;">' )
@@ -548,6 +551,10 @@ if output_format == 'pdf' :
 
                 nplot = 0
                 for proc in processors :
+
+                    if fwork not in DB[proc][app][prog].keys() :
+                        continue
+                
                     pos     = 0
                     y_pos   = []
                     y_label = []
