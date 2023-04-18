@@ -318,6 +318,19 @@ for app in applications :
 if output_format == 'text' :
     min_time_style = colors['bold'] + colors['red']
 
+    # maximal length of processor names
+    proc_len = 0
+    for proc in processors :
+        proc_len = max( proc_len, len(proc) )
+
+    # header and format strings for processors
+    proc_hdr = ''
+    proc_spc = ''
+    for i in range(proc_len+2) : # +2 for spaces left/right
+        proc_hdr += '─'
+        proc_spc += ' '
+    proc_fmt = '%%%ds' % proc_len
+                       
     for app in applications :
 
         if app != applications[0] :
@@ -337,8 +350,8 @@ if output_format == 'text' :
         
         for prog in programs :
 
-            tophdr  = '───────────┬─────────────────╥'
-            midhdr  = '───────────┼─────────────────╫'
+            tophdr  = '───────────┬' + proc_hdr + '╥'
+            midhdr  = '───────────┼' + proc_hdr + '╫'
             for blas in blass[:-1] :
                 tophdr  += '──────────┬'
                 midhdr  += '──────────┼'
@@ -347,10 +360,10 @@ if output_format == 'text' :
 
             print( add_style( f'{prog}', colors['bold'] ) )
             print( tophdr )
-            print( ' Framework │        CPU      ║', end = '' )
+            print( ' Framework │' + ' {0:^{n}} '.format( 'CPU', n = proc_len ) + '║', end = '' )
             for blas in blass[:-1] :
-                print( ' %8s │' % name_mapping[blas] , end = '' )
-            print( ' %8s ║    Best  ' % name_mapping[blass[-1]] )
+                print( ' {0:^8} │'.format( name_mapping[blas] ), end = '' )
+            print( ' {0:^8} ║    Best  '.format( name_mapping[blass[-1]] ) )
             print( midhdr )
 
             old_fwork = ''
@@ -377,9 +390,9 @@ if output_format == 'text' :
                         old_fwork = fwork
         
                     if proc == old_proc :
-                        print( "                 ║", end = '' )
+                        print( proc_spc + '║', end = '' )
                     else :
-                        print( " %15s ║" % proc, end = '' )
+                        print( ' {0:{n}} '.format( proc, n = proc_len ) + '║', end = '' )
                         old_proc = proc
 
                     # style for data entries
