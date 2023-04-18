@@ -501,9 +501,10 @@ if output_format == 'pdf' :
     theme = { 'text.usetex'           : False,
               'font.family'           : 'Roboto Condensed',
               'figure.facecolor'      : "#ffffff",
-              'axes.titlesize'        : 16,
+              'figure.titlesize'      : 16,
+              'axes.titlesize'        : 20,
               'axes.titlelocation'    : 'center',
-              'axes.labelsize'        : 14,
+              'axes.labelsize'        : 16,
               'axes.labelcolor'       : "#000000",
               'axes.facecolor'        : "#fdfdf6",
               'lines.markeredgewidth' : 0.0,
@@ -512,15 +513,15 @@ if output_format == 'pdf' :
               'lines.linewidth'       : 3,
               'legend.fontsize'       : 16,
               'legend.framealpha'     : 1.0,
-              'xtick.labelsize'       : 14,
-              'ytick.labelsize'       : 14,
+              'xtick.labelsize'       : 16,
+              'ytick.labelsize'       : 16,
               'figure.figsize'        : ( 8, 7 )
              }
     
     mpl.use( 'Agg' )
     mpl.rcParams.update( theme )     
 
-    annotate_size = 8
+    annotate_size = 16
 
     import matplotlib.pyplot as plt
     from   matplotlib.backends.backend_pdf import PdfPages
@@ -547,7 +548,7 @@ if output_format == 'pdf' :
                 
                 plt.figure( nfig )
                 nfig += 1
-                fig, axs = plt.subplots( len(processors), sharex = True, figsize = ( 8, 0.4 * len(processors) * ( len(blass) + 1 ) ) )
+                fig, axs = plt.subplots( len(processors), sharex = True, figsize = ( 8, 0.6 * len(processors) * ( len(blass) + 1 ) ) )
 
                 nplot = 0
                 for proc in processors :

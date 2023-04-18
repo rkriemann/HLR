@@ -220,8 +220,9 @@ if [[ $DRY_RUN == 0 && $BLAS_IMPL =~ openblas ]]; then
         TARGET=HASWELL
 
         case $ARCH in
-            znver*) TARGET=ZEN ;;
-            *)      TARGET=HASWELL ;;
+            znver*)         TARGET=ZEN      ;;
+            icelake-server) TARGET=SKYLAKEX ;;
+            *)              TARGET=HASWELL  ;;
         esac
 
         make TARGET=$TARGET USE_THREAD=0 USE_LOCKING=1 NO_LAPACK=1
