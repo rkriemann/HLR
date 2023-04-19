@@ -770,25 +770,27 @@ sthosvd ( const tensor3< value_t > &  X,
     return sthosvd( X, acc, apx );
 }
 
-template < typename  value_t >
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
 std::tuple< tensor3< value_t >,
             matrix< value_t >,
             matrix< value_t >,
             matrix< value_t > >
 greedy_hosvd ( const tensor3< value_t > &  X,
-               const accuracy &            acc )
+               const accuracy &            acc,
+               const approx_t &            apx )
 {
     auto  X0         = X.unfold( 0 );
     auto  [ U0, S0 ] = apx.column_basis( X0 );
-    auto  k0         = acc.trunc_acc( S0 );
+    auto  k0         = acc.trunc_rank( S0 );
 
     auto  X1         = X.unfold( 1 );
     auto  [ U1, S1 ] = apx.column_basis( X1 );
-    auto  k1         = acc.trunc_acc( S1 );
+    auto  k1         = acc.trunc_rank( S1 );
 
     auto  X2         = X.unfold( 2 );
     auto  [ U2, S2 ] = apx.column_basis( X2 );
-    auto  k2         = acc.trunc_acc( S2 );
+    auto  k2         = acc.trunc_rank( S2 );
 
     auto  error = value_t(0);
 

@@ -155,8 +155,10 @@ program_main ()
         std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
 
         tic = timer::now();
-        
-        auto  acc               = absolute_prec( Hpro::frobenius_norm, cmdline::eps / std::sqrt( double(3) ) );
+
+        auto  dim_fac           = 1.0 / std::sqrt( 3.0 );
+        auto  tol               = cmdline::eps * dim_fac / norm_X;
+        auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
         auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
             
         toc = timer::since( tic );
@@ -214,7 +216,9 @@ program_main ()
 
         tic = timer::now();
         
-        auto  acc               = absolute_prec( Hpro::frobenius_norm, cmdline::eps / std::sqrt( double(3) ) );
+        auto  dim_fac           = 1.0 / std::sqrt( 3.0 );
+        auto  tol               = cmdline::eps * dim_fac / norm_X;
+        auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
         auto  [ G, X0, X1, X2 ] = blas::sthosvd( X, acc, apx );
             
         toc = timer::since( tic );

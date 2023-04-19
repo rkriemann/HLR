@@ -612,7 +612,7 @@ struct SVD
                 E(i) = perm[i].first;
 
             // better: permute V
-            auto  Vk = blas::matrix< value_t >( V.nrows(), k );
+            auto  Vk = blas::matrix< value_t >( V.nrows(), V.ncols() );
             
             for ( uint  i = 0; i < V.ncols(); ++i )
             {

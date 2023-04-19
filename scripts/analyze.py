@@ -329,17 +329,10 @@ for app in applications :
 if output_format == 'text' :
     min_time_style = colors['bold'] + colors['red']
 
-    # maximal length of processor names
-    proc_len = 0
-    for proc in processors :
-        proc_len = max( proc_len, len(proc) )
-
     # header and format strings for processors
-    proc_hdr = ''
-    proc_spc = ''
-    for i in range(proc_len+2) : # +2 for spaces left/right
-        proc_hdr += '─'
-        proc_spc += ' '
+    proc_len = max( [ len(s) for s in processors ] )
+    proc_hdr = '{:─<{n}}'.format( '', n = proc_len+2 )
+    proc_spc = '{: <{n}}'.format( '', n = proc_len+2 )
     proc_fmt = '%%%ds' % proc_len
                        
     for app in applications :
