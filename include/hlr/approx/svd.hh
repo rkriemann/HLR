@@ -584,6 +584,79 @@ struct SVD
             return  blas::prod( M, Uk );
         }// else
     }
+
+    //
+    // compute column basis and return basis and singular values
+    //
+    
+    std::pair< blas::matrix< value_t >,
+               blas::vector< typename Hpro::real_type_t< value_t > > >
+    column_basis ( blas::matrix< value_t > &  M ) const
+    {
+        if ( M.ncols() > 2 * M.nrows() )
+        {
+            //
+            // compute eigenvalues and eigenvectors of M·M'
+            //
+            
+            auto  G        = blas::prod( M, blas::adjoint( M ) );
+            auto  [ V, E ] = blas::eigen_herm( G );
+            auto  perm     = std::vector< std::pair< value_t, uint > >( E.length() );
+            
+            for ( uint  i = 0; i < E.length(); ++i )
+                perm.push_back({ E(i), i });
+            
+            std::sort( perm.begin(), perm.end(), [] ( auto  a, auto b ) { return a.first > b.first; } );
+            
+            for ( uint  i = 0; i < E.length(); ++i )
+                E(i) = perm[i].first;
+
+            // better: permute V
+            auto  Vk = blas::matrix< value_t >( V.nrows(), k );
+            
+            for ( uint  i = 0; i < V.ncols(); ++i )
+            {
+                auto  v1 = V.column( perm[i].second );
+                auto  v2 = Vk.column( i );
+                
+                copy( v1, v2 );
+            }// for
+
+            return { std::move(Vk), std::move(E) };
+        }// if
+        else if ( M.ncols() > M.nrows() / 2 )
+        {
+            //
+            // directly use first k column of U from M = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  S = blas::vector< real_t >();
+
+            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+        
+            blas::svd( M, S );
+
+            return  { std::move(blas::copy( M )), std::move(S) };
+        }// if
+        else
+        {
+            //
+            // M = Q·R = Q·U·S·V' with R = U·S·V'
+            // - V can be omitted as is does not contribute to basis
+            //
+            
+            auto  R = blas::matrix< value_t >();
+
+            blas::qr( M, R );
+
+            auto  S = blas::vector< real_t >();
+
+            blas::svd( R, S );
+            
+            return  { std::move(blas::prod( M, R )), std::move( S ) };
+        }// else
+    }
 };
 
 template < typename T_value >

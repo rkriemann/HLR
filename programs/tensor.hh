@@ -105,36 +105,36 @@ program_main ()
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
     }// if
-    else
-    {
-        std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
-
-        X = std::move( coulomb_cost< value_t >( n ) );
-    }// if
     // else
     // {
-    //     std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
-            
-    //     const size_t  n = cmdline::n;
-    //     const auto    π = std::numbers::pi;
-    //     const double  h = π / double(n-1);
-    //     // double        v = 1.0;
-            
-    //     X = std::move( blas::tensor3< value_t >( n, n, n ) );
-            
-    //     tic = timer::now();
+    //     std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
 
-    //     for ( uint  l = 0; l < n; ++l )
-    //         for ( uint  j = 0; j < n; ++j )
-    //             for ( uint  i = 0; i < n; ++i )
-    //             {
-    //                 // X( i, j, l ) = v++;
-    //                 X( i, j, l ) = std::sin( 32.0 * i * h ) + std::cos( 16.0 * j * h ) + std::sin( 8.0 * l * h );
-    //             }// for
+    //     X = std::move( coulomb_cost< value_t >( n ) );
+    // }// if
+    else
+    {
+        std::cout << "  " << term::bullet << term::bold << "building tensor" << term::reset << std::endl;
             
-    //     toc = timer::since( tic );
-    //     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    // }// else
+        const size_t  n = cmdline::n;
+        const auto    π = std::numbers::pi;
+        const double  h = π / double(n-1);
+        // double        v = 1.0;
+            
+        X = std::move( blas::tensor3< value_t >( n, n, n ) );
+            
+        tic = timer::now();
+
+        for ( uint  l = 0; l < n; ++l )
+            for ( uint  j = 0; j < n; ++j )
+                for ( uint  i = 0; i < n; ++i )
+                {
+                    // X( i, j, l ) = v++;
+                    X( i, j, l ) = std::sin( 32.0 * i * h ) + std::cos( 16.0 * j * h ) + std::sin( 8.0 * l * h );
+                }// for
+            
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+    }// else
         
     std::cout << "    dims   = " << term::bold << X.size(0) << " × " << X.size(1) << " × " << X.size(2) << term::reset << std::endl;
     std::cout << "    mem    = " << format_mem( X.byte_size() ) << std::endl;
@@ -150,13 +150,13 @@ program_main ()
     // HOSVD
     //
     
-    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 256 )
+    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
     {
         std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
 
         tic = timer::now();
         
-        auto  acc               = Hpro::fixed_prec( Hpro::frobenius_norm, cmdline::eps );
+        auto  acc               = absolute_prec( Hpro::frobenius_norm, cmdline::eps / std::sqrt( double(3) ) );
         auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
             
         toc = timer::since( tic );
@@ -208,13 +208,13 @@ program_main ()
     // ST-HOSVD
     //
 
-    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 256 )
+    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
     {
         std::cout << term::bullet << term::bold << "ST-HOSVD" << term::reset << std::endl;
 
         tic = timer::now();
         
-        auto  acc               = Hpro::fixed_prec( Hpro::frobenius_norm, cmdline::eps );
+        auto  acc               = absolute_prec( Hpro::frobenius_norm, cmdline::eps / std::sqrt( double(3) ) );
         auto  [ G, X0, X1, X2 ] = blas::sthosvd( X, acc, apx );
             
         toc = timer::since( tic );
@@ -272,7 +272,7 @@ program_main ()
         tic = timer::now();
         
         // auto  acc = local_accuracy( norm_X * cmdline::eps / double( std::max({ X.size(0), X.size(1), X.size(2) }) ) );
-        auto  acc = fixed_prec( cmdline::eps * norm_X / 3.0 ) );
+        auto  acc = fixed_prec( cmdline::eps * norm_X / 3.0 );
         auto  H   = impl::tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
             
         toc = timer::since( tic );
@@ -284,7 +284,7 @@ program_main ()
         if ( verbose(1) ) io::vtk::print( *H, "H" );
 
         auto  Y = impl::tensor::to_dense( *H );
-            
+
         if ( verbose(3) ) io::vtk::print( *Y, "Y2" );
         if ( verbose(2) ) io::hdf5::write( Y->tensor(), "Y2" );
             

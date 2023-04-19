@@ -14,6 +14,7 @@ namespace hlr
 using accuracy = Hpro::TTruncAcc;
 
 using Hpro::fixed_prec;
+using Hpro::absolute_prec;
 using Hpro::fixed_rank;
 
 using Hpro::spectral_norm;

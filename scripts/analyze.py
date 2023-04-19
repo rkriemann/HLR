@@ -24,6 +24,7 @@ name_mapping = { 'approx-mm'  : 'H-Matrix Mult.',
 
                  'refblas'    : 'RefBlas',
                  'blis'       : 'BLIS',
+                 'amdblis'    : 'AMD-BLIS',
                  'openblas'   : 'OpenBLAS',
                  'mkl'        : 'MKL' }
 
@@ -251,6 +252,12 @@ programs     = sorted( programs )
 frameworks   = sorted( frameworks )
 blass        = sorted( blass )
 
+print( 'processors found:   ', ', '.join( processors ) )
+print( 'applications found: ', ', '.join( applications ) )
+print( 'programs found:     ', ', '.join( programs ) )
+print( 'frameworks found:   ', ', '.join( frameworks ) )
+print( 'BLAS found:         ', ', '.join( blass ) )
+
 #
 # minimal runtimes per processor
 #
@@ -273,6 +280,10 @@ for proc in processors :
                 tmin = None
             
                 for blas in blass :
+
+                    if not blas in DB[proc][app][prog][fwork].keys() :
+                        continue
+                    
                     if tmin == None : tmin = DB[proc][app][prog][fwork][blas]['time']
                     else :            tmin = min( tmin, DB[proc][app][prog][fwork][blas]['time'] )
                 
@@ -400,6 +411,9 @@ if output_format == 'text' :
                     best_style = ''
 
                     for blas in blass :
+                        if not blas in data.keys() :
+                            continue
+
                         style[blas] = ''
                         if data[blas]['time'] == min_proc :
                             style[blas] = min_time_style
@@ -409,14 +423,20 @@ if output_format == 'text' :
 
                     # actual data
                     for blas in blass[:-1] :
-                        style = min_time_style if data[blas]['time'] == min_proc else ''
-                        print( add_style( "%8.2fs │" % data[blas]['time'], style ), end = '' )
+                        if not blas in data.keys() :
+                            print( '          │', end = '' )
+                        else :
+                            style = min_time_style if data[blas]['time'] == min_proc else ''
+                            print( add_style( '%8.2fs │' % data[blas]['time'], style ), end = '' )
 
                     style = min_time_style if data[blass[-1]]['time'] == min_proc else ''
                     print( add_style( '%8.2fs ║' % data[blass[-1]]['time'], style ), end = '' )
 
                     is_best = False
                     for blas in blass :
+                        if not blas in data.keys() :
+                            continue
+
                         if data[blas]['time'] == min_total :
                             is_best = True
                             break
@@ -547,10 +567,11 @@ if output_format == 'pdf' :
                     '#75507b', # plum2
                     '#c17d11', # chocolate2
                     '#edd400', # butter2
-                    '#83a598', # faded aqua
+                    '#204a87', # faded aqua
                    ]
     blas_colors = { 'mkl'      : colorscheme[1],
                     'blis'     : colorscheme[2],
+                    'amdblis'  : colorscheme[8],
                     'openblas' : colorscheme[3],
                     'refblas'  : colorscheme[4] }
     nfig = 1
@@ -561,7 +582,19 @@ if output_format == 'pdf' :
                 
                 plt.figure( nfig )
                 nfig += 1
-                fig, axs = plt.subplots( len(processors), sharex = True, figsize = ( 8, 0.6 * len(processors) * ( len(blass) + 1 ) ) )
+
+                ndata = 0
+                for proc in processors :
+                    if fwork in DB[proc][app][prog].keys() :
+                        for blas in blass :
+                            if blas in DB[proc][app][prog][fwork].keys() :
+                                ndata += 1
+                        ndata += 1 # one extra per processor
+
+                if ndata == 0 :
+                    continue
+
+                fig, axs = plt.subplots( len(processors), sharex = True, figsize = ( 8, 0.5 * ndata ) )
 
                 nplot = 0
                 for proc in processors :
@@ -574,6 +607,9 @@ if output_format == 'pdf' :
                     y_label = []
                     data    = DB[proc][app][prog][fwork]
                     for blas in blass :
+                        if not blas in data.keys() :
+                            continue
+                        
                         val  = data[blas]['time']
                         rect = axs[nplot].barh( pos, val, color = blas_colors[blas], align = 'center', label = blas )
                         axs[nplot].annotate( '%.2f' % val,
@@ -596,9 +632,60 @@ if output_format == 'pdf' :
                     axs[nplot].set_yticklabels( y_label )
                     axs[nplot].invert_yaxis()  # labels read top-to-bottom
                     nplot += 1
-                        
+
                 plt.tight_layout()
                 filename = app + '--' + prog + '--' + fwork + '.pdf'
+                filename = filename.replace( ' ', '_' )
+                pp = PdfPages( filename )
+                pp.savefig()
+                pp.close()
+                
+                # show best times per processor
+                ypos   = []
+                ylabel = []
+                pos    = 0
+                
+                plt.figure( nfig )
+                nfig += 1
+                fig, ax = plt.subplots( 1, sharex = True, figsize = ( 8, 0.66 * len(processors) ) )
+                
+                for proc in processors :
+                    
+                    if not fwork in min_time[proc][app][prog].keys() :
+                        continue
+                    
+                    color = colorscheme[0]
+                    data  = DB[proc][app][prog][fwork]
+                    for blas in blass :
+                        if not blas in data.keys() :
+                            continue
+                        if min_time[proc][app][prog][fwork] == data[blas]['time'] :
+                            color = blas_colors[blas]
+                            break
+                    
+                    val  = min_time[proc][app][prog][fwork]
+                    rect = ax.barh( pos, val, color = color, align = 'center', label = proc )
+                    ax.annotate( '%.2f' % val,
+                                         xy         = ( val, pos ),
+                                         xytext     = ( 2, -annotate_size // 3),
+                                         textcoords = "offset points",
+                                         ha         = 'left',
+                                         va         = 'baseline',
+                                         color      = 'black',
+                                         fontsize   = annotate_size )
+                    y_pos.append( pos )
+                    y_label.append( proc )
+                    pos += 1
+                pos += 1
+                ax.grid( axis = 'x', which = 'major', linestyle = 'dashed', linewidth='0.5',  color='#888a85' )
+                ax.set_axisbelow( True )
+                # ax.set_title( 'Best per Processor' )
+                ax.set_yticks( y_pos )
+                ax.set_yticklabels( y_label )
+                ax.invert_yaxis()  # labels read top-to-bottom
+                    
+                plt.tight_layout()
+                filename = app + '--' + prog + '--' + fwork + '--best.pdf'
                 filename = filename.replace( ' ', '_' )
                 pp = PdfPages( filename )
                 pp.savefig()
