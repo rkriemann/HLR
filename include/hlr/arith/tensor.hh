@@ -780,23 +780,84 @@ greedy_hosvd ( const tensor3< value_t > &  X,
                const accuracy &            acc,
                const approx_t &            apx )
 {
+    //
+    // compute full column bases for unfolded matrices
+    // for all dimensions
+    //
+    
     auto  X0         = X.unfold( 0 );
     auto  [ U0, S0 ] = apx.column_basis( X0 );
-    auto  k0         = acc.trunc_rank( S0 );
 
     auto  X1         = X.unfold( 1 );
     auto  [ U1, S1 ] = apx.column_basis( X1 );
-    auto  k1         = acc.trunc_rank( S1 );
 
     auto  X2         = X.unfold( 2 );
     auto  [ U2, S2 ] = apx.column_basis( X2 );
-    auto  k2         = acc.trunc_rank( S2 );
 
-    auto  error = value_t(0);
-
-    //
-    // error = Σ_d Σ_
+    // for index-based access
+    matrix< value_t >  U[3] = { U0, U1, U2 };
+    vector< value_t >  S[3] = { S0, S1, S2 };
     
+    //
+    // iterate until error is met increasing rank of
+    // dimension with highest error contribution, i.e.,
+    // largest _next_ singular value
+    //
+    // error = √( Σ_d Σ_i>k_i σ²_d,i )
+    //
+
+    const auto  tol      = acc.abs_eps();
+    value_t     error[3] = { 0, 0, 0 };
+    size_t      k[3]     = { 1, 1, 1 }; // start with at least one rank per dimension
+
+    // initial error
+    for ( uint  d = 0; d < 3; ++d )
+        for ( uint  i = k[d]; i < S[d].length(); ++i )
+            error[d] += S[d](i) * S[d](i);
+
+    // iteration
+    while ( std::sqrt( error[0] + error[1] + error[2] ) > tol )
+    {
+        int      max_dim = -1; // to signal error
+        value_t  max_sig = 0;
+
+        for ( uint  d = 0; d < 3; ++d )
+        {
+            if ( k[d] < S[d].length()-1 )
+            {
+                if ( S[d](k[d]) > max_sig )
+                {
+                    max_sig = S[d](k[d]);
+                    max_dim = d;
+                }// if
+            }// if
+        }// for
+
+        if ( max_dim < 0 )
+        {
+            // all singular values used; error should be zero
+            break;
+        }// if
+
+        error[ max_dim ] -= max_sig * max_sig;
+        k[ max_dim ]     += 1;
+        
+        std::cout << "  max_dim " << max_dim << ", error = " << std::sqrt( error[0] + error[1] + error[2] ) << std::endl;
+    }// while
+
+    auto  U0k = matrix( U0, range::all, range( 0, k[0]-1 ) );
+    auto  U1k = matrix( U1, range::all, range( 0, k[1]-1 ) );
+    auto  U2k = matrix( U2, range::all, range( 0, k[2]-1 ) );
+
+    auto  W0  = blas::copy( U0k );
+    auto  W1  = blas::copy( U1k );
+    auto  W2  = blas::copy( U2k );
+    
+    auto  Y0 = tensor_product( X,  adjoint( W0 ), 0 );
+    auto  Y1 = tensor_product( Y0, adjoint( W1 ), 1 );
+    auto  G  = tensor_product( Y1, adjoint( W2 ), 2 );
+
+    return { std::move(G), std::move(W0), std::move(W1), std::move(W2) };
 }
 
 }}// namespace hlr::blas

@@ -152,12 +152,12 @@ program_main ()
     
     if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
     {
-        std::cout << term::bullet << term::bold << "HOSVD" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "HOSVD" << " ( ε = " << cmdline::eps << " )" << term::reset << std::endl;
 
         tic = timer::now();
 
         auto  dim_fac           = 1.0 / std::sqrt( 3.0 );
-        auto  tol               = cmdline::eps * dim_fac / norm_X;
+        auto  tol               = cmdline::eps * norm_X / dim_fac;
         auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
         auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
             
@@ -212,12 +212,12 @@ program_main ()
 
     if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
     {
-        std::cout << term::bullet << term::bold << "ST-HOSVD" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "ST-HOSVD" << " ( ε = " << cmdline::eps << " )" << term::reset << std::endl;
 
         tic = timer::now();
         
         auto  dim_fac           = 1.0 / std::sqrt( 3.0 );
-        auto  tol               = cmdline::eps * dim_fac / norm_X;
+        auto  tol               = cmdline::eps * norm_X / dim_fac;
         auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
         auto  [ G, X0, X1, X2 ] = blas::sthosvd( X, acc, apx );
             
@@ -253,6 +253,68 @@ program_main ()
         std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
 
         Z.compress( acc );
+
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+
+        T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
+        T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
+        Y  = std::move( blas::tensor_product( T1, Z.X_decompressed(2), 2 ) );
+
+        impl::blas::add( -1, X, Y );
+        norm_Y = impl::blas::norm_F( Y );
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
+    }
+
+    //
+    // ST-HOSVD
+    //
+
+    if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
+    {
+        std::cout << term::bullet << term::bold << "Greedy-HOSVD" << " ( ε = " << cmdline::eps << " )" << term::reset << std::endl;
+
+        auto  tol               = cmdline::eps * norm_X;
+        auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
+
+        std::cout << "    tol    =  " << boost::format( "%.4e" ) % tol << std::endl;
+
+        tic = timer::now();
+        
+        auto  [ G, X0, X1, X2 ] = blas::greedy_hosvd( X, acc, apx );
+            
+        toc = timer::since( tic );
+            
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+            
+        auto  Z  = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
+                                                      std::move( G ),
+                                                      std::move( X0 ),
+                                                      std::move( X1 ),
+                                                      std::move( X2 ) );
+            
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+
+        auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
+        auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
+        auto  Y  = blas::tensor_product( T1,    Z.X(2), 2 );
+        
+        if ( verbose(3) ) io::vtk::print( Y, "Y1" );
+        if ( verbose(2) ) io::hdf5::write( Y, "Y1" );
+            
+        impl::blas::add( -1, X, Y );
+
+        auto  norm_Y = impl::blas::norm_F( Y );
+        
+        std::cout << "    error  = " << format_error( norm_Y, norm_Y / norm_X ) << std::endl;
+            
+        if ( verbose(3) ) io::vtk::print( Y, "error1" );
+
+        std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
+
+        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
