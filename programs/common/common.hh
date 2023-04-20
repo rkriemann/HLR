@@ -121,6 +121,13 @@ format_flops ( const double  f,
     return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
 }
 
+inline
+std::string
+format_rate ( const double  r )
+{
+    return hlr::term::italic( str( boost::format( "%.02fx" ) % r ) );
+}
+
 //
 // return min/max/median of elements in container
 //

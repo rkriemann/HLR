@@ -24,30 +24,42 @@ namespace detail
 {
 
 //
-// determine truncate rank of R by looking at
+// determine "singular values" of R by looking at
 // norms of R(i:·,i:·) for all i
 //
 template < typename value_t >
-int
-trunc_rank ( const blas::matrix< value_t > &  R,
-             const Hpro::TTruncAcc &          acc )
+blas::vector< Hpro::real_type_t< value_t > >
+singular_values ( const blas::matrix< value_t > &  R )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
-    const idx_t             n = idx_t( R.nrows() );
-    blas::vector< real_t >  s( n );
+    const idx_t  n = idx_t( R.nrows() );
+    auto         S = blas::vector< real_t >( n );
     
     for ( int  i = 0; i < n; ++i )
     {
         auto  rest = blas::range( i, n-1 );
         auto  R_i  = blas::matrix< value_t >( R, rest, rest );
         
-        s( i ) = blas::normF( R_i );
+        S( i ) = blas::normF( R_i );
     }// for
 
-    return acc.trunc_rank( s );
+    return S;
+}
+
+//
+// return truncation rank of R
+//
+template < typename value_t >
+int
+trunc_rank ( const blas::matrix< value_t > &  R,
+             const Hpro::TTruncAcc &          acc )
+{
+    auto  S = singular_values( R );
+
+    return acc.trunc_rank( S );
 }
 
 }// namespace detail
@@ -453,6 +465,25 @@ struct RRQR
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
         return blas::copy( Qk );
+    }
+
+    std::pair< blas::matrix< value_t >,
+               blas::vector< typename Hpro::real_type_t< value_t > > >
+    column_basis ( blas::matrix< value_t > &  M ) const
+    {
+        const idx_t  ncols = idx_t( M.ncols() );
+
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
+    
+        auto  R = blas::matrix< value_t >( ncols, ncols );
+        auto  P = std::vector< int >( ncols, 0 );
+
+        blas::qrp( M, R, P );
+
+        auto  S  = detail::singular_values( R );
+
+        return { std::move( blas::copy( M ) ), std::move( S ) };
     }
 };
 

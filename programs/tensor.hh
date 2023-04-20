@@ -26,7 +26,7 @@ using namespace hlr;
 struct local_accuracy : public hlr::tensor_accuracy
 {
     local_accuracy ( const double  abs_eps )
-            : tensor_accuracy( hlr::frobenius_norm, abs_eps )
+            : tensor_accuracy( hlr::frobenius_norm, 0.0, abs_eps )
     {}
     
     virtual
@@ -35,7 +35,7 @@ struct local_accuracy : public hlr::tensor_accuracy
           const indexset &  is1,
           const indexset &  is2 ) const
     {
-        return Hpro::absolute_prec( abs_eps() * std::pow( double(is0.size()) * double(is1.size()) * double(is2.size()), 0.333 ) );
+        return absolute_prec( hlr::frobenius_norm, abs_eps() * std::sqrt( double(is0.size()) * double(is1.size()) * double(is2.size()) ) );
     }
     using accuracy::acc;
 };
@@ -173,7 +173,7 @@ program_main ()
                                                       std::move( X2 ) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
         auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
@@ -195,7 +195,7 @@ program_main ()
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
         T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
@@ -233,7 +233,7 @@ program_main ()
                                                       std::move( X2 ) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
             
         auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
         auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
@@ -252,10 +252,10 @@ program_main ()
 
         std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
 
-        Z.compress( acc );
+        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
         T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
@@ -267,7 +267,7 @@ program_main ()
     }
 
     //
-    // ST-HOSVD
+    // Greedy-HOSVD
     //
 
     if ( std::max({ X.size(0), X.size(1), X.size(2) }) <= 300 )
@@ -277,7 +277,7 @@ program_main ()
         auto  tol               = cmdline::eps * norm_X;
         auto  acc               = absolute_prec( Hpro::frobenius_norm, tol );
 
-        std::cout << "    tol    =  " << boost::format( "%.4e" ) % tol << std::endl;
+        std::cout << "    tol    = " << boost::format( "%.4e" ) % tol << std::endl;
 
         tic = timer::now();
         
@@ -295,7 +295,7 @@ program_main ()
                                                       std::move( X2 ) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         auto  T0 = blas::tensor_product( Z.G(), Z.X(0), 0 );
         auto  T1 = blas::tensor_product( T0,    Z.X(1), 1 );
@@ -317,7 +317,7 @@ program_main ()
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
 
         T0 = std::move( blas::tensor_product( Z.G_decompressed(), Z.X_decompressed(0), 0 ) );
         T1 = std::move( blas::tensor_product( T0, Z.X_decompressed(1), 1 ) );
@@ -331,21 +331,26 @@ program_main ()
     //
     // Hierarchical HOSVD
     //
-    
+
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "Hierarchical HOSVD (" << "ntile = " << cmdline::ntile << ")" << term::reset << std::endl;
 
+        auto  tol = cmdline::eps * norm_X / std::sqrt( double(X.size(0)) * double(X.size(1)) * double(X.size(2)) );
+        auto  acc = local_accuracy( tol );
+        // auto  acc = fixed_prec( cmdline::eps * norm_X / 3.0 );
+
+        std::cout << "    tol    = " << boost::format( "%.4e" ) % tol << std::endl;
+        
         tic = timer::now();
         
-        // auto  acc = local_accuracy( norm_X * cmdline::eps / double( std::max({ X.size(0), X.size(1), X.size(2) }) ) );
-        auto  acc = fixed_prec( cmdline::eps * norm_X / 3.0 );
         auto  H   = impl::tensor::build_hierarchical_tucker( X, acc, apx, cmdline::ntile );
             
         toc = timer::since( tic );
             
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
         if ( verbose(1) ) io::vtk::print( *H, "H" );
 
@@ -372,7 +377,7 @@ program_main ()
         
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( H->byte_size() ) << std::endl;
-        std::cout << "      rate = " << boost::format( "%.02fx" ) % ( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
         Y = impl::tensor::to_dense( *H );
         impl::blas::add( -1, X, Y->tensor() );

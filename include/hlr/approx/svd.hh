@@ -530,7 +530,7 @@ struct SVD
             std::sort( perm.begin(), perm.end(), [] ( auto  a, auto b ) { return a.first > b.first; } );
             
             for ( uint  i = 0; i < E.length(); ++i )
-                E(i) = perm[i].first;
+                E(i) = std::sqrt( perm[i].first ); // σ_i = √(λ_i)
             
             const auto  k  = acc.trunc_rank( E );
             auto        Vk = blas::matrix< value_t >( V.nrows(), k );
@@ -609,7 +609,7 @@ struct SVD
             std::sort( perm.begin(), perm.end(), [] ( auto  a, auto b ) { return a.first > b.first; } );
             
             for ( uint  i = 0; i < E.length(); ++i )
-                E(i) = perm[i].first;
+                E(i) = std::sqrt( perm[i].first ); // σ_i = √(λ_i)
 
             // better: permute V
             auto  Vk = blas::matrix< value_t >( V.nrows(), V.ncols() );

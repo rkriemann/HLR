@@ -797,7 +797,7 @@ greedy_hosvd ( const tensor3< value_t > &  X,
     // for index-based access
     matrix< value_t >  U[3] = { U0, U1, U2 };
     vector< value_t >  S[3] = { S0, S1, S2 };
-    
+
     //
     // iterate until error is met increasing rank of
     // dimension with highest error contribution, i.e.,
@@ -806,7 +806,7 @@ greedy_hosvd ( const tensor3< value_t > &  X,
     // error = √( Σ_d Σ_i>k_i σ²_d,i )
     //
 
-    const auto  tol      = acc.abs_eps();
+    const auto  tol      = acc.abs_eps() * acc.abs_eps();
     value_t     error[3] = { 0, 0, 0 };
     size_t      k[3]     = { 1, 1, 1 }; // start with at least one rank per dimension
 
@@ -816,7 +816,7 @@ greedy_hosvd ( const tensor3< value_t > &  X,
             error[d] += S[d](i) * S[d](i);
 
     // iteration
-    while ( std::sqrt( error[0] + error[1] + error[2] ) > tol )
+    while ( error[0] + error[1] + error[2] > tol )
     {
         int      max_dim = -1; // to signal error
         value_t  max_sig = 0;
@@ -842,7 +842,7 @@ greedy_hosvd ( const tensor3< value_t > &  X,
         error[ max_dim ] -= max_sig * max_sig;
         k[ max_dim ]     += 1;
         
-        std::cout << "  max_dim " << max_dim << ", error = " << std::sqrt( error[0] + error[1] + error[2] ) << std::endl;
+        // std::cout << "  max_dim " << max_dim << ", error = " << std::sqrt( error[0] + error[1] + error[2] ) << std::flush;
     }// while
 
     auto  U0k = matrix( U0, range::all, range( 0, k[0]-1 ) );
