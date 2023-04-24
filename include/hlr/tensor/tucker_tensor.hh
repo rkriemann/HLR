@@ -34,18 +34,18 @@ public:
 
 private:
     // core tensor
-    blas::tensor3< value_t >  _G;
+    blas::tensor3< value_t >         _G;
 
     // per mode matrices
-    mat_array_t               _X;
+    mat_array_t                      _X;
 
+    // ranks of G (and X)
+    std::array< size_t, dimension >  _rank;
+    
     #if HLR_HAS_COMPRESSION == 1
     // compressed data
     compress::zarray                           _zG;
     std::array< compress::zarray, dimension >  _zX;
-    
-    // need rank information for G
-    std::array< uint, dimension >              _rank_G;
     #endif
 
 public:
@@ -60,12 +60,14 @@ public:
             : super_t( t )
             , _G( t._G )
             , _X( t._X )
+            , _rank{ 0, 0, 0 }
     {}
 
     tucker_tensor3 ( tucker_tensor3 &&  t )
             : super_t( std::forward< base_tensor3< value_t > >( t ) )
             , _G( std::move( t._G ) )
             , _X( std::move( t._X ) )
+            , _rank( std::move( t._rank ) )
     {}
 
     tucker_tensor3 ( const indexset &  is0,
@@ -78,6 +80,7 @@ public:
             : super_t( is0, is1, is2 )
             , _G( std::move( aG ) )
             , _X{ std::move( aX0 ), std::move( aX1 ), std::move( aX2 ) }
+            , _rank{ _G.size(0), _G.size(1), _G.size(2) }
     {
         HLR_ASSERT( ( is0.size() == _X[0].nrows() ) &&
                     ( is1.size() == _X[1].nrows() ) &&
@@ -100,20 +103,26 @@ public:
 
         for ( uint  i = 0; i < dimension; ++i )
             _X[i] = blas::copy( t._X[i] );
+
+        _rank = t._rank;
     }
 
     tucker_tensor3 &  operator = ( tucker_tensor3 &&  t )
     {
         super_t::operator = ( std::forward( t ) );
 
-        _G = std::move( t._G );
-        _X = std::move( t._X );
+        _G    = std::move( t._G );
+        _X    = std::move( t._X );
+        _rank = std::move( t._rank );
     }
 
     //
     // access Tucker data
     //
 
+    uint  rank ( const uint  d ) const { HLR_ASSERT( d < dimension ); return _rank[ d ]; }
+
+    // TODO: replace by set_* functions to update rank data
     blas::tensor3< value_t > &        G ()                     { return _G; }
     blas::matrix< value_t > &         X ( const uint d )       { HLR_ASSERT(( d < dimension ) && ! is_compressed()); return _X[d]; }
     
@@ -127,7 +136,7 @@ public:
         
         if ( is_compressed() )
         {
-            auto  dG = blas::tensor3< value_t >( _rank_G[0], _rank_G[1], _rank_G[2] );
+            auto  dG = blas::tensor3< value_t >( _rank[0], _rank[1], _rank[2] );
     
             compress::decompress< value_t >( _zG, dG );
             
@@ -148,7 +157,7 @@ public:
         
         if ( is_compressed() )
         {
-            auto  dX = blas::matrix< value_t >( this->dim(d), _rank_G[d] );
+            auto  dX = blas::matrix< value_t >( this->dim(d), _rank[d] );
     
             compress::decompress< value_t >( _zX[d], dX );
             
@@ -210,7 +219,6 @@ public:
         {
             X->_zX[i] = compress::zarray( _zX[i].size() );
             std::copy( _zX[i].begin(), _zX[i].end(), X->_zX[i].begin() );
-            X->_rank_G[i] = _rank_G[i];
         }// for
         
         #endif
@@ -241,7 +249,7 @@ public:
         for ( uint  i = 0; i < dimension; ++i )
             s += hlr::compress::byte_size( _zX[i] );
 
-        s += sizeof( _rank_G );
+        s += sizeof( _rank );
         
         #endif
 
@@ -342,9 +350,6 @@ tucker_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _zX[1] = std::move( zX1 );
         _zX[2] = std::move( zX2 );
 
-        for ( uint  i = 0; i < dimension; ++i )
-            _rank_G[i] = _G.size(i);
-        
         _G     = std::move( blas::tensor3< value_t >() );
         _X[0]  = std::move( blas::matrix< value_t >() );
         _X[1]  = std::move( blas::matrix< value_t >() );

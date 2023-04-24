@@ -190,7 +190,7 @@ write ( const blas::matrix< value_t > &  M,
     Hpro::THDF5MatrixIO  mio;
     
     if ( filename == "" )
-        mio.write( M, matname + ".hdf5", matname );
+        mio.write( M, matname + ".h5", matname );
     else
         mio.write( M, filename, matname );
 }
@@ -204,7 +204,7 @@ write ( const Hpro::TMatrix< value_t > &  M,
     Hpro::THDF5MatrixIO  mio;
     
     if ( filename == "" )
-        mio.write( &M, matname + ".hdf5", matname );
+        mio.write( &M, matname + ".h5", matname );
     else
         mio.write( &M, filename, matname );
 }

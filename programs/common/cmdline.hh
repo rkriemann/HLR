@@ -54,6 +54,7 @@ string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 double  eta        = 2.0;          // admissibility parameter
 string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
+string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
 string  arith      = "std";        // which kind of arithmetic to use
 double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
@@ -142,6 +143,7 @@ parse ( int argc, char ** argv )
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
         ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
+        ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
         ( "nbench",      value<int>(),    ": (maximal) number of benchmark iterations" )
         ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
@@ -203,6 +205,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
+    if ( vm.count( "tapprox"    ) ) tapprox    = vm["tapprox"].as<string>();
     if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
@@ -264,6 +267,19 @@ parse ( int argc, char ** argv )
                   << "  - hpro    : purely use Hpro functions for approximation" << std::endl
                   << "  - all     : use all for comparison" << std::endl
                   << "  - default : use default approximation (SVD)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( tapprox == "help" )
+    {
+        std::cout << "Tensor Low-rank approximation methods:" << std::endl
+                  << "  - hosvd   : standard HOSVD" << std::endl
+                  << "  - sthosvd : sequentially truncated HOSVD" << std::endl
+                  << "  - ghosvd  : greedy HOSVD" << std::endl
+                  << "  - hhosvd  : hierarchical HOSVD" << std::endl
+                  << "  - tcafull : full tensor cross approximation" << std::endl
+                  << "  - default : use default approximation (HHOSVD)" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -335,6 +351,11 @@ parse ( int argc, char ** argv )
              ( approx == "randlr" ) || ( approx == "aca"  ) || ( approx == "lanczos" ) ||
              ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
         HLR_ERROR( "unknown approximation : " + approx );
+
+    for ( auto &  entry : split( cmdline::tapprox, "," ) )
+        if ( ! ( ( entry == "hosvd"  ) || ( entry == "sthosvd" ) || ( entry == "ghosvd" ) ||
+                 ( entry == "hhosvd" ) || ( entry == "tcafull" ) || ( entry == "default" ) ) )
+            HLR_ERROR( "unknown tensor approximation : " + entry );
 
     if ( ! ( ( arith == "std" )  || ( arith == "dagstd" )  ||
              ( arith == "accu" ) || ( arith == "dagaccu" ) ||

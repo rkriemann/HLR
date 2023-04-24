@@ -8,14 +8,17 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <vector>
 #include <type_traits>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 
 #include <hpro/blas/MemBlock.hh>
 
 #include <hlr/approx/traits.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/utils/detail/afloat.hh>
 
 namespace hlr
 {
@@ -821,21 +824,23 @@ greedy_hosvd ( const tensor3< value_t > &  X,
         int      max_dim = -1; // to signal error
         value_t  max_sig = 0;
 
+        // look for maximal σ in all dimensions
         for ( uint  d = 0; d < 3; ++d )
         {
-            if ( k[d] < S[d].length()-1 )
+            // skip fully exhausted dimensions
+            if ( k[d] == S[d].length() )
+                continue;
+            
+            if ( S[d](k[d]) > max_sig )
             {
-                if ( S[d](k[d]) > max_sig )
-                {
-                    max_sig = S[d](k[d]);
-                    max_dim = d;
-                }// if
+                max_sig = S[d](k[d]);
+                max_dim = d;
             }// if
         }// for
 
         if ( max_dim < 0 )
         {
-            // all singular values used; error should be zero
+            // no unused singular values left; error should be zero
             break;
         }// if
 
@@ -857,9 +862,100 @@ greedy_hosvd ( const tensor3< value_t > &  X,
     auto  Y1 = tensor_product( Y0, adjoint( W1 ), 1 );
     auto  G  = tensor_product( Y1, adjoint( W2 ), 2 );
 
+    // // print compressed memory
+    // if ( false )
+    // {
+    //     size_t  mem  = 0;
+    //     size_t  zmem = 0;
+
+    //     {
+    //         auto    zconf = compress::afloat::get_config( zacc.rel_eps() );
+    //         auto    Zc    = compress::afloat::compress( zconf, G.data(), G.size(0), G.size(1), G.size(2) );
+    //         size_t  memc  = sizeof(value_t) * G.size(0) * G.size(1) * G.size(2);
+    //         auto    zmemc = compress::afloat::byte_size( Zc );
+
+    //         mem  += memc;
+    //         zmem += zmemc;
+    //     }
+        
+    //     {
+    //         auto  S0k   = vector< value_t >( S0, range( 0, k[0]-1 ) );
+    //         auto  norm0 = std::accumulate( S0k.data(), S0k.data() + k[0], value_t(0), std::plus< value_t >() );
+    //         auto  tol0  = norm0 * zacc.rel_eps();
+
+    //         std::for_each( S0k.data(), S0k.data() + k[0], [tol0] ( auto & f ) { f *= tol0; } );
+        
+    //         auto  Z0    = compress::afloat::compress_lr( W0, S0k );
+    //         auto  mem0  = sizeof(value_t) * W0.nrows() * W0.ncols();
+    //         auto  zmem0 = compress::afloat::byte_size( Z0 );
+
+    //         mem  += mem0;
+    //         zmem += zmem0;
+    //     }
+        
+    //     {
+    //         auto  S1k   = vector< value_t >( S1, range( 0, k[1]-1 ) );
+    //         auto  norm1 = std::accumulate( S1k.data(), S1k.data() + k[1], value_t(0), std::plus< value_t >() );
+    //         auto  tol1  = norm1 * zacc.rel_eps();
+
+    //         std::for_each( S1k.data(), S1k.data() + k[1], [tol1] ( auto & f ) { f *= tol1; } );
+        
+    //         auto  Z1    = compress::afloat::compress_lr( W1, S1k );
+    //         auto  mem1  = sizeof(value_t) * W1.nrows() * W1.ncols();
+    //         auto  zmem1 = compress::afloat::byte_size( Z1 );
+
+    //         mem  += mem1;
+    //         zmem += zmem1;
+    //     }
+        
+    //     {
+    //         auto  S2k   = vector< value_t >( S2, range( 0, k[2]-1 ) );
+    //         auto  norm2 = std::accumulate( S2k.data(), S2k.data() + k[2], value_t(0), std::plus< value_t >() );
+    //         auto  tol2  = norm2 * zacc.rel_eps();
+
+    //         std::for_each( S2k.data(), S2k.data() + k[2], [tol2] ( auto & f ) { f *= tol2; } );
+        
+    //         auto  Z2    = compress::afloat::compress_lr( W2, S2k );
+    //         auto  mem2  = sizeof(value_t) * W2.nrows() * W2.ncols();
+    //         auto  zmem2 = compress::afloat::byte_size( Z2 );
+
+    //         mem  += mem2;
+    //         zmem += zmem2;
+    //     }
+
+    //     std::cout << mem << " / " << zmem << std::endl;
+    // }
+    
     return { std::move(G), std::move(W0), std::move(W1), std::move(W2) };
 }
 
+//
+// recompress given tucker tensor
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t,
+           typename                    hosvd_func_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+recompress ( tensor3< value_t > &  G,
+             matrix< value_t > &   X0,
+             matrix< value_t > &   X1,
+             matrix< value_t > &   X2,
+             const accuracy &      acc,
+             const approx_t &      apx,
+             hosvd_func_t &&       func )
+{
+    auto  [ G2, Y0, Y1, Y2 ] = func( G, acc, apx );
+
+    auto  W0 = blas::prod( X0, Y0 );
+    auto  W1 = blas::prod( X1, Y1 );
+    auto  W2 = blas::prod( X2, Y2 );
+
+    return { std::move(G2), std::move(W0), std::move(W1), std::move(W2) };
+}
+    
 }}// namespace hlr::blas
 
 #endif  // __HPRO_BLAS_TENSOR_HH

@@ -13,6 +13,8 @@
 #include <list>
 #include <set>
 #include <unordered_set>
+#include <ranges>
+#include <string_view>
 
 namespace hlr
 {
@@ -80,6 +82,29 @@ behead ( T_container &  acont )
     acont.pop_front();
     
     return t;
+}
+
+//
+// split given string into substrings based on delimiter
+//
+inline
+std::vector< std::string >
+split ( const std::string_view &  text,
+        const std::string_view &  delim )
+{
+    auto  split = text 
+        | std::ranges::views::split( delim )
+        | std::ranges::views::transform( [] ( auto && str )
+        {
+            return std::string_view( &*str.begin(), std::ranges::distance( str ) );
+        } );
+
+    std::vector< std::string >  arr;
+    
+    for ( auto &&  entry : split )
+        arr.push_back( std::string( entry ) );
+
+    return arr;
 }
 
 }// namespace hlr

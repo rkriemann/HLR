@@ -1297,6 +1297,19 @@ qr ( matrix< value_t > &  M,
         qr2( M, R, comp_Q );
 }
 
+template < typename value_t >
+std::pair< matrix< value_t >,
+           matrix< value_t > >
+qr ( matrix< value_t > &  M )
+{
+    auto  Q = copy( M );
+    auto  R = matrix< value_t >();
+    
+    qr2( M, R, true );
+
+    return { std::move( Q ), std::move( R ) };
+}
+
 //
 // compute QR factorisation A = Q·R with orthonormal Q
 // and upper triangular R. Upon exit, A will hold Q
