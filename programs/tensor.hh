@@ -273,6 +273,99 @@ program_main ()
 {
     using value_t = double;
 
+    {
+        auto  X = blas::tensor3< value_t >( 3, 4, 2 );
+        uint  val = 1;
+        
+        for ( size_t  i = 0; i < 3*4*2; ++i )
+            X.data()[i] = val++;
+
+        std::cout << X << std::endl;
+
+        if ( true )
+        {
+            auto  U = blas::matrix< value_t >( 2, 3 );
+
+            val = 1;
+
+            for ( size_t  i = 0; i < 2*3; ++i )
+                U.data()[i] = val++;
+        
+            std::cout << U << std::endl;
+
+            auto  XU = blas::tensor_product( X, U, 0 );
+            
+            std::cout << XU << std::endl;
+            
+            auto  X0   = blas::copy( X.slice( 2, 0 ) );
+            auto  X1   = blas::copy( X.slice( 2, 1 ) );
+            auto  XU0  = blas::prod( U, X0 );
+            auto  XU1  = blas::prod( U, X1 );
+            
+            std::cout << XU1 << std::endl;
+            std::cout << XU0 << std::endl;
+        }
+
+        if ( false )
+        {
+            auto  U = blas::matrix< value_t >( 3, 4 );
+
+            val = 1;
+
+            for ( size_t  i = 0; i < 2*4; ++i )
+                U.data()[i] = val++;
+        
+            std::cout << U << std::endl;
+
+            auto  XU = blas::tensor_product( X, U, 1 );
+            
+            std::cout << XU << std::endl;
+            
+            auto  X0   = blas::copy( X.slice( 0, 0 ) );
+            auto  X1   = blas::copy( X.slice( 0, 1 ) );
+            auto  XU0  = blas::prod( U, X0 );
+            auto  XU1  = blas::prod( U, X1 );
+            
+            std::cout << XU1 << std::endl;
+            std::cout << XU0 << std::endl;
+        }
+        
+        if ( false )
+        {
+            auto  U = blas::matrix< value_t >( 2, 2 );
+
+            val = 1;
+
+            for ( size_t  i = 0; i < 2*4; ++i )
+                U.data()[i] = val++;
+        
+            std::cout << U << std::endl;
+
+            auto  XU = blas::tensor_product( X, U, 2 );
+            
+            std::cout << XU << std::endl;
+            
+            auto  X0   = blas::copy( X.slice( 1, 0 ) );
+            std::cout << X0 << std::endl;
+            // auto  X1   = blas::copy( X.slice( 1, 1 ) );
+            auto  XU0  = blas::prod( U, X0 );
+            // auto  XU1  = blas::prod( X1, blas::transposed( U ) );
+            
+            // std::cout << XU1 << std::endl;
+            std::cout << XU0 << std::endl;
+        }
+        
+        // auto  X_1  = X.slice( 1, 2 );
+        
+        // std::cout << X_1 << std::endl;
+        
+        // auto  X_01 = X.fiber( 0, 0, 0 );
+
+        // std::cout << X_01 << std::endl;
+
+        return;
+    }
+    
     auto  tic = timer::now();
     auto  toc = timer::since( tic );
     auto  apx = approx::SVD< value_t >();
@@ -296,7 +389,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 2 )
+        switch ( 3 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;

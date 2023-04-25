@@ -351,7 +351,18 @@ public:
     // sub-tensors
     //
 
-    // return i'th mod-d fiber
+    // return slice by fixing i'th mode <mode>
+    matrix< value_t >  slice ( const uint    mode,
+                               const size_t  i ) const
+    {
+        if      ( mode == 0 ) return matrix< value_t >( data() + i,                     size(1), size(0), size(2), size(0)*size(1) );
+        else if ( mode == 1 ) return matrix< value_t >( data() + i * size(0),           size(0),       1, size(2), size(0)*size(1) );
+        else if ( mode == 2 ) return matrix< value_t >( data() + i * size(0) * size(1), size(0),       1, size(1), size(0)         );
+        else
+            HLR_ERROR( "wrong mode" );
+    }
+                          
+    // return (i,j)'th mode-d fiber
     vector< value_t >  fiber ( const uint    mode,
                                const size_t  i,
                                const size_t  j ) const
@@ -407,10 +418,17 @@ void
 print ( const tensor_type auto &  t,
         std::ostream &            out = std::cout )
 {
-    for ( uint  l = 0; l < t.size(2); ++l )
+    // from back to front
+    for ( int  l = t.size(2)-1; l >= 0; --l )
     {
+        // top to bottom
         for ( uint  i = 0; i < t.size(0); ++i )
         {
+            // offset of 3D effect
+            for ( uint  o = 0; o < l; ++o )
+                out << "   ";
+                    
+            // print single row
             for ( uint  j = 0; j < t.size(1); ++j )
                 out << t( i, j, l ) << ", ";
 
@@ -621,6 +639,47 @@ tensor_product ( const tensor3< value_t > &  X,
                                   ( mode == 1 ? M.nrows() : X.size(1) ),
                                   ( mode == 2 ? M.nrows() : X.size(2) ) );
 
+    #if 1
+
+    if ( mode == 0 )
+    {
+        for ( size_t  l = 0; l < X.size(2); ++l )
+        {
+            auto  Xl = X.slice( 2, l );
+            auto  Yl = Y.slice( 2, l );
+
+            prod( value_t(1), M, Xl, value_t(0), Yl );
+        }// for
+    }// if
+    else if ( mode == 1 )
+    {
+        for ( size_t  l = 0; l < X.size(2); ++l )
+        {
+            for ( size_t  i = 0; i < X.size(0); ++i )
+            {
+                auto  x_ij = X.fiber( mode, i, l );
+                auto  y_ij = Y.fiber( mode, i, l );
+
+                mulvec( M, x_ij, y_ij );
+            }// for
+        }// for
+    }// if
+    else if ( mode == 2 )
+    {
+        for ( size_t  j = 0; j < X.size(1); ++j )
+        {
+            for ( size_t  i = 0; i < X.size(0); ++i )
+            {
+                auto  x_ij = X.fiber( mode, i, j );
+                auto  y_ij = Y.fiber( mode, i, j );
+
+                mulvec( M, x_ij, y_ij );
+            }// for
+        }// for
+    }// if
+    
+    #else
+    
     if ( mode == 0 )
     {
         for ( size_t  l = 0; l < X.size(2); ++l )
@@ -660,6 +719,8 @@ tensor_product ( const tensor3< value_t > &  X,
             }// for
         }// for
     }// if
+
+    #endif
 
     return Y;
 }
