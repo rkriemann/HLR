@@ -639,7 +639,7 @@ tensor_product ( const tensor3< value_t > &  X,
                                   ( mode == 1 ? M.nrows() : X.size(1) ),
                                   ( mode == 2 ? M.nrows() : X.size(2) ) );
 
-    #if 1
+    #if 0
 
     if ( mode == 0 )
     {
@@ -1017,6 +1017,26 @@ recompress ( tensor3< value_t > &  G,
     return { std::move(G2), std::move(W0), std::move(W1), std::move(W2) };
 }
     
+//
+// error of Tucker decomposition D - G ×₀ X₀ ×₁ X₁ ×₂ X₂ 
+//
+template < typename value_t >
+Hpro::real_type_t< value_t >
+tucker_error ( const tensor3< value_t > &  D,
+               const tensor3< value_t > &  G,
+               const matrix< value_t > &   X0,
+               const matrix< value_t > &   X1,
+               const matrix< value_t > &   X2 )
+{
+    auto  T0 = tensor_product( G,  X0, 0 );
+    auto  T1 = tensor_product( T0, X1, 1 );
+    auto  Y  = tensor_product( T1, X2, 2 );
+        
+    add( -1, D, Y );
+
+    return norm_F( Y );
+}
+
 }}// namespace hlr::blas
 
 #endif  // __HPRO_BLAS_TENSOR_HH

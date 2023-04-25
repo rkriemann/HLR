@@ -41,9 +41,10 @@ build_hierarchical_tucker ( const indexset &                  is0,
                             const approx_t &                  apx,
                             const size_t                      ntile )
 {
-    auto  hosvd = blas::hosvd< value_t, approx_t >;
+    // choose one to be used below
+    // auto  hosvd = blas::hosvd< value_t, approx_t >;
     // auto  hosvd = blas::sthosvd< value_t, approx_t >;
-    // auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
+    auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
         
     if ( std::min( D.size(0), std::min( D.size(1), D.size(2) ) ) <= ntile )
     {
@@ -60,9 +61,9 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
-                std::cout << "R: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
-                          << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
-                          << std::endl;
+                // std::cout << "R: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
+                //           << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
+                //           << std::endl;
 
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),
@@ -72,7 +73,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
             }// if
         }// if
 
-        std::cout << "D: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
+        // std::cout << "D: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
 
         return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
     }// if
@@ -117,7 +118,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
         }// for
 
         //
-        // try to merge
+        // try to merge to coarse Tucker
         //
 
         if ( all_tucker )
@@ -149,11 +150,11 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 }// for
             }// for
 
-            std::cout << is0 << " × " << is1 << " × " << is2 << " : "
-                      << rank[0] << " / " << rank[1] << " / " << rank[2] << std::endl;
+            // std::cout << is0 << " × " << is1 << " × " << is2 << " : "
+            //           << rank[0] << " / " << rank[1] << " / " << rank[2] << std::endl;
             
             //
-            // construct joint tucker representation
+            // construct merged tucker representation
             //
 
             auto  G      = blas::tensor3< value_t >( rank[0], rank[1], rank[2] );
@@ -189,80 +190,53 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 }// for
             }// for
 
-            {
-                auto  D1 = blas::copy( D );
+            // io::hdf5::write( D, "D" );
+            // io::hdf5::write( G, "G" );
+            // io::matlab::write( X0, "X0" );
+            // io::matlab::write( X1, "X1" );
+            // io::matlab::write( X2, "X2" );
 
-                auto  T0 = blas::tensor_product( G,  X0, 0 );
-                auto  T1 = blas::tensor_product( T0, X1, 1 );
-                auto  Y  = blas::tensor_product( T1, X2, 2 );
-        
-                blas::add( -1, D1, Y );
-
-                std::cout << blas::norm_F( Y ) << std::endl;
-            }
+            // std::cout << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl;
 
             //
-            // reorthogonalize
+            // orthogonalize merged Tucker tensor
             //
 
-            auto  [ Q0, R0 ] = blas::qr( X0 );
-            auto  [ Q1, R1 ] = blas::qr( X1 );
-            auto  [ Q2, R2 ] = blas::qr( X2 );
+            auto  R0 = blas::matrix< value_t >();
+            auto  R1 = blas::matrix< value_t >();
+            auto  R2 = blas::matrix< value_t >();
+            
+            blas::qr( X0, R0 );
+            blas::qr( X1, R1 );
+            blas::qr( X2, R2 );
 
             auto  W0 = blas::tensor_product( G,  R0, 0 );
             auto  W1 = blas::tensor_product( W0, R1, 1 );
-            auto  G3 = blas::tensor_product( W1, R2, 2 );
+            auto  G2 = blas::tensor_product( W1, R2, 2 );
             
-            {
-                auto  D1 = blas::copy( D );
+            // std::cout << blas::tucker_error( D, G2, X0, X1, X2 ) << std::endl;
 
-                auto  T0 = blas::tensor_product( G3, Q0, 0 );
-                auto  T1 = blas::tensor_product( T0, Q1, 1 );
-                auto  Y  = blas::tensor_product( T1, Q2, 2 );
-        
-                blas::add( -1, D1, Y );
-
-                std::cout << blas::norm_F( Y ) << std::endl;
-            }
-
-            io::hdf5::write( G, "G" );
-            io::hdf5::write( X0, "X0" );
-            io::hdf5::write( X1, "X1" );
-            io::hdf5::write( X2, "X2" );
-
-            {
-                auto  Y0 = G.unfold( 0 );
-                auto  Y1 = G.unfold( 1 );
-                auto  Y2 = G.unfold( 2 );
-
-                io::hdf5::write( Y0, "Y0" );
-                io::hdf5::write( Y1, "Y1" );
-                io::hdf5::write( Y2, "Y2" );
-            }
+            //
+            // compress with respect to local accuracy
+            //
             
             const auto  lacc               = acc( is0, is1, is2 );
-            auto        [ G2, Y0, Y1, Y2 ] = blas::recompress( G, X0, X1, X2, lacc, apx, hosvd );
+            auto        [ G3, Y0, Y1, Y2 ] = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
 
-            std::cout << is0 << " × " << is1 << " × " << is2 << " : "
-                      << G2.size(0) << " / " << G2.size(1) << " / " << G2.size(2) << std::endl;
+            // std::cout << is0 << " × " << is1 << " × " << is2 << " : "
+            //           << G3.size(0) << " / " << G3.size(1) << " / " << G3.size(2) << std::endl;
             
-            // {
-            //     auto  D1 = blas::copy( D );
-
-            //     auto  T0 = blas::tensor_product( G2, Y0, 0 );
-            //     auto  T1 = blas::tensor_product( T0, Y1, 1 );
-            //     auto  Y  = blas::tensor_product( T1, Y2, 2 );
-        
-            //     blas::add( -1, D1, Y );
-
-            //     std::cout << blas::norm_F( Y ) << std::endl;
-            // }
+            // io::matlab::write( Y0, "Y0" );
+            // io::matlab::write( Y1, "Y1" );
+            // io::matlab::write( Y2, "Y2" );
+            
+            // std::cout << blas::tucker_error( D, G3, Y0, Y1, Y2 ) << std::endl;
             
             //
             // return coarse tucker tensor if more memory efficient
             //
 
-            const auto  mem_coarse = sizeof(value_t) * ( G2.size(0) * G2.size(1) * G2.size(2) +
+            const auto  mem_coarse = sizeof(value_t) * ( G3.size(0) * G3.size(1) * G3.size(2) +
                                                          Y0.nrows() * Y0.ncols() +
                                                          Y1.nrows() * Y1.ncols() +
                                                          Y2.nrows() * Y2.ncols() );
@@ -270,7 +244,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
             if ( mem_coarse < mem_sub )
             {
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
-                                                                      std::move( G2 ),
+                                                                      std::move( G3 ),
                                                                       std::move( Y0 ),
                                                                       std::move( Y1 ),
                                                                       std::move( Y2 ) );
@@ -315,7 +289,7 @@ template < typename                    value_t,
 std::unique_ptr< base_tensor3< value_t > >
 build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
                             const tensor_accuracy &           acc,
-                            const approx_t &                  approx,
+                            const approx_t &                  apx,
                             const size_t                      ntile )
 {
     //
@@ -335,7 +309,7 @@ build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
     M = std::move( detail::build_hierarchical_tucker( indexset( 0, D.size(0)-1 ),
                                                       indexset( 0, D.size(1)-1 ),
                                                       indexset( 0, D.size(2)-1 ),
-                                                      D, acc, approx, ntile ) );
+                                                      D, acc, apx, ntile ) );
 
     HLR_ASSERT( M.get() != nullptr );
 

@@ -1300,12 +1300,12 @@ qr ( matrix< value_t > &  M,
 template < typename value_t >
 std::pair< matrix< value_t >,
            matrix< value_t > >
-qr ( matrix< value_t > &  M )
+qr ( const matrix< value_t > &  M )
 {
     auto  Q = copy( M );
     auto  R = matrix< value_t >();
-    
-    qr2( M, R, true );
+
+    qr2( Q, R, true );
 
     return { std::move( Q ), std::move( R ) };
 }

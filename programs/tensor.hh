@@ -41,26 +41,6 @@ struct local_accuracy : public hlr::tensor_accuracy
 };
 
 //
-// error of tucker decomposition
-//
-template < typename value_t >
-Hpro::real_type_t< value_t >
-tucker_error ( const blas::tensor3< value_t > &  X,
-               const blas::tensor3< value_t > &  G,
-               const blas::matrix< value_t > &   X0,
-               const blas::matrix< value_t > &   X1,
-               const blas::matrix< value_t > &   X2 )
-{
-    auto  T0 = blas::tensor_product( G,  X0, 0 );
-    auto  T1 = blas::tensor_product( T0, X1, 1 );
-    auto  Y  = blas::tensor_product( T1, X2, 2 );
-        
-    impl::blas::add( -1, X, Y );
-
-    return impl::blas::norm_F( Y );
-}
-
-//
 // construct X as
 //                                        1
 //    X_ijl = V(x^ijl) =    Σ    ───────────────────
@@ -273,7 +253,12 @@ program_main ()
 {
     using value_t = double;
 
+    if ( false )
     {
+        //
+        // play around with slices and tensor_product
+        //
+        
         auto  X = blas::tensor3< value_t >( 3, 4, 2 );
         uint  val = 1;
         
@@ -389,7 +374,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 3 )
+        switch ( 2 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
@@ -466,7 +451,7 @@ program_main ()
                                                          std::move( X0 ),
                                                          std::move( X1 ),
                                                          std::move( X2 ) );
-        auto  error = tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+        auto  error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -476,7 +461,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -509,7 +494,7 @@ program_main ()
                                                          std::move( X0 ),
                                                          std::move( X1 ),
                                                          std::move( X2 ) );
-        auto  error = tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+        auto  error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -518,7 +503,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -567,7 +552,7 @@ program_main ()
             auto  V1 = blas::prod( X1, W1 );
             auto  V2 = blas::prod( X2, W2 );
 
-            auto  error = tucker_error( X, G2, V0, V1, V2 );
+            auto  error = blas::tucker_error( X, G2, V0, V1, V2 );
             
             std::cout << "      error  = " << format_error( error, error / norm_X ) << std::endl;
         }
@@ -577,7 +562,7 @@ program_main ()
                                                          std::move( X0 ),
                                                          std::move( X1 ),
                                                          std::move( X2 ) );
-        auto  error = tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+        auto  error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -587,7 +572,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
