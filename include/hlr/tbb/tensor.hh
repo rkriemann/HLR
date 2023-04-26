@@ -57,10 +57,6 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
-                std::cout << "R: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
-                          << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
-                          << std::endl;
-
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),
                                                                       std::move( X0 ),
@@ -68,8 +64,6 @@ build_hierarchical_tucker ( const indexset &                  is0,
                                                                       std::move( X2 ) );
             }// if
         }// if
-
-        std::cout << "D: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
 
         return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
     }// if
@@ -162,7 +156,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                     }// for
                 }// for
             }// for
-            
+
             //
             // decide how to proceed based on merged ranks
             //
@@ -172,18 +166,16 @@ build_hierarchical_tucker ( const indexset &                  is0,
             auto  Y1 = blas::matrix< value_t >();
             auto  Y2 = blas::matrix< value_t >();
         
-            std::cout << is0 << " × " << is1 << " × " << is2 << " ( merged ranks ) : "
-                      << rank[0] << " / " << rank[1] << " / " << rank[2] << std::endl;
-            
-            if ( std::max({ rank[0], rank[1], rank[2] }) >= std::max({ D.size(0), D.size(1), D.size(2) }) )
+            if ( std::min({ rank[0], rank[1], rank[2] }) >= std::min({ D.size(0), D.size(1), D.size(2) }) )
             {
                 //
                 // directly use HOSVD on D as merged ranks are too large
                 //
                 
+                auto        Dc   = blas::copy( D );  // do not modify D (!)
                 const auto  lacc = acc( is0, is1, is2 );
 
-                std::tie( G3, Y0, Y1, Y2 ) = hosvd( D, lacc, apx );
+                std::tie( G3, Y0, Y1, Y2 ) = hosvd( Dc, lacc, apx );
             }// if
             else
             {
@@ -239,35 +231,38 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 auto  W0 = blas::tensor_product( G,  R0, 0 );
                 auto  W1 = blas::tensor_product( W0, R1, 1 );
                 auto  G2 = blas::tensor_product( W1, R2, 2 );
-            
+
                 //
                 // compress with respect to local accuracy
                 //
             
                 const auto  lacc = acc( is0, is1, is2 );
-                
+
                 std::tie( G3, Y0, Y1, Y2 ) = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
             }// if
-
-            std::cout << is0 << " × " << is1 << " × " << is2 << " (recompressed) : "
-                      << G3.size(0) << " / " << G3.size(1) << " / " << G3.size(2) << std::endl;
             
             //
             // return coarse tucker tensor if more memory efficient
             //
 
+            const auto  mem_full   = sizeof(value_t) * ( D.size(0) * D.size(1) * D.size(2) );
             const auto  mem_coarse = sizeof(value_t) * ( G3.size(0) * G3.size(1) * G3.size(2) +
                                                          Y0.nrows() * Y0.ncols() +
                                                          Y1.nrows() * Y1.ncols() +
                                                          Y2.nrows() * Y2.ncols() );
 
-            if ( mem_coarse < mem_sub )
+            if ( mem_coarse < std::min( mem_sub, mem_full ) )
             {
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G3 ),
                                                                       std::move( Y0 ),
                                                                       std::move( Y1 ),
                                                                       std::move( Y2 ) );
+            }// if
+            
+            if ( mem_full < mem_sub )
+            {
+                return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
             }// if
         }// if
 

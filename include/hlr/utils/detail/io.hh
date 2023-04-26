@@ -13,6 +13,8 @@
 #include <array>
 
 #include <hlr/tensor/structured_tensor.hh>
+#include <hlr/tensor/tucker_tensor.hh>
+#include <hlr/tensor/dense_tensor.hh>
 
 #include <hlr/utils/tools.hh>
 
@@ -524,6 +526,7 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
     
     auto  coords = std::deque< coord_t >();
     auto  voxels = std::deque< voxel_t >();
+    auto  colors = std::deque< int >();
     
     size_t  ncoord = 0;
     size_t  nvoxel = 0;
@@ -566,6 +569,10 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
 
             voxels.push_back({ nvoxel, nvoxel+1, nvoxel+2, nvoxel+3, nvoxel+4, nvoxel+5, nvoxel+6, nvoxel+7 });
             nvoxel += 8;
+
+            if      ( tensor::is_tucker( *T ) ) colors.push_back( 1 );
+            else if ( tensor::is_dense(  *T ) ) colors.push_back( 2 );
+            else                                colors.push_back( 0 );
         }// else
     }// while
 
@@ -595,6 +602,17 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
         
     for ( size_t  i = 0; i < voxels.size(); ++i )
         out << "11 ";
+    out << std::endl;
+
+    //
+    // cell colour
+    //
+
+    out << "CELL_DATA " << voxels.size() << std::endl
+        << "COLOR_SCALARS cellcolour 1" << std::endl;
+
+    for ( auto  c : colors )
+        out << c << ' ';
     out << std::endl;
 }
 
