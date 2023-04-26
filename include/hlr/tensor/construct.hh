@@ -180,7 +180,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 auto        Dc   = blas::copy( D );  // do not modify D (!)
                 const auto  lacc = acc( is0, is1, is2 );
 
-                std::tie( G3, Y0, Y1, Y2 ) = hosvd( Dc, lacc, apx );
+                std::tie( G3, Y0, Y1, Y2 ) = std::move( hosvd( Dc, lacc, apx ) );
 
                 if constexpr ( verbosity >= 1 )
                     std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (hosvd)        : "
@@ -262,7 +262,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
                 const auto  lacc = acc( is0, is1, is2 );
 
-                std::tie( G3, Y0, Y1, Y2 ) = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
+                std::tie( G3, Y0, Y1, Y2 ) = std::move( blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd ) );
 
                 if constexpr ( verbosity >= 1 )
                     std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (recompressed) : "

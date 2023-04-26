@@ -175,7 +175,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 auto        Dc   = blas::copy( D );  // do not modify D (!)
                 const auto  lacc = acc( is0, is1, is2 );
 
-                std::tie( G3, Y0, Y1, Y2 ) = hosvd( Dc, lacc, apx );
+                std::tie( G3, Y0, Y1, Y2 ) = std::move( hosvd( Dc, lacc, apx ) );
             }// if
             else
             {
@@ -238,7 +238,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
                 const auto  lacc = acc( is0, is1, is2 );
 
-                std::tie( G3, Y0, Y1, Y2 ) = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
+                std::tie( G3, Y0, Y1, Y2 ) = std::move( blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd ) );
             }// if
             
             //
@@ -342,7 +342,7 @@ to_dense ( const base_tensor3< value_t > &  X,
 {
     if ( is_structured( X ) )
     {
-        auto  BX    = cptrcast( &X, structured_tensor3< value_t > );
+        auto  BX = cptrcast( &X, structured_tensor3< value_t > );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range3d< uint >( 0, BX->nblocks(0),

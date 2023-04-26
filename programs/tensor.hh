@@ -439,7 +439,7 @@ program_main ()
         
         tic = timer::now();
 
-        auto  [ G, X0, X1, X2 ] = blas::hosvd( X, acc, apx );
+        auto  [ G, X0, X1, X2 ] = impl::blas::hosvd( X, acc, apx );
             
         toc = timer::since( tic );
             
@@ -525,7 +525,7 @@ program_main ()
 
         tic = timer::now();
         
-        auto  [ G, X0, X1, X2 ] = blas::greedy_hosvd( X, acc, apx );
+        auto  [ G, X0, X1, X2 ] = impl::blas::greedy_hosvd( X, acc, apx );
             
         toc = timer::since( tic );
             
@@ -541,7 +541,7 @@ program_main ()
         //     std::cout << "      X2 = " << X2.nrows() << " × " << X2.ncols() << std::endl;
 
         //     auto  acc2               = absolute_prec( Hpro::frobenius_norm, 10.0 * tol );
-        //     auto  [ G2, W0, W1, W2 ] = blas::greedy_hosvd( G, acc2, apx );
+        //     auto  [ G2, W0, W1, W2 ] = impl::blas::greedy_hosvd( G, acc2, apx );
 
         //     std::cout << "      G2 = " << G2.size(0) << " × " << G2.size(1) << " × " << G2.size(2) << std::endl;
         //     std::cout << "      W0 = " << W0.nrows() << " × " << W0.ncols() << std::endl;
