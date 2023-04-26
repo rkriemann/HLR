@@ -532,30 +532,30 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
 
-        {
-            std::cout << "  " << term::bullet << term::bold << "recompression" << term::reset << std::endl;
+        // {
+        //     std::cout << "  " << term::bullet << term::bold << "recompression" << term::reset << std::endl;
 
-            std::cout << "      G  = " << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << std::endl;
-            std::cout << "      X0 = " << X0.nrows() << " × " << X0.ncols() << std::endl;
-            std::cout << "      X1 = " << X1.nrows() << " × " << X1.ncols() << std::endl;
-            std::cout << "      X2 = " << X2.nrows() << " × " << X2.ncols() << std::endl;
+        //     std::cout << "      G  = " << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << std::endl;
+        //     std::cout << "      X0 = " << X0.nrows() << " × " << X0.ncols() << std::endl;
+        //     std::cout << "      X1 = " << X1.nrows() << " × " << X1.ncols() << std::endl;
+        //     std::cout << "      X2 = " << X2.nrows() << " × " << X2.ncols() << std::endl;
 
-            auto  acc2               = absolute_prec( Hpro::frobenius_norm, 10.0 * tol );
-            auto  [ G2, W0, W1, W2 ] = blas::greedy_hosvd( G, acc2, apx );
+        //     auto  acc2               = absolute_prec( Hpro::frobenius_norm, 10.0 * tol );
+        //     auto  [ G2, W0, W1, W2 ] = blas::greedy_hosvd( G, acc2, apx );
 
-            std::cout << "      G2 = " << G2.size(0) << " × " << G2.size(1) << " × " << G2.size(2) << std::endl;
-            std::cout << "      W0 = " << W0.nrows() << " × " << W0.ncols() << std::endl;
-            std::cout << "      W1 = " << W1.nrows() << " × " << W1.ncols() << std::endl;
-            std::cout << "      W2 = " << W2.nrows() << " × " << W2.ncols() << std::endl;
+        //     std::cout << "      G2 = " << G2.size(0) << " × " << G2.size(1) << " × " << G2.size(2) << std::endl;
+        //     std::cout << "      W0 = " << W0.nrows() << " × " << W0.ncols() << std::endl;
+        //     std::cout << "      W1 = " << W1.nrows() << " × " << W1.ncols() << std::endl;
+        //     std::cout << "      W2 = " << W2.nrows() << " × " << W2.ncols() << std::endl;
 
-            auto  V0 = blas::prod( X0, W0 );
-            auto  V1 = blas::prod( X1, W1 );
-            auto  V2 = blas::prod( X2, W2 );
+        //     auto  V0 = blas::prod( X0, W0 );
+        //     auto  V1 = blas::prod( X1, W1 );
+        //     auto  V2 = blas::prod( X2, W2 );
 
-            auto  error = blas::tucker_error( X, G2, V0, V1, V2 );
+        //     auto  error = blas::tucker_error( X, G2, V0, V1, V2 );
             
-            std::cout << "      error  = " << format_error( error, error / norm_X ) << std::endl;
-        }
+        //     std::cout << "      error  = " << format_error( error, error / norm_X ) << std::endl;
+        // }
         
         auto  Z     = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
                                                          std::move( G ),

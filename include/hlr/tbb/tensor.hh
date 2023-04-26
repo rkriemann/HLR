@@ -57,6 +57,10 @@ build_hierarchical_tucker ( const indexset &                  is0,
             
             if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
             {
+                std::cout << "R: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
+                          << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
+                          << std::endl;
+
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),
                                                                       std::move( X0 ),
@@ -64,6 +68,8 @@ build_hierarchical_tucker ( const indexset &                  is0,
                                                                       std::move( X2 ) );
             }// if
         }// if
+
+        std::cout << "D: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
 
         return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
     }// if
@@ -125,7 +131,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 }// for
         
         //
-        // try to merge to coarse Tucker
+        // if all sub blocks are Tucker tensors, try to merge
         //
 
         if ( all_tucker )
@@ -158,65 +164,94 @@ build_hierarchical_tucker ( const indexset &                  is0,
             }// for
             
             //
-            // construct merged tucker representation
+            // decide how to proceed based on merged ranks
             //
-
-            auto  G      = blas::tensor3< value_t >( rank[0], rank[1], rank[2] );
-            auto  X0     = blas::matrix< value_t >( is0.size(), rank[0] );
-            auto  X1     = blas::matrix< value_t >( is1.size(), rank[1] );
-            auto  X2     = blas::matrix< value_t >( is2.size(), rank[2] );
-            uint  ofs[3] = { 0, 0, 0 };
             
-            for ( uint  l = 0; l < 2; ++l )
+            auto  G3 = blas::tensor3< value_t >();
+            auto  Y0 = blas::matrix< value_t >();
+            auto  Y1 = blas::matrix< value_t >();
+            auto  Y2 = blas::matrix< value_t >();
+        
+            std::cout << is0 << " × " << is1 << " × " << is2 << " ( merged ranks ) : "
+                      << rank[0] << " / " << rank[1] << " / " << rank[2] << std::endl;
+            
+            if ( std::max({ rank[0], rank[1], rank[2] }) >= std::max({ D.size(0), D.size(1), D.size(2) }) )
             {
-                for ( uint  j = 0; j < 2; ++j )
+                //
+                // directly use HOSVD on D as merged ranks are too large
+                //
+                
+                const auto  lacc = acc( is0, is1, is2 );
+
+                std::tie( G3, Y0, Y1, Y2 ) = hosvd( D, lacc, apx );
+            }// if
+            else
+            {
+                //
+                // construct merged tucker representation
+                //
+
+                auto  G      = blas::tensor3< value_t >( rank[0], rank[1], rank[2] );
+                auto  X0     = blas::matrix< value_t >( is0.size(), rank[0] );
+                auto  X1     = blas::matrix< value_t >( is1.size(), rank[1] );
+                auto  X2     = blas::matrix< value_t >( is2.size(), rank[2] );
+                uint  ofs[3] = { 0, 0, 0 };
+            
+                for ( uint  l = 0; l < 2; ++l )
                 {
-                    for ( uint  i = 0; i < 2; ++i )
+                    for ( uint  j = 0; j < 2; ++j )
                     {
-                        auto  D_ijl  = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
-                        auto  k0     = blas::range( ofs[0], ofs[0] + D_ijl->rank(0) - 1 );
-                        auto  k1     = blas::range( ofs[1], ofs[1] + D_ijl->rank(1) - 1 );
-                        auto  k2     = blas::range( ofs[2], ofs[2] + D_ijl->rank(2) - 1 );
-                        auto  G_ijl  = blas::tensor3< value_t >( G, k0, k1, k2 );
-                        auto  X0_ijl = blas::matrix< value_t >( X0, D_ijl->is(0) - is0.first(), k0 );
-                        auto  X1_ijl = blas::matrix< value_t >( X1, D_ijl->is(1) - is1.first(), k1 );
-                        auto  X2_ijl = blas::matrix< value_t >( X2, D_ijl->is(2) - is2.first(), k2 );
+                        for ( uint  i = 0; i < 2; ++i )
+                        {
+                            auto  D_ijl  = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
+                            auto  k0     = blas::range( ofs[0], ofs[0] + D_ijl->rank(0) - 1 );
+                            auto  k1     = blas::range( ofs[1], ofs[1] + D_ijl->rank(1) - 1 );
+                            auto  k2     = blas::range( ofs[2], ofs[2] + D_ijl->rank(2) - 1 );
+                            auto  G_ijl  = blas::tensor3< value_t >( G, k0, k1, k2 );
+                            auto  X0_ijl = blas::matrix< value_t >( X0, D_ijl->is(0) - is0.first(), k0 );
+                            auto  X1_ijl = blas::matrix< value_t >( X1, D_ijl->is(1) - is1.first(), k1 );
+                            auto  X2_ijl = blas::matrix< value_t >( X2, D_ijl->is(2) - is2.first(), k2 );
 
-                        blas::copy( D_ijl->G_decompressed(), G_ijl );
-                        blas::copy( D_ijl->X_decompressed( 0 ), X0_ijl );
-                        blas::copy( D_ijl->X_decompressed( 1 ), X1_ijl );
-                        blas::copy( D_ijl->X_decompressed( 2 ), X2_ijl );
+                            blas::copy( D_ijl->G_decompressed(), G_ijl );
+                            blas::copy( D_ijl->X_decompressed( 0 ), X0_ijl );
+                            blas::copy( D_ijl->X_decompressed( 1 ), X1_ijl );
+                            blas::copy( D_ijl->X_decompressed( 2 ), X2_ijl );
 
-                        ofs[0] += D_ijl->rank(0);
-                        ofs[1] += D_ijl->rank(1);
-                        ofs[2] += D_ijl->rank(2);
+                            ofs[0] += D_ijl->rank(0);
+                            ofs[1] += D_ijl->rank(1);
+                            ofs[2] += D_ijl->rank(2);
+                        }// for
                     }// for
                 }// for
-            }// for
 
-            //
-            // orthogonalize merged Tucker tensor
-            //
+                //
+                // orthogonalize merged Tucker tensor
+                //
 
-            auto  R0 = blas::matrix< value_t >();
-            auto  R1 = blas::matrix< value_t >();
-            auto  R2 = blas::matrix< value_t >();
+                auto  R0 = blas::matrix< value_t >();
+                auto  R1 = blas::matrix< value_t >();
+                auto  R2 = blas::matrix< value_t >();
             
-            blas::qr( X0, R0 );
-            blas::qr( X1, R1 );
-            blas::qr( X2, R2 );
+                blas::qr( X0, R0 );
+                blas::qr( X1, R1 );
+                blas::qr( X2, R2 );
 
-            auto  W0 = blas::tensor_product( G,  R0, 0 );
-            auto  W1 = blas::tensor_product( W0, R1, 1 );
-            auto  G2 = blas::tensor_product( W1, R2, 2 );
+                auto  W0 = blas::tensor_product( G,  R0, 0 );
+                auto  W1 = blas::tensor_product( W0, R1, 1 );
+                auto  G2 = blas::tensor_product( W1, R2, 2 );
             
-            //
-            // compress with respect to local accuracy
-            //
+                //
+                // compress with respect to local accuracy
+                //
             
-            const auto  lacc               = acc( is0, is1, is2 );
-            auto        [ G3, Y0, Y1, Y2 ] = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
+                const auto  lacc = acc( is0, is1, is2 );
+                
+                std::tie( G3, Y0, Y1, Y2 ) = blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd );
+            }// if
 
+            std::cout << is0 << " × " << is1 << " × " << is2 << " (recompressed) : "
+                      << G3.size(0) << " / " << G3.size(1) << " / " << G3.size(2) << std::endl;
+            
             //
             // return coarse tucker tensor if more memory efficient
             //
@@ -246,7 +281,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
         }// if
         
         //
-        // construct structured tensor
+        // as merge was not successful, construct structured tensor
         //
 
         auto  B = std::make_unique< structured_tensor3< value_t > >( is0, is1, is2 );
