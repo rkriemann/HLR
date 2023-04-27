@@ -253,8 +253,8 @@ build_hierarchical_tucker ( const indexset &                  is0,
     
     // choose one to be used below
     // auto  hosvd = blas::hosvd< value_t, approx_t >;
-    auto  hosvd = blas::sthosvd< value_t, approx_t >;
-    // auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
+    // auto  hosvd = blas::sthosvd< value_t, approx_t >;
+    auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
         
     if ( std::min( D.size(0), std::min( D.size(1), D.size(2) ) ) <= ntile )
     {
