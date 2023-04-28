@@ -791,19 +791,19 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         _mpdata.sv = std::vector< mptype1_t >( orank );
         std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
         
-        {
-            io::matlab::write( oU, "U1" );
-            io::matlab::write( oV, "V1" );
+        // {
+        //     io::matlab::write( oU, "U1" );
+        //     io::matlab::write( oV, "V1" );
             
-            auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
-            auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+        //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+        //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
             
-            hlr::compress::apfloat::decompress_lr( zU, dU );
-            hlr::compress::apfloat::decompress_lr( zV, dV );
+        //     hlr::compress::apfloat::decompress_lr( zU, dU );
+        //     hlr::compress::apfloat::decompress_lr( zV, dV );
 
-            io::matlab::write( dU, "U2" );
-            io::matlab::write( dV, "V2" );
-        }
+        //     io::matlab::write( dU, "U2" );
+        //     io::matlab::write( dV, "V2" );
+        // }
         
         _mpdata.zU = std::move( zU );
         _mpdata.zV = std::move( zV );

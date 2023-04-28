@@ -12,6 +12,7 @@
 #include <half.hpp>
 
 #include "hlr/arith/norm.hh"
+#include "hlr/approx/accuracy.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/mplrmatrix.hh>
@@ -65,53 +66,36 @@ program_main ()
 
     blas::reset_flops();
     
-    auto  problem = gen_problem< problem_t >();
-    auto  coord   = problem->coordinates();
-    auto  ct      = gen_ct( *coord );
-    auto  bct     = gen_bct( *ct, *ct );
+    auto  acc = gen_accuracy();
+    auto  A   = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
-    if ( hpro::verbose( 3 ) )
-        io::eps::print( *bct->root(), "bct" );
+    if ( matrixfile == "" )
+    {
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
+        auto  coeff   = problem->coeff_func();
+        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+        
+        tic = timer::now();
+        A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        toc = timer::since( tic );
+
+        io::hpro::write< value_t >( *A, "A.hm" );
+    }// if
+    else
+    {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    matrix = " << matrixfile
+                  << std::endl;
+
+        A = io::hpro::read< value_t >( matrixfile );
+    }// else
     
-    auto  acc     = gen_accuracy();
-    auto  coeff   = problem->coeff_func();
-    auto  pcoeff  = hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-
-    // std::cout << "  " << term::bullet << term::bold << "nearfield" << term::reset << std::endl;
-    
-    // auto  A_nf    = impl::matrix::build_nearfield( bct->root(), pcoeff, nseq );
-    
-    // std::cout << "    done in " << format_time( toc ) << std::endl;
-    // std::cout << "    dims   = " << A_nf->nrows() << " × " << A_nf->ncols() << std::endl;
-    // std::cout << "    mem    = " << format_mem( A_nf->byte_size() ) << std::endl;
-
-    // // auto  norm_nf  = norm::spectral( *A_nf );
-    // auto  norm_nf  = norm::frobenius( *A_nf );
-
-    // std::cout << "    |A_nf| = " << format_norm( norm_nf ) << std::endl;
-
-    // auto  delta   = norm_nf * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
-    // // auto  acc2    = hpro::absolute_prec( delta );
-    // auto  acc2    = local_accuracy( delta );
-
-    // std::cout << "  " << term::bullet << term::bold << "H-matrix, ε = " << delta << term::reset << std::endl;
-
-    auto  lrapx   = bem::aca_lrapx< hpro::TPermCoeffFn< value_t > >( pcoeff );
-    // auto  lrapx   = hpro::TDenseLRApx< value_t >( & pcoeff );
-
-    tic = timer::now();
-    
-    auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A       = impl::matrix::build( bct->root(), pcoeff, lrapx, acc2, nseq );
-    
-    toc = timer::since( tic );
-
     auto  mem_A  = A->byte_size();
     auto  norm_A = impl::norm::frobenius( *A );
-
-    // delta = norm_A * hlr::cmdline::eps / ( A_nf->nrows() / hlr::cmdline::ntile );
-    // delta = hlr::cmdline::eps; //  * norm_A / (A_nf->nrows());
-    // auto  delta  = 0.25 * hlr::cmdline::eps * norm_A; // / (A->nrows());
     auto  delta  = hlr::cmdline::eps; // / (A->nrows());
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -186,7 +170,7 @@ program_main ()
         
             tic = timer::now();
     
-            impl::matrix::compress( *B, Hpro::fixed_prec( delta ) );
+            impl::matrix::compress( *B, absolute_prec( delta ) );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
