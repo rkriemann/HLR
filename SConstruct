@@ -536,61 +536,61 @@ if 'cuda' in frameworks :
 
 # support for half precision
 if half :
-    env.Append( CPPDEFINES = 'HLR_USE_HALF' )
+    env.Append( CPPDEFINES = 'HLR_HAS_HALF' )
     env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
         
 # support for ZFP compression
 if zfp :
-    env.Append( CPPDEFINES = 'HLR_USE_ZFP' )
+    env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zfp' ] )
         
 # support for SZ compression
 if sz :
-    env.Append( CPPDEFINES = 'HLR_USE_SZ' )
+    env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'SZ' ] )
         
 # support for SZ3 compression
 if sz3 :
-    env.Append( CPPDEFINES = 'HLR_USE_SZ3' )
+    env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
     env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
         
 # support for MGARD compression
 if mgard :
-    env.Append( CPPDEFINES = 'HLR_USE_MGARD' )
+    env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'mgard' ] )
         
 # support for LZ4 compression
 if lz4 :
-    env.Append( CPPDEFINES = 'HLR_USE_LZ4' )
+    env.Append( CPPDEFINES = 'HLR_HAS_LZ4' )
     env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'lz4' ] )
         
 # support for ZLIB compression
 if zlib :
-    env.Append( CPPDEFINES = 'HLR_USE_ZLIB' )
+    env.Append( CPPDEFINES = 'HLR_HAS_ZLIB' )
     env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'z' ] )
         
 # support for Zstd compression
 if zstd :
-    env.Append( CPPDEFINES = 'HLR_USE_ZSTD' )
+    env.Append( CPPDEFINES = 'HLR_HAS_ZSTD' )
     env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
         
 # support for universal number library
 if universal :
-    env.Append( CPPDEFINES = 'HLR_USE_UNIVERSAL' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 
 if   compressor == 'fp32'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
