@@ -479,12 +479,13 @@ template < typename value_t >
 void
 dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    HLR_ASSERT( acc.is_fixed_prec() );
+    HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( this->nrows() * this->ncols() == 0 )
         return;
-        
-    const auto  eps   = acc( this->row_is(), this->col_is() ).rel_eps();
+
+    const auto  lacc  = acc( this->row_is(), this->col_is() );
+    const auto  eps   = lacc.abs_eps();
     // const auto  normF = blas::norm_F( this->blas_mat() );
     // const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
     // const auto  lacc  = acc( this->row_is(), this->col_is() );

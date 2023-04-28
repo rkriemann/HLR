@@ -8,6 +8,7 @@
 
 #include <hlr/utils/io.hh>
 #include <hlr/approx/svd.hh>
+#include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
 
@@ -46,26 +47,31 @@ program_main ()
 
     blas::reset_flops();
     
-    auto  acc     = gen_accuracy();
-    auto  problem = gen_problem< problem_t >();
-    auto  coord   = problem->coordinates();
-    auto  ct      = gen_ct( *coord );
-    auto  bct     = gen_bct( *ct, *ct );
-    auto  coeff   = problem->coeff_func();
-    auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
-    auto  A       = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  acc = gen_accuracy();
+    auto  A   = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
     if ( matrixfile == "" )
     {
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
+        auto  coeff   = problem->coeff_func();
+        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+        
         tic = timer::now();
         A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
 
-        // io::hpro::write< value_t >( *A, "A.hm" );
+        io::hpro::write< value_t >( *A, "A.hm" );
     }// if
     else
     {
+        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
+                  << "    matrix = " << matrixfile
+                  << std::endl;
+
         A = io::hpro::read< value_t >( matrixfile );
     }// else
     
@@ -79,9 +85,6 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
 
-    // assign clusters since needed for cluster bases
-    seq::matrix::assign_cluster( *A, *bct->root() );
-    
     //////////////////////////////////////////////////////////////////////
     //
     // further compress matrix
@@ -101,6 +104,9 @@ program_main ()
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
+        // auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
+        auto  lacc = absolute_prec( cmdline::eps );
+        
         runtime.clear();
         
         for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
@@ -109,7 +115,8 @@ program_main ()
         
             tic = timer::now();
     
-            impl::matrix::compress( *B, Hpro::fixed_prec( acc.rel_eps() ) );
+            // impl::matrix::compress( *B, Hpro::fixed_prec( norm_A * acc.rel_eps() ) );
+            impl::matrix::compress( *B, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );

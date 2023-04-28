@@ -491,12 +491,12 @@ template < typename value_t >
 void
 uniform_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    HLR_ASSERT( acc.is_fixed_prec() );
+    HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( this->nrows() * this->ncols() == 0 )
         return;
         
-    compress( compress::get_config( acc( this->row_is(), this->col_is() ).rel_eps() ) );
+    compress( compress::get_config( acc( this->row_is(), this->col_is() ).abs_eps() ) );
 }
 
 //

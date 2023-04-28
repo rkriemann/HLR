@@ -753,7 +753,7 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //
 
     const auto    norm  = blas::lr_normF( this->U(), this->V() );
-    double        tol   = acc( this->row_is(), this->col_is() ).rel_eps() * norm;
+    double        tol   = acc( this->row_is(), this->col_is() ).abs_eps() * norm;
     auto          QU    = blas::copy( this->U() );
     auto          QV    = blas::copy( this->V() );
     const auto    orank = QU.ncols();
