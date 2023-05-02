@@ -47,7 +47,7 @@ bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
 int     coarse     = 0;            // use coarse sparse graph
-int     nbench     = 1;            // perform computations <nbench> times (at most)
+uint    nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
@@ -145,7 +145,7 @@ parse ( int argc, char ** argv )
         ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
         ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
-        ( "nbench",      value<int>(),    ": (maximal) number of benchmark iterations" )
+        ( "nbench",      value<uint>(),   ": (maximal) number of benchmark iterations" )
         ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
@@ -231,7 +231,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
-    if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<int>();
+    if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<uint>();
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
     if ( vm.count( "ref"        ) ) ref        = vm["ref"].as<string>();
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();

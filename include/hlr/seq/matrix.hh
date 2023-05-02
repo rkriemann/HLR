@@ -771,8 +771,6 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
-    
     if ( is_blocked( M ) )
     {
         auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );

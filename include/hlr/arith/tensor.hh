@@ -168,10 +168,10 @@ public:
                 _stride[2] = _length[0]*_length[1];
                 super_t::alloc_wo_value( _length[0] * _length[1] * _length[2] );
 
-                for ( idx_t p = 0; p < idx_t( _length[2] ); p++ )
+                for ( idx_t l = 0; l < idx_t( _length[2] ); l++ )
                     for ( idx_t j = 0; j < idx_t( _length[1] ); j++ )
                         for ( idx_t i = 0; i < idx_t( _length[0] ); i++ )
-                            (*this)(i,j,p) = t(i,j,p);
+                            (*this)(i,j,l) = t(i,j,l);
                 
                 break;
         }// switch
@@ -224,12 +224,12 @@ public:
                 _stride[1] = _length[0];
                 _stride[2] = _length[0]*_length[1];
 
-                for ( idx_t p = 0; p < idx_t( _length[2] ); p++ )
+                for ( idx_t l = 0; l < idx_t( _length[2] ); l++ )
                     for ( idx_t j = 0; j < idx_t( _length[1] ); j++ )
                         for ( idx_t i = 0; i < idx_t( _length[0] ); i++ )
-                            (*this)(i,j,p) = t( r0.first() + i * idx_t( r0.stride() ),
+                            (*this)(i,j,l) = t( r0.first() + i * idx_t( r0.stride() ),
                                                 r1.first() + j * idx_t( r1.stride() ),
-                                                r2.first() + p * idx_t( r2.stride() ) );
+                                                r2.first() + l * idx_t( r2.stride() ) );
                 break;
         }// switch
     }

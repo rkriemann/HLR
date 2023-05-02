@@ -10,7 +10,7 @@
 
 #include <hpro/config.h>
 
-#if USE_GSL == 1
+#if HPRO_USE_GSL == 1
 #include <gsl/gsl_sf_bessel.h>
 #include <gsl/gsl_sf_gamma.h>
 #else
@@ -270,7 +270,7 @@ struct matern_covariance_function
             return sigmasq;
                 
         const auto  nu_l_r   = r * sqrnu_over_l;
-        #if USE_GSL == 1
+        #if HPRO_USE_GSL == 1
         const auto  bessel_r = gsl_sf_bessel_Knu( nu, nu_l_r );
         #else
         const auto  bessel_r = std::cyl_bessel_k( nu, nu_l_r );
@@ -282,13 +282,13 @@ struct matern_covariance_function
     value_t  eval_gamma ( const value_t  asigma,
                           const value_t  anu ) const
     {
-        #if USE_GSL == 1
-        const auto  gamma_nu = gsl_sf_gamma( anu );
+        #if HPRO_USE_GSL == 1
+        const auto  tgamma_nu = gsl_sf_gamma( anu );
         #else
-        const auto  gamma_nu = std::tgamma( anu );
+        const auto  tgamma_nu = std::tgamma( anu );
         #endif
         
-        return math::sqrt( asigma ) * std::pow( value_t(2), value_t(1) - nu ) / gamma_nu;
+        return math::sqrt( asigma ) * std::pow( value_t(2), value_t(1) - nu ) / tgamma_nu;
     }
 };
 

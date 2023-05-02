@@ -92,7 +92,7 @@ program_main ()
     //////////////////////////////////////////////////////////////////////
 
     auto  zA     = impl::matrix::copy_compressible( *A );
-    auto  norm_A = norm::spectral( impl::arithmetic, *A );
+    auto  norm_A = impl::norm::frobenius( *A );
     
     std::cout << "  "
               << term::bullet << term::bold
@@ -109,7 +109,7 @@ program_main ()
         
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
         {
             auto  B = impl::matrix::copy( *zA );
         
@@ -140,8 +140,9 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
     
-    auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
-    auto  error = norm::spectral( impl::arithmetic, *diff );
+    // auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
+    // auto  error = norm::spectral( impl::arithmetic, *diff );
+    auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     
@@ -179,9 +180,12 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
+        // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zB );
 
-        error = norm::spectral( impl::arithmetic, *diffB );
+        // error = norm::spectral( impl::arithmetic, *diffB );
+        
+        error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zB );
+        
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 

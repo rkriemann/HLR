@@ -1,7 +1,7 @@
 
 #include <hpro/config.h>
 
-#if USE_TBB == 1
+#if HPRO_USE_TBB == 1
 #include <tbb/global_control.h>
 #endif
 

@@ -429,7 +429,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     if ( is_compressed() )
         return;
 
-    // if ( this->block_is() == Hpro::bis( Hpro::is( 96, 111 ), Hpro::is( 225, 240 ) ) )
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 0, 63 ), Hpro::is( 256, 319 ) ) )
     //     std::cout << std::endl;
 
     auto          M         = this->blas_mat();
@@ -442,16 +442,17 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     //     compress::decompress( zM, dM );
 
-    //     io::matlab::write( M, "M1" );
-    //     io::matlab::write( dM, "M2" );
+    //     // io::matlab::write( M, "M1" );
+    //     // io::matlab::write( dM, "M2" );
         
     //     blas::add( value_t(-1), M, dM );
 
-    //     std::cout << "D " << this->block_is().to_string() << " : "
-    //               << blas::norm_F( dM ) / blas::norm_F(M)
-    //               << " / "
-    //               << blas::max_abs_val( dM )
-    //               << std::endl;
+    //     if ( blas::norm_F( dM ) / blas::norm_F(M) > 1e-6 )
+    //         std::cout << "D " << this->block_is().to_string() << " : "
+    //                   << blas::norm_F( dM ) / blas::norm_F(M)
+    //                   << " / "
+    //                   << blas::max_abs_val( dM )
+    //                   << std::endl;
             
     //     // for ( size_t  i = 0; i < M.nrows() * M.ncols(); ++i )
     //     // {

@@ -164,7 +164,7 @@ program_main ()
     {
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1 ); ++i )
+        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
         {
             auto  B = impl::matrix::copy( *zA );
         
@@ -176,7 +176,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == std::max( nbench, 1 )-1 )
+            if ( i == std::max( nbench, 1u )-1 )
                 zA = std::move( B );
         }// for
 
@@ -224,7 +224,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < std::max( nbench, 1 )-1 )
+            if ( i < std::max( nbench, 1u )-1 )
                 zB = std::move( impl::matrix::copy( *zA ) );
         }// for
         

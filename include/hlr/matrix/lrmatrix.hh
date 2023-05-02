@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-// #include <boost/format.hpp>
+#include <boost/format.hpp>
 
 #include <hpro/matrix/TMatrix.hh>
 
@@ -492,10 +492,10 @@ lrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
     
 template < typename value_t >
 void
-lrmatrix< value_t >::apply_add ( const value_t                   alpha,
+lrmatrix< value_t >::apply_add ( const value_t                    alpha,
                                  const blas::vector< value_t > &  x,
                                  blas::vector< value_t > &        y,
-                                 const matop_t                   op ) const
+                                 const matop_t                    op ) const
 {
     #if HLR_HAS_COMPRESSION == 1
 
@@ -505,12 +505,9 @@ lrmatrix< value_t >::apply_add ( const value_t                   alpha,
         HLR_ASSERT( y.length() == this->nrows( op ) );
 
         // auto  ty = blas::vector< value_t >( y.length() );
-        auto  uU = blas::matrix< value_t >( this->nrows(), this->rank() );
-        auto  uV = blas::matrix< value_t >( this->ncols(), this->rank() );
+        auto  uU = U_decompressed();
+        auto  uV = V_decompressed();
     
-        compress::decompress< value_t >( _zdata.U, uU );
-        compress::decompress< value_t >( _zdata.V, uV );
-        
         blas::mulvec_lr( alpha, uU, uV, op, x, y );
         // blas::add( value_t(1), ty, y );
     }// if
@@ -537,7 +534,7 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     if ( is_compressed() )
         return;
                  
-    // if ( this->block_is() == Hpro::bis( Hpro::is( 192, 255 ), Hpro::is( 256, 319 ) ) )
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 0, 63 ), Hpro::is( 256, 319 ) ) )
     //     std::cout << std::endl;
 
     auto          oU      = this->U();
@@ -556,11 +553,12 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dU, "U2" );
             
     //     blas::add( value_t(-1), oU, dU );
-    //     std::cout << "U " << this->block_is().to_string() << " : "
-    //               << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
-    //               << " / "
-    //               << boost::format( "%.4e" ) % blas::max_abs_val( dU )
-    //               << std::endl;
+    //     if ( blas::norm_F( dU ) / blas::norm_F(oU) > 1e-8 )
+    //         std::cout << this->block_is().to_string() << " : " << "U " << this->block_is().to_string() << " : "
+    //                   << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
+    //                   << " / "
+    //                   << boost::format( "%.4e" ) % blas::max_abs_val( dU )
+    //                   << std::endl;
 
     //     // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
     //     // {
@@ -584,11 +582,12 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dV, "V2" );
             
     //     blas::add( value_t(-1), oV, dV );
-    //     std::cout << "V " << this->block_is().to_string() << " : "
-    //               << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
-    //               << " / "
-    //               << boost::format( "%.4e" ) % blas::max_abs_val( dV )
-    //               << std::endl;
+    //     if ( blas::norm_F( dV ) / blas::norm_F(oV) > 1e-8 )
+    //         std::cout << this->block_is().to_string() << " : " << "V " << this->block_is().to_string() << " : "
+    //                   << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
+    //                   << " / "
+    //                   << boost::format( "%.4e" ) % blas::max_abs_val( dV )
+    //                   << std::endl;
 
     //     // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )
     //     // {
