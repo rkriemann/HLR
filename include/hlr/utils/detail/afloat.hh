@@ -1031,10 +1031,10 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         vmant_bits[l] = tol_to_rate( S(l) );
         vmin_val[l]   = vmin;
 
-        const size_t  nbits      = 1 + exp_bits[l] + mant_bits[l]; // number of bits per value
-        const size_t  n_tot_bits = n * nbits;                      // number of bits for all values in column
+        const size_t  nbits      = 1 + vexp_bits[l] + vmant_bits[l]; // number of bits per value
+        const size_t  n_tot_bits = n * nbits;                        // number of bits for all values in column
         
-        if (( m[l] <= 23 ) && ( nbits <= 32 ))
+        if (( vmant_bits[l] <= 23 ) && ( nbits <= 32 ))
             zsize += sizeof(float) + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
         else
             zsize += sizeof(double) + 1 + 1 + n_tot_bits / 8 + ( n_tot_bits % 8 != 0 ? 1 : 0 );
@@ -1053,11 +1053,11 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         
     for ( uint  l = 0; l < k; ++l )
     {
-        const double  data      = U.data() + l * n;
-        const uint    exp_bits  = vexp_bits[l];
-        const uint    exp_mask  = ( 1 << exp_bits ) - 1;
-        const uint    prec_bits = vmant_bits[l];
-        const size_t  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const double *  data      = U.data() + l * n;
+        const uint      exp_bits  = vexp_bits[l];
+        const uint      exp_mask  = ( 1 << exp_bits ) - 1;
+        const uint      prec_bits = vmant_bits[l];
+        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         if (( prec_bits <= 23 ) && ( nbits <= 32 ))
         {
@@ -1163,7 +1163,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
                 {
                     const bool   zsign = ( val < 0 );
                 
-                    const float  sval  = std::max( fscale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
+                    const float  sval  = std::max( scale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
                     const uint   isval = (*reinterpret_cast< const uint * >( & sval ) );
                     const uint   sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
                     const uint   smant = ( isval & ((1u << fp32_mant_bits) - 1) );
