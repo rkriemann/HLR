@@ -191,6 +191,101 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
+    // test also for FP32
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    {
+        std::cout << "  "
+                  << term::bullet << term::bold
+                  << "FP32 compression ("
+                  << "ε = " << boost::format( "%.2e" ) % cmdline::eps
+                  << ", "
+                  << hlr::compress::provider << ')'
+                  << term::reset << std::endl;
+        std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
+        
+        auto  As      = impl::matrix::convert< float >( *A );
+        auto  zAs     = impl::matrix::copy_compressible( *As );
+        auto  norm_As = impl::norm::frobenius( *As );
+        auto  mem_As  = A->byte_size();
+
+        std::cout << "    mem   = " << format_mem( mem_As ) << std::endl;
+
+        {
+            // auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
+            auto  lacc = absolute_prec( cmdline::eps );
+        
+            runtime.clear();
+        
+            for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
+            {
+                auto  B = impl::matrix::copy( *zAs );
+        
+                tic = timer::now();
+    
+                impl::matrix::compress( *B, lacc );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+                std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+
+                if ( i == nbench-1 )
+                    zAs = std::move( B );
+            }// for
+
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+        }
+
+        const auto  mem_zAs = zAs->byte_size();
+    
+        std::cout << "    mem   = " << format_mem( mem_zAs ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zAs) / double(mem_As) ) << std::endl;
+
+        auto  error = impl::norm::frobenius( value_t(1), *As, value_t(-1), *zAs );
+
+        std::cout << "    error = " << format_error( error, error / norm_As ) << std::endl;
+
+        std::cout << "  "
+                  << term::bullet << term::bold
+                  << "decompression "
+                  << term::reset << std::endl;
+
+        {
+            runtime.clear();
+        
+            auto  zB = impl::matrix::copy( *zAs );
+        
+            for ( uint  i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                impl::matrix::decompress( *zB );
+            
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+                std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    zB = std::move( impl::matrix::copy( *zAs ) );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            error = impl::norm::frobenius( value_t(1), *As, value_t(-1), *zB );
+        
+            std::cout << "    error = " << format_error( error, error / norm_As ) << std::endl;
+        }
+    }
+    
+    //////////////////////////////////////////////////////////////////////
+    //
     // H-matrix matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////

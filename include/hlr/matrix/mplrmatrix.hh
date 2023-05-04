@@ -118,7 +118,7 @@ private:
     //
     struct mp_storage
     {
-        std::vector< mptype1_t >  sv;
+        std::vector< real_t >     sv;
 
         #if defined(USE_AFLOAT)
         hlr::compress::apfloat::zarray  zU, zV;
@@ -447,7 +447,7 @@ public:
         
         if ( is_compressed() )
         {
-            R->_mpdata.sv = std::vector< mptype1_t >( _mpdata.sv.size() );
+            R->_mpdata.sv = std::vector< real_t >( _mpdata.sv.size() );
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
 
@@ -515,7 +515,7 @@ public:
             
         if ( is_compressed() )
         {
-            R->_mpdata.sv = std::vector< mptype1_t >( _mpdata.sv.size() );
+            R->_mpdata.sv = std::vector< real_t >( _mpdata.sv.size() );
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
             
@@ -590,7 +590,7 @@ public:
     {
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
-        size += sizeof(mptype1_t) * ( _mpdata.sv.size() );
+        size += sizeof(real_t) * ( _mpdata.sv.size() );
 
         #if defined(USE_AFLOAT)
 
@@ -630,7 +630,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _mpdata.sv = std::vector< mptype1_t >();
+        _mpdata.sv = std::vector< real_t >();
 
         #if defined(USE_AFLOAT)
 
@@ -784,11 +784,11 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     auto          zU     = hlr::compress::apfloat::compress_lr( oU, S_tol );
     auto          zV     = hlr::compress::apfloat::compress_lr( oV, S_tol );
     const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_mp = hlr::compress::apfloat::byte_size( zU ) + hlr::compress::apfloat::byte_size( zV ) + sizeof(mptype1_t) * orank;
+    const size_t  mem_mp = hlr::compress::apfloat::byte_size( zU ) + hlr::compress::apfloat::byte_size( zV ) + sizeof(real_t) * orank;
 
     if ( mem_mp < mem_lr )
     {
-        _mpdata.sv = std::vector< mptype1_t >( orank );
+        _mpdata.sv = std::vector< real_t >( orank );
         std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
         
         // {
@@ -864,7 +864,7 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         auto  oU = blas::prod( QU, Us );
         auto  oV = blas::prod( QV, Vs );
 
-        _mpdata.sv = std::vector< mptype1_t >( orank );
+        _mpdata.sv = std::vector< real_t >( orank );
         std::copy( S.data(), S.data() + orank, _mpdata.sv.data() );
         
         if constexpr ( Hpro::is_complex_type_v< value_t > )
