@@ -96,7 +96,7 @@ h5_write_tensor ( H5::H5File &                              file,
         hsize_t  data_dims[ dim ];
 
         for ( uint  i = 0; i < dim; ++i )
-            data_dims[i] = t.dim(i);
+            data_dims[i] = t.dim(2-i);
     
         auto  data_space = H5::DataSpace( dim, data_dims );
 
@@ -132,7 +132,7 @@ h5_write_tensor ( H5::H5File &                      file,
     hsize_t  data_dims[ dim ];
 
     for ( uint  i = 0; i < dim; ++i )
-        data_dims[i] = t.size(i);
+        data_dims[i] = t.size(2-i);
     
     auto  data_space = H5::DataSpace( dim, data_dims );
     auto  data_type  = ( Hpro::is_single_prec_v< value_t > ? H5::PredType::NATIVE_FLOAT : H5::PredType::NATIVE_DOUBLE );
@@ -260,7 +260,7 @@ h5_read_tensor ( H5::H5File &         file,
 
         for ( uint  d = 0; d < dim; ++d )
         {
-            HLR_ASSERT( dims[d] == is[d].size() );
+            HLR_ASSERT( dims[2-d] == is[d].size() );
         }// for
         
         data_set.read( t.tensor().data(), data_type );
@@ -298,7 +298,7 @@ h5_read_blas_tensor ( H5::H5File &         file,
 
     data_space.getSimpleExtentDims( dims.data() );
     
-    auto  t = blas::tensor3< value_t >( dims[0], dims[1], dims[2] );
+    auto  t = blas::tensor3< value_t >( dims[2], dims[1], dims[0] );
     
     data_set.read( t.data(), data_type );
     
