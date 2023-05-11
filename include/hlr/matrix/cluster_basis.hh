@@ -48,6 +48,7 @@ class cluster_basis : public compress::compressible
 public:
 
     using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
     // associated indexset
@@ -65,6 +66,13 @@ private:
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
     compress::zarray                           _zV;
+
+    #if HLR_USE_APCOMPRESSION == 1
+    // also singular values assoc. with basis vectors
+    // in case of adaptive precision compression
+    std::vector< real_t >                      _sv;
+    #endif
+    
     #endif
     
 public:
@@ -130,33 +138,58 @@ public:
     {
         #if HLR_HAS_COMPRESSION == 1
         
-        HLR_ASSERT( is_compressed() );
-
-        auto  V = blas::matrix< value_t >( _is.size(), rank() );
+        if ( is_compressed() )
+        {
+            auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-        compress::decompress< value_t >( _zV, V );
+            compress::decompress< value_t >( _zV, V );
 
-        return V;
+            return V;
+        }// if
 
-        #else
+        #endif
 
         return _V;
-        
-        #endif
     }
     
     // set local basis
     void
-    set_basis  ( const hlr::blas::matrix< value_t > &  aV )
+    set_basis  ( const blas::matrix< value_t > &  aV )
     {
-        _V = std::move( blas::copy( aV ) );
+        if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() ))
+            blas::copy( aV, _V );
+        else
+            _V = std::move( blas::copy( aV ) );
     }
     
     void
-    set_basis  ( hlr::blas::matrix< value_t > &&  aV )
+    set_basis  ( blas::matrix< value_t > &&  aV )
     {
-        // TODO: test "copy" if dimensions are compatible
-        _V = std::move( aV );
+        if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() ))
+            blas::copy( aV, _V );
+        else
+            _V = std::move( aV );
+    }
+
+    // set basis together with singular values
+    void
+    set_basis  ( const blas::matrix< value_t > &  aV,
+                 const blas::matrix< real_t > &   asv )
+    {
+        if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() ))
+            blas::copy( aV, _V );
+        else
+            _V = std::move( blas::copy( aV ) );
+    }
+    
+    void
+    set_basis  ( blas::matrix< value_t > &&  aV,
+                 blas::matrix< real_t > &&   asv )
+    {
+        if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() ))
+            blas::copy( aV, _V );
+        else
+            _V = std::move( aV );
     }
     
     ///////////////////////////////////////////////////////
@@ -172,13 +205,17 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        return blas::mulvec( hlr::blas::adjoint( _V ), v );
+        auto  V = basis_decompressed();
+        
+        return blas::mulvec( hlr::blas::adjoint( V ), v );
     }
     
     hlr::blas::matrix< value_t >
     transform_forward  ( const hlr::blas::matrix< value_t > &  M ) const
     {
-        return blas::prod( hlr::blas::adjoint( _V ), M );
+        auto  V = basis_decompressed();
+        
+        return blas::prod( hlr::blas::adjoint( V ), M );
     }
     
     //
@@ -189,13 +226,17 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        return hlr::blas::mulvec( _V, s );
+        auto  V = basis_decompressed();
+        
+        return hlr::blas::mulvec( V, s );
     }
     
     hlr::blas::matrix< value_t >
     transform_backward  ( const hlr::blas::matrix< value_t > &  S ) const
     {
-        return hlr::blas::prod( _V, S );
+        auto  V = basis_decompressed();
+        
+        return hlr::blas::prod( V, S );
     }
 
     ///////////////////////////////////////////////////////
@@ -297,9 +338,9 @@ public:
     {
         #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zV.data() );
-        #else
-        return false;
         #endif
+        
+        return false;
     }
 
 protected:
