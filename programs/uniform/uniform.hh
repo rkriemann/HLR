@@ -144,7 +144,7 @@ program_main ()
     auto  A_uni     = std::unique_ptr< hpro::TMatrix< value_t > >();
     auto  apx       = approx::SVD< value_t >();
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     

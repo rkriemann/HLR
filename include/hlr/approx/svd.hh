@@ -512,7 +512,8 @@ struct SVD
     
     blas::matrix< value_t >
     column_basis ( blas::matrix< value_t > &  M,
-                   const Hpro::TTruncAcc &    acc ) const
+                   const Hpro::TTruncAcc &    acc,
+                   blas::vector< real_t > *   sv = nullptr ) const
     {
         if ( M.ncols() > 2 * M.nrows() )
         {
@@ -543,6 +544,15 @@ struct SVD
                 copy( v1, v2 );
             }// for
 
+            if ( ! is_null( sv ) )
+            {
+                if ( sv->length() != k )
+                    *sv = std::move( blas::vector< real_t >( k ) );
+                
+                for ( uint  i = 0; i < k; ++i )
+                    (*sv)(i) = std::abs(E(i));
+            }// if
+
             return Vk;
         }// if
         else if ( M.ncols() > M.nrows() / 2 )
@@ -560,6 +570,15 @@ struct SVD
 
             const auto  k  = acc.trunc_rank( S );
             const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+
+            if ( ! is_null( sv ) )
+            {
+                if ( sv->length() != k )
+                    *sv = std::move( blas::vector< real_t >( k ) );
+                
+                for ( uint  i = 0; i < k; ++i )
+                    (*sv)(i) = S(i);
+            }// if
 
             return  blas::copy( Uk );
         }// if
@@ -580,6 +599,15 @@ struct SVD
             
             const auto  k  = acc.trunc_rank( S );
             const auto  Uk = blas::matrix< value_t >( R, blas::range::all, blas::range( 0, k-1 ) );
+
+            if ( ! is_null( sv ) )
+            {
+                if ( sv->length() != k )
+                    *sv = std::move( blas::vector< real_t >( k ) );
+                
+                for ( uint  i = 0; i < k; ++i )
+                    (*sv)(i) = S(i);
+            }// if
 
             return  blas::prod( M, Uk );
         }// else

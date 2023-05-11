@@ -50,13 +50,14 @@ using matrix::is_uniform_lowrank;
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_extended_row_basis ( const cluster_basis< value_t > &     cb,
-                             const blas::matrix< value_t > &      W,
-                             const blas::matrix< value_t > &      T,
-                             const Hpro::TTruncAcc &              acc,
-                             const approx_t &                     approx,
-                             const is_matrix_map_t< value_t > &   matmap,
-                             const uniform_lrmatrix< value_t > *  M = nullptr )
+compute_extended_row_basis ( const cluster_basis< value_t > &                cb,
+                             const blas::matrix< value_t > &                 W,
+                             const blas::matrix< value_t > &                 T,
+                             const Hpro::TTruncAcc &                         acc,
+                             const approx_t &                                approx,
+                             const is_matrix_map_t< value_t > &              matmap,
+                             const uniform_lrmatrix< value_t > *             M  = nullptr,
+                             blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -189,14 +190,15 @@ compute_extended_row_basis ( const cluster_basis< value_t > &     cb,
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
-                            const blas::matrix< value_t > &      W,
-                            const blas::matrix< value_t > &      T,
-                            const Hpro::TTruncAcc &              acc,
-                            const approx_t &                     approx,
-                            const is_matrix_map_t< value_t > &   matmap )
+compute_updated_row_basis ( const uniform_lrmatrix< value_t > &             M,
+                            const blas::matrix< value_t > &                 W,
+                            const blas::matrix< value_t > &                 T,
+                            const Hpro::TTruncAcc &                         acc,
+                            const approx_t &                                approx,
+                            const is_matrix_map_t< value_t > &              matmap,
+                            blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
 {
-    return compute_extended_row_basis( M.row_cb(), W, T, acc, approx, matmap, &M );
+    return compute_extended_row_basis( M.row_cb(), W, T, acc, approx, matmap, &M, sv );
 }
 
 //
@@ -209,13 +211,14 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &  M,
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
-                             const blas::matrix< value_t > &      T,
-                             const blas::matrix< value_t > &      X,
-                             const Hpro::TTruncAcc &              acc,
-                             const approx_t &                     approx,
-                             const is_matrix_map_t< value_t > &   matmap,
-                             const uniform_lrmatrix< value_t > *  M = nullptr )
+compute_extended_col_basis ( const cluster_basis< value_t > &                cb,
+                             const blas::matrix< value_t > &                 T,
+                             const blas::matrix< value_t > &                 X,
+                             const Hpro::TTruncAcc &                         acc,
+                             const approx_t &                                approx,
+                             const is_matrix_map_t< value_t > &              matmap,
+                             const uniform_lrmatrix< value_t > *             M  = nullptr,
+                             blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -346,14 +349,15 @@ compute_extended_col_basis ( const cluster_basis< value_t > &     cb,
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_updated_col_basis ( const uniform_lrmatrix< value_t > &  M,
-                            const blas::matrix< value_t > &      T,
-                            const blas::matrix< value_t > &      X,
-                            const Hpro::TTruncAcc &              acc,
-                            const approx_t &                     approx,
-                            const is_matrix_map_t< value_t > &   matmap )
+compute_updated_col_basis ( const uniform_lrmatrix< value_t > &             M,
+                            const blas::matrix< value_t > &                 T,
+                            const blas::matrix< value_t > &                 X,
+                            const Hpro::TTruncAcc &                         acc,
+                            const approx_t &                                approx,
+                            const is_matrix_map_t< value_t > &              matmap,
+                            blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
 {
-    return compute_extended_col_basis( M.col_cb(), T, X, acc, approx, matmap, &M );
+    return compute_extended_col_basis( M.col_cb(), T, X, acc, approx, matmap, &M, sv );
 }
 
 //

@@ -1064,6 +1064,7 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                     is_matrix_map_t< typename basisapx_t::value_t > &      colmap )
 {
     using value_t = typename basisapx_t::value_t;
+    using real_t  = Hpro::real_type_t< value_t >;
 
     using namespace hlr::matrix;
 
@@ -1093,9 +1094,12 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         //
         // update cluster bases
         //
+
+        auto  Us = blas::vector< real_t >(); // singular values corresponding to basis vectors
+        auto  Vs = blas::vector< real_t >();
             
-        auto  Un = hlr::uniform::detail::compute_extended_row_basis( rowcb, W, T, acc, basisapx, rowmap );
-        auto  Vn = hlr::uniform::detail::compute_extended_col_basis( colcb, T, X, acc, basisapx, colmap );
+        auto  Un = hlr::uniform::detail::compute_extended_row_basis< value_t, basisapx_t >( rowcb, W, T, acc, basisapx, rowmap, nullptr, & Us );
+        auto  Vn = hlr::uniform::detail::compute_extended_col_basis< value_t, basisapx_t >( colcb, T, X, acc, basisapx, colmap, nullptr, & Vs );
             
         hlr::uniform::detail::update_row_coupling( rowcb, Un, rowmap );
         hlr::uniform::detail::update_col_coupling( colcb, Vn, colmap );
