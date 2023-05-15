@@ -31,21 +31,38 @@ using hlr::uniform::is_matrix_map_t;
 template < typename value_t,
            typename basisapx_t >
 blas::matrix< value_t >
-compute_extended_basis ( const cluster_basis< value_t > &  cb,
-                         const blas::matrix< value_t > &   W,
-                         const blas::matrix< value_t > &   T,
-                         const hpro::TTruncAcc &           acc,
-                         const basisapx_t &                basisapx,
-                         is_matrix_map_t< value_t > &      matmap,
-                         std::mutex &                      matmapmtx,
-                         const matop_t                     op,
-                         uniform_lrmatrix< value_t > *     M = nullptr )
+compute_extended_basis ( const cluster_basis< value_t > &                cb,
+                         const blas::matrix< value_t > &                 W,
+                         const blas::matrix< value_t > &                 T,
+                         const hpro::TTruncAcc &                         acc,
+                         const basisapx_t &                              basisapx,
+                         is_matrix_map_t< value_t > &                    matmap,
+                         std::mutex &                                    matmapmtx,
+                         const matop_t                                   op,
+                         uniform_lrmatrix< value_t > *                   M = nullptr,
+                         blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
 {
     using  real_t = hpro::real_type_t< value_t >;
 
     // zero basis implies empty matrix list
     if ( cb.basis().ncols() == 0 )
+    {
+        if ( ! is_null( sv ) )
+        {
+            // determine singular values from T
+            auto  S = blas::sv( T );
+
+            HLR_ASSERT( W.ncols() >= S.length() );
+            
+            if ( sv->length() != W.ncols() )
+                *sv = blas::vector< real_t >( W.ncols() );
+
+            for ( uint  i = 0; i < W.ncols(); ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return std::move( blas::copy( W ) );
+    }// if
             
     //
     // copy uniform matrices for basis to local list for minimal blocking
@@ -153,7 +170,7 @@ compute_extended_basis ( const cluster_basis< value_t > &  cb,
     blas::qr( S, R, false );
 
     auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
-    auto  Un  = basisapx.column_basis( UeR, acc );
+    auto  Un  = basisapx.column_basis( UeR, acc, sv );
 
     return  Un;
 }

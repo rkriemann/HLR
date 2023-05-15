@@ -270,12 +270,11 @@ public:
         {
             cb->_zV = _zV;
             // cb->_zV = compress::zarray( _zV.size() );
-
             // std::copy( _zV.begin(), _zV.end(), cb->_zV.begin() );
         }// if
 
         #if HLR_USE_APCOMPRESSION == 1
-        cb->_sv = _sv;
+        cb->_sv = std::move( blas::copy( _sv ) );
         #endif
         #endif
         
@@ -311,6 +310,10 @@ public:
 
         #if HLR_HAS_COMPRESSION == 1
         n += hlr::compress::byte_size( _zV );
+
+        #if HLR_USE_APCOMPRESSION  == 1
+        n += _sv.byte_size();
+        #endif
         #endif
         
         for ( auto  son : _sons )
@@ -457,21 +460,30 @@ cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
         auto  zV = hlr::compress::apfloat::compress_lr< value_t >( _V, S );
 
-        {
-            auto  T = blas::copy( _V );
+        // {
+        //     auto  T = blas::copy( _V );
 
-            hlr::compress::apfloat::decompress_lr< value_t >( zV, T );
-        }
+        //     hlr::compress::apfloat::decompress_lr< value_t >( zV, T );
+
+        //     blas::add( value_t(-1), _V, T );
+        //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
+        // }
         
         if ( compress::byte_size( zV ) < mem_dense )
         {
             _zV = std::move( zV );
             _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
         }// if
+
+        return;
     }// if
     
     #endif
 
+    //
+    // use standard compression
+    //
+    
     auto  zconfig = compress::get_config( acc.abs_eps() );
     auto  zV      = compress::compress< value_t >( zconfig, _V );
 

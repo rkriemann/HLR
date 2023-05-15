@@ -1215,9 +1215,9 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             zsize += sizeof(double) + 1 + 1 + n * npbyte;
     }// for
 
-    for ( uint  l = 0; l < k; ++l )
-        std::cout << e[l] << '/' << m[l] << std::endl;
-    std::cout << std::endl;
+    // for ( uint  l = 0; l < k; ++l )
+    //     std::cout << e[l] << '/' << m[l] << std::endl;
+    // std::cout << std::endl;
 
     //
     // convert each column to compressed form
@@ -1309,7 +1309,7 @@ decompress_lr< double > ( const zarray &            zdata,
 
         pos += 2;
         
-        std::cout << exp_bits << '/' << prec_bits << std::endl;
+        // std::cout << exp_bits << '/' << prec_bits << std::endl;
         
         if (( prec_bits <= 23 ) && ( nbits <= 32 ))
         {

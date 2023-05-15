@@ -1689,6 +1689,7 @@ template < typename basisapx_t >
 struct rec_uniform_construction
 {
     using  value_t = typename basisapx_t::value_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
     
     // maps indexsets to set of uniform matrices sharing corresponding cluster basis
     // and their mutexes
@@ -1758,18 +1759,20 @@ struct rec_uniform_construction
                         ::tbb::parallel_invoke(
                             [&] ()
                             {
-                                auto  Un = compute_extended_basis( rowcb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint );
+                                auto  Us = blas::vector< real_t >(); // singular values corresponding to basis vectors
+                                auto  Un = compute_extended_basis< value_t, basisapx_t >( rowcb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint, nullptr, & Us );
                         
-                                update( rowcb, Un, rowmap, rowmapmtx, false );
-                                rowcb.set_basis( std::move( Un ) );
+                                update_coupling( rowcb, Un, rowmap, rowmapmtx, false );
+                                rowcb.set_basis( std::move( Un ), std::move( Us ) );
                             },
                 
                             [&] ()
                             {
-                                auto  Vn = compute_extended_basis( colcb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal );
+                                auto  Vs = blas::vector< real_t >();
+                                auto  Vn = compute_extended_basis< value_t, basisapx_t >( colcb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal, nullptr, & Vs );
                         
                                 update_coupling( colcb, Vn, colmap, colmapmtx, true );
-                                colcb.set_basis( std::move( Vn ) );
+                                colcb.set_basis( std::move( Vn ), std::move( Vs ) );
                             }
                         );
 
@@ -1892,18 +1895,20 @@ struct rec_uniform_construction
                 ::tbb::parallel_invoke(
                     [&] ()
                     {
-                        auto  Un = compute_extended_basis( rowcb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint );
+                        auto  Us = blas::vector< real_t >(); // singular values corresponding to basis vectors
+                        auto  Un = compute_extended_basis< value_t, basisapx_t >( rowcb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint, nullptr, & Us );
                 
                         update_coupling( rowcb, Un, rowmap, rowmapmtx, false );
-                        rowcb.set_basis( std::move( Un ) );
+                        rowcb.set_basis( std::move( Un ), std::move( Us ) );
                     },
         
                     [&] ()
                     {
-                        auto  Vn = compute_extended_basis( colcb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal );
+                        auto  Vs = blas::vector< real_t >();
+                        auto  Vn = compute_extended_basis< value_t, basisapx_t >( colcb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal, nullptr, & Vs );
                 
                         update_coupling( colcb, Vn, colmap, colmapmtx, true );
-                        colcb.set_basis( std::move( Vn ) );
+                        colcb.set_basis( std::move( Vn ), std::move( Vs ) );
                     }
                 );
 
