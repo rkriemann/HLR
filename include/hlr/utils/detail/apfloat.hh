@@ -1215,9 +1215,9 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             zsize += sizeof(double) + 1 + 1 + n * npbyte;
     }// for
 
-    // for ( uint  l = 0; l < k; ++l )
-    //     std::cout << e[l] << '/' << m[l] << ", ";
-    // std::cout << std::endl;
+    for ( uint  l = 0; l < k; ++l )
+        std::cout << e[l] << '/' << m[l] << std::endl;
+    std::cout << std::endl;
 
     //
     // convert each column to compressed form
@@ -1279,6 +1279,15 @@ decompress_lr< float > ( const zarray &           zdata,
 template <>
 inline
 void
+decompress_lr< std::complex< float > > ( const zarray &                           zdata,
+                                         blas::matrix< std::complex< float > > &  U )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+void
 decompress_lr< double > ( const zarray &            zdata,
                           blas::matrix< double > &  U )
 {
@@ -1300,6 +1309,8 @@ decompress_lr< double > ( const zarray &            zdata,
 
         pos += 2;
         
+        std::cout << exp_bits << '/' << prec_bits << std::endl;
+        
         if (( prec_bits <= 23 ) && ( nbits <= 32 ))
         {
             decompress_fp32( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
@@ -1311,6 +1322,15 @@ decompress_lr< double > ( const zarray &            zdata,
             pos += 8 + nbyte * n;
         }// else
     }// for
+}
+
+template <>
+inline
+void
+decompress_lr< std::complex< double > > ( const zarray &                            zdata,
+                                          blas::matrix< std::complex< double > > &  U )
+{
+    HLR_ERROR( "TODO" );
 }
 
 }}}// namespace hlr::compress::apfloat

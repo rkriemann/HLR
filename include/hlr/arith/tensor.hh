@@ -911,9 +911,9 @@ greedy_hosvd ( const tensor3< value_t > &  X,
         // std::cout << "  max_dim " << max_dim << ", error = " << std::sqrt( error[0] + error[1] + error[2] ) << std::flush;
     }// while
 
-    auto  U0k = matrix( U0, range::all, range( 0, k[0]-1 ) );
-    auto  U1k = matrix( U1, range::all, range( 0, k[1]-1 ) );
-    auto  U2k = matrix( U2, range::all, range( 0, k[2]-1 ) );
+    auto  U0k = matrix< value_t >( U0, range::all, range( 0, k[0]-1 ) );
+    auto  U1k = matrix< value_t >( U1, range::all, range( 0, k[1]-1 ) );
+    auto  U2k = matrix< value_t >( U2, range::all, range( 0, k[2]-1 ) );
 
     auto  W0  = blas::copy( U0k );
     auto  W1  = blas::copy( U1k );

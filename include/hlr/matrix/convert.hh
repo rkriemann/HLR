@@ -90,8 +90,8 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R        = cptrcast( &M, uniform_lrmatrix< value_t > );
-        auto  US       = blas::prod( R->row_cb().basis(), R->coeff() );
-        auto  [ U, V ] = approx( US, R->col_cb().basis(), acc );
+        auto  US       = blas::prod( R->row_basis(), R->coupling() );
+        auto  [ U, V ] = approx( US, R->col_basis(), acc );
         
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
@@ -179,7 +179,7 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
     else if ( is_uniform_lowrank( M ) )
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
-        auto  U = blas::prod( R->row_basis(), R->coeff() );
+        auto  U = blas::prod( R->row_basis(), R->coupling() );
         auto  V = blas::copy( R->col_basis() );
         
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
@@ -264,7 +264,7 @@ convert_to_dense ( const Hpro::TMatrix< value_t > &  M )
         auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  D   = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is() );
         auto  DD  = blas::mat< value_t >( *D );
-        auto  UxS = blas::prod( value_t(1), R->row_cb().basis(), R->coeff() );
+        auto  UxS = blas::prod( value_t(1), R->row_cb().basis(), R->coupling() );
 
         blas::prod( value_t(1), UxS, blas::adjoint( R->col_cb().basis() ),
                     value_t(0), DD );

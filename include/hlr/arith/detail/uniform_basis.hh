@@ -116,6 +116,20 @@ compute_extended_row_basis ( const cluster_basis< value_t > &                cb,
         // since there is no other low-rank block, new row basis is W
         //
 
+        if ( ! is_null( sv ) )
+        {
+            // determine singular values from T
+            auto  S = blas::sv( T );
+
+            HLR_ASSERT( W.ncols() >= S.length() );
+            
+            if ( sv->length() != W.ncols() )
+                *sv = blas::vector< real_t >( W.ncols() );
+
+            for ( uint  i = 0; i < W.ncols(); ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return std::move( blas::copy( W ) );
     }// if
     else
@@ -178,7 +192,7 @@ compute_extended_row_basis ( const cluster_basis< value_t > &                cb,
         blas::qr( S, R, false );
 
         auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
-        auto  Un  = approx.column_basis( UeR, acc );
+        auto  Un  = approx.column_basis( UeR, acc, sv );
 
         return  Un;
     }// else
@@ -272,6 +286,20 @@ compute_extended_col_basis ( const cluster_basis< value_t > &                cb,
         // since there is no other low-rank block, new basis is X
         //
 
+        if ( ! is_null( sv ) )
+        {
+            // determine singular values from T
+            auto  S = blas::sv( T );
+
+            HLR_ASSERT( X.ncols() >= S.length() );
+            
+            if ( sv->length() != X.ncols() )
+                *sv = blas::vector< real_t >( X.ncols() );
+
+            for ( uint  i = 0; i < X.ncols(); ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return std::move( blas::copy( X ) );
     }// if
     else
@@ -337,7 +365,7 @@ compute_extended_col_basis ( const cluster_basis< value_t > &                cb,
         blas::qr( S, R, false );
 
         auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
-        auto  Vn  = approx.column_basis( VeR, acc );
+        auto  Vn  = approx.column_basis( VeR, acc, sv );
         
         return  Vn;
     }// else

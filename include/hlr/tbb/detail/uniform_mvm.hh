@@ -71,40 +71,32 @@ mul_vec ( const value_t                                       alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D    = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         auto  mtx  = mtx_map.at( M.row_is( op_M ) ).get();
         auto  lock = std::scoped_lock( *mtx );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
+        M.apply_add( alpha, x_i, y_j, op_M );
     }// if
     else if ( hlr::matrix::is_uniform_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  R    = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  lock = std::scoped_lock( y.mutex() );
         
         if ( op_M == Hpro::apply_normal )
         {
-            std::scoped_lock  lock( y.mutex() );
-
             blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
         }// if
         else if ( op_M == Hpro::apply_conjugate )
         {
-            std::scoped_lock  lock( y.mutex() );
-
             HLR_ASSERT( false );
         }// if
         else if ( op_M == Hpro::apply_transposed )
         {
-            std::scoped_lock  lock( y.mutex() );
-
             HLR_ASSERT( false );
         }// if
         else if ( op_M == Hpro::apply_adjoint )
         {
-            std::scoped_lock  lock( y.mutex() );
-            
             blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
         }// if
     }// if

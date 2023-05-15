@@ -905,6 +905,7 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                     is_matrix_map_t< typename coeff_t::value_t > &  colmap )
 {
     using value_t = typename coeff_t::value_t;
+    using real_t  = Hpro::real_type_t< value_t >;
 
     using namespace hlr::matrix;
     
@@ -941,8 +942,11 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                 // update cluster bases
                 //
 
-                auto  Un = hlr::uniform::detail::compute_extended_row_basis( rowcb, W, T, acc, basisapx, rowmap );
-                auto  Vn = hlr::uniform::detail::compute_extended_col_basis( colcb, T, X, acc, basisapx, colmap );
+                auto  Us = blas::vector< real_t >(); // singular values corresponding to basis vectors
+                auto  Vs = blas::vector< real_t >();
+                
+                auto  Un = hlr::uniform::detail::compute_extended_row_basis< value_t, basisapx_t >( rowcb, W, T, acc, basisapx, rowmap, nullptr, & Us );
+                auto  Vn = hlr::uniform::detail::compute_extended_col_basis< value_t, basisapx_t >( colcb, T, X, acc, basisapx, colmap, nullptr, & Vs );
 
                 hlr::uniform::detail::update_row_coupling( rowcb, Un, rowmap );
                 hlr::uniform::detail::update_col_coupling( colcb, Vn, colmap );
@@ -957,8 +961,8 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                 auto  S  = blas::prod( T1, blas::adjoint( VX ) );
 
                 // update bases in cluster bases objects (only now since Un/Vn are used before)
-                rowcb.set_basis( std::move( Un ) );
-                colcb.set_basis( std::move( Vn ) );
+                rowcb.set_basis( std::move( Un ), std::move( Us ) );
+                colcb.set_basis( std::move( Vn ), std::move( Vs ) );
                 
                 auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( R->row_is(), R->col_is(), rowcb, colcb, std::move( S ) );
 
@@ -986,13 +990,13 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
         {
             M = coeff.build( bct->is().row_is(), bct->is().col_is() );
 
-            // if ( is_dense( *M ) )
-            // {
-            //     auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-            //     auto  DD = blas::copy( blas::mat( D ) );
+            if ( is_dense( *M ) )
+            {
+                auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  DD = blas::copy( blas::mat( D ) );
 
-            //     M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
-            // }// if
+                M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+            }// if
         }// else
     }// if
     else
@@ -1114,8 +1118,8 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         auto  S  = blas::prod( T1, blas::adjoint( VX ) );
 
         // update bases in cluster bases objects (only now since Un/Vn are used before)
-        rowcb.set_basis( std::move( Un ) );
-        colcb.set_basis( std::move( Vn ) );
+        rowcb.set_basis( std::move( Un ), std::move( Us ) );
+        colcb.set_basis( std::move( Vn ), std::move( Vs ) );
                 
         auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( R->row_is(), R->col_is(), rowcb, colcb, std::move( S ) );
 
@@ -1176,12 +1180,12 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     {
         HLR_ASSERT( ! compress::is_compressible( A ) );
 
-        M = A.copy();
+        // M = A.copy();
 
-        // auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
-        // auto  DD = blas::copy( blas::mat( D ) );
+        auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  DD = blas::copy( blas::mat( D ) );
 
-        // return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
     {

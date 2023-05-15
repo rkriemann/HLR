@@ -19,6 +19,7 @@
 #include <hlr/matrix/tiled_lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/convert.hh>
 
 #include <hlr/utils/log.hh>
 #include <hlr/utils/checks.hh>
@@ -348,6 +349,18 @@ frobenius ( const value_t                     alpha,
 
             return std::sqrt( std::abs( sqn ) );
         }// else
+    }// if
+    else if ( matrix::is_uniform_lowrank_all( A, B ) )
+    {
+        //
+        // assumption: different cluster basis but same block cluster
+        // => convert to lowrank and compute norm
+        //
+        
+        auto  RA = matrix::convert_to_lowrank( A );
+        auto  RB = matrix::convert_to_lowrank( B );
+
+        return frobenius( alpha, *RA, beta, *RB );
     }// if
     else if ( is_dense_all( A, B ) )
     {

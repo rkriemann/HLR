@@ -1786,6 +1786,21 @@ using Hpro::BLAS::svd;
 // compute singular vectors of U·V'
 //
 template < typename value_t >
+vector< Hpro::real_type_t< value_t > >
+sv ( const matrix< value_t > &  M )
+{
+    auto  T = blas::copy( M );
+    auto  S = blas::vector< Hpro::real_type_t< value_t > >();
+    
+    Hpro::BLAS::sv( T, S );
+    
+    return S;
+}
+
+//
+// compute singular vectors of U·V'
+//
+template < typename value_t >
 vector< value_t >
 sv ( const matrix< value_t > &  U,
      const matrix< value_t > &  V )

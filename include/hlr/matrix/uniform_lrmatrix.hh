@@ -140,11 +140,11 @@ public:
     cluster_basis< value_t > &        row_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_cb() : col_cb(); }
     cluster_basis< value_t > &        col_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_cb() : row_cb(); }
 
-    const blas::matrix< value_t > &   row_basis () const { return _row_cb->basis(); }
-    const blas::matrix< value_t > &   col_basis () const { return _col_cb->basis(); }
+    const blas::matrix< value_t >     row_basis () const { return _row_cb->basis(); }
+    const blas::matrix< value_t >     col_basis () const { return _col_cb->basis(); }
     
-    const blas::matrix< value_t > &   row_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? row_basis() : col_basis(); }
-    const blas::matrix< value_t > &   col_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? col_basis() : row_basis(); }
+    const blas::matrix< value_t >     row_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? row_basis() : col_basis(); }
+    const blas::matrix< value_t >     col_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? col_basis() : row_basis(); }
     
     void
     set_cluster_bases ( cluster_basis< value_t > &  arow_cb,
@@ -160,27 +160,26 @@ public:
         _col_cb = & acol_cb;
     }
 
-    blas::matrix< value_t > &        coeff ()       { return _S; }
-    const blas::matrix< value_t > &  coeff () const { return _S; }
+    // blas::matrix< value_t >          coeff ()       { return _S; }
+    // const blas::matrix< value_t > &  coeff () const { return _S; }
 
     // return decompressed local basis
-    hlr::blas::matrix< value_t >     coeff_decompressed () const
+    hlr::blas::matrix< value_t >     coeff () const
     {
         #if HLR_HAS_COMPRESSION == 1
-        
-        HLR_ASSERT( is_compressed() );
 
-        auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
+        if ( is_compressed() )
+        {
+            auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
     
-        compress::decompress< value_t >( _zS, S );
+            compress::decompress< value_t >( _zS, S );
 
-        return S;
-
-        #else
-
-        return _S;
+            return S;
+        }// if
 
         #endif
+
+        return _S;
     }
     
     void
@@ -202,9 +201,9 @@ public:
     }
 
     // rename coeff by coupling
-    blas::matrix< value_t > &        coupling ()       { return _S; }
-    const blas::matrix< value_t > &  coupling () const { return _S; }
-    hlr::blas::matrix< value_t >     coupling_decompressed () const { return coeff_decompressed(); }
+    // blas::matrix< value_t > &        coupling ()       { return _S; }
+    // const blas::matrix< value_t > &  coupling () const { return _S; }
+    hlr::blas::matrix< value_t >     coupling () const { return coeff(); }
 
     void set_coupling ( const blas::matrix< value_t > &  aS ) { set_coeff( aS ); }
     void set_coupling ( blas::matrix< value_t > &&       aS ) { set_coeff( std::move( aS ) ); }
@@ -406,9 +405,9 @@ uniform_lrmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->col_is( op ).size() );
     HLR_ASSERT( y.length() == this->row_is( op ).size() );
 
-    const auto  U = ( row_cb().is_compressed() ? row_cb().basis_decompressed() : row_cb().basis() );
-    const auto  V = ( col_cb().is_compressed() ? col_cb().basis_decompressed() : col_cb().basis() );
-    const auto  S = ( is_compressed()          ? coeff_decompressed()          : coeff() );
+    const auto  U = row_basis();
+    const auto  V = col_basis();
+    const auto  S = coupling();
     
     if ( op == Hpro::apply_normal )
     {
@@ -511,7 +510,7 @@ uniform_lrmatrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    _S = std::move( coeff_decompressed() );
+    _S = std::move( coupling() );
 
     remove_compressed();
 
