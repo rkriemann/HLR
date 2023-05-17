@@ -64,7 +64,8 @@ program_main ()
         A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
 
-        io::hpro::write< value_t >( *A, "A.hm" );
+        if ( verbose( 2 ) )
+            io::hpro::write< value_t >( *A, "A.hm" );
     }// if
     else
     {

@@ -106,7 +106,7 @@ program_main ()
     const auto  mem_rcb = rowcb->byte_size();
     const auto  mem_ccb = colcb->byte_size();
     
-    std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_A ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_A, mem_rcb + mem_ccb + mem_A ) << std::endl;
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_rcb + mem_ccb + mem_A) / double(mem_H) ) << std::endl;
 
     if ( verbose( 3 ) )
@@ -131,7 +131,6 @@ program_main ()
     auto  zA     = impl::matrix::copy( *A );
     auto  zrowcb = rowcb->copy();
     auto  zcolcb = colcb->copy();
-    auto  norm_A = impl::norm::frobenius( *A );
 
     matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
     
@@ -142,7 +141,6 @@ program_main ()
               << ", "
               << hlr::compress::provider << ')'
               << term::reset << std::endl;
-    std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
         auto  lacc = absolute_prec( cmdline::eps );
@@ -151,27 +149,23 @@ program_main ()
         
         for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
         {
-            auto  zA2     = impl::matrix::copy( *zA );
-            auto  zrowcb2 = zrowcb->copy();
-            auto  zcolcb2 = zcolcb->copy();
-        
-            matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
-            
             tic = timer::now();
     
-            impl::matrix::compress( *zrowcb2, lacc );
-            impl::matrix::compress( *zcolcb2, lacc );
-            impl::matrix::compress( *zA2,     lacc );
+            impl::matrix::compress( *zrowcb, lacc );
+            impl::matrix::compress( *zcolcb, lacc );
+            impl::matrix::compress( *zA,     lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == nbench-1 )
+            if ( i < nbench-1 )
             {
-                zA     = std::move( zA2 );
-                zrowcb = std::move( zrowcb2 );
-                zcolcb = std::move( zcolcb2 );
+                zA     = std::move( impl::matrix::copy( *A ) );
+                zrowcb = std::move( zrowcb->copy() );
+                zcolcb = std::move( zcolcb->copy() );
+        
+                matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
             }// if
         }// for
 
@@ -185,7 +179,7 @@ program_main ()
     const auto  mem_zrcb = zrowcb->byte_size();
     const auto  mem_zccb = zcolcb->byte_size();
     
-    std::cout << "    mem   = " << format_mem( mem_zrcb, mem_zccb, mem_zA ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_zrcb, mem_zccb, mem_zA, mem_zrcb + mem_zccb + mem_zA ) << std::endl;
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zrcb + mem_zccb + mem_zA) / double(mem_rcb + mem_ccb + mem_A) ) << std::endl;
 
     if ( verbose( 3 ) )
@@ -217,33 +211,27 @@ program_main ()
         
         matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
         
-        impl::matrix::decompress( *zrowcb2 );
-        impl::matrix::decompress( *zcolcb2 );
-        impl::matrix::decompress( *zA2 );
-        
-        // for ( uint  i = 0; i < nbench; ++i )
-        // {
-        //     auto  zA3     = impl::matrix::copy( *zA2 );
-        //     auto  zrowcb3 = zrowcb->copy();
-        //     auto  zcolcb3 = zcolcb->copy();
-            
-        //     tic = timer::now();
+        for ( uint  i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
     
-        //     impl::matrix::decompress( *zrowcb3 );
-        //     impl::matrix::decompress( *zcolcb3 );
-        //     impl::matrix::decompress( *zA3 );
+            impl::matrix::decompress( *zrowcb2 );
+            impl::matrix::decompress( *zcolcb2 );
+            impl::matrix::decompress( *zA2 );
             
-        //     toc = timer::since( tic );
-        //     runtime.push_back( toc.seconds() );
-        //     std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-        //     if ( i == nbench-1 )
-        //     {
-        //         zA2     = std::move( zA3 );
-        //         zrowcb2 = std::move( zrowcb3 );
-        //         zcolcb2 = std::move( zcolcb3 );
-        //     }// if
-        // }// for
+            if ( i < nbench-1 )
+            {
+                zA2     = std::move( impl::matrix::copy( *zA ) );
+                zrowcb2 = std::move( zrowcb->copy() );
+                zcolcb2 = std::move( zcolcb->copy() );
+            
+                matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
+            }// if
+        }// for
         
         if ( nbench > 1 )
             std::cout << "    runtime  = "
