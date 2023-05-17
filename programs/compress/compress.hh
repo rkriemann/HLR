@@ -195,6 +195,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
+    if ( true )
     {
         std::cout << "  "
                   << term::bullet << term::bold
@@ -208,7 +209,7 @@ program_main ()
         auto  As      = impl::matrix::convert< float >( *A );
         auto  zAs     = impl::matrix::copy_compressible( *As );
         auto  norm_As = impl::norm::frobenius( *As );
-        auto  mem_As  = A->byte_size();
+        auto  mem_As  = As->byte_size();
 
         std::cout << "    mem   = " << format_mem( mem_As ) << std::endl;
 

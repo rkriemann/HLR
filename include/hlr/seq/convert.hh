@@ -20,6 +20,8 @@ namespace hlr { namespace seq { namespace matrix {
 
 using hlr::matrix::convert_to_lowrank;
 using hlr::matrix::convert_to_dense;
+using hlr::matrix::convert_to_h;
+using hlr::matrix::convert_to_compressible;
 
 //
 // convert matrix between different floating point precisions

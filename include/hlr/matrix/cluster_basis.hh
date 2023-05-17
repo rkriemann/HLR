@@ -21,7 +21,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/compression.hh>
-#include <hlr/utils/detail/apfloat.hh>
+#include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 
 namespace hlr
@@ -144,7 +144,7 @@ public:
     
             #if HLR_USE_APCOMPRESSION == 1
 
-            hlr::compress::apfloat::decompress_lr< value_t >( _zV, V );
+            hlr::compress::afloat::decompress_lr< value_t >( _zV, V );
 
             #else
             
@@ -458,12 +458,12 @@ cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
         
-        auto  zV = hlr::compress::apfloat::compress_lr< value_t >( _V, S );
+        auto  zV = hlr::compress::afloat::compress_lr< value_t >( _V, S );
 
         // {
         //     auto  T = blas::copy( _V );
 
-        //     hlr::compress::apfloat::decompress_lr< value_t >( zV, T );
+        //     hlr::compress::afloat::decompress_lr< value_t >( zV, T );
 
         //     blas::add( value_t(-1), _V, T );
         //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;

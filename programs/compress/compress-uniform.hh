@@ -79,11 +79,20 @@ program_main ()
     std::cout << "    dims  = " << H->nrows() << " × " << H->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
 
-    const auto  mem_H = H->byte_size();
+    const auto  mem_H  = H->byte_size();
+    const auto  norm_H = impl::norm::frobenius( *H );
     
     std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
 
-    auto  cbapx   = approx::SVD< value_t >();
+    //////////////////////////////////////////////////////////////////////
+    //
+    // convert to uniform matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
+
+    auto  cbapx = approx::SVD< value_t >();
 
     tic = timer::now();
 
@@ -103,6 +112,13 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,norank,nosize" );
 
+    {
+        auto  B     = impl::matrix::convert_to_h( *A );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+
+        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+    }
+    
     // assign clusters since needed for cluster bases
     // seq::matrix::assign_cluster( *A, *bct->root() );
     
@@ -115,7 +131,7 @@ program_main ()
     auto  zA     = impl::matrix::copy( *A );
     auto  zrowcb = rowcb->copy();
     auto  zcolcb = colcb->copy();
-    auto  norm_A = norm::spectral( impl::arithmetic, *A );
+    auto  norm_A = impl::norm::frobenius( *A );
 
     matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
     
@@ -175,15 +191,17 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
     
-    auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
-    auto  error = norm::spectral( impl::arithmetic, *diff );
+    // auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
+    // auto  error = norm::spectral( impl::arithmetic, *diff );
 
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
-    
-    norm_A = norm::frobenius( *A );
-    error  = norm::frobenius( 1, *A, -1, *zA );
-    
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+    {
+        auto  B     = impl::matrix::convert_to_h( *zA );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+
+        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+    }
 
     std::cout << "  "
               << term::bullet << term::bold
@@ -232,10 +250,14 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
+        // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
-        error = norm::spectral( impl::arithmetic, *diffB );
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+        {
+            auto  B     = impl::matrix::convert_to_h( *zA2 );
+            auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+
+            std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+        }
     }
 
     //////////////////////////////////////////////////////////////////////

@@ -15,7 +15,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/compression.hh>
 #include <hlr/utils/detail/afloat.hh>
-#include <hlr/utils/detail/apfloat.hh>
+#include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -121,7 +121,7 @@ private:
         std::vector< real_t >     sv;
 
         #if defined(USE_AFLOAT)
-        hlr::compress::apfloat::zarray  zU, zV;
+        hlr::compress::afloat::zarray  zU, zV;
         #else
         std::vector< mptype1_t >  U1, V1;
         std::vector< mptype2_t >  U2, V2;
@@ -183,7 +183,7 @@ public:
 
             #if defined(USE_AFLOAT)
             
-            hlr::compress::apfloat::decompress_lr( _mpdata.zU, dU );
+            hlr::compress::afloat::decompress_lr( _mpdata.zU, dU );
 
             for ( uint  l = 0; l < dU.ncols(); ++l )
             {
@@ -277,7 +277,7 @@ public:
 
             #if defined(USE_AFLOAT)
             
-            hlr::compress::apfloat::decompress_lr( _mpdata.zV, dV );
+            hlr::compress::afloat::decompress_lr( _mpdata.zV, dV );
             
             #else
             
@@ -453,8 +453,8 @@ public:
 
             #if defined(USE_AFLOAT)
 
-            R->_mpdata.zU = hlr::compress::apfloat::zarray( _mpdata.zU.size() );
-            R->_mpdata.zV = hlr::compress::apfloat::zarray( _mpdata.zV.size() );
+            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
             
             std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
             std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -521,8 +521,8 @@ public:
             
             #if defined(USE_AFLOAT)
 
-            R->_mpdata.zU = hlr::compress::apfloat::zarray( _mpdata.zU.size() );
-            R->_mpdata.zV = hlr::compress::apfloat::zarray( _mpdata.zV.size() );
+            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
             
             std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
             std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -594,8 +594,8 @@ public:
 
         #if defined(USE_AFLOAT)
 
-        size += hlr::compress::apfloat::byte_size( _mpdata.zU );
-        size += hlr::compress::apfloat::byte_size( _mpdata.zV );
+        size += hlr::compress::afloat::byte_size( _mpdata.zU );
+        size += hlr::compress::afloat::byte_size( _mpdata.zV );
         
         #else
         
@@ -634,8 +634,8 @@ protected:
 
         #if defined(USE_AFLOAT)
 
-        _mpdata.zU = hlr::compress::apfloat::zarray();
-        _mpdata.zV = hlr::compress::apfloat::zarray();
+        _mpdata.zU = hlr::compress::afloat::zarray();
+        _mpdata.zV = hlr::compress::afloat::zarray();
         
         #else
         
@@ -781,10 +781,10 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     for ( uint  l = 0; l < orank; ++l )
         S_tol(l) = tol / S(l);
 
-    auto          zU     = hlr::compress::apfloat::compress_lr( oU, S_tol );
-    auto          zV     = hlr::compress::apfloat::compress_lr( oV, S_tol );
+    auto          zU     = hlr::compress::afloat::compress_lr( oU, S_tol );
+    auto          zV     = hlr::compress::afloat::compress_lr( oV, S_tol );
     const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_mp = hlr::compress::apfloat::byte_size( zU ) + hlr::compress::apfloat::byte_size( zV ) + sizeof(real_t) * orank;
+    const size_t  mem_mp = hlr::compress::afloat::byte_size( zU ) + hlr::compress::afloat::byte_size( zV ) + sizeof(real_t) * orank;
 
     if ( mem_mp < mem_lr )
     {
@@ -798,8 +798,8 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
         //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
             
-        //     hlr::compress::apfloat::decompress_lr( zU, dU );
-        //     hlr::compress::apfloat::decompress_lr( zV, dV );
+        //     hlr::compress::afloat::decompress_lr( zU, dU );
+        //     hlr::compress::afloat::decompress_lr( zV, dV );
 
         //     io::matlab::write( dU, "U2" );
         //     io::matlab::write( dV, "V2" );

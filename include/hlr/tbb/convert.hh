@@ -299,6 +299,68 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
         HLR_ERROR( "unsupported matrix type " + A.typestr() );
 }
 
+//
+// convert given matrix into H-matrix, i.e., with standard lowrank and
+// dense leaf blocks
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+convert_to_h ( const Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        //
+        // convert each sub block into low-rank format and 
+        // enlarge to size of M (pad with zeroes)
+        //
+
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [BM,&B] ( auto  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( BM->block( i, j ) != nullptr )
+                        {
+                            auto  B_ij = convert_to_h( * BM->block( i, j ) );
+                    
+                            B_ij->set_parent( B );
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( is_uniform_lowrank( M ) )
+    {
+        auto  RM = cptrcast( &M, uniform_lrmatrix< value_t > );
+        auto  U  = blas::prod( RM->row_basis(), RM->coupling() );
+        auto  V  = RM->col_basis();
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
+    else
+    {
+        return M.copy();
+    }// if
+}
+
 }}}// namespace hlr::tbb::matrix
 
 #endif // __HLR_TBB_CONVERT_HH
