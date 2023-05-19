@@ -99,7 +99,7 @@ program_main ()
 
     tic = timer::now();
 
-    auto  [ rowcb, colcb, A ] = impl::matrix::build_uniform_rec( *H, cbapx, acc );
+    auto  [ rowcb, colcb, A ] = impl::matrix::build_uniform_rec2( *H, cbapx, acc );
     
     toc = timer::since( tic );
 

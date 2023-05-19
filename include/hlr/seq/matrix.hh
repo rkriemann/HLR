@@ -568,15 +568,6 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     // mapping of index sets to lowrank matrices 
     //
 
-    auto  row_map = detail::lr_coupling_map_t< value_t >();
-    auto  col_map = detail::lr_coupling_map_t< value_t >();
-    
-    detail::build_mat_map( A, row_map, col_map );
-    
-    //
-    // build cluster bases
-    //
-    
     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
@@ -586,8 +577,17 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
 
-    detail::build_cluster_basis< value_t, basisapx_t >( A, *rowcb, basisapx, acc, row_map, false );
-    detail::build_cluster_basis< value_t, basisapx_t >( A, *colcb, basisapx, acc, col_map, true );
+    auto  row_map = detail::lr_coupling_map_t< value_t >();
+    auto  col_map = detail::lr_coupling_map_t< value_t >();
+    
+    detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
+    
+    //
+    // build cluster bases
+    //
+    
+    detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
+    detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
 
     //
     // construct uniform lowrank matrices with given cluster bases
