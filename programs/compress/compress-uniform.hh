@@ -84,6 +84,9 @@ program_main ()
     
     std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
 
+    if ( verbose( 3 ) )
+        io::eps::print( *H, "H" );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // convert to uniform matrix
@@ -110,7 +113,7 @@ program_main ()
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_rcb + mem_ccb + mem_A) / double(mem_H) ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,norank,nosize" );
+        matrix::print_eps( *A, "A", "noid,nosize" );
 
     {
         auto  B     = impl::matrix::convert_to_h( *A );
