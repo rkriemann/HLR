@@ -87,14 +87,14 @@ public:
 
     // construct cluster basis corresponding to cluster <cl>
     // with basis defined by <V>
-    cluster_basis ( const indexset &                       ais,
-                    const hlr::blas::matrix< value_t > &&  V )
+    cluster_basis ( const indexset &                      ais,
+                    const hlr::blas::matrix< value_t > &  V )
             : _is( ais )
             , _V( V )
     {}
 
-    cluster_basis ( const indexset &                       ais,
-                    hlr::blas::matrix< value_t > &&        V )
+    cluster_basis ( const indexset &                      ais,
+                    hlr::blas::matrix< value_t > &&       V )
             : _is( ais )
             , _V( std::move( V ) )
     {}
