@@ -129,8 +129,9 @@ mul_vec ( const value_t                             alpha,
     //
 
     // auto  tic = timer::now();
-    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
-    auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
+    auto &  cb = ( op_M == hpro::apply_normal ? colcb : rowcb );
+    auto    ux = detail::scalar_to_uniform( cb, x );
+    auto    uy = hlr::vector::make_uniform< value_t, matrix::cluster_basis< value_t > >( cb );
     // auto  toc = timer::since( tic );
     // auto  t1  = toc.seconds();
 

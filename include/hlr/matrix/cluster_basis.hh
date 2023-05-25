@@ -8,16 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hpro/config.h>
-
-#if defined(HPRO_USE_LIC_CHECK)
-#define HLR_HAS_H2
-#endif
-
 #include <hpro/cluster/TCluster.hh>
-#if defined(HLR_HAS_H2)
-#include <hpro/cluster/TClusterBasis.hh>
-#endif
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/compression.hh>
@@ -558,19 +549,6 @@ rank_info ( const cluster_basis< value_t > &  cb )
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
-
-#if defined(HLR_HAS_H2)
-
-template < typename value_t >
-std::tuple< uint, uint, uint >
-rank_info ( const Hpro::TClusterBasis< value_t > &  cb )
-{
-    auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_cb( cb );
-
-    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
-}
-
-#endif
     
 }} // namespace hlr::matrix
 

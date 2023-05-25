@@ -144,7 +144,7 @@ program_main ()
     auto  A_uni     = std::unique_ptr< hpro::TMatrix< value_t > >();
     auto  apx       = approx::SVD< value_t >();
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
     
@@ -171,7 +171,7 @@ program_main ()
         }
     }
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
     
@@ -289,15 +289,61 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined(HLR_HAS_H2)
-    
-    auto  rowcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
-    auto  colcb_h2 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
+    auto  rowcb_h2 = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
+    auto  colcb_h2 = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
     auto  A_h2     = std::unique_ptr< hpro::TMatrix< value_t > >();
-    
+
     if ( true )
     {
         std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_h2_rec( *A, apx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
+
+        std::cout << "    ranks  = "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
+        
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( *A2, "H2", "noid" );
+            io::eps::print( *rowcb, "rowcb_h2" );
+            io::eps::print( *colcb, "colcb_h2" );
+        }// if
+        
+        {
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+
+        //
+        // preserve for MVM
+        //
+
+        A_h2     = std::move( A2 );
+        rowcb_h2 = std::move( rowcb );
+        colcb_h2 = std::move( colcb );
+    }
+
+    #if defined(HLR_HAS_H2)
+    
+    auto  rowcb_h21 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
+    auto  colcb_h21 = std::unique_ptr< hpro::TClusterBasis< value_t > >();
+    auto  A_h21     = std::unique_ptr< hpro::TMatrix< value_t > >();
+    
+    if ( true )
+    {
+        std::cout << term::bullet << term::bold << "H²-matrix (Hpro)" << term::reset << std::endl;
 
         std::cout << "  " << term::bullet << term::bold << "build cluster bases" << term::reset << std::endl;
     
@@ -320,8 +366,8 @@ program_main ()
         
         if ( verbose( 3 ) )
         {
-            io::eps::print( *rowcb, "rowcb" );
-            io::eps::print( *colcb, "colcb" );
+            io::eps::print( *rowcb, "rowcb_h2_2" );
+            io::eps::print( *colcb, "colcb_h2_2" );
         }// if
 
         std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
@@ -341,15 +387,15 @@ program_main ()
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         
         if ( hpro::verbose( 3 ) )
-            io::eps::print( *A2, "A2", "noid" );
+            io::eps::print( *A2, "H2_2", "noid" );
 
         //
         // preserve for MVM
         //
 
-        A_h2     = std::move( A2 );
-        rowcb_h2 = std::move( rowcb );
-        colcb_h2 = std::move( colcb );
+        A_h21     = std::move( A2 );
+        rowcb_h21 = std::move( rowcb );
+        colcb_h21 = std::move( colcb );
     }// if
 
     #endif
@@ -413,7 +459,7 @@ program_main ()
     
     //////////////////////////////////////////////////////////////////////
     //
-    // conversion to uniform
+    // uniform-H
     //
     //////////////////////////////////////////////////////////////////////
 
@@ -503,12 +549,10 @@ program_main ()
     
     //////////////////////////////////////////////////////////////////////
     //
-    // conversion to H²
+    // H²
     //
     //////////////////////////////////////////////////////////////////////
 
-    #if defined(HLR_HAS_H2)
-    
     if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
@@ -534,6 +578,51 @@ program_main ()
             for ( int j = 0; j < 50; ++j )
                 // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
                 impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x, *y, *rowcb_h2, *colcb_h2 );
+
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+        
+            std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+            
+            if ( i < nbench-1 )
+                y->fill( 1 );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        runtime.clear();
+    }// if
+
+    #if defined(HLR_HAS_H2)
+    
+    if ( true )
+    {
+        std::cout << "  " << term::bullet << term::bold << "H²-matrix (Hpro)" << term::reset << std::endl;
+
+        {
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            
+            impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h21, *x_ref, *y, *rowcb_h21, *colcb_h21 );
+            
+            y->axpy( -1.0, y_ref.get() );
+            std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
+        }
+            
+        auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_h21->col_is() );
+        auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_h21->row_is() );
+
+        x->fill( 1 );
+            
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+    
+            for ( int j = 0; j < 50; ++j )
+                // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
+                impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h21, *x, *y, *rowcb_h21, *colcb_h21 );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );

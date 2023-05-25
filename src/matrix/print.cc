@@ -25,6 +25,7 @@
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/eps_printer.hh>
@@ -262,6 +263,29 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
 
             // background
             prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        else if ( matrix::is_h2_lowrank( &M ) )
+        {
+            auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+
+            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -818,7 +842,92 @@ print_eps ( const cluster_basis< value_t > &  cb,
 
             for ( uint  i = 0; i < clb->nsons(); ++i )
             {
-                if ( clb->son( i ) != nullptr )
+                if ( ! is_null( clb->son( i ) ) )
+                    sons.push_back( clb->son( i ) );
+            }// for
+        }// while
+
+        bases = std::move( sons );
+
+        ++level;
+    }// while
+    
+    prn.end();
+}
+
+template < typename value_t >
+void
+print_eps ( const nested_cluster_basis< value_t > &  cb,
+            const std::string &                      filename,
+            const std::string &                      options )
+{
+    using real_t = Hpro::real_type_t< value_t >;
+    
+    const boost::filesystem::path  filepath( filename );
+    std::string                    suffix;
+
+    if ( ! filepath.has_extension() )
+        suffix = ".eps";
+
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+    
+    std::ofstream  out( filename + suffix );
+    eps_printer    prn( out );
+
+    const uint    depth     = uint( cb.depth() );
+    const uint    size      = uint( cb.is().size() );
+    const double  max_x     = 500.0;
+    const double  scale_x   = max_x / double(size);
+    const double  scale_y   = std::min( 500.0 / double(depth+1), 20.0 );
+    const double  prn_width = max_x;
+    auto          bases     = std::list< const nested_cluster_basis< value_t > * >{ & cb };
+    uint          level     = 0;
+
+    prn.begin( uint(prn_width), uint(( depth ) * scale_y) );
+    prn.set_line_width( 1.0 / std::max( scale_x, scale_y ) );
+
+    while ( ! bases.empty() )
+    {
+        decltype( bases )  sons;
+
+        for ( auto  clb : bases )
+        {
+            const auto    is      = clb->is();
+            const double  fn_size = std::min( 5.0, scale_x * double(is.size()) / 2.0 );
+
+            if ( clb->rank() != 0 )
+            {
+                uint  text_col = 0;
+                
+                if ( ! contains( optarr, "norank" ) )
+                {
+                    std::ostringstream  srank;
+
+                    srank << clb->rank();
+                
+                    prn.save();
+
+                    if ( text_col != 0 )
+                        prn.set_gray( text_col );
+                    
+                    prn.set_font( "Helvetica", fn_size );
+                    prn.draw_text( scale_x * (is.first() + is.last() + 1) / 2.0,
+                                   scale_y * (level + 0.5) + fn_size * 0.4,
+                                   srank.str(),
+                                   'c' );
+                
+                    prn.restore();
+                }// if
+            }// if
+            
+            prn.draw_rect( scale_x * is.first(),    scale_y * level,
+                           scale_x * (is.last()+1), scale_y * ( level+1 ) );
+
+            for ( uint  i = 0; i < clb->nsons(); ++i )
+            {
+                if ( ! is_null( clb->son( i ) ) )
                     sons.push_back( clb->son( i ) );
             }// for
         }// while
@@ -842,6 +951,9 @@ print_eps ( const cluster_basis< value_t > &  cb,
                                           const std::string &          , \
                                           const std::string &          ); \
     template void print_eps< type >     ( const cluster_basis< type > & , \
+                                          const std::string &,          \
+                                          const std::string & );        \
+    template void print_eps< type >     ( const nested_cluster_basis< type > & , \
                                           const std::string &,          \
                                           const std::string & );        \
 

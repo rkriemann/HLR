@@ -79,23 +79,21 @@ public:
             , _basis( nullptr )
     {}
 
-    uniform_vector ( const indexset           ais,
-                     const cluster_basis_t &  acb )
-            : Hpro::TVector< value_t >( ais.first() )
-            , _is( ais )
-            , _basis( &acb )
-            , _coeffs( acb.rank() )
-            , _blocks( acb.nsons() )
+    uniform_vector ( const cluster_basis_t &  abasis )
+            : Hpro::TVector< value_t >( abasis.is().first() )
+            , _is( abasis.is() )
+            , _basis( &abasis )
+            , _coeffs( abasis.rank() )
+            , _blocks( abasis.nsons() )
     {}
 
-    uniform_vector ( const indexset              ais,
-                     const cluster_basis_t &     acb,
+    uniform_vector ( const cluster_basis_t &     abasis,
                      blas::vector< value_t > &&  acoeff )
-            : Hpro::TVector< value_t >( ais.first() )
-            , _is( ais )
-            , _basis( &acb )
+            : Hpro::TVector< value_t >( abasis.is().first() )
+            , _is( abasis.is() )
+            , _basis( &abasis )
             , _coeffs( std::move( acoeff ) )
-            , _blocks( acb.nsons() )
+            , _blocks( abasis.nsons() )
     {
         HLR_ASSERT( ! ( _coeffs.length() == _basis->rank() ) );
     }
@@ -316,7 +314,7 @@ public:
     std::unique_ptr< hpro::TVector< value_t > >
     copy () const
     {
-        return std::make_unique< uniform_vector >( _is, *_basis, std::move( blas::copy( _coeffs ) ) );
+        return std::make_unique< uniform_vector >( *_basis, std::move( blas::copy( _coeffs ) ) );
     }
 
     // copy vector data to A
@@ -367,6 +365,25 @@ public:
         return n;
     }
 };
+
+//
+// create empty uniform vector for given cluster basis
+//
+template < typename value_t,
+           typename cluster_basis_t >
+std::unique_ptr< uniform_vector< cluster_basis_t > >
+make_uniform ( const cluster_basis_t &  cb )
+{
+    auto  u = std::make_unique< uniform_vector< cluster_basis_t > >( cb );
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            u->set_block( i, make_uniform< value_t, cluster_basis_t >( *cb.son(i) ).release() );
+    }// if
+
+    return u;
+}
 
 }}// namespace hlr::vector
 

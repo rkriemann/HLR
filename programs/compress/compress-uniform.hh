@@ -1,7 +1,7 @@
 //
 // Project     : HLR
 // Program     : compress-uniform
-// Description : construction and MVM with compressed data blocks
+// Description : construction and MVM for compressed uniform-H matrices
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //

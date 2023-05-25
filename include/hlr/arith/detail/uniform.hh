@@ -89,22 +89,11 @@ mul_vec ( const value_t                                       alpha,
 
         switch ( op_M )
         {
-            case Hpro::apply_normal :
-                blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
-                break;
-
-            case Hpro::apply_conjugate :
-                HLR_ASSERT( false );
-
-            case Hpro::apply_transposed :
-                HLR_ASSERT( false );
-
-            case Hpro::apply_adjoint :
-                blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
-                break;
-
-            default:
-                HLR_ERROR( "unsupported matrix operator" );
+            case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
+            case Hpro::apply_conjugate  : HLR_ASSERT( false );
+            case Hpro::apply_transposed : HLR_ASSERT( false );
+            case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
+            default                     : HLR_ERROR( "unsupported matrix operator" );
         }// switch
     }// if
     else
@@ -119,7 +108,7 @@ std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
                     const scalar_vector< value_t > &  v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
 
     if ( cb.rank() > 0 )
     {
@@ -160,24 +149,6 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
         for ( uint  i = 0; i < cb.nsons(); ++i )
             scalar_to_uniform( *cb.son(i), v, coeffmap );
     }// if
-}
-
-//
-// create empty uniform vector for given cluster basis
-//
-template < typename value_t >
-std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
-make_uniform ( const cluster_basis< value_t > &  cb )
-{
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
-
-    if ( cb.nsons() > 0 )
-    {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            u->set_block( i, make_uniform( *cb.son(i) ).release() );
-    }// if
-
-    return u;
 }
 
 //

@@ -13,6 +13,7 @@
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/nested_cluster_basis.hh>
 
 namespace hlr { namespace matrix {
 
@@ -53,6 +54,12 @@ void
 print_eps ( const cluster_basis< value_t > &  cb,
             const std::string &               filename,
             const std::string &               options = "default" );
+
+template < typename value_t >
+void
+print_eps ( const nested_cluster_basis< value_t > &  cb,
+            const std::string &                      filename,
+            const std::string &                      options = "default" );
 
 }}// namespace hlr::matrix
 

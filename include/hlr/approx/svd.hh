@@ -511,9 +511,9 @@ struct SVD
     //
     
     blas::matrix< value_t >
-    column_basis ( blas::matrix< value_t > &  M,
-                   const Hpro::TTruncAcc &    acc,
-                   blas::vector< real_t > *   sv = nullptr ) const
+    column_basis ( const blas::matrix< value_t > &  M,
+                   const Hpro::TTruncAcc &          acc,
+                   blas::vector< real_t > *         sv = nullptr ) const
     {
         if ( M.ncols() > 2 * M.nrows() )
         {
@@ -561,15 +561,16 @@ struct SVD
             // directly use first k column of U from M = U·S·V'
             // - V can be omitted as is does not contribute to basis
             //
-            
+
+            auto  U = blas::copy( M );
             auto  S = blas::vector< real_t >();
 
-            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+            HLR_APPROX_RANK_STAT( "full " << std::min( U.nrows(), U.ncols() ) );
         
-            blas::svd( M, S );
+            blas::svd( U, S );
 
             const auto  k  = acc.trunc_rank( S );
-            const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
+            const auto  Uk = blas::matrix< value_t >( U, blas::range::all, blas::range( 0, k-1 ) );
 
             if ( ! is_null( sv ) )
             {
@@ -588,10 +589,11 @@ struct SVD
             // M = Q·R = Q·U·S·V' with R = U·S·V'
             // - V can be omitted as is does not contribute to basis
             //
-            
+
+            auto  Q = blas::copy( M );
             auto  R = blas::matrix< value_t >();
 
-            blas::qr( M, R );
+            blas::qr( Q, R );
 
             auto  S = blas::vector< real_t >();
 
@@ -609,7 +611,7 @@ struct SVD
                     (*sv)(i) = S(i);
             }// if
 
-            return  blas::prod( M, Uk );
+            return  blas::prod( Q, Uk );
         }// else
     }
 
@@ -619,7 +621,7 @@ struct SVD
     
     std::pair< blas::matrix< value_t >,
                blas::vector< typename Hpro::real_type_t< value_t > > >
-    column_basis ( blas::matrix< value_t > &  M ) const
+    column_basis ( const blas::matrix< value_t > &  M ) const
     {
         if ( M.ncols() > 2 * M.nrows() )
         {
@@ -659,13 +661,14 @@ struct SVD
             // - V can be omitted as is does not contribute to basis
             //
             
+            auto  U = blas::copy( M );
             auto  S = blas::vector< real_t >();
 
-            HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
+            HLR_APPROX_RANK_STAT( "full " << std::min( U.nrows(), U.ncols() ) );
         
-            blas::svd( M, S );
+            blas::svd( U, S );
 
-            return  { std::move(blas::copy( M )), std::move(S) };
+            return  { std::move(blas::copy( U )), std::move(S) };
         }// if
         else
         {
@@ -673,16 +676,17 @@ struct SVD
             // M = Q·R = Q·U·S·V' with R = U·S·V'
             // - V can be omitted as is does not contribute to basis
             //
-            
+
+            auto  Q = blas::copy( M );
             auto  R = blas::matrix< value_t >();
 
-            blas::qr( M, R );
+            blas::qr( Q, R );
 
             auto  S = blas::vector< real_t >();
 
             blas::svd( R, S );
             
-            return  { std::move(blas::prod( M, R )), std::move( S ) };
+            return  { std::move(blas::prod( Q, R )), std::move( S ) };
         }// else
     }
 };

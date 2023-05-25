@@ -422,6 +422,15 @@ print ( const hlr::matrix::cluster_basis< value_t > &  cb,
     hlr::matrix::print_eps( cb, filename, options );
 }
 
+template < typename value_t >
+void
+print ( const hlr::matrix::nested_cluster_basis< value_t > &  cb,
+        const std::string &                                   filename,
+        const std::string &                                   options = "default" )
+{
+    hlr::matrix::print_eps( cb, filename, options );
+}
+
 #if defined(HLR_USE_H2)
 template < typename value_t >
 void
