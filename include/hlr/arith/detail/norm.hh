@@ -18,6 +18,7 @@
 #include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/convert.hh>
 
@@ -197,12 +198,22 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
     else if ( hlr::matrix::is_uniform_lowrank( A ) )
     {
         //
-        // |A| = | U S V' | = |U||S||V| = |S|
+        // |A| = | U S V' | = |U||S||V| = |S| with orthogonal U/V
         //
 
         auto  R = cptrcast( &A, hlr::matrix::uniform_lrmatrix< value_t > );
         
-        return blas::norm2( R->coeff() );
+        return blas::norm2( R->coupling() );
+    }// if
+    else if ( hlr::matrix::is_h2_lowrank( A ) )
+    {
+        //
+        // |A| = | U S V' | = |U||S||V| = |S| with orthogonal U/V
+        //
+
+        auto  R = cptrcast( &A, hlr::matrix::h2_lrmatrix< value_t > );
+        
+        return blas::norm2( R->coupling() );
     }// if
     else if ( is_dense( A ) )
     {
@@ -362,6 +373,18 @@ frobenius ( const value_t                     alpha,
 
         return frobenius( alpha, *RA, beta, *RB );
     }// if
+    else if ( matrix::is_h2_lowrank_all( A, B ) )
+    {
+        //
+        // assumption: different cluster basis but same block cluster
+        // => convert to lowrank and compute norm
+        //
+        
+        auto  RA = matrix::convert_to_lowrank( A );
+        auto  RB = matrix::convert_to_lowrank( B );
+
+        return frobenius( alpha, *RA, beta, *RB );
+    }// if
     else if ( is_dense_all( A, B ) )
     {
         auto  comp_dense = [alpha,beta] ( const blas::matrix< value_t > &  MA,
@@ -413,7 +436,8 @@ frobenius ( const value_t                     alpha,
     }// if
     else
     {
-        HLR_ASSERT( is_blocked_all( A, B ) || is_lowrank_all( A, B ) || is_dense_all( A, B ) );
+        HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
+        // HLR_ASSERT( is_blocked_all( A, B ) || is_lowrank_all( A, B ) || is_dense_all( A, B ) );
     }// else
 
     return 0;

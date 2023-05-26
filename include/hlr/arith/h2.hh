@@ -127,7 +127,9 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
 
     if ( cb.nsons() == 0 )
     {
-        if ( cb.basis().nrows() == 0 )
+        auto  V = cb.basis();
+        
+        if ( V.nrows() == 0 )
             return u;
         
         //
@@ -135,7 +137,7 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
         //
         
         auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
-        auto  s    = blas::mulvec( blas::adjoint( cb.basis() ), v_cb );
+        auto  s    = blas::mulvec( blas::adjoint( V ), v_cb );
 
         u->set_coeffs( std::move( s ) );
     }// if
@@ -178,19 +180,21 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis_t > &  u,
     else
         s = blas::copy( u.coeffs() );
 
-    if ( u.basis().nsons() == 0 )
-    {
-        auto  v_loc = blas::vector( blas::vec( v ), u.basis().is() - v.ofs() );
+    auto &  cb = u.basis();
 
-        blas::mulvec( value_t(1), u.basis().basis(), s, value_t(1), v_loc );
+    if ( cb.nsons() == 0 )
+    {
+        auto  v_loc = blas::vector( blas::vec( v ), cb.is() - v.ofs() );
+
+        blas::mulvec( value_t(1), cb.basis(), s, value_t(1), v_loc );
     }// if
     else
     {
         // shift local coefficients of u to sons and proceed
-        for ( uint  i = 0; i < u.basis().nsons(); ++i )
+        for ( uint  i = 0; i < cb.nsons(); ++i )
         {
             auto  u_i = u.block( i );
-            auto  s_i = u.basis().transfer_to_son( i, s );
+            auto  s_i = cb.transfer_to_son( i, s );
             
             add_uniform_to_scalar( *u_i, v, s_i );
         }// for

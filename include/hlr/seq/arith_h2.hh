@@ -10,14 +10,10 @@
 
 #include <hlr/arith/h2.hh>
 
-#if defined(HLR_HAS_H2)
-
 namespace hlr { namespace seq { namespace h2 {
 
 using hlr::h2::mul_vec;
 
 }}}// namespace hlr::seq::h2
-
-#endif // HLR_HAS_H2
 
 #endif // __HLR_SEQ_ARITH_H2_HH

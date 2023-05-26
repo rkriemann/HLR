@@ -154,8 +154,8 @@ program_main ()
         {
             tic = timer::now();
     
-            impl::matrix::compress( *zrowcb, lacc );
-            impl::matrix::compress( *zcolcb, lacc );
+            impl::matrix::compress< matrix::cluster_basis< value_t > >( *zrowcb, lacc );
+            impl::matrix::compress< matrix::cluster_basis< value_t > >( *zcolcb, lacc );
             impl::matrix::compress( *zA,     lacc );
 
             toc = timer::since( tic );
@@ -218,8 +218,8 @@ program_main ()
         {
             tic = timer::now();
     
-            impl::matrix::decompress( *zrowcb2 );
-            impl::matrix::decompress( *zcolcb2 );
+            impl::matrix::decompress< matrix::cluster_basis< value_t > >( *zrowcb2 );
+            impl::matrix::decompress< matrix::cluster_basis< value_t > >( *zcolcb2 );
             impl::matrix::decompress( *zA2 );
             
             toc = timer::since( tic );

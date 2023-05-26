@@ -11,8 +11,9 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
-#include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 
@@ -94,6 +95,16 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         auto  [ U, V ] = approx( US, R->col_basis(), acc );
         
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_h2_lowrank( M ) )
+    {
+        auto  R        = cptrcast( &M, h2_lrmatrix< value_t > );
+        auto  U        = R->row_cb().transform_backward( R->coupling() );
+        auto  I        = blas::identity< value_t >( R->col_rank() );
+        auto  V        = R->col_cb().transform_backward( I );
+        auto  [ W, X ] = approx( U, V, acc );
+        
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
     }// if
     else if ( is_dense( M ) )
     {
@@ -181,6 +192,15 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  U = blas::prod( R->row_basis(), R->coupling() );
         auto  V = blas::copy( R->col_basis() );
+        
+        return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( is_h2_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, h2_lrmatrix< value_t > );
+        auto  U = R->row_cb().transform_backward( R->coupling() );
+        auto  I = blas::identity< value_t >( R->col_rank() );
+        auto  V = R->col_cb().transform_backward( I );
         
         return std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
@@ -417,6 +437,18 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
         auto  U  = blas::prod( RM->row_basis(), RM->coupling() );
         auto  V  = RM->col_basis();
         auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
+    else if ( is_h2_lowrank( M ) )
+    {
+        auto  RM = cptrcast( &M, h2_lrmatrix< value_t > );
+        auto  U  = RM->row_cb().transform_backward( RM->coupling() );
+        auto  I  = blas::identity< value_t >( RM->col_rank() );
+        auto  V  = RM->col_cb().transform_backward( I );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
 
         R->set_id( M.id() );
 

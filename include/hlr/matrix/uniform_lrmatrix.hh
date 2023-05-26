@@ -609,14 +609,14 @@ uniform_lrmatrix< value_t >::byte_size () const
 
     size += sizeof(_row_is) + sizeof(_col_is);
     size += sizeof(_row_cb) + sizeof(_col_cb);
-    size += sizeof(_S) + sizeof(value_t) * _S.nrows() * _S.ncols();
+    size += _S.byte_size();
 
     #if HLR_HAS_COMPRESSION == 1
 
     size += compress::byte_size( _zS );
 
     #endif
-    
+
     return size;
 }
 

@@ -809,10 +809,11 @@ using hlr::matrix::decompress;
 //
 // compress cluster basis data
 //
-template < typename value_t >
+template < typename value_t,
+           typename cluster_basis_t >
 void
-compress ( matrix::cluster_basis< value_t > &  cb,
-           const Hpro::TTruncAcc &             acc )
+compress ( cluster_basis_t &        cb,
+           const Hpro::TTruncAcc &  acc )
 {
     using namespace hlr::matrix;
 
@@ -825,7 +826,7 @@ compress ( matrix::cluster_basis< value_t > &  cb,
             if ( is_null( cb.son(i) ) )
                 continue;
                 
-            compress( *cb.son(i), acc );
+            compress< cluster_basis_t >( *cb.son(i), acc );
         }// for
     }// if
 }
@@ -833,9 +834,10 @@ compress ( matrix::cluster_basis< value_t > &  cb,
 //
 // decompress cluster basis data
 //
-template < typename value_t >
+template < typename value_t,
+           typename cluster_basis_t >
 void
-decompress ( matrix::cluster_basis< value_t > &  cb )
+decompress ( cluster_basis_t &  cb )
 {
     using namespace hlr::matrix;
 
@@ -848,7 +850,7 @@ decompress ( matrix::cluster_basis< value_t > &  cb )
             if ( is_null( cb.son(i) ) )
                 continue;
                 
-            decompress( *cb.son(i) );
+            decompress< cluster_basis_t >( *cb.son(i) );
         }// for
     }// if
 }
