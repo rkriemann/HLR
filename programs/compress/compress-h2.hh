@@ -1,7 +1,7 @@
 //
 // Project     : HLR
-// Program     : compress-uniform
-// Description : construction and MVM for compressed uniform-H matrices
+// Program     : compress-h2
+// Description : construction and MVM for H²-matrices
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
@@ -89,11 +89,11 @@ program_main ()
     
     //////////////////////////////////////////////////////////////////////
     //
-    // convert to uniform matrix
+    // convert to H²
     //
     //////////////////////////////////////////////////////////////////////
     
-    std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
+    std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
 
     auto  cbapx = approx::SVD< value_t >();
 

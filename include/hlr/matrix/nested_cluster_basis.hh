@@ -30,8 +30,6 @@
 namespace hlr
 { 
 
-#define HLR_USE_APCOMPRESSION  0
-
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
 using accuracy     = Hpro::TTruncAcc;
@@ -43,6 +41,8 @@ DECLARE_TYPE( nested_cluster_basis );
 
 namespace matrix
 {
+
+#define HLR_USE_APCOMPRESSION  0
 
 //
 // represents cluster basis for single cluster with
@@ -825,7 +825,9 @@ rank_info ( const Hpro::TClusterBasis< value_t > &  cb )
 }
 
 #endif
-    
+
+#undef HLR_USE_APCOMPRESSION
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_NESTED_CLUSTER_BASIS_HH

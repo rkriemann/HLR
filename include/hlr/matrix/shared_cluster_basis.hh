@@ -18,8 +18,6 @@
 namespace hlr
 { 
 
-#define HLR_USE_APCOMPRESSION  0
-
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
 using accuracy     = Hpro::TTruncAcc;
@@ -31,6 +29,8 @@ DECLARE_TYPE( shared_cluster_basis );
 
 namespace matrix
 {
+
+#define HLR_USE_APCOMPRESSION  1
 
 //
 // represents cluster basis for single cluster with
@@ -442,8 +442,15 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
         HLR_ASSERT( _sv.length() == _V.ncols() );
 
-        double  tol = acc.abs_eps();
-        auto    S   = blas::copy( _sv );
+        auto  norm = real_t(0);
+
+        for ( uint  i = 0; i < _sv.length(); ++i )
+            norm += _sv(0) * _sv(0);
+
+        norm = std::sqrt( norm );
+                
+        real_t  tol  = acc.abs_eps() * _sv(0);
+        auto    S    = blas::copy( _sv );
 
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
@@ -548,7 +555,9 @@ rank_info ( const shared_cluster_basis< value_t > &  cb )
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
-    
+
+#undef HLR_USE_APCOMPRESSION
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_SHARED_CLUSTER_BASIS_HH
