@@ -18,7 +18,7 @@
 namespace hlr
 { 
 
-#define HLR_USE_APCOMPRESSION  1
+#define HLR_USE_APCOMPRESSION  0
 
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
@@ -446,7 +446,7 @@ cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
-        
+
         auto  zV = hlr::compress::afloat::compress_lr< value_t >( _V, S );
 
         // {

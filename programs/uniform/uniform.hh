@@ -171,7 +171,7 @@ program_main ()
         }
     }
 
-    if ( false )
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (rec)" << term::reset << std::endl;
     

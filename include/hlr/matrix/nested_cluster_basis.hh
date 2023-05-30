@@ -30,7 +30,7 @@
 namespace hlr
 { 
 
-#define HLR_USE_APCOMPRESSION  1
+#define HLR_USE_APCOMPRESSION  0
 
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
