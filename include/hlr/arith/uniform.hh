@@ -113,13 +113,13 @@ construct_indexset_to_block_maps ( hpro::TMatrix< value_t > &  A )
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                             alpha,
-          const hpro::matop_t                       op_M,
-          const hpro::TMatrix< value_t > &          M,
-          const vector::scalar_vector< value_t > &  x,
-          vector::scalar_vector< value_t > &        y,
-          matrix::cluster_basis< value_t > &        rowcb,
-          matrix::cluster_basis< value_t > &        colcb )
+mul_vec ( const value_t                              alpha,
+          const hpro::matop_t                        op_M,
+          const hpro::TMatrix< value_t > &           M,
+          const vector::scalar_vector< value_t > &   x,
+          vector::scalar_vector< value_t > &         y,
+          matrix::shared_cluster_basis< value_t > &  rowcb,
+          matrix::shared_cluster_basis< value_t > &  colcb )
 {
     if ( alpha == value_t(0) )
         return;
@@ -131,7 +131,7 @@ mul_vec ( const value_t                             alpha,
     // auto  tic = timer::now();
     auto &  cb = ( op_M == hpro::apply_normal ? colcb : rowcb );
     auto    ux = detail::scalar_to_uniform( cb, x );
-    auto    uy = hlr::vector::make_uniform< value_t, matrix::cluster_basis< value_t > >( cb );
+    auto    uy = hlr::vector::make_uniform< value_t, matrix::shared_cluster_basis< value_t > >( cb );
     // auto  toc = timer::since( tic );
     // auto  t1  = toc.seconds();
 
@@ -146,13 +146,13 @@ mul_vec ( const value_t                             alpha,
 
 template < typename value_t >
 void
-mul_vec2 ( const value_t                             alpha,
-           const hpro::matop_t                       op_M,
-           const hpro::TMatrix< value_t > &          M,
-           const vector::scalar_vector< value_t > &  x,
-           vector::scalar_vector< value_t > &        y,
-           matrix::cluster_basis< value_t > &        rowcb,
-           matrix::cluster_basis< value_t > &        colcb )
+mul_vec2 ( const value_t                              alpha,
+           const hpro::matop_t                        op_M,
+           const hpro::TMatrix< value_t > &           M,
+           const vector::scalar_vector< value_t > &   x,
+           vector::scalar_vector< value_t > &         y,
+           matrix::shared_cluster_basis< value_t > &  rowcb,
+           matrix::shared_cluster_basis< value_t > &  colcb )
 {
     if ( alpha == value_t(0) )
         return;
@@ -368,15 +368,15 @@ namespace accu2
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix< value_t > &          A,
-     hpro::TMatrix< value_t > &          L,
-     hpro::TMatrix< value_t > &          U,
-     const hpro::TTruncAcc &             acc,
-     const approx_t &                    approx,
-     matrix::cluster_basis< value_t > &  rowcb_L,
-     matrix::cluster_basis< value_t > &  colcb_L,
-     matrix::cluster_basis< value_t > &  rowcb_U,
-     matrix::cluster_basis< value_t > &  colcb_U )
+lu ( hpro::TMatrix< value_t > &                 A,
+     hpro::TMatrix< value_t > &                 L,
+     hpro::TMatrix< value_t > &                 U,
+     const hpro::TTruncAcc &                    acc,
+     const approx_t &                           approx,
+     matrix::shared_cluster_basis< value_t > &  rowcb_L,
+     matrix::shared_cluster_basis< value_t > &  colcb_L,
+     matrix::shared_cluster_basis< value_t > &  rowcb_U,
+     matrix::shared_cluster_basis< value_t > &  colcb_U )
 {
     auto  rowmap_L = is_matrix_map_t< value_t >();
     auto  colmap_L = is_matrix_map_t< value_t >();
@@ -422,11 +422,11 @@ namespace accu4
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix< value_t > &          A,
-     const hpro::TTruncAcc &             acc,
-     const approx_t &                    approx,
-     matrix::cluster_basis< value_t > &  rowcb,
-     matrix::cluster_basis< value_t > &  colcb )
+lu ( hpro::TMatrix< value_t > &                 A,
+     const hpro::TTruncAcc &                    acc,
+     const approx_t &                           approx,
+     matrix::shared_cluster_basis< value_t > &  rowcb,
+     matrix::shared_cluster_basis< value_t > &  colcb )
 {
     auto  rowmap = is_matrix_map_t< value_t >();
     auto  colmap = is_matrix_map_t< value_t >();
@@ -652,7 +652,7 @@ lu_sep ( hpro::TMatrix< value_t > &  L,
                 auto  V_i  = R_ji->col_basis();
                 auto  X_i  = blas::prod( blas::adjoint( DU_ii ), V_i );
 
-                // const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( blas::copy( QX ) ) );
+                // const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( blas::copy( QX ) ) );
                 R_ji->col_cb().set_basis( std::move( X_i ) );
 
                 break;

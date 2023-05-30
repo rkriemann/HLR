@@ -39,8 +39,8 @@ using namespace hlr;
 
 template < typename value_t >
 void
-print_cb ( const matrix::cluster_basis< value_t > &  cb,
-           const uint                                indent = 0 )
+print_cb ( const matrix::shared_cluster_basis< value_t > &  cb,
+           const uint                                       indent = 0 )
 {
     for ( uint  i = 0; i < indent; ++i )
         std::cout << ' ';

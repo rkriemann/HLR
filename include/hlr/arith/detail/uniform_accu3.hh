@@ -16,7 +16,6 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/detail/uniform.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/restrict.hh>

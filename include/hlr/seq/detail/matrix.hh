@@ -29,8 +29,8 @@ using hlr::uniform::is_matrix_map_t;
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
 build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
@@ -46,7 +46,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
     assert( bct != nullptr );
 
     using value_t       = typename coeff_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
     using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
     using lrmat_map_t   = std::unordered_map< indexset, std::list< Hpro::TRkMatrix< value_t > * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< Hpro::idx_t, Hpro::TBlockMatrix< value_t > * >;
@@ -607,14 +607,14 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
 //
 template < typename basisapx_t >
 std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > >
-build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                    const basisapx_t &                                     basisapx,
-                    const accuracy &                                       acc,
-                    cluster_basis< typename basisapx_t::value_t > &        rowcb_root,
-                    cluster_basis< typename basisapx_t::value_t > &        colcb_root )
+build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
+                    const basisapx_t &                                      basisapx,
+                    const accuracy &                                        acc,
+                    shared_cluster_basis< typename basisapx_t::value_t > &  rowcb_root,
+                    shared_cluster_basis< typename basisapx_t::value_t > &  colcb_root )
 {
     using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
     using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
     using lrmat_map_t   = std::unordered_map< indexset, std::list< const Hpro::TRkMatrix< value_t > * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< Hpro::idx_t, Hpro::TBlockMatrix< value_t > * >;
@@ -895,15 +895,15 @@ template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
-build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
-                    const coeff_t &                                 coeff,
-                    const lrapx_t &                                 lrapx,
-                    const basisapx_t &                              basisapx,
-                    const accuracy &                                acc,
-                    cluster_basis< typename coeff_t::value_t > &    rowcb,
-                    cluster_basis< typename coeff_t::value_t > &    colcb,
-                    is_matrix_map_t< typename coeff_t::value_t > &  rowmap,
-                    is_matrix_map_t< typename coeff_t::value_t > &  colmap )
+build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
+                    const coeff_t &                                      coeff,
+                    const lrapx_t &                                      lrapx,
+                    const basisapx_t &                                   basisapx,
+                    const accuracy &                                     acc,
+                    shared_cluster_basis< typename coeff_t::value_t > &  rowcb,
+                    shared_cluster_basis< typename coeff_t::value_t > &  colcb,
+                    is_matrix_map_t< typename coeff_t::value_t > &       rowmap,
+                    is_matrix_map_t< typename coeff_t::value_t > &       colmap )
 {
     using value_t = typename coeff_t::value_t;
     using real_t  = Hpro::real_type_t< value_t >;
@@ -1024,14 +1024,14 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
                 {
                     if ( is_null( rowcb_i ) )
                     {
-                        rowcb_i = new cluster_basis< value_t >( bct->son( i, j )->is().row_is() );
+                        rowcb_i = new shared_cluster_basis< value_t >( bct->son( i, j )->is().row_is() );
                         rowcb_i->set_nsons( bct->son( i, j )->rowcl()->nsons() );
                         rowcb.set_son( i, rowcb_i );
                     }// if
             
                     if ( is_null( colcb_j ) )
                     {
-                        colcb_j = new cluster_basis< value_t >( bct->son( i, j )->is().col_is() );
+                        colcb_j = new shared_cluster_basis< value_t >( bct->son( i, j )->is().col_is() );
                         colcb_j->set_nsons( bct->son( i, j )->colcl()->nsons() );
                         colcb.set_son( j, colcb_j );
                     }// if
@@ -1060,13 +1060,13 @@ build_uniform_rec ( const Hpro::TBlockCluster *                     bct,
 
 template < typename basisapx_t >
 std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > >
-build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                    const basisapx_t &                                     basisapx,
-                    const accuracy &                                       acc,
-                    cluster_basis< typename basisapx_t::value_t > &        rowcb,
-                    cluster_basis< typename basisapx_t::value_t > &        colcb,
-                    is_matrix_map_t< typename basisapx_t::value_t > &      rowmap,
-                    is_matrix_map_t< typename basisapx_t::value_t > &      colmap )
+build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
+                    const basisapx_t &                                      basisapx,
+                    const accuracy &                                        acc,
+                    shared_cluster_basis< typename basisapx_t::value_t > &  rowcb,
+                    shared_cluster_basis< typename basisapx_t::value_t > &  colcb,
+                    is_matrix_map_t< typename basisapx_t::value_t > &       rowmap,
+                    is_matrix_map_t< typename basisapx_t::value_t > &       colmap )
 {
     using value_t = typename basisapx_t::value_t;
     using real_t  = Hpro::real_type_t< value_t >;
@@ -1154,7 +1154,7 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                 {
                     if ( is_null( rowcb_i ) )
                     {
-                        rowcb_i = new cluster_basis< value_t >( A_ij->row_is() );
+                        rowcb_i = new shared_cluster_basis< value_t >( A_ij->row_is() );
                         rowcb.set_son( i, rowcb_i );
                     }// if
             
@@ -1163,7 +1163,7 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                         
                     if ( is_null( colcb_j ) )
                     {
-                        colcb_j = new cluster_basis< value_t >( A_ij->col_is() );
+                        colcb_j = new shared_cluster_basis< value_t >( A_ij->col_is() );
                         colcb.set_son( j, colcb_j );
                     }// if
             
@@ -1201,9 +1201,9 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
 template < typename value_t >
 void
-init_cluster_bases ( const Hpro::TMatrix< value_t > &  M,
-                     cluster_basis< value_t > &        rowcb,
-                     cluster_basis< value_t > &        colcb )
+init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
+                     shared_cluster_basis< value_t > &  rowcb,
+                     shared_cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
@@ -1222,7 +1222,7 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &  M,
                 {
                     if ( is_null( rowcb_i ) )
                     {
-                        rowcb_i = new cluster_basis< value_t >( M_ij->row_is() );
+                        rowcb_i = new shared_cluster_basis< value_t >( M_ij->row_is() );
                         rowcb.set_son( i, rowcb_i );
                     }// if
             
@@ -1231,7 +1231,7 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &  M,
                         
                     if ( is_null( colcb_j ) )
                     {
-                        colcb_j = new cluster_basis< value_t >( M_ij->col_is() );
+                        colcb_j = new shared_cluster_basis< value_t >( M_ij->col_is() );
                         colcb.set_son( j, colcb_j );
                     }// if
             
@@ -1270,11 +1270,11 @@ using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< 
 
 template < typename value_t >
 void
-build_mat_map ( const Hpro::TMatrix< value_t > &  A,
-                cluster_basis< value_t > &        rowcb,
-                cluster_basis< value_t > &        colcb,
-                lr_coupling_map_t< value_t > &    row_map,
-                lr_coupling_map_t< value_t > &    col_map )
+build_mat_map ( const Hpro::TMatrix< value_t > &   A,
+                shared_cluster_basis< value_t > &  rowcb,
+                shared_cluster_basis< value_t > &  colcb,
+                lr_coupling_map_t< value_t > &     row_map,
+                lr_coupling_map_t< value_t > &     col_map )
 {
     using namespace hlr::matrix;
     
@@ -1324,7 +1324,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &  A,
                 {
                     if ( is_null( rowcb_i ) )
                     {
-                        rowcb_i = new cluster_basis< value_t >( M_ij->row_is() );
+                        rowcb_i = new shared_cluster_basis< value_t >( M_ij->row_is() );
                         rowcb.set_son( i, rowcb_i );
                     }// if
             
@@ -1333,7 +1333,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &  A,
                         
                     if ( is_null( colcb_j ) )
                     {
-                        colcb_j = new cluster_basis< value_t >( M_ij->col_is() );
+                        colcb_j = new shared_cluster_basis< value_t >( M_ij->col_is() );
                         colcb.set_son( j, colcb_j );
                     }// if
             
@@ -1369,7 +1369,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &  A,
 template < typename value_t,
            typename basisapx_t >
 void
-build_cluster_basis ( cluster_basis< value_t > &            cb,
+build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
                       const basisapx_t &                    basisapx,
                       const accuracy &                      acc,
                       const lr_coupling_map_t< value_t > &  mat_map,
@@ -1444,9 +1444,9 @@ build_cluster_basis ( cluster_basis< value_t > &            cb,
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-build_uniform ( const Hpro::TMatrix< value_t > &  A,
-                cluster_basis< value_t > &        rowcb,
-                cluster_basis< value_t > &        colcb )
+build_uniform ( const Hpro::TMatrix< value_t > &   A,
+                shared_cluster_basis< value_t > &  rowcb,
+                shared_cluster_basis< value_t > &  colcb )
 {
     using namespace hlr::matrix;
 

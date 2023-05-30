@@ -10,7 +10,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/uniform.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
@@ -35,13 +34,13 @@ namespace hpro = HLIB;
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                             alpha,
-          const matop_t                             op_M,
-          const Hpro::TMatrix< value_t > &          M,
-          const vector::scalar_vector< value_t > &  x,
-          vector::scalar_vector< value_t > &        y,
-          hlr::matrix::cluster_basis< value_t > &   rowcb,
-          hlr::matrix::cluster_basis< value_t > &   colcb )
+mul_vec ( const value_t                                   alpha,
+          const matop_t                                   op_M,
+          const Hpro::TMatrix< value_t > &                M,
+          const vector::scalar_vector< value_t > &        x,
+          vector::scalar_vector< value_t > &              y,
+          hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+          hlr::matrix::shared_cluster_basis< value_t > &  colcb )
 {
     if ( alpha == value_t(0) )
         return;
@@ -66,13 +65,13 @@ mul_vec ( const value_t                             alpha,
 
 template < typename value_t >
 void
-mul_vec2 ( const value_t                             alpha,
-           const matop_t                             op_M,
-           const Hpro::TMatrix< value_t > &          M,
-           const vector::scalar_vector< value_t > &  x,
-           vector::scalar_vector< value_t > &        y,
-           hlr::matrix::cluster_basis< value_t > &   rowcb,
-           hlr::matrix::cluster_basis< value_t > &   colcb )
+mul_vec2 ( const value_t                                   alpha,
+           const matop_t                                   op_M,
+           const Hpro::TMatrix< value_t > &                M,
+           const vector::scalar_vector< value_t > &        x,
+           vector::scalar_vector< value_t > &              y,
+           hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+           hlr::matrix::shared_cluster_basis< value_t > &  colcb )
 {
     if ( alpha == value_t(0) )
         return;
@@ -171,15 +170,15 @@ namespace accu2
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix< value_t > &               A,
-     hpro::TMatrix< value_t > &               L,
-     hpro::TMatrix< value_t > &               U,
-     const hpro::TTruncAcc &                  acc,
-     const approx_t &                         approx,
-     hlr::matrix::cluster_basis< value_t > &  rowcb_L,
-     hlr::matrix::cluster_basis< value_t > &  colcb_L,
-     hlr::matrix::cluster_basis< value_t > &  rowcb_U,
-     hlr::matrix::cluster_basis< value_t > &  colcb_U )
+lu ( hpro::TMatrix< value_t > &                      A,
+     hpro::TMatrix< value_t > &                      L,
+     hpro::TMatrix< value_t > &                      U,
+     const hpro::TTruncAcc &                         acc,
+     const approx_t &                                approx,
+     hlr::matrix::shared_cluster_basis< value_t > &  rowcb_L,
+     hlr::matrix::shared_cluster_basis< value_t > &  colcb_L,
+     hlr::matrix::shared_cluster_basis< value_t > &  rowcb_U,
+     hlr::matrix::shared_cluster_basis< value_t > &  colcb_U )
 {
     auto  accu = hlr::tbb::uniform::accu::detail2::accumulator< value_t >();
     auto  lu   = hlr::tbb::uniform::accu::detail2::rec_lu_factorization< value_t >( L, U );

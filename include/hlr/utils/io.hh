@@ -415,9 +415,9 @@ print_mem ( const Hpro::TMatrix< value_t > &  M,
 //
 template < typename value_t >
 void
-print ( const hlr::matrix::cluster_basis< value_t > &  cb,
-        const std::string &                            filename,
-        const std::string &                            options = "default" )
+print ( const hlr::matrix::shared_cluster_basis< value_t > &  cb,
+        const std::string &                                   filename,
+        const std::string &                                   options = "default" )
 {
     hlr::matrix::print_eps( cb, filename, options );
 }

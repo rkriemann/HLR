@@ -14,11 +14,11 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/detail/uniform_basis.hh>
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
 
 namespace hlr { namespace tbb { namespace uniform { namespace detail {
 
-using hlr::matrix::cluster_basis;
+using hlr::matrix::shared_cluster_basis;
 using hlr::matrix::uniform_lrmatrix;
 using hlr::uniform::is_matrix_map_t;
 
@@ -31,7 +31,7 @@ using hlr::uniform::is_matrix_map_t;
 template < typename value_t,
            typename basisapx_t >
 blas::matrix< value_t >
-compute_extended_basis ( const cluster_basis< value_t > &                cb,
+compute_extended_basis ( const shared_cluster_basis< value_t > &         cb,
                          const blas::matrix< value_t > &                 W,
                          const blas::matrix< value_t > &                 T,
                          const hpro::TTruncAcc &                         acc,
@@ -180,12 +180,12 @@ compute_extended_basis ( const cluster_basis< value_t > &                cb,
 //
 template < typename value_t >
 void
-update_coupling ( const cluster_basis< value_t > &  cb,
-                  const blas::matrix< value_t > &   Un,
-                  is_matrix_map_t< value_t > &      matmap,
-                  std::mutex &                      matmapmtx,
-                  const bool                        cols,
-                  uniform_lrmatrix< value_t > *     M = nullptr )
+update_coupling ( const shared_cluster_basis< value_t > &  cb,
+                  const blas::matrix< value_t > &          Un,
+                  is_matrix_map_t< value_t > &             matmap,
+                  std::mutex &                             matmapmtx,
+                  const bool                               cols,
+                  uniform_lrmatrix< value_t > *            M = nullptr )
 {
     if ( cb.basis().ncols() == 0 )
         return;

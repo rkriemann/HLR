@@ -12,7 +12,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/norm.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 // #include <hlr/utils/io.hh> // DEBUG
 
@@ -36,7 +35,7 @@ using  is_matrix_cmap_t = std::unordered_map< indexset, std::list< const Hpro::T
 namespace detail
 {
 
-using matrix::cluster_basis;
+using matrix::shared_cluster_basis;
 using matrix::uniform_lrmatrix;
 using matrix::is_uniform_lowrank;
 
@@ -50,7 +49,7 @@ using matrix::is_uniform_lowrank;
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_extended_row_basis ( const cluster_basis< value_t > &                cb,
+compute_extended_row_basis ( const shared_cluster_basis< value_t > &         cb,
                              const blas::matrix< value_t > &                 W,
                              const blas::matrix< value_t > &                 T,
                              const Hpro::TTruncAcc &                         acc,
@@ -225,7 +224,7 @@ compute_updated_row_basis ( const uniform_lrmatrix< value_t > &             M,
 template < typename value_t,
            typename approx_t >
 blas::matrix< value_t >
-compute_extended_col_basis ( const cluster_basis< value_t > &                cb,
+compute_extended_col_basis ( const shared_cluster_basis< value_t > &         cb,
                              const blas::matrix< value_t > &                 T,
                              const blas::matrix< value_t > &                 X,
                              const Hpro::TTruncAcc &                         acc,
@@ -396,10 +395,10 @@ compute_updated_col_basis ( const uniform_lrmatrix< value_t > &             M,
 //
 template < typename value_t >
 void
-update_col_coupling ( const cluster_basis< value_t > &     cb,
-                      const blas::matrix< value_t > &      Vn,
-                      const is_matrix_map_t< value_t > &   matmap,
-                      const uniform_lrmatrix< value_t > *  M = nullptr )
+update_col_coupling ( const shared_cluster_basis< value_t > &  cb,
+                      const blas::matrix< value_t > &          Vn,
+                      const is_matrix_map_t< value_t > &       matmap,
+                      const uniform_lrmatrix< value_t > *      M = nullptr )
 {
     //
     // transform coupling matrix for blocks in current block column as
@@ -443,10 +442,10 @@ update_col_coupling ( const cluster_basis< value_t > &     cb,
 //
 template < typename value_t >
 void
-update_row_coupling ( const cluster_basis< value_t > &     cb,
-                      const blas::matrix< value_t > &      Un,
-                      const is_matrix_map_t< value_t > &   matmap,
-                      const uniform_lrmatrix< value_t > *  M = nullptr )
+update_row_coupling ( const shared_cluster_basis< value_t > &  cb,
+                      const blas::matrix< value_t > &          Un,
+                      const is_matrix_map_t< value_t > &       matmap,
+                      const uniform_lrmatrix< value_t > *      M = nullptr )
 {
     //
     // transform coupling matrix for blocks in current block column as
@@ -613,8 +612,8 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &       M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
-    const_cast< matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
 }
 
 //
@@ -701,7 +700,7 @@ update_row_basis ( uniform_lrmatrix< value_t > &       M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M.row_cb() )->set_basis( std::move( Un ) );
 }
 
 //
@@ -787,7 +786,7 @@ update_col_basis ( uniform_lrmatrix< value_t > &       M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M.col_cb() )->set_basis( std::move( Vn ) );
 }
 
 }// namespace detail
@@ -854,7 +853,7 @@ extend_col_basis ( Hpro::TBlockMatrix< value_t > &        M,
         auto  Sn = blas::prod( M_ij.coeff(), blas::adjoint( RX ) );
 
         M_ij.set_coeff_unsafe( std::move( Sn ) );
-        const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( blas::copy( QX ) ) );
+        const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( blas::copy( QX ) ) );
         return;
     }// if
     
@@ -995,7 +994,7 @@ extend_col_basis ( Hpro::TBlockMatrix< value_t > &        M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
 }
 
 //
@@ -1149,7 +1148,7 @@ extend_col_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.col_cb() )->set_basis( std::move( Vn ) );
 }
 
 //
@@ -1202,7 +1201,7 @@ extend_row_basis ( Hpro::TBlockMatrix< value_t > &        M,
         auto  Sn = blas::prod( RW, M_ij.coeff() );
         
         M_ij.set_coeff_unsafe( std::move( Sn ) );
-        const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( blas::copy( QW ) ) );
+        const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( blas::copy( QW ) ) );
         return;
     }// if
     
@@ -1346,7 +1345,7 @@ extend_row_basis ( Hpro::TBlockMatrix< value_t > &        M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
 }
 
 //
@@ -1497,7 +1496,7 @@ extend_row_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & M_ij.row_cb() )->set_basis( std::move( Un ) );
 }
 
 //
@@ -1884,8 +1883,8 @@ replace_row_col_basis ( Hpro::TBlockMatrix< value_t > &  M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
-    const_cast< matrix::cluster_basis< value_t > * >( & R_ij->row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & R_ij->row_cb() )->set_basis( std::move( Un ) );
 }
 
 template < typename value_t >
@@ -2139,8 +2138,8 @@ replace_row_col_basis_ref ( Hpro::TBlockMatrix< value_t > &  M,
     // finally adjust cluster basis
     //
 
-    const_cast< matrix::cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
-    const_cast< matrix::cluster_basis< value_t > * >( & R_ij->row_cb() )->set_basis( std::move( Un ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & R_ij->col_cb() )->set_basis( std::move( Vn ) );
+    const_cast< matrix::shared_cluster_basis< value_t > * >( & R_ij->row_cb() )->set_basis( std::move( Un ) );
 }
 
 }}}}// namespace hlr::uniform::tlr::detail

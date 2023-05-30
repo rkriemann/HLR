@@ -487,8 +487,8 @@ build_sparse ( const hpro::TBlockCluster &             bct,
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hpro::TMatrix< typename coeff_t::value_t > > >
 build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
@@ -501,8 +501,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
 }
 
 template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_lvl ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &       basisapx,
@@ -510,7 +510,7 @@ build_uniform_lvl ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const size_t             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
     auto  rowcb = std::make_unique< cluster_basis >( A.row_is() );
     auto  colcb = std::make_unique< cluster_basis >( A.col_is() );
@@ -537,8 +537,8 @@ build_uniform_lvl ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hpro::TMatrix< typename coeff_t::value_t > > >
 build_uniform_rec ( const hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
@@ -555,7 +555,7 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
     HLR_ASSERT( bct != nullptr );
 
     using value_t       = typename coeff_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
     auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
     auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
@@ -577,8 +577,8 @@ build_uniform_rec ( const hpro::TBlockCluster *  bct,
 //   shared bases are constructed on-the-fly
 //
 template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &                                       basisapx,
@@ -586,7 +586,7 @@ build_uniform_rec ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const size_t                                             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
@@ -606,8 +606,8 @@ build_uniform_rec ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
 }
 
 template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename basisapx_t::value_t > >,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec2 ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                      const basisapx_t &                                       basisapx,
@@ -615,7 +615,7 @@ build_uniform_rec2 ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
                      const size_t                                             /* nseq */ = hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
     //
     // mapping of index sets to lowrank matrices 
@@ -1381,9 +1381,9 @@ realloc ( hpro::TMatrix< value_t > *  A )
 //
 template < typename value_t >
 std::unique_ptr< hpro::TMatrix< value_t > >
-copy_uniform ( const hpro::TMatrix< value_t > &         M,
-               hlr::matrix::cluster_basis< value_t > &  rowcb,
-               hlr::matrix::cluster_basis< value_t > &  colcb )
+copy_uniform ( const hpro::TMatrix< value_t > &                M,
+               hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+               hlr::matrix::shared_cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {

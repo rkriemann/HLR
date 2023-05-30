@@ -22,7 +22,7 @@
 #endif
 
 #include <hlr/arith/blas.hh>
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
 #include <hlr/utils/compression.hh>
 #include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>

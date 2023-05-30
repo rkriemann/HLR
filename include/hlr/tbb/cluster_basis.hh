@@ -12,7 +12,7 @@
 #include <tbb/parallel_invoke.h>
 
 #include <hlr/utils/log.hh>
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
 #include <hlr/seq/cluster_basis.hh>
 
 namespace hlr { namespace tbb { namespace matrix {
@@ -29,7 +29,7 @@ using hlr::seq::matrix::detail::lrmatrix_map_t;
 using hlr::seq::matrix::detail::build_lrmatrix_map;
 
 template < typename value_t >
-std::unique_ptr< cluster_basis< value_t > >
+std::unique_ptr< shared_cluster_basis< value_t > >
 construct_basis ( const cluster_tree &         ct,
                   lrmatrix_map_t< value_t > &  mat_map,
                   const accuracy &             acc,
@@ -43,8 +43,8 @@ construct_basis ( const cluster_tree &         ct,
 // - cluster bases are not nested
 //
 template < typename value_t >
-std::pair< std::unique_ptr< cluster_basis< value_t > >,
-           std::unique_ptr< cluster_basis< value_t > > >
+std::pair< std::unique_ptr< shared_cluster_basis< value_t > >,
+           std::unique_ptr< shared_cluster_basis< value_t > > >
 construct_from_H ( const cluster_tree &              rowct,
                    const cluster_tree &              colct,
                    const Hpro::TMatrix< value_t > &  M,
@@ -65,7 +65,7 @@ construct_from_H ( const cluster_tree &              rowct,
     // next, construct cluster basis for each cluster in cluster tree
     //
 
-    std::unique_ptr< cluster_basis< value_t > >  row_cb, col_cb;
+    std::unique_ptr< shared_cluster_basis< value_t > >  row_cb, col_cb;
 
     ::tbb::parallel_invoke( [&] { row_cb = detail::construct_basis< value_t >( rowct, row_map, acc, false ); },
                             [&] { col_cb = detail::construct_basis< value_t >( colct, col_map, acc, true  ); } );
@@ -84,13 +84,13 @@ using hlr::seq::matrix::detail::V;
 // construct cluster basis for each cluster (block rows)
 //
 template < typename value_t >
-std::unique_ptr< cluster_basis< value_t > >
+std::unique_ptr< shared_cluster_basis< value_t > >
 construct_basis ( const cluster_tree &         ct,
                   lrmatrix_map_t< value_t > &  mat_map,
                   const accuracy &             acc,
                   const bool                   adjoint )
 {
-    auto  cb = std::make_unique< cluster_basis< value_t > >( ct );
+    auto  cb = std::make_unique< shared_cluster_basis< value_t > >( ct );
 
     //
     // compute row basis for all blocks

@@ -15,7 +15,7 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/vector/TScalarVector.hh>
 
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
 #include <hlr/utils/compression.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
@@ -44,23 +44,23 @@ public:
     // export local types
     //
 
-    // value type
-    using  value_t = T_value;
+    using  value_t         = T_value;
+    using  cluster_basis_t = shared_cluster_basis< value_t >;
     
 private:
     // local index set of matrix
-    indexset                    _row_is, _col_is;
+    indexset                 _row_is, _col_is;
     
     // low-rank factors in uniform storage
-    cluster_basis< value_t > *  _row_cb;
-    cluster_basis< value_t > *  _col_cb;
+    cluster_basis_t *        _row_cb;
+    cluster_basis_t *        _col_cb;
 
     // local coupling matrix
-    blas::matrix< value_t >     _S;
+    blas::matrix< value_t >  _S;
     
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
-    compress::zarray            _zS;
+    compress::zarray         _zS;
     #endif
     
 public:
@@ -88,11 +88,11 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    uniform_lrmatrix ( const indexset                   arow_is,
-                       const indexset                   acol_is,
-                       cluster_basis< value_t > &       arow_cb,
-                       cluster_basis< value_t > &       acol_cb,
-                       hlr::blas::matrix< value_t > &   aS )
+    uniform_lrmatrix ( const indexset             arow_is,
+                       const indexset             acol_is,
+                       cluster_basis_t &          arow_cb,
+                       cluster_basis_t &          acol_cb,
+                       blas::matrix< value_t > &  aS )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -103,11 +103,11 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    uniform_lrmatrix ( const indexset                   arow_is,
-                       const indexset                   acol_is,
-                       cluster_basis< value_t > &       arow_cb,
-                       cluster_basis< value_t > &       acol_cb,
-                       hlr::blas::matrix< value_t > &&  aS )
+    uniform_lrmatrix ( const indexset              arow_is,
+                       const indexset              acol_is,
+                       cluster_basis_t &           arow_cb,
+                       cluster_basis_t &           acol_cb,
+                       blas::matrix< value_t > &&  aS )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -126,29 +126,29 @@ public:
     // access internal data
     //
 
-    uint                              rank     () const { return std::min( row_rank(), col_rank() ); }
+    uint                           rank     () const { return std::min( row_rank(), col_rank() ); }
 
-    uint                              row_rank () const { HLR_ASSERT( ! is_null( _row_cb ) ); return _row_cb->rank(); }
-    uint                              col_rank () const { HLR_ASSERT( ! is_null( _col_cb ) ); return _col_cb->rank(); }
+    uint                           row_rank () const { HLR_ASSERT( ! is_null( _row_cb ) ); return _row_cb->rank(); }
+    uint                           col_rank () const { HLR_ASSERT( ! is_null( _col_cb ) ); return _col_cb->rank(); }
 
-    uint                              row_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
-    uint                              col_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
+    uint                           row_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
+    uint                           col_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
 
-    cluster_basis< value_t > &        row_cb   () const { return *_row_cb; }
-    cluster_basis< value_t > &        col_cb   () const { return *_col_cb; }
+    cluster_basis_t &              row_cb   () const { return *_row_cb; }
+    cluster_basis_t &              col_cb   () const { return *_col_cb; }
 
-    cluster_basis< value_t > &        row_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_cb() : col_cb(); }
-    cluster_basis< value_t > &        col_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_cb() : row_cb(); }
+    cluster_basis_t &              row_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_cb() : col_cb(); }
+    cluster_basis_t &              col_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_cb() : row_cb(); }
 
-    const blas::matrix< value_t >     row_basis () const { return _row_cb->basis(); }
-    const blas::matrix< value_t >     col_basis () const { return _col_cb->basis(); }
+    const blas::matrix< value_t >  row_basis () const { return _row_cb->basis(); }
+    const blas::matrix< value_t >  col_basis () const { return _col_cb->basis(); }
     
-    const blas::matrix< value_t >     row_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? row_basis() : col_basis(); }
-    const blas::matrix< value_t >     col_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? col_basis() : row_basis(); }
+    const blas::matrix< value_t >  row_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? row_basis() : col_basis(); }
+    const blas::matrix< value_t >  col_basis ( const matop_t  op ) const { return op == Hpro::apply_normal ? col_basis() : row_basis(); }
     
     void
-    set_cluster_bases ( cluster_basis< value_t > &  arow_cb,
-                        cluster_basis< value_t > &  acol_cb )
+    set_cluster_bases ( cluster_basis_t &  arow_cb,
+                        cluster_basis_t &  acol_cb )
     {
         HLR_ASSERT(( row_rank() == arow_cb.rank() ) &&
                    ( col_rank() == acol_cb.rank() ));
@@ -157,11 +157,9 @@ public:
         _col_cb = & acol_cb;
     }
 
-    // blas::matrix< value_t >          coeff ()       { return _S; }
-    // const blas::matrix< value_t > &  coeff () const { return _S; }
-
     // return decompressed local basis
-    hlr::blas::matrix< value_t >     coeff () const
+    blas::matrix< value_t >
+    coeff () const
     {
         #if HLR_HAS_COMPRESSION == 1
 
@@ -198,9 +196,7 @@ public:
     }
 
     // rename coeff by coupling
-    // blas::matrix< value_t > &        coupling ()       { return _S; }
-    // const blas::matrix< value_t > &  coupling () const { return _S; }
-    hlr::blas::matrix< value_t >     coupling () const { return coeff(); }
+    blas::matrix< value_t >  coupling () const { return coeff(); }
 
     void set_coupling ( const blas::matrix< value_t > &  aS ) { set_coeff( aS ); }
     void set_coupling ( blas::matrix< value_t > &&       aS ) { set_coeff( std::move( aS ) ); }
@@ -223,9 +219,9 @@ public:
     }
     
     void
-    set_matrix_data ( cluster_basis< value_t > &       arow_cb,
+    set_matrix_data ( cluster_basis_t &       arow_cb,
                       const blas::matrix< value_t > &  aS,
-                      cluster_basis< value_t > &       acol_cb )
+                      cluster_basis_t &       acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -236,9 +232,9 @@ public:
     }
 
     void
-    set_matrix_data ( cluster_basis< value_t > &  arow_cb,
+    set_matrix_data ( cluster_basis_t &  arow_cb,
                       blas::matrix< value_t > &&  aS,
-                      cluster_basis< value_t > &  acol_cb )
+                      cluster_basis_t &  acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -646,9 +642,9 @@ HLR_TEST_ANY( is_uniform_lowrank, Hpro::TMatrix< value_t > )
 //
 template < typename value_t >
 void
-replace_cluster_basis ( Hpro::TMatrix< value_t > &  M,
-                        cluster_basis< value_t > &  rowcb,
-                        cluster_basis< value_t > &  colcb )
+replace_cluster_basis ( Hpro::TMatrix< value_t > &         M,
+                        shared_cluster_basis< value_t > &  rowcb,
+                        shared_cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {

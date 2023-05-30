@@ -13,7 +13,6 @@
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/invert.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/convert.hh>
 #include <hlr/vector/scalar_vector.hh>
@@ -30,7 +29,7 @@ namespace hlr { namespace uniform { namespace detail {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-using matrix::cluster_basis;
+using matrix::shared_cluster_basis;
 using matrix::uniform_lrmatrix;
 using matrix::is_uniform_lowrank;
 using vector::scalar_vector;
@@ -44,13 +43,13 @@ using indexset = Hpro::TIndexSet;
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                                       alpha,
-          const Hpro::matop_t                                 op_M,
-          const Hpro::TMatrix< value_t > &                    M,
-          const uniform_vector< cluster_basis< value_t > > &  x,
-          uniform_vector< cluster_basis< value_t > > &        y,
-          const scalar_vector< value_t > &                    sx,
-          scalar_vector< value_t > &                          sy )
+mul_vec ( const value_t                                              alpha,
+          const Hpro::matop_t                                        op_M,
+          const Hpro::TMatrix< value_t > &                           M,
+          const uniform_vector< shared_cluster_basis< value_t > > &  x,
+          uniform_vector< shared_cluster_basis< value_t > > &        y,
+          const scalar_vector< value_t > &                           sx,
+          scalar_vector< value_t > &                                 sy )
 {
     if ( is_blocked( M ) )
     {
@@ -104,11 +103,11 @@ mul_vec ( const value_t                                       alpha,
 // copy given scalar vector into uniform vector format
 //
 template < typename value_t >
-std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
-scalar_to_uniform ( const cluster_basis< value_t > &  cb,
-                    const scalar_vector< value_t > &  v )
+std::unique_ptr< uniform_vector< shared_cluster_basis< value_t > > >
+scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
+                    const scalar_vector< value_t > &         v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
+    auto  u = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( cb );
 
     if ( cb.rank() > 0 )
     {
@@ -132,9 +131,9 @@ using  is_veccoeff_map_t  = std::unordered_map< indexset, blas::vector< value_t 
 
 template < typename value_t >
 void
-scalar_to_uniform ( const cluster_basis< value_t > &  cb,
-                    const scalar_vector< value_t > &  v,
-                    is_veccoeff_map_t< value_t > &    coeffmap )
+scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
+                    const scalar_vector< value_t > &         v,
+                    is_veccoeff_map_t< value_t > &           coeffmap )
 {
     if ( cb.rank() > 0 )
     {
@@ -156,8 +155,8 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
 //
 template < typename value_t >
 void
-add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
-                        scalar_vector< value_t > &                          v )
+add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > &  u,
+                        scalar_vector< value_t > &                                 v )
 {
     if ( u.basis().rank() > 0 )
     {
@@ -190,11 +189,11 @@ mul_vec2 ( const value_t                         alpha,
 
     for ( auto  entry : matmap )
     {
-        const auto                        is    = entry.first;
-        auto                              y_j   = blas::vector< value_t >();
-        auto                              ly    = blas::vector< value_t >();
-        auto                              sy    = blas::vector< value_t >();
-        const cluster_basis< value_t > *  rowcb = nullptr;
+        const auto                               is    = entry.first;
+        auto                                     y_j   = blas::vector< value_t >();
+        auto                                     ly    = blas::vector< value_t >();
+        auto                                     sy    = blas::vector< value_t >();
+        const shared_cluster_basis< value_t > *  rowcb = nullptr;
         
         for ( auto  M : matmap.at( is ) )
         {

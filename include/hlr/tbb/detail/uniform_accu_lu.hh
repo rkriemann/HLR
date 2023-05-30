@@ -16,7 +16,6 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/detail/uniform.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/restrict.hh>
 #include <hlr/utils/hash.hh>
@@ -26,7 +25,7 @@
 
 namespace hlr { namespace tbb { namespace uniform { namespace accu { namespace detail2 {
 
-using  hlr::matrix::cluster_basis;
+using  hlr::matrix::shared_cluster_basis;
 using  hlr::matrix::is_uniform_lowrank;
 using  hlr::matrix::is_uniform_lowrank_all;
 using  hlr::matrix::uniform_lrmatrix;
@@ -841,15 +840,15 @@ struct rec_lu_factorization
 
     template < typename approx_t >
     void
-    solve_lower_tri ( const eval_side_t           side,
-                      const diag_type_t           diag,
-                      Hpro::TMatrix< value_t > &  L,
-                      Hpro::TMatrix< value_t > &  M,
-                      accumulator< value_t > &    accu,
-                      const Hpro::TTruncAcc &     acc,
-                      const approx_t &            approx,
-                      cluster_basis< value_t > &  rowcb,   // new cluster bases for M
-                      cluster_basis< value_t > &  colcb )
+    solve_lower_tri ( const eval_side_t                  side,
+                      const diag_type_t                  diag,
+                      Hpro::TMatrix< value_t > &         L,
+                      Hpro::TMatrix< value_t > &         M,
+                      accumulator< value_t > &           accu,
+                      const Hpro::TTruncAcc &            acc,
+                      const approx_t &                   approx,
+                      shared_cluster_basis< value_t > &  rowcb,   // new cluster bases for M
+                      shared_cluster_basis< value_t > &  colcb )
     {
         //
         // evaluate all computable updates to M
@@ -1011,15 +1010,15 @@ struct rec_lu_factorization
 
     template < typename approx_t >
     void
-    solve_upper_tri ( const eval_side_t           side,
-                      const diag_type_t           diag,
-                      Hpro::TMatrix< value_t > &  U,
-                      Hpro::TMatrix< value_t > &  M,
-                      accumulator< value_t > &    accu,
-                      const Hpro::TTruncAcc &     acc,
-                      const approx_t &            approx,
-                      cluster_basis< value_t > &  rowcb,   // new cluster bases for M
-                      cluster_basis< value_t > &  colcb )
+    solve_upper_tri ( const eval_side_t                  side,
+                      const diag_type_t                  diag,
+                      Hpro::TMatrix< value_t > &         U,
+                      Hpro::TMatrix< value_t > &         M,
+                      accumulator< value_t > &           accu,
+                      const Hpro::TTruncAcc &            acc,
+                      const approx_t &                   approx,
+                      shared_cluster_basis< value_t > &  rowcb,   // new cluster bases for M
+                      shared_cluster_basis< value_t > &  colcb )
     {
         //
         // evaluate all computable updates to M
@@ -1184,16 +1183,16 @@ struct rec_lu_factorization
     //
     template < typename approx_t >
     void
-    lu ( Hpro::TMatrix< value_t > &  A,
-         Hpro::TMatrix< value_t > &  L,
-         Hpro::TMatrix< value_t > &  U,
-         accumulator< value_t > &    accu,
-         const Hpro::TTruncAcc &     acc,
-         const approx_t &            approx,
-         cluster_basis< value_t > &  rowcb_L, // new cluster bases for L
-         cluster_basis< value_t > &  colcb_L,
-         cluster_basis< value_t > &  rowcb_U, // new cluster bases for U
-         cluster_basis< value_t > &  colcb_U )
+    lu ( Hpro::TMatrix< value_t > &         A,
+         Hpro::TMatrix< value_t > &         L,
+         Hpro::TMatrix< value_t > &         U,
+         accumulator< value_t > &           accu,
+         const Hpro::TTruncAcc &            acc,
+         const approx_t &                   approx,
+         shared_cluster_basis< value_t > &  rowcb_L, // new cluster bases for L
+         shared_cluster_basis< value_t > &  colcb_L,
+         shared_cluster_basis< value_t > &  rowcb_U, // new cluster bases for U
+         shared_cluster_basis< value_t > &  colcb_U )
     {
         //
         // evaluate all computable updates to M

@@ -1,8 +1,8 @@
-#ifndef __HLR_MATRIX_CLUSTER_BASIS_HH
-#define __HLR_MATRIX_CLUSTER_BASIS_HH
+#ifndef __HLR_MATRIX_SHARED_CLUSTER_BASIS_HH
+#define __HLR_MATRIX_SHARED_CLUSTER_BASIS_HH
 //
 // Project     : HLR
-// Module      : matrix/cluster_basis
+// Module      : matrix/shared_cluster_basis
 // Description : (non-nested) cluster basis
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -27,7 +27,7 @@ using accuracy     = Hpro::TTruncAcc;
 using Hpro::idx_t;
 
 // local matrix type
-DECLARE_TYPE( cluster_basis );
+DECLARE_TYPE( shared_cluster_basis );
 
 namespace matrix
 {
@@ -37,34 +37,35 @@ namespace matrix
 // additional hierarchy
 //
 template < typename T_value >
-class cluster_basis : public compress::compressible
+class shared_cluster_basis : public compress::compressible
 {
 public:
 
     using  value_t = T_value;
     using  real_t  = Hpro::real_type_t< value_t >;
+    using  self_t  = shared_cluster_basis< value_t >;
     
 private:
     // associated indexset
-    const indexset                             _is;
+    const indexset           _is;
 
     // cluster basis of sub clusters
-    std::vector< cluster_basis< value_t > * >  _sons;
+    std::vector< self_t * >  _sons;
     
     // basis
-    hlr::blas::matrix< value_t >               _V;
+    blas::matrix< value_t >  _V;
 
     // mutex for synchronised changes
-    std::mutex                                 _mtx;
+    std::mutex               _mtx;
 
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
-    compress::zarray                           _zV;
+    compress::zarray         _zV;
 
     #if HLR_USE_APCOMPRESSION == 1
     // also singular values assoc. with basis vectors
     // in case of adaptive precision compression
-    blas::vector< real_t >                     _sv;
+    blas::vector< real_t >   _sv;
     #endif
     
     #endif
@@ -72,26 +73,26 @@ private:
 public:
     
     // construct cluster basis corresponding to cluster <cl>
-    cluster_basis ( const indexset &  ais )
+    shared_cluster_basis ( const indexset &  ais )
             : _is( ais )
     {}
 
     // construct cluster basis corresponding to cluster <cl>
     // with basis defined by <V>
-    cluster_basis ( const indexset &                      ais,
+    shared_cluster_basis ( const indexset &                      ais,
                     const hlr::blas::matrix< value_t > &  V )
             : _is( ais )
             , _V( V )
     {}
 
-    cluster_basis ( const indexset &                      ais,
+    shared_cluster_basis ( const indexset &                      ais,
                     hlr::blas::matrix< value_t > &&       V )
             : _is( ais )
             , _V( std::move( V ) )
     {}
 
     // dtor: delete sons
-    ~cluster_basis ()
+    ~shared_cluster_basis ()
     {
         for ( auto  cb : _sons )
             delete cb;
@@ -108,11 +109,11 @@ public:
     void                   set_nsons ( const uint  n )       { _sons.resize( n ); }
 
     // access <i>'th son
-    cluster_basis *        son       ( const uint  i )       { return _sons[i]; }
-    const cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
+    shared_cluster_basis *        son       ( const uint  i )       { return _sons[i]; }
+    const shared_cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
 
     void                   set_son   ( const uint       i,
-                                       cluster_basis *  cb ) { _sons[i] = cb; }
+                                       shared_cluster_basis *  cb ) { _sons[i] = cb; }
 
     //
     // access basis
@@ -250,10 +251,10 @@ public:
     //
 
     // return copy of cluster basis
-    std::unique_ptr< cluster_basis >
+    std::unique_ptr< shared_cluster_basis >
     copy () const
     {
-        auto  cb = std::make_unique< cluster_basis >( _is, std::move( blas::copy( _V ) ) );
+        auto  cb = std::make_unique< shared_cluster_basis >( _is, std::move( blas::copy( _V ) ) );
 
         #if HLR_HAS_COMPRESSION == 1
         
@@ -278,10 +279,10 @@ public:
     }
     
     // return structural copy (no data) of cluster basis
-    std::unique_ptr< cluster_basis >
+    std::unique_ptr< shared_cluster_basis >
     copy_struct () const
     {
-        auto  cb = std::make_unique< cluster_basis >( _is );
+        auto  cb = std::make_unique< shared_cluster_basis >( _is );
 
         cb->set_nsons( nsons() );
 
@@ -295,7 +296,7 @@ public:
     size_t
     byte_size () const
     {
-        size_t  n = ( sizeof(_is) + sizeof(cluster_basis< value_t > *) * _sons.size() + _V.byte_size() );
+        size_t  n = ( sizeof(_is) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
 
         #if HLR_HAS_COMPRESSION == 1
         n += hlr::compress::byte_size( _zV );
@@ -368,11 +369,11 @@ protected:
 //
 template < typename value_dest_t,
            typename value_src_t = value_dest_t >
-std::unique_ptr< cluster_basis< value_dest_t > >
-copy ( const cluster_basis< value_src_t > &  src )
+std::unique_ptr< shared_cluster_basis< value_dest_t > >
+copy ( const shared_cluster_basis< value_src_t > &  src )
 {
     auto  V_dest = blas::copy< value_dest_t, value_src_t >( src.basis() );
-    auto  dest   = std::make_unique< cluster_basis< value_dest_t > >( src.is(), std::move( V_dest ) );
+    auto  dest   = std::make_unique< shared_cluster_basis< value_dest_t > >( src.is(), std::move( V_dest ) );
 
     dest->set_nsons( src.nsons() );
         
@@ -390,7 +391,7 @@ copy ( const cluster_basis< value_src_t > &  src )
 //
 template < typename value_t >
 void
-cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
+shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
     #if HLR_HAS_COMPRESSION == 1
         
@@ -418,7 +419,7 @@ cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
 template < typename value_t >
 void
-cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
     if ( is_compressed() )
         return;
@@ -490,7 +491,7 @@ cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 //
 template < typename value_t >
 void
-cluster_basis< value_t >::decompress ()
+shared_cluster_basis< value_t >::decompress ()
 {
     #if HLR_HAS_COMPRESSION == 1
         
@@ -510,9 +511,9 @@ cluster_basis< value_t >::decompress ()
 namespace detail
 {
 
-template < typename cluster_basis_t >
+template < typename shared_cluster_basis_t >
 std::tuple< uint, size_t, uint, size_t >
-rank_info_helper_cb ( const cluster_basis_t &  cb )
+rank_info_helper_cb ( const shared_cluster_basis_t &  cb )
 {
     uint    min_rank = cb.rank();
     uint    max_rank = cb.rank();
@@ -541,7 +542,7 @@ rank_info_helper_cb ( const cluster_basis_t &  cb )
 
 template < typename value_t >
 std::tuple< uint, uint, uint >
-rank_info ( const cluster_basis< value_t > &  cb )
+rank_info ( const shared_cluster_basis< value_t > &  cb )
 {
     auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_cb( cb );
 
@@ -550,4 +551,4 @@ rank_info ( const cluster_basis< value_t > &  cb )
     
 }} // namespace hlr::matrix
 
-#endif // __HLR_MATRIX_CLUSTER_BASIS_HH
+#endif // __HLR_MATRIX_SHARED_CLUSTER_BASIS_HH

@@ -12,7 +12,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/approx/svd.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/io.hh> // DEBUG
 

@@ -10,7 +10,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/uniform.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
@@ -18,7 +17,7 @@
 
 namespace hlr { namespace tbb { namespace uniform { namespace detail {
 
-using hlr::matrix::cluster_basis;
+using hlr::matrix::shared_cluster_basis;
 using hlr::matrix::uniform_lrmatrix;
 using hlr::vector::scalar_vector;
 using hlr::vector::uniform_vector;
@@ -31,14 +30,14 @@ using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                                       alpha,
-          const Hpro::matop_t                                 op_M,
-          const Hpro::TMatrix< value_t > &                    M,
-          const uniform_vector< cluster_basis< value_t > > &  x,
-          uniform_vector< cluster_basis< value_t > > &        y,
-          const scalar_vector< value_t > &                    sx,
-          scalar_vector< value_t > &                          sy,
-          mutex_map_t &                                       mtx_map )
+mul_vec ( const value_t                                              alpha,
+          const Hpro::matop_t                                        op_M,
+          const Hpro::TMatrix< value_t > &                           M,
+          const uniform_vector< shared_cluster_basis< value_t > > &  x,
+          uniform_vector< shared_cluster_basis< value_t > > &        y,
+          const scalar_vector< value_t > &                           sx,
+          scalar_vector< value_t > &                                 sy,
+          mutex_map_t &                                              mtx_map )
 {
     if ( is_blocked( M ) )
     {
@@ -106,13 +105,13 @@ mul_vec ( const value_t                                       alpha,
 
 template < typename value_t >
 void
-mul_vec2 ( const value_t                                       alpha,
-           const Hpro::matop_t                                 op_M,
-           const Hpro::TMatrix< value_t > &                    M,
-           const uniform_vector< cluster_basis< value_t > > &  x,
-           uniform_vector< cluster_basis< value_t > > &        y,
-           const scalar_vector< value_t > &                    sx,
-           scalar_vector< value_t > &                          sy )
+mul_vec2 ( const value_t                                              alpha,
+           const Hpro::matop_t                                        op_M,
+           const Hpro::TMatrix< value_t > &                           M,
+           const uniform_vector< shared_cluster_basis< value_t > > &  x,
+           uniform_vector< shared_cluster_basis< value_t > > &        y,
+           const scalar_vector< value_t > &                           sx,
+           scalar_vector< value_t > &                                 sy )
 {
     if ( is_blocked( M ) )
     {
@@ -169,11 +168,11 @@ mul_vec2 ( const value_t                                       alpha,
 // copy given scalar vector into uniform vector format
 //
 template < typename value_t >
-std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
-scalar_to_uniform ( const cluster_basis< value_t > &  cb,
-                    const scalar_vector< value_t > &  v )
+std::unique_ptr< uniform_vector< shared_cluster_basis< value_t > > >
+scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
+                    const scalar_vector< value_t > &         v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
+    auto  u = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( cb );
 
     ::tbb::parallel_invoke(
         [&] ()
@@ -206,10 +205,10 @@ scalar_to_uniform ( const cluster_basis< value_t > &  cb,
 // create empty uniform vector for given cluster basis
 //
 template < typename value_t >
-std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
-make_uniform ( const cluster_basis< value_t > &  cb )
+std::unique_ptr< uniform_vector< shared_cluster_basis< value_t > > >
+make_uniform ( const shared_cluster_basis< value_t > &  cb )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
+    auto  u = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( cb );
 
     if ( cb.nsons() > 0 )
     {
@@ -228,8 +227,8 @@ make_uniform ( const cluster_basis< value_t > &  cb )
 //
 template < typename value_t >
 void
-add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
-                        scalar_vector< value_t > &                          v )
+add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > &  u,
+                        scalar_vector< value_t > &                                 v )
 {
     if ( u.basis().rank() > 0 )
     {
@@ -254,8 +253,8 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis< value_t > > &  u,
 //
 template < typename value_t >
 void
-build_mutex_map ( const cluster_basis< value_t > &  cb,
-                  mutex_map_t &                     mtx_map )
+build_mutex_map ( const shared_cluster_basis< value_t > &  cb,
+                  mutex_map_t &                            mtx_map )
 {
     mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
 

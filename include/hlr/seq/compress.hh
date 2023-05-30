@@ -9,7 +9,8 @@
 //
 
 #include <hlr/matrix/compress.hh>
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
+#include <hlr/matrix/nested_cluster_basis.hh>
 #include <hlr/tensor/compress.hh>
 #include <hlr/approx/aca.hh>
 #include <hlr/utils/io.hh>

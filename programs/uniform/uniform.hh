@@ -139,8 +139,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  rowcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
-    auto  colcb_uni = std::unique_ptr< matrix::cluster_basis< value_t > >();
+    auto  rowcb_uni = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
+    auto  colcb_uni = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
     auto  A_uni     = std::unique_ptr< hpro::TMatrix< value_t > >();
     auto  apx       = approx::SVD< value_t >();
 

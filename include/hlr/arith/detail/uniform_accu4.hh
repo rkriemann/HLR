@@ -16,7 +16,6 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/detail/uniform.hh>
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/restrict.hh>
@@ -28,7 +27,7 @@ namespace hlr { namespace uniform { namespace accu4 {
 namespace detail
 {
 
-using  hlr::matrix::cluster_basis;
+using  hlr::matrix::shared_cluster_basis;
 using  hlr::matrix::is_uniform_lowrank;
 using  hlr::matrix::is_uniform_lowrank_all;
 using  hlr::matrix::uniform_lrmatrix;
@@ -608,17 +607,17 @@ struct accumulator
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t                 side,
-                  const diag_type_t                 diag,
-                  const Hpro::TMatrix< value_t > &  L,
-                  Hpro::TMatrix< value_t > &        M,
-                  accumulator< value_t > &          accu,
-                  const Hpro::TTruncAcc &           acc,
-                  const approx_t &                  approx,
-                  cluster_basis< value_t > &        rowcb, // new cluster bases for M
-                  cluster_basis< value_t > &        colcb,
-                  uniform_map_t< value_t > &        rowmap,
-                  uniform_map_t< value_t > &        colmap )
+solve_lower_tri ( const eval_side_t                  side,
+                  const diag_type_t                  diag,
+                  const Hpro::TMatrix< value_t > &   L,
+                  Hpro::TMatrix< value_t > &         M,
+                  accumulator< value_t > &           accu,
+                  const Hpro::TTruncAcc &            acc,
+                  const approx_t &                   approx,
+                  shared_cluster_basis< value_t > &  rowcb, // new cluster bases for M
+                  shared_cluster_basis< value_t > &  colcb,
+                  uniform_map_t< value_t > &         rowmap,
+                  uniform_map_t< value_t > &         colmap )
 {
     //
     // evaluate all computable updates to M
@@ -744,17 +743,17 @@ solve_lower_tri ( const eval_side_t                 side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t                 side,
-                  const diag_type_t                 diag,
-                  const Hpro::TMatrix< value_t > &  U,
-                  Hpro::TMatrix< value_t > &        M,
-                  accumulator< value_t > &          accu,
-                  const Hpro::TTruncAcc &           acc,
-                  const approx_t &                  approx,
-                  cluster_basis< value_t > &        rowcb, // new cluster bases for M
-                  cluster_basis< value_t > &        colcb,
-                  uniform_map_t< value_t > &        rowmap,
-                  uniform_map_t< value_t > &        colmap )
+solve_upper_tri ( const eval_side_t                  side,
+                  const diag_type_t                  diag,
+                  const Hpro::TMatrix< value_t > &   U,
+                  Hpro::TMatrix< value_t > &         M,
+                  accumulator< value_t > &           accu,
+                  const Hpro::TTruncAcc &            acc,
+                  const approx_t &                   approx,
+                  shared_cluster_basis< value_t > &  rowcb, // new cluster bases for M
+                  shared_cluster_basis< value_t > &  colcb,
+                  uniform_map_t< value_t > &         rowmap,
+                  uniform_map_t< value_t > &         colmap )
 {
     //
     // evaluate all computable updates to M
@@ -886,14 +885,14 @@ solve_upper_tri ( const eval_side_t                 side,
 template < typename value_t,
            typename approx_t >
 void
-lu ( Hpro::TMatrix< value_t > &  A,
-     accumulator< value_t > &    accu,
-     const Hpro::TTruncAcc &     acc,
-     const approx_t &            approx,
-     cluster_basis< value_t > &  rowcb, // new cluster bases
-     cluster_basis< value_t > &  colcb,
-     uniform_map_t< value_t > &  rowmap,
-     uniform_map_t< value_t > &  colmap )
+lu ( Hpro::TMatrix< value_t > &         A,
+     accumulator< value_t > &           accu,
+     const Hpro::TTruncAcc &            acc,
+     const approx_t &                   approx,
+     shared_cluster_basis< value_t > &  rowcb, // new cluster bases
+     shared_cluster_basis< value_t > &  colcb,
+     uniform_map_t< value_t > &         rowmap,
+     uniform_map_t< value_t > &         colmap )
 {
     //
     // evaluate all computable updates to M

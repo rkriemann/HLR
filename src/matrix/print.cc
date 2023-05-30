@@ -718,9 +718,9 @@ print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
 //
 template < typename value_t >
 void
-print_eps ( const cluster_basis< value_t > &  cb,
-            const std::string &               filename,
-            const std::string &               options )
+print_eps ( const shared_cluster_basis< value_t > &  cb,
+            const std::string &                      filename,
+            const std::string &                      options )
 {
     using real_t = Hpro::real_type_t< value_t >;
     
@@ -743,7 +743,7 @@ print_eps ( const cluster_basis< value_t > &  cb,
     const double  scale_x   = max_x / double(size);
     const double  scale_y   = std::min( 500.0 / double(depth+1), 20.0 );
     const double  prn_width = max_x;
-    auto          bases     = std::list< const cluster_basis< value_t > * >{ & cb };
+    auto          bases     = std::list< const shared_cluster_basis< value_t > * >{ & cb };
     uint          level     = 0;
 
     prn.begin( uint(prn_width), uint(( depth ) * scale_y) );
@@ -950,7 +950,7 @@ print_eps ( const nested_cluster_basis< value_t > &  cb,
     template void print_mem_eps< type > ( const Hpro::TMatrix< type > &, \
                                           const std::string &          , \
                                           const std::string &          ); \
-    template void print_eps< type >     ( const cluster_basis< type > & , \
+    template void print_eps< type >     ( const shared_cluster_basis< type > & , \
                                           const std::string &,          \
                                           const std::string & );        \
     template void print_eps< type >     ( const nested_cluster_basis< type > & , \

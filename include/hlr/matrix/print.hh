@@ -12,7 +12,7 @@
 
 #include <hpro/matrix/TMatrix.hh>
 
-#include <hlr/matrix/cluster_basis.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
 #include <hlr/matrix/nested_cluster_basis.hh>
 
 namespace hlr { namespace matrix {
@@ -51,9 +51,9 @@ print_mem_eps ( const Hpro::TMatrix< value_t > &  M,
 //
 template < typename value_t >
 void
-print_eps ( const cluster_basis< value_t > &  cb,
-            const std::string &               filename,
-            const std::string &               options = "default" );
+print_eps ( const shared_cluster_basis< value_t > &  cb,
+            const std::string &                      filename,
+            const std::string &                      options = "default" );
 
 template < typename value_t >
 void
