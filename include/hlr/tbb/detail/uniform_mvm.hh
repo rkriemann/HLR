@@ -173,7 +173,7 @@ std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 scalar_to_uniform ( const cluster_basis< value_t > &  cb,
                     const scalar_vector< value_t > &  v )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
 
     ::tbb::parallel_invoke(
         [&] ()
@@ -209,7 +209,7 @@ template < typename value_t >
 std::unique_ptr< uniform_vector< cluster_basis< value_t > > >
 make_uniform ( const cluster_basis< value_t > &  cb )
 {
-    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb.is(), cb );
+    auto  u = std::make_unique< uniform_vector< cluster_basis< value_t > > >( cb );
 
     if ( cb.nsons() > 0 )
     {

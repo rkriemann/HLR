@@ -355,6 +355,18 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
 
         return R;
     }// if
+    else if ( is_h2_lowrank( M ) )
+    {
+        auto  RM = cptrcast( &M, h2_lrmatrix< value_t > );
+        auto  U  = RM->row_cb().transform_backward( RM->coupling() );
+        auto  I  = blas::identity< value_t >( RM->col_rank() );
+        auto  V  = RM->col_cb().transform_backward( I );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
     else
     {
         return M.copy();
