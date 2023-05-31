@@ -183,7 +183,7 @@ program_main ()
     const auto  mem_zccb = zcolcb->byte_size();
     
     std::cout << "    mem   = " << format_mem( mem_zrcb, mem_zccb, mem_zA, mem_zrcb + mem_zccb + mem_zA ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zrcb + mem_zccb + mem_zA) / double(mem_rcb + mem_ccb + mem_A) ) << std::endl;
+    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zrcb + mem_zccb + mem_zA) / double(mem_H) ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
@@ -253,7 +253,7 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
-    // H-matrix matrix vector multiplication
+    // matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////
 

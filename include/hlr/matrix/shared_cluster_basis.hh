@@ -442,12 +442,12 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
         HLR_ASSERT( _sv.length() == _V.ncols() );
 
-        auto  norm = real_t(0);
+        // auto  norm = real_t(0);
 
-        for ( uint  i = 0; i < _sv.length(); ++i )
-            norm += _sv(0) * _sv(0);
+        // for ( uint  i = 0; i < _sv.length(); ++i )
+        //     norm += _sv(0) * _sv(0);
 
-        norm = std::sqrt( norm );
+        // norm = std::sqrt( norm );
                 
         real_t  tol  = acc.abs_eps() * _sv(0);
         auto    S    = blas::copy( _sv );
