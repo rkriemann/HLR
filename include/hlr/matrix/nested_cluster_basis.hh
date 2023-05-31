@@ -42,7 +42,7 @@ DECLARE_TYPE( nested_cluster_basis );
 namespace matrix
 {
 
-#define HLR_USE_APCOMPRESSION  0
+#define HLR_USE_APCOMPRESSION  1
 
 //
 // represents cluster basis for single cluster with
@@ -703,7 +703,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
             HLR_ASSERT( _sv.length() == _V.ncols() );
 
-            double  tol = acc.abs_eps();
+            real_t  tol = acc.abs_eps() * _sv(0);
             auto    S   = blas::copy( _sv );
 
             for ( uint  l = 0; l < S.length(); ++l )
