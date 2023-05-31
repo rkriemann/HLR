@@ -2675,11 +2675,16 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             // build mapping from lowrank matrices of son cluster to R_i
             //
 
-            auto    map_i   = lrmat_map.at( cb_i->is() );
-            auto    list_i  = lr_mat_list_t< value_t >( mat_list.begin(), mat_list.end() );
-            auto    mat_idx = std::unordered_map< const Hpro::TRkMatrix< value_t > *, idx_t >();
+            auto  list_i  = lr_mat_list_t< value_t >( mat_list.begin(), mat_list.end() );
+            auto  mat_idx = std::unordered_map< const Hpro::TRkMatrix< value_t > *, idx_t >();
             
-            list_i.insert( list_i.end(), map_i.begin(), map_i.end() );
+            if ( lrmat_map.find( cb_i->is() ) != lrmat_map.end() )
+            {
+                auto  map_i = lrmat_map.at( cb_i->is() );
+                
+                list_i.insert( list_i.end(), map_i.begin(), map_i.end() );
+            }// if
+
             list_i.sort( is_sort );
 
             // offset is defined by position in son list ...
