@@ -73,7 +73,9 @@ program_main ()
                   << "    matrix = " << matrixfile
                   << std::endl;
 
+        tic = timer::now();
         A = io::hpro::read< value_t >( matrixfile );
+        toc = timer::since( tic );
     }// else
     
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
