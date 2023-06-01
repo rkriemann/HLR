@@ -14,8 +14,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/compression.hh>
-#include <hlr/utils/detail/afloat.hh>
-#include <hlr/utils/detail/afloat.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -32,7 +30,7 @@ DECLARE_TYPE( mplrmatrix );
 namespace matrix
 {
 
-#define USE_AFLOAT
+#define HLR_USE_APCOMPRESSION  1
 
 //
 // GCC >= 12 and Clang >= 15 support _Float16
@@ -120,8 +118,8 @@ private:
     {
         std::vector< real_t >     sv;
 
-        #if defined(USE_AFLOAT)
-        hlr::compress::afloat::zarray  zU, zV;
+        #if HLR_USE_APCOMPRESSION == 1
+        compress::ap::zarray  zU, zV;
         #else
         std::vector< mptype1_t >  U1, V1;
         std::vector< mptype2_t >  U2, V2;
@@ -181,9 +179,9 @@ public:
             auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
             uint  k  = 0;
 
-            #if defined(USE_AFLOAT)
+            #if HLR_USE_APCOMPRESSION == 1
             
-            hlr::compress::afloat::decompress_lr( _mpdata.zU, dU );
+            compress::ap::decompress_lr( _mpdata.zU, dU );
 
             for ( uint  l = 0; l < dU.ncols(); ++l )
             {
@@ -275,9 +273,9 @@ public:
         {
             auto        dV  = blas::matrix< value_t >( this->ncols(), this->rank() );
 
-            #if defined(USE_AFLOAT)
+            #if HLR_USE_APCOMPRESSION == 1
             
-            hlr::compress::afloat::decompress_lr( _mpdata.zV, dV );
+            compress::ap::decompress_lr( _mpdata.zV, dV );
             
             #else
             
@@ -451,10 +449,10 @@ public:
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
 
-            #if defined(USE_AFLOAT)
+            #if HLR_USE_APCOMPRESSION == 1
 
-            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
-            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
+            R->_mpdata.zU = compress::ap::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = compress::ap::zarray( _mpdata.zV.size() );
             
             std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
             std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -519,10 +517,10 @@ public:
 
             std::copy( _mpdata.sv.begin(), _mpdata.sv.end(), R->_mpdata.sv.begin() );
             
-            #if defined(USE_AFLOAT)
+            #if HLR_USE_APCOMPRESSION == 1
 
-            R->_mpdata.zU = hlr::compress::afloat::zarray( _mpdata.zU.size() );
-            R->_mpdata.zV = hlr::compress::afloat::zarray( _mpdata.zV.size() );
+            R->_mpdata.zU = compress::ap::zarray( _mpdata.zU.size() );
+            R->_mpdata.zV = compress::ap::zarray( _mpdata.zV.size() );
             
             std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
             std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -592,10 +590,10 @@ public:
 
         size += sizeof(real_t) * ( _mpdata.sv.size() );
 
-        #if defined(USE_AFLOAT)
+        #if HLR_USE_APCOMPRESSION == 1
 
-        size += hlr::compress::afloat::byte_size( _mpdata.zU );
-        size += hlr::compress::afloat::byte_size( _mpdata.zV );
+        size += compress::ap::byte_size( _mpdata.zU );
+        size += compress::ap::byte_size( _mpdata.zV );
         
         #else
         
@@ -632,10 +630,10 @@ protected:
     {
         _mpdata.sv = std::vector< real_t >();
 
-        #if defined(USE_AFLOAT)
+        #if HLR_USE_APCOMPRESSION == 1
 
-        _mpdata.zU = hlr::compress::afloat::zarray();
-        _mpdata.zV = hlr::compress::afloat::zarray();
+        _mpdata.zU = compress::ap::zarray();
+        _mpdata.zV = compress::ap::zarray();
         
         #else
         
@@ -769,7 +767,7 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     
     blas::svd( Us, S, Vs );
 
-    #if defined(USE_AFLOAT)
+    #if HLR_USE_APCOMPRESSION == 1
 
     // compute _orthogonal_ lowrank factors
     auto  oU = blas::prod( QU, Us );
@@ -781,10 +779,10 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     for ( uint  l = 0; l < orank; ++l )
         S_tol(l) = tol / S(l);
 
-    auto          zU     = hlr::compress::afloat::compress_lr( oU, S_tol );
-    auto          zV     = hlr::compress::afloat::compress_lr( oV, S_tol );
+    auto          zU     = compress::ap::compress_lr( oU, S_tol );
+    auto          zV     = compress::ap::compress_lr( oV, S_tol );
     const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_mp = hlr::compress::afloat::byte_size( zU ) + hlr::compress::afloat::byte_size( zV ) + sizeof(real_t) * orank;
+    const size_t  mem_mp = compress::ap::byte_size( zU ) + compress::ap::byte_size( zV ) + sizeof(real_t) * orank;
 
     if ( mem_mp < mem_lr )
     {
@@ -798,8 +796,8 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
         //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
             
-        //     hlr::compress::afloat::decompress_lr( zU, dU );
-        //     hlr::compress::afloat::decompress_lr( zV, dV );
+        //     compress::ap::decompress_lr( zU, dU );
+        //     compress::ap::decompress_lr( zV, dV );
 
         //     io::matlab::write( dU, "U2" );
         //     io::matlab::write( dV, "V2" );
