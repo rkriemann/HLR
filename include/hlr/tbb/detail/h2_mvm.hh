@@ -130,6 +130,67 @@ mul_vec ( const value_t                              alpha,
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
+template < typename value_t,
+           typename cluster_basis_t >
+void
+mul_vec2 ( const value_t                              alpha,
+           const Hpro::matop_t                        op_M,
+           const Hpro::TMatrix< value_t > &           M,
+           const uniform_vector< cluster_basis_t > &  x,
+           uniform_vector< cluster_basis_t > &        y,
+           const scalar_vector< value_t > &           sx,
+           scalar_vector< value_t > &                 sy )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        HLR_ASSERT(( B->nblock_rows( op_M ) == y.nblocks() ) &&
+                   ( B->nblock_cols( op_M ) == x.nblocks() ));
+
+        //
+        // parallelise only block rows, then only one task will access y
+        //
+        
+        ::tbb::parallel_for< uint >(
+            0, B->nblock_rows( op_M ),
+            [&,alpha,op_M,B] ( const auto  i )
+            {
+                auto  y_i = y.block( i );
+                
+                for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
+                {
+                    auto  B_ij = B->block( i, j, op_M );
+                    
+                    if ( ! is_null( B_ij ) )
+                    {
+                        auto  x_j = x.block( j );
+                        
+                        mul_vec2( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
+                    }// if
+                }// for
+            } );
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        
+        M.apply_add( alpha, x_i, y_j, op_M );
+    }// if
+    else if ( hlr::matrix::is_h2_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+        
+        if      ( op_M == Hpro::apply_normal     ) blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() );
+        else if ( op_M == Hpro::apply_conjugate  ) { HLR_ASSERT( false ); }
+        else if ( op_M == Hpro::apply_transposed ) { HLR_ASSERT( false ); }
+        else if ( op_M == Hpro::apply_adjoint    ) blas::mulvec( alpha, blas::adjoint(R->coupling()), x.coeffs(), value_t(1), y.coeffs() );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+}
+
 //
 // copy given scalar vector into uniform vector format
 //
