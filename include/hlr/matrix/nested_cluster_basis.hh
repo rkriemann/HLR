@@ -242,7 +242,7 @@ public:
 
         _rank = _V.ncols();
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
@@ -261,7 +261,7 @@ public:
 
         _rank = _V.ncols();
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );

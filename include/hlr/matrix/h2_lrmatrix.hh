@@ -467,12 +467,16 @@ template < typename value_t >
 void
 h2_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
+    #if HLR_HAS_COMPRESSION == 1
+        
     HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( this->nrows() * this->ncols() == 0 )
         return;
         
     compress( compress::get_config( acc( this->row_is(), this->col_is() ).abs_eps() ) );
+
+    #endif
 }
 
 //

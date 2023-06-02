@@ -175,7 +175,7 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( blas::copy( aV ) );
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
@@ -190,7 +190,7 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( aV );
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );
