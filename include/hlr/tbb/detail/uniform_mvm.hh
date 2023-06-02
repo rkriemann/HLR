@@ -145,11 +145,10 @@ mul_vec2 ( const value_t                                              alpha,
     }// if
     else if ( is_dense( M ) )
     {
-        auto  D   = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         
-        blas::mulvec( alpha, blas::mat_view( op_M, blas::mat( D ) ), x_i, value_t(1), y_j );
+        M.apply_add( alpha, x_i, y_j, op_M );
     }// if
     else if ( hlr::matrix::is_uniform_lowrank( M ) )
     {

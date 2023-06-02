@@ -21,11 +21,7 @@
 #include <hpro/cluster/TClusterBasis.hh>
 #endif
 
-#include <hlr/arith/blas.hh>
 #include <hlr/matrix/shared_cluster_basis.hh>
-#include <hlr/utils/compression.hh>
-#include <hlr/utils/detail/afloat.hh>
-#include <hlr/utils/checks.hh>
 
 namespace hlr
 { 
@@ -77,14 +73,18 @@ private:
     std::mutex                              _mtx;
 
     #if HLR_HAS_COMPRESSION == 1
-    // compressed basis and transfer matrices
-    compress::zarray                        _zV;
-    std::vector< compress::zarray >         _zE;
-
     #if HLR_USE_APCOMPRESSION == 1
+    // compressed basis and transfer matrices
+    compress::ap::zarray                    _zV;
+    std::vector< compress::ap::zarray >     _zE;
+
     // also singular values assoc. with basis vectors
     // in case of adaptive precision compression
     blas::vector< real_t >                  _sv;
+    #else
+    // compressed basis and transfer matrices
+    compress::zarray                        _zV;
+    std::vector< compress::zarray >         _zE;
     #endif
     #endif
     
@@ -191,7 +191,7 @@ public:
     
             #if HLR_USE_APCOMPRESSION == 1
 
-            hlr::compress::afloat::decompress_lr< value_t >( _zV, V );
+            compress::ap::decompress_lr< value_t >( _zV, V );
 
             #else
             
@@ -569,15 +569,18 @@ public:
             n += _E[i].byte_size();
         
         #if HLR_HAS_COMPRESSION == 1
+        #if HLR_USE_APCOMPRESSION  == 1
+        n += compress::ap::byte_size( _zV );
+        n += _sv.byte_size();
+        #else
         n += hlr::compress::byte_size( _zV );
+        #endif
+        
         n += sizeof(_zE);
-
+        
         for ( uint  i = 0; i < _zE.size(); ++i )
             n += hlr::compress::byte_size( _zE[i] );
-
-        #if HLR_USE_APCOMPRESSION  == 1
-        n += _sv.byte_size();
-        #endif
+        
         #endif
         
         for ( auto  son : _sons )
@@ -633,7 +636,11 @@ protected:
     virtual void   remove_compressed ()
     {
         #if HLR_HAS_COMPRESSION == 1
+        #if HLR_USE_APCOMPRESSION  == 1
+        _zV = compress::ap::zarray();
+        #else
         _zV = compress::zarray();
+        #endif
         _zE.resize( 0 );
         #endif
     }
@@ -709,7 +716,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             for ( uint  l = 0; l < S.length(); ++l )
                 S(l) = tol / S(l);
         
-            auto  zV = hlr::compress::afloat::compress_lr< value_t >( _V, S );
+            auto  zV = compress::ap::compress_lr< value_t >( _V, S );
 
             // {
             //     auto  T = blas::copy( _V );
@@ -720,7 +727,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
             // }
         
-            if ( compress::byte_size( zV ) < mem_dense )
+            if ( compress::ap::byte_size( zV ) < mem_dense )
             {
                 _zV = std::move( zV );
                 _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank

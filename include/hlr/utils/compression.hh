@@ -15,20 +15,34 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
 
-////////////////////////////////////////////////////////////
-//
-// compression configuration type
-//
-////////////////////////////////////////////////////////////
+// different compressor types
+#define HLR_COMPRESSOR_AFLOAT   1
+#define HLR_COMPRESSOR_APFLOAT  2
+#define HLR_COMPRESSOR_BFLOAT   3
+#define HLR_COMPRESSOR_DFLOAT   4
+#define HLR_COMPRESSOR_ZFP      5
+#define HLR_COMPRESSOR_SZ       6
+#define HLR_COMPRESSOR_SZ3      6
+#define HLR_COMPRESSOR_MGARD    7
+#define HLR_COMPRESSOR_LZ4      8
+#define HLR_COMPRESSOR_ZLIB     9
+#define HLR_COMPRESSOR_ZSTD     10
+#define HLR_COMPRESSOR_POSITS   11
+#define HLR_COMPRESSOR_FP32     12
+#define HLR_COMPRESSOR_FP16     13
+#define HLR_COMPRESSOR_BF16     14
+#define HLR_COMPRESSOR_TF32     15
+#define HLR_COMPRESSOR_BF24     16
+#define HLR_COMPRESSOR_NONE     17
 
 #if defined(HLR_COMPRESSOR)
 
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#if HLR_COMPRESSOR == 1
-
 #  define HLR_HAS_COMPRESSION  1
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#if HLR_COMPRESSOR == HLR_COMPRESSOR_FP32
 
 #include <hlr/utils/detail/fp32.hh>
 
@@ -49,13 +63,11 @@ using hlr::compress::fp32::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 2
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FP16
 
 #  if !defined(HLR_HAS_HALF)
 #    error "half library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/fp16.hh>
 
@@ -76,13 +88,11 @@ using hlr::compress::fp16::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 3
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 #  if !defined(HLR_HAS_ZFP)
 #    error "ZFP library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/zfp.hh>
 
@@ -103,13 +113,11 @@ using hlr::compress::zfp::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 4
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_POSITS
 
 #  if !defined(HLR_HAS_UNIVERSAL)
 #    error "Universal library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/posits.hh>
 
@@ -130,13 +138,11 @@ using hlr::compress::posits::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 5
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SZ
 
 #  if !defined(HLR_HAS_SZ)
 #    error "SZ library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/sz.hh>
 
@@ -157,13 +163,11 @@ using hlr::compress::sz::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 6
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SZ3
 
 #  if !defined(HLR_HAS_SZ3)
 #    error "SZ3 library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/sz3.hh>
 
@@ -184,13 +188,11 @@ using hlr::compress::sz3::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 7
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_LZ4
 
 #  if !defined(HLR_HAS_LZ4)
 #    error "LZ4 library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/lz4.hh>
 
@@ -211,13 +213,11 @@ using hlr::compress::lz4::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 8
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZLIB
 
 #  if !defined(HLR_HAS_ZLIB)
 #    error "ZLIB library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/zlib.hh>
 
@@ -238,13 +238,11 @@ using hlr::compress::zlib::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 9
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZSTD
 
 #  if !defined(HLR_HAS_ZSTD)
 #    error "ZSTD library not available"
 #  endif
-
-#  define HLR_HAS_COMPRESSION  1
 
 #include <hlr/utils/detail/zstd.hh>
 
@@ -265,9 +263,7 @@ using hlr::compress::zstd::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 10
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF16
 
 #include <hlr/utils/detail/bf16.hh>
 
@@ -288,9 +284,7 @@ using hlr::compress::bf16::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 11
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_TF32
 
 #include <hlr/utils/detail/tf32.hh>
 
@@ -311,9 +305,7 @@ using hlr::compress::tf32::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 12
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF24
 
 #include <hlr/utils/detail/bf24.hh>
 
@@ -334,9 +326,7 @@ using hlr::compress::bf24::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 13
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFLOAT
 
 #include <hlr/utils/detail/afloat.hh>
 
@@ -357,9 +347,7 @@ using hlr::compress::afloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 14
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
 
 #include <hlr/utils/detail/apfloat.hh>
 
@@ -380,9 +368,7 @@ using hlr::compress::apfloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 15
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFLOAT
 
 #include <hlr/utils/detail/bfloat.hh>
 
@@ -403,9 +389,7 @@ using hlr::compress::bfloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 16
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFLOAT
 
 #include <hlr/utils/detail/dfloat.hh>
 
@@ -426,9 +410,7 @@ using hlr::compress::dfloat::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 17
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
 #include <hlr/utils/detail/mgard.hh>
 
@@ -449,9 +431,7 @@ using hlr::compress::mgard::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == 18
-
-#  define HLR_HAS_COMPRESSION  1
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
 
 #include <hlr/utils/detail/dummy.hh>
 
@@ -472,22 +452,16 @@ using hlr::compress::dummy::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#else // no library available
+#else
 
-#  define HLR_HAS_COMPRESSION  0
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "none";
-
-struct zconfig_t {};
-struct zarray    {};
-
-}} // namespace hlr::compress
+#  error "unsupported HLR_COMPRESSOR value"
 
 #endif
 
-#else // HLR_COMPRESSOR == none
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#else // HLR_COMPRESSOR not defined
 
 #  define HLR_HAS_COMPRESSION  0
 
@@ -504,6 +478,9 @@ inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensure
 }} // namespace hlr::compress
     
 #endif
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 namespace hlr { namespace compress {
 
@@ -622,79 +599,18 @@ is_compressed ( const T *  ptr )
 }
 
 //
-// memory accessor
+// define implementation for adaptive precision compression
+// for lowrank matrices
 //
-struct mem_accessor
-{
-    zconfig_t  mode;
+#if HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
 
-    mem_accessor ( const double  eps )
-            : mode( compress::get_config( eps ) )
-    {}
-    
-    template < typename value_t >
-    zarray
-    encode ( value_t *        data,
-             const size_t     dim0,
-             const size_t     dim1 = 0,
-             const size_t     dim2 = 0,
-             const size_t     dim3 = 0 )
-    {
-        return compress::compress( mode, data, dim0, dim1, dim2, dim3 );
-    }
-    
-    template < typename value_t >
-    zarray
-    encode ( const blas::matrix< value_t > &  M )
-    {
-        return compress::compress( mode, M );
-    }
-    
-    template < typename value_t >
-    zarray
-    encode ( const blas::vector< value_t > &  v )
-    {
-        return compress::compress( mode, v );
-    }
-    
-    template < typename value_t >
-    void
-    decode ( const zarray &  zbuf,
-             value_t *       dest,
-             const size_t    dim0,
-             const size_t    dim1 = 0,
-             const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
-    {
-        compress::decompress( zbuf, dest, dim0, dim1, dim2, dim3 );
-    }
+namespace ap = hlr::compress::apfloat;
 
-    template < typename value_t >
-    void
-    decode ( const zarray &             zbuf,
-             blas::matrix< value_t > &  M )
-    {
-        compress::decompress( zbuf, M );
-    }
+#else
 
-    template < typename value_t >
-    void
-    decode ( const zarray &             zbuf,
-             blas::vector< value_t > &  v )
-    {
-        compress::decompress( zbuf, v );
-    }
+namespace ap = hlr::compress::afloat;
 
-    size_t
-    byte_size ( const zarray &  zbuf )
-    {
-        return compress::byte_size( zbuf );
-    }
-
-private:
-
-    mem_accessor ();
-};
+#endif
 
 }} // namespace hlr::compress
 

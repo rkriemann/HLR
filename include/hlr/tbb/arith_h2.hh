@@ -49,6 +49,36 @@ mul_vec ( const value_t                             alpha,
     detail::add_uniform_to_scalar( *uy, y, s );
 }
 
+template < typename value_t,
+           typename cluster_basis_t >
+void
+mul_vec2 ( const value_t                             alpha,
+           const matop_t                             op_M,
+           const Hpro::TMatrix< value_t > &          M,
+           const vector::scalar_vector< value_t > &  x,
+           vector::scalar_vector< value_t > &        y,
+           cluster_basis_t &                         rowcb,
+           cluster_basis_t &                         colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
+    auto  uy = detail::make_uniform< value_t, cluster_basis_t >( op_M == hpro::apply_normal ? rowcb : colcb );
+    auto  s  = blas::vector< value_t >();
+
+    detail::mul_vec2( alpha, op_M, M, *ux, *uy, x, y );
+    detail::add_uniform_to_scalar( *uy, y, s );
+}
+
 }}}// namespace hlr::tbb::h2
 
 #endif // __HLR_ARITH_H2_HH

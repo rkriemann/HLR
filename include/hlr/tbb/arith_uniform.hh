@@ -84,8 +84,6 @@ mul_vec2 ( const value_t                                   alpha,
     // construct uniform representation of x and y
     //
 
-    detail::mutex_map_t  mtx_map;
-    
     auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
     auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
 
