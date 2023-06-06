@@ -431,23 +431,23 @@ using hlr::compress::mgard::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
+// #elif HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
 
-#include <hlr/utils/detail/dummy.hh>
+// #include <hlr/utils/detail/dummy.hh>
 
-namespace hlr { namespace compress {
+// namespace hlr { namespace compress {
 
-static const char provider[] = "dummy";
+// static const char provider[] = "dummy";
 
-using  zconfig_t = hlr::compress::dummy::config;
-using  zarray    = hlr::compress::dummy::zarray;
+// using  zconfig_t = hlr::compress::dummy::config;
+// using  zarray    = hlr::compress::dummy::zarray;
 
-using hlr::compress::dummy::compress;
-using hlr::compress::dummy::decompress;
-using hlr::compress::dummy::get_config;
-using hlr::compress::dummy::byte_size;
+// using hlr::compress::dummy::compress;
+// using hlr::compress::dummy::decompress;
+// using hlr::compress::dummy::get_config;
+// using hlr::compress::dummy::byte_size;
 
-}} // namespace hlr::compress
+// }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////

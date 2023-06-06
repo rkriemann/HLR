@@ -610,7 +610,7 @@ elif compressor == 'fp16'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
 elif compressor == 'bf16'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
 elif compressor == 'tf32'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=15' )
 elif compressor == 'bf24'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
-elif compressor == 'none'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
+# elif compressor == 'none'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
 ######################################################################
 #
