@@ -62,6 +62,7 @@ struct accumulator
 
     // accumulated pending (recursive) updates
     update_list                                   pending;
+    std::mutex                                    pend_mtx;
     
     //
     // ctors
@@ -95,12 +96,25 @@ struct accumulator
     }
 
     //
+    // copy operator
+    //
+    accumulator &  operator = ( accumulator &&  accu )
+    {
+        matrix  = std::move( accu.matrix );
+        pending = std::move( accu.pending );
+        
+        return *this;
+    }
+    
+    //
     // add update A×B
     //
     void
     add_update ( Hpro::TMatrix< value_t > &  A,
                  Hpro::TMatrix< value_t > &  B )
     {
+        if ( pend_mtx.try_lock() ) pend_mtx.unlock(); else std::cout << "mtx locked" << std::endl;
+        
         pending.push_back( { apply_normal, &A, apply_normal, &B } );
     }
 
@@ -110,6 +124,8 @@ struct accumulator
                  const matop_t               op_B,
                  Hpro::TMatrix< value_t > &  B )
     {
+        if ( pend_mtx.try_lock() ) pend_mtx.unlock(); else std::cout << "mtx locked" << std::endl;
+        
         pending.push_back( { op_A, &A, op_B, &B } );
     }
     
@@ -189,7 +205,7 @@ struct accumulator
             {
                 HLR_ASSERT( ! is_null( M.block( i, j ) ) );
 
-                sub_accu(i,j) = restrict( i, j, M );
+                sub_accu(i,j) = std::move( restrict( i, j, M ) );
             }// for
         }// for
 
@@ -206,6 +222,8 @@ struct accumulator
            const Hpro::TTruncAcc &     acc,
            const approx_t &            approx )
     {
+        auto  pend_lock = std::scoped_lock( pend_mtx );
+        
         //
         // first check for dense handling
         //
@@ -220,6 +238,8 @@ struct accumulator
                 break;
             }// if
         }// for
+
+        // handle_dense = false;
         
         if ( ! handle_dense )
         {
@@ -405,6 +425,8 @@ struct accumulator
         
         for ( auto  it = pending.begin(); it != pending.end(); )
         {
+            // HLR_ASSERT( ! hlr::matrix::is_uniform_lowrank_any( (*it).A, (*it).B ) );
+            
             if ( ! is_blocked_all( (*it).A, (*it).B ) )
             {
                 pending_comp.push_back( *it );
@@ -708,7 +730,40 @@ struct accumulator
                 T = std::make_unique< Hpro::TRkMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
             }// else
 
-            hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
+            //
+            // in case of handle_dense, A or B may be uniform_lowrank and therefore need to be
+            // locked before multiplication to prevent a race condition with basis updates
+            //
+
+            if ( hlr::matrix::is_uniform_lowrank_all( A, B ) )
+            {
+                auto  RA   = ptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                auto  RB   = ptrcast( B, matrix::uniform_lrmatrix< value_t > );
+                auto  lock = std::scoped_lock( RA->mutex(),
+                                               RB->mutex(),
+                                               RA->col_cb( op_A ).mutex(),
+                                               RB->row_cb( op_B ).mutex() );
+
+                hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
+            }// if
+            else if ( hlr::matrix::is_uniform_lowrank( A ) )
+            {
+                auto  RA   = ptrcast( A, matrix::uniform_lrmatrix< value_t > );
+                auto  lock = std::scoped_lock( RA->mutex(),
+                                               RA->col_cb( op_A ).mutex() );
+
+                hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
+            }// if
+            else if ( hlr::matrix::is_uniform_lowrank( B ) )
+            {
+                auto  RB   = ptrcast( B, matrix::uniform_lrmatrix< value_t > );
+                auto  lock = std::scoped_lock( RB->mutex(),
+                                               RB->row_cb( op_B ).mutex() );
+
+                hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
+            }// if
+            else
+                hlr::multiply< value_t >( value_t(1), op_A, *A, op_B, *B, *T, acc, approx );
 
             return T;
         }// if
