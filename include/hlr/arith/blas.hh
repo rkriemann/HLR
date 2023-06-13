@@ -1783,7 +1783,7 @@ svd ( const matrix_t &  M )
 using Hpro::BLAS::svd;
 
 //
-// compute singular vectors of U·V'
+// compute singular values of M
 //
 template < typename value_t >
 vector< Hpro::real_type_t< value_t > >
@@ -1798,7 +1798,7 @@ sv ( const matrix< value_t > &  M )
 }
 
 //
-// compute singular vectors of U·V'
+// compute singular values of U·V'
 //
 template < typename value_t >
 vector< value_t >

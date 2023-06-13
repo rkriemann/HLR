@@ -107,8 +107,8 @@ program_main ()
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
-        // auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
-        auto  lacc = absolute_prec( cmdline::eps );
+        auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
+        // auto  lacc = absolute_prec( cmdline::eps );
         
         runtime.clear();
         
@@ -217,8 +217,8 @@ program_main ()
         std::cout << "    mem   = " << format_mem( mem_As ) << std::endl;
 
         {
-            // auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
-            auto  lacc = absolute_prec( cmdline::eps );
+            auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
+            // auto  lacc = absolute_prec( cmdline::eps );
         
             runtime.clear();
         
