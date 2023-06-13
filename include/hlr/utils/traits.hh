@@ -12,6 +12,12 @@ namespace hlr
 {
 
 //
+// concept for general number
+//
+template < typename value_t >
+concept general_number = std::floating_point< value_t > || std::integral< value_t >;
+
+//
 // requires types to have "value_t" as sub type
 //
 template < typename T >

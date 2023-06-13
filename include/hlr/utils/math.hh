@@ -16,11 +16,12 @@
 
 namespace hlr { namespace math {
 
+// import all from HLIBpro
+using namespace Hpro::Math;
+
 //
 // half precision floating point type
 //
-
-using namespace Hpro::Math;
 
 #if defined(HAS_HALF)
 using half = half_float::half;

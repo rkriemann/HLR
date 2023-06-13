@@ -50,37 +50,8 @@ inline
 byte_t
 eps_to_rate ( const double eps )
 {
-    #if defined(HLR_COMPRESS_RATE_ARITH)
-
-    if      ( eps >= 1e-2  ) return 12;
-    else if ( eps >= 1e-3  ) return 14;
-    else if ( eps >= 1e-4  ) return 18;
-    else if ( eps >= 1e-5  ) return 22;
-    else if ( eps >= 1e-6  ) return 24;
-    else if ( eps >= 1e-7  ) return 28;
-    else if ( eps >= 1e-8  ) return 32;
-    else if ( eps >= 1e-9  ) return 34;
-    else if ( eps >= 1e-10 ) return 38;
-    else if ( eps >= 1e-12 ) return 38;
-    else if ( eps >= 1e-14 ) return 42;
-    else                     return 64;
-
-    #else
-
-    if      ( eps >= 1e-2  ) return 10;
-    else if ( eps >= 1e-3  ) return 12;
-    else if ( eps >= 1e-4  ) return 14;
-    else if ( eps >= 1e-5  ) return 16;
-    else if ( eps >= 1e-6  ) return 20;
-    else if ( eps >= 1e-7  ) return 22;
-    else if ( eps >= 1e-8  ) return 26;
-    else if ( eps >= 1e-9  ) return 30;
-    else if ( eps >= 1e-10 ) return 34;
-    else if ( eps >= 1e-12 ) return 38;
-    else if ( eps >= 1e-14 ) return 42;
-    else                     return 64;
-
-    #endif
+    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
+    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
 }
 
 inline

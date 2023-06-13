@@ -27,15 +27,17 @@ namespace hlr { namespace norm {
 namespace detail {
 
 template < typename value_t >
-Hpro::real_type_t< value_t >
-frobenius ( const Hpro::TMatrix< value_t > &  A );
+long double
+frobenius_squared ( const Hpro::TMatrix< value_t > &  A );
 
-template < typename value_t >
-Hpro::real_type_t< value_t >
-frobenius ( const value_t                     alpha,
-            const Hpro::TMatrix< value_t > &  A,
-            const value_t                     beta,
-            const Hpro::TMatrix< value_t > &  B );
+template < general_number alpha_t,
+           general_number beta_t,
+           typename value_t >
+long double
+frobenius_squared ( const alpha_t                     alpha,
+                    const Hpro::TMatrix< value_t > &  A,
+                    const beta_t                      beta,
+                    const Hpro::TMatrix< value_t > &  B );
 
 template < arithmetic_type arithmetic_t,
            typename operator_t >
@@ -58,7 +60,7 @@ template < typename value_t >
 Hpro::real_type_t< value_t >
 frobenius ( const Hpro::TMatrix< value_t > &  A )
 {
-    return detail::frobenius( A );
+    return std::sqrt( detail::frobenius_squared( A ) );
 }
 
 //
@@ -73,7 +75,7 @@ frobenius ( const alpha_t                     alpha,
             const beta_t                      beta,
             const Hpro::TMatrix< value_t > &  B )
 {
-    return detail::frobenius( value_t(alpha), A, value_t(beta), B );
+    return std::sqrt( detail::frobenius_squared( value_t(alpha), A, value_t(beta), B ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////

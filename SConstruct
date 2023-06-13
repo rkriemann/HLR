@@ -229,17 +229,17 @@ opts.Add(               'optflags',  'compiler optimization flags',   OPTFLAGS )
 opts.Add(               'cpuflags',  'path to cpuflags',              CPUFLAGS )
 opts.Add(               'defines',   'preprocessor defines',          DEFINES )
 
-opts.Add( PathVariable( 'hpro',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tbb',       'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tf',        'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'hpx',       'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'gpi2',      'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mkl',       'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'cuda',      'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpro_dir',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tbb_dir',       'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tf_dir',        'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'hpx_dir',       'base directory of HPX',         HPX_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'gpi2_dir',      'base directory of GPI2',        GPI2_DIR,     PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mkl_dir',       'base directory of MKL',         MKL_DIR,      PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'cuda_dir',      'base directory of CUDA',        CUDA_DIR,     PathVariable.PathIsDir ) )
 
-opts.Add( PathVariable( 'jemalloc',  'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'mimalloc',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
-opts.Add( PathVariable( 'tcmalloc',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'jemalloc_dir',  'base directory of jemalloc',    JEMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'mimalloc_dir',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
+opts.Add( PathVariable( 'tcmalloc_dir',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
 opts.Add(               'lapackflags',   'user defined link flags for lapack', default = LAPACK_FLAGS )
@@ -307,22 +307,23 @@ OPTFLAGS      = opt_env['optflags']
 CPUFLAGS      = opt_env['cpuflags']
 DEFINES       = opt_env['defines']
 
-HPRO_DIR      = opt_env['hpro']
-TBB_DIR       = opt_env['tbb']
-TASKFLOW_DIR  = opt_env['tf']
-HPX_DIR       = opt_env['hpx']
-GPI2_DIR      = opt_env['gpi2']
+HPRO_DIR      = opt_env['hpro_dir']
+TBB_DIR       = opt_env['tbb_dir']
+TASKFLOW_DIR  = opt_env['tf_dir']
+HPX_DIR       = opt_env['hpx_dir']
+GPI2_DIR      = opt_env['gpi2_dir']
 
-MKL_DIR       = opt_env['mkl']
-CUDA_DIR      = opt_env['cuda']
+MKL_DIR       = opt_env['mkl_dir']
+CUDA_DIR      = opt_env['cuda_dir']
 
-JEMALLOC_DIR  = opt_env['jemalloc']
-MIMALLOC_DIR  = opt_env['mimalloc']
-TCMALLOC_DIR  = opt_env['tcmalloc']
+JEMALLOC_DIR  = opt_env['jemalloc_dir']
+MIMALLOC_DIR  = opt_env['mimalloc_dir']
+TCMALLOC_DIR  = opt_env['tcmalloc_dir']
+malloc        = opt_env['malloc']
 
 lapack        = opt_env['lapack']
 LAPACK_FLAGS  = opt_env['lapackflags']
-malloc        = opt_env['malloc']
+
 eigen         = opt_env['eigen']
 EIGEN_DIR     = opt_env['eigen_dir']
 hdf5          = opt_env['hdf5']

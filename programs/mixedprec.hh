@@ -95,9 +95,9 @@ program_main ()
         A = io::hpro::read< value_t >( matrixfile );
     }// else
     
-    auto  mem_A  = A->byte_size();
-    auto  norm_A = impl::norm::frobenius( *A );
-    auto  delta  = hlr::cmdline::eps; // / (A->nrows());
+    const auto  mem_A  = A->byte_size();
+    const auto  norm_A = impl::norm::frobenius( *A );
+    const auto  delta  = norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
@@ -119,7 +119,7 @@ program_main ()
         std::cout << "  "
                   << term::bullet << term::bold
                   << "compression ("
-                  << "ε = " << boost::format( "%.2e" ) % delta
+                  << "δ = " << boost::format( "%.2e" ) % delta
                   << ", "
                   << "mixedprec)"
                   << term::reset << std::endl;
@@ -152,17 +152,17 @@ program_main ()
 
     auto  zA = impl::matrix::copy_mixedprec( *A );
 
-    norm_A = norm::spectral( impl::arithmetic, *A );
-    
     std::cout << "  "
               << term::bullet << term::bold
               << "compression ("
-              << "ε = " << boost::format( "%.2e" ) % delta
-              << ", mixedprec )"
+              << "δ = " << boost::format( "%.2e" ) % delta
+              << ", mixedprec + " << hlr::compress::provider << ")"
               << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
+        auto  lacc = local_accuracy( delta );
+        
         runtime.clear();
         
         for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
@@ -171,7 +171,8 @@ program_main ()
         
             tic = timer::now();
     
-            impl::matrix::compress( *B, absolute_prec( delta ) );
+            // impl::matrix::compress( *B, absolute_prec( delta ) );
+            impl::matrix::compress( *B, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -195,13 +196,12 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
     
-    auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
-    auto  error = norm::spectral( impl::arithmetic, *diff );
+    // auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
+    // auto  error = norm::spectral( impl::arithmetic, *diff );
 
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
-    norm_A = impl::norm::frobenius( *A );
-    error  = impl::norm::frobenius( 1, *A, -1, *zA );
+    auto  error  = impl::norm::frobenius( 1, *A, -1, *zA );
 
     std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     

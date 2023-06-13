@@ -94,21 +94,22 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  zA     = impl::matrix::copy_compressible( *A );
-    auto  norm_A = impl::norm::frobenius( *A );
+    auto        zA     = impl::matrix::copy_compressible( *A );
+    auto        norm_A = impl::norm::frobenius( *A );
+    const auto  delta  = norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
     
     std::cout << "  "
               << term::bullet << term::bold
               << "compression ("
-              << "ε = " << boost::format( "%.2e" ) % cmdline::eps
+              << "δ = " << boost::format( "%.2e" ) % delta
               << ", "
               << hlr::compress::provider << ')'
               << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
-        auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
-        // auto  lacc = absolute_prec( cmdline::eps );
+        // auto  lacc = local_accuracy( delta );
+        auto  lacc = absolute_prec( cmdline::eps );
         
         runtime.clear();
         
@@ -142,17 +143,13 @@ program_main ()
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
-    
-    // auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
-    // auto  error = norm::spectral( impl::arithmetic, *diff );
-    auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
 
-    std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
-    
-    // norm_A = norm::frobenius( *A );
-    // error  = norm::frobenius( 1, *A, -1, *zA );
-    
-    // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    {
+        auto  B     = impl::matrix::convert_to_h( *zA );
+        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *B );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+    }
 
     std::cout << "  "
               << term::bullet << term::bold
@@ -187,7 +184,7 @@ program_main ()
 
         // error = norm::spectral( impl::arithmetic, *diffB );
         
-        error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zB );
+        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zB );
         
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
@@ -198,7 +195,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         std::cout << "  "
                   << term::bullet << term::bold
@@ -217,7 +214,7 @@ program_main ()
         std::cout << "    mem   = " << format_mem( mem_As ) << std::endl;
 
         {
-            auto  lacc = local_accuracy( norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) ) );
+            auto  lacc = local_accuracy( delta );
             // auto  lacc = absolute_prec( cmdline::eps );
         
             runtime.clear();

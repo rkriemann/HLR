@@ -9,6 +9,7 @@
 //
 
 #include <random>
+#include <concepts>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/defaults.hh>
@@ -26,6 +27,7 @@
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/text.hh>
 #include <hlr/utils/math.hh>
+#include <hlr/utils/traits.hh>
 
 namespace hlr { namespace norm { namespace detail {
 
@@ -36,15 +38,16 @@ namespace hlr { namespace norm { namespace detail {
 ////////////////////////////////////////////////////////////////////////////////
 
 template < typename value_t >
-Hpro::real_type_t< value_t >
-frobenius ( const Hpro::TMatrix< value_t > &  A )
+long double
+frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    // using  real_t   = Hpro::real_type_t< value_t >;
+    using  result_t = long double;
     
     if ( is_blocked( A ) )
     {
-        auto    B   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        real_t  val = 0.0;
+        auto      B   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        result_t  val = 0.0;
         
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
@@ -53,13 +56,11 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
                 if ( is_null( B->block( i, j ) ) )
                     continue;
                 
-                const auto  val_ij = frobenius( * B->block( i, j ) );
-
-                val += val_ij * val_ij;
+                val += frobenius_squared( * B->block( i, j ) );
             }// for
         }// for
 
-        return std::sqrt( val );
+        return val;
     }// if
     else if ( is_lowrank( A ) )
     {
@@ -75,7 +76,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
                              const blas::matrix< value_t > &  V )
         {
             const uint  rank = U.ncols();
-            value_t     val  = 0.0;
+            result_t    val  = 0.0;
     
             for ( size_t  l = 0; l < rank; l++ )
             {
@@ -91,13 +92,13 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
                 }// for
             }// for
         
-            return std::sqrt( std::abs( val ) );
+            return std::abs( val );
         };
 
         if ( matrix::is_mixedprec_lowrank( A ) )
         {
-            return comp_lr( cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed(),
-                            cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed() );
+            return comp_lr( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
+                            cptrcast( &A, matrix::mplrmatrix< value_t > )->V() );
         }// if
         else if ( compress::is_compressed( A ) )
         {
@@ -147,7 +148,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
     //                 }// for
     //             }// for
                 
-    //             return std::real( std::sqrt( std::abs( norm ) ) );
+    //             return std::real( std::abs( norm ) );
     //         },
     //         R->factors()
     //     );
@@ -165,14 +166,14 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
         auto          R   = cptrcast( & A, hlr::matrix::tiled_lrmatrix< value_t > );
         const auto &  U   = R->U();
         const auto &  V   = R->V();
-        value_t       val = 0.0;
+        result_t      val = 0.0;
         
         for ( size_t  l = 0; l < R->rank(); l++ )
         {
             for ( size_t  k = 0; k < R->rank(); k++ )
             {
-                value_t  dot_U = 0;
-                value_t  dot_V = 0;
+                result_t  dot_U = 0;
+                result_t  dot_V = 0;
 
                 auto  U_i = U.cbegin();
                 auto  V_i = V.cbegin();
@@ -193,7 +194,7 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
             }// for
         }// for
 
-        return std::sqrt( std::abs( val ) );
+        return std::abs( val );
     }// if
     else if ( hlr::matrix::is_uniform_lowrank( A ) )
     {
@@ -201,9 +202,14 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
         // |A| = | U S V' | = |U||S||V| = |S| with orthogonal U/V
         //
 
-        auto  R = cptrcast( &A, hlr::matrix::uniform_lrmatrix< value_t > );
-        
-        return blas::norm2( R->coupling() );
+        auto  R   = cptrcast( &A, hlr::matrix::uniform_lrmatrix< value_t > );
+        auto  C   = R->coupling();
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
+            val += math::square( C.data()[ i ] );
+
+        return val;
     }// if
     else if ( hlr::matrix::is_h2_lowrank( A ) )
     {
@@ -211,22 +217,31 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
         // |A| = | U S V' | = |U||S||V| = |S| with orthogonal U/V
         //
 
-        auto  R = cptrcast( &A, hlr::matrix::h2_lrmatrix< value_t > );
-        
-        return blas::norm2( R->coupling() );
+        auto  R   = cptrcast( &A, hlr::matrix::h2_lrmatrix< value_t > );
+        auto  C   = R->coupling();
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
+            val += math::square( C.data()[ i ] );
+
+        return val;
     }// if
     else if ( is_dense( A ) )
     {
+        auto  M = blas::matrix< value_t >();
+        
         if ( compress::is_compressed( A ) )
-            return blas::normF( cptrcast( &A, matrix::dense_matrix< value_t > )->mat_decompressed() );
+            M = cptrcast( &A, matrix::dense_matrix< value_t > )->mat_decompressed();
         else
-            return blas::normF( blas::mat( cptrcast( &A, Hpro::TDenseMatrix< value_t > ) ) );
+            M = blas::mat( cptrcast( &A, Hpro::TDenseMatrix< value_t > ) );
+        
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < M.nrows()*M.ncols(); ++i )
+            val += math::square( M.data()[ i ] );
+
+        return val;
     }// if
-    // else if ( matrix::is_generic_dense( A ) )
-    // {
-    //     return std::visit( [] ( auto &&  M ) -> real_t { return blas::normF( M ); },
-    //                        cptrcast( &A, matrix::dense_matrix )->matrix() ); 
-    // }// if
     else
     {
         HLR_ASSERT( is_blocked( A ) || is_lowrank( A ) || is_dense( A ) );
@@ -238,22 +253,25 @@ frobenius ( const Hpro::TMatrix< value_t > &  A )
 //
 // return Frobenius norm of αA+βB, e.g. |αA+βB|_F
 //
-template < typename value_t >
-Hpro::real_type_t< value_t >
-frobenius ( const value_t                     alpha,
-            const Hpro::TMatrix< value_t > &  A,
-            const value_t                     beta,
-            const Hpro::TMatrix< value_t > &  B )
+template < general_number alpha_t,
+           general_number beta_t,
+           typename value_t >
+long double
+frobenius_squared ( const alpha_t                     alpha,
+                    const Hpro::TMatrix< value_t > &  A,
+                    const beta_t                      beta,
+                    const Hpro::TMatrix< value_t > &  B )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    // using  real_t = Hpro::real_type_t< value_t >;
+    using  result_t = long double;
 
     HLR_ASSERT( A.block_is() == B.block_is() );
     
     if ( is_blocked_all( A, B ) )
     {
-        auto     BA   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        auto     BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
-        value_t  val = 0.0;
+        auto      BA  = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto      BB  = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+        result_t  val = 0.0;
 
         HLR_ASSERT(( BA->nblock_rows() == BB->block_rows() ) &&
                    ( BA->nblock_cols() == BB->block_cols() ));
@@ -267,20 +285,20 @@ frobenius ( const value_t                     alpha,
                     if ( is_null( BB->block( i, j ) ) )
                         continue;
                     else
-                        val += math::square( beta * frobenius( * BB->block( i, j ) ) );
+                        val += beta * frobenius_squared( * BB->block( i, j ) );
                 }// if
                 else
                 {
                     if ( is_null( BB->block( i, j ) ) )
-                        val += math::square( alpha * frobenius( * BA->block( i, j ) ) );
+                        val += alpha * frobenius_squared( * BA->block( i, j ) );
                     else
-                        val += math::square( frobenius( alpha, * BA->block( i, j ),
-                                                        beta,  * BB->block( i, j ) ) );
+                        val += frobenius_squared( alpha, * BA->block( i, j ),
+                                                  beta,  * BB->block( i, j ) );
                 }// else
             }// for
         }// for
 
-        return std::sqrt( std::abs( val ) );
+        return std::abs( val );
     }// if
     else if ( is_lowrank_all( A, B ) )
     {
@@ -297,7 +315,7 @@ frobenius ( const value_t                     alpha,
                           {
                               const auto  rank1 = U1.ncols();
                               const auto  rank2 = U2.ncols();
-                              value_t     val   = 0.0;
+                              result_t    val   = 0.0;
                               
                               for ( size_t  l = 0; l < rank1; l++ )
                               {
@@ -323,8 +341,8 @@ frobenius ( const value_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( A ) )
             {
-                UA = cptrcast( &A, matrix::mplrmatrix< value_t > )->U_decompressed();
-                VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V_decompressed();
+                UA = cptrcast( &A, matrix::mplrmatrix< value_t > )->U();
+                VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( A )  )
             {
@@ -339,8 +357,8 @@ frobenius ( const value_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( B ) )
             {
-                UB = cptrcast( &B, matrix::mplrmatrix< value_t > )->U_decompressed();
-                VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V_decompressed();
+                UB = cptrcast( &B, matrix::mplrmatrix< value_t > )->U();
+                VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( B )  )
             {
@@ -358,7 +376,7 @@ frobenius ( const value_t                     alpha,
                                 alpha * beta  * lrdot( UB, VB, UA, VA ) +
                                 beta  * beta  * lrdot( UB, VB, UB, VB ) );
 
-            return std::sqrt( std::abs( sqn ) );
+            return std::abs( sqn );
         }// else
     }// if
     else if ( matrix::is_uniform_lowrank_all( A, B ) )
@@ -371,7 +389,7 @@ frobenius ( const value_t                     alpha,
         auto  RA = matrix::convert_to_lowrank( A );
         auto  RB = matrix::convert_to_lowrank( B );
 
-        return frobenius( alpha, *RA, beta, *RB );
+        return frobenius_squared( alpha, *RA, beta, *RB );
     }// if
     else if ( matrix::is_h2_lowrank_all( A, B ) )
     {
@@ -383,14 +401,14 @@ frobenius ( const value_t                     alpha,
         auto  RA = matrix::convert_to_lowrank( A );
         auto  RB = matrix::convert_to_lowrank( B );
 
-        return frobenius( alpha, *RA, beta, *RB );
+        return frobenius_squared( alpha, *RA, beta, *RB );
     }// if
     else if ( is_dense_all( A, B ) )
     {
         auto  comp_dense = [alpha,beta] ( const blas::matrix< value_t > &  MA,
                                           const blas::matrix< value_t > &  MB )
         {
-            real_t       val = 0;
+            result_t     val = 0;
             const idx_t  n   = idx_t(MA.nrows());
             const idx_t  m   = idx_t(MA.ncols());
     
@@ -400,11 +418,11 @@ frobenius ( const value_t                     alpha,
                 {
                     const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
                     
-                    val += std::real( math::conj( a_ij ) * a_ij );
+                    val += std::abs( math::square( a_ij ) );
                 }// for
             }// for
             
-            return std::sqrt( std::abs( val ) );
+            return val;
         };
 
         if ( compress::is_compressed( A ) )
