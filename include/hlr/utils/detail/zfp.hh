@@ -12,6 +12,8 @@
 
 #include <zfp.h>
 
+#include <hlr/arith/blas.hh>
+
 namespace hlr { namespace compress { namespace zfp {
 
 //
@@ -32,24 +34,10 @@ inline
 uint
 eps_to_rate ( const double eps )
 {
-    // if      ( eps >= 1e-2 ) return 8;
-    // else if ( eps >= 1e-3 ) return 10;
-    // else if ( eps >= 1e-4 ) return 14;
-    // else if ( eps >= 1e-5 ) return 16;
-    // else if ( eps >= 1e-6 ) return 20;
-    // else if ( eps >= 1e-7 ) return 24;
-    // else if ( eps >= 1e-8 ) return 28;
-    // else if ( eps >= 1e-9 ) return 30;
-    // else if ( eps >= 1e-9 ) return 30;
-
     #if defined(HLR_COMPRESS_RATE_ARITH)
-    
     return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 8;
-
     #else
-
     return uint( std::ceil( std::abs( std::log2( eps ) ) ) );
-
     #endif
 }
 
@@ -63,7 +51,8 @@ inline config  get_config        ( const double  acc  ) { return fixed_rate( eps
 // inline config  get_config        ( const double  acc  ) { return absolute_accuracy( acc ); }
 
 // holds compressed data
-using  zarray = std::vector< unsigned char >;
+using  byte_t = unsigned char;
+using  zarray = std::vector< byte_t >;
 
 inline size_t  byte_size ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
 
@@ -183,9 +172,13 @@ compress< std::complex< double > > ( const config &            config,
 //
 // decompression function
 //
+//
+// decompression function
+//
 template < typename value_t >
 void
-decompress ( const zarray &  buffer,
+decompress ( const uchar *   zdata,
+             const size_t    zsize,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
@@ -229,7 +222,7 @@ decompress ( const zarray &  buffer,
     // parallelism via hierarchy not within ZFP
     zfp_stream_set_execution( zfp, zfp_exec_serial );
 
-    auto  stream  = stream_open( const_cast< unsigned char * >( buffer.data() ), buffer.size() );
+    auto  stream  = stream_open( const_cast< byte_t * >( zdata ), zsize );
 
     zfp_stream_set_bit_stream( zfp, stream );
     zfp_stream_rewind( zfp );
@@ -243,6 +236,18 @@ decompress ( const zarray &  buffer,
     zfp_field_free( field );    
     zfp_stream_close( zfp );
     stream_close( stream );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  buffer,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0 )
+{
+    decompress( buffer.data(), buffer.size(), dest, dim0, dim1, dim2, dim3 );
 }
 
 template <>
@@ -283,6 +288,74 @@ decompress< std::complex< double > > ( const zarray &            zdata,
         decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
     else
         decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// special version for lowrank matrices
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > &                       U,
+              const blas::vector< Hpro::real_type_t< value_t > > &  S )
+{
+    //
+    // first, determine exponent bits and mantissa bits for all
+    // columns
+    //
+
+    const size_t  n     = U.nrows();
+    const size_t  k     = U.ncols();
+    size_t        zsize = 0;
+    auto          zlist = std::vector< zarray >( k );
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        auto  zconf = get_config( 2e-2 * S(l) );
+        auto  z_i   = compress( zconf, U.data() + l * n, n );
+
+        zsize += z_i.size();
+        zlist[l] = std::move( z_i );
+    }// for
+
+    zarray  zdata( zsize + sizeof(uint) * k );
+    size_t  pos = 0;
+
+    for ( auto &  z_i : zlist )
+    {
+        const uint  s_i = z_i.size();
+        
+        memcpy( zdata.data() + pos, & s_i, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        memcpy( zdata.data() + pos, z_i.data(), s_i );
+        pos += s_i;
+    }// for
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U )
+{
+    const size_t  n   = U.nrows();
+    const uint    k   = U.ncols();
+    size_t        pos = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        uint  s_i = 0;
+
+        memcpy( & s_i, zdata.data() + pos, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
+        pos += s_i;
+    }// for
 }
 
 }}}// namespace hlr::compress::zfp

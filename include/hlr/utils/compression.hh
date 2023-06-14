@@ -602,7 +602,11 @@ is_compressed ( const T *  ptr )
 // define implementation for adaptive precision compression
 // for lowrank matrices
 //
-#if HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
+#if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+
+namespace ap = hlr::compress::zfp;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
 
 namespace ap = hlr::compress::apfloat;
 
