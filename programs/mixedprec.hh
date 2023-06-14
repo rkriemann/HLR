@@ -97,7 +97,8 @@ program_main ()
     
     const auto  mem_A  = A->byte_size();
     const auto  norm_A = impl::norm::frobenius( *A );
-    const auto  delta  = norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    // const auto  delta  = norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    const auto  delta  = cmdline::eps;
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
@@ -161,7 +162,8 @@ program_main ()
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     {
-        auto  lacc = local_accuracy( delta );
+        // auto  lacc = local_accuracy( delta );
+        auto  lacc = absolute_prec( delta );
         
         runtime.clear();
         
@@ -171,7 +173,6 @@ program_main ()
         
             tic = timer::now();
     
-            // impl::matrix::compress( *B, absolute_prec( delta ) );
             impl::matrix::compress( *B, lacc );
 
             toc = timer::since( tic );

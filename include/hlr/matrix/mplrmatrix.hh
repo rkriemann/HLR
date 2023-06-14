@@ -809,7 +809,7 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
     norm = math::sqrt( norm );
     
-    const auto  tol = acc( this->row_is(), this->col_is() ).abs_eps(); // * norm;
+    const auto  tol = acc( this->row_is(), this->col_is() ).abs_eps() * norm;
 
     #if HLR_USE_APCOMPRESSION == 1
 

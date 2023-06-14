@@ -74,18 +74,15 @@ private:
 
     #if HLR_HAS_COMPRESSION == 1
     #if HLR_USE_APCOMPRESSION == 1
-    // compressed basis and transfer matrices
+    // basis and corresponding singular values
     compress::ap::zarray                    _zV;
-    std::vector< compress::ap::zarray >     _zE;
-
-    // also singular values assoc. with basis vectors
-    // in case of adaptive precision compression
     blas::vector< real_t >                  _sv;
     #else
-    // compressed basis and transfer matrices
+    // just basis with standard compression
     compress::zarray                        _zV;
-    std::vector< compress::zarray >         _zE;
     #endif
+    // coefficients always with std. compression
+    std::vector< compress::zarray >         _zE;
     #endif
     
 public:

@@ -41,37 +41,54 @@ template < typename value_t >
 zarray
 compress ( const config &   config,
            value_t *        data,
-           const size_t     dim0,
-           const size_t     dim1 = 0,
-           const size_t     dim2 = 0,
-           const size_t     dim3 = 0 )
+           const size_t     adim0,
+           const size_t     adim1 = 0,
+           const size_t     adim2 = 0,
+           const size_t     adim3 = 0 )
 {
+    size_t  dim0 = adim0;
+    size_t  dim1 = adim1;
+    size_t  dim2 = adim2;
+    size_t  dim3 = adim3;
+
+    if (( dim3 > 0 ) && ( dim3 < 3 )) { dim2 *= dim3; dim3  = 0; }
+    if (( dim2 > 0 ) && ( dim2 < 3 )) { dim1 *= dim2; dim2  = 0; }
+    if (( dim1 > 0 ) && ( dim1 < 3 )) { dim0 *= dim1; dim1  = 0; }
+
+    HLR_ASSERT( dim0 >= 3 );
+
     const uint  ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
 
     mgard_x::Config  mconfig;
-    double           s       = 0;  // s = 0 for L2 norm
+    double           s = 0;  // s = 0 for L2 norm
     void *           c_array;
     size_t           c_size;
 
     mconfig.lossless = mgard_x::lossless_type::Huffman_Zstd;
     mconfig.dev_type = mgard_x::device_type::AUTO;
-    
-    if ( ndims == 2 )
-    {
-        auto  shape = std::vector< mgard_x::SIZE >{ dim0, dim1 };
 
-        mgard_x::compress( 2,
-                           mgard_x::data_type::Double,
-                           shape,
-                           config.tol,
-                           s, // s = 0 for L2 norm
-                           mgard_x::error_bound_type::REL,
-                           data,
-                           c_array,
-                           c_size,
-                           mconfig,
-                           false );
-    }// if
+    auto  shape = std::vector< mgard_x::SIZE >( ndims );
+
+    switch ( ndims )
+    {
+        case 4  : shape[3] = dim3;
+        case 3  : shape[2] = dim2;
+        case 2  : shape[1] = dim1;
+        case 1  : shape[0] = dim0; break;
+        default : HLR_ERROR( "unsupported number of dimensions" );
+    }// switch
+    
+    mgard_x::compress( ndims,
+                       mgard_x::data_type::Double,
+                       shape,
+                       config.tol,
+                       s, // s = 0 for L2 norm
+                       mgard_x::error_bound_type::REL,
+                       data,
+                       c_array,
+                       c_size,
+                       mconfig,
+                       false );
 
     auto  result = zarray( c_size );
 
@@ -79,7 +96,7 @@ compress ( const config &   config,
                reinterpret_cast< byte_t * >( c_array ) + c_size,
                result.begin() );
 
-    delete c_array;
+    free( c_array );
     
     return result;
 }
@@ -129,14 +146,25 @@ compress< std::complex< double > > ( const config &            config,
 //
 template < typename value_t >
 void
-decompress ( const zarray &  zdata,
+decompress ( const byte_t *  zptr,
+             const size_t    zsize,
              value_t *       dest,
-             const size_t    dim0,
-             const size_t    dim1 = 0,
-             const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
+             const size_t    adim0,
+             const size_t    adim1 = 0,
+             const size_t    adim2 = 0,
+             const size_t    adim3 = 0 )
 {
-    const uint    ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
+    size_t  dim0 = adim0;
+    size_t  dim1 = adim1;
+    size_t  dim2 = adim2;
+    size_t  dim3 = adim3;
+
+    if (( dim3 > 0 ) && ( dim3 < 3 )) { dim2 *= dim3; dim3  = 0; }
+    if (( dim2 > 0 ) && ( dim2 < 3 )) { dim1 *= dim2; dim2  = 0; }
+    if (( dim1 > 0 ) && ( dim1 < 3 )) { dim0 *= dim1; dim1  = 0; }
+
+    HLR_ASSERT( dim0 >= 3 );
+        
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     mgard_x::Config  config;
@@ -146,11 +174,23 @@ decompress ( const zarray &  zdata,
 
     void *  d_array = nullptr;
     
-    mgard_x::decompress( zdata.data(), zdata.size(), d_array, config, false );
+    mgard_x::decompress( zptr, zsize, d_array, config, false );
     std::copy( reinterpret_cast< value_t * >( d_array ),
                reinterpret_cast< value_t * >( d_array ) + nsize,
                dest );
     
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  zdata,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0 )
+{
+    decompress( zdata.data(), zdata.size(), dest, dim0, dim1, dim2, dim3 );
 }
 
 template <>
@@ -191,6 +231,74 @@ decompress< std::complex< double > > ( const zarray &            zdata,
         decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
     else
         decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// special version for lowrank matrices
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > &                       U,
+              const blas::vector< Hpro::real_type_t< value_t > > &  S )
+{
+    //
+    // first, determine exponent bits and mantissa bits for all
+    // columns
+    //
+
+    const size_t  n     = U.nrows();
+    const size_t  k     = U.ncols();
+    size_t        zsize = 0;
+    auto          zlist = std::vector< zarray >( k );
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        auto  zconf = get_config( S(l) );
+        auto  z_i   = compress( zconf, U.data() + l * n, n );
+
+        zsize   += z_i.size();
+        zlist[l] = std::move( z_i );
+    }// for
+
+    zarray  zdata( zsize + sizeof(uint) * k );
+    size_t  pos = 0;
+
+    for ( auto &  z_i : zlist )
+    {
+        const uint  s_i = z_i.size();
+        
+        memcpy( zdata.data() + pos, & s_i, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        memcpy( zdata.data() + pos, z_i.data(), s_i );
+        pos += s_i;
+    }// for
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U )
+{
+    const size_t  n   = U.nrows();
+    const uint    k   = U.ncols();
+    size_t        pos = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        uint  s_i = 0;
+
+        memcpy( & s_i, zdata.data() + pos, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
+        pos += s_i;
+    }// for
 }
 
 }}}// namespace hlr::compress::mgard

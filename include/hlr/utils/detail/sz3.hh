@@ -24,6 +24,8 @@
 
 namespace hlr { namespace compress { namespace sz3 {
 
+using byte_t = char;
+
 //
 // holds compression parameters
 //
@@ -33,7 +35,7 @@ struct config
     double  eps;
 };
 
-inline config  get_config ( double  eps ) { return config{ SZ::EB_REL, eps }; }
+inline config  get_config ( double  eps ) { return config{ SZ::EB_REL, 0.5 * eps }; }
 // inline config  get_config ( double  eps ) { return config{ SZ::EB_L2NORM, eps }; }
 // inline config  get_config ( double  eps ) { return config{ SZ::EB_ABS,    eps }; }
 
@@ -43,7 +45,6 @@ inline config  get_config ( double  eps ) { return config{ SZ::EB_REL, eps }; }
 struct zarray
 {
     using value_t = char;
-    using byte_t  = char;
 
 private:
     byte_t *  _ptr;
@@ -94,7 +95,7 @@ public:
 
         return *this;
     }
-    
+
     byte_t *  begin () const { return _ptr; }
     byte_t *  end   () const { return _ptr + _size; }
     
@@ -119,18 +120,7 @@ compress ( const config &   config,
            const size_t     dim1 = 0,
            const size_t     dim2 = 0,
            const size_t     dim3 = 0,
-           const size_t     dim4 = 0 );
-
-template <>
-inline
-zarray
-compress< float > ( const config &  config,
-                    const float *   data,
-                    const size_t    dim0,
-                    const size_t    dim1,
-                    const size_t    dim2,
-                    const size_t    dim3,
-                    const size_t    dim4 )
+           const size_t     dim4 = 0 )
 {
     const uint  ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
     SZ::Config  conf;
@@ -169,60 +159,7 @@ compress< float > ( const config &  config,
     }// switch
     
     size_t  csize = 0;
-    auto    ptr   = SZ_compress< float >( conf, data, csize );
-
-    return zarray( ptr, csize );
-}
-
-template <>
-inline
-zarray
-compress< double > ( const config &  config,
-                     const double *  data,
-                     const size_t    dim0,
-                     const size_t    dim1,
-                     const size_t    dim2,
-                     const size_t    dim3,
-                     const size_t    dim4 )
-{
-    const uint  ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
-    SZ::Config  conf;
-
-    switch ( ndims )
-    {
-        case  1 : conf = SZ::Config( dim0 ); break;
-        case  2 : conf = SZ::Config( dim0, dim1 ); break;
-        case  3 : conf = SZ::Config( dim0, dim1, dim2 ); break;
-        case  4 : conf = SZ::Config( dim0, dim1, dim2, dim3 ); break;
-        default :
-            HLR_ASSERT( "unsupported number of dimensions for SZ3" );
-    }// switch
-    
-    conf.errorBoundMode = config.mode;
-    
-    switch ( config.mode )
-    {
-        case SZ::EB_REL :
-            conf.errorBoundMode = SZ::EB_REL;
-            conf.relErrorBound  = config.eps;
-            break;
-            
-        case SZ::EB_ABS :
-            conf.errorBoundMode = SZ::EB_ABS;
-            conf.absErrorBound  = config.eps;
-            break;
-            
-        case SZ::EB_L2NORM :
-            conf.errorBoundMode   = SZ::EB_L2NORM;
-            conf.l2normErrorBound = config.eps;
-            break;
-
-        default:
-            HLR_ERROR( "unsupported compression mode in SZ3" );
-    }// switch
-    
-    size_t  csize = 0;
-    auto    ptr   = SZ_compress< double >( conf, data, csize );
+    auto    ptr   = SZ_compress< value_t >( conf, data, csize );
 
     return zarray( ptr, csize );
 }
@@ -257,24 +194,14 @@ compress< std::complex< double > > ( const config &                 config,
 
 template < typename value_t >
 void
-decompress ( const zarray &  v,
-             value_t *      dest,
-             const size_t   dim0,
-             const size_t   dim1 = 0,
-             const size_t   dim2 = 0,
-             const size_t   dim3 = 0,
-             const size_t   dim4 = 0 );
-
-template <>
-inline
-void
-decompress< float > ( const zarray &  v,
-                      float *        dest,
-                      const size_t   dim0,
-                      const size_t   dim1,
-                      const size_t   dim2,
-                      const size_t   dim3,
-                      const size_t   dim4 )
+decompress ( const byte_t *  zptr,
+             const size_t    zsize,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 )
 {
     const uint  ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
     SZ::Config  conf;
@@ -289,40 +216,14 @@ decompress< float > ( const zarray &  v,
             HLR_ASSERT( "unsupported number of dimensions for SZ3" );
     }// switch
 
-    SZ_decompress< float >( conf, v.data(), v.size(), dest );
+    SZ_decompress< value_t >( conf, const_cast< byte_t * >( zptr ), zsize, dest );
 }
 
 template <>
 inline
 void
-decompress< double > ( const zarray &  v,
-                       double *       dest,
-                       const size_t   dim0,
-                       const size_t   dim1,
-                       const size_t   dim2,
-                       const size_t   dim3,
-                       const size_t   dim4 )
-{
-    const uint  ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
-    SZ::Config  conf;
-
-    switch ( ndims )
-    {
-        case  1 : conf = SZ::Config( dim0 ); break;
-        case  2 : conf = SZ::Config( dim0, dim1 ); break;
-        case  3 : conf = SZ::Config( dim0, dim1, dim2 ); break;
-        case  4 : conf = SZ::Config( dim0, dim1, dim2, dim3 ); break;
-        default :
-            HLR_ASSERT( "unsupported number of dimensions for SZ3" );
-    }// switch
-
-    SZ_decompress< double >( conf, v.data(), v.size(), dest );
-}
-
-template <>
-inline
-void
-decompress< std::complex< float > > ( const zarray &            v,
+decompress< std::complex< float > > ( const byte_t *            zptr,
+                                      const size_t              zsize,
                                       std::complex< float > *   dest,
                                       const size_t              dim0,
                                       const size_t              dim1,
@@ -336,7 +237,8 @@ decompress< std::complex< float > > ( const zarray &            v,
 template <>
 inline
 void
-decompress< std::complex< double > > ( const zarray &            v,
+decompress< std::complex< double > > ( const byte_t *            zptr,
+                                       const size_t              zsize,
                                        std::complex< double > *  dest,
                                        const size_t              dim0,
                                        const size_t              dim1,
@@ -345,6 +247,87 @@ decompress< std::complex< double > > ( const zarray &            v,
                                        const size_t              dim4 )
 {
     HLR_ERROR( "TO DO" );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  v,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 )
+{
+    decompress( v.data(), v.size(), dest, dim0, dim1, dim2, dim3, dim4 );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// special version for lowrank matrices
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > &                       U,
+              const blas::vector< Hpro::real_type_t< value_t > > &  S )
+{
+    //
+    // first, determine exponent bits and mantissa bits for all
+    // columns
+    //
+
+    const size_t  n     = U.nrows();
+    const size_t  k     = U.ncols();
+    size_t        zsize = 0;
+    auto          zlist = std::vector< zarray >( k );
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        auto  zconf = get_config( S(l) );
+        auto  z_i   = compress( zconf, U.data() + l * n, n );
+
+        zsize   += z_i.size();
+        zlist[l] = std::move( z_i );
+    }// for
+
+    zarray  zdata( zsize + sizeof(uint) * k );
+    size_t  pos = 0;
+
+    for ( auto &  z_i : zlist )
+    {
+        const uint  s_i = z_i.size();
+        
+        memcpy( zdata.data() + pos, & s_i, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        memcpy( zdata.data() + pos, z_i.data(), s_i );
+        pos += s_i;
+    }// for
+
+    return zdata;
+}
+
+template < typename value_t >
+void
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U )
+{
+    const size_t  n   = U.nrows();
+    const uint    k   = U.ncols();
+    size_t        pos = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        uint  s_i = 0;
+
+        memcpy( & s_i, zdata.data() + pos, sizeof(uint) );
+        pos += sizeof(uint);
+        
+        decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
+        pos += s_i;
+    }// for
 }
 
 }}}// namespace hlr::compress::sz

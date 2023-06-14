@@ -540,78 +540,70 @@ if half :
     env.Append( CPPDEFINES = 'HLR_HAS_HALF' )
     env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
         
-# support for ZFP compression
-if zfp :
+if   compressor == 'afloat'  :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
+elif compressor == 'apfloat' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=2' )
+elif compressor == 'bfloat'  :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
+elif compressor == 'dfloat'  :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
+elif compressor == 'zfp'     :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zfp' ] )
-        
-# support for SZ compression
-if sz :
+elif compressor == 'sz'      :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=6' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'SZ' ] )
-        
-# support for SZ3 compression
-if sz3 :
+elif compressor == 'sz3'     :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=7' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
     env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
-        
-# support for MGARD compression
-if mgard :
+elif compressor == 'mgard'   :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=8' )
     env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'mgard' ] )
-        
-# support for LZ4 compression
-if lz4 :
+elif compressor == 'lz4'     :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
     env.Append( CPPDEFINES = 'HLR_HAS_LZ4' )
     env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'lz4' ] )
-        
-# support for ZLIB compression
-if zlib :
+elif compressor == 'zlib'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=10' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZLIB' )
     env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'z' ] )
-        
-# support for Zstd compression
-if zstd :
+elif compressor == 'zstd'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=11' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZSTD' )
     env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
-        
-# support for universal number library
-if universal :
+elif compressor == 'posits'  :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-
-if   compressor == 'afloat'  : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
-elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=2' )
-elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
-elif compressor == 'dfloat'  : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
-elif compressor == 'zfp'     : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
-elif compressor == 'sz'      : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=6' )
-elif compressor == 'sz3'     : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=6' )
-elif compressor == 'mgard'   : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=7' )
-elif compressor == 'lz4'     : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=8' )
-elif compressor == 'zlib'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
-elif compressor == 'zstd'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=10' )
-elif compressor == 'posits'  : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=11' )
-elif compressor == 'fp32'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
-elif compressor == 'fp16'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
-elif compressor == 'bf16'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
-elif compressor == 'tf32'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=15' )
-elif compressor == 'bf24'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
-# elif compressor == 'none'    : env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
+elif compressor == 'fp32'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
+elif compressor == 'fp16'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
+elif compressor == 'bf16'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=15' )
+elif compressor == 'tf32'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
+elif compressor == 'bf24'    :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
 ######################################################################
 #

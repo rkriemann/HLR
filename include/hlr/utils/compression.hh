@@ -22,18 +22,17 @@
 #define HLR_COMPRESSOR_DFLOAT   4
 #define HLR_COMPRESSOR_ZFP      5
 #define HLR_COMPRESSOR_SZ       6
-#define HLR_COMPRESSOR_SZ3      6
-#define HLR_COMPRESSOR_MGARD    7
-#define HLR_COMPRESSOR_LZ4      8
-#define HLR_COMPRESSOR_ZLIB     9
-#define HLR_COMPRESSOR_ZSTD     10
-#define HLR_COMPRESSOR_POSITS   11
-#define HLR_COMPRESSOR_FP32     12
-#define HLR_COMPRESSOR_FP16     13
-#define HLR_COMPRESSOR_BF16     14
-#define HLR_COMPRESSOR_TF32     15
-#define HLR_COMPRESSOR_BF24     16
-#define HLR_COMPRESSOR_NONE     17
+#define HLR_COMPRESSOR_SZ3      7
+#define HLR_COMPRESSOR_MGARD    8
+#define HLR_COMPRESSOR_LZ4      9
+#define HLR_COMPRESSOR_ZLIB     10
+#define HLR_COMPRESSOR_ZSTD     11
+#define HLR_COMPRESSOR_POSITS   12
+#define HLR_COMPRESSOR_FP32     13
+#define HLR_COMPRESSOR_FP16     14
+#define HLR_COMPRESSOR_BF16     15
+#define HLR_COMPRESSOR_TF32     16
+#define HLR_COMPRESSOR_BF24     17
 
 #if defined(HLR_COMPRESSOR)
 
@@ -605,6 +604,22 @@ is_compressed ( const T *  ptr )
 #if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 namespace ap = hlr::compress::zfp;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SZ3
+
+namespace ap = hlr::compress::sz3;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
+
+namespace ap = hlr::compress::mgard;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFLOAT
+
+namespace ap = hlr::compress::bfloat;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFLOAT
+
+namespace ap = hlr::compress::dfloat;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
 

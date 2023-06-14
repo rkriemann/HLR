@@ -11,6 +11,8 @@
 #include <cstring>
 #include <limits>
 
+#include <hlr/utils/detail/byte_n.hh>
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -40,12 +42,6 @@ constexpr ulong   fp64_exp_highbit = 0b10000000000;
 constexpr ulong   fp64_zero_val    = 0xffffffffffffffff;
 constexpr double  fp64_infinity    = std::numeric_limits< double >::infinity();
 
-// return byte padded value of <n>
-inline size_t byte_pad ( size_t  n )
-{
-    return ( n % 8 != 0 ) ? n + (8 - n%8) : n;
-}
-    
 inline
 byte_t
 eps_to_rate ( const double eps )
@@ -74,66 +70,6 @@ inline size_t  byte_size  ( const zarray &  v   ) { return sizeof(v) + v.size();
 
 // return compression configuration for desired accuracy eps
 inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
-
-// for optimized <n>-byte assignment
-struct  byte3_t
-{
-    byte_t  data[3];
-    
-    void operator = ( const uint  n )
-    {
-        data[0] = (n & 0x0000ff);
-        data[1] = (n & 0x00ff00) >> 8;
-        data[2] = (n & 0xff0000) >> 16;
-    }
-
-    operator uint () const { return ( data[2] << 16 ) | ( data[1] << 8 ) | data[0]; }
-};
-
-struct  byte5_t
-{
-    byte_t  data[5];
-    
-    void operator = ( const ulong  n )
-    {
-        *reinterpret_cast< uint * >( data ) = uint(n & 0xffffffff);
-        data[4] = byte_t( (n >> 32) & 0xff );
-    }
-
-    operator ulong () const { return ulong(data[4]) << 32 | ulong(*reinterpret_cast< const uint * >( data )); }
-};
-
-struct  byte6_t
-{
-    byte_t  data[6];
-    
-    void operator = ( const ulong  n )
-    {
-        *reinterpret_cast< uint *   >( data   ) = uint( n & 0xffffffff );
-        *reinterpret_cast< ushort * >( data+4 ) = ushort( (n >> 32) & 0xffff );
-    }
-
-    operator ulong () const { return ( ulong(*reinterpret_cast< const ushort * >( data+4 )) << 32 |
-                                       ulong(*reinterpret_cast< const uint *   >( data   )) ); }
-};
-
-struct  byte7_t
-{
-    byte_t  data[7];
-    
-    void operator = ( const ulong  n )
-    {
-        *reinterpret_cast< uint *   >( data ) = uint( n & 0xffffffff );
-
-        const uint  n1 = n >> 32;
-        
-        data[4] = (n1 & 0x0000ff);
-        data[5] = (n1 & 0x00ff00) >> 8;
-        data[6] = (n1 & 0xff0000) >> 16;
-    }
-
-    operator ulong () const { return ulong(data[6]) << 48 | ulong(data[5]) << 40 | ulong(data[4]) << 32 | ulong(*reinterpret_cast< const uint *   >( data   )); }
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 //
