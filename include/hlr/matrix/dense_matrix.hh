@@ -444,24 +444,11 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         
     //     blas::add( value_t(-1), M, dM );
 
-    //     // if ( blas::norm_F( dM ) / blas::norm_F(M) > 1e-6 )
-    //         std::cout << "D " << this->block_is().to_string() << " : "
-    //                   << blas::norm_F( dM ) / blas::norm_F(M)
-    //                   << " / "
-    //                   << blas::max_abs_val( dM )
-    //                   << std::endl;
-            
-    //     // for ( size_t  i = 0; i < M.nrows() * M.ncols(); ++i )
-    //     // {
-    //     //     const auto  error = std::abs( (M.data()[i] - dM.data()[i]) / M.data()[i] );
-
-    //     //     if ( error > 1e-6 )
-    //     //         std::cout << "D " << i << " : "
-    //     //                   << M.data()[i] << " / "
-    //     //                   << dM.data()[i] << " / "
-    //     //                   << std::abs( error )
-    //     //                   << std::endl;
-    //     // }// for
+    //     std::cout << "D " << this->block_is().to_string() << " : "
+    //               << blas::norm_F( dM ) / blas::norm_F(M)
+    //               << " / "
+    //               << blas::max_abs_val( dM )
+    //               << std::endl;
     // }
     
     if ( compress::byte_size( zM ) < mem_dense )

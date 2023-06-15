@@ -14,6 +14,7 @@
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
+#include <hlr/utils/detail/mixedprec.hh>
 
 // different compressor types
 #define HLR_COMPRESSOR_AFLOAT   1
@@ -33,6 +34,7 @@
 #define HLR_COMPRESSOR_BF16     15
 #define HLR_COMPRESSOR_TF32     16
 #define HLR_COMPRESSOR_BF24     17
+#define HLR_COMPRESSOR_MP       18
 
 #if defined(HLR_COMPRESSOR)
 
@@ -430,23 +432,28 @@ using hlr::compress::mgard::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-// #elif HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MP
 
-// #include <hlr/utils/detail/dummy.hh>
+//
+// special compressor only for lowrank
+//
 
-// namespace hlr { namespace compress {
+namespace hlr { namespace compress {
 
-// static const char provider[] = "dummy";
+#  undef  HLR_HAS_COMPRESSION
+#  define HLR_HAS_COMPRESSION  0
 
-// using  zconfig_t = hlr::compress::dummy::config;
-// using  zarray    = hlr::compress::dummy::zarray;
+namespace hlr { namespace compress {
 
-// using hlr::compress::dummy::compress;
-// using hlr::compress::dummy::decompress;
-// using hlr::compress::dummy::get_config;
-// using hlr::compress::dummy::byte_size;
+static const char provider[] = "none";
 
-// }} // namespace hlr::compress
+struct zconfig_t {};
+struct zarray    {};
+
+inline zconfig_t  get_config ( double /* eps */ ) { return zconfig_t{}; }
+inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+
+}} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -601,7 +608,11 @@ is_compressed ( const T *  ptr )
 // define implementation for adaptive precision compression
 // for lowrank matrices
 //
-#if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+#if HLR_COMPRESSOR == HLR_COMPRESSOR_MP
+
+namespace ap = hlr::compress::mixedprec;
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 namespace ap = hlr::compress::zfp;
 

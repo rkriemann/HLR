@@ -553,24 +553,11 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dU, "U2" );
             
     //     blas::add( value_t(-1), oU, dU );
-    //     if ( blas::norm_F( dU ) / blas::norm_F(oU) > 1e-8 )
-    //         std::cout << this->block_is().to_string() << " : " << "U " << this->block_is().to_string() << " : "
-    //                   << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
-    //                   << " / "
-    //                   << boost::format( "%.4e" ) % blas::max_abs_val( dU )
-    //                   << std::endl;
-
-    //     // for ( size_t  i = 0; i < oU.nrows() * oU.ncols(); ++i )
-    //     // {
-    //     //     const auto  error = std::abs( (oU.data()[i] - dU.data()[i]) / oU.data()[i] );
-
-    //     //     if ( error > 1e-6 )
-    //     //         std::cout << "U " << i << " : "
-    //     //                   << oU.data()[i] << " / "
-    //     //                   << dU.data()[i] << " / "
-    //     //                   << std::abs( error )
-    //     //                   << std::endl;
-    //     // }// for
+    //     std::cout << this->block_is().to_string() << " : " << "U " << this->block_is().to_string() << " : "
+    //               << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
+    //               << " / "
+    //               << boost::format( "%.4e" ) % blas::max_abs_val( dU )
+    //               << std::endl;
     // }
     
     // {
@@ -582,24 +569,11 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //     // io::matlab::write( dV, "V2" );
             
     //     blas::add( value_t(-1), oV, dV );
-    //     if ( blas::norm_F( dV ) / blas::norm_F(oV) > 1e-8 )
-    //         std::cout << this->block_is().to_string() << " : " << "V " << this->block_is().to_string() << " : "
-    //                   << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
-    //                   << " / "
-    //                   << boost::format( "%.4e" ) % blas::max_abs_val( dV )
-    //                   << std::endl;
-
-    //     // for ( size_t  i = 0; i < oV.nrows() * oV.ncols(); ++i )
-    //     // {
-    //     //     const auto  error = std::abs( (oV.data()[i] - dV.data()[i]) / oV.data()[i] );
-
-    //     //     if ( error > 1e-6 )
-    //     //         std::cout << "V " << i << " : "
-    //     //                   << oV.data()[i] << " / "
-    //     //                   << dV.data()[i] << " / "
-    //     //                   << std::abs( error )
-    //     //                   << std::endl;
-    //     // }// for
+    //     std::cout << this->block_is().to_string() << " : " << "V " << this->block_is().to_string() << " : "
+    //               << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
+    //               << " / "
+    //               << boost::format( "%.4e" ) % blas::max_abs_val( dV )
+    //               << std::endl;
     // }
     
     if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )

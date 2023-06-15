@@ -259,6 +259,16 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         auto  zconf = get_config( S(l) );
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
+        // {
+        //     blas::vector< value_t >  t( n );
+        //     auto                     u_l = U.column( l );
+            
+        //     decompress( z_i.data(), z_i.size(), t.data(), n );
+
+        //     blas::add( -1.0, u_l, t );
+        //     std::cout << blas::norm_2( t ) << std::endl;
+        // }
+        
         zsize   += z_i.size();
         zlist[l] = std::move( z_i );
     }// for
@@ -266,8 +276,9 @@ compress_lr ( const blas::matrix< value_t > &                       U,
     zarray  zdata( zsize + sizeof(uint) * k );
     size_t  pos = 0;
 
-    for ( auto &  z_i : zlist )
+    for ( uint  l = 0; l < k; ++l )
     {
+        auto        z_i = std::move( zlist[l] );
         const uint  s_i = z_i.size();
         
         memcpy( zdata.data() + pos, & s_i, sizeof(uint) );

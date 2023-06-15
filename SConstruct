@@ -124,6 +124,7 @@ COMPRESSORS   = [ 'none',
                   'apfloat',
                   'bfloat',
                   'dfloat',
+                  'mixedprec',
                   'dummy' ]
 compressor    = 'none'
 
@@ -604,6 +605,8 @@ elif compressor == 'tf32'    :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
 elif compressor == 'bf24'    :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
+elif compressor == 'mixedprec' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
 
 ######################################################################
 #
