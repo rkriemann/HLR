@@ -30,6 +30,8 @@ using byte_t = unsigned char;
 // holds compressed data
 using  zarray = std::vector< byte_t >;
 
+inline size_t  byte_size  ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+
 //////////////////////////////////////////////////////////////////////////////////////
 //
 // different floating point types for mixed precision
@@ -150,7 +152,8 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             
         while ( i >= 0 )
         {
-            if ( S(i) <= u ) nprec++;
+            // test u ≤ tol / σ_i = S_i
+            if ( u <= S(i) ) nprec++; 
             else             break;
             --i;
         }// while
