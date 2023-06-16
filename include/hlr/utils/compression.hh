@@ -443,8 +443,6 @@ namespace hlr { namespace compress {
 #  undef  HLR_HAS_COMPRESSION
 #  define HLR_HAS_COMPRESSION  0
 
-namespace hlr { namespace compress {
-
 static const char provider[] = "none";
 
 struct zconfig_t {};

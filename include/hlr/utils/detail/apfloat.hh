@@ -331,6 +331,16 @@ compress_fp64 ( const double *  data,
     memcpy( zdata + 2, & scale, 8 );
 
     //
+    // in case of 8 byte, just copy data
+    //
+
+    if ( nbyte == 8 )
+    {
+        std::copy( data, data + nsize, reinterpret_cast< double * >( zdata + 10 ) );
+        return;
+    }// if
+    
+    //
     // compress data in "vectorized" form
     //
         
@@ -452,6 +462,15 @@ decompress_fp64 ( double *        data,
     const ulong   zero_val   = fp64_zero_val & (( 1ul << nbits) - 1 );
     double        scale;
 
+    // just retrieve data for nbyte == 8
+    if ( nbyte == 8 )
+    {
+        std::copy( reinterpret_cast< const double * >( zdata + 8 ),
+                   reinterpret_cast< const double * >( zdata + 8 ) + nsize,
+                   data );
+        return;
+    }// if
+         
     // get scaling factor
     memcpy( & scale, zdata, 8 );
 
@@ -597,73 +616,6 @@ compress< float > ( const config &   config,
     HLR_ASSERT( prec_bits <= fp32_mant_bits );
 
     compress_fp32( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
-    
-    // HLR_ASSERT( nbits     <= 32 );
-    // HLR_ASSERT( prec_bits <= fp32_mant_bits );
-    
-    // // first, store scaling factor
-    // memcpy( zdata.data(), & scale, 4 );
-
-    // // then store number of exponents bits
-    // zdata[4] = exp_bits;
-            
-    // // and precision bits
-    // zdata[5] = prec_bits;
-
-    // for ( size_t  i = 0; i < nsize; ++i )
-    // {
-    //     const float   val   = data[i];
-    //     const bool    zsign = ( val < 0 );
-
-    //     //
-    //     // Use absolute value and scale v_i and add 1 such that v_i >= 2.
-    //     // With this, highest exponent bit is 1 and we only need to store
-    //     // lowest <exp_bits> exponent bits
-    //     //
-        
-    //     const float   sval  = scale * std::abs(val) + 1;
-    //     const uint    isval = (*reinterpret_cast< const uint * >( & sval ) );
-    //     const uint    sexp  = ( isval >> fp32_mant_bits ) & ((1u << fp32_exp_bits) - 1);
-    //     const uint    smant = ( isval & ((1u << fp32_mant_bits) - 1) );
-
-    //     // exponent and mantissa reduced to stored size
-    //     const uint    zexp  = sexp & exp_mask;
-    //     const uint    zmant = smant >> prec_ofs;
-    //     const uint    zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
-
-    //     // // DEBUG
-    //     // {
-    //     //     const byte_t  fp32_sign_bit  = 31;
-    //     //     const byte_t  sign_shift = exp_bits + prec_bits;
-            
-    //     //     const uint   mant  = zval & prec_mask;
-    //     //     const uint   exp   = (zval >> prec_bits) & exp_mask;
-    //     //     const bool   sign  = zval >> sign_shift;
-
-    //     //     const uint   rexp  = exp | 0b10000000; // re-add leading bit
-    //     //     const uint   rmant = mant << prec_ofs;
-    //     //     const uint   irval = (rexp << fp32_mant_bits) | rmant;
-    //     //     const float  rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
-
-    //     //     std::cout << i << " : " << val << " / " << rval << " / " << std::abs( (val - rval) / val ) << std::endl;
-    //     // }
-        
-    //     //
-    //     // copy zval into data buffer
-    //     //
-
-    //     const size_t  pos = 6 + i * nbyte;
-        
-    //     switch ( nbyte )
-    //     {
-    //         case  4 : zdata[pos+3] = ( zval & 0xff000000 ) >> 24;
-    //         case  3 : zdata[pos+2] = ( zval & 0x00ff0000 ) >> 16;
-    //         case  2 : zdata[pos+1] = ( zval & 0x0000ff00 ) >> 8;
-    //         case  1 : zdata[pos]   = ( zval & 0x000000ff ); break;
-    //         default :
-    //             HLR_ERROR( "unsupported storage size" );
-    //     }// switch
-    // }// for
 
     return zdata;
 }
@@ -706,8 +658,7 @@ compress< double > ( const config &   config,
     const uint    prec_bits  = nbits - 1 - exp_bits;                                                        // actual number of precision bits
     auto          zdata      = std::vector< byte_t >();                                                     // array storing compressed data
 
-    HLR_ASSERT( nbits     <= 64 );
-    HLR_ASSERT( prec_bits <= fp64_mant_bits );
+    HLR_ASSERT( nbits <= 64 );
 
     if (( nbyte <= 4 ) && ( prec_bits <= fp32_mant_bits ))
     {

@@ -30,7 +30,7 @@ DECLARE_TYPE( mplrmatrix );
 namespace matrix
 {
 
-#define HLR_USE_APCOMPRESSION  0
+#define HLR_USE_APCOMPRESSION  1
 
 //
 // Represents a low-rank matrix in factorised form: U·S·V^H
@@ -232,6 +232,8 @@ public:
     {
         #if HLR_USE_APCOMPRESSION == 1
         return _mpdata.zU.size() > 0;
+        #else
+        return false;
         #endif
     }
 
