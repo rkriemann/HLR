@@ -12,8 +12,6 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/compression.hh>
-#include <hlr/utils/detail/afloat.hh>
-#include <hlr/utils/detail/apfloat.hh>
 #include <hlr/utils/checks.hh>
 
 namespace hlr

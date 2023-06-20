@@ -14,7 +14,6 @@
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
-#include <hlr/utils/detail/mixedprec.hh>
 
 // different compressor types
 #define HLR_COMPRESSOR_AFLOAT   1
@@ -602,41 +601,144 @@ is_compressed ( const T *  ptr )
     return ! is_null( C ) && C->is_compressed();
 }
 
+}}// namespace hlr::compress
+
 //
 // define implementation for adaptive precision compression
 // for lowrank matrices
 //
-#if HLR_COMPRESSOR == HLR_COMPRESSOR_MP
+#if HLR_AP_COMPRESSOR == HLR_COMPRESSOR_MP
 
-namespace ap = hlr::compress::mixedprec;
+#include <hlr/utils/detail/mixedprec.hh>
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+namespace hlr { namespace compress { namespace ap {
 
-namespace ap = hlr::compress::zfp;
+using zarray = hlr::compress::mixedprec::zarray;
+using hlr::compress::mixedprec::compress_lr;
+using hlr::compress::mixedprec::decompress_lr;
+using hlr::compress::mixedprec::byte_size;
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SZ3
+static const char provider[] = "mixedprec";
 
-namespace ap = hlr::compress::sz3;
+}// namespace hlr::compress::ap
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
-namespace ap = hlr::compress::mgard;
+#include <hlr/utils/detail/zfp.hh>
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFLOAT
+namespace hlr { namespace compress { namespace ap {
 
-namespace ap = hlr::compress::bfloat;
+using zarray = hlr::compress::zfp::zarray;
+using hlr::compress::zfp::compress_lr;
+using hlr::compress::zfp::decompress_lr;
+using hlr::compress::zfp::byte_size;
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFLOAT
+static const char provider[] = "zfp";
 
-namespace ap = hlr::compress::dfloat;
+}// namespace hlr::compress::ap
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_SZ3
 
-namespace ap = hlr::compress::apfloat;
+#include <hlr/utils/detail/sz3.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::sz3::zarray;
+using hlr::compress::sz3::compress_lr;
+using hlr::compress::sz3::decompress_lr;
+using hlr::compress::sz3::byte_size;
+
+static const char provider[] = "sz3";
+
+}// namespace hlr::compress::ap
+
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_MGARD
+
+#include <hlr/utils/detail/mgard.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::mgard::zarray;
+using hlr::compress::mgard::compress_lr;
+using hlr::compress::mgard::decompress_lr;
+using hlr::compress::mgard::byte_size;
+
+static const char provider[] = "mgard";
+
+}// namespace hlr::compress::ap
+
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_BFLOAT
+
+#include <hlr/utils/detail/bfloat.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::bfloat::zarray;
+using hlr::compress::bfloat::compress_lr;
+using hlr::compress::bfloat::decompress_lr;
+using hlr::compress::bfloat::byte_size;
+
+static const char provider[] = "bfloat";
+
+}// namespace hlr::compress::ap
+
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_DFLOAT
+
+#include <hlr/utils/detail/dfloat.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::dfloat::zarray;
+using hlr::compress::dfloat::compress_lr;
+using hlr::compress::dfloat::decompress_lr;
+using hlr::compress::dfloat::byte_size;
+
+static const char provider[] = "dfloat";
+
+}// namespace hlr::compress::ap
+
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_APFLOAT
+
+#include <hlr/utils/detail/apfloat.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::apfloat::zarray;
+using hlr::compress::apfloat::compress_lr;
+using hlr::compress::apfloat::decompress_lr;
+using hlr::compress::apfloat::byte_size;
+
+static const char provider[] = "apfloat";
+
+}// namespace hlr::compress::ap
+
+#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_AFLOAT
+
+#include <hlr/utils/detail/afloat.hh>
+
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::afloat::zarray;
+using hlr::compress::afloat::compress_lr;
+using hlr::compress::afloat::decompress_lr;
+using hlr::compress::afloat::byte_size;
+
+static const char provider[] = "afloat";
+
+}// namespace hlr::compress::ap
 
 #else
 
-namespace ap = hlr::compress::afloat;
+namespace hlr { namespace compress { namespace ap {
+
+using zarray = hlr::compress::mixedprec::zarray;
+using hlr::compress::mixedprec::compress_lr;
+using hlr::compress::mixedprec::decompress_lr;
+using hlr::compress::mixedprec::byte_size;
+
+static const char provider[] = "mixedprec";
+
+}// namespace hlr::compress::ap
 
 #endif
 

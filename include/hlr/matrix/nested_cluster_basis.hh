@@ -718,7 +718,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             // {
             //     auto  T = blas::copy( _V );
 
-            //     hlr::compress::afloat::decompress_lr< value_t >( zV, T );
+            //     compress::ap::decompress_lr< value_t >( zV, T );
 
             //     blas::add( value_t(-1), _V, T );
             //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;

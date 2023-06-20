@@ -111,42 +111,6 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
-    // virtual mixedprec test (and output)
-    //
-    //////////////////////////////////////////////////////////////////////
-
-    if ( false )
-    {
-        std::cout << "  "
-                  << term::bullet << term::bold
-                  << "compression ("
-                  << "δ = " << boost::format( "%.2e" ) % delta
-                  << ", "
-                  << "mixedprec)"
-                  << term::reset << std::endl;
-        std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
-    
-        if ( hpro::verbose( 2 ) )
-            print_prec( *A, delta ); // acc2.abs_eps() );
-
-        auto  Amp     = impl::matrix::copy( *A );
-        auto  mem_mp  = convert_mp( *Amp, delta );
-        auto  mem_Amp = std::get<0>( mem_mp ) + std::get<1>( mem_mp ) + std::get<2>( mem_mp );
-    
-        std::cout << "    mem   = " << format_mem( mem_Amp ) << std::endl;
-        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Amp) / double(mem_A) ) << std::endl;
-        std::cout << "      FP16  " << boost::format( "%.3f" ) % ( double(std::get<0>( mem_mp )) / double(mem_A) ) << std::endl;
-        std::cout << "      FP32  " << boost::format( "%.3f" ) % ( double(std::get<1>( mem_mp )) / double(mem_A) ) << std::endl;
-        std::cout << "      FP64  " << boost::format( "%.3f" ) % ( double(std::get<2>( mem_mp )) / double(mem_A) ) << std::endl;
-        std::cout << "    |Amp| = " << format_norm( impl::norm::frobenius( *Amp ) ) << std::endl;
-        
-        auto  error   = impl::norm::frobenius( 1.0, *A, -1.0, *Amp );
-        
-        std::cout << "    error = " << format_error( error ) << " / " << format_error( error / norm_A ) << std::endl;
-    }
-
-    //////////////////////////////////////////////////////////////////////
-    //
     // convert to mixed precision format
     //
     //////////////////////////////////////////////////////////////////////
@@ -157,7 +121,7 @@ program_main ()
               << term::bullet << term::bold
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
-              << ", mixedprec + " << hlr::compress::provider << ")"
+              << ", " << hlr::compress::provider << " + " << hlr::compress::ap::provider << ")"
               << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 

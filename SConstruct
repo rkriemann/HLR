@@ -123,10 +123,22 @@ COMPRESSORS   = [ 'none',
                   'afloat',
                   'apfloat',
                   'bfloat',
-                  'dfloat',
-                  'mixedprec',
-                  'dummy' ]
+                  'dfloat' ]
 compressor    = 'none'
+
+# supported and active adaptive precision lowrank compressor
+APCOMPRESSORS = [ 'none',
+                  'default',
+                  'zfp',
+                  'sz',
+                  'sz3',
+                  'mgard',
+                  'afloat',
+                  'apfloat',
+                  'bfloat',
+                  'dfloat',
+                  'mixedprec' ]
+apcompressor  = 'none'
 
 ######################################################################
 #
@@ -271,7 +283,8 @@ opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       z
 opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
-opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS, ignorecase = 2 ) )
+opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS,   ignorecase = 2 ) )
+opts.Add( EnumVariable( 'apcompressor',  'defined AP compressor',              'none', allowed_values = APCOMPRESSORS, ignorecase = 2 ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
 opts.Add( EnumVariable( 'buildtype', 'how to build the binaries (debug/release)', buildtype, allowed_values = [ 'debug', 'release' ], ignorecase = 2 ) )
@@ -352,6 +365,7 @@ ZSTD_DIR      = opt_env['zstd_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 compressor    = opt_env['compressor']
+apcompressor  = opt_env['apcompressor']
 
 buildtype     = opt_env['buildtype']
 fullmsg       = opt_env['fullmsg']
@@ -605,8 +619,50 @@ elif compressor == 'tf32'    :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
 elif compressor == 'bf24'    :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
-elif compressor == 'mixedprec' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
+
+if apcompressor == 'default'  :
+    if   compressor == 'afloat'  : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=1' )
+    elif compressor == 'apfloat' : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=2' )
+    elif compressor == 'bfloat'  : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=3' )
+    elif compressor == 'dfloat'  : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=4' )
+    elif compressor == 'zfp'     : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=5' )
+    elif compressor == 'sz'      : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=6' )
+    elif compressor == 'sz3'     : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=7' )
+    elif compressor == 'mgard'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=8' )
+elif apcompressor == 'mixedprec'  :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=18' )
+elif apcompressor == 'afloat'  :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=1' )
+elif apcompressor == 'apfloat' :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=2' )
+elif apcompressor == 'bfloat'  :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=3' )
+elif apcompressor == 'dfloat'  :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=4' )
+elif apcompressor == 'zfp'     :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=5' )
+    env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
+    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zfp' ] )
+elif apcompressor == 'sz'      :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=6' )
+    env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
+    env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'SZ' ] )
+elif apcompressor == 'sz3'     :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=7' )
+    env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
+    env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zstd' ] )
+elif apcompressor == 'mgard'   :
+    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=8' )
+    env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
+    env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'mgard' ] )
 
 ######################################################################
 #
@@ -658,41 +714,42 @@ def show_help ( target, source, env ):
     for i in range( 1, len(parts) ) :
         print( '             │                               │', parts[i] )
     
-    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}mkl{1}        │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( LAPACKLIBS ) )
-    print( '  {0}lapackflags{1}│ user provided link flags      │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}hdf5{1}       │ use HDF5 library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}likwid{1}     │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}malloc{1}     │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
-    print( '  {0}jemalloc{1}   │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}mimalloc{1}   │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}tcmalloc{1}   │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}compressor{1} │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], ', '.join( COMPRESSORS ) ) )
-    print( '  {0}zfp{1}        │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}sz{1}         │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}sz3{1}        │ use SZ3 compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}universal{1}  │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}mgard{1}      │ use MGARD compression library │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}half{1}       │ use half number library       │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}lz4{1}        │ use LZ4 library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}zlib{1}       │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}zstd{1}       │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}buildtype{1}  │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), 'debug/release' )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}frameworks{1}   │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}hpro{1}         │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tbb{1}          │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tf{1}           │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}hpx{1}          │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}gpi2{1}         │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mkl{1}          │ base directory of MKL         │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}cuda{1}         │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}lapack{1}       │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( LAPACKLIBS ) )
+    print( '  {0}lapackflags{1}  │ user provided link flags      │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}hdf5{1}         │ use HDF5 library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}likwid{1}       │ use LikWid library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}malloc{1}       │ malloc library to use         │'.format( colors['bold'], colors['reset'] ), ', '.join( MALLOCS ) )
+    print( '  {0}jemalloc{1}     │ base directory of jemalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}mimalloc{1}     │ base directory of mimalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}tcmalloc{1}     │ base directory of tcmalloc    │'.format( colors['bold'], colors['reset'] ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], ', '.join( COMPRESSORS ) ) )
+    print( '  {0}apcompressor{1} │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], ', '.join( APCOMPRESSORS ) ) )
+    print( '  {0}zfp{1}          │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}sz{1}           │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}sz3{1}          │ use SZ3 compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}universal{1}    │ use Universal number library  │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}mgard{1}        │ use MGARD compression library │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}half{1}         │ use half number library       │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}lz4{1}          │ use LZ4 library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}zlib{1}         │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}zstd{1}         │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), 'debug/release' )
+    print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}fullmsg{1}      │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}color{1}        │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print() 
     print( 'The parameters {0}programs{1} and {0}frameworks{1} can get comma separated values:'.format( colors['bold'], colors['reset'] ) ) 
     print() 
@@ -754,6 +811,7 @@ def show_options ( target, source, env ):
     print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1} │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
+    print( '  {0}apcompressor{1} │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], apcompressor ) )
     print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
     print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
     print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
