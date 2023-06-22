@@ -466,25 +466,28 @@ dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
     #if HLR_HAS_COMPRESSION == 1
         
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
-    const auto  lacc  = acc( this->row_is(), this->col_is() );
-    const auto  eps   = lacc.abs_eps();
-    // const auto  normF = blas::norm_F( this->blas_mat() );
-    // const auto  delta = eps * normF / std::sqrt( double( this->nrows() * this->ncols() ) );
-    // const auto  lacc  = acc( this->row_is(), this->col_is() );
-    // const auto  peps  = std::ceil( std::log2( lacc.rel_eps() ) ) + 7; // see ZFP documentation; FAQ Q20
-    // const auto  vmin = blas::min_val( this->blas_mat() );
-    // const auto  vmax = blas::max_val( this->blas_mat() );
+    const auto  lacc = acc( this->row_is(), this->col_is() );
 
-    // std::cout << vmin << " / " << vmax << std::endl;
+    if ( lacc.abs_eps() != 0 )
+    {
+        const auto  eps = lacc.abs_eps();
         
-    // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
-    compress( compress::get_config( eps ) );
-
+        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else if ( lacc.rel_eps() != 0 )
+    {
+        const auto  eps = lacc.rel_eps();
+        
+        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported accuracy type" );
+    
     #endif
 }
 

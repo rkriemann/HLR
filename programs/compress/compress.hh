@@ -96,7 +96,7 @@ program_main ()
 
     auto        zA     = impl::matrix::copy_compressible( *A );
     auto        norm_A = impl::norm::frobenius( *A );
-    const auto  delta  = norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    const auto  delta  = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
     
     std::cout << "  "
               << term::bullet << term::bold
@@ -109,7 +109,7 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc = absolute_prec( cmdline::eps );
+        auto  lacc = absolute_prec( delta );
         
         runtime.clear();
         

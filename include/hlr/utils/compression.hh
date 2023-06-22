@@ -729,6 +729,8 @@ static const char provider[] = "afloat";
 
 #else
 
+#include <hlr/utils/detail/mixedprec.hh>
+
 namespace hlr { namespace compress { namespace ap {
 
 using zarray = hlr::compress::mixedprec::zarray;

@@ -84,17 +84,24 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto  zA     = impl::matrix::copy_compressible( *A );
-    auto  norm_A = norm::spectral( impl::arithmetic, *A );
+    auto        zA     = impl::matrix::copy_compressible( *A );
+    auto        norm_A = impl::norm::frobenius( *A );
+    const auto  delta  = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    // auto        lacc   = local_accuracy( delta );
+    auto        lacc   = absolute_prec( delta );
     
-    std::cout << "  " << term::bullet << term::bold << "compression via "
-              << hlr::compress::provider
-              << ", ε = " << boost::format( "%.2e" ) % cmdline::eps << term::reset << std::endl;
+    std::cout << "  "
+              << term::bullet << term::bold
+              << "compression ("
+              << "δ = " << boost::format( "%.2e" ) % delta
+              << ", "
+              << hlr::compress::provider << ')'
+              << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 
     tic = timer::now();
 
-    impl::matrix::compress( *zA, Hpro::fixed_prec( acc.rel_eps() ) );
+    impl::matrix::compress( *zA, lacc );
 
     toc = timer::since( tic );
     runtime.push_back( toc.seconds() );
@@ -129,12 +136,12 @@ program_main ()
                 // "H+rec",
                 // "H+rec+accu",
                 "H+dag",
-                // "H+dag+accu+lazy",
+                "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
                 // "zH+rec",
                 // "zH+rec+accu",
                 "zH+dag",
-                // "zH+dag+accu+lazy"
+                "zH+dag+accu+lazy"
             };
 
             std::cout << term::bullet << term::bold << "H-LU (" << apxname << ")" << term::reset << std::endl;

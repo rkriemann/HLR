@@ -591,15 +591,27 @@ template < typename value_t >
 void
 lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
     const auto  lacc = acc( this->row_is(), this->col_is() );
-    const auto  eps  = lacc.abs_eps();
 
-    compress( compress::get_config( eps ) );
+    if ( lacc.abs_eps() != 0 )
+    {
+        const auto  eps = lacc.abs_eps();
+        
+        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else if ( lacc.rel_eps() != 0 )
+    {
+        const auto  eps = lacc.rel_eps();
+        
+        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported accuracy type" );
 }
 
 // decompress internal data
