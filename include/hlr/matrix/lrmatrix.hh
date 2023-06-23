@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <boost/format.hpp>
+#include <boost/format.hpp> // DEBUG
 
 #include <hpro/matrix/TMatrix.hh>
 
@@ -594,24 +594,42 @@ lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
+    // // DEBUG
+    // auto  R1 = this->copy();
+    // auto  M1 = blas::prod( ptrcast( R1.get(), lrmatrix< value_t > )->U(),
+    //                        blas::adjoint( ptrcast( R1.get(), lrmatrix< value_t > )->V() ) );
+
     const auto  lacc = acc( this->row_is(), this->col_is() );
 
-    if ( lacc.abs_eps() != 0 )
-    {
-        const auto  eps = lacc.abs_eps();
-        
-        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
-        compress( compress::get_config( eps ) );
-    }// if
-    else if ( lacc.rel_eps() != 0 )
+    if ( lacc.rel_eps() != 0 )
     {
         const auto  eps = lacc.rel_eps();
         
-        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else if ( lacc.abs_eps() != 0 )
+    {
+        const auto  eps = lacc.abs_eps();
+        
         compress( compress::get_config( eps ) );
     }// if
     else
         HLR_ERROR( "unsupported accuracy type" );
+
+    // // DEBUG
+    // auto  R2 = this->copy();
+
+    // ptrcast( R2.get(), lrmatrix< value_t > )->decompress();
+
+    // auto  M2 = blas::prod( ptrcast( R2.get(), lrmatrix< value_t > )->U(),
+    //                        blas::adjoint( ptrcast( R2.get(), lrmatrix< value_t > )->V() ) );
+    
+    // blas::add( -1.0, M1, M2 );
+
+    // auto  n1 = blas::norm_F( M1 );
+    // auto  n2 = blas::norm_F( M2 );
+
+    // std::cout << "R: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
 }
 
 // decompress internal data

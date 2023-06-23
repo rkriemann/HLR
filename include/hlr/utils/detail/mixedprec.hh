@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <cstdint>
+
 #include <hlr/arith/blas.hh>
 
 ////////////////////////////////////////////////////////////
@@ -25,7 +27,7 @@
 
 namespace hlr { namespace compress { namespace mixedprec {
 
-using byte_t = unsigned char;
+using byte_t = uint8_t;
 
 // holds compressed data
 using  zarray = std::vector< byte_t >;
@@ -63,7 +65,7 @@ public:
     // cast to float/double
     operator float () const
     {
-        const uint  ival = data << 16;
+        const uint32_t  ival = data << 16;
 
         return * reinterpret_cast< const float * >( & ival );
     }
@@ -74,7 +76,7 @@ public:
     bf16 &
     operator = ( const float  val )
     {
-        data = (* reinterpret_cast< const uint * >( & val ) ) >> 16;
+        data = (* reinterpret_cast< const uint32_t * >( & val ) ) >> 16;
         
         return *this;
     }
@@ -142,13 +144,13 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     // determine corresponding parts for MP1, MP2, MP3
     //
 
-    const size_t  n    = U.nrows();
-    const uint    rank = U.ncols();
-    int           i    = rank-1;
+    const size_t    n    = U.nrows();
+    const uint32_t  rank = U.ncols();
+    int             i    = rank-1;
 
     auto  test_prec = [&i,&S] ( double  u )
     {
-        uint  nprec = 0;
+        uint32_t  nprec = 0;
             
         while ( i >= 0 )
         {
@@ -161,10 +163,10 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         return nprec;
     };
 
-    const uint  n_mp3 = test_prec( mpprec3 );
-    const uint  n_mp2 = test_prec( mpprec2 );
-    const uint  n_mp1 = i+1;                   // remaining singular values
-    size_t      s     = 0;
+    const uint32_t  n_mp3 = test_prec( mpprec3 );
+    const uint32_t  n_mp2 = test_prec( mpprec2 );
+    const uint32_t  n_mp1 = i+1;                   // remaining singular values
+    size_t          s     = 0;
 
     // std::cout << n_mp3 << " / " << n_mp2 << " / " << n_mp1 << std::endl;
     
@@ -175,24 +177,24 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     // copy into storage
     //
 
-    const size_t  zsize = ( 3 * sizeof(uint) +
+    const size_t  zsize = ( 3 * sizeof(uint32_t) +
                             sizeof(mptype1_t) * n * n_mp1 +
                             sizeof(mptype2_t) * n * n_mp2 +
                             sizeof(mptype3_t) * n * n_mp3 );
     zarray        zdata( zsize );
 
-    reinterpret_cast< uint * >( zdata.data() )[0] = n_mp1;
-    reinterpret_cast< uint * >( zdata.data() )[1] = n_mp2;
-    reinterpret_cast< uint * >( zdata.data() )[2] = n_mp3;
+    reinterpret_cast< uint32_t * >( zdata.data() )[0] = n_mp1;
+    reinterpret_cast< uint32_t * >( zdata.data() )[1] = n_mp2;
+    reinterpret_cast< uint32_t * >( zdata.data() )[2] = n_mp3;
 
-    uint    k   = 0;
-    size_t  pos = 3 * sizeof(uint);
+    uint32_t  k   = 0;
+    size_t    pos = 3 * sizeof(uint32_t);
         
     {
         auto    zptr = reinterpret_cast< mptype1_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp1; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp1; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = mptype1_t( U(i,k) );
@@ -204,7 +206,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         auto    zptr = reinterpret_cast< mptype2_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp2; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp2; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = mptype2_t( U(i,k) );
@@ -216,7 +218,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         auto    zptr = reinterpret_cast< mptype3_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp3; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp3; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = mptype3_t( U(i,k) );
@@ -248,7 +250,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
     // if constexpr ( Hpro::is_complex_type_v< value_t > )
     // {
-    //     uint    k     = 0;
+    //     uint32_t    k     = 0;
     //     size_t  pos_U = 0;
     //     size_t  pos_V = 0;
 
@@ -338,20 +340,20 @@ void
 decompress_lr< double > ( const zarray &            zdata,
                           blas::matrix< double > &  U )
 {
-    const size_t  n     = U.nrows();
-    const uint    rank  = U.ncols();
-    const uint    n_mp1 = reinterpret_cast< const uint * >( zdata.data() )[0];
-    const uint    n_mp2 = reinterpret_cast< const uint * >( zdata.data() )[1];
-    const uint    n_mp3 = reinterpret_cast< const uint * >( zdata.data() )[2];
-    size_t        pos   = 3 * sizeof(uint);
-    uint          k     = 0;
+    const size_t    n     = U.nrows();
+    const uint32_t  rank  = U.ncols();
+    const uint32_t  n_mp1 = reinterpret_cast< const uint32_t * >( zdata.data() )[0];
+    const uint32_t  n_mp2 = reinterpret_cast< const uint32_t * >( zdata.data() )[1];
+    const uint32_t  n_mp3 = reinterpret_cast< const uint32_t * >( zdata.data() )[2];
+    size_t          pos   = 3 * sizeof(uint32_t);
+    uint32_t        k     = 0;
     
     if ( n_mp1 > 0 )
     {
         auto    zptr = reinterpret_cast< const mptype1_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp1; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp1; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
@@ -364,7 +366,7 @@ decompress_lr< double > ( const zarray &            zdata,
         auto    zptr = reinterpret_cast< const mptype2_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp2; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp2; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
@@ -377,7 +379,7 @@ decompress_lr< double > ( const zarray &            zdata,
         auto    zptr = reinterpret_cast< const mptype3_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
-        for ( uint  l = 0; l < n_mp3; ++l, ++k )
+        for ( uint32_t  l = 0; l < n_mp3; ++l, ++k )
         {
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
@@ -405,34 +407,34 @@ decompress_lr< std::complex< double > > ( const zarray &                        
 {
     HLR_ERROR( "todo" );
     
-    // size_t      pos   = 0;
-    // const uint  n_mp1 = _mpdata.U1.size() / (2 * dU.nrows());
-    // const uint  n_mp2 = _mpdata.U2.size() / (2 * dU.nrows());
-    // const uint  n_mp3 = _mpdata.U3.size() / (2 * dU.nrows());
+    // size_t          pos   = 0;
+    // const uint32_t  n_mp1 = _mpdata.U1.size() / (2 * dU.nrows());
+    // const uint32_t  n_mp2 = _mpdata.U2.size() / (2 * dU.nrows());
+    // const uint32_t  n_mp3 = _mpdata.U3.size() / (2 * dU.nrows());
                 
-    // for ( uint  k1 = 0; k1 < n_mp1; ++k1, ++k )
+    // for ( uint32_t  k1 = 0; k1 < n_mp1; ++k1, ++k )
     // {
     //     const auto  s_k = _S(k);
                     
-    //     for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+    //     for ( uint32_t  i = 0; i < dU.nrows(); ++i, pos += 2 )
     //         dU(i,k) = s_k * value_t( _mpdata.U1[ pos ], _mpdata.U1[ pos+1 ] );
     // }// for
 
     // pos = 0;
-    // for ( uint  k2 = 0; k2 < n_mp2; ++k2, ++k )
+    // for ( uint32_t  k2 = 0; k2 < n_mp2; ++k2, ++k )
     // {
     //     const auto  s_k = _S(k);
                     
-    //     for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+    //     for ( uint32_t  i = 0; i < dU.nrows(); ++i, pos += 2 )
     //         dU(i,k) = s_k * value_t( _mpdata.U2[ pos ], _mpdata.U2[ pos+1 ] );
     // }// for
                 
     // pos = 0;
-    // for ( uint  k3 = 0; k3 < n_mp3; ++k3, ++k )
+    // for ( uint32_t  k3 = 0; k3 < n_mp3; ++k3, ++k )
     // {
     //     const auto  s_k = _S(k);
                     
-    //     for ( uint  i = 0; i < dU.nrows(); ++i, pos += 2 )
+    //     for ( uint32_t  i = 0; i < dU.nrows(); ++i, pos += 2 )
     //         dU(i,k) = s_k * value_t( _mpdata.U3[ pos ], _mpdata.U3[ pos+1 ] );
     // }// for
 }

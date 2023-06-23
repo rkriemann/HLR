@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <vector>
+#include <boost/format.hpp> // DEBUG
 
 #include <hpro/matrix/TDenseMatrix.hh>
 
@@ -469,25 +469,41 @@ dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
+    // // DEBUG
+    // auto  D1 = this->copy();
+    // auto  M1 = ptrcast( D1.get(), dense_matrix< value_t > )->mat();
+    
     const auto  lacc = acc( this->row_is(), this->col_is() );
 
-    if ( lacc.abs_eps() != 0 )
-    {
-        const auto  eps = lacc.abs_eps();
-        
-        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
-        compress( compress::get_config( eps ) );
-    }// if
-    else if ( lacc.rel_eps() != 0 )
+    if ( lacc.rel_eps() != 0 )
     {
         const auto  eps = lacc.rel_eps();
         
-        // compress( compress::get_config( eps * normF / double(std::min( this->nrows(), this->ncols() )) ) );
+        compress( compress::get_config( eps ) );
+    }// if
+    else if ( lacc.abs_eps() != 0 )
+    {
+        const auto  eps = lacc.abs_eps();
+        
         compress( compress::get_config( eps ) );
     }// if
     else
         HLR_ERROR( "unsupported accuracy type" );
+
+    // // DEBUG
+    // auto  D2 = this->copy();
+
+    // ptrcast( D2.get(), dense_matrix< value_t > )->decompress();
+
+    // auto  M2 = ptrcast( D2.get(), dense_matrix< value_t > )->mat();
     
+    // blas::add( -1.0, M1, M2 );
+
+    // auto  n1 = blas::norm_F( M1 );
+    // auto  n2 = blas::norm_F( M2 );
+
+    // std::cout << "D: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+
     #endif
 }
 

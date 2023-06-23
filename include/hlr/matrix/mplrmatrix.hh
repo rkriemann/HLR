@@ -569,10 +569,10 @@ template < typename value_t >
 void
 mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    HLR_ASSERT( acc.is_fixed_prec() );
-
     if ( this->nrows() * this->ncols() == 0 )
         return;
+
+    HLR_ASSERT( acc.is_fixed_prec() );
 
     if ( is_compressed() )
         return;
@@ -581,22 +581,34 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     auto  oV = this->_mat_B;
     
     //
-    // compute Frobenius norm and set toleranc
+    // compute Frobenius norm and set tolerance
     //
 
-    real_t  norm = real_t(0);
+    // defaults to absolute error: δ = ε
+    auto  lacc = acc( this->row_is(), this->col_is() );
+    auto  tol  = lacc.abs_eps();
 
-    for ( uint  i = 0; i < _S.length(); ++i )
-        norm += math::square( _S(i) );
+    if ( lacc.rel_eps() != 0 )
+    {
+        // use relative error: δ = ε |M|
+        real_t  norm = real_t(0);
 
-    norm = math::sqrt( norm );
+        for ( uint  i = 0; i < _S.length(); ++i )
+            norm += math::square( _S(i) );
+
+        norm = math::sqrt( norm );
     
-    const auto  tol = acc( this->row_is(), this->col_is() ).abs_eps() * norm;
-    const auto  k   = this->rank();
+        tol = acc( this->row_is(), this->col_is() ).abs_eps() * norm;
+    }// if
+    
+    const auto  k = this->rank();
 
     #if HLR_USE_APCOMPRESSION == 1
 
-    // need tolerance divided by singular values for accuracy
+    //
+    // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
+    //
+    
     auto  S_tol = blas::copy( _S );
 
     for ( uint  l = 0; l < k; ++l )
