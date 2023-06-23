@@ -37,7 +37,7 @@ eps_to_rate ( const double eps )
     #if defined(HLR_COMPRESS_RATE_ARITH)
     return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 8;
     #else
-    return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 2;
+    return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 2; // correction needed
     #endif
 }
 
@@ -313,7 +313,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = get_config( 2e-2 * S(l) );
+        auto  zconf = get_config( 0.1 * S(l) ); // correction to achieve desired precision
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();
