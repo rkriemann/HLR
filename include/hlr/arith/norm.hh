@@ -15,6 +15,7 @@
 #include <hlr/matrix/sum.hh>
 #include <hlr/matrix/identity.hh>
 #include <hlr/matrix/linop.hh>
+#include <hlr/utils/traits.hh>
 
 namespace hlr { namespace norm {
 

@@ -97,8 +97,10 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 
         if ( matrix::is_mixedprec_lowrank( A ) )
         {
-            return comp_lr( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
-                            cptrcast( &A, matrix::mplrmatrix< value_t > )->V() );
+            auto  U = blas::prod_diag( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
+                                       cptrcast( &A, matrix::mplrmatrix< value_t > )->S() );
+            
+            return comp_lr( U, cptrcast( &A, matrix::mplrmatrix< value_t > )->V() );
         }// if
         else if ( compress::is_compressed( A ) )
         {
@@ -341,7 +343,10 @@ frobenius_squared ( const alpha_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( A ) )
             {
-                UA = cptrcast( &A, matrix::mplrmatrix< value_t > )->U();
+                auto  U = blas::prod_diag( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
+                                           cptrcast( &A, matrix::mplrmatrix< value_t > )->S() );
+            
+                UA = std::move( U );
                 VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( A )  )
@@ -357,7 +362,10 @@ frobenius_squared ( const alpha_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( B ) )
             {
-                UB = cptrcast( &B, matrix::mplrmatrix< value_t > )->U();
+                auto  U = blas::prod_diag( cptrcast( &B, matrix::mplrmatrix< value_t > )->U(),
+                                           cptrcast( &B, matrix::mplrmatrix< value_t > )->S() );
+            
+                UB = std::move( U );
                 VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( B )  )

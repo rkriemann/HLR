@@ -380,11 +380,11 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
 
         compress::decompress< value_t >( _zdata.S, uS );
 
-        blas::mulvec_lrs( alpha, uU, uS, uV, op, x, y );
+        blas::mulvec_lr( alpha, uU, uS, uV, op, x, y );
 
         #else
         
-        blas::mulvec_lrs( alpha, uU, S(), uV, op, x, y );
+        blas::mulvec_lr( alpha, uU, S(), uV, op, x, y );
         
         #endif
     }// if
@@ -392,7 +392,7 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
 
     #endif
     {
-        blas::mulvec_lrs( alpha, U(), S(), V(), op, x, y );
+        blas::mulvec_lr( alpha, U(), S(), V(), op, x, y );
     }// else
 }
 

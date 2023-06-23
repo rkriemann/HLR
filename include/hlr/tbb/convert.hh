@@ -371,7 +371,7 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
     else if ( is_mixedprec_lowrank( M ) )
     {
         auto  RM = cptrcast( &M, mplrmatrix< value_t > );
-        auto  U  = RM->U();
+        auto  U  = blas::prod_diag( RM->U(), RM->S() );
         auto  V  = RM->V();
         auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
 

@@ -78,24 +78,24 @@ template < typename T > concept  matrix_type = is_matrix_v< T >;
 //
 //////////////////////////////////////////////////////////////////////
 
-template < typename value_t >       vector< value_t > & vec ( Hpro::TScalarVector< value_t > *       v ) { HLR_ASSERT( ! is_null( v ) ); return v->blas_vec(); }
-template < typename value_t > const vector< value_t > & vec ( const Hpro::TScalarVector< value_t > * v ) { HLR_ASSERT( ! is_null( v ) ); return v->blas_vec(); }
+template < typename value_t >       vector< value_t > & vec ( Hpro::TScalarVector< value_t > *       v ) { HLR_DBG_ASSERT( ! is_null( v ) ); return v->blas_vec(); }
+template < typename value_t > const vector< value_t > & vec ( const Hpro::TScalarVector< value_t > * v ) { HLR_DBG_ASSERT( ! is_null( v ) ); return v->blas_vec(); }
 template < typename value_t >       vector< value_t > & vec ( Hpro::TScalarVector< value_t > &       v ) { return v.blas_vec(); }
 template < typename value_t > const vector< value_t > & vec ( const Hpro::TScalarVector< value_t > & v ) { return v.blas_vec(); }
-template < typename value_t >       vector< value_t > & vec ( std::unique_ptr< Hpro::TScalarVector< value_t > > & v ) { HLR_ASSERT( ! is_null( v.get() ) ); return v->blas_vec(); }
+template < typename value_t >       vector< value_t > & vec ( std::unique_ptr< Hpro::TScalarVector< value_t > > & v ) { HLR_DBG_ASSERT( ! is_null( v.get() ) ); return v->blas_vec(); }
 
-template < typename value_t >       matrix< value_t > & mat ( Hpro::TDenseMatrix< value_t > *       A ) { HLR_ASSERT( ! is_null( A ) ); return A->blas_mat(); }
-template < typename value_t > const matrix< value_t > & mat ( const Hpro::TDenseMatrix< value_t > * A ) { HLR_ASSERT( ! is_null( A ) ); return A->blas_mat(); }
+template < typename value_t >       matrix< value_t > & mat ( Hpro::TDenseMatrix< value_t > *       A ) { HLR_DBG_ASSERT( ! is_null( A ) ); return A->blas_mat(); }
+template < typename value_t > const matrix< value_t > & mat ( const Hpro::TDenseMatrix< value_t > * A ) { HLR_DBG_ASSERT( ! is_null( A ) ); return A->blas_mat(); }
 template < typename value_t >       matrix< value_t > & mat ( Hpro::TDenseMatrix< value_t > &       A ) { return A.blas_mat(); }
 template < typename value_t > const matrix< value_t > & mat ( const Hpro::TDenseMatrix< value_t > & A ) { return A.blas_mat(); }
-template < typename value_t >       matrix< value_t > & mat ( std::unique_ptr< Hpro::TDenseMatrix< value_t > > & A ) { HLR_ASSERT( ! is_null( A.get() ) ); return A->blas_mat(); }
+template < typename value_t >       matrix< value_t > & mat ( std::unique_ptr< Hpro::TDenseMatrix< value_t > > & A ) { HLR_DBG_ASSERT( ! is_null( A.get() ) ); return A->blas_mat(); }
 
 
 template < typename value_t >
 matrix< value_t > &
 mat_U ( Hpro::TRkMatrix< value_t > *  A )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
     return A->blas_mat_A();
 }
 
@@ -104,7 +104,7 @@ matrix< value_t > &
 mat_U ( Hpro::TRkMatrix< value_t > *  A,
         const Hpro::matop_t           op )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
 
     if ( op == Hpro::apply_normal )
         return A->blas_mat_A();
@@ -116,7 +116,7 @@ template < typename value_t >
 matrix< value_t > &
 mat_V ( Hpro::TRkMatrix< value_t > *  A )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
     return A->blas_mat_B();
 }
 
@@ -125,7 +125,7 @@ matrix< value_t > &
 mat_V ( Hpro::TRkMatrix< value_t > *    A,
         const Hpro::matop_t             op )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
 
     if ( op == Hpro::apply_normal )
         return A->blas_mat_B();
@@ -137,7 +137,7 @@ template < typename value_t >
 const matrix< value_t > &
 mat_U ( const Hpro::TRkMatrix< value_t > *  A )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
     return A->blas_mat_A();
 }
 
@@ -146,7 +146,7 @@ const matrix< value_t > &
 mat_U ( const Hpro::TRkMatrix< value_t > *  A,
         const Hpro::matop_t                 op )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
 
     if ( op == Hpro::apply_normal )
         return A->blas_mat_A();
@@ -158,7 +158,7 @@ template < typename value_t >
 const matrix< value_t > &
 mat_V ( const Hpro::TRkMatrix< value_t > *  A )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
     return A->blas_mat_B();
 }
 
@@ -167,7 +167,7 @@ const matrix< value_t > &
 mat_V ( const Hpro::TRkMatrix< value_t > *  A,
         const Hpro::matop_t                 op )
 {
-    HLR_ASSERT( ! is_null( A ) );
+    HLR_DBG_ASSERT( ! is_null( A ) );
 
     if ( op == Hpro::apply_normal )
         return A->blas_mat_B();
@@ -369,7 +369,7 @@ join_row ( const std::list< matrix< value_t > > &  matrices )
         if ( nrows == 0 )
             nrows = M_i.nrows();
         else
-            HLR_ASSERT( nrows == M_i.nrows() );
+            HLR_DBG_ASSERT( nrows == M_i.nrows() );
 
         ncols += M_i.ncols();
     }// for
@@ -549,7 +549,7 @@ void
 copy ( const matrix< value_src_t > &   A,
        const matrix< value_dest_t > &  B )
 {
-    HLR_ASSERT(( A.nrows() == B.nrows() ) && ( A.ncols() == B.ncols() ));
+    HLR_DBG_ASSERT(( A.nrows() == B.nrows() ) && ( A.ncols() == B.ncols() ));
     
     const size_t  n = A.nrows() * A.ncols();
 
@@ -618,11 +618,11 @@ template < matrix_type  matrix_t >
 typename matrix_t::value_t
 max_abs_val ( const matrix_t &  M )
 {
-    HLR_ASSERT( M.nrows() * M.ncols() > 0 );
+    HLR_DBG_ASSERT( M.nrows() * M.ncols() > 0 );
 
     // todo
     HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
-               ( M.row_stride() == 1 ));
+                   ( M.row_stride() == 1 ));
         
     const auto  res = max_idx( blas_int_t(M.nrows() * M.ncols()), M.data(), 1 )-1;
 
@@ -636,7 +636,7 @@ template < matrix_type  matrix_t >
 typename matrix_t::value_t
 min_abs_val ( const matrix_t &  M )
 {
-    HLR_ASSERT( M.nrows() * M.ncols() > 0 );
+    HLR_DBG_ASSERT( M.nrows() * M.ncols() > 0 );
 
     // todo
     HLR_ASSERT(( M.col_stride() == M.nrows() ) &&
@@ -827,6 +827,8 @@ mulvec_lr ( const T_alpha                    alpha,
 {
     using  value_t = T_value;
     
+    HLR_DBG_ASSERT( U.ncols() == V.ncols() );
+
     if ( op == Hpro::apply_normal )
     {
         //
@@ -889,15 +891,18 @@ mulvec_lr ( const T_alpha                    alpha,
 template < typename T_alpha,
            typename T_value >
 void
-mulvec_lrs ( const T_alpha                    alpha,
-             const blas::matrix< T_value > &  U,
-             const blas::matrix< T_value > &  S,
-             const blas::matrix< T_value > &  V,
-             const matop_t                    op,
-             const blas::vector< T_value > &  x,
-             blas::vector< T_value > &        y )
+mulvec_lr ( const T_alpha                    alpha,
+            const blas::matrix< T_value > &  U,
+            const blas::matrix< T_value > &  S,
+            const blas::matrix< T_value > &  V,
+            const matop_t                    op,
+            const blas::vector< T_value > &  x,
+            blas::vector< T_value > &        y )
 {
     using  value_t = T_value;
+    
+    HLR_DBG_ASSERT( U.ncols() == S.nrows() );
+    HLR_DBG_ASSERT( V.ncols() == S.ncols() );
     
     if ( op == Hpro::apply_normal )
     {
@@ -955,6 +960,85 @@ mulvec_lrs ( const T_alpha                    alpha,
     }// if
 }
 
+//
+// compute op(U·S·V')·x = y with diagonal S
+//
+template < typename T_alpha,
+           typename T_value >
+void
+mulvec_lr ( const T_alpha                    alpha,
+            const blas::matrix< T_value > &  U,
+            const blas::vector< T_value > &  S,
+            const blas::matrix< T_value > &  V,
+            const matop_t                    op,
+            const blas::vector< T_value > &  x,
+            blas::vector< T_value > &        y )
+{
+    using  value_t = T_value;
+
+    HLR_DBG_ASSERT( U.ncols() == S.length() );
+    HLR_DBG_ASSERT( V.ncols() == S.length() );
+    
+    if ( op == Hpro::apply_normal )
+    {
+        //
+        // y = y + U·S·V^H x
+        //
+        
+        // t := V^H x
+        auto  t = blas::mulvec( blas::adjoint( V ), x );
+
+        // t := α S t
+        for ( uint  i = 0; i < t.length(); ++i )
+            t(i) *= alpha * S(i);
+        
+        // y := y + U s
+        blas::mulvec( U, t, y );
+    }// if
+    else if ( op == Hpro::apply_transposed )
+    {
+        //
+        // y = y + (U·S·V^H)^T x
+        //   = y + conj(V)·S^T·U^T x
+        //
+        
+        // t := U^T x
+        auto  t = blas::mulvec( blas::transposed( U ), x );
+
+        // t := conj( α S^T t )
+        for ( uint  i = 0; i < t.length(); ++i )
+            t(i) = math::conj( alpha * S(i) * t(i) );
+        
+        // r := conj(V) t = conj( V · conj(t) )  (conj(t) already before)
+        auto  r = blas::mulvec( V, t );
+
+        blas::conj( r );
+
+        // y = y + r
+        blas::add( value_t(1), r, y );
+    }// if
+    else if ( op == Hpro::apply_adjoint )
+    {
+        //
+        // y = y + (U·S·V^H)^H x
+        //   = y + V·S^H·U^H x
+        //
+        
+        // t := U^H x
+        auto  t = blas::mulvec( blas::adjoint( U ), x );
+
+        // s := α S^H t
+        for ( uint  i = 0; i < t.length(); ++i )
+            t(i) *= alpha * math::conj( S(i) );
+        
+        // y := t + V t
+        blas::mulvec( V, t, y );
+    }// if
+}
+
+//
+// simplifications for default BLAS::prod
+//
 template < typename T_beta,
            matrix_type matrixA_t,
            matrix_type matrixB_t,
@@ -965,7 +1049,7 @@ requires ( std::same_as< typename matrixA_t::value_t, typename matrixB_t::value_
 void
 prod ( const matrixA_t &  A,
        const matrixB_t &  B,
-       const T_beta    beta,
+       const T_beta       beta,
        matrixC_t &        C )
 {
     HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&
@@ -1012,6 +1096,50 @@ prod ( const matrixA_t &  A,
 
 using Hpro::BLAS::mulvec;
 using Hpro::BLAS::prod;
+
+//
+// compute M ≔ M·D with diagonal D
+//
+template < matrix_type matrix_t,
+           vector_type vector_t >
+requires ( std::same_as< typename matrix_t::value_t, typename vector_t::value_t > )
+matrix< typename matrix_t::value_t >    
+prod_diag ( const matrix_t &  M,
+            const vector_t &  D )
+{
+    HLR_DBG_ASSERT( M.ncols() == D.length() );
+    
+    using  value_t = typename matrix_t::value_t;
+
+    auto  T = copy( M );
+
+    Hpro::BLAS::prod_diag( T, D, T.ncols() );
+
+    return T;
+}
+
+//
+// compute M ≔ D·M with diagonal D
+//
+template < vector_type vector_t,
+           matrix_type matrix_t >
+requires ( std::same_as< typename matrix_t::value_t, typename vector_t::value_t > )
+matrix< typename matrix_t::value_t >    
+prod_diag ( const vector_t &  D,
+            const matrix_t &  M )
+{
+    HLR_DBG_ASSERT( M.nrows() == D.length() );
+    
+    using  value_t = typename matrix_t::value_t;
+
+    auto  T = copy( M );
+
+    Hpro::BLAS::prod_diag( D, T, T.ncols() );
+
+    return T;
+}
+
+using Hpro::BLAS::prod_diag;
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -1195,7 +1323,7 @@ qrt  ( matrix< value_t > &  M,
     std::vector< value_t >  T( nb * minrc );
     std::vector< value_t >  work( nb * ncols );
 
-    HLR_ASSERT( ncols <= nrows );
+    HLR_DBG_ASSERT( ncols <= nrows );
 
     blas_int_t  info = 0;
 
@@ -1242,7 +1370,7 @@ qrts  ( matrix< value_t > &  M,
     const blas_int_t        nbcol = ncols;
     std::vector< value_t >  T( nbcol * ncols * ( 1 + ( nrows - ncols ) / ( nbrow - ncols ) ) );
 
-    HLR_ASSERT( 2*ncols < nrows );
+    HLR_DBG_ASSERT( 2*ncols < nrows );
 
     //
     // work size query
@@ -1532,7 +1660,7 @@ tsqr  ( matrix< value_t > &  M,
     const size_t  ncols = M.ncols();
     const size_t  ntile = 256;
 
-    HLR_ASSERT( nrows >= ncols );
+    HLR_DBG_ASSERT( nrows >= ncols );
     
     if (( nrows > ntile ) && ( nrows >= 4 * ncols ))
     {

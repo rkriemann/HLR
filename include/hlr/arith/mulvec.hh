@@ -11,11 +11,6 @@
 #include "hlr/utils/log.hh"
 #include "hlr/arith/blas.hh"
 #include "hlr/arith/h2.hh"
-#include "hlr/matrix/dense_matrix.hh"
-#include "hlr/matrix/lrmatrix.hh"
-#include "hlr/matrix/lrsmatrix.hh"
-#include "hlr/matrix/mplrmatrix.hh"
-#include "hlr/matrix/uniform_lrmatrix.hh"
 #include "hlr/vector/scalar_vector.hh"
 
 namespace hlr
