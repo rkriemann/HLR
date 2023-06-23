@@ -71,27 +71,10 @@ build ( const Hpro::TBlockCluster *  bct,
         if ( bct->is_adm() )
         {
             M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
-
-            // if ( is_lowrank( *M ) )
-            // {
-            //     auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
-            //     auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
-            //                                                                      std::move( blas::mat_U( R ) ),
-            //                                                                      std::move( blas::mat_V( R ) ) );
-            //     M = std::move( zR );
-            // }// if
         }// if
         else
         {
             M = coeff.build( rowis, colis );
-
-            // if ( is_dense( *M ) )
-            // {
-            //     auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-            //     auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-            //     M = std::move( zD );
-            // }// if
         }// else
     }// if
     else
@@ -121,6 +104,100 @@ build ( const Hpro::TBlockCluster *  bct,
     }// else
 
     // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// same as above but use compressable matrix types,
+// e.g., dense_matrix and lrmatrix, and directly compress
+// matrix data
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_compressed ( const Hpro::TBlockCluster *  bct,
+                   const coeff_t &              coeff,
+                   const lrapx_t &              lrapx,
+                   const Hpro::TTruncAcc &      acc,
+                   const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+
+    using value_t = typename coeff_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    
+    if ( bct->is_leaf() )
+    {
+        auto  rowis = bct->is().row_is();
+        auto  colis = bct->is().col_is();
+        auto  lacc  = acc( rowis, colis );
+        
+        if ( bct->is_adm() )
+        {
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, lacc ) );
+
+            if ( is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                 std::move( blas::mat_U( R ) ),
+                                                                                 std::move( blas::mat_V( R ) ) );
+
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+        }// if
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( bct->son( i, j ) != nullptr )
+                {
+                    auto  B_ij = build_compressed( bct->son( i, j ), coeff, lrapx, acc, nseq );
+
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+    }// else
+
     M->set_id( bct->id() );
     M->set_procs( bct->procs() );
 
