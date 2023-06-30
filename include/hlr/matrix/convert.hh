@@ -16,7 +16,7 @@
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
-#include <hlr/matrix/mplrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
 
 namespace hlr { namespace matrix {
 
@@ -457,7 +457,7 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
     }// if
     else if ( is_mixedprec_lowrank( M ) )
     {
-        auto  RM = cptrcast( &M, mplrmatrix< value_t > );
+        auto  RM = cptrcast( &M, lrsvmatrix< value_t > );
         auto  U  = blas::prod_diag( RM->U(), RM->S() );
         auto  V  = RM->V();
         auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );

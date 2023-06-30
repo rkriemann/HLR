@@ -23,7 +23,7 @@
 #endif
 
 #include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/mplrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
@@ -163,7 +163,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         }// if
         // else if ( is_mixedprec_lowrank( M ) && is_compressed( M ) )
         // {
-        //     auto        R          = cptrcast( &M, matrix::mplrmatrix< value_t > );
+        //     auto        R          = cptrcast( &M, matrix::lrsvmatrix< value_t > );
         //     const auto  rank       = R->rank();
         //     auto        mpdata     = R->mp_data();
         //     uint        col_bg[3]  = { 0, 0, 0 };

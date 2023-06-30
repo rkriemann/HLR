@@ -16,7 +16,7 @@
 #include <hlr/arith/operator_wrapper.hh>
 
 #include <hlr/matrix/lrmatrix.hh>
-#include <hlr/matrix/mplrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
@@ -97,10 +97,10 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 
         if ( matrix::is_mixedprec_lowrank( A ) )
         {
-            auto  U = blas::prod_diag( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
-                                       cptrcast( &A, matrix::mplrmatrix< value_t > )->S() );
+            auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
+                                       cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
             
-            return comp_lr( U, cptrcast( &A, matrix::mplrmatrix< value_t > )->V() );
+            return comp_lr( U, cptrcast( &A, matrix::lrsvmatrix< value_t > )->V() );
         }// if
         else if ( compress::is_compressed( A ) )
         {
@@ -343,11 +343,11 @@ frobenius_squared ( const alpha_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( A ) )
             {
-                auto  U = blas::prod_diag( cptrcast( &A, matrix::mplrmatrix< value_t > )->U(),
-                                           cptrcast( &A, matrix::mplrmatrix< value_t > )->S() );
+                auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
+                                           cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
             
                 UA = std::move( U );
-                VA = cptrcast( &A, matrix::mplrmatrix< value_t > )->V();
+                VA = cptrcast( &A, matrix::lrsvmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( A )  )
             {
@@ -362,11 +362,11 @@ frobenius_squared ( const alpha_t                     alpha,
             
             if ( matrix::is_mixedprec_lowrank( B ) )
             {
-                auto  U = blas::prod_diag( cptrcast( &B, matrix::mplrmatrix< value_t > )->U(),
-                                           cptrcast( &B, matrix::mplrmatrix< value_t > )->S() );
+                auto  U = blas::prod_diag( cptrcast( &B, matrix::lrsvmatrix< value_t > )->U(),
+                                           cptrcast( &B, matrix::lrsvmatrix< value_t > )->S() );
             
                 UB = std::move( U );
-                VB = cptrcast( &B, matrix::mplrmatrix< value_t > )->V();
+                VB = cptrcast( &B, matrix::lrsvmatrix< value_t > )->V();
             }// if
             else if ( compress::is_compressed( B )  )
             {

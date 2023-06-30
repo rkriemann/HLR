@@ -15,7 +15,6 @@
 #include "hlr/approx/accuracy.hh"
 #include "hlr/bem/aca.hh"
 #include <hlr/matrix/print.hh>
-#include <hlr/matrix/mplrmatrix.hh>
 #include <hlr/utils/io.hh>
 
 #include <hlr/utils/eps_printer.hh>

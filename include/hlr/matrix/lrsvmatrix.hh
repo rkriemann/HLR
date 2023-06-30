@@ -1,8 +1,8 @@
-#ifndef __HLR_MATRIX_MPLRMATRIX_HH
-#define __HLR_MATRIX_MPLRMATRIX_HH
+#ifndef __HLR_MATRIX_LRSVMATRIX_HH
+#define __HLR_MATRIX_LRSVMATRIX_HH
 //
 // Project     : HLR
-// Module      : mplrmatrix
+// Module      : lrsvmatrix
 // Description : low-rank matrix with dynamic value type
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -25,7 +25,7 @@ namespace hlr
 using indexset = Hpro::TIndexSet;
 
 // local matrix type
-DECLARE_TYPE( mplrmatrix );
+DECLARE_TYPE( lrsvmatrix );
 
 namespace matrix
 {
@@ -34,10 +34,11 @@ namespace matrix
 
 //
 // Represents a low-rank matrix in factorised form: U·S·V^H
-// with orthogonal U/V and diagonal S.
+// with orthogonal U/V and diagonal S, i.e., its singular
+// values.
 //
 template < typename T_value >
-class mplrmatrix : public Hpro::TRkMatrix< T_value >, public compress::compressible
+class lrsvmatrix : public Hpro::TRkMatrix< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;
@@ -66,16 +67,16 @@ public:
     // ctors
     //
 
-    mplrmatrix ()
+    lrsvmatrix ()
             : Hpro::TRkMatrix< value_t >()
     {}
     
-    mplrmatrix ( const indexset  arow_is,
+    lrsvmatrix ( const indexset  arow_is,
                  const indexset  acol_is )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {}
 
-    mplrmatrix ( const indexset                   arow_is,
+    lrsvmatrix ( const indexset                   arow_is,
                  const indexset                   acol_is,
                  hlr::blas::matrix< value_t > &   aU,
                  hlr::blas::matrix< value_t > &   aV )
@@ -84,7 +85,7 @@ public:
         set_lrmat( aU, aV );
     }
 
-    mplrmatrix ( const indexset                   arow_is,
+    lrsvmatrix ( const indexset                   arow_is,
                  const indexset                   acol_is,
                  hlr::blas::matrix< value_t > &&  aU,
                  hlr::blas::matrix< value_t > &&  aV )
@@ -94,7 +95,7 @@ public:
     }
 
     // dtor
-    virtual ~mplrmatrix ()
+    virtual ~lrsvmatrix ()
     {}
     
     //
@@ -192,14 +193,14 @@ public:
     // RTTI
     //
 
-    HPRO_RTTI_DERIVED( mplrmatrix, Hpro::TRkMatrix< value_t > )
+    HPRO_RTTI_DERIVED( lrsvmatrix, Hpro::TRkMatrix< value_t > )
 
     //
     // virtual constructor
     //
 
     // return matrix of same class (but no content)
-    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< mplrmatrix< value_t > >(); }
+    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< lrsvmatrix< value_t > >(); }
 
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
@@ -214,7 +215,7 @@ public:
     // return structural copy of matrix
     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
-        return std::make_unique< mplrmatrix< value_t > >( this->row_is(), this->col_is() );
+        return std::make_unique< lrsvmatrix< value_t > >( this->row_is(), this->col_is() );
     }
 
     // copy matrix data to A
@@ -313,14 +314,14 @@ inline
 bool
 is_mixedprec_lowrank ( const Hpro::TMatrix< value_t > &  M )
 {
-    return IS_TYPE( &M, mplrmatrix );
+    return IS_TYPE( &M, lrsvmatrix );
 }
 
 template < typename value_t >
 bool
 is_mixedprec_lowrank ( const Hpro::TMatrix< value_t > *  M )
 {
-    return ! is_null( M ) && IS_TYPE( M, mplrmatrix );
+    return ! is_null( M ) && IS_TYPE( M, lrsvmatrix );
 }
 
 HLR_TEST_ALL( is_mixedprec_lowrank, Hpro::TMatrix< value_t > )
@@ -331,7 +332,7 @@ HLR_TEST_ANY( is_mixedprec_lowrank, Hpro::TMatrix< value_t > )
 //
 template < typename value_t >
 blas::matrix< value_t >
-mplrmatrix< value_t >::U () const
+lrsvmatrix< value_t >::U () const
 {
     if ( is_compressed() )
     {
@@ -361,7 +362,7 @@ mplrmatrix< value_t >::U () const
     
 template < typename value_t >
 blas::matrix< value_t >
-mplrmatrix< value_t >::V () const
+lrsvmatrix< value_t >::V () const
 {
     if ( is_compressed() )
     {
@@ -386,7 +387,7 @@ mplrmatrix< value_t >::V () const
 //
 template < typename value_t >
 void
-mplrmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
+lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
                                    const blas::matrix< value_t > &  aV )
 {
     HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
@@ -415,7 +416,7 @@ mplrmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
     
 template < typename value_t >
 void
-mplrmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
+lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
                                    blas::matrix< value_t > &&  aV )
 {
     HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
@@ -449,7 +450,7 @@ mplrmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
 
 template < typename value_t >
 void
-mplrmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
+lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
                                    const blas::vector< value_t > &  aS,
                                    const blas::matrix< value_t > &  aV )
 {
@@ -469,7 +470,7 @@ mplrmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
     
 template < typename value_t >
 void
-mplrmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
+lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
                                    blas::vector< value_t > &&  aS,
                                    blas::matrix< value_t > &&  aV )
 {
@@ -492,7 +493,7 @@ mplrmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
 //
 template < typename value_t >
 void
-mplrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
+lrsvmatrix< value_t >::mul_vec  ( const value_t                     alpha,
                                   const Hpro::TVector< value_t > *  vx,
                                   const value_t                     beta,
                                   Hpro::TVector< value_t > *        vy,
@@ -514,7 +515,7 @@ mplrmatrix< value_t >::mul_vec  ( const value_t                     alpha,
     
 template < typename value_t >
 void
-mplrmatrix< value_t >::apply_add ( const value_t                    alpha,
+lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
                                    const blas::vector< value_t > &  x,
                                    blas::vector< value_t > &        y,
                                    const matop_t                    op ) const
@@ -535,13 +536,13 @@ mplrmatrix< value_t >::apply_add ( const value_t                    alpha,
 
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-mplrmatrix< value_t >::copy () const
+lrsvmatrix< value_t >::copy () const
 {
     auto  M = Hpro::TMatrix< value_t >::copy();
     
-    HLR_ASSERT( IS_TYPE( M.get(), mplrmatrix ) );
+    HLR_ASSERT( IS_TYPE( M.get(), lrsvmatrix ) );
 
-    auto  R = ptrcast( M.get(), mplrmatrix< value_t > );
+    auto  R = ptrcast( M.get(), lrsvmatrix< value_t > );
 
     if ( this->cluster() != nullptr )
         R->set_cluster( this->cluster() );
@@ -569,13 +570,13 @@ mplrmatrix< value_t >::copy () const
 
 template < typename value_t >
 void
-mplrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
+lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 {
-    HLR_ASSERT( IS_TYPE( A, mplrmatrix ) );
+    HLR_ASSERT( IS_TYPE( A, lrsvmatrix ) );
 
     Hpro::TMatrix< value_t >::copy_to( A );
     
-    auto  R = ptrcast( A, mplrmatrix< value_t > );
+    auto  R = ptrcast( A, lrsvmatrix< value_t > );
 
     R->_rows  = this->_rows;
     R->_cols  = this->_cols;
@@ -606,7 +607,7 @@ mplrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 // - may result in non-compression if storage does not decrease
 template < typename value_t >
 void
-mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
     if ( this->nrows() * this->ncols() == 0 )
         return;
@@ -618,9 +619,9 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
     // // DEBUG
     // auto  R1  = this->copy();
-    // auto  US1 = blas::prod_diag( ptrcast( R1.get(), mplrmatrix< value_t > )->U(),
-    //                              ptrcast( R1.get(), mplrmatrix< value_t > )->S() );
-    // auto  M1  = blas::prod( US1, blas::adjoint( ptrcast( R1.get(), mplrmatrix< value_t > )->V() ) );
+    // auto  US1 = blas::prod_diag( ptrcast( R1.get(), lrsvmatrix< value_t > )->U(),
+    //                              ptrcast( R1.get(), lrsvmatrix< value_t > )->S() );
+    // auto  M1  = blas::prod( US1, blas::adjoint( ptrcast( R1.get(), lrsvmatrix< value_t > )->V() ) );
     
     auto  oU = this->_mat_A;
     auto  oV = this->_mat_B;
@@ -722,9 +723,9 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
     // // DEBUG
     // auto  R2  = this->copy();
-    // auto  US2 = blas::prod_diag( ptrcast( R2.get(), mplrmatrix< value_t > )->U(),
-    //                              ptrcast( R2.get(), mplrmatrix< value_t > )->S() );
-    // auto  M2  = blas::prod( US2, blas::adjoint( ptrcast( R2.get(), mplrmatrix< value_t > )->V() ) );
+    // auto  US2 = blas::prod_diag( ptrcast( R2.get(), lrsvmatrix< value_t > )->U(),
+    //                              ptrcast( R2.get(), lrsvmatrix< value_t > )->S() );
+    // auto  M2  = blas::prod( US2, blas::adjoint( ptrcast( R2.get(), lrsvmatrix< value_t > )->V() ) );
 
     // blas::add( -1.0, M1, M2 );
 
@@ -739,7 +740,7 @@ mplrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 // decompress internal data
 template < typename value_t >
 void
-mplrmatrix< value_t >::decompress ()
+lrsvmatrix< value_t >::decompress ()
 {
     if ( ! is_compressed() )
         return;
@@ -752,4 +753,4 @@ mplrmatrix< value_t >::decompress ()
 
 }} // namespace hlr::matrix
 
-#endif // __HLR_MATRIX_MPLRMATRIX_HH
+#endif // __HLR_MATRIX_LRSVMATRIX_HH

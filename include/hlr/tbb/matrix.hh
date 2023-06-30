@@ -25,7 +25,7 @@
 #include <hlr/matrix/convert.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
-#include <hlr/matrix/mplrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 
 #include <hlr/tbb/detail/matrix.hh>
@@ -1057,7 +1057,7 @@ copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
         auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
         auto  U = blas::copy( blas::mat_U( R ) );
         auto  V = blas::copy( blas::mat_V( R ) );
-        auto  N = std::make_unique< matrix::mplrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+        auto  N = std::make_unique< matrix::lrsvmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
             
         N->set_id( M.id() );
         

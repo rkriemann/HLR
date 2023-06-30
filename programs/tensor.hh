@@ -255,6 +255,42 @@ program_main ()
 
     if ( false )
     {
+        blas::matrix< double >  M( 3, 2 );
+
+        M( 0, 0 ) = 1;
+        M( 0, 1 ) = 2;
+        M( 1, 0 ) = 3;
+        M( 1, 1 ) = 4;
+        M( 2, 0 ) = 5;
+        M( 2, 1 ) = 6;
+
+        io::hdf5::write( M, "M" );
+        
+        auto  M2 = blas::copy( blas::adjoint( M ) );
+        
+        io::hdf5::write( M2, "M2" );
+        
+        return;
+    }
+    
+    {
+        blas::tensor3< double >  M( 4, 3, 2 );
+        uint  val = 1;
+
+        for ( uint l = 0; l < 2; ++l )
+            for ( uint j = 0; j < 3; ++j )
+                for ( uint i = 0; i < 4; ++i )
+                    M( i, j, l ) = val++;
+
+        std::cout << M << std::endl;
+        
+        io::hdf5::write( M, "M" );
+        
+        return;
+    }
+    
+    if ( false )
+    {
         //
         // play around with slices and tensor_product
         //
