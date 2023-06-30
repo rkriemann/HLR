@@ -149,7 +149,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             {
                 auto  D = blas::matrix< value_t >();
 
-                if ( is_compressible_dense( M ) ) D = cptrcast( &M, dense_matrix< value_t > )->mat_decompressed();
+                if ( is_compressible_dense( M ) ) D = cptrcast( &M, dense_matrix< value_t > )->mat();
                 else                              D = cptrcast( &M, Hpro::TDenseMatrix< value_t > )->blas_mat();
 
                 prn.set_gray( 0 );
@@ -236,8 +236,8 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
 
                     if ( is_compressible_lowrank( M ) )
                     {
-                        U = cptrcast( &M, lrmatrix< value_t > )->U_decompressed();
-                        V = cptrcast( &M, lrmatrix< value_t > )->V_decompressed();
+                        U = cptrcast( &M, lrmatrix< value_t > )->U();
+                        V = cptrcast( &M, lrmatrix< value_t > )->V();
                     }// if
                     else
                     {

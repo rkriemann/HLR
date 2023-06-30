@@ -79,10 +79,10 @@ public:
     // access internal data
     //
 
-    blas::matrix< value_t > &        mat ()       { return this->blas_mat(); }
-    const blas::matrix< value_t > &  mat () const { return this->blas_mat(); }
+    // blas::matrix< value_t > &        mat ()       { return this->blas_mat(); }
+    // const blas::matrix< value_t > &  mat () const { return this->blas_mat(); }
     
-    blas::matrix< value_t >          mat_decompressed () const
+    blas::matrix< value_t >          mat () const
     {
         #if HLR_HAS_COMPRESSION == 1
         
@@ -95,11 +95,11 @@ public:
             return dM;
         }// if
         else
-            return mat();
+            return this->blas_mat();
 
         #else
 
-        return mat();
+        return this->blas_mat();
 
         #endif
     }
@@ -301,16 +301,9 @@ public:
     // test data for invalid values, e.g. INF and NAN
     virtual void check_data () const
     {
-        if ( is_compressed() )
-        {
-            auto  M = mat_decompressed();
+        auto  M = mat();
 
-            M.check_data();
-        }// if
-        else
-        {
-            mat().check_data();
-        }// else
+        M.check_data();
     }
 
 protected:
@@ -402,7 +395,7 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
 
         // #else
         
-        auto  M = mat_decompressed();
+        auto  M = mat();
         
         blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
 
@@ -519,7 +512,7 @@ dense_matrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    this->blas_mat() = std::move( mat_decompressed() );
+    this->blas_mat() = std::move( mat() );
 
     remove_compressed();
 

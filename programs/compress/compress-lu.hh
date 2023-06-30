@@ -133,15 +133,15 @@ program_main ()
 
             // define methods to execute
             const auto methods = std::set< std::string >{
-                // "H+rec",
+                "H+rec",
                 // "H+rec+accu",
                 "H+dag",
-                "H+dag+accu+lazy",
+                // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
                 // "zH+rec",
                 // "zH+rec+accu",
-                "zH+dag",
-                "zH+dag+accu+lazy"
+                // "zH+dag",
+                // "zH+dag+accu+lazy"
             };
 
             std::cout << term::bullet << term::bold << "H-LU (" << apxname << ")" << term::reset << std::endl;

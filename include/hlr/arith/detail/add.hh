@@ -341,8 +341,8 @@ add ( const value_t                        alpha,
     // restrict low-rank matrix to sub blocks and recurse
     //
 
-    auto  UA = A.U_decompressed();
-    auto  VA = A.V_decompressed();
+    auto  UA = A.U();
+    auto  VA = A.V();
 
     for ( uint  i = 0; i < C.nblock_rows(); ++i )
     {
@@ -492,7 +492,7 @@ add ( const value_t                            alpha,
     // recurse for each block of C with corresponding virtual block of A
     //
 
-    auto  DA = A.mat_decompressed();
+    auto  DA = A.mat();
 
     for ( uint  i = 0; i < C.nblock_rows(); ++i )
     {
@@ -607,8 +607,8 @@ add ( const value_t                        alpha,
         return;
     
     std::scoped_lock  lock( C.mutex() );
-    auto              UA = A.U_decompressed();
-    auto              VA = A.V_decompressed();
+    auto              UA = A.U();
+    auto              VA = A.V();
     
     // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
     if ( alpha != value_t(1) )
@@ -648,8 +648,8 @@ add ( const value_t                        alpha,
         return;
     
     std::scoped_lock  lock( C.mutex() );
-    auto              UA = A.U_decompressed();
-    auto              VA = A.V_decompressed();
+    auto              UA = A.U();
+    auto              VA = A.V();
 
     C.decompress();
     
@@ -782,7 +782,7 @@ add ( const value_t                            alpha,
     
     std::scoped_lock  lock( C.mutex() );
 
-    auto  DA = A.mat_decompressed();
+    auto  DA = A.mat();
     auto  TA = blas::copy( DA );
 
     blas::prod( value_t(1),
@@ -813,7 +813,7 @@ add ( const value_t                            alpha,
 
     C.decompress();
     
-    auto  DA = A.mat_decompressed();
+    auto  DA = A.mat();
     auto  TA = blas::copy( DA );
 
     blas::prod( value_t(1),
@@ -940,8 +940,8 @@ add ( const value_t                        alpha,
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
-    auto              UA = A.U_decompressed();
-    auto              VA = A.V_decompressed();
+    auto              UA = A.U();
+    auto              VA = A.V();
     
     blas::prod(      alpha, UA, blas::adjoint( VA ),
                 value_t(1), blas::mat( C ) );
@@ -957,8 +957,8 @@ add ( const value_t                        alpha,
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     std::scoped_lock  lock( C.mutex() );
-    auto              UA = A.U_decompressed();
-    auto              VA = A.V_decompressed();
+    auto              UA = A.U();
+    auto              VA = A.V();
     
     C.decompress();
     
@@ -1012,7 +1012,7 @@ add ( const value_t                            alpha,
     std::scoped_lock  lock( C.mutex() );
     
     // C = C + α A
-    auto  DA = A.mat_decompressed();
+    auto  DA = A.mat();
     
     blas::add( alpha, DA, blas::mat( C ) );
 }
@@ -1031,7 +1031,7 @@ add ( const value_t                            alpha,
     C.decompress();
     
     // C = C + α A
-    auto  DA = A.mat_decompressed();
+    auto  DA = A.mat();
     
     blas::add( alpha, DA, blas::mat( C ) );
 

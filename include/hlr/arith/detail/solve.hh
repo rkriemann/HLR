@@ -845,7 +845,7 @@ solve_lower_tri ( const eval_side_t                        side,
         // TODO: option argument?
         //
 
-        const auto  DL = L.mat_decompressed();
+        const auto  DL = L.mat();
         auto        Mc = blas::copy( blas::mat( M ) );
 
         blas::prod( value_t(1), DL, Mc, value_t(0), blas::mat( M ) );
@@ -882,7 +882,7 @@ solve_lower_tri ( const eval_side_t                        side,
         // TODO: option argument?
         //
 
-        const auto  DL = L.mat_decompressed();
+        const auto  DL = L.mat();
         auto        Mc = blas::copy( blas::mat( M ) );
 
         blas::prod( value_t(1), DL, Mc, value_t(0), blas::mat( M ) );
@@ -1571,7 +1571,7 @@ solve_upper_tri ( const eval_side_t                        side,
     // TODO: option argument?
     //
 
-    const auto  DU = U.mat_decompressed();
+    const auto  DU = U.mat();
     
     if ( side == from_left )
     {
@@ -1611,7 +1611,7 @@ solve_upper_tri ( const eval_side_t                        side,
     // TODO: option argument?
     //
 
-    const auto  DU = U.mat_decompressed();
+    const auto  DU = U.mat();
     
     if ( side == from_left )
     {

@@ -122,8 +122,8 @@ multiply ( const value_t                        alpha,
     if ( A.is_zero() )
         return;
 
-    const auto  U = A.U_decompressed();
-    const auto  V = A.V_decompressed();
+    const auto  U = A.U();
+    const auto  V = A.V();
     
     multiply( alpha, op_A, U, V, B, C );
 }
@@ -156,7 +156,7 @@ multiply ( const value_t                            alpha,
            const blas::matrix< value_t > &          B,
            blas::matrix< value_t > &                C )
 {
-    const auto  D = A.mat_decompressed();
+    const auto  D = A.mat();
     
     blas::prod( alpha, blas::mat_view( op_A, D ), B, value_t(1), C );
 }
@@ -315,8 +315,8 @@ multiply ( const value_t                        alpha,
     if ( B.is_zero() )
         return;
 
-    const auto  U = B.U_decompressed();
-    const auto  V = B.V_decompressed();
+    const auto  U = B.U();
+    const auto  V = B.V();
 
     multiply( alpha, A, op_B, U, V, C );
 }
@@ -349,7 +349,7 @@ multiply ( const value_t                            alpha,
            const matrix::dense_matrix< value_t > &  B,
            blas::matrix< value_t > &                C )
 {
-    const auto  D = B.mat_decompressed();
+    const auto  D = B.mat();
     
     blas::prod( alpha, A, blas::mat_view( op_B, D ), value_t(1), C );
 }

@@ -1598,8 +1598,8 @@ multiply ( const value_t                     alpha,
         {
             auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
 
-            V = std::move( RA->V_decompressed( op_A ) );
-            W = std::move( blas::copy( RA->U_decompressed( op_A ) ) );
+            V = std::move( RA->V( op_A ) );
+            W = std::move( blas::copy( RA->U( op_A ) ) );
             k = RA->rank();
         }// if
         else
@@ -1637,8 +1637,8 @@ multiply ( const value_t                     alpha,
         {
             auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
             
-            U = std::move( RB->U_decompressed( op_B ) );
-            X = std::move( blas::copy( RB->V_decompressed( op_B ) ) );
+            U = std::move( RB->U( op_B ) );
+            X = std::move( blas::copy( RB->V( op_B ) ) );
             k = RB->rank();
         }// if
         else

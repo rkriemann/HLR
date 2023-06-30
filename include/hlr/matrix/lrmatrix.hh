@@ -99,13 +99,13 @@ public:
     // access low-rank factors
     //
 
-    blas::matrix< value_t > &        U ()       { return this->blas_mat_A(); }
-    blas::matrix< value_t > &        V ()       { return this->blas_mat_B(); }
+    // blas::matrix< value_t > &        U ()       { return this->blas_mat_A(); }
+    // blas::matrix< value_t > &        V ()       { return this->blas_mat_B(); }
     
-    const blas::matrix< value_t > &  U () const { return this->blas_mat_A(); }
-    const blas::matrix< value_t > &  V () const { return this->blas_mat_B(); }
+    // const blas::matrix< value_t > &  U () const { return this->blas_mat_A(); }
+    // const blas::matrix< value_t > &  V () const { return this->blas_mat_B(); }
 
-    blas::matrix< value_t >          U_decompressed () const
+    blas::matrix< value_t >          U () const
     {
         #if HLR_HAS_COMPRESSION == 1
         
@@ -118,16 +118,16 @@ public:
             return dU;
         }// if
         else
-            return U();
+            return this->_mat_A;
         
         #else
 
-        return U();
+        return this->_mat_A;
 
         #endif
     }
     
-    blas::matrix< value_t >          V_decompressed () const
+    blas::matrix< value_t >          V () const
     {
         #if HLR_HAS_COMPRESSION == 1
         
@@ -140,11 +140,11 @@ public:
             return dV;
         }// if
         else
-            return V();
+            return this->_mat_B;
         
         #else
 
-        return V();
+        return this->_mat_B;
 
         #endif
     }
@@ -153,14 +153,14 @@ public:
     // access low-rank factors with matrix operator
     //
     
-    blas::matrix< value_t > &        U ( const Hpro::matop_t  op ) { return ( op == apply_normal ? U() : V() ); }
-    blas::matrix< value_t > &        V ( const Hpro::matop_t  op ) { return ( op == apply_normal ? V() : U() ); }
+    // blas::matrix< value_t > &        U ( const Hpro::matop_t  op ) { return ( op == apply_normal ? U() : V() ); }
+    // blas::matrix< value_t > &        V ( const Hpro::matop_t  op ) { return ( op == apply_normal ? V() : U() ); }
     
-    const blas::matrix< value_t > &  U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
-    const blas::matrix< value_t > &  V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
+    // const blas::matrix< value_t > &  U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
+    // const blas::matrix< value_t > &  V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
 
-    blas::matrix< value_t >          U_decompressed ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U_decompressed() : V_decompressed() ); }
-    blas::matrix< value_t >          V_decompressed ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V_decompressed() : U_decompressed() ); }
+    blas::matrix< value_t >          U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
+    blas::matrix< value_t >          V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
 
     //
     // directly set low-rank factors
@@ -177,8 +177,8 @@ public:
         if ( is_compressed() )
             remove_compressed();
         
-        blas::copy( aU, U() );
-        blas::copy( aV, V() );
+        blas::copy( aU, this->_mat_A );
+        blas::copy( aV, this->_mat_B );
     }
     
     void
@@ -192,10 +192,10 @@ public:
         if ( is_compressed() )
             remove_compressed();
         
-        U() = std::move( aU );
-        V() = std::move( aV );
+        this->_mat_A = std::move( aU );
+        this->_mat_B = std::move( aV );
 
-        this->_rank = U().ncols();
+        this->_rank = this->_mat_A.ncols();
     }
 
     //
@@ -397,19 +397,11 @@ public:
     // test data for invalid values, e.g. INF and NAN
     virtual void check_data () const
     {
-        if ( is_compressed() )
-        {
-            auto  RU = U_decompressed();
-            auto  RV = V_decompressed();
+        auto  RU = U();
+        auto  RV = V();
 
-            RU.check_data();
-            RV.check_data();
-        }// if
-        else
-        {
-            U().check_data();
-            V().check_data();
-        }// else
+        RU.check_data();
+        RV.check_data();
     }
 
 protected:
@@ -505,8 +497,8 @@ lrmatrix< value_t >::apply_add ( const value_t                    alpha,
         HLR_ASSERT( y.length() == this->nrows( op ) );
 
         // auto  ty = blas::vector< value_t >( y.length() );
-        auto  uU = U_decompressed();
-        auto  uV = V_decompressed();
+        auto  uU = U();
+        auto  uV = V();
     
         blas::mulvec_lr( alpha, uU, uV, op, x, y );
         // blas::add( value_t(1), ty, y );
@@ -537,8 +529,8 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     // if ( this->block_is() == Hpro::bis( Hpro::is( 0, 63 ), Hpro::is( 256, 319 ) ) )
     //     std::cout << std::endl;
 
-    auto          oU      = this->U();
-    auto          oV      = this->V();
+    auto          oU      = this->_mat_A;
+    auto          oV      = this->_mat_B;
     const auto    orank   = oU.ncols();
     const size_t  mem_lr  = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
     auto          zU      = compress::compress< value_t >( zconfig, oU );
@@ -578,10 +570,10 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     
     if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
     {
-        _zdata.U  = std::move( zU );
-        _zdata.V  = std::move( zV );
-        this->U() = std::move( blas::matrix< value_t >( 0, 0 ) );
-        this->V() = std::move( blas::matrix< value_t >( 0, 0 ) );
+        _zdata.U     = std::move( zU );
+        _zdata.V     = std::move( zV );
+        this->_mat_A = std::move( blas::matrix< value_t >( 0, 0 ) );
+        this->_mat_B = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
 
     #endif
@@ -642,8 +634,8 @@ lrmatrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    this->U() = std::move( U_decompressed() );
-    this->V() = std::move( V_decompressed() );
+    this->_mat_A = std::move( U() );
+    this->_mat_B = std::move( V() );
 
     remove_compressed();
         

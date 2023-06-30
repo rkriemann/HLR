@@ -174,25 +174,25 @@ public:
         _V = std::move( aV );
     }
 
-    // modify coefficients S even if not consistent with U/V
-    void
-    set_coeff_unsafe ( const blas::matrix< value_t > &  T )
-    {
-        blas::copy( T, _S );
-    }
+    // // modify coefficients S even if not consistent with U/V
+    // void
+    // set_coeff_unsafe ( const blas::matrix< value_t > &  T )
+    // {
+    //     blas::copy( T, _S );
+    // }
     
-    void
-    set_coeff_unsafe ( blas::matrix< value_t > &&  T )
-    {
-        if (( _S.nrows() == T.nrows() ) && ( _S.ncols() == T.ncols() ))
-            blas::copy( T, _S );
-        else
-            _S = std::move( T );
-    }
+    // void
+    // set_coeff_unsafe ( blas::matrix< value_t > &&  T )
+    // {
+    //     if (( _S.nrows() == T.nrows() ) && ( _S.ncols() == T.ncols() ))
+    //         blas::copy( T, _S );
+    //     else
+    //         _S = std::move( T );
+    // }
 
-    // clear row/column "bases" (HACK for parallel handling!!!)
-    void clear_row_basis () { _U = blas::matrix< value_t >(); }
-    void clear_col_basis () { _V = blas::matrix< value_t >(); }
+    // // clear row/column "bases" (HACK for parallel handling!!!)
+    // void clear_row_basis () { _U = blas::matrix< value_t >(); }
+    // void clear_col_basis () { _V = blas::matrix< value_t >(); }
     
     //
     // matrix data

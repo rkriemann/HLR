@@ -37,8 +37,8 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
         {
             auto  RM = cptrcast( &M, lrmatrix< value_t > );
             auto  R  = std::make_unique< lrmatrix< value_t > >( bis.row_is(), bis.col_is() );
-            auto  MU = RM->U_decompressed();
-            auto  MV = RM->V_decompressed();
+            auto  MU = RM->U();
+            auto  MV = RM->V();
             auto  RU = blas::matrix< value_t >( MU,
                                                 bis.row_is() - M.row_ofs(),
                                                 blas::range::all,
@@ -55,7 +55,7 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
         else if ( is_dense( M ) )
         {
             auto  DM = cptrcast( &M, dense_matrix< value_t > );
-            auto  DD = DM->mat_decompressed();
+            auto  DD = DM->mat();
             auto  D  = blas::matrix< value_t >( DD,
                                                 bis.row_is() - M.row_ofs(),
                                                 bis.col_is() - M.col_ofs(),
