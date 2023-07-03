@@ -1069,10 +1069,10 @@ requires ( std::same_as< typename matrixA_t::value_t, typename matrixB_t::value_
            std::convertible_to< T_alpha, typename matrixA_t::value_t > &&
            std::convertible_to< T_beta,  typename matrixC_t::value_t > )
 void
-prod ( const T_alpha   alpha,
+prod ( const T_alpha      alpha,
        const matrixA_t &  A,
        const matrixB_t &  B,
-       const T_beta    beta,
+       const T_beta       beta,
        matrixC_t &        C )
 {
     HLR_DBG_ASSERT(( A.ncols() == B.nrows() ) &&

@@ -368,7 +368,7 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
 
         return R;
     }// if
-    else if ( is_mixedprec_lowrank( M ) )
+    else if ( is_lowrank_sv( M ) )
     {
         auto  RM = cptrcast( &M, lrsvmatrix< value_t > );
         auto  U  = blas::prod_diag( RM->U(), RM->S() );

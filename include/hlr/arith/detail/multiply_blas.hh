@@ -221,12 +221,12 @@ multiply ( const value_t                          alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                       alpha,
-           const blas::matrix< value_t > &     A,
-           const Hpro::matop_t                 op_B,
-           const blas::matrix< value_t > &     U,
-           const blas::matrix< value_t > &     V,
-           blas::matrix< value_t > &           C )
+multiply ( const value_t                    alpha,
+           const blas::matrix< value_t > &  A,
+           const Hpro::matop_t              op_B,
+           const blas::matrix< value_t > &  U,
+           const blas::matrix< value_t > &  V,
+           blas::matrix< value_t > &        C )
 {
     switch ( op_B )
     {

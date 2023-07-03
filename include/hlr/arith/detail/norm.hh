@@ -95,7 +95,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
             return std::abs( val );
         };
 
-        if ( matrix::is_mixedprec_lowrank( A ) )
+        if ( matrix::is_lowrank_sv( A ) )
         {
             auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
                                        cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
@@ -341,7 +341,7 @@ frobenius_squared ( const alpha_t                     alpha,
             auto  UB = blas::matrix< value_t >();
             auto  VB = blas::matrix< value_t >();
             
-            if ( matrix::is_mixedprec_lowrank( A ) )
+            if ( matrix::is_lowrank_sv( A ) )
             {
                 auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
                                            cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
@@ -360,7 +360,7 @@ frobenius_squared ( const alpha_t                     alpha,
                 VA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B();
             }// else
             
-            if ( matrix::is_mixedprec_lowrank( B ) )
+            if ( matrix::is_lowrank_sv( B ) )
             {
                 auto  U = blas::prod_diag( cptrcast( &B, matrix::lrsvmatrix< value_t > )->U(),
                                            cptrcast( &B, matrix::lrsvmatrix< value_t > )->S() );

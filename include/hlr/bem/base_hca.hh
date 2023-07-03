@@ -12,7 +12,6 @@
 
 #include <hpro/cluster/TGeomCluster.hh>
 #include <hpro/algebra/TLowRankApx.hh>
-#include <hpro/blas/Algebra.hh>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/bem/interpolation.hh>
@@ -145,14 +144,14 @@ public:
         // auto  R     = blas::matrix< value_t >();
         // auto  P_row = std::vector< int >();
 
-        // HLIB::BLAS::qrp( DT, R, P_row );
+        // blas::qrp( DT, R, P_row );
 
         // const auto  k_row = approx::detail::trunc_rank( R, fixed_prec( eps ) );
 
         // // determine column pivots
         // auto  P_col = std::vector< int >();
 
-        // HLIB::BLAS::qrp( D, R, P_col );
+        // blas::qrp( D, R, P_col );
 
         // const auto  k_col = approx::detail::trunc_rank( R, fixed_prec( eps ) );
 
@@ -225,8 +224,10 @@ public:
 
     // build low rank matrix for block cluster bct with
     // rank defined by accuracy acc
-    virtual TMatrix * build ( const TBlockCluster *   bc,
-                              const TTruncAcc &       acc ) const
+    virtual
+    std::unique_ptr< TMatrix< value_t > >
+    build ( const TBlockCluster *  bc,
+            const TTruncAcc &      acc ) const
     {
         HLR_ASSERT( IS_TYPE( bc->rowcl(), TGeomCluster ) && IS_TYPE( bc->colcl(), TGeomCluster ) );
         
@@ -235,8 +236,10 @@ public:
                             acc );
     }
 
-    virtual TMatrix * build ( const TBlockIndexSet & ,
-                              const TTruncAcc & ) const
+    virtual
+    std::unique_ptr< TMatrix< value_t > >
+    build ( const TBlockIndexSet & ,
+            const TTruncAcc & ) const
     {
         HLR_ERROR( "hca_lrapx::build : block index set not supported" );
     }

@@ -61,7 +61,7 @@ build ( const Hpro::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
     if ( bct->is_leaf() )
     {
@@ -70,11 +70,27 @@ build ( const Hpro::TBlockCluster *  bct,
         
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
+            M = lrapx.build( bct, acc( rowis, colis ) );
+
+            if ( is_lowrank( *M ) )
+            {
+                auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                     std::move( blas::mat_U( R ) ),
+                                                                                     std::move( blas::mat_V( R ) ) ) );
+            }// if
         }// if
         else
         {
             M = coeff.build( rowis, colis );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+            }// if
         }// else
     }// if
     else
@@ -231,7 +247,17 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
             return nullptr;
         else
         {
-            M = coeff.build( bct->is().row_is(), bct->is().col_is() );
+            const auto  row_is = bct->is().row_is();
+            const auto  col_is = bct->is().col_is();
+            
+            M = coeff.build( row_is, col_is );
+
+            if ( is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( row_is, col_is, std::move( blas::mat( D ) ) ) );
+            }// if
         }// else
     }// if
     else

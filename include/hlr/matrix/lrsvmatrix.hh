@@ -122,7 +122,7 @@ public:
     set_lrmat ( blas::matrix< value_t > &&  aU,
                 blas::matrix< value_t > &&  aV );
 
-    // assuming U/V are orthogonal
+    // assuming U/V are orthogonal!!!
     virtual void
     set_lrmat ( const blas::matrix< value_t > &  aU,
                 const blas::vector< value_t > &  aS,
@@ -133,6 +133,13 @@ public:
                 blas::vector< value_t > &&  aS,
                 blas::matrix< value_t > &&  aV );
 
+    // set U/V and recompress if currently compressed
+    //  - neither U nor V are assumed to be orthogonal, so also reorthogonalize 
+    void set_U ( blas::matrix< value_t > && aU,
+                 const accuracy &           acc );
+    void set_V ( blas::matrix< value_t > && aV,
+                 const accuracy &           acc );
+        
     //
     // matrix data
     //
@@ -312,20 +319,20 @@ protected:
 template < typename value_t >
 inline
 bool
-is_mixedprec_lowrank ( const Hpro::TMatrix< value_t > &  M )
+is_lowrank_sv ( const Hpro::TMatrix< value_t > &  M )
 {
     return IS_TYPE( &M, lrsvmatrix );
 }
 
 template < typename value_t >
 bool
-is_mixedprec_lowrank ( const Hpro::TMatrix< value_t > *  M )
+is_lowrank_sv ( const Hpro::TMatrix< value_t > *  M )
 {
     return ! is_null( M ) && IS_TYPE( M, lrsvmatrix );
 }
 
-HLR_TEST_ALL( is_mixedprec_lowrank, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_mixedprec_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_lowrank_sv, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_lowrank_sv, Hpro::TMatrix< value_t > )
 
 //
 // access low-rank factors
@@ -488,6 +495,70 @@ lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
     this->_rank  = _S.length();
 }
 
+// set U/V and recompress if currently compressed
+//  - neither U nor V are assumed to be orthogonal, so also reorthogonalize 
+template < typename value_t >
+void
+lrsvmatrix< value_t >::set_U ( blas::matrix< value_t > && aU,
+                               const accuracy &           acc )
+{
+    HLR_ASSERT( aU.ncols() == _S.length() );
+    
+    //
+    // orthogonalise aU S V^H
+    //
+
+    auto  RU = blas::matrix< value_t >( aU.ncols(), aU.ncols() );
+
+    blas::qr( aU, RU );
+
+    auto  R             = blas::prod_diag( RU, _S );
+    auto  [ Us, S, Vs ] = blas::svd( R );
+
+    auto  TU = blas::prod( aU, Us );
+    auto  TV = blas::prod( V(), Vs );
+
+    const bool  was_compressed = is_compressed();
+    
+    set_lrmat( std::move( TU ),
+               std::move(  S ),
+               std::move( TV ) );
+
+    if ( was_compressed )
+        compress( acc );
+}
+
+template < typename value_t >
+void
+lrsvmatrix< value_t >::set_V ( blas::matrix< value_t > && aV,
+                               const accuracy &           acc )
+{
+    HLR_ASSERT( aV.ncols() == _S.length() );
+    
+    //
+    // orthogonalise U S aV^H
+    //
+
+    auto  RV = blas::matrix< value_t >( aV.ncols(), aV.ncols() );
+
+    blas::qr( aV, RV );
+
+    auto  R             = blas::prod_diag( _S, blas::adjoint( RV ) );
+    auto  [ Us, S, Vs ] = blas::svd( R );
+
+    auto  TU = blas::prod( U(), Us );
+    auto  TV = blas::prod(  aV, Vs );
+
+    const bool  was_compressed = is_compressed();
+    
+    set_lrmat( std::move( TU ),
+               std::move(  S ),
+               std::move( TV ) );
+
+    if ( was_compressed )
+        compress( acc );
+}
+
 //
 // matrix vector multiplication
 //
@@ -611,8 +682,6 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
     if ( this->nrows() * this->ncols() == 0 )
         return;
-
-    HLR_ASSERT( acc.is_fixed_prec() );
 
     if ( is_compressed() )
         return;

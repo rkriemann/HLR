@@ -13,6 +13,8 @@
 
 namespace hlr { namespace matrix {
 
+using hlr::compress::is_compressible;
+
 HLR_TEST_ALL( is_compressible, Hpro::TMatrix< value_t > )
 HLR_TEST_ANY( is_compressible, Hpro::TMatrix< value_t > )
 

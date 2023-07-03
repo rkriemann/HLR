@@ -9,15 +9,13 @@
 //
 
 #include <vector>
-#include <deque>
 #include <limits>
 
-#include <boost/math/constants/constants.hpp>
-
 #include <hpro/algebra/TLowRankApx.hh>
-#include <hpro/blas/Algebra.hh>
 
+#include <hlr/arith/blas.hh>
 #include <hlr/approx/aca.hh>
+#include <hlr/matrix/lrmatrix.hh>
 
 namespace hlr { namespace bem {
 
@@ -67,27 +65,10 @@ public:
     build ( const Hpro::TBlockIndexSet &  bis,
             const Hpro::TTruncAcc &       acc ) const
     {
-        const auto  op           = coefffn_operator( bis, _coeff_fn );
-        auto        pivot_search = approx::aca_pivot< decltype(op) >( op );
-        
-
-        auto [ U, V ] = approx::aca( op, pivot_search, acc, nullptr );
-
-        // {
-        //     auto  M = _coeff_fn.build( bis.row_is(), bis.col_is() );
-        //     auto  UV = blas::prod( value_t(1), U, blas::adjoint(V) );
-
-        //     blas::add( value_t(-1), Hpro::blas_mat< value_t >( cptrcast( M.get(), Hpro::TDenseMatrix< value_t > ) ), UV );
-
-        //     std::cout << blas::norm_F( UV ) / blas::norm_F( Hpro::blas_mat< value_t >( cptrcast( M.get(), Hpro::TDenseMatrix< value_t > ) ) ) << std::endl;
-            
-        //     Hpro::DBG::write( U, "U.mat", "U" );
-        //     Hpro::DBG::write( V, "V.mat", "V" );
-        //     Hpro::DBG::write( M.get(), "M.mat", "M" );
-        //     std::exit( 0 );
-        // }
-        
-        auto  R = std::make_unique< Hpro::TRkMatrix< value_t > >( bis.row_is(), bis.col_is(), std::move( U ), std::move( V ) );
+        auto  op           = coefffn_operator( bis, _coeff_fn );
+        auto  pivot_search = approx::aca_pivot< decltype(op) >( op );
+        auto  [ U, V ]     = approx::aca( op, pivot_search, acc, nullptr );
+        auto  R            = std::make_unique< matrix::lrmatrix< value_t > >( bis.row_is(), bis.col_is(), std::move( U ), std::move( V ) );
 
         R->truncate( acc );
 

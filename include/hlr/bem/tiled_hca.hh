@@ -66,7 +66,8 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
     // actual HCA algorithm
     // - <acc> only used for recompression
     //
-    TMatrix *
+    virtual
+    std::unique_ptr< TMatrix< value_t > >
     approx ( const TGeomCluster &  rowcl,
              const TGeomCluster &  colcl,
              const TTruncAcc &     acc ) const
@@ -110,7 +111,7 @@ struct tiled_hca : public base_hca< T_coeff, T_generator_fn >
                                                                          std::move( U_tr ),
                                                                          std::move( V_tr ) );
 
-        return R.release();
+        return R;
     }
     
     //

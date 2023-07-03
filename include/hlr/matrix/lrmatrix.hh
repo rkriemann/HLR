@@ -198,6 +198,67 @@ public:
         this->_rank = this->_mat_A.ncols();
     }
 
+    void
+    set_lrmat ( blas::matrix< value_t > &&  aU,
+                blas::matrix< value_t > &&  aV,
+                const accuracy &            acc )
+    {
+        HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
+                   ( this->ncols() == aV.nrows() ) &&
+                   ( aU.ncols()    == aV.ncols() ));
+
+        auto  was_compressed = is_compressed();
+        
+        if ( was_compressed )
+            remove_compressed();
+        
+        this->_mat_A = std::move( aU );
+        this->_mat_B = std::move( aV );
+
+        this->_rank = this->_mat_A.ncols();
+
+        if ( was_compressed )
+            compress( acc );
+    }
+
+    // update U and recompress if needed
+    void
+    set_U ( blas::matrix< value_t > &&  aU,
+            const accuracy &            acc )
+    {
+        HLR_ASSERT(( this->nrows() == aU.nrows() ) && ( aU.ncols() == this->rank() ));
+
+        #if HLR_HAS_COMPRESSION == 1
+        if ( is_compressed() )
+        {
+            // as this is just an update, compress without memory size test
+            auto  zconfig = get_zconfig( acc );
+            _zdata.U      = std::move( compress::compress< value_t >( zconfig, aU ) );
+        }// if
+        else
+        #endif
+            this->_mat_A = std::move( aU );
+    }
+
+    // update V and recompress if needed
+    void
+    set_V ( blas::matrix< value_t > &&  aV,
+            const accuracy &            acc )
+    {
+        HLR_ASSERT(( this->ncols() == aV.nrows() ) && ( aV.ncols() == this->rank() ));
+
+        #if HLR_HAS_COMPRESSION == 1
+        if ( is_compressed() )
+        {
+            // as this is just an update, compress without memory size test
+            auto  zconfig = get_zconfig( acc );
+            _zdata.V      = std::move( compress::compress< value_t >( zconfig, aV ) );
+        }// if
+        else
+        #endif
+            this->_mat_B = std::move( aV );
+    }
+
     //
     // matrix data
     //
@@ -238,20 +299,15 @@ public:
     // truncate matrix to accuracy acc
     virtual void truncate ( const Hpro::TTruncAcc & acc )
     {
-        HLR_ERROR( "todo" );
+        if ( is_compressed() ) { HLR_ERROR( "todo" ); }
+        else                   Hpro::TRkMatrix< value_t >::truncate( acc ); }
     }
 
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
     {
-        if ( is_compressed() )
-        {
-            HLR_ERROR( "todo" );
-        }// if
-        else
-        {
-            Hpro::TRkMatrix< value_t >::scale( alpha );
-        }// else
+        if ( is_compressed() ) { HLR_ERROR( "todo" ); }
+        else                   Hpro::TRkMatrix< value_t >::scale( alpha );
     }
 
     //
@@ -372,6 +428,9 @@ public:
         #endif
     }
 
+    // return compression config based on given accuracy
+    virtual auto   get_zconfig   ( const accuracy &  acc ) -> compress::zconfig_t;
+    
     //
     // misc.
     //
@@ -591,22 +650,7 @@ lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     // auto  M1 = blas::prod( ptrcast( R1.get(), lrmatrix< value_t > )->U(),
     //                        blas::adjoint( ptrcast( R1.get(), lrmatrix< value_t > )->V() ) );
 
-    const auto  lacc = acc( this->row_is(), this->col_is() );
-
-    if ( lacc.rel_eps() != 0 )
-    {
-        const auto  eps = lacc.rel_eps();
-        
-        compress( compress::get_config( eps ) );
-    }// if
-    else if ( lacc.abs_eps() != 0 )
-    {
-        const auto  eps = lacc.abs_eps();
-        
-        compress( compress::get_config( eps ) );
-    }// if
-    else
-        HLR_ERROR( "unsupported accuracy type" );
+    compress( get_zconfig( acc ) );
 
     // // DEBUG
     // auto  R2 = this->copy();
@@ -640,6 +684,31 @@ lrmatrix< value_t >::decompress ()
     remove_compressed();
         
     #endif
+}
+
+//
+// return compression config based on accuracy
+//
+template < typename value_t >
+compress::zconfig_t
+lrmatrix< value_t >::get_zconfig ( const accuracy &  acc )
+{
+    const auto  lacc = acc( this->row_is(), this->col_is() );
+
+    if ( lacc.rel_eps() != 0 )
+    {
+        const auto  eps = lacc.rel_eps();
+        
+        return compress::get_config( eps );
+    }// if
+    else if ( lacc.abs_eps() != 0 )
+    {
+        const auto  eps = lacc.abs_eps();
+        
+        return compress::get_config( eps );
+    }// if
+    else
+        HLR_ERROR( "unsupported accuracy type" );
 }
 
 }} // namespace hlr::matrix

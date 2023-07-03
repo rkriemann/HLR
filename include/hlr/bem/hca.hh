@@ -14,8 +14,6 @@
 
 namespace hlr { namespace bem {
 
-namespace hpro = HLIB;
-
 //////////////////////////////////////////////////////////////////////
 //
 // implement hybrid cross approximation
@@ -54,7 +52,8 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     // actual HCA algorithm
     // - <acc> only used for recompression
     //
-    TMatrix *
+    virtual
+    std::unique_ptr< TMatrix< value_t > >
     approx ( const TGeomCluster &  rowcl,
              const TGeomCluster &  colcl,
              const TTruncAcc &     acc ) const 
@@ -75,7 +74,7 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
 
         // immediately return empty matrix
         if ( k == 0 )
-            return new TRkMatrix( rowcl, colcl );
+            return std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl );
     
         //
         // compute G = (S|_pivot_row,pivot_col)^-1
@@ -89,13 +88,11 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
 
         auto  U = compute_U( rowcl, k, pivots, col_grid, G );
         auto  V = compute_V( colcl, k, pivots, row_grid );
-        auto  R = std::make_unique< TRkMatrix >( rowcl, colcl, hpro::value_type_v< value_t > );
+        auto  R = std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl, std::move( U ), std::move( V ) );
 
-        // std::move not working above for TRkMatrix ???
-        R->set_lrmat( U, V );
         R->truncate( acc );
 
-        return R.release();
+        return R;
     }
 
     //

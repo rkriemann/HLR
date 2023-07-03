@@ -129,16 +129,16 @@ program_main ()
     auto  comp_lu =
         [&] ( const auto  apx, const std::string &  apxname )
         {
-            size_t     mem_LU  = 0;
+            auto  mem_LU = std::unordered_map< std::string, size_t >();
 
             // define methods to execute
             const auto methods = std::set< std::string >{
                 "H+rec",
                 // "H+rec+accu",
-                "H+dag",
+                // "H+dag",
                 // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
-                // "zH+rec",
+                "zH+rec",
                 // "zH+rec+accu",
                 // "zH+dag",
                 // "zH+dag+accu+lazy"
@@ -174,7 +174,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                mem_LU["H+rec"] = LU->byte_size();
+                std::cout << "    mem    = " << format_mem( mem_LU["H+rec"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "HLU", prnopt );
@@ -212,7 +213,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                mem_LU["H+rec+accu"] = LU->byte_size();
+                std::cout << "    mem    = " << format_mem( mem_LU["H+rec+accu"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "HLU", prnopt );
@@ -255,9 +257,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
 
-                mem_LU = LU->byte_size();
-        
-                std::cout << "    mem    = " << format_mem( mem_LU ) << std::endl;
+                mem_LU["H+dag"] = LU->byte_size();
+                std::cout << "    mem    = " << format_mem( mem_LU["H+dag"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "HLU2", prnopt );
@@ -300,7 +301,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                mem_LU["H+dag+accy+lazy"] = LU->byte_size();
+                std::cout << "    mem    = " << format_mem( mem_LU["H+dag+accy+lazy"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "HLU2", prnopt );
@@ -343,7 +345,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                std::cout << "    mem    = " << format_mem( LU->byte_size() ) << std::endl;
+                mem_LU["H+dag+accy+eager"] = LU->byte_size();
+                std::cout << "    mem    = " << format_mem( mem_LU["H+dag+accy+eager"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "HLU2", prnopt );
@@ -384,7 +387,9 @@ program_main ()
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
-                std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
+
+                if ( mem_LU.contains( "H+rec" ) )
+                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU", prnopt );
@@ -426,7 +431,9 @@ program_main ()
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
-                std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
+
+                if ( mem_LU.contains( "H+rec+accu" ) )
+                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec+accu"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU", prnopt );
@@ -471,7 +478,9 @@ program_main ()
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
-                std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
+
+                if ( mem_LU.contains( "H+dag" ) )
+                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU2", prnopt );
@@ -516,7 +525,9 @@ program_main ()
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
-                std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU) ) << std::endl;
+
+                if ( mem_LU.contains( "H+dag+accu+lazy" ) )
+                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag+accu+lazy"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU2", prnopt );
@@ -528,7 +539,8 @@ program_main ()
             }
         };
 
-    if      ( cmdline::approx == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    if      ( cmdline::approx == "default" ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    else if ( cmdline::approx == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
     // else if ( cmdline::approx == "rrqr"    ) comp_lu( approx::RRQR< value_t >(), "RRQR" );
     // else if ( cmdline::approx == "randsvd" ) comp_lu( approx::RandSVD< value_t >(), "RandSVD" );
 }
