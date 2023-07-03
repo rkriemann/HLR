@@ -269,14 +269,14 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
                                                Hpro::apply_normal, *BA->block( k, i ),
                                                *A_ji, acc, approx );
 
-            if ( is_lowrank( A_ji ) )
+            if ( matrix::is_lowrank( A_ji ) )
             {
                 // A_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
                 // ⟶ W = U, X = D_ii^-T·V
-                auto  R_ji = ptrcast( A_ji, Hpro::TRkMatrix< value_t > );
-                auto  V    = blas::copy( blas::mat_V< value_t >( R_ji ) );
+                auto  R_ji = ptrcast( A_ji, matrix::lrmatrix< value_t > );
+                auto  V_ji = blas::prod( value_t(1), blas::adjoint( D_ii ), R_ji->V() );
 
-                blas::prod( value_t(1), blas::adjoint( D_ii ), V, value_t(0), blas::mat_V< value_t >( R_ji ) );
+                R_ji->set_V( std::move( V_ji ), acc );
             }// if
             else if ( is_dense( A_ji ) )
             {
@@ -332,14 +332,14 @@ ldu ( Hpro::TMatrix< value_t > &  A,
         {
             auto  L_ji = BA->block( j, i );
 
-            if ( is_lowrank( L_ji ) )
+            if ( matrix::is_lowrank( L_ji ) )
             {
                 // L_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
                 // ⟶ W = U, X = D_ii^-T·V
-                auto  R_ji = ptrcast( L_ji, Hpro::TRkMatrix< value_t > );
-                auto  V    = blas::copy( blas::mat_V< value_t >( R_ji ) );
+                auto  R_ji = ptrcast( L_ji, matrix::lrmatrix< value_t > );
+                auto  V_ji = blas::prod( blas::adjoint( D_ii ), R_ji->V() );
 
-                blas::prod( value_t(1), blas::adjoint( D_ii ), V, value_t(0), blas::mat_V< value_t >( R_ji ) );
+                R_ji->set_V( std::move( V_ji ), acc );
             }// if
             else if ( is_dense( L_ji ) )
             {

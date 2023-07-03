@@ -118,7 +118,7 @@ add ( const value_t                          alpha,
                 else if ( is_dense( A_ij ) )
                 {
                     auto  D_ij     = cptrcast( A_ij, matrix::dense_matrix< value_t > );
-                    auto  M        = blas::copy( blas::mat( D_ij ) );
+                    auto  M        = blas::copy( D_ij->mat() );
                     auto  [ U, V ] = approx( M, acc );
 
                     if ( U.ncols() > 0 )
@@ -246,7 +246,7 @@ add ( const value_t                          alpha,
             if ( is_null( A_ij ) )
                 continue;
 
-            auto  D_ij = blas::matrix< value_t >( blas::mat( C ),
+            auto  D_ij = blas::matrix< value_t >( C.mat(),
                                                   A_ij->row_is() - C.row_ofs(), 
                                                   A_ij->col_is() - C.col_ofs() );
             auto  C_ij = matrix::dense_matrix( A_ij->row_is(), A_ij->col_is(), D_ij );
@@ -322,16 +322,16 @@ add ( const value_t                        alpha,
 
         blas::scale( alpha, sUA );
 
-        auto [ U, V ] = approx( { sUA, blas::mat_U( C ) },
-                                { VA,  blas::mat_V( C ) },
+        auto [ U, V ] = approx( { sUA, C.U() },
+                                { VA,  C.V() },
                                 acc );
         
         C.set_lrmat( std::move( U ), std::move( V ), acc );
     }// if
     else
     {
-        auto [ U, V ] = approx( { UA, blas::mat_U( C ) },
-                                { VA, blas::mat_V( C ) },
+        auto [ U, V ] = approx( { UA, C.U() },
+                                { VA, C.V() },
                                 acc );
         
         C.set_lrmat( std::move( U ), std::move( V ), acc );
@@ -517,7 +517,9 @@ add ( const value_t                            alpha,
     C.decompress();
     
     // C = C + α A
-    blas::add( alpha, A.mat(), blas::mat( C ) );
+    auto  DC = C.mat();
+    
+    blas::add( alpha, A.mat(), DC );
 
     if ( was_compressed )
         C.compress( acc );
@@ -530,13 +532,15 @@ add ( const value_t                            alpha,
       matrix::dense_matrix< value_t > &        C )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
-    
+
     std::scoped_lock  lock( C.mutex() );
 
     HLR_ASSERT( ! C.is_compressed() );
     
     // C = C + α A
-    blas::add( alpha, A.mat(), C.mat() );
+    auto  DC = C.mat();
+
+    blas::add( alpha, A.mat(), DC );
 }
 
 }// namespace hlr

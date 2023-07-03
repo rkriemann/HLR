@@ -62,99 +62,18 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 
         return val;
     }// if
-    else if ( is_lowrank( A ) )
+    else if ( matrix::is_lowrank( A ) )
     {
-        //
-        // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
-        //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
-        //              = ∑_ij ∑_k ∑_l U_ik V_jk' U_il' V_jl
-        //              = ∑_k ∑_l ∑_i U_ik U_il' ∑_j V_jk' V_jl
-        //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
-        //
-
-        auto  comp_lr = [] ( const blas::matrix< value_t > &  U,
-                             const blas::matrix< value_t > &  V )
-        {
-            const uint  rank = U.ncols();
-            result_t    val  = 0.0;
-    
-            for ( size_t  l = 0; l < rank; l++ )
-            {
-                const auto  U_l = U.column( l );
-                const auto  V_l = V.column( l );
-            
-                for ( size_t  k = 0; k < rank; k++ )
-                {
-                    const auto  U_k = U.column( k );
-                    const auto  V_k = V.column( k );
-                
-                    val += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
-                }// for
-            }// for
-        
-            return std::abs( val );
-        };
-
-        if ( matrix::is_lowrank_sv( A ) )
-        {
-            auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
-                                       cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
-            
-            return comp_lr( U, cptrcast( &A, matrix::lrsvmatrix< value_t > )->V() );
-        }// if
-        else if ( compress::is_compressed( A ) )
-        {
-            return comp_lr( cptrcast( &A, matrix::lrmatrix< value_t > )->U(),
-                            cptrcast( &A, matrix::lrmatrix< value_t > )->V() );
-        }// if
-        else
-        {
-            return comp_lr( cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_A(),
-                            cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B() );
-        }// if
+        return blas::sqnorm_F( cptrcast( &A, matrix::lrmatrix< value_t > )->U(),
+                               cptrcast( &A, matrix::lrmatrix< value_t > )->V() );
     }// if
-    // else if ( matrix::is_generic_lowrank( A ) )
-    // {
-    //     auto  R = cptrcast( &A, matrix::lrmatrix );
+    else if ( matrix::is_lowrank_sv( A ) )
+    {
+        auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
+                                   cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
         
-    //     //
-    //     // ∑_ij (R_ij)² = ∑_ij (∑_k U_ik V_jk')²
-    //     //              = ∑_ij (∑_k U_ik V_jk') (∑_l U_il V_jl')'
-    //     //              = ∑_ij ∑_k ∑_l U_ik V_jk' U_il' V_jl
-    //     //              = ∑_k ∑_l ∑_i U_ik U_il' ∑_j V_jk' V_jl
-    //     //              = ∑_k ∑_l (U_l)^H · U_k  V_k^H · V_l
-    //     //
-
-    //     const auto  UV  = R->factors();
-
-    //     return std::visit(
-    //         [rank=R->rank()] ( auto &&  UV ) -> real_t
-    //         {
-    //             using  value_t = typename std::decay_t< decltype(UV) >::value_t;
-                
-    //             const auto  U    = UV.U;
-    //             const auto  V    = UV.V;
-    //             value_t     norm = value_t(0);
-                
-    //             for ( size_t  l = 0; l < rank; l++ )
-    //             {
-    //                 const auto  U_l = U.column( l );
-    //                 const auto  V_l = V.column( l );
-                    
-    //                 for ( size_t  k = 0; k < rank; k++ )
-    //                 {
-    //                     const auto  U_k = U.column( k );
-    //                     const auto  V_k = V.column( k );
-                        
-    //                     norm += blas::dot( U_l, U_k ) * blas::dot( V_l, V_k );
-    //                 }// for
-    //             }// for
-                
-    //             return std::real( std::abs( norm ) );
-    //         },
-    //         R->factors()
-    //     );
-    // }// if
+        return blas::sqnorm_F( U, cptrcast( &A, matrix::lrsvmatrix< value_t > )->V() );
+    }// if
     else if ( hlr::matrix::is_tiled_lowrank( A ) )
     {
         //
@@ -228,15 +147,9 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 
         return val;
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        auto  M = blas::matrix< value_t >();
-        
-        if ( compress::is_compressed( A ) )
-            M = cptrcast( &A, matrix::dense_matrix< value_t > )->mat();
-        else
-            M = blas::mat( cptrcast( &A, Hpro::TDenseMatrix< value_t > ) );
-        
+        auto  M   = cptrcast( &A, matrix::dense_matrix< value_t > )->mat();
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < M.nrows()*M.ncols(); ++i )
@@ -246,7 +159,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
     }// if
     else
     {
-        HLR_ASSERT( is_blocked( A ) || is_lowrank( A ) || is_dense( A ) );
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
     }// else
 
     return 0;
@@ -269,6 +182,32 @@ frobenius_squared ( const alpha_t                     alpha,
 
     HLR_ASSERT( A.block_is() == B.block_is() );
     
+    auto  lrdot = [] ( const auto &  U1,
+                       const auto &  V1,
+                       const auto &  U2,
+                       const auto &  V2 )
+    {
+        const auto  rank1 = U1.ncols();
+        const auto  rank2 = U2.ncols();
+        result_t    val   = 0.0;
+                              
+        for ( size_t  l = 0; l < rank1; l++ )
+        {
+            const auto  U1_l = U1.column( l );
+            const auto  V1_l = V1.column( l );
+                                  
+            for ( size_t  k = 0; k < rank2; k++ )
+            {
+                const auto  U2_k = U2.column( k );
+                const auto  V2_k = V2.column( k );
+                                      
+                val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
+            }// for
+        }// for
+
+        return val;
+    };
+
     if ( is_blocked_all( A, B ) )
     {
         auto      BA  = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
@@ -302,90 +241,50 @@ frobenius_squared ( const alpha_t                     alpha,
 
         return std::abs( val );
     }// if
-    else if ( is_lowrank_all( A, B ) )
+    else if (( matrix::is_lowrank(    A ) && matrix::is_lowrank(    B ) ) ||
+             ( matrix::is_lowrank(    A ) && matrix::is_lowrank_sv( B ) ) ||
+             ( matrix::is_lowrank_sv( A ) && matrix::is_lowrank(    B ) ) ||
+             ( matrix::is_lowrank_sv( A ) && matrix::is_lowrank_sv( B ) ))
     {
-        // if ( A.is_complex() )
-        // {
-        //     HLR_ERROR( "TODO" );
-        // }// if
-        // else
+        auto  UA = blas::matrix< value_t >();
+        auto  VA = blas::matrix< value_t >();
+        auto  UB = blas::matrix< value_t >();
+        auto  VB = blas::matrix< value_t >();
+
+        if ( matrix::is_lowrank( A )  )
         {
-            auto  lrdot = [] ( const auto &  U1,
-                               const auto &  V1,
-                               const auto &  U2,
-                               const auto &  V2 )
-                          {
-                              const auto  rank1 = U1.ncols();
-                              const auto  rank2 = U2.ncols();
-                              result_t    val   = 0.0;
-                              
-                              for ( size_t  l = 0; l < rank1; l++ )
-                              {
-                                  const auto  U1_l = U1.column( l );
-                                  const auto  V1_l = V1.column( l );
-                                  
-                                  for ( size_t  k = 0; k < rank2; k++ )
-                                  {
-                                      const auto  U2_k = U2.column( k );
-                                      const auto  V2_k = V2.column( k );
-                                      
-                                      val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
-                                  }// for
-                              }// for
+            UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U();
+            VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V();
+        }// if
+        else if ( matrix::is_lowrank_sv( A ) )
+        {
+            auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
+                                       cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
+            
+            UA = std::move( U );
+            VA = cptrcast( &A, matrix::lrsvmatrix< value_t > )->V();
+        }// if
 
-                              return val;
-                          };
-
-            auto  UA = blas::matrix< value_t >();
-            auto  VA = blas::matrix< value_t >();
-            auto  UB = blas::matrix< value_t >();
-            auto  VB = blas::matrix< value_t >();
+        if ( matrix::is_lowrank( B )  )
+        {
+            UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U();
+            VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V();
+        }// if
+        else if ( matrix::is_lowrank_sv( B ) )
+        {
+            auto  U = blas::prod_diag( cptrcast( &B, matrix::lrsvmatrix< value_t > )->U(),
+                                       cptrcast( &B, matrix::lrsvmatrix< value_t > )->S() );
             
-            if ( matrix::is_lowrank_sv( A ) )
-            {
-                auto  U = blas::prod_diag( cptrcast( &A, matrix::lrsvmatrix< value_t > )->U(),
-                                           cptrcast( &A, matrix::lrsvmatrix< value_t > )->S() );
-            
-                UA = std::move( U );
-                VA = cptrcast( &A, matrix::lrsvmatrix< value_t > )->V();
-            }// if
-            else if ( compress::is_compressed( A )  )
-            {
-                UA = cptrcast( &A, matrix::lrmatrix< value_t > )->U();
-                VA = cptrcast( &A, matrix::lrmatrix< value_t > )->V();
-            }// if
-            else
-            {
-                UA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                VA = cptrcast( &A, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-            }// else
-            
-            if ( matrix::is_lowrank_sv( B ) )
-            {
-                auto  U = blas::prod_diag( cptrcast( &B, matrix::lrsvmatrix< value_t > )->U(),
-                                           cptrcast( &B, matrix::lrsvmatrix< value_t > )->S() );
-            
-                UB = std::move( U );
-                VB = cptrcast( &B, matrix::lrsvmatrix< value_t > )->V();
-            }// if
-            else if ( compress::is_compressed( B )  )
-            {
-                UB = cptrcast( &B, matrix::lrmatrix< value_t > )->U();
-                VB = cptrcast( &B, matrix::lrmatrix< value_t > )->V();
-            }// if
-            else
-            {
-                UB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                VB = cptrcast( &B, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-            }// else
-            
-            const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                                alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                                alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                                beta  * beta  * lrdot( UB, VB, UB, VB ) );
-
-            return std::abs( sqn );
-        }// else
+            UB = std::move( U );
+            VB = cptrcast( &B, matrix::lrsvmatrix< value_t > )->V();
+        }// if
+        
+        const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
+                            alpha * beta  * lrdot( UA, VA, UB, VB ) +
+                            alpha * beta  * lrdot( UB, VB, UA, VA ) +
+                            beta  * beta  * lrdot( UB, VB, UB, VB ) );
+        
+        return std::abs( sqn );
     }// if
     else if ( matrix::is_uniform_lowrank_all( A, B ) )
     {
@@ -411,7 +310,7 @@ frobenius_squared ( const alpha_t                     alpha,
 
         return frobenius_squared( alpha, *RA, beta, *RB );
     }// if
-    else if ( is_dense_all( A, B ) )
+    else if ( matrix::is_dense_all( A, B ) )
     {
         auto  comp_dense = [alpha,beta] ( const blas::matrix< value_t > &  MA,
                                           const blas::matrix< value_t > &  MB )
@@ -433,37 +332,12 @@ frobenius_squared ( const alpha_t                     alpha,
             return val;
         };
 
-        if ( compress::is_compressed( A ) )
-        {
-            if ( compress::is_compressed( B ) )
-            {
-                return comp_dense( cptrcast( &A, matrix::dense_matrix< value_t > )->mat(),
-                                   cptrcast( &B, matrix::dense_matrix< value_t > )->mat() );
-            }// if
-            else
-            {
-                return comp_dense( cptrcast( &A, matrix::dense_matrix< value_t > )->mat(),
-                                   cptrcast( &B, Hpro::TDenseMatrix< value_t > )->blas_mat() );
-            }// else
-        }// if
-        else
-        {
-            if ( compress::is_compressed( B ) )
-            {
-                return comp_dense( cptrcast( &A, Hpro::TDenseMatrix< value_t > )->blas_mat(),
-                                   cptrcast( &B, matrix::dense_matrix< value_t > )->mat() );
-            }// if
-            else
-            {
-                return comp_dense( cptrcast( &A, Hpro::TDenseMatrix< value_t > )->blas_mat(),
-                                   cptrcast( &B, Hpro::TDenseMatrix< value_t > )->blas_mat() );
-            }// else
-        }// else
+        return comp_dense( cptrcast( &A, matrix::dense_matrix< value_t > )->mat(),
+                           cptrcast( &B, matrix::dense_matrix< value_t > )->mat() );
     }// if
     else
     {
         HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
-        // HLR_ASSERT( is_blocked_all( A, B ) || is_lowrank_all( A, B ) || is_dense_all( A, B ) );
     }// else
 
     return 0;

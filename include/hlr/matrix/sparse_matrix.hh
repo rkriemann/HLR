@@ -371,8 +371,8 @@ is_sparse_eigen ( const Hpro::TMatrix< value_t > *  M )
     return ! is_null( M ) && IS_TYPE( M, sparse_matrix );
 }
 
-HLR_TEST_ALL( is_sparse_eigen, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_sparse_eigen, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_sparse_eigen, hlr::matrix::is_sparse_eigen, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_sparse_eigen, hlr::matrix::is_sparse_eigen, Hpro::TMatrix< value_t > )
 
 //
 // ctors

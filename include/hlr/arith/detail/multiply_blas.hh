@@ -174,14 +174,14 @@ multiply ( const value_t                     alpha,
     if      ( is_blocked( A ) )             multiply( alpha, op_A, * cptrcast( & A, Hpro::TBlockMatrix< value_t > ), B, C );
     else if ( compress::is_compressible( A ) )
     {
-        if      ( is_lowrank( A ) )         multiply( alpha, op_A, * cptrcast( & A, lrmatrix< value_t > ), B, C );
-        else if ( is_uniform_lowrank( A ) ) multiply( alpha, op_A, * cptrcast( & A, uniform_lrmatrix< value_t > ), B, C );
-        else if ( is_dense( A ) )           multiply( alpha, op_A, * cptrcast( & A, dense_matrix< value_t > ), B, C );
+        if      ( matrix::is_lowrank( A ) )         multiply( alpha, op_A, * cptrcast( & A, lrmatrix< value_t > ), B, C );
+        else if ( matrix::is_uniform_lowrank( A ) ) multiply( alpha, op_A, * cptrcast( & A, uniform_lrmatrix< value_t > ), B, C );
+        else if ( matrix::is_dense( A ) )           multiply( alpha, op_A, * cptrcast( & A, dense_matrix< value_t > ), B, C );
         else
             HLR_ERROR( "unsupported matrix type : " + A.typestr() );
     }// if
-    else if ( is_lowrank( A ) )             multiply( alpha, op_A, * cptrcast( & A, Hpro::TRkMatrix< value_t > ), B, C );
-    else if ( is_dense( A ) )               multiply( alpha, op_A, * cptrcast( & A, Hpro::TDenseMatrix< value_t > ), B, C );
+    else if ( matrix::is_lowrank( A ) )             multiply( alpha, op_A, * cptrcast( & A, Hpro::TRkMatrix< value_t > ), B, C );
+    else if ( matrix::is_dense( A ) )               multiply( alpha, op_A, * cptrcast( & A, Hpro::TDenseMatrix< value_t > ), B, C );
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 }
@@ -367,13 +367,13 @@ multiply ( const value_t                     alpha,
     if      ( is_blocked( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TBlockMatrix< value_t > ), C );
     else if ( compress::is_compressible( B ) )
     {
-        if      ( is_lowrank( B ) )         multiply( alpha, A, op_B, * cptrcast( & B, lrmatrix< value_t > ), C );
-        else if ( is_uniform_lowrank( B ) ) multiply( alpha, A, op_B, * cptrcast( & B, uniform_lrmatrix< value_t > ), C );
+        if      ( matrix::is_lowrank( B ) )         multiply( alpha, A, op_B, * cptrcast( & B, lrmatrix< value_t > ), C );
+        else if ( matrix::is_uniform_lowrank( B ) ) multiply( alpha, A, op_B, * cptrcast( & B, uniform_lrmatrix< value_t > ), C );
         else if ( is_dense( B ) )           multiply( alpha, A, op_B, * cptrcast( & B, dense_matrix< value_t > ), C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_lowrank( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TRkMatrix< value_t > ), C );
+    else if ( matrix::is_lowrank( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TRkMatrix< value_t > ), C );
     else if ( is_dense( B ) )               multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TDenseMatrix< value_t > ), C );
     else
         HLR_ERROR( "unsupported matrix type : " + B.typestr() );

@@ -621,8 +621,8 @@ is_h2_lowrank ( const Hpro::TMatrix< value_t > *  M )
     return ! is_null( M ) && IS_TYPE( M, h2_lrmatrix );
 }
 
-HLR_TEST_ALL( is_h2_lowrank, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_h2_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_h2_lowrank, hlr::matrix::is_h2_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_h2_lowrank, hlr::matrix::is_h2_lowrank, Hpro::TMatrix< value_t > )
 
 //
 // replace current cluster basis by given cluster bases

@@ -637,8 +637,8 @@ is_uniform_lowrank ( const Hpro::TMatrix< value_t > *  M )
     return ! is_null( M ) && IS_TYPE( M, uniform_lrmatrix );
 }
 
-HLR_TEST_ALL( is_uniform_lowrank, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_uniform_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_uniform_lowrank, hlr::matrix::is_uniform_lowrank, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_uniform_lowrank, hlr::matrix::is_uniform_lowrank, Hpro::TMatrix< value_t > )
 
 //
 // replace current cluster basis by given cluster bases

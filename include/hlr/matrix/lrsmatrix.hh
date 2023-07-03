@@ -229,9 +229,6 @@ public:
                            Hpro::TVector< value_t > *        y,
                            const Hpro::matop_t               op = Hpro::apply_normal ) const;
     
-    // truncate matrix to accuracy \a acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc );
-
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
     virtual void  apply_add   ( const value_t                    alpha,
@@ -244,7 +241,8 @@ public:
                                 blas::matrix< value_t > &        Y,
                                 const matop_t                    op = apply_normal ) const;
 
-    using Hpro::TMatrix< value_t >::apply_add;
+    // truncate matrix to accuracy \a acc
+    virtual void truncate ( const Hpro::TTruncAcc & acc );
     
     //
     // RTTI
@@ -721,25 +719,25 @@ is_lowrankS ( const Hpro::TMatrix< value_t > *  M )
     return ! is_null( M ) && IS_TYPE( M, lrsmatrix );
 }
 
-HLR_TEST_ALL( is_lowrankS, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_lowrankS, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_lowrankS, hlr::matrix::is_lowrankS, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_lowrankS, hlr::matrix::is_lowrankS, Hpro::TMatrix< value_t > )
 
-template < typename value_t >
-bool
-is_compressible_lowrankS ( const Hpro::TMatrix< value_t > &  M )
-{
-    return IS_TYPE( &M, lrsmatrix );
-}
+// template < typename value_t >
+// bool
+// is_compressible_lowrankS ( const Hpro::TMatrix< value_t > &  M )
+// {
+//     return IS_TYPE( &M, lrsmatrix );
+// }
 
-template < typename value_t >
-bool
-is_compressible_lowrankS ( const Hpro::TMatrix< value_t > *  M )
-{
-    return ! is_null( M ) && IS_TYPE( M, lrsmatrix );
-}
+// template < typename value_t >
+// bool
+// is_compressible_lowrankS ( const Hpro::TMatrix< value_t > *  M )
+// {
+//     return ! is_null( M ) && IS_TYPE( M, lrsmatrix );
+// }
 
-HLR_TEST_ALL( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
+// HLR_TEST_ALL( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
+// HLR_TEST_ANY( is_compressible_lowrankS, Hpro::TMatrix< value_t > )
 
 }} // namespace hlr::matrix
 

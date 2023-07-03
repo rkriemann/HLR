@@ -76,56 +76,56 @@ multiply ( const value_t                     alpha,
             auto  B = cptrcast( &aB, Hpro::TBlockMatrix< value_t > );
             
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, * A, op_B, * B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, * A, op_B, * B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, * A, op_B, * B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >(           alpha, op_A, * A, op_B, * B, * ptrcast( &C, dense_matrix< value_t > ) );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, * A, op_B, * B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, * A, op_B, * B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >(           alpha, op_A, * A, op_B, * B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank_sv( aB ) )
+        else if ( matrix::is_lowrank_sv( aB ) )
         {
             auto  B = cptrcast( &aB, lrsvmatrix< value_t > );
             
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank( aB ) )
+        else if ( matrix::is_lowrank( aB ) )
         {
             auto  B = cptrcast( &aB, lrmatrix< value_t > );
                 
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_uniform_lowrank( aB ) )
+        else if ( matrix::is_uniform_lowrank( aB ) )
         {
             auto  B = cptrcast( &aB, uniform_lrmatrix< value_t > );
                 
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense( aB ) )
+        else if ( matrix::is_dense( aB ) )
         {
             auto  B = cptrcast( &aB, dense_matrix< value_t > );
                 
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >(           alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + aB.typestr() );
     }// if
-    else if ( is_lowrank_sv( aA ) )
+    else if ( matrix::is_lowrank_sv( aA ) )
     {
         auto  A = cptrcast( &aA, lrsvmatrix< value_t > );
             
@@ -134,35 +134,35 @@ multiply ( const value_t                     alpha,
             auto  B = cptrcast( &aB, Hpro::TBlockMatrix< value_t > );
 
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank_sv( aB ) )
+        else if ( matrix::is_lowrank_sv( aB ) )
         {
             auto  B = cptrcast( &aB, lrsvmatrix< value_t > );
                     
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense( aB ) )
+        else if ( matrix::is_dense( aB ) )
         {
             auto  B = cptrcast( &aB, dense_matrix< value_t > );
                     
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + aB.typestr() );
     }// if
-    else if ( is_lowrank( aA ) )
+    else if ( matrix::is_lowrank( aA ) )
     {
         auto  A = cptrcast( &aA, lrmatrix< value_t > );
             
@@ -171,35 +171,35 @@ multiply ( const value_t                     alpha,
             auto  B = cptrcast( &aB, Hpro::TBlockMatrix< value_t > );
 
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank( aB ) )
+        else if ( matrix::is_lowrank( aB ) )
         {
             auto  B = cptrcast( &aB, lrmatrix< value_t > );
                     
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense( aB ) )
+        else if ( matrix::is_dense( aB ) )
         {
             auto  B = cptrcast( &aB, dense_matrix< value_t > );
                     
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + aB.typestr() );
     }// if
-    else if ( is_uniform_lowrank( aA ) )
+    else if ( matrix::is_uniform_lowrank( aA ) )
     {
         auto  A = cptrcast( &aA, uniform_lrmatrix< value_t > );
         
@@ -207,33 +207,33 @@ multiply ( const value_t                     alpha,
         {
             auto  B = cptrcast( &aB, Hpro::TBlockMatrix< value_t > );
                 
-            if      ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
+            if      ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_uniform_lowrank( aB ) )
+        else if ( matrix::is_uniform_lowrank( aB ) )
         {
             auto  B = cptrcast( &aB, uniform_lrmatrix< value_t > );
             
-            if      ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
+            if      ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense( aB ) )
+        else if ( matrix::is_dense( aB ) )
         {
             auto  B = cptrcast( &aB, dense_matrix< value_t > );
                 
-            if      ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
+            if      ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + aB.typestr() );
     }// if
-    else if ( is_dense( aA ) )
+    else if ( matrix::is_dense( aA ) )
     {
         auto  A = cptrcast( &aA, dense_matrix< value_t > );
             
@@ -242,49 +242,49 @@ multiply ( const value_t                     alpha,
             auto  B = cptrcast( &aB, Hpro::TBlockMatrix< value_t > );
             
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank_sv( aB ) )
+        else if ( matrix::is_lowrank_sv( aB ) )
         {
             auto  B = cptrcast( &aB, lrsvmatrix< value_t > );
                     
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_lowrank( aB ) )
+        else if ( matrix::is_lowrank( aB ) )
         {
             auto  B = cptrcast( &aB, lrmatrix< value_t > );
                     
             if      ( is_blocked( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_uniform_lowrank( aB ) )
+        else if ( matrix::is_uniform_lowrank( aB ) )
         {
             auto  B =  cptrcast( &aB, matrix::uniform_lrmatrix< value_t > );
             
-            if      ( is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
+            if      ( matrix::is_lowrank( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(   C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense( aB ) )
+        else if ( matrix::is_dense( aB ) )
         {
             auto  B = cptrcast( &aB, dense_matrix< value_t > );
             
             if      ( is_blocked(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-            else if ( is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
-            else if ( is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-            else if ( is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
+            else if ( matrix::is_lowrank_sv( C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrsvmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_lowrank(    C ) ) multiply< value_t, approx_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, lrmatrix< value_t > ), acc, approx );
+            else if ( matrix::is_dense(      C ) ) multiply< value_t >( alpha, op_A, *A, op_B, *B, * ptrcast( &C, dense_matrix< value_t > ), acc );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -352,7 +352,7 @@ multiply ( const value_t                     alpha,
     
     using namespace hlr::matrix;
     
-    if ( ! is_dense( aC ) )
+    if ( ! matrix::is_dense( aC ) )
         HLR_ERROR( "unsupported matrix type : " + aC.typestr() );
 
     #if HLR_MULT_TESTS == 1
@@ -365,58 +365,58 @@ multiply ( const value_t                     alpha,
 
     #endif
 
-    auto  C = ptrcast( &aC, Hpro::TDenseMatrix< value_t > );
+    auto  C = ptrcast( &aC, matrix::dense_matrix< value_t > );
     
     if ( is_blocked( aA ) )
     {
         auto  A = cptrcast( &aA, Hpro::TBlockMatrix< value_t > );
         
         if      ( is_blocked(         B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( is_lowrank_sv(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
-        else if ( is_lowrank(         B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
-        else if ( is_uniform_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ), *C );
-        else if ( is_dense(           B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
+        else if ( matrix::is_lowrank_sv(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
+        else if ( matrix::is_lowrank(         B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
+        else if ( matrix::is_uniform_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ), *C );
+        else if ( matrix::is_dense(           B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_lowrank_sv( aA ) )
+    else if ( matrix::is_lowrank_sv( aA ) )
     {
         auto  A = cptrcast( &aA, lrsvmatrix< value_t > );
             
         if      ( is_blocked(    B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( is_lowrank_sv( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
-        else if ( is_dense(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
+        else if ( matrix::is_lowrank_sv( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
+        else if ( matrix::is_dense(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_lowrank( aA ) )
+    else if ( matrix::is_lowrank( aA ) )
     {
         auto  A = cptrcast( &aA, lrmatrix< value_t > );
             
         if      ( is_blocked( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( is_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
-        else if ( is_dense(   B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
+        else if ( matrix::is_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
+        else if ( matrix::is_dense(   B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_uniform_lowrank( aA ) )
+    else if ( matrix::is_uniform_lowrank( aA ) )
     {
         auto  A = cptrcast( &aA, uniform_lrmatrix< value_t > );
         
         if      ( is_blocked(         B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( is_uniform_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ), *C );
-        else if ( is_dense(           B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ), *C );
+        else if ( matrix::is_uniform_lowrank( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ), *C );
+        else if ( matrix::is_dense(           B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, matrix::dense_matrix< value_t > ), *C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_dense( aA ) )
+    else if ( matrix::is_dense( aA ) )
     {
         auto  A = cptrcast( &aA, dense_matrix< value_t > );
             
         if      ( is_blocked(    B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( is_lowrank_sv( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
-        else if ( is_lowrank(    B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
-        else if ( is_dense(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
+        else if ( matrix::is_lowrank_sv( B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrsvmatrix< value_t > ), *C );
+        else if ( matrix::is_lowrank(    B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, lrmatrix< value_t > ), *C );
+        else if ( matrix::is_dense(      B ) ) multiply< value_t >( alpha, op_A, *A, op_B, * cptrcast( &B, dense_matrix< value_t > ), *C );
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
@@ -454,34 +454,17 @@ multiply ( const value_t                     alpha,
 
     HLR_ASSERT( ! matrix::is_lowrank_sv_any( A, B ) );
     
-    if ( is_lowrank( A ) )
+    if ( matrix::is_lowrank( A ) )
     {
         //
         // U·V' × B = W·X'
         //
 
-        uint  k = 0;
-        auto  V = blas::matrix< value_t >();
-        auto  W = blas::matrix< value_t >();
-        
-        if ( compress::is_compressible( A ) )
-        {
-            auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
-
-            V = std::move( RA->V( op_A ) );
-            W = std::move( blas::copy( RA->U( op_A ) ) );
-            k = RA->rank();
-        }// if
-        else
-        {
-            auto  RA = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-
-            V = std::move( blas::mat_V( RA, op_A ) );
-            W = std::move( blas::copy( blas::mat_U( RA, op_A ) ) );
-            k = RA->rank();
-        }// else
-        
-        auto  X = blas::matrix< value_t >( B.ncols( op_B ), k );
+        auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
+        auto  V  = std::move( RA->V( op_A ) );
+        auto  W  = std::move( blas::copy( RA->U( op_A ) ) );
+        auto  k  = RA->rank();
+        auto  X  = blas::matrix< value_t >( B.ncols( op_B ), k );
 
         multiply( alpha, blas::adjoint( op_B ), B, V, X );
 
@@ -491,44 +474,27 @@ multiply ( const value_t                     alpha,
             blas::conj( X );
         }// if
         
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+        return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
-    else if ( is_lowrank( B ) )
+    else if ( matrix::is_lowrank( B ) )
     {
         //
         // A × U·V' = W·X'
         //
 
-        uint  k = 0;
-        auto  U = blas::matrix< value_t >();
-        auto  X = blas::matrix< value_t >();
-        
-        if ( compress::is_compressible( B ) )
-        {
-            auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
-            
-            U = std::move( RB->U( op_B ) );
-            X = std::move( blas::copy( RB->V( op_B ) ) );
-            k = RB->rank();
-        }// if
-        else
-        {
-            auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
-            
-            U = std::move( blas::mat_U( RB, op_B ) );
-            X = std::move( blas::copy( blas::mat_V( RB, op_B ) ) );
-            k = RB->rank();
-        }// else
-        
+        auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
+        auto  U  = std::move( RB->U( op_B ) );
+        auto  X  = std::move( blas::copy( RB->V( op_B ) ) );
+        auto  k  = RB->rank();
         auto  W  = blas::matrix< value_t >( A.nrows( op_A ), k );
         
         multiply( alpha, op_A, A, U, W );
 
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+        return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
-    else if ( is_dense_any( A, B ) )
+    else if ( matrix::is_dense_any( A, B ) )
     {
-        C = std::make_unique< Hpro::TDenseMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ) );
+        C = std::make_unique< matrix::dense_matrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ) );
 
         multiply( alpha, op_A, A, op_B, B, *C );
     }// if
@@ -1370,12 +1336,12 @@ multiply_diag ( const value_t                     alpha,
                 const Hpro::matop_t               op_B,
                 const Hpro::TMatrix< value_t > &  B )
 {
-    if ( is_lowrank( A ) )
+    if ( matrix::is_lowrank( A ) )
     {
         // U·V' × D × B = W·X' ⇒ B' × D' × V = X
-        auto  RA = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  V  = blas::mat_V( RA, op_A );
-        auto  W  = blas::copy( blas::mat_U( RA, op_A ) );
+        auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
+        auto  V  = RA->V( op_A );
+        auto  W  = blas::copy( RA->U( op_A ) );
         auto  X  = blas::matrix< value_t >( B.ncols( op_B ), RA->rank() );
 
         multiply_diag( alpha, blas::adjoint( op_B ), B, blas::adjoint( op_D ), D, V, X );
@@ -1386,15 +1352,15 @@ multiply_diag ( const value_t                     alpha,
             blas::conj( X );
         }// if
 
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+        return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
-    else if ( is_lowrank( B ) )
+    else if ( matrix::is_lowrank( B ) )
     {
         // A × D × U·V' = W·X' ⇒ A × D × U = W
-        auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
-        auto  U  = blas::mat_U( RB, op_B );
+        auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
+        auto  U  = RB->U( op_B );
         auto  W  = blas::matrix< value_t >( A.nrows( op_A ), RB->rank() );
-        auto  X  = blas::copy( blas::mat_V( RB, op_B ) );
+        auto  X  = blas::copy( RB->V( op_B ) );
 
         multiply_diag( alpha, op_A, A, op_D, D, U, W );
 
@@ -1404,11 +1370,11 @@ multiply_diag ( const value_t                     alpha,
             blas::conj( X );
         }// if
 
-        return std::make_unique< Hpro::TRkMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+        return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
-    else if ( is_dense_any( A, B ) )
+    else if ( matrix::is_dense_any( A, B ) )
     {
-        auto  C = std::make_unique< Hpro::TDenseMatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ) );
+        auto  C = std::make_unique< matrix::dense_matrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ) );
 
         multiply_diag( alpha, op_A, A, op_D, D, op_B, B, *C );
 
@@ -1453,22 +1419,24 @@ multiply_hadamard ( const value_t                     alpha,
             }// for
         }// for
     }// if
-    else if ( is_dense_all( A, B ) )
+    else if ( matrix::is_dense_all( A, B ) )
     {
-        auto        DA     = ptrcast( &A,  Hpro::TDenseMatrix< value_t > );
-        auto        DB     = cptrcast( &B, Hpro::TDenseMatrix< value_t > );
-        auto        blas_A = Hpro::blas_mat< value_t >( DA );
-        auto        blas_B = Hpro::blas_mat< value_t >( DB );
+        auto        DA     = ptrcast( &A,  matrix::dense_matrix< value_t > );
+        auto        DB     = cptrcast( &B, matrix::dense_matrix< value_t > );
+        auto        blas_A = blas::copy( DA.mat() );
+        auto        blas_B = DB.mat();
         const auto  nrows  = DA->nrows();
         const auto  ncols  = DA->ncols();
 
         for ( size_t  i = 0; i < nrows*ncols; ++i )
             blas_A.data()[i] *= alpha * blas_B.data()[i];
+
+        DA->set_matrix( blas_A, acc );
     }// if
-    else if ( is_lowrank_all( A, B ) )
+    else if ( matrix::is_lowrank_all( A, B ) )
     {
-        auto  RA = ptrcast( &A,  Hpro::TRkMatrix< value_t > );
-        auto  RB = cptrcast( &B, Hpro::TRkMatrix< value_t > );
+        auto  RA = ptrcast( &A,  matrix::lrmatrix< value_t > );
+        auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
 
         //
         // construct product with rank rank(A)·rank(B) and fill
@@ -1525,7 +1493,7 @@ multiply_hadamard ( const value_t                     alpha,
 
         auto [ Y_acc, Z_acc ] = approx( Y, Z, acc );
         
-        RA->set_lrmat( std::move( Y_acc ), std::move( Z_acc ) );
+        RA->set_lrmat( std::move( Y_acc ), std::move( Z_acc ), acc );
     }// if
 }
 

@@ -9,6 +9,7 @@
 //
 
 #include <hlr/arith/mulvec.hh>
+#include <hlr/matrix/dense_matrix.hh>
 
 namespace hlr
 {
@@ -104,7 +105,7 @@ solve_lower_tri ( const Hpro::matop_t               op_L,
             }// for
         }// else
     }// if
-    else if ( is_dense( L ) )
+    else if ( matrix::is_dense( L ) )
     {
         if ( diag_mode == Hpro::general_diag )
         {
@@ -213,7 +214,7 @@ solve_upper_tri ( const Hpro::matop_t               op_U,
             }// for
         }// else
     }// if
-    else if ( is_dense( U ) )
+    else if ( matrix::is_dense( U ) )
     {
         if ( diag_mode == Hpro::general_diag )
         {

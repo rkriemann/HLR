@@ -116,9 +116,9 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
     }// if
     else
     {
-        if ( is_dense( M ) || is_compressible_dense( M ) )
+        if ( matrix::is_dense( M ) || Hpro::is_dense( M ) )
         {
-            if ( is_compressible_dense( M ) && cptrcast( &M, dense_matrix< value_t > )->is_compressed() )
+            if ( matrix::is_dense( M ) && cptrcast( &M, matrix::dense_matrix< value_t > )->is_compressed() )
                 prn.set_rgb( colors[HLR_COLOR_BG_DENSE_COMPRESSED] );
             else
                 prn.set_rgb( colors[HLR_COLOR_BG_DENSE] );
@@ -149,8 +149,8 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             {
                 auto  D = blas::matrix< value_t >();
 
-                if ( is_compressible_dense( M ) ) D = cptrcast( &M, dense_matrix< value_t > )->mat();
-                else                              D = cptrcast( &M, Hpro::TDenseMatrix< value_t > )->blas_mat();
+                if ( matrix::is_dense( M ) ) D = cptrcast( &M, matrix::dense_matrix< value_t > )->mat();
+                else                         D = cptrcast( &M, Hpro::TDenseMatrix< value_t > )->blas_mat();
 
                 prn.set_gray( 0 );
                 
@@ -200,16 +200,15 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         //         prn.restore();
         //     }// if
         // }// if
-        else if ( is_lowrank( M ) || is_compressible_lowrank( M ) )
+        else if ( matrix::is_lowrank( M ) )
         {
-            auto  rank = cptrcast( &M, Hpro::TRkMatrix< value_t > )->rank();
+            auto  R    = cptrcast( &M, matrix::lrmatrix< value_t > );
+            auto  rank = R->rank();
 
             if ( ! contains( options, "nonempty" ) || ( rank > 0 ))
             {
-                if ( is_compressible_lowrank( M ) && cptrcast( &M, lrmatrix< value_t > )->is_compressed() )
-                    prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
-                else
-                    prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
+                if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+                else                      prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
 
                 prn.fill_rect( M.col_ofs(),
                                M.row_ofs(),
@@ -231,21 +230,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
 
                 if ( contains( options, "pattern" ) )
                 {
-                    auto  U = blas::matrix< value_t >();
-                    auto  V = blas::matrix< value_t >();
-
-                    if ( is_compressible_lowrank( M ) )
-                    {
-                        U = cptrcast( &M, lrmatrix< value_t > )->U();
-                        V = cptrcast( &M, lrmatrix< value_t > )->V();
-                    }// if
-                    else
-                    {
-                        U = cptrcast( &M, Hpro::TRkMatrix< value_t > )->blas_mat_A();
-                        V = cptrcast( &M, Hpro::TRkMatrix< value_t > )->blas_mat_B();
-                    }// else
-
-                    auto  D = blas::prod( U, blas::adjoint( V ) );
+                    auto  D = blas::prod( R->U(), blas::adjoint( R->V() ) );
                     
                     prn.set_gray( 0 );
                 
@@ -257,7 +242,7 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 }// if
             }// if
         }// if
-        else if ( is_uniform_lowrank( M ) )
+        else if ( matrix::is_uniform_lowrank( M ) )
         {
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
 
@@ -466,7 +451,7 @@ print_mem ( const Hpro::TMatrix< value_t > &    M,
     }// if
     else
     {
-        if ( is_dense( M ) )
+        if ( matrix::is_dense( M ) )
         {
             // background
             prn.set_gray( 0 );
@@ -475,9 +460,9 @@ print_mem ( const Hpro::TMatrix< value_t > &    M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
         }// if
-        else if ( is_lowrank( M ) )
+        else if ( matrix::is_lowrank( M ) )
         {
-            auto  R     = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+            auto  R     = cptrcast( &M, matrix::lrmatrix< value_t > );
             auto  rank  = R->rank();
             auto  ratio = ( rank * double( R->nrows() + R->ncols() ) ) / ( double(R->nrows()) * double(R->ncols()) );
             
@@ -488,7 +473,7 @@ print_mem ( const Hpro::TMatrix< value_t > &    M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
         }// if
-        else if ( is_uniform_lowrank( M ) )
+        else if ( matrix::is_uniform_lowrank( M ) )
         {
             auto  R        = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
             auto  row_rank = R->row_rank();
@@ -505,6 +490,8 @@ print_mem ( const Hpro::TMatrix< value_t > &    M,
                            M.col_ofs() + M.ncols(),
                            M.row_ofs() + M.nrows() );
         }// if
+        else
+            HLR_ERROR( "unsupported matrix type: " + M.typestr() );
 
         // draw frame
         prn.set_gray( 0 );

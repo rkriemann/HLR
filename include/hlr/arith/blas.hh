@@ -722,9 +722,9 @@ HLR_BLAS_NORMM( std::complex< double >, zlange_ )
 // Frobenius norm for lowrank matrices
 //
 template < typename value_t >
-typename Hpro::real_type_t< value_t >
-norm_F ( const matrix< value_t > &  U,
-         const matrix< value_t > &  V )
+long double
+sqnorm_F ( const matrix< value_t > &  U,
+           const matrix< value_t > &  V )
 {
     //
     // ∑_ij (M_ij)² = ∑_ij (∑_k u_ik v_jk')²
@@ -734,7 +734,7 @@ norm_F ( const matrix< value_t > &  U,
     //              = ∑_k ∑_l (u_l)^H · u_k  v_k^H · v_l
     //
     
-    auto  res = value_t(0);
+    long double  res = 0;
     
     for ( size_t  k = 0; k < U.ncols(); k++ )
     {
@@ -750,7 +750,15 @@ norm_F ( const matrix< value_t > &  U,
         }// for
     }// for
 
-    return math::abs( math::sqrt( res ) );
+    return math::abs( res );
+}
+
+template < typename value_t >
+typename Hpro::real_type_t< value_t >
+norm_F ( const matrix< value_t > &  U,
+         const matrix< value_t > &  V )
+{
+    return math::sqrt( sqnorm_F( U, V ) );
 }
 
 // make sure, standard norm_F is found

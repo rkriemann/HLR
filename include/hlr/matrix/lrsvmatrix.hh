@@ -331,8 +331,8 @@ is_lowrank_sv ( const Hpro::TMatrix< value_t > *  M )
     return ! is_null( M ) && IS_TYPE( M, lrsvmatrix );
 }
 
-HLR_TEST_ALL( is_lowrank_sv, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_lowrank_sv, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_lowrank_sv, hlr::matrix::is_lowrank_sv, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_lowrank_sv, hlr::matrix::is_lowrank_sv, Hpro::TMatrix< value_t > )
 
 //
 // access low-rank factors

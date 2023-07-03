@@ -67,7 +67,7 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::print( *A, "A", "norank,nosize" );
+        io::eps::print( *A, "A", prnopt );
 
     // {
     //     auto  D = coeff->build( A->row_is(), A->col_is() );
@@ -113,7 +113,7 @@ program_main ()
     std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::print( *zA, "zA", "noid,norank,nosize" );
+        io::eps::print( *zA, "zA", prnopt );
     
     auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *zA );
     auto  error = norm::spectral( impl::arithmetic, *diff );

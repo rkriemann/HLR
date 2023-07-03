@@ -33,7 +33,7 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
 
     if ( compress::is_compressible( M ) )
     {
-        if ( is_lowrank( M ) )
+        if ( matrix::is_lowrank( M ) )
         {
             auto  RM = cptrcast( &M, lrmatrix< value_t > );
             auto  R  = std::make_unique< lrmatrix< value_t > >( bis.row_is(), bis.col_is() );
@@ -52,7 +52,7 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
 
             return R;
         }// if
-        else if ( is_dense( M ) )
+        else if ( matrix::is_dense( M ) )
         {
             auto  DM = cptrcast( &M, dense_matrix< value_t > );
             auto  DD = DM->mat();
@@ -68,12 +68,12 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
     }// if
     else
     {
-        if ( is_lowrank( M ) )
+        if ( matrix::is_lowrank( M ) )
         {
             auto  RM = cptrcast( &M, lrmatrix< value_t > );
             auto  R  = std::make_unique< lrmatrix< value_t > >( bis.row_is(), bis.col_is() );
-            auto  MU = RM->blas_mat_A();
-            auto  MV = RM->blas_mat_B();
+            auto  MU = RM->U();
+            auto  MV = RM->V();
             auto  RU = blas::matrix< value_t >( MU,
                                                 bis.row_is() - M.row_ofs(),
                                                 blas::range::all,
@@ -87,10 +87,10 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
 
             return R;
         }// if
-        else if ( is_dense( M ) )
+        else if ( matrix::is_dense( M ) )
         {
             auto  DM = cptrcast( &M, dense_matrix< value_t > );
-            auto  D  = blas::matrix< value_t >( DM->blas_mat(),
+            auto  D  = blas::matrix< value_t >( DM->mat(),
                                                 bis.row_is() - M.row_ofs(),
                                                 bis.col_is() - M.col_ofs(),
                                                 Hpro::copy_value );

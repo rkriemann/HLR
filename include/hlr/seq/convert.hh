@@ -23,70 +23,70 @@ using hlr::matrix::convert_to_dense;
 using hlr::matrix::convert_to_h;
 using hlr::matrix::convert_to_compressible;
 
-//
-// convert matrix between different floating point precisions
-// - return storage used with destination precision
-//
-template < typename T_value_dest,
-           typename T_value_src >
-size_t
-convert_prec ( Hpro::TMatrix< T_value_src > &  M )
-{
-    if constexpr( std::is_same_v< T_value_dest, T_value_src > )
-        return M.byte_size();
+// //
+// // convert matrix between different floating point precisions
+// // - return storage used with destination precision
+// //
+// template < typename T_value_dest,
+//            typename T_value_src >
+// size_t
+// convert_prec ( Hpro::TMatrix< T_value_src > &  M )
+// {
+//     if constexpr( std::is_same_v< T_value_dest, T_value_src > )
+//         return M.byte_size();
     
-    if ( is_blocked( M ) )
-    {
-        auto    B = ptrcast( &M, Hpro::TBlockMatrix< T_value_src > );
-        size_t  s = sizeof(Hpro::TBlockMatrix< T_value_src >);
+//     if ( is_blocked( M ) )
+//     {
+//         auto    B = ptrcast( &M, Hpro::TBlockMatrix< T_value_src > );
+//         size_t  s = sizeof(Hpro::TBlockMatrix< T_value_src >);
 
-        s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< T_value_src > *);
+//         s += B->nblock_rows() * B->nblock_cols() * sizeof(Hpro::TMatrix< T_value_src > *);
         
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                if ( ! is_null( B->block( i, j ) ) )
-                    s += convert_prec< T_value_dest, T_value_src >( * B->block( i, j ) );
-            }// for
-        }// for
+//         for ( uint  i = 0; i < B->nblock_rows(); ++i )
+//         {
+//             for ( uint  j = 0; j < B->nblock_cols(); ++j )
+//             {
+//                 if ( ! is_null( B->block( i, j ) ) )
+//                     s += convert_prec< T_value_dest, T_value_src >( * B->block( i, j ) );
+//             }// for
+//         }// for
 
-        return s;
-    }// if
-    else if ( is_lowrank( M ) )
-    {
-        auto  R = ptrcast( &M, Hpro::TRkMatrix< T_value_src > );
-        auto  U = blas::copy< T_value_dest >( blas::mat_U< T_value_src >( R ) );
-        auto  V = blas::copy< T_value_dest >( blas::mat_V< T_value_src >( R ) );
+//         return s;
+//     }// if
+//     else if ( matrix::is_lowrank( M ) )
+//     {
+//         auto  R = ptrcast( &M, matrix::lrmatrix< T_value_src > );
+//         auto  U = blas::copy< T_value_dest >( R->U() );
+//         auto  V = blas::copy< T_value_dest >( R->V() );
 
-        blas::copy< T_value_dest, T_value_src >( U, blas::mat_U< T_value_src >( R ) );
-        blas::copy< T_value_dest, T_value_src >( V, blas::mat_V< T_value_src >( R ) );
+//         blas::copy< T_value_dest, T_value_src >( U, blas::mat_U< T_value_src >( R ) );
+//         blas::copy< T_value_dest, T_value_src >( V, blas::mat_V< T_value_src >( R ) );
 
-        return R->byte_size() - sizeof(T_value_src) * R->rank() * ( R->nrows() + R->ncols() ) + sizeof(T_value_dest) * R->rank() * ( R->nrows() + R->ncols() ); 
-    }// if
-    else if ( is_uniform_lowrank( M ) )
-    {
-        auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
-        auto  S = blas::copy< T_value_dest >( U->coeff() );
+//         return R->byte_size() - sizeof(T_value_src) * R->rank() * ( R->nrows() + R->ncols() ) + sizeof(T_value_dest) * R->rank() * ( R->nrows() + R->ncols() ); 
+//     }// if
+//     else if ( is_uniform_lowrank( M ) )
+//     {
+//         auto  U = ptrcast( &M, matrix::uniform_lrmatrix< T_value_src > );
+//         auto  S = blas::copy< T_value_dest >( U->coeff() );
 
-        blas::copy< T_value_dest, T_value_src >( S, U->coeff() );
+//         blas::copy< T_value_dest, T_value_src >( S, U->coeff() );
 
-        return U->byte_size() - sizeof(T_value_src) * S.nrows() * S.ncols() + sizeof(T_value_dest) * S.nrows() * S.ncols(); 
-    }// if
-    else if ( is_dense( M ) )
-    {
-        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< T_value_src > );
-        auto  DD = blas::copy< T_value_dest >( blas::mat< T_value_src >( D ) );
+//         return U->byte_size() - sizeof(T_value_src) * S.nrows() * S.ncols() + sizeof(T_value_dest) * S.nrows() * S.ncols(); 
+//     }// if
+//     else if ( is_dense( M ) )
+//     {
+//         auto  D  = ptrcast( &M, Hpro::TDenseMatrix< T_value_src > );
+//         auto  DD = blas::copy< T_value_dest >( blas::mat< T_value_src >( D ) );
 
-        blas::copy< T_value_dest, T_value_src >( DD, blas::mat< T_value_src >( D ) );
+//         blas::copy< T_value_dest, T_value_src >( DD, blas::mat< T_value_src >( D ) );
 
-        return D->byte_size() - sizeof(T_value_src) * D->nrows() * D->ncols() + sizeof(T_value_dest) * D->nrows() * D->ncols();
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+//         return D->byte_size() - sizeof(T_value_src) * D->nrows() * D->ncols() + sizeof(T_value_dest) * D->nrows() * D->ncols();
+//     }// if
+//     else
+//         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 
-    return 0;
-}
+//     return 0;
+// }
 
 //
 // return copy of matrix in given value type
@@ -133,26 +133,22 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
 
         return BC;
     }// if
-    else if ( is_lowrank( A ) )
+    else if ( matrix::is_lowrank( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-        
-        auto  RA = cptrcast( &A, Hpro::TRkMatrix< src_value_t > );
-        auto  U  = blas::convert< dest_value_t >( RA->blas_mat_A() );
-        auto  V  = blas::convert< dest_value_t >( RA->blas_mat_B() );
-        auto  RC = std::make_unique< Hpro::TRkMatrix< dest_value_t > >( RA->row_is(), RA->col_is(), std::move( U ), std::move( V ) );
+        auto  RA = cptrcast( &A, matrix::lrmatrix< src_value_t > );
+        auto  U  = blas::convert< dest_value_t >( RA->U() );
+        auto  V  = blas::convert< dest_value_t >( RA->V() );
+        auto  RC = std::make_unique< matrix::lrmatrix< dest_value_t > >( RA->row_is(), RA->col_is(), std::move( U ), std::move( V ) );
 
         copy_struct( *RA, *RC );
         
         return RC;
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-        
-        auto  DA = cptrcast( &A, Hpro::TDenseMatrix< src_value_t > );
-        auto  D  = blas::convert< dest_value_t >( DA->blas_mat() );
-        auto  DC = std::make_unique< Hpro::TDenseMatrix< dest_value_t > >( DA->row_is(), DA->col_is(), std::move( D ) );
+        auto  DA = cptrcast( &A, matrix::dense_matrix< src_value_t > );
+        auto  D  = blas::convert< dest_value_t >( DA->mat() );
+        auto  DC = std::make_unique< matrix::dense_matrix< dest_value_t > >( DA->row_is(), DA->col_is(), std::move( D ) );
 
         copy_struct( *DA, *DC );
         

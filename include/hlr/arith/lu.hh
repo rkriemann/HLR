@@ -70,17 +70,16 @@ lu ( Hpro::TMatrix< value_t > &  A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        if ( compress::is_compressible( A ) )
-            dynamic_cast< compress::compressible * >( &A )->decompress();
-        
-        auto  D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  D              = ptrcast( &A, matrix::dense_matrix< value_t > );
+        auto  DD             = D->mat();
+        auto  was_compressed = D->is_compressed();
+            
+        blas::invert( DD );
 
-        invert< value_t >( *D );
-
-        if ( compress::is_compressible( A ) )
-            dynamic_cast< compress::compressible * >( &A )->compress( acc );
+        if ( was_compressed )
+            D->compress( acc );
     }// if
     else if ( matrix::is_sparse_eigen( A ) )
     {
@@ -323,12 +322,18 @@ ldu ( Hpro::TMatrix< value_t > &  A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
-
         A.copy_to( &D );
-        invert< value_t >( *DA );
+        
+        auto  DD             = ptrcast( &D, matrix::dense_matrix< value_t > );
+        auto  DM             = D->mat();
+        auto  was_compressed = D->is_compressed();
+            
+        blas::invert( DD );
+
+        if ( was_compressed )
+            D->compress( acc );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );

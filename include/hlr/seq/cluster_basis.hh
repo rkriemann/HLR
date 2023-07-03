@@ -10,11 +10,10 @@
 
 #include <unordered_map>
 
-#include <hpro/matrix/TRkMatrix.hh>
-
 #include <hlr/utils/log.hh>
 #include <hlr/utils/hash.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/shared_cluster_basis.hh>
 
 namespace hlr { namespace seq { namespace matrix {
@@ -32,7 +31,7 @@ using  indexset = Hpro::TIndexSet;
 
 // mapping of clusters/indexsets to corresponding matrix blocks
 template < typename value_t >
-using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const Hpro::TRkMatrix< value_t > * >, indexset_hash >;
+using  lrmatrix_map_t = std::unordered_map< indexset, std::list< const matrix::lrmatrix< value_t > * >, indexset_hash >;
 
 template < typename value_t >
 void
@@ -87,27 +86,6 @@ namespace detail
 {
 
 //
-// access factors U/V or low-rank matrices
-//
-template < typename value_t >
-const blas::matrix< value_t > &
-U ( const Hpro::TRkMatrix< value_t > *  M,
-    const bool               adjoint )
-{
-    if ( adjoint ) return Hpro::blas_mat_B< value_t >( M );
-    else           return Hpro::blas_mat_A< value_t >( M );
-}
-
-template < typename value_t >
-const blas::matrix< value_t > &
-V ( const Hpro::TRkMatrix< value_t > *  M,
-    const bool               adjoint )
-{
-    if ( adjoint ) return Hpro::blas_mat_A< value_t >( M );
-    else           return Hpro::blas_mat_B< value_t >( M );
-}
-
-//
 // construct map from index sets to matrix blocks for row clusters
 //
 template < typename value_t >
@@ -158,10 +136,10 @@ build_lrmatrix_map ( const cluster_tree &              ct,
             }// for
         }// else
     }// if
-    else if ( is_lowrank( M ) )
+    else if ( matrix::is_lowrank( M ) )
     {
         // std::cout << ct.to_string() << " : " << M.block_is().to_string() << std::endl;
-        mat_map[ ct ].push_back( cptrcast( &M, Hpro::TRkMatrix< value_t > ) );
+        mat_map[ ct ].push_back( cptrcast( &M, matrix::lrmatrix< value_t > ) );
     }// if
     else if ( is_dense( M ) )
     {

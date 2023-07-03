@@ -86,6 +86,8 @@ multiply ( const value_t                                   alpha,
 {
     HLR_MULT_PRINT;
 
+    HLR_ASSERT( ! C.is_compressed() );
+    
     // (A × U)·S·V'
     auto  UB = B.row_basis( op_B );
     auto  UC = blas::matrix< value_t >( C.nrows(), UB.ncols() );
@@ -95,8 +97,9 @@ multiply ( const value_t                                   alpha,
     auto  UxS = blas::prod( UC, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
-
-    blas::prod( value_t(1), UxS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), blas::mat( C ) );
+    auto              DC = C.mat();
+    
+    blas::prod( value_t(1), UxS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), DC );
 }
 
 //
@@ -199,7 +202,8 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
 
     // C + A × B = C + ((A × U)·S)·V'
-    auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat( A ) ), B.row_basis( op_B ) );
+    auto  DA  = A.mat();
+    auto  AU  = blas::prod( blas::mat_view( op_A, DA ), B.row_basis( op_B ) );
     auto  AUS = blas::prod( alpha, AU, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
@@ -414,7 +418,8 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
 
     // C + A × B = C + U·(S·(V' × B)) -> (B' × V)·S'
-    auto  BV  = blas::prod( blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ), A.col_basis( op_A ) );
+    auto  DB  = B.mat();
+    auto  BV  = blas::prod( blas::mat_view( blas::adjoint( op_B ), DB ), A.col_basis( op_A ) );
     auto  BVS = blas::prod( alpha, BV, blas::mat_view( blas::adjoint( op_A ), A.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );

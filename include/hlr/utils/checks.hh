@@ -18,31 +18,31 @@ namespace hlr
 //
 // extend standard test to "all" and "any" of the arguments
 //
-#define HLR_TEST_ALL( name, type )                                      \
+#define HLR_TEST_ALL( name, base_func, type )                           \
     template < typename value_t >                                       \
-    bool name ## _all  ( const type *  p ) noexcept { return name( p ); } \
+    bool name ## _all  ( const type *  p ) noexcept { return base_func( p ); } \
                                                                         \
     template < typename value_t, typename... T >                        \
-    bool name ## _all  ( const type *  p, T&&...  args ) noexcept { return name( p ) && name ## _all( std::forward< T >( args )... ); } \
+    bool name ## _all  ( const type *  p, T&&...  args ) noexcept { return base_func( p ) && name ## _all( std::forward< T >( args )... ); } \
                                                                         \
     template < typename value_t >                                       \
-    bool name ## _all  ( const type &  p ) noexcept { return name( p ); } \
+    bool name ## _all  ( const type &  p ) noexcept { return base_func( p ); } \
                                                                         \
     template < typename value_t, typename... T >                        \
-    bool name ## _all  ( const type &  p, T&&...  args ) noexcept { return name( p ) && name ## _all( std::forward< T >( args )... ); }
+    bool name ## _all  ( const type &  p, T&&...  args ) noexcept { return base_func( p ) && name ## _all( std::forward< T >( args )... ); }
     
-#define HLR_TEST_ANY( name, type )                                      \
+#define HLR_TEST_ANY( name, base_func, type )                           \
     template < typename value_t >                                       \
-    bool name ## _any  ( const type *  p ) noexcept { return name( p ); } \
+    bool name ## _any  ( const type *  p ) noexcept { return base_func( p ); } \
                                                                         \
     template < typename value_t, typename... T >                        \
-    bool name ## _any  ( const type *  p, T&&...  args ) noexcept { return name( p ) || name ## _any( std::forward< T >( args )... ); } \
+    bool name ## _any  ( const type *  p, T&&...  args ) noexcept { return base_func( p ) || name ## _any( std::forward< T >( args )... ); } \
                                                                         \
     template < typename value_t >                                       \
-    bool name ## _any  ( const type &  p ) noexcept { return name( p ); } \
+    bool name ## _any  ( const type &  p ) noexcept { return base_func( p ); } \
                                                                         \
     template < typename value_t, typename... T >                        \
-    bool name ## _any  ( const type &  p, T&&...  args ) noexcept { return name( p ) || name ## _any( std::forward< T >( args )... ); }
+    bool name ## _any  ( const type &  p, T&&...  args ) noexcept { return base_func( p ) || name ## _any( std::forward< T >( args )... ); }
     
 //
 // return true, if pointer is null
@@ -253,8 +253,8 @@ bool is_blocked_any ( const Hpro::TMatrix< value_t > *  A,
 // template < typename value_t >
 // bool is_dense  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_dense( & A ); }
 
-HLR_TEST_ALL( is_dense, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_dense, Hpro::TMatrix< value_t > )
+// HLR_TEST_ALL( is_dense, Hpro::TMatrix< value_t > )
+// HLR_TEST_ANY( is_dense, Hpro::TMatrix< value_t > )
 
 //
 // return true if given matrix is a low-rank matrix
@@ -266,8 +266,8 @@ HLR_TEST_ANY( is_dense, Hpro::TMatrix< value_t > )
 // template < typename value_t >
 // bool is_lowrank  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_lowrank( &A ); }
 
-HLR_TEST_ALL( is_lowrank, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_lowrank, Hpro::TMatrix< value_t > )
+// HLR_TEST_ALL( is_lowrank, Hpro::TMatrix< value_t > )
+// HLR_TEST_ANY( is_lowrank, Hpro::TMatrix< value_t > )
 
 //
 // return true if given matrix is a sparse matrix
@@ -279,8 +279,8 @@ HLR_TEST_ANY( is_lowrank, Hpro::TMatrix< value_t > )
 // template < typename value_t >
 // bool is_sparse  ( const Hpro::TMatrix< value_t > &  A ) noexcept { return hlr::is_sparse( & A ); }
 
-HLR_TEST_ALL( is_sparse, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_sparse, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_sparse, is_sparse, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_sparse, is_sparse, Hpro::TMatrix< value_t > )
 
 //
 // return true if given matrix has nested dissection structure
@@ -292,8 +292,8 @@ bool is_nd     ( const Hpro::TMatrix< value_t > &  A )     noexcept { return Hpr
 template < typename value_t >
 bool is_nd     ( const Hpro::TMatrix< value_t > *  A )     noexcept { return Hpro::is_dd( A ); }
 
-HLR_TEST_ALL( is_nd, Hpro::TMatrix< value_t > )
-HLR_TEST_ANY( is_nd, Hpro::TMatrix< value_t > )
+HLR_TEST_ALL( is_nd, is_nd, Hpro::TMatrix< value_t > )
+HLR_TEST_ANY( is_nd, is_nd, Hpro::TMatrix< value_t > )
 
 //
 // return true if given vector is a scalar vector
