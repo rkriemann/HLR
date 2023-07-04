@@ -29,7 +29,7 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
-    auto  prnopt  = "noinnerid";
+    auto  prnopt  = "";
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();

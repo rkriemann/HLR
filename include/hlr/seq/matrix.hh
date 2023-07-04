@@ -912,36 +912,17 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         
         return N;
     }// if
-    // else if ( Hpro::is_lowrank( M ) )
-    // {
-    //     auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
-    //     auto  U = blas::copy( blas::mat_U( R ) );
-    //     auto  V = blas::copy( blas::mat_V( R ) );
-
-    //     if ( false )
-    //     {
-    //         auto  RU = blas::matrix< value_t >( U.ncols(), U.ncols() );
-    //         auto  RV = blas::matrix< value_t >( V.ncols(), V.ncols() );
-
-    //         blas::qr( U, RU );
-    //         blas::qr( V, RV );
-
-    //         auto  S = blas::prod( RU, blas::adjoint( RV ) );
-    //         auto  N = std::make_unique< matrix::lrsmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( S ), std::move( V ) );
-        
-    //         N->set_id( M.id() );
-        
-    //         return N;
-    //     }// if
-    //     else
-    //     {
-    //         auto  N = std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+    else if ( Hpro::is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  U = blas::copy( blas::mat_U( R ) );
+        auto  V = blas::copy( blas::mat_V( R ) );
+        auto  N = std::make_unique< matrix::lrmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
             
-    //         N->set_id( M.id() );
+        N->set_id( M.id() );
         
-    //         return N;
-    //     }// else
-    // }// if
+        return N;
+    }// if
     else if ( matrix::is_dense( M ) )
     {
         auto  N = M.copy();
@@ -1007,7 +988,18 @@ copy_mixedprec ( const hpro::TMatrix< value_t > &  M )
         
         return N;
     }// if
-    else if ( is_dense( M ) )
+    else if ( Hpro::is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  U = blas::copy( blas::mat_U( R ) );
+        auto  V = blas::copy( blas::mat_V( R ) );
+        auto  N = std::make_unique< matrix::lrsvmatrix< value_t > >( R->row_is(), R->col_is(), std::move( U ), std::move( V ) );
+            
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( Hpro::is_dense( M ) )
     {
         auto  D  = cptrcast( &M, Hpro::TDenseMatrix< value_t > );
         auto  DD = blas::copy( blas::mat( D ) );
@@ -1057,7 +1049,7 @@ copy_nearfield ( const Hpro::TMatrix< value_t > &  M )
         
         return N;
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         // assuming non-structured block
         auto  N = M.copy();
@@ -1252,11 +1244,11 @@ copy_ll ( const Hpro::TMatrix< value_t > &  M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                HLR_ASSERT( is_dense( T.get() ) );
+                HLR_ASSERT( matrix::is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), Hpro::TDenseMatrix< value_t > );
+                auto  D = ptrcast( T.get(), matrix::dense_matrix< value_t > );
 
-                D->blas_mat() = blas::identity< value_t >( D->nrows() );
+                D->set_matrix( blas::identity< value_t >( D->nrows() ) );
             }// if
         }// if
 
@@ -1305,11 +1297,11 @@ copy_ur ( const Hpro::TMatrix< value_t > &    M,
         {
             if ( T->row_is() == T->col_is() )
             {
-                HLR_ASSERT( is_dense( T.get() ) );
+                HLR_ASSERT( matrix::is_dense( T.get() ) );
 
-                auto  D = ptrcast( T.get(), Hpro::TDenseMatrix< value_t > );
+                auto  D = ptrcast( T.get(), matrix::dense_matrix< value_t > );
 
-                D->blas_mat() = blas::identity< value_t >( D->nrows() );
+                D->set_matrix( blas::identity< value_t >( D->nrows() ) );
             }// if
         }// if
 

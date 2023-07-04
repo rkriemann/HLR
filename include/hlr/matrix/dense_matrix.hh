@@ -136,8 +136,8 @@ public:
     blas::matrix< value_t > &        mat_dbg ()       { HLR_ASSERT( ! is_compressed() ); return _mat; }
     const blas::matrix< value_t > &  mat_dbg () const { HLR_ASSERT( ! is_compressed() ); return _mat; }
 
-    blas::matrix< value_t > & mat () { return _mat; }
-    const blas::matrix< value_t > & mat () const
+    // blas::matrix< value_t > & mat () { return _mat; }
+    blas::matrix< value_t >  mat () const
     {
         // #if HLR_HAS_COMPRESSION == 1
         // if ( is_compressed() )
@@ -178,6 +178,33 @@ public:
         }// if
         else
             blas::copy( aM, _mat );
+    }
+
+    void
+    set_matrix ( blas::matrix< value_t > &&  aM )
+    {
+        HLR_ASSERT(( this->nrows() == aM.nrows() ) && ( this->ncols() == aM.ncols() ));
+
+        if ( is_compressed() )
+            remove_compressed();
+        
+        _mat = std::move( aM );
+    }
+    
+    void
+    set_matrix ( blas::matrix< value_t > &&  aM,
+                 const accuracy &            acc )
+    {
+        HLR_ASSERT(( this->nrows() == aM.nrows() ) && ( this->ncols() == aM.ncols() ));
+
+        if ( is_compressed() )
+        {
+            remove_compressed();
+            _mat = std::move( aM );
+            compress( acc );
+        }// if
+        else
+            _mat = std::move( aM );
     }
 
     //
@@ -230,18 +257,18 @@ public:
 
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::vector< value_t > &  x,
-                                blas::vector< value_t > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add  ( const value_t                    alpha,
+                               const blas::vector< value_t > &  x,
+                               blas::vector< value_t > &        y,
+                               const matop_t                    op = apply_normal ) const;
 
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::matrix< value_t > &  X,
-                                blas::matrix< value_t > &        Y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add  ( const value_t                    alpha,
+                               const blas::matrix< value_t > &  X,
+                               blas::matrix< value_t > &        Y,
+                               const matop_t                    op = apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
-    virtual void truncate ( const Hpro::TTruncAcc & ) {}
+    virtual void  truncate   ( const Hpro::TTruncAcc & ) {}
 
     //
     // compression
@@ -274,10 +301,10 @@ public:
     HPRO_RTTI_DERIVED( dense_matrix, Hpro::TMatrix< value_t > )
 
     // return matrix of same class (but no content)
-    virtual auto   create       () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< dense_matrix< value_t > >(); }
+    virtual auto   create  () const -> std::unique_ptr< Hpro::TMatrix< value_t > > { return std::make_unique< dense_matrix< value_t > >(); }
 
     // return copy of matrix
-    virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    virtual auto   copy    () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
         auto  M = std::unique_ptr< dense_matrix< value_t > >();
 

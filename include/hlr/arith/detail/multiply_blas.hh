@@ -99,20 +99,6 @@ multiply ( const value_t                       alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                       alpha,
-           const Hpro::matop_t                 op_A,
-           const Hpro::TRkMatrix< value_t > &  A,
-           const blas::matrix< value_t > &     B,
-           blas::matrix< value_t > &           C )
-{
-    if ( A.is_zero() )
-        return;
-
-    multiply( alpha, op_A, blas::mat_U( A ), blas::mat_V( A ), B, C );
-}
-
-template < typename value_t >
-void
 multiply ( const value_t                        alpha,
            const Hpro::matop_t                  op_A,
            const matrix::lrmatrix< value_t > &  A,
@@ -136,17 +122,6 @@ multiply ( const value_t                                alpha,
            const matrix::uniform_lrmatrix< value_t > &  A,
            const blas::matrix< value_t > &              B,
            blas::matrix< value_t > &                    C );
-
-template < typename value_t >
-void
-multiply ( const value_t                          alpha,
-           const Hpro::matop_t                    op_A,
-           const Hpro::TDenseMatrix< value_t > &  A,
-           const blas::matrix< value_t > &        B,
-           blas::matrix< value_t > &              C )
-{
-    blas::prod( alpha, blas::mat_view( op_A, blas::mat( A ) ), B, value_t(1), C );
-}
 
 template < typename value_t >
 void
@@ -292,20 +267,6 @@ multiply ( const value_t                    alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                       alpha,
-           const blas::matrix< value_t > &     A,
-           const Hpro::matop_t                 op_B,
-           const Hpro::TRkMatrix< value_t > &  B,
-           blas::matrix< value_t > &           C )
-{
-    if ( B.is_zero() )
-        return;
-
-    multiply( alpha, A, op_B, blas::mat_U( B ), blas::mat_V( B ), C );
-}
-
-template < typename value_t >
-void
 multiply ( const value_t                        alpha,
            const blas::matrix< value_t > &      A,
            const Hpro::matop_t                  op_B,
@@ -332,17 +293,6 @@ multiply ( const value_t                                alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                          alpha,
-           const blas::matrix< value_t > &        A,
-           const Hpro::matop_t                    op_B,
-           const Hpro::TDenseMatrix< value_t > &  B,
-           blas::matrix< value_t > &              C )
-{
-    blas::prod( alpha, A, blas::mat_view( op_B, blas::mat( B ) ), value_t(1), C );
-}
-
-template < typename value_t >
-void
 multiply ( const value_t                            alpha,
            const blas::matrix< value_t > &          A,
            const Hpro::matop_t                      op_B,
@@ -364,17 +314,10 @@ multiply ( const value_t                     alpha,
 {
     using namespace hlr::matrix;
     
-    if      ( is_blocked( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TBlockMatrix< value_t > ), C );
-    else if ( compress::is_compressible( B ) )
-    {
-        if      ( matrix::is_lowrank( B ) )         multiply( alpha, A, op_B, * cptrcast( & B, lrmatrix< value_t > ), C );
-        else if ( matrix::is_uniform_lowrank( B ) ) multiply( alpha, A, op_B, * cptrcast( & B, uniform_lrmatrix< value_t > ), C );
-        else if ( is_dense( B ) )           multiply( alpha, A, op_B, * cptrcast( & B, dense_matrix< value_t > ), C );
-        else
-            HLR_ERROR( "unsupported matrix type : " + B.typestr() );
-    }// if
-    else if ( matrix::is_lowrank( B ) )             multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TRkMatrix< value_t > ), C );
-    else if ( is_dense( B ) )               multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TDenseMatrix< value_t > ), C );
+    if      ( is_blocked( B ) )                 multiply( alpha, A, op_B, * cptrcast( & B, Hpro::TBlockMatrix< value_t > ), C );
+    if      ( matrix::is_lowrank( B ) )         multiply( alpha, A, op_B, * cptrcast( & B, lrmatrix< value_t > ), C );
+    else if ( matrix::is_uniform_lowrank( B ) ) multiply( alpha, A, op_B, * cptrcast( & B, uniform_lrmatrix< value_t > ), C );
+    else if ( matrix::is_dense( B ) )           multiply( alpha, A, op_B, * cptrcast( & B, dense_matrix< value_t > ), C );
     else
         HLR_ERROR( "unsupported matrix type : " + B.typestr() );
 }

@@ -124,7 +124,7 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
             {
                 if ( ! is_null( BA->block( i, j ) ) )
                 {
-                    auto  BC_ij = convert< dest_value_t, src_value_t >( *BA->block( i, j ) );
+                    auto  BC_ij = hlr::seq::matrix::convert< dest_value_t, src_value_t >( *BA->block( i, j ) );
                     
                     BC->set_block( i, j, BC_ij.release() );
                 }// if

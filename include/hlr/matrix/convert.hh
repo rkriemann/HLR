@@ -465,7 +465,7 @@ convert_to_hpro ( const Hpro::TMatrix< value_t > &  M )
             {
                 if ( BM->block( i, j ) != nullptr )
                 {
-                    auto  B_ij = convert_to_h( * BM->block( i, j ) );
+                    auto  B_ij = convert_to_hpro( * BM->block( i, j ) );
                     
                     B_ij->set_parent( B );
                     B->set_block( i, j, B_ij.release() );

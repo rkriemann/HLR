@@ -200,9 +200,9 @@ solve_lower_tri ( const eval_side_t                 side,
     auto  TM = convert_to_hpro( M );
 
     if ( side == from_left )
-        Hpro::solve_lower_left< value_t >( apply_normal, TL.get(), nullptr, TM.get(), acc, { Hpro::block_wise, diag } );
+        Hpro::solve_lower_left< value_t >( apply_normal, TL.get(), TM.get(), acc, { Hpro::block_wise, diag } );
     else
-        Hpro::solve_lower_right< value_t >( TM.get(), apply_normal, TL.get(), nullptr, acc, { Hpro::block_wise, diag } );
+        Hpro::solve_lower_right< value_t >( TM.get(), apply_normal, TL.get(), acc, { Hpro::block_wise, diag } );
     // TEST
             
     if ( is_blocked( L ) )
@@ -256,7 +256,11 @@ solve_lower_tri ( const eval_side_t                 side,
 
     blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
     if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+    {
+        io::matlab::write( blas::mat( DX1 ), "X1" );
+        io::matlab::write( blas::mat( DX2 ), "X2" );
         std::cout << Hpro::to_string( "solve_lower_tri( %d, %d )", L.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    }// if
     // TEST
 }
 
@@ -264,7 +268,7 @@ template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                 side,
                   const diag_type_t                 diag,
-                  const Hpro::TMatrix< value_t > &  aL,
+                  const Hpro::TMatrix< value_t > &  L,
                   Hpro::TMatrix< value_t > &        M )
 {
     using namespace hlr::matrix;
@@ -272,33 +276,53 @@ solve_lower_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
 
-    HLR_ASSERT( (( side == from_left  ) && ( aL.col_is() == M.row_is() )) ||
-                (( side == from_right ) && ( M.col_is()  == aL.row_is() )) );
+    HLR_ASSERT( (( side == from_left  ) && ( L.col_is() == M.row_is() )) ||
+                (( side == from_right ) && ( M.col_is() == L.row_is() )) );
 
-    if ( is_blocked( aL ) )
-    {
-        auto  L = cptrcast( & aL, Hpro::TBlockMatrix< value_t > );
+    // TEST
+    auto  TL = convert_to_hpro( L );
+    auto  TM = convert_to_hpro( M );
+
+    if ( side == from_left )
+        Hpro::solve_lower_left< value_t >( apply_normal, TL.get(), TM.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
+    else
+        Hpro::solve_lower_right< value_t >( TM.get(), apply_normal, TL.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
+    // TEST
             
-        if      ( matrix::is_lowrank_sv( M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrsvmatrix< value_t > ) );
-        else if ( matrix::is_lowrank(    M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrmatrix< value_t > ) );
-        else if ( matrix::is_lowrankS(   M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, dense_matrix< value_t > ) );
+    if ( is_blocked( L ) )
+    {
+        auto  BL = cptrcast( & L, Hpro::TBlockMatrix< value_t > );
+            
+        if      ( matrix::is_lowrank_sv( M ) ) solve_lower_tri( side, diag, *BL, * ptrcast( & M, lrsvmatrix< value_t > ) );
+        else if ( matrix::is_lowrank(    M ) ) solve_lower_tri( side, diag, *BL, * ptrcast( & M, lrmatrix< value_t > ) );
+        else if ( matrix::is_lowrankS(   M ) ) solve_lower_tri( side, diag, *BL, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_lower_tri( side, diag, *BL, * ptrcast( & M, dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }// if
-    else if ( matrix::is_dense( aL ) )
+    else if ( matrix::is_dense( L ) )
     {
-        auto  L = cptrcast( & aL, dense_matrix< value_t > );
+        auto  DL = cptrcast( & L, dense_matrix< value_t > );
         
-        if      ( matrix::is_lowrank_sv( M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrsvmatrix< value_t > ) );
-        else if ( matrix::is_lowrank(    M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrmatrix< value_t > ) );
-        else if ( matrix::is_lowrankS(   M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_lower_tri( side, diag, *L, * ptrcast( & M, dense_matrix< value_t > ) );
+        if      ( matrix::is_lowrank_sv( M ) ) solve_lower_tri( side, diag, *DL, * ptrcast( & M, lrsvmatrix< value_t > ) );
+        else if ( matrix::is_lowrank(    M ) ) solve_lower_tri( side, diag, *DL, * ptrcast( & M, lrmatrix< value_t > ) );
+        else if ( matrix::is_lowrankS(   M ) ) solve_lower_tri( side, diag, *DL, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_lower_tri( side, diag, *DL, * ptrcast( & M, dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }// if
     else
-        HLR_ERROR( "unsupported matrix type for L : " + aL.typestr() );
+        HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
+
+    // TEST
+    auto  TC  = convert_to_hpro( M );
+    auto  DX1 = Hpro::to_dense( TM.get() );
+    auto  DX2 = Hpro::to_dense( TC.get() );
+
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+        std::cout << Hpro::to_string( "solve_lower_tri( %d, %d )", L.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    // TEST
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -341,7 +365,7 @@ template < typename value_t,
 void
 solve_upper_tri ( const eval_side_t                 side,
                   const diag_type_t                 diag,
-                  const Hpro::TMatrix< value_t > &  aU,
+                  const Hpro::TMatrix< value_t > &  U,
                   Hpro::TMatrix< value_t > &        M,
                   const accuracy &                  acc,
                   const approx_t &                  approx )
@@ -351,73 +375,73 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
 
-    // auto  Mc = M.copy();
+    // TEST
+    auto  TU = convert_to_hpro( U );
+    auto  TM = convert_to_hpro( M );
 
-    // if ( side == from_left )
-    //     Hpro::solve_upper_left( apply_adjoint, &U, nullptr, Mc.get(), acc, { Hpro::block_wise, diag } );
-    // else
-    //     Hpro::solve_upper_right( Mc.get(), &U, nullptr, acc, { Hpro::block_wise, diag } );
+    if ( side == from_left )
+        Hpro::solve_upper_left< value_t >( apply_adjoint, TU.get(), TM.get(), acc, { Hpro::block_wise, diag } );
+    else
+        Hpro::solve_upper_right< value_t >( TM.get(), TU.get(), acc, { Hpro::block_wise, diag } );
+    // TEST
             
-    // if ( compress::is_compressible( M ) )
-    //     dynamic_cast< compressible * >( &M )->decompress();
-    
-    if ( is_blocked( aU ) )
+    if ( is_blocked( U ) )
     {
-        auto  U = cptrcast( & aU, Hpro::TBlockMatrix< value_t > );
+        auto  BU = cptrcast( & U, Hpro::TBlockMatrix< value_t > );
         
-        if      ( is_blocked(            M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsvmatrix< value_t > ), acc );
-        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrmatrix< value_t > ), acc );
-        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, dense_matrix< value_t > ), acc );
+        if      ( is_blocked(            M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrsvmatrix< value_t > ), acc );
+        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrmatrix< value_t > ), acc );
+        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
-    else if ( matrix::is_dense( aU ) )
+    else if ( matrix::is_dense( U ) )
     {
-        auto  U = cptrcast( & aU, dense_matrix< value_t > );
+        auto  DU = cptrcast( & U, dense_matrix< value_t > );
         
-        if      ( is_blocked(            M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsvmatrix< value_t > ), acc );
-        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrmatrix< value_t > ), acc );
-        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, dense_matrix< value_t > ), acc );
+        if      ( is_blocked(            M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrsvmatrix< value_t > ), acc );
+        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrmatrix< value_t > ), acc );
+        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
-    else if ( matrix::is_sparse_eigen( aU ) )
+    else if ( matrix::is_sparse_eigen( U ) )
     {
-        auto  U = cptrcast( & aU, matrix::sparse_matrix< value_t > );
+        auto  SU = cptrcast( & U, matrix::sparse_matrix< value_t > );
         
-        if      ( is_blocked(              M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank(      M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
-        else if ( matrix::is_dense(        M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
-        else if ( matrix::is_sparse_eigen( M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, matrix::sparse_matrix< value_t > ) );
+        if      ( is_blocked(              M ) ) solve_upper_tri( side, diag, *SU, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank(      M ) ) solve_upper_tri( side, diag, *SU, * ptrcast( & M, Hpro::TRkMatrix< value_t > ) );
+        else if ( matrix::is_dense(        M ) ) solve_upper_tri( side, diag, *SU, * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        else if ( matrix::is_sparse_eigen( M ) ) solve_upper_tri( side, diag, *SU, * ptrcast( & M, matrix::sparse_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
     else
-        HLR_ERROR( "unsupported matrix type : " + aU.typestr() );
+        HLR_ERROR( "unsupported matrix type : " + U.typestr() );
 
     // test data in result
     // M.check_data();
     
-    // if ( compress::is_compressible( M ) )
-    //     dynamic_cast< compressible * >( &M )->compress( acc );
+    // TEST
+    auto  TC  = convert_to_hpro( M );
+    auto  DX1 = Hpro::to_dense( TM.get() );
+    auto  DX2 = Hpro::to_dense( TC.get() );
 
-    // auto  DX1 = Hpro::to_dense( &M );
-    // auto  DX2 = Hpro::to_dense( Mc.get() );
-
-    // blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
-    // if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
-    //     std::cout << Hpro::to_string( "svutr( %d, %d )", U.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+        std::cout << Hpro::to_string( "solve_upper_tri( %d, %d )", U.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    // TEST
 }
 
 template < typename value_t >
 void
 solve_upper_tri ( const eval_side_t                 side,
                   const diag_type_t                 diag,
-                  const Hpro::TMatrix< value_t > &  aU,
+                  const Hpro::TMatrix< value_t > &  U,
                   Hpro::TMatrix< value_t > &        M )
 {
     using namespace hlr::matrix;
@@ -425,30 +449,57 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
     
-    if ( is_blocked( aU ) )
+    // TEST
+    auto  TU  = convert_to_hpro( U );
+    auto  TM  = convert_to_hpro( M );
+    auto  DX0 = Hpro::to_dense( TM.get() );
+
+    io::matlab::write( *DX0, "X0" );
+    
+    if ( side == from_left )
+        Hpro::solve_upper_left< value_t >( apply_adjoint, TU.get(), TM.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
+    else
+        Hpro::solve_upper_right< value_t >( TM.get(), TU.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
+    // TEST
+
+    if ( is_blocked( U ) )
     {
-        auto  U = cptrcast( & aU, Hpro::TBlockMatrix< value_t > );
+        auto  BU = cptrcast( & U, Hpro::TBlockMatrix< value_t > );
         
-        if      ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsvmatrix< value_t > ) );
-        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrmatrix< value_t > ) );
-        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, dense_matrix< value_t > ) );
+        if      ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrsvmatrix< value_t > ) );
+        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrmatrix< value_t > ) );
+        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *BU, * ptrcast( & M, dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
-    else if ( matrix::is_dense( aU ) )
+    else if ( matrix::is_dense( U ) )
     {
-        auto  U = cptrcast( & aU, dense_matrix< value_t > );
+        auto  DU = cptrcast( & U, dense_matrix< value_t > );
         
-        if      ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsvmatrix< value_t > ) );
-        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrmatrix< value_t > ) );
-        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, lrsmatrix< value_t > ) );
-        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *U, * ptrcast( & M, dense_matrix< value_t > ) );
+        if      ( matrix::is_lowrank_sv( M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrsvmatrix< value_t > ) );
+        else if ( matrix::is_lowrank(    M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrmatrix< value_t > ) );
+        else if ( matrix::is_lowrankS(   M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, lrsmatrix< value_t > ) );
+        else if ( matrix::is_dense(      M ) ) solve_upper_tri( side, diag, *DU, * ptrcast( & M, dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
     }//if
     else
-        HLR_ERROR( "unsupported matrix type : " + aU.typestr() );
+        HLR_ERROR( "unsupported matrix type : " + U.typestr() );
+
+    // TEST
+    auto  TC  = convert_to_hpro( M );
+    auto  DX1 = Hpro::to_dense( TM.get() );
+    auto  DX2 = Hpro::to_dense( TC.get() );
+
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+    {
+        io::matlab::write( *DX1, "X1" );
+        io::matlab::write( *DX2, "X2" );
+        std::cout << Hpro::to_string( "solve_upper_tri( %d, %d )", U.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    }// if
+    // TEST
 }
 
 ////////////////////////////////////////////////////////////////////////////////

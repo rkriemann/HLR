@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <hpro/algebra/mat_fac.hh> // DEBUG
+
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/invert.hh>
@@ -31,6 +33,10 @@ lu ( Hpro::TMatrix< value_t > &  A,
      const Hpro::TTruncAcc &     acc,
      const approx_t &            approx )
 {
+    auto  TA = matrix::convert_to_hpro( A );
+
+    Hpro::LU::factorise( TA.get(), acc, Hpro::fac_options_t{ Hpro::block_wise, Hpro::store_inverse, false } );
+    
     if ( is_blocked( A ) )
     {
         auto  BA = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
@@ -79,7 +85,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
         blas::invert( DD );
         
         if ( was_compressed )
-            D->compress( acc );
+            D->set_matrix( std::move( DD ), acc );
     }// if
     else if ( matrix::is_sparse_eigen( A ) )
     {
@@ -99,6 +105,20 @@ lu ( Hpro::TMatrix< value_t > &  A,
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+
+    // TEST
+    auto  TC  = matrix::convert_to_hpro( A );
+    auto  DX1 = Hpro::to_dense( TA.get() );
+    auto  DX2 = Hpro::to_dense( TC.get() );
+
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+    {
+        io::matlab::write( *DX1, "X1" );
+        io::matlab::write( *DX2, "X2" );
+        std::cout << Hpro::to_string( "lu( %d )", A.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    }// if
+    // TEST
 }
 
 ////////////////////////////////////////////////////////////////////////////////

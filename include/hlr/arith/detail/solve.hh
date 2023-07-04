@@ -330,6 +330,73 @@ solve_diag ( const eval_side_t                      side,
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// solve for blas matrices
+//
+template < typename value_t >
+void
+solve_lower_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  L,
+                  blas::matrix< value_t > &         M )
+{
+    if ( is_blocked( L ) )
+    {
+        auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
+        
+        if ( side == from_left )
+        {
+            for ( uint j = 0; j < BL->nblock_cols(); ++j )
+            {
+                const auto  L_jj = BL->block( j, j );
+
+                HLR_ASSERT( ! is_null( L_jj ) );
+
+                auto  M_j = blas::matrix< value_t >( M, L_jj->col_is() - BL->col_ofs(), blas::range::all );
+
+                solve_lower_tri< value_t >( side, diag, *L_jj, M_j );
+
+                for ( uint  k = j+1; k < BL->nblock_rows(); ++k )
+                {
+                    auto  L_kj = BL->block( k, j );
+                
+                    if ( ! is_null( L_kj ) )
+                    {
+                        auto  M_k = blas::matrix< value_t >( M, L_kj->row_is() - BL->row_ofs(), blas::range::all );
+                    
+                        multiply< value_t >( value_t(-1), apply_normal, *L_kj, M_j, M_k );
+                    }// for
+                }// for
+            }// for
+        }// if
+        else
+        {
+            HLR_ASSERT( false );
+        }// else
+    }// if
+    else if ( matrix::is_dense( L ) )
+    {
+        if ( diag == unit_diag )
+            return;
+    
+        auto  DL = cptrcast( &L, matrix::dense_matrix< value_t > );
+        
+        if ( side == from_left )
+        {
+            auto  DLM = DL->mat();
+            auto  Mc  = blas::prod( DLM, M );
+
+            blas::copy( Mc, M );
+        }// if
+        else
+        {
+            HLR_ASSERT( false );
+        }// else
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + L.typestr() );
+}
+
+//
 // forward for general version
 //
 template < typename value_t,
@@ -353,7 +420,7 @@ solve_lower_tri ( const eval_side_t                   side,
                   Hpro::TMatrix< value_t > &          M );
 
 //
-// specializations
+// blocked x blocked
 //
 template < typename value_t,
            typename approx_t >
@@ -464,61 +531,9 @@ solve_lower_tri ( const eval_side_t                      side,
     }// else
 }
 
-// template < typename value_t >
-// void
-// solve_lower_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TBlockMatrix< value_t > &  L,
-//                   Hpro::TDenseMatrix< value_t > &        M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
-
-//     if ( side == from_left )
-//     {
-//         //
-//         // from top to bottom in L
-//         // - solve in current block row
-//         // - update matrices in remaining block rows
-//         //
-        
-//         for ( uint j = 0; j < L.nblock_cols(); ++j )
-//         {
-//             const auto  L_jj = L.block( j, j );
-
-//             HLR_ASSERT( ! is_null( L_jj ) );
-
-//             auto  M_j = blas::matrix< value_t >( blas::mat( M ),
-//                                                  L_jj->col_is() - L.col_ofs(),
-//                                                  blas::range::all );
-//             auto  D_j = Hpro::TDenseMatrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
-
-//             solve_lower_tri< value_t >( side, diag, *L_jj, D_j );
-
-//             for ( uint  k = j+1; k < L.nblock_rows(); ++k )
-//             {
-//                 auto  L_kj = L.block( k, j );
-                
-//                 if ( ! is_null( L_kj ) )
-//                 {
-//                     auto  M_k = blas::matrix< value_t >( blas::mat( M ),
-//                                                          L_kj->row_is() - L.row_ofs(),
-//                                                          blas::range::all );
-//                     auto  D_k = Hpro::TDenseMatrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
-                    
-//                     multiply< value_t >( value_t(-1),
-//                                          apply_normal, *L_kj,
-//                                          apply_normal, D_j,
-//                                          D_k );
-//                 }// for
-//             }// for
-//         }// for
-//     }// if
-//     else
-//     {
-//         HLR_ASSERT( false );
-//     }// else
-// }
-
+//
+// blocked x dense
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                      side,
@@ -531,15 +546,19 @@ solve_lower_tri ( const eval_side_t                      side,
 
     if ( side == from_left )
     {
-        auto  lock = std::scoped_lock( M.mutex() );
+        auto  lock           = std::scoped_lock( M.mutex() );
+        auto  was_compressed = M.is_compressed();
 
-        M.decompress();
+        if ( was_compressed )
+            M.decompress();
         
         //
         // from top to bottom in L
         // - solve in current block row
         // - update matrices in remaining block rows
         //
+
+        auto  DM = M.mat_dbg();
         
         for ( uint j = 0; j < L.nblock_cols(); ++j )
         {
@@ -547,9 +566,7 @@ solve_lower_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( L_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
-                                                 L_jj->col_is() - L.col_ofs(),
-                                                 blas::range::all );
+            auto  M_j = blas::matrix< value_t >( DM, L_jj->col_is() - L.col_ofs(), blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
 
             solve_lower_tri< value_t >( side, diag, *L_jj, D_j );
@@ -560,9 +577,7 @@ solve_lower_tri ( const eval_side_t                      side,
                 
                 if ( ! is_null( L_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
-                                                         L_kj->row_is() - L.row_ofs(),
-                                                         blas::range::all );
+                    auto  M_k = blas::matrix< value_t >( DM, L_kj->row_is() - L.row_ofs(), blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
                     
                     multiply< value_t >( value_t(-1),
@@ -573,7 +588,8 @@ solve_lower_tri ( const eval_side_t                      side,
             }// for
         }// for
 
-        M.compress( acc );
+        if ( was_compressed )
+            M.compress( acc );
     }// if
     else
     {
@@ -600,6 +616,8 @@ solve_lower_tri ( const eval_side_t                      side,
         // - solve in current block row
         // - update matrices in remaining block rows
         //
+
+        auto  DM = M.mat_dbg();
         
         for ( uint j = 0; j < L.nblock_cols(); ++j )
         {
@@ -607,9 +625,7 @@ solve_lower_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( L_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
-                                                 L_jj->col_is() - L.col_ofs(),
-                                                 blas::range::all );
+            auto  M_j = blas::matrix< value_t >( DM, L_jj->col_is() - L.col_ofs(), blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
 
             solve_lower_tri< value_t >( side, diag, *L_jj, D_j );
@@ -620,9 +636,7 @@ solve_lower_tri ( const eval_side_t                      side,
                 
                 if ( ! is_null( L_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
-                                                         L_kj->row_is() - L.row_ofs(),
-                                                         blas::range::all );
+                    auto  M_k = blas::matrix< value_t >( DM, L_kj->row_is() - L.row_ofs(), blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
                     
                     multiply< value_t >( value_t(-1),
@@ -639,32 +653,9 @@ solve_lower_tri ( const eval_side_t                      side,
     }// else
 }
 
-// template < typename value_t >
-// void
-// solve_lower_tri ( const eval_side_t                 side,
-//                   const diag_type_t                 diag,
-//                   const Hpro::TMatrix< value_t > &  L,
-//                   Hpro::TRkMatrix< value_t > &      M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, R %d )", L.id(), M.id() ) );
-
-//     if ( side == from_left )
-//     {
-//         //
-//         // solve L M = L U(X) V(X)' = U(M) V(M)'
-//         // as L U(X) = U(M)
-//         //
-        
-//         auto  U = Hpro::TDenseMatrix< value_t >( M.row_is(), Hpro::is( 0, M.rank()-1 ), blas::mat_U( M ) );
-
-//         solve_lower_tri< value_t >( side, diag, L, U );
-//     }// if
-//     else
-//     {
-//         HLR_ASSERT( false );
-//     }// else
-// }
-
+//
+// general x lowrank
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                 side,
@@ -685,10 +676,9 @@ solve_lower_tri ( const eval_side_t                 side,
         //
 
         auto  U = M.U();
-        auto  D = matrix::dense_matrix< value_t >( M.row_is(), Hpro::is( 0, M.rank()-1 ), U );
 
-        solve_lower_tri< value_t >( side, diag, L, D );
-        
+        solve_lower_tri< value_t >( side, diag, L, U );
+
         if ( M.is_compressed() )
             M.set_U( std::move( U ), acc );
     }// if
@@ -717,12 +707,12 @@ solve_lower_tri ( const eval_side_t                 side,
         // as L U(X) = U(M)
         //
 
-        auto  U = blas::copy( M.U() ); // just in case and reorthogonalization below is more expensive
-        auto  D = matrix::dense_matrix< value_t >( M.row_is(), Hpro::is( 0, M.rank()-1 ), U );
+        auto  U = M.U();
 
-        solve_lower_tri< value_t >( side, diag, L, D );
+        solve_lower_tri< value_t >( side, diag, L, U );
 
-        M.set_U( std::move( U ), acc );
+        if ( M.is_compressed() )
+            M.set_U( std::move( U ), acc );
     }// if
     else
     {
@@ -759,106 +749,9 @@ solve_lower_tri ( const eval_side_t                 side,
     }// else
 }
 
-// template < typename value_t,
-//            typename approx_t >
-// void
-// solve_lower_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  /* L */,
-//                   Hpro::TBlockMatrix< value_t > &        /* M */,
-//                   const accuracy &                       /* acc */,
-//                   const approx_t &                       /* approx */ )
-// {
-//     // HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, B %d )", L.id(), M.id() ) );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     if ( side == from_left )
-//     {
-//         HLR_ERROR( "todo" );
-//     }// if
-//     else
-//     {
-//         HLR_ASSERT( false );
-//     }// else
-// }
-
-// template < typename value_t >
-// void
-// solve_lower_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  L,
-//                   Hpro::TDenseMatrix< value_t > &        M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
-    
-//     // Hpro::DBG::write( L, "L.mat", "L" );
-//     // Hpro::DBG::write( M, "M.mat", "M" );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     if ( side == from_left )
-//     {
-//         //
-//         // blockwise evaluation and L is assumed to hold L^-1
-//         // TODO: option argument?
-//         //
-
-//         auto  Mc = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), blas::mat( L ), Mc, value_t(0), blas::mat( M ) );
-//     }// if
-//     else
-//     {
-//         HLR_ASSERT( false );
-//     }// else
-
-//     // Hpro::DBG::write( M, "X.mat", "X" );
-// }
-
-// template < typename value_t >
-// void
-// solve_lower_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  L,
-//                   matrix::dense_matrix< value_t > &      M,
-//                   const accuracy &                       acc )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( D %d, D %d )", L.id(), M.id() ) );
-    
-//     // Hpro::DBG::write( L, "L.mat", "L" );
-//     // Hpro::DBG::write( M, "M.mat", "M" );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     if ( side == from_left )
-//     {
-//         auto  lock = std::scoped_lock( M.mutex() );
-
-//         M.decompress();
-        
-//         //
-//         // blockwise evaluation and L is assumed to hold L^-1
-//         // TODO: option argument?
-//         //
-
-//         auto  Mc = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), blas::mat( L ), Mc, value_t(0), blas::mat( M ) );
-
-//         M.compress( acc );
-//     }// if
-//     else
-//     {
-//         HLR_ASSERT( false );
-//     }// else
-
-//     // Hpro::DBG::write( M, "X.mat", "X" );
-// }
-
+//
+// dense x dense
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                        side,
@@ -876,24 +769,12 @@ solve_lower_tri ( const eval_side_t                        side,
     {
         auto  lock = std::scoped_lock( M.mutex() );
 
-        M.decompress();
-        
-        //
-        // blockwise evaluation and L is assumed to hold L^-1
-        // TODO: option argument?
-        //
-
-        const auto  DL = L.mat();
-        auto        Mc = blas::prod( DL, M.mat() );
-
-        M.set_matrix( Mc, acc );
+        M.set_matrix( blas::prod( L.mat(), M.mat() ), acc );
     }// if
     else
     {
         HLR_ASSERT( false );
     }// else
-
-    // Hpro::DBG::write( M, "X.mat", "X" );
 }
 
 template < typename value_t >
@@ -908,19 +789,11 @@ solve_lower_tri ( const eval_side_t                        side,
     if ( diag == unit_diag )
         return;
     
+    HLR_ASSERT( ! M.is_compressed() );
+        
     if ( side == from_left )
     {
-        //
-        // blockwise evaluation and L is assumed to hold L^-1
-        // TODO: option argument?
-        //
-
-        HLR_ASSERT( ! M.is_compressed() );
-        
-        const auto  DL = L.mat();
-        auto        Mc = blas::prod( value_t(1), DL, M.mat() );
-
-        M.set_matrix( Mc );
+        M.set_matrix( blas::prod( L.mat(), M.mat() ) );
     }// if
     else
     {
@@ -930,6 +803,9 @@ solve_lower_tri ( const eval_side_t                        side,
     // Hpro::DBG::write( M, "X.mat", "X" );
 }
 
+//
+// sparse x dense
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                         side,
@@ -960,6 +836,9 @@ solve_lower_tri ( const eval_side_t                         side,
     HLR_ERROR( "TO DO" );
 }
 
+//
+// sparse x blocked
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                         side,
@@ -975,6 +854,9 @@ solve_lower_tri ( const eval_side_t                         side,
     HLR_ERROR( "TO DO" );
 }
 
+//
+// sparse x sparse
+//
 template < typename value_t >
 void
 solve_lower_tri ( const eval_side_t                         side,
@@ -998,6 +880,101 @@ solve_lower_tri ( const eval_side_t                         side,
 // - on exit, M contains X
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// solving for blas matrices
+//
+template < typename value_t >
+void
+solve_upper_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  U,
+                  blas::matrix< value_t > &         M )
+{
+    if ( is_blocked( U ) )
+    {
+        auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
+        
+        if ( side == from_left )
+        {
+            //
+            // assumption: U' is used
+            //
+
+            const matop_t  op_U = apply_adjoint;
+        
+            for ( uint j = 0; j < BU->nblock_cols( op_U ); ++j )
+            {
+                const auto  U_jj = BU->block( j, j, op_U );
+
+                HLR_ASSERT( ! is_null( U_jj ) );
+
+                auto  M_j = blas::matrix< value_t >( M, U_jj->col_is( op_U ) - BU->col_ofs( op_U ), blas::range::all );
+            
+                solve_upper_tri< value_t >( side, diag, *U_jj, M_j );
+            
+                for ( uint  k = j+1; k < BU->nblock_rows( op_U ); ++k )
+                {
+                    auto  U_kj = BU->block( k, j, op_U );
+                    
+                    if ( ! is_null( U_kj ) )
+                    {
+                        auto  M_k = blas::matrix< value_t >( M, U_kj->row_is( op_U ) - BU->row_ofs( op_U ), blas::range::all );
+            
+                        multiply< value_t >( value_t(-1), op_U, *U_kj, M_j, M_k );
+                    }// if
+                }// for
+            }// for
+        }// if
+        else
+        {
+            for ( uint i = 0; i < BU->nblock_rows(); ++i )
+            {
+                const auto  U_ii = BU->block( i, i );
+
+                HLR_ASSERT( ! is_null( U_ii ) );
+
+                auto  M_i = blas::matrix< value_t >( M, blas::range::all, U_ii->row_is() - BU->row_ofs() );
+            
+                solve_upper_tri< value_t >( side, diag, *U_ii, M_i );
+            
+                for ( uint  k = i+1; k < BU->nblock_cols(); ++k )
+                {
+                    auto  U_ik = BU->block(i,k);
+                    
+                    if ( ! is_null( U_ik ) )
+                    {
+                        auto  M_k = blas::matrix< value_t >( M, blas::range::all, U_ik->col_is() - BU->col_ofs() );
+            
+                        multiply< value_t >( value_t(-1), M_i, apply_normal, *U_ik, M_k );
+                    }// if
+                }// for
+            }// for
+        }// else
+    }// if
+    else if ( matrix::is_dense( U ) )
+    {
+        auto  DU  = cptrcast( &U, matrix::dense_matrix< value_t > );
+        auto  DUM = DU->mat();
+    
+        if ( side == from_left )
+        {
+            // assuming U' X = M
+            const matop_t  op_U = apply_adjoint;
+            auto           Mc   = blas::prod( blas::mat_view( op_U, DUM ), M );
+
+            blas::copy( Mc, M );
+        }// if
+        else
+        {
+            auto  Mc = blas::prod( M, DUM );
+
+            blas::copy( Mc, M );
+        }// else
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix types: " + U.typestr() );
+}
 
 //
 // forward for general version
@@ -1073,85 +1050,6 @@ solve_upper_tri ( const eval_side_t                      side,
     }// else
 }
 
-// template < typename value_t >
-// void
-// solve_upper_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TBlockMatrix< value_t > &  U,
-//                   Hpro::TDenseMatrix< value_t > &        M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
-
-//     if ( side == from_left )
-//     {
-//         //
-//         // assumption: U' is used
-//         //
-
-//         const matop_t  op_U = apply_adjoint;
-        
-//         for ( uint j = 0; j < U.nblock_cols( op_U ); ++j )
-//         {
-//             const auto  U_jj = U.block( j, j, op_U );
-
-//             HLR_ASSERT( ! is_null( U_jj ) );
-
-//             auto  M_j = blas::matrix< value_t >( blas::mat( M ),
-//                                                  U_jj->col_is( op_U ) - U.col_ofs( op_U ),
-//                                                  blas::range::all );
-//             auto  D_j = Hpro::TDenseMatrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
-            
-//             solve_upper_tri< value_t >( side, diag, *U_jj, D_j );
-            
-//             for ( uint  k = j+1; k < U.nblock_rows( op_U ); ++k )
-//             {
-//                 auto  U_kj = U.block( k, j, op_U );
-                    
-//                 if ( ! is_null( U_kj ) )
-//                 {
-//                     auto  M_k = blas::matrix< value_t >( blas::mat( M ),
-//                                                          U_kj->row_is( op_U ) - U.row_ofs( op_U ),
-//                                                          blas::range::all );
-//                     auto  D_k = Hpro::TDenseMatrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
-            
-//                     multiply< value_t >( value_t(-1), op_U, *U_kj, apply_normal, D_j, D_k );
-//                 }// if
-//             }// for
-//         }// for
-//     }// if
-//     else
-//     {
-//         for ( uint i = 0; i < U.nblock_rows(); ++i )
-//         {
-//             const auto  U_ii = U.block( i, i );
-
-//             HLR_ASSERT( ! is_null( U_ii ) );
-
-//             auto  M_i = blas::matrix< value_t >( blas::mat( M ),
-//                                                  blas::range::all,
-//                                                  U_ii->row_is() - U.row_ofs() );
-//             auto  D_i = Hpro::TDenseMatrix< value_t >( M.row_is(), U_ii->row_is(), M_i );
-            
-//             solve_upper_tri< value_t >( side, diag, *U_ii, D_i );
-            
-//             for ( uint  k = i+1; k < U.nblock_cols(); ++k )
-//             {
-//                 auto  U_ik = U.block(i,k);
-                    
-//                 if ( ! is_null( U_ik ) )
-//                 {
-//                     auto  M_k = blas::matrix< value_t >( blas::mat( M ),
-//                                                          blas::range::all,
-//                                                          U_ik->col_is() - U.col_ofs() );
-//                     auto  D_k = Hpro::TDenseMatrix< value_t >( M.row_is(), U_ik->col_is(), M_k );
-            
-//                     multiply< value_t >( value_t(-1), apply_normal, D_i, apply_normal, *U_ik, D_k );
-//                 }// if
-//             }// for
-//         }// for
-//     }// else
-// }
-
 template < typename value_t >
 void
 solve_upper_tri ( const eval_side_t                      side,
@@ -1162,10 +1060,14 @@ solve_upper_tri ( const eval_side_t                      side,
 {
     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
 
-    auto  lock = std::scoped_lock( M.mutex() );
+    auto  lock           = std::scoped_lock( M.mutex() );
+    auto  was_compressed = M.is_compressed();
 
-    M.decompress();
-        
+    if ( was_compressed )
+        M.decompress();
+
+    auto  DM = M.mat_dbg();
+    
     if ( side == from_left )
     {
         //
@@ -1180,9 +1082,7 @@ solve_upper_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( U_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat(),
-                                                 U_jj->col_is( op_U ) - U.col_ofs( op_U ),
-                                                 blas::range::all );
+            auto  M_j = blas::matrix< value_t >( DM, U_jj->col_is( op_U ) - U.col_ofs( op_U ), blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
             
             solve_upper_tri< value_t >( side, diag, *U_jj, D_j );
@@ -1193,9 +1093,7 @@ solve_upper_tri ( const eval_side_t                      side,
                     
                 if ( ! is_null( U_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
-                                                         U_kj->row_is( op_U ) - U.row_ofs( op_U ),
-                                                         blas::range::all );
+                    auto  M_k = blas::matrix< value_t >( DM, U_kj->row_is( op_U ) - U.row_ofs( op_U ), blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
             
                     multiply< value_t >( value_t(-1), op_U, *U_kj, apply_normal, D_j, D_k );
@@ -1211,9 +1109,7 @@ solve_upper_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( U_ii ) );
 
-            auto  M_i = blas::matrix< value_t >( M.mat(),
-                                                 blas::range::all,
-                                                 U_ii->row_is() - U.row_ofs() );
+            auto  M_i = blas::matrix< value_t >( DM, blas::range::all, U_ii->row_is() - U.row_ofs() );
             auto  D_i = matrix::dense_matrix< value_t >( M.row_is(), U_ii->row_is(), M_i );
             
             solve_upper_tri< value_t >( side, diag, *U_ii, D_i );
@@ -1224,9 +1120,7 @@ solve_upper_tri ( const eval_side_t                      side,
                     
                 if ( ! is_null( U_ik ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
-                                                         blas::range::all,
-                                                         U_ik->col_is() - U.col_ofs() );
+                    auto  M_k = blas::matrix< value_t >( DM, blas::range::all, U_ik->col_is() - U.col_ofs() );
                     auto  D_k = matrix::dense_matrix< value_t >( M.row_is(), U_ik->col_is(), M_k );
             
                     multiply< value_t >( value_t(-1), apply_normal, D_i, apply_normal, *U_ik, D_k );
@@ -1235,7 +1129,8 @@ solve_upper_tri ( const eval_side_t                      side,
         }// for
     }// else
 
-    M.compress( acc );
+    if ( was_compressed )
+        M.compress( acc );
 }
 
 template < typename value_t >
@@ -1246,10 +1141,10 @@ solve_upper_tri ( const eval_side_t                      side,
                   matrix::dense_matrix< value_t > &      M )
 {
     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
-
     HLR_ASSERT( ! M.is_compressed() );
     
     auto  lock = std::scoped_lock( M.mutex() );
+    auto  DM   = M.mat_dbg();
         
     if ( side == from_left )
     {
@@ -1265,9 +1160,7 @@ solve_upper_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( U_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
-                                                 U_jj->col_is( op_U ) - U.col_ofs( op_U ),
-                                                 blas::range::all );
+            auto  M_j = blas::matrix< value_t >( DM, U_jj->col_is( op_U ) - U.col_ofs( op_U ), blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
             
             solve_upper_tri< value_t >( side, diag, *U_jj, D_j );
@@ -1278,9 +1171,7 @@ solve_upper_tri ( const eval_side_t                      side,
                     
                 if ( ! is_null( U_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
-                                                         U_kj->row_is( op_U ) - U.row_ofs( op_U ),
-                                                         blas::range::all );
+                    auto  M_k = blas::matrix< value_t >( DM, U_kj->row_is( op_U ) - U.row_ofs( op_U ), blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
             
                     multiply< value_t >( value_t(-1), op_U, *U_kj, apply_normal, D_j, D_k );
@@ -1296,9 +1187,7 @@ solve_upper_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( U_ii ) );
 
-            auto  M_i = blas::matrix< value_t >( M.mat(),
-                                                 blas::range::all,
-                                                 U_ii->row_is() - U.row_ofs() );
+            auto  M_i = blas::matrix< value_t >( DM, blas::range::all, U_ii->row_is() - U.row_ofs() );
             auto  D_i = matrix::dense_matrix< value_t >( M.row_is(), U_ii->row_is(), M_i );
             
             solve_upper_tri< value_t >( side, diag, *U_ii, D_i );
@@ -1309,9 +1198,7 @@ solve_upper_tri ( const eval_side_t                      side,
                     
                 if ( ! is_null( U_ik ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
-                                                         blas::range::all,
-                                                         U_ik->col_is() - U.col_ofs() );
+                    auto  M_k = blas::matrix< value_t >( DM, blas::range::all, U_ik->col_is() - U.col_ofs() );
                     auto  D_k = matrix::dense_matrix< value_t >( M.row_is(), U_ik->col_is(), M_k );
             
                     multiply< value_t >( value_t(-1), apply_normal, D_i, apply_normal, *U_ik, D_k );
@@ -1320,33 +1207,6 @@ solve_upper_tri ( const eval_side_t                      side,
         }// for
     }// else
 }
-
-// template < typename value_t >
-// void
-// solve_upper_tri ( const eval_side_t                 side,
-//                   const diag_type_t                 diag,
-//                   const Hpro::TMatrix< value_t > &  U,
-//                   Hpro::TRkMatrix< value_t > &      M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, R %d )", U.id(), M.id() ) );
-
-//     if ( side == from_left )
-//     {
-//         HLR_ASSERT( false );
-//     }// if
-//     else
-//     {
-//         //
-//         // solve X U = U(X) V(X)' U = U(M) V(M)' = M
-//         // as V(X)' U = V(M)' or
-//         //    U' V(X) = V(M), respectively
-//         //
-
-//         auto  V = Hpro::TDenseMatrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), blas::mat_V( M ) );
-
-//         solve_upper_tri< value_t >( from_left, diag, U, V );
-//     }// else
-// }
 
 template < typename value_t >
 void
@@ -1376,16 +1236,14 @@ solve_upper_tri ( const eval_side_t                 side,
             io::matlab::write( cptrcast( &U, matrix::dense_matrix< value_t > )->mat(), "U" );
         
         auto  V = M.V();
-        auto  D = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), std::move( V ) );
 
-        io::matlab::write( M.V(), "M1" );
+        io::matlab::write( V, "M1" );
         
-        solve_upper_tri< value_t >( from_left, diag, U, D );
+        solve_upper_tri< value_t >( from_left, diag, U, V );
 
-        io::matlab::write( M.V(), "M2" );
+        io::matlab::write( V, "M2" );
         
-        if ( M.is_compressed() )
-            M.set_V( std::move( V ), acc );
+        M.set_V( V, acc );
     }// else
 }
 
@@ -1413,12 +1271,12 @@ solve_upper_tri ( const eval_side_t                 side,
         //    U' V(X) = V(M), respectively
         //
 
-        auto  V = blas::copy( M.V() ); // just in case and reorthogonalization below is more expensive
-        auto  D = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), V );
+        auto  V = M.V();
 
-        solve_upper_tri< value_t >( from_left, diag, U, D );
+        solve_upper_tri< value_t >( from_left, diag, U, V );
 
-        M.set_V( std::move( V ), acc );
+        if ( M.is_compressed() )
+            M.set_V( std::move( V ), acc );
     }// else
 }
 
@@ -1445,146 +1303,11 @@ solve_upper_tri ( const eval_side_t                 side,
 
         HLR_ASSERT( ! M.is_compressed() );
         
-        auto  V  = M.V();
-        auto  DV = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), V );
+        auto  V = M.V();
 
-        solve_upper_tri< value_t >( from_left, diag, U, DV );
+        solve_upper_tri< value_t >( from_left, diag, U, V );
     }// else
 }
-
-// template < typename value_t,
-//            typename approx_t >
-// void
-// solve_upper_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  U,
-//                   Hpro::TBlockMatrix< value_t > &        M,
-//                   const accuracy &                       acc,
-//                   const approx_t &                       approx )
-// {
-//     // HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, B %d )", U.id(), M.id() ) );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     if ( side == from_left )
-//     {
-//         HLR_ASSERT( false );
-//     }// if
-//     else
-//     {
-//         // X U = M
-//         HLR_ERROR( "todo" );
-//     }// else
-// }
-
-// template < typename value_t >
-// void
-// solve_upper_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  U,
-//                   Hpro::TDenseMatrix< value_t > &        M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     //
-//     // blockwise evaluation and U is assumed to hold L^-1
-//     // TODO: option argument?
-//     //
-
-//     if ( side == from_left )
-//     {
-//         // assuming U' X = M
-//         const matop_t  op_U = apply_adjoint;
-//         auto           Mc   = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), blas::mat_view( op_U, blas::mat( U ) ), Mc, value_t(0), blas::mat( M ) );
-//     }// if
-//     else
-//     {
-//         auto  Mc = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), Mc, blas::mat( U ), value_t(0), blas::mat( M ) );
-//     }// else
-// }
-
-// template < typename value_t >
-// void
-// solve_upper_tri ( const eval_side_t                      side,
-//                   const diag_type_t                      diag,
-//                   const Hpro::TDenseMatrix< value_t > &  U,
-//                   matrix::dense_matrix< value_t > &      M,
-//                   const accuracy &                       acc )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     //
-//     // blockwise evaluation and U is assumed to hold L^-1
-//     // TODO: option argument?
-//     //
-
-//     auto  lock = std::scoped_lock( M.mutex() );
-
-//     M.decompress();
-        
-//     if ( side == from_left )
-//     {
-//         // assuming U' X = M
-//         const matop_t  op_U = apply_adjoint;
-//         auto           Mc   = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), blas::mat_view( op_U, blas::mat( U ) ), Mc, value_t(0), blas::mat( M ) );
-//     }// if
-//     else
-//     {
-//         auto  Mc = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), Mc, blas::mat( U ), value_t(0), blas::mat( M ) );
-//     }// else
-
-//     M.compress( acc );
-// }
-
-// template < typename value_t >
-// void
-// solve_upper_tri ( const eval_side_t                        side,
-//                   const diag_type_t                        diag,
-//                   const matrix::dense_matrix< value_t > &  U,
-//                   Hpro::TDenseMatrix< value_t > &          M )
-// {
-//     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( D %d, D %d )", U.id(), M.id() ) );
-
-//     if ( diag == unit_diag )
-//         return;
-    
-//     //
-//     // blockwise evaluation and U is assumed to hold L^-1
-//     // TODO: option argument?
-//     //
-
-//     const auto  DU = U.mat();
-    
-//     if ( side == from_left )
-//     {
-//         // assuming U' X = M
-//         const matop_t  op_U = apply_adjoint;
-//         auto           Mc   = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), blas::mat_view( op_U, DU ), Mc, value_t(0), blas::mat( M ) );
-//     }// if
-//     else
-//     {
-//         auto  Mc = blas::copy( blas::mat( M ) );
-
-//         blas::prod( value_t(1), Mc, DU, value_t(0), blas::mat( M ) );
-//     }// else
-// }
 
 template < typename value_t >
 void
@@ -1611,16 +1334,11 @@ solve_upper_tri ( const eval_side_t                        side,
     if ( side == from_left )
     {
         // assuming U' X = M
-        const matop_t  op_U = apply_adjoint;
-        auto           Mc   = blas::prod( blas::mat_view( op_U, DU ), M.mat() );
-
-        M.set_matrix( Mc, acc );
+        M.set_matrix( blas::prod( blas::mat_view( apply_adjoint, DU ), M.mat() ), acc ); // TODO: check std::move( Mc )
     }// if
     else
     {
-        auto  Mc = blas::prod( M.mat(), DU );
-
-        M.set_matrix( Mc, acc );
+        M.set_matrix( blas::prod( M.mat(), DU ), acc ); // TODO: check std::move( Mc )
     }// else
 }
 
@@ -1650,16 +1368,11 @@ solve_upper_tri ( const eval_side_t                        side,
     if ( side == from_left )
     {
         // assuming U' X = M
-        const matop_t  op_U = apply_adjoint;
-        auto           Mc   = blas::prod( blas::mat_view( op_U, DU ), M.mat() );
-
-        M.set_matrix( Mc );
+        M.set_matrix( blas::prod( blas::mat_view( apply_adjoint, DU ), M.mat() ) );
     }// if
     else
     {
-        auto  Mc = blas::prod( M.mat(), DU );
-
-        M.set_matrix( Mc );
+        M.set_matrix( blas::prod( M.mat(), DU ) );
     }// else
 }
 

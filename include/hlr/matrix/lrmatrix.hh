@@ -259,6 +259,27 @@ public:
 
     // update U and recompress if needed
     void
+    set_U ( const blas::matrix< value_t > &  aU,
+            const accuracy &                 acc )
+    {
+        HLR_ASSERT(( this->nrows() == aU.nrows() ) && ( aU.ncols() == this->rank() ));
+
+        #if HLR_HAS_COMPRESSION == 1
+        if ( is_compressed() )
+        {
+            // as this is just an update, compress without memory size test
+            auto  zconfig = get_zconfig( acc );
+            
+            _zdata.U = std::move( compress::compress< value_t >( zconfig, aU ) );
+        }// if
+        else
+        #endif
+        {
+            blas::copy( aU, _U );
+        }// else
+    }
+
+    void
     set_U ( blas::matrix< value_t > &&  aU,
             const accuracy &            acc )
     {
@@ -271,15 +292,36 @@ public:
             auto  zconfig = get_zconfig( acc );
             
             _zdata.U = std::move( compress::compress< value_t >( zconfig, aU ) );
-
-            return;
         }// if
+        else
         #endif
-        
-        _U = std::move( aU );
+        {
+            _U = std::move( aU );
+        }// else
     }
 
     // update V and recompress if needed
+    void
+    set_V ( const blas::matrix< value_t > &  aV,
+            const accuracy &                 acc )
+    {
+        HLR_ASSERT(( this->ncols() == aV.nrows() ) && ( aV.ncols() == this->rank() ));
+
+        #if HLR_HAS_COMPRESSION == 1
+        if ( is_compressed() )
+        {
+            // as this is just an update, compress without memory size test
+            auto  zconfig = get_zconfig( acc );
+            
+            _zdata.V = std::move( compress::compress< value_t >( zconfig, aV ) );
+        }// if
+        else
+        #endif
+        {
+            blas::copy( aV, _V );
+        }// else
+    }
+
     void
     set_V ( blas::matrix< value_t > &&  aV,
             const accuracy &            acc )
@@ -293,12 +335,12 @@ public:
             auto  zconfig = get_zconfig( acc );
             
             _zdata.V = std::move( compress::compress< value_t >( zconfig, aV ) );
-
-            return;
         }// if
+        else
         #endif
-        
-        _V = std::move( aV );
+        {
+            _V = std::move( aV );
+        }// else
     }
 
     //
