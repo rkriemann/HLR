@@ -30,7 +30,7 @@ namespace hlr
 {
 
 // to enable accuracy tests
-#define HLR_MULT_TESTS  1
+// #define HLR_MULT_TESTS
 
 /////////////////////////////////////////////////////////////////////////////////
 //
@@ -60,7 +60,7 @@ multiply ( const value_t                     alpha,
     // B.check_data();
     // C.check_data();
     
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
 
     auto  TA = matrix::convert_to_hpro( A );
     auto  TB = matrix::convert_to_hpro( B );
@@ -300,7 +300,7 @@ multiply ( const value_t                     alpha,
     // test data in result
     // C.check_data();
     
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
     
     auto  TX = matrix::convert_to_hpro( C );
     auto  DX1 = Hpro::to_dense( TC.get() );
@@ -360,7 +360,7 @@ multiply ( const value_t                     alpha,
     if ( ! matrix::is_dense( C ) )
         HLR_ERROR( "unsupported matrix type : " + C.typestr() );
 
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
 
     auto  TA = matrix::convert_to_hpro( A );
     auto  TB = matrix::convert_to_hpro( B );
@@ -428,7 +428,7 @@ multiply ( const value_t                     alpha,
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
     
     auto  TX = matrix::convert_to_hpro( C );
     auto  DX1 = Hpro::to_dense( TC.get() );
@@ -596,7 +596,7 @@ multiply_diag ( const value_t                     alpha,
                 const Hpro::TTruncAcc &           acc,
                 const approx_t &                  approx )
 {
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
 
     auto  TA = hlr::matrix::convert_to_dense< value_t >( A );
     auto  DD = hlr::seq::matrix::copy_diag( D );
@@ -1114,7 +1114,7 @@ multiply_diag ( const value_t                     alpha,
         HLR_ERROR( "unsupported matrix type for A : " + A.typestr() );
 
     
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
     
     auto  TT = hlr::matrix::convert_to_dense< value_t >( C );
 
@@ -1142,7 +1142,7 @@ multiply_diag ( const value_t                     alpha,
                 const Hpro::TMatrix< value_t > &  B,
                 Hpro::TMatrix< value_t > &        C )
 {
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
 
     auto  TA = hlr::matrix::convert_to_dense< value_t >( A );
     auto  DD = hlr::seq::matrix::copy_diag( D );
@@ -1314,7 +1314,7 @@ multiply_diag ( const value_t                     alpha,
         HLR_ERROR( "unsupported matrix type for A : " + A.typestr() );
 
     
-    #if HLR_MULT_TESTS == 1
+    #if defined(HLR_MULT_TESTS)
     
     auto  TT = hlr::matrix::convert_to_dense< value_t >( C );
 

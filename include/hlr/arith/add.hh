@@ -8,12 +8,18 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <hpro/algebra/mat_add.hh> // DEBUG
+#include <hpro/matrix/convert.hh> // DEBUG
+
 #include "hlr/arith/detail/add.hh"
 #include "hlr/matrix/lrsmatrix.hh"
 #include "hlr/utils/log.hh"
 
 namespace hlr
 {
+
+// to enable accuracy tests
+// #define HLR_ADD_TESTS
 
 //
 // compute C := C + α A with different types of A/C
@@ -22,62 +28,68 @@ template < typename value_t,
            typename approx_t >
 void
 add ( const value_t                     alpha,
-      const Hpro::TMatrix< value_t > &  aA,
+      const Hpro::TMatrix< value_t > &  A,
       Hpro::TMatrix< value_t > &        C,
       const Hpro::TTruncAcc &           acc,
       const approx_t &                  approx )
 {
-    using namespace hlr::matrix;
+    #if defined(HLR_ADD_TESTS)
     
-    using  matrix::is_lowrankS;
-    using  matrix::lrsmatrix;
+    auto  TA = matrix::convert_to_hpro( A );
+    auto  TC = matrix::convert_to_hpro( C );
 
-    // if ( compress::is_compressible( C ) )
-    // {
-    //     auto  lock = std::scoped_lock( C.mutex() );
-        
-    //     dynamic_cast< compressible * >( &C )->decompress();
-    // }// if
-        
-    if ( is_blocked( aA ) )
+    Hpro::add( alpha, TA.get(), value_t(1), TC.get(), acc );
+
+    #endif
+    
+    if ( is_blocked( A ) )
     {
-        auto  A = cptrcast( &aA, Hpro::TBlockMatrix< value_t > );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         
-        if      ( is_blocked( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >( alpha, *A, *ptrcast( &C, dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *BA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
-    else if ( matrix::is_dense( aA ) )
+    else if ( matrix::is_lowrank( A ) )
     {
-        auto  A = cptrcast( &aA, dense_matrix< value_t > );
+        auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
         
-        if      ( is_blocked( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >( alpha, *A, *ptrcast( &C, dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *RA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
-    else if ( matrix::is_lowrank( aA ) )
+    else if ( matrix::is_dense( A ) )
     {
-        auto  A = cptrcast( &aA, lrmatrix< value_t > );
+        auto  DA = cptrcast( &A, matrix::dense_matrix< value_t > );
         
-        if      ( is_blocked( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *A, *ptrcast( &C, lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >( alpha, *A, *ptrcast( &C, dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *DA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
     else
-        HLR_ERROR( "unsupported matrix type : " + aA.typestr() );
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    // if ( compress::is_compressible( C ) )
-    // {
-    //     auto  lock = std::scoped_lock( C.mutex() );
-        
-    //     dynamic_cast< compressible * >( &C )->compress( acc );
-    // }// if
+    #if defined(HLR_ADD_TESTS)
+
+    auto  TX = matrix::convert_to_hpro( C );
+    auto  DX1 = Hpro::to_dense( TC.get() );
+    auto  DX2 = Hpro::to_dense( TX.get() );
+
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
+    {
+        io::matlab::write( *DX1, "X1" );
+        io::matlab::write( *DX2, "X2" );
+        std::cout << Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    }// if
+
+    #endif
 }
 
 //
@@ -87,32 +99,44 @@ template < typename value_t >
 void
 add ( const value_t                     alpha,
       const Hpro::TMatrix< value_t > &  A,
-      Hpro::TMatrix< value_t > &        aC )
+      Hpro::TMatrix< value_t > &        C )
 {
-    using namespace hlr::matrix;
+    #if defined(HLR_ADD_TESTS)
     
-    HLR_ASSERT( matrix::is_dense( aC ) );
+    auto  TA = matrix::convert_to_hpro( A );
+    auto  TC = matrix::convert_to_hpro( C );
 
-    if ( compress::is_compressible( aC ) && compress::is_compressed( aC ) )
+    Hpro::add( alpha, TA.get(), value_t(1), TC.get(), Hpro::acc_exact );
+
+    #endif
+    
+    HLR_ASSERT( matrix::is_dense( C ) );
+
+    if ( compress::is_compressible( C ) && compress::is_compressed( C ) )
         HLR_ERROR( "TODO" );
 
-    auto  C = ptrcast( &aC, Hpro::TDenseMatrix< value_t > );
+    auto  DC = ptrcast( &C, Hpro::TDenseMatrix< value_t > );
     
-    if ( compress::is_compressible( A ) )
-    {
-        if      ( matrix::is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, dense_matrix< value_t > ), *C );
-        else if ( matrix::is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, lrmatrix< value_t > ),     *C );
-        else
-            HLR_ERROR( "unsupported matrix type : " + A.typestr() );
-    }// if
+    if      ( matrix::is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::dense_matrix< value_t > ), *DC );
+    else if ( matrix::is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::lrmatrix< value_t > ),     *DC );
     else
+        HLR_ERROR( "unsupported matrix type : " + A.typestr() );
+
+    #if defined(HLR_ADD_TESTS)
+    
+    auto  TX = matrix::convert_to_hpro( C );
+    auto  DX1 = Hpro::to_dense( TC.get() );
+    auto  DX2 = Hpro::to_dense( TX.get() );
+
+    blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
+    if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
     {
-        if      ( is_blocked( A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TBlockMatrix< value_t > ), *C );
-        else if ( matrix::is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TRkMatrix< value_t > ),    *C );
-        else if ( matrix::is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, Hpro::TDenseMatrix< value_t > ), *C );
-        else
-            HLR_ERROR( "unsupported matrix type : " + A.typestr() );
-    }// else
+        io::matlab::write( *DX1, "X1" );
+        io::matlab::write( *DX2, "X2" );
+        std::cout << Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
+    }// if
+    
+    #endif
 }
 
 }// namespace hlr

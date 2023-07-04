@@ -1232,18 +1232,12 @@ solve_upper_tri ( const eval_side_t                 side,
         //    U' V(X) = V(M), respectively
         //
 
-        if ( matrix::is_dense( U ) )
-            io::matlab::write( cptrcast( &U, matrix::dense_matrix< value_t > )->mat(), "U" );
-        
         auto  V = M.V();
-
-        io::matlab::write( V, "M1" );
         
         solve_upper_tri< value_t >( from_left, diag, U, V );
 
-        io::matlab::write( V, "M2" );
-        
-        M.set_V( V, acc );
+        if ( M.is_compressed() )
+            M.set_V( V, acc );
     }// else
 }
 

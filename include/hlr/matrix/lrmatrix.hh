@@ -76,6 +76,7 @@ public:
             : Hpro::TMatrix< value_t >()
             , _row_is( 0, 0 )
             , _col_is( 0, 0 )
+            , _rank( 0 )
     {}
     
     lrmatrix ( const indexset              arow_is,
@@ -85,6 +86,7 @@ public:
             , _col_is( acol_is )
             , _U( _row_is.size(), 0 ) // to avoid issues with nrows/ncols
             , _V( _col_is.size(), 0 )
+            , _rank( 0 )
     {
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
@@ -98,6 +100,7 @@ public:
             , _col_is( acol_is )
             , _U( aU )
             , _V( aV )
+            , _rank( _U.ncols() )
     {
         HLR_ASSERT(( _row_is.size() == _U.nrows() ) &&
                    ( _col_is.size() == _V.nrows() ) &&
@@ -115,6 +118,7 @@ public:
             , _col_is( acol_is )
             , _U( std::move( aU ) )
             , _V( std::move( aV ) )
+            , _rank( _U.ncols() )
     {
         HLR_ASSERT(( _row_is.size() == _U.nrows() ) &&
                    ( _col_is.size() == _V.nrows() ) &&
@@ -122,6 +126,15 @@ public:
         
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
+
+    lrmatrix ( const lrmatrix< value_t > &  M )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( M._row_is )
+            , _col_is( M._col_is )
+            , _U( blas::copy( M._U ) )
+            , _V( blas::copy( M._V ) )
+            , _rank( _U.ncols() )
+    {}
 
     // dtor
     virtual ~lrmatrix ()

@@ -26,6 +26,9 @@
 namespace hlr
 {
 
+// to enable accuracy tests
+// #define HLR_SOLVE_TESTS
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // matrix solving with diagonal matrix D
@@ -195,7 +198,7 @@ solve_lower_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TL = convert_to_hpro( L );
     auto  TM = convert_to_hpro( M );
 
@@ -203,7 +206,7 @@ solve_lower_tri ( const eval_side_t                 side,
         Hpro::solve_lower_left< value_t >( apply_normal, TL.get(), TM.get(), acc, { Hpro::block_wise, diag } );
     else
         Hpro::solve_lower_right< value_t >( TM.get(), apply_normal, TL.get(), acc, { Hpro::block_wise, diag } );
-    // TEST
+    #endif
             
     if ( is_blocked( L ) )
     {
@@ -249,7 +252,7 @@ solve_lower_tri ( const eval_side_t                 side,
     // if ( compress::is_compressible( M ) )
     //     dynamic_cast< compressible * >( &M )->compress( acc );
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TC  = convert_to_hpro( M );
     auto  DX1 = Hpro::to_dense( TM.get() );
     auto  DX2 = Hpro::to_dense( TC.get() );
@@ -261,7 +264,7 @@ solve_lower_tri ( const eval_side_t                 side,
         io::matlab::write( blas::mat( DX2 ), "X2" );
         std::cout << Hpro::to_string( "solve_lower_tri( %d, %d )", L.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
     }// if
-    // TEST
+    #endif
 }
 
 template < typename value_t >
@@ -279,7 +282,7 @@ solve_lower_tri ( const eval_side_t                 side,
     HLR_ASSERT( (( side == from_left  ) && ( L.col_is() == M.row_is() )) ||
                 (( side == from_right ) && ( M.col_is() == L.row_is() )) );
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TL = convert_to_hpro( L );
     auto  TM = convert_to_hpro( M );
 
@@ -287,7 +290,7 @@ solve_lower_tri ( const eval_side_t                 side,
         Hpro::solve_lower_left< value_t >( apply_normal, TL.get(), TM.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
     else
         Hpro::solve_lower_right< value_t >( TM.get(), apply_normal, TL.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
-    // TEST
+    #endif
             
     if ( is_blocked( L ) )
     {
@@ -314,7 +317,7 @@ solve_lower_tri ( const eval_side_t                 side,
     else
         HLR_ERROR( "unsupported matrix type for L : " + L.typestr() );
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TC  = convert_to_hpro( M );
     auto  DX1 = Hpro::to_dense( TM.get() );
     auto  DX2 = Hpro::to_dense( TC.get() );
@@ -322,7 +325,7 @@ solve_lower_tri ( const eval_side_t                 side,
     blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
     if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
         std::cout << Hpro::to_string( "solve_lower_tri( %d, %d )", L.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
-    // TEST
+    #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -375,7 +378,7 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TU = convert_to_hpro( U );
     auto  TM = convert_to_hpro( M );
 
@@ -383,7 +386,7 @@ solve_upper_tri ( const eval_side_t                 side,
         Hpro::solve_upper_left< value_t >( apply_adjoint, TU.get(), TM.get(), acc, { Hpro::block_wise, diag } );
     else
         Hpro::solve_upper_right< value_t >( TM.get(), TU.get(), acc, { Hpro::block_wise, diag } );
-    // TEST
+    #endif
             
     if ( is_blocked( U ) )
     {
@@ -426,7 +429,7 @@ solve_upper_tri ( const eval_side_t                 side,
     // test data in result
     // M.check_data();
     
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TC  = convert_to_hpro( M );
     auto  DX1 = Hpro::to_dense( TM.get() );
     auto  DX2 = Hpro::to_dense( TC.get() );
@@ -434,7 +437,7 @@ solve_upper_tri ( const eval_side_t                 side,
     blas::add( value_t(-1), blas::mat( DX1 ), blas::mat( DX2 ) );
     if ( blas::norm_F( blas::mat( DX2 ) ) > 1e-14 )
         std::cout << Hpro::to_string( "solve_upper_tri( %d, %d )", U.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
-    // TEST
+    #endif
 }
 
 template < typename value_t >
@@ -449,7 +452,7 @@ solve_upper_tri ( const eval_side_t                 side,
     if ( M.is_zero() )
         return;
     
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TU  = convert_to_hpro( U );
     auto  TM  = convert_to_hpro( M );
     auto  DX0 = Hpro::to_dense( TM.get() );
@@ -460,7 +463,7 @@ solve_upper_tri ( const eval_side_t                 side,
         Hpro::solve_upper_left< value_t >( apply_adjoint, TU.get(), TM.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
     else
         Hpro::solve_upper_right< value_t >( TM.get(), TU.get(), Hpro::acc_exact, { Hpro::block_wise, diag } );
-    // TEST
+    #endif
 
     if ( is_blocked( U ) )
     {
@@ -487,7 +490,7 @@ solve_upper_tri ( const eval_side_t                 side,
     else
         HLR_ERROR( "unsupported matrix type : " + U.typestr() );
 
-    // TEST
+    #if defined(HLR_SOLVE_TESTS)
     auto  TC  = convert_to_hpro( M );
     auto  DX1 = Hpro::to_dense( TM.get() );
     auto  DX2 = Hpro::to_dense( TC.get() );
@@ -499,7 +502,7 @@ solve_upper_tri ( const eval_side_t                 side,
         io::matlab::write( *DX2, "X2" );
         std::cout << Hpro::to_string( "solve_upper_tri( %d, %d )", U.id(), M.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
     }// if
-    // TEST
+    #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

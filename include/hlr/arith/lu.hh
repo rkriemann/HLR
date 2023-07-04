@@ -20,6 +20,9 @@
 
 namespace hlr {
 
+// to enable accuracy tests
+// #define HLR_LU_TESTS
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // general H-LU factorization
@@ -106,7 +109,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 
-    // TEST
+    #if defined(HLR_LU_TESTS)
     auto  TC  = matrix::convert_to_hpro( A );
     auto  DX1 = Hpro::to_dense( TA.get() );
     auto  DX2 = Hpro::to_dense( TC.get() );
@@ -118,7 +121,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
         io::matlab::write( *DX2, "X2" );
         std::cout << Hpro::to_string( "lu( %d )", A.id() ) << ", error = " << blas::norm_F( blas::mat( DX2 ) ) << std::endl;
     }// if
-    // TEST
+    #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
