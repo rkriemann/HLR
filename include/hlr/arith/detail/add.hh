@@ -105,7 +105,7 @@ add ( const value_t                          alpha,
             
             if ( ! is_null( A_ij ) )
             {
-                if ( is_lowrank( A_ij ) )
+                if ( matrix::is_lowrank( A_ij ) )
                 {
                     const auto  R_ij = cptrcast( A_ij, matrix::lrmatrix< value_t > );
 
@@ -115,7 +115,7 @@ add ( const value_t                          alpha,
                         lr_blocks.push_back( R_ij );
                     }// if
                 }// if
-                else if ( is_dense( A_ij ) )
+                else if ( matrix::is_dense( A_ij ) )
                 {
                     auto  D_ij     = cptrcast( A_ij, matrix::dense_matrix< value_t > );
                     auto  M        = blas::copy( D_ij->mat() );

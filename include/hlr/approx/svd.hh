@@ -299,17 +299,17 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
     const size_t  ncols   = V.front().nrows();
     uint          in_rank = 0;
 
+    #if ! defined(NDEBUG)
     for ( auto &  U_i : U )
     {
         in_rank += U_i.ncols();
 
-        HLR_DBG_ASSERT( U_i.nrows() == nrows );
+        HLR_DBG_ASSERT( ( U_i.ncols() == 0 ) || ( U_i.nrows() == nrows ));
     }// for
 
-    #if ! defined(NDEBUG)
     for ( auto &  V_i : V )
     {
-        HLR_DBG_ASSERT( V_i.nrows() == ncols );
+        HLR_DBG_ASSERT( ( V_i.ncols() == 0 ) || ( V_i.nrows() == ncols ));
     }// for
     #endif
     

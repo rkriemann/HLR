@@ -75,9 +75,9 @@ lu ( Hpro::TMatrix< value_t > &  A,
         auto  D              = ptrcast( &A, matrix::dense_matrix< value_t > );
         auto  DD             = D->mat();
         auto  was_compressed = D->is_compressed();
-            
-        blas::invert( DD );
 
+        blas::invert( DD );
+        
         if ( was_compressed )
             D->compress( acc );
     }// if

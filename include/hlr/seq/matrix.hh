@@ -1196,7 +1196,7 @@ copy_diag ( const Hpro::TMatrix< value_t > &  M )
         {
             if ( ! is_null( BM->block( i, i ) ) )
             {
-                auto  B_ii = copy_diag( * BM->block( i, i ) );
+                auto  B_ii = hlr::seq::matrix::copy_diag( * BM->block( i, i ) );
                     
                 B_ii->set_parent( B );
                 B->set_block( i, i, B_ii.release() );

@@ -78,7 +78,7 @@ public:
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
-            , _mat( blas::copy( aM ) )
+            , _mat( aM )
     {
         HLR_ASSERT(( _row_is.size() == _mat.nrows() ) &&
                    ( _col_is.size() == _mat.ncols() ));
@@ -133,18 +133,22 @@ public:
     // access internal data
     //
 
-    blas::matrix< value_t >  mat () const
+    blas::matrix< value_t > &        mat_dbg ()       { HLR_ASSERT( ! is_compressed() ); return _mat; }
+    const blas::matrix< value_t > &  mat_dbg () const { HLR_ASSERT( ! is_compressed() ); return _mat; }
+
+    blas::matrix< value_t > & mat () { return _mat; }
+    const blas::matrix< value_t > & mat () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        if ( is_compressed() )
-        {
-            auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
+        // #if HLR_HAS_COMPRESSION == 1
+        // if ( is_compressed() )
+        // {
+        //     auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
     
-            compress::decompress< value_t >( _zM, dM );
+        //     compress::decompress< value_t >( _zM, dM );
             
-            return dM;
-        }// if
-        #endif
+        //     return dM;
+        // }// if
+        // #endif
 
         return _mat;
     }

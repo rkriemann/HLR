@@ -439,6 +439,71 @@ convert_to_h ( const Hpro::TMatrix< value_t > &  M )
     }// if
 }
 
+//
+// convert given matrix into HLIBpro matrix types, e.g., TRkMatrix and TDenseMatrix
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+convert_to_hpro ( const Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        //
+        // convert each sub block into low-rank format and 
+        // enlarge to size of M (pad with zeroes)
+        //
+
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = convert_to_h( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( matrix::is_lowrank( M ) )
+    {
+        auto  RM = cptrcast( &M, matrix::lrmatrix< value_t > );
+        auto  U  = blas::copy( RM->U() );
+        auto  V  = blas::copy( RM->V() );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  DM = cptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = blas::copy( DM->mat() );
+        auto  D  = std::make_unique< Hpro::TDenseMatrix< value_t > >( M.row_is(), M.col_is(), std::move( DD ) );
+
+        D->set_id( M.id() );
+
+        return D;
+    }// if
+    else
+    {
+        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+    }// if
+}
+
 }}// namespace hlr::matrix
 
 #endif // __HLR_MATRIX_CONVERT_HH

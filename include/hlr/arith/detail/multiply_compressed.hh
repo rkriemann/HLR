@@ -304,9 +304,9 @@ multiply ( const value_t                                   alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  T  = matrix::dense_matrix< value_t >( C.row_is(), C.col_is() );
-    auto  DT = T.mat();
+    auto  DT = T.mat_dbg();
             
     for ( uint  i = 0; i < A.nblock_rows( op_A ); ++i )
     {
@@ -337,7 +337,7 @@ multiply ( const value_t                                   alpha,
 
         auto  DT_i = blas::matrix< value_t >( DT, T_i.row_is() - T.row_ofs(), T_i.col_is() - T.col_ofs() );
 
-        blas::add( value_t(1), T_i.mat(), DT_i );
+        blas::add( value_t(1), T_i.mat_dbg(), DT_i );
         // T.add_block( value_t(1), value_t(1), &T_i );
     }// for
 
@@ -457,7 +457,7 @@ multiply ( const value_t                                   alpha,
     C.decompress();
     
     // W·V' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
 
     blas::prod( value_t(1), W, blas::adjoint( B.V( op_B ) ), value_t(1), DC );
 
@@ -486,7 +486,7 @@ multiply ( const value_t                                   alpha,
     std::scoped_lock  lock( C.mutex() );
     
     // W·V' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
 
     blas::prod( value_t(1), W, blas::adjoint( B.V( op_B ) ), value_t(1), DC );
 }
@@ -516,7 +516,7 @@ multiply ( const value_t                          alpha,
     C.decompress();
     
     // AxU·V' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( value_t(1), AxU, blas::adjoint( B.V( op_B ) ), value_t(1), DC );
 
@@ -678,9 +678,9 @@ multiply ( const value_t                                   alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  T  = matrix::dense_matrix< value_t >( C.row_is(), C.col_is() );
-    auto  DT = T.mat();
+    auto  DT = T.mat_dbg();
     
     for ( uint  j = 0; j < B.nblock_cols( op_B ); ++j )
     {
@@ -711,7 +711,7 @@ multiply ( const value_t                                   alpha,
 
         auto  DT_j = blas::matrix< value_t >( DT, T_j.row_is() - T.row_ofs(), T_j.col_is() - T.col_ofs() );
 
-        blas::add( value_t(1), T_j.mat(), DT_j );
+        blas::add( value_t(1), T_j.mat_dbg(), DT_j );
         // T.add_block( value_t(1), value_t(1), &T_j );
     }// for
 
@@ -781,8 +781,8 @@ multiply ( const value_t                                   alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  DA = A.mat();
-    auto  DB = B.mat();
+    auto  DA = A.mat_dbg();
+    auto  DB = B.mat_dbg();
     auto  DT = blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ) );
     auto  T  = Hpro::TDenseMatrix< value_t >( C.row_is(), C.col_is(), std::move( DT ) );
         
@@ -803,8 +803,8 @@ multiply ( const value_t                                   alpha,
 // {
 //     HLR_MULT_PRINT;
 
-//     auto  DA = A.mat();
-//     auto  DB = B.mat();
+//     auto  DA = A.mat_dbg();
+//     auto  DB = B.mat_dbg();
     
 //     std::scoped_lock  lock( C.mutex() );
     
@@ -827,8 +827,8 @@ multiply ( const value_t                                   alpha,
 {
     HLR_MULT_PRINT;
 
-    auto  DA = A.mat();
-    auto  DB = B.mat();
+    auto  DA = A.mat_dbg();
+    auto  DB = B.mat_dbg();
     
     std::scoped_lock  lock( C.mutex() );
     const auto        was_compressed = C.is_compressed();
@@ -836,7 +836,7 @@ multiply ( const value_t                                   alpha,
     C.decompress();
     
     // C = C + A B
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ), value_t(1), DC );
 
@@ -856,13 +856,13 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
 
-    auto  DA = A.mat();
-    auto  DB = B.mat();
+    auto  DA = A.mat_dbg();
+    auto  DB = B.mat_dbg();
     
     std::scoped_lock  lock( C.mutex() );
 
     // C = C + A B
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, blas::mat_view( op_A, DA ), blas::mat_view( op_B, DB ), value_t(1), DC );
 }
@@ -1048,8 +1048,8 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // [ U(C), V(C) ] = approx( C - A B )
-    auto  DA = A.mat();
-    auto  DB = B.mat();
+    auto  DA = A.mat_dbg();
+    auto  DB = B.mat_dbg();
     auto  AB = blas::prod( alpha,
                            blas::mat_view( op_A, DA ),
                            blas::mat_view( op_B, DB ) );
@@ -1079,7 +1079,7 @@ multiply ( const value_t                                   alpha,
            const approx_t &                                approx )
 {
     // C = C + ( A U(B) ) V(B)^H
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  UB = B.U( op_B );
     auto  VB = B.V( op_B );
     auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
@@ -1126,7 +1126,7 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // C = C + ( A U(B) ) V(B)^H
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  UB = B.U( op_B );
     auto  VB = B.V( op_B );
     auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
@@ -1136,7 +1136,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), DC );
 
@@ -1157,14 +1157,14 @@ multiply ( const value_t                                   alpha,
     HLR_ASSERT( ! C.is_compressed() );
     
     // C = C + ( A U(B) ) V(B)^H
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  UB = B.U( op_B );
     auto  VB = B.V( op_B );
     auto  AU = blas::prod( value_t(1), blas::mat_view( op_A, DA ), UB );
 
     std::scoped_lock  lock( C.mutex() );
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), DC );
 }
@@ -1182,7 +1182,7 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // C = C + ( A U(B) ) S(B) V(B)^H
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  UB = B.U( op_B );
     auto  SB = B.S();
     auto  VB = B.V( op_B );
@@ -1195,7 +1195,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
 
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, AU, blas::adjoint( VB ), value_t(1), DC );
 
@@ -1323,7 +1323,7 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // [ U(C), V(C) ] = truncate( [ U(C), A U(B) ] , [ V(C), V(B) ] )
-    auto  DA = A.mat();
+    auto  DA = A.mat_dbg();
     auto  UB = B.U( op_B );
     auto  VB = B.V( op_B );
     auto  AU = blas::prod( alpha, blas::mat_view( op_A, DA ), UB );
@@ -1404,7 +1404,7 @@ multiply ( const value_t                                   alpha,
     C.decompress();
     
     // U·X' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( value_t(1), A.U( op_A ), blas::adjoint( X ), value_t(1), DC );
 
@@ -1433,7 +1433,7 @@ multiply ( const value_t                                   alpha,
     std::scoped_lock  lock( C.mutex() );
     
     // U·X' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( value_t(1), A.U( op_A ), blas::adjoint( X ), value_t(1), DC );
 }
@@ -1465,7 +1465,7 @@ multiply ( const value_t                                   alpha,
     C.decompress();
     
     // U·X' + C
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( value_t(1), A.U( op_A ), blas::adjoint( X ), value_t(1), DC );
 
@@ -1565,7 +1565,7 @@ multiply ( const value_t                                   alpha,
     // C = C + U(A) ( B^H V(A) )^H
     auto  UA = A.U( op_A );
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  VB = blas::prod( blas::adjoint( blas::mat_view( op_B, DB ) ), VA );
     auto  RC = matrix::lrmatrix< value_t >( C.row_is(), C.col_is(), UA, VB );
 
@@ -1589,7 +1589,7 @@ multiply ( const value_t                                   alpha,
 //     // C = C + U(A) ( V(A)^H B )
 //     auto  UA = A.U( op_A );
 //     auto  VA = A.V( op_A );
-//     auto  DB = B.mat();
+//     auto  DB = B.mat_dbg();
 //     auto  VB = blas::prod( value_t(1), blas::adjoint( VA ), blas::mat_view( op_B, DB ) );
 
 //     std::scoped_lock  lock( C.mutex() );
@@ -1612,7 +1612,7 @@ multiply ( const value_t                                   alpha,
     // C = C + U(A) ( V(A)^H B )
     auto  UA = A.U( op_A );
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  VB = blas::prod( value_t(1), blas::adjoint( VA ), blas::mat_view( op_B, DB ) );
 
     std::scoped_lock  lock( C.mutex() );
@@ -1620,7 +1620,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UA, VB, value_t(1), DC );
 
@@ -1643,12 +1643,12 @@ multiply ( const value_t                                   alpha,
     // C = C + U(A) ( V(A)^H B )
     auto  UA = A.U( op_A );
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  VB = blas::prod( value_t(1), blas::adjoint( VA ), blas::mat_view( op_B, DB ) );
 
     std::scoped_lock  lock( C.mutex() );
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UA, VB, value_t(1), DC );
 }
@@ -1669,7 +1669,7 @@ multiply ( const value_t                                   alpha,
     auto  UA = A.U( op_A );
     auto  SA = A.S();
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  VB = blas::prod( value_t(1), blas::adjoint( VA ), blas::mat_view( op_B, DB ) );
 
     blas::prod_diag( SA, VB );
@@ -1679,7 +1679,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UA, VB, value_t(1), DC );
 
@@ -1853,7 +1853,7 @@ multiply ( const value_t                                   alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
     auto  UA = A.U( op_A );
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
+    auto  DB = B.mat_dbg();
     auto  VB = blas::prod( alpha, blas::adjoint( blas::mat_view( op_B, DB ) ), VA );
 
     std::scoped_lock  lock( C.mutex() );
@@ -1951,7 +1951,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UT, blas::adjoint( VB ), value_t(1), DC );
 
@@ -1983,7 +1983,7 @@ multiply ( const value_t                                   alpha,
 
     std::scoped_lock  lock( C.mutex() );
     
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UT, blas::adjoint( VB ), value_t(1), DC );
 }
@@ -2021,7 +2021,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
 
-    auto  DC = C.mat();
+    auto  DC = C.mat_dbg();
     
     blas::prod( alpha, UT, blas::adjoint( VB ), value_t(1), DC );
 

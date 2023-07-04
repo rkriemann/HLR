@@ -547,7 +547,7 @@ solve_lower_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( L_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat(),
+            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
                                                  L_jj->col_is() - L.col_ofs(),
                                                  blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
@@ -560,7 +560,7 @@ solve_lower_tri ( const eval_side_t                      side,
                 
                 if ( ! is_null( L_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
+                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
                                                          L_kj->row_is() - L.row_ofs(),
                                                          blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
@@ -607,7 +607,7 @@ solve_lower_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( L_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat(),
+            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
                                                  L_jj->col_is() - L.col_ofs(),
                                                  blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
@@ -620,7 +620,7 @@ solve_lower_tri ( const eval_side_t                      side,
                 
                 if ( ! is_null( L_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
+                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
                                                          L_kj->row_is() - L.row_ofs(),
                                                          blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
@@ -688,7 +688,7 @@ solve_lower_tri ( const eval_side_t                 side,
         auto  D = matrix::dense_matrix< value_t >( M.row_is(), Hpro::is( 0, M.rank()-1 ), U );
 
         solve_lower_tri< value_t >( side, diag, L, D );
-
+        
         if ( M.is_compressed() )
             M.set_U( std::move( U ), acc );
     }// if
@@ -1265,7 +1265,7 @@ solve_upper_tri ( const eval_side_t                      side,
 
             HLR_ASSERT( ! is_null( U_jj ) );
 
-            auto  M_j = blas::matrix< value_t >( M.mat(),
+            auto  M_j = blas::matrix< value_t >( M.mat_dbg(),
                                                  U_jj->col_is( op_U ) - U.col_ofs( op_U ),
                                                  blas::range::all );
             auto  D_j = matrix::dense_matrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
@@ -1278,7 +1278,7 @@ solve_upper_tri ( const eval_side_t                      side,
                     
                 if ( ! is_null( U_kj ) )
                 {
-                    auto  M_k = blas::matrix< value_t >( M.mat(),
+                    auto  M_k = blas::matrix< value_t >( M.mat_dbg(),
                                                          U_kj->row_is( op_U ) - U.row_ofs( op_U ),
                                                          blas::range::all );
                     auto  D_k = matrix::dense_matrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
@@ -1372,11 +1372,18 @@ solve_upper_tri ( const eval_side_t                 side,
         //    U' V(X) = V(M), respectively
         //
 
+        if ( matrix::is_dense( U ) )
+            io::matlab::write( cptrcast( &U, matrix::dense_matrix< value_t > )->mat(), "U" );
+        
         auto  V = M.V();
-        auto  D = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), V );
+        auto  D = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, M.rank()-1 ), std::move( V ) );
 
+        io::matlab::write( M.V(), "M1" );
+        
         solve_upper_tri< value_t >( from_left, diag, U, D );
 
+        io::matlab::write( M.V(), "M2" );
+        
         if ( M.is_compressed() )
             M.set_V( std::move( V ), acc );
     }// else

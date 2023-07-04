@@ -299,13 +299,13 @@ multiply ( const value_t                     alpha,
     
     #if HLR_MULT_TESTS == 1
     
-    auto  TT = hlr::matrix::convert_to_dense< value_t >( C );
+    auto  TT  = hlr::matrix::convert_to_dense< value_t >( C );
 
-    blas::add( value_t(-1), blas::mat( *TC ), blas::mat( *TT ) );
+    blas::add( value_t(-1), TC->mat(), TT->mat_dbg() );
 
-    if ( blas::norm_F( blas::mat( *TT ) ) > 1e-4 )
+    // if ( blas::norm_F( TT->mat() ) > 1e-4 )
     {
-        std::cout << aA.id() << " × " << aB.id() << " -> " << C.id() << " : " << blas::norm_F( blas::mat( *TT ) ) << std::endl;
+        std::cout << aA.id() << " × " << aB.id() << " -> " << C.id() << " : " << blas::norm_F( TT->mat_dbg() ) << std::endl;
         hlr::breakpoint();
     }// if
 
@@ -425,13 +425,13 @@ multiply ( const value_t                     alpha,
 
     #if HLR_MULT_TESTS == 1
 
-    auto  TT = hlr::matrix::convert_to_dense< value_t >( C );
+    auto  TT = hlr::matrix::convert_to_dense< value_t >( *C );
 
-    blas::add( value_t(-1), blas::mat( *TC ), blas::mat( *TT ) );
+    blas::add( value_t(-1), TC->mat(), TT->mat_dbg() );
 
-    if ( blas::norm_F( blas::mat( *TT ) ) > 1e-4 )
+    // if ( blas::norm_F( TT->mat_dbg() ) > 1e-4 )
     {
-        std::cout << aA.id() << " × " << B.id() << " -> " << aC.id() << " : " << blas::norm_F( blas::mat( *TT ) ) << std::endl;
+        std::cout << aA.id() << " × " << B.id() << " -> " << aC.id() << " : " << blas::norm_F( TT->mat_dbg() ) << std::endl;
         hlr::breakpoint();
     }// if
 
@@ -1311,11 +1311,11 @@ multiply_diag ( const value_t                     alpha,
     
     auto  TT = hlr::matrix::convert_to_dense< value_t >( C );
 
-    blas::add( value_t(-1), blas::mat( *TC ), blas::mat( *TT ) );
+    blas::add( value_t(-1), TC->mat(), TT->mat_dbg() );
 
-    if ( blas::norm_F( blas::mat( *TT ) ) > 1e-4 )
+    if ( blas::norm_F( TT->mat_dbg() ) > 1e-4 )
     {
-        std::cout << A.id() << " × " << D.id() << " × " << B.id() << " -> " << C.id() << " : " << blas::norm_F( blas::mat( *TT ) ) << std::endl;
+        std::cout << A.id() << " × " << D.id() << " × " << B.id() << " -> " << C.id() << " : " << blas::norm_F( TT->mat_dbg() ) << std::endl;
         hlr::breakpoint();
     }// if
 

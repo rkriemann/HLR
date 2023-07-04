@@ -78,19 +78,21 @@ public:
             , _col_is( 0, 0 )
     {}
     
-    lrmatrix ( const indexset                arow_is,
-               const indexset                acol_is )
+    lrmatrix ( const indexset              arow_is,
+               const indexset              acol_is )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
+            , _U( _row_is.size(), 0 ) // to avoid issues with nrows/ncols
+            , _V( _col_is.size(), 0 )
     {
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    lrmatrix ( const indexset                   arow_is,
-               const indexset                   acol_is,
-               hlr::blas::matrix< value_t > &   aU,
-               hlr::blas::matrix< value_t > &   aV )
+    lrmatrix ( const indexset              arow_is,
+               const indexset              acol_is,
+               blas::matrix< value_t > &   aU,
+               blas::matrix< value_t > &   aV )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -104,10 +106,10 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    lrmatrix ( const indexset                   arow_is,
-               const indexset                   acol_is,
-               hlr::blas::matrix< value_t > &&  aU,
-               hlr::blas::matrix< value_t > &&  aV )
+    lrmatrix ( const indexset              arow_is,
+               const indexset              acol_is,
+               blas::matrix< value_t > &&  aU,
+               blas::matrix< value_t > &&  aV )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -368,14 +370,9 @@ public:
     // return copy of matrix
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
-        auto  M = std::make_unique< lrmatrix< value_t > >( _row_is, _col_is );
+        auto  R = std::make_unique< lrmatrix< value_t > >( _row_is, _col_is );
         
-        M->copy_struct_from( this );
-        
-        HLR_ASSERT( IS_TYPE( M.get(), lrmatrix ) );
-
-        auto  R = ptrcast( M.get(), lrmatrix< value_t > );
-
+        R->copy_struct_from( this );
         R->_rank = _rank;
         
         #if HLR_HAS_COMPRESSION == 1
@@ -386,8 +383,6 @@ public:
 
             std::copy( _zdata.U.begin(), _zdata.U.end(), R->_zdata.U.begin() );
             std::copy( _zdata.V.begin(), _zdata.V.end(), R->_zdata.V.begin() );
-
-            return M;
         }// if
         else
         #endif
@@ -396,7 +391,7 @@ public:
             R->_V = std::move( blas::copy( _V ) );
         }// else
         
-        return M;
+        return R;
     }
 
     // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
