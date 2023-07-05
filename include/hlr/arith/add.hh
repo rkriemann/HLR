@@ -112,10 +112,7 @@ add ( const value_t                     alpha,
     
     HLR_ASSERT( matrix::is_dense( C ) );
 
-    if ( compress::is_compressible( C ) && compress::is_compressed( C ) )
-        HLR_ERROR( "TODO" );
-
-    auto  DC = ptrcast( &C, Hpro::TDenseMatrix< value_t > );
+    auto  DC = ptrcast( &C, matrix::dense_matrix< value_t > );
     
     if      ( matrix::is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::dense_matrix< value_t > ), *DC );
     else if ( matrix::is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::lrmatrix< value_t > ),     *DC );

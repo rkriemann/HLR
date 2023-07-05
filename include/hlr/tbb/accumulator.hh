@@ -159,8 +159,8 @@ struct accumulator : public hlr::matrix::accumulator_base
             else
             {
                 // has to be low-rank: truncate
-                auto  R1       = ptrcast( T1.get(), hpro::TRkMatrix );
-                auto  R2       = ptrcast( T2.get(), hpro::TRkMatrix );
+                auto  R1       = ptrcast( T1.get(), matrix::lrmatrix< value_t > );
+                auto  R2       = ptrcast( T2.get(), matrix::lrmatrix< value_t > );
                 auto  [ U, V ] = approx( { blas::mat_U< value_t >( R1 ), blas::mat_U< value_t >( R2 ) },
                                          { blas::mat_V< value_t >( R1 ), blas::mat_V< value_t >( R2 ) },
                                          acc );
@@ -221,9 +221,8 @@ struct accumulator : public hlr::matrix::accumulator_base
                     {
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                         
-                        BC->set_block( i, j, new hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                  BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                  hpro::value_type_v< value_t > ) );
+                        BC->set_block( i, j, new matrix::lrmatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                              BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
             }// if

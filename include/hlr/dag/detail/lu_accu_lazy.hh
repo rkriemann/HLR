@@ -141,7 +141,7 @@ struct accumulator
 
         //     auto  T = hlr::multiply( value_t(1), op_A, A, op_B, B );
 
-        //     if ( handle_dense && ! is_dense( *T ) )
+        //     if ( handle_dense && ! matrix::is_dense( *T ) )
         //         T = matrix::convert_to_dense< value_t >( *T );
             
         //     //
@@ -155,7 +155,7 @@ struct accumulator
         //     {
         //         matrix = std::move( T );
         //     }// if
-        //     else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+        //     else if ( ! matrix::is_dense( *matrix ) && matrix::is_dense( *T ) )
         //     {
         //         // prefer dense format to avoid unnecessary truncations
         //         hlr::add( value_t(1), *matrix, *T );

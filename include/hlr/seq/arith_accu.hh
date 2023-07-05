@@ -120,7 +120,7 @@ struct accumulator
     void
     apply ( const value_t               alpha,
             Hpro::TMatrix< value_t > &  M,
-            const Hpro::TTruncAcc &     acc,
+            const accuracy &            acc,
             const approx_t &            approx )
     {
         if ( ! is_null( matrix ) )
@@ -208,7 +208,7 @@ struct accumulator
     void
     eval ( const value_t                     alpha,
            const Hpro::TMatrix< value_t > &  M,
-           const Hpro::TTruncAcc &           acc,
+           const accuracy &                  acc,
            const approx_t &                  approx )
     {
         std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
@@ -274,8 +274,8 @@ struct accumulator
                             BC->set_block( i, j, new matrix::dense_matrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
                                                                                       BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         else
-                            BC->set_block( i, j, new matrix::dense_matrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                                      BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                            BC->set_block( i, j, new matrix::lrmatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                  BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
             }// if
@@ -408,7 +408,7 @@ void
 multiply ( const value_t              alpha,
            Hpro::TMatrix< value_t > & C,
            accumulator< value_t > &   accu,
-           const Hpro::TTruncAcc &    acc,
+           const accuracy &           acc,
            const approx_t &           approx )
 {
     //
@@ -470,7 +470,7 @@ multiply ( const value_t                     alpha,
            const Hpro::matop_t               op_B,
            const Hpro::TMatrix< value_t > &  B,
            Hpro::TMatrix< value_t > &        C,
-           const Hpro::TTruncAcc &           acc,
+           const accuracy &                  acc,
            const approx_t &                  approx )
 {
     auto  accu = detail::accumulator< value_t >();
@@ -497,7 +497,7 @@ solve_diag ( const eval_side_t                side,
              const Hpro::TMatrix< value_t > & D,
              Hpro::TMatrix< value_t > &       M,
              accumulator< value_t > &         accu,
-             const Hpro::TTruncAcc &          acc,
+             const accuracy &                 acc,
              const approx_t &                 approx )
 {
     //
@@ -568,7 +568,7 @@ solve_lower_tri ( const eval_side_t                 side,
                   const Hpro::TMatrix< value_t > &  L,
                   Hpro::TMatrix< value_t > &        M,
                   accumulator< value_t > &          accu,
-                  const Hpro::TTruncAcc &           acc,
+                  const accuracy &                  acc,
                   const approx_t &                  approx )
 {
     //
@@ -644,7 +644,7 @@ solve_upper_tri ( const eval_side_t                 side,
                   const Hpro::TMatrix< value_t > &  U,
                   Hpro::TMatrix< value_t > &        M,
                   accumulator< value_t > &          accu,
-                  const Hpro::TTruncAcc &           acc,
+                  const accuracy &                  acc,
                   const approx_t &                  approx )
 {
     // apply computable updates
@@ -711,7 +711,7 @@ template < typename value_t,
 void
 lu ( Hpro::TMatrix< value_t > &  M,
      accumulator< value_t > &    accu,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     //
@@ -804,7 +804,7 @@ template < typename value_t,
 void
 ldu ( Hpro::TMatrix< value_t > & M,
       accumulator< value_t > &   accu,
-      const Hpro::TTruncAcc &    acc,
+      const accuracy &           acc,
       const approx_t &           approx )
 {
     //
@@ -880,9 +880,13 @@ ldu ( Hpro::TMatrix< value_t > & M,
         
         if ( matrix::is_dense( M ) )
         {
-            auto  D = ptrcast( &M, matrix::dense_matrix< value_t > );
+            auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+            auto  DD = D->mat();
 
-            invert< value_t >( *D );
+            blas::invert( DD );
+        
+            if ( D->is_compressed() )
+                D->set_matrix( std::move( DD ), acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -895,7 +899,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &  M,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     auto  accu = detail::accumulator< value_t >();
@@ -907,7 +911,7 @@ template < typename value_t,
            typename approx_t >
 void
 ldu ( Hpro::TMatrix< value_t > &  M,
-      const Hpro::TTruncAcc &     acc,
+      const accuracy &            acc,
       const approx_t &            approx )
 {
     auto  accu = detail::accumulator< value_t >();

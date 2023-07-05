@@ -71,7 +71,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
             U_ij = hlr::matrix::restrict( *matrix, M.block( i, j )->block_is() );
 
             // prefer dense if destination is dense
-            if ( check_dense( *M.block( i, j ) ) && ! is_dense( *U_ij ) )
+            if ( check_dense( *M.block( i, j ) ) && ! matrix::is_dense( *U_ij ) )
                 U_ij = std::move( hlr::matrix::convert_to_dense< value_t >( *U_ij ) );
         }// if
 
@@ -140,9 +140,9 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_dense_all( A, B ) ||
-                 ( is_blocked( A ) && is_dense(   B ) ) ||
-                 ( is_dense(   A ) && is_blocked( B ) ))
+            if ( matrix::is_dense_all( A, B ) ||
+                 ( is_blocked( A ) && matrix::is_dense(   B ) ) ||
+                 ( matrix::is_dense(   A ) && is_blocked( B ) ))
             {
                 handle_dense = true;
                 break;
@@ -165,7 +165,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
                     continue;
                 
                 // TODO: non low-rank M
-                HLR_ASSERT( is_lowrank( M ) );
+                HLR_ASSERT( matrix::is_lowrank( M ) );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                 auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
@@ -181,13 +181,11 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
 
                         if ( handle_dense )
-                            BC->set_block( i, j, new Hpro::TDenseMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                         BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                         Hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new matrix::dense_matrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                      BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         else
-                            BC->set_block( i, j, new Hpro::TRkMatrix( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                      BB->block( 0, j, op_B )->col_is( op_B ),
-                                                                      Hpro::value_type_v< value_t > ) );
+                            BC->set_block( i, j, new matrix::lrmatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                  BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
             }// if
@@ -199,7 +197,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
 
                 auto  T = hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B );
 
-                if ( handle_dense && ! is_dense( *T ) )
+                if ( handle_dense && ! matrix::is_dense( *T ) )
                     T = matrix::convert_to_dense< value_t >( *T );
                 
                 //
@@ -210,7 +208,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
                 {
                     matrix = std::move( T );
                 }// if
-                else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+                else if ( ! matrix::is_dense( *matrix ) && matrix::is_dense( *T ) )
                 {
                     // prefer dense format to avoid unnecessary truncations
                     hlr::add( value_t(1), *matrix, *T );
@@ -276,7 +274,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
     check_dense ( const Hpro::TMatrix< value_t > &  M ) const
     {
         // return false;
-        if ( is_dense( M ) )
+        if ( matrix::is_dense( M ) )
         {
             return true;
         }// if
@@ -292,7 +290,7 @@ struct accumulator : public hlr::matrix::accumulator_base< value_t >
             {
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    if ( ! is_null( B->block( i, j ) ) && ! is_dense( B->block( i, j ) ) )
+                    if ( ! is_null( B->block( i, j ) ) && ! matrix::is_dense( B->block( i, j ) ) )
                          return false;
                 }// for
             }// for

@@ -48,7 +48,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
     using value_t       = typename coeff_t::value_t;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
     using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
-    using lrmat_map_t   = std::unordered_map< indexset, std::list< Hpro::TRkMatrix< value_t > * >, indexset_hash >;
+    using lrmat_map_t   = std::unordered_map< indexset, std::list< lrmatrix< value_t > * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< Hpro::idx_t, Hpro::TBlockMatrix< value_t > * >;
 
     //
@@ -75,7 +75,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
         auto  children = decltype( nodes )();
         auto  rowmap   = lrmat_map_t();
         auto  colmap   = lrmat_map_t();
-        auto  lrmat    = std::list< Hpro::TRkMatrix< value_t > * >();
+        auto  lrmat    = std::list< lrmatrix< value_t > * >();
         
         for ( auto  node : nodes )
         {
@@ -91,7 +91,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
 
                     if ( is_lowrank( *M ) )
                     {
-                        auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                        auto  R = ptrcast( M.get(), lrmatrix< value_t > );
                         
                         rowmap[ M->row_is() ].push_back( R );
                         colmap[ M->col_is() ].push_back( R );
@@ -275,8 +275,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
             for ( auto &  R : matrices )
             {
                 // R = U·V' = W·T·X'
-                auto  U_i = blas::mat_U< value_t >( R );
-                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i = R->U();
+                auto  V_i = blas::copy( R->V() );
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
@@ -348,8 +348,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
             for ( auto &  R : matrices )
             {
                 // R = U·V' = Qu·Ru×Rv'·Qv'
-                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
-                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i  = blas::copy( R->U() );
+                auto  V_i  = blas::copy( R->V() );
                 auto  Ru_i = blas::matrix< value_t >();
                 auto  Rv_i = blas::matrix< value_t >();
                 auto  k    = R->rank();
@@ -446,8 +446,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
             for ( auto &  R : matrices )
             {
                 // R' = (U·V')' = V·U' = X·T'·W'
-                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
-                auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  V_i = blas::copy( R->V() );
+                auto  U_i = blas::copy( R->U() );
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
@@ -525,8 +525,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
             for ( auto &  R : matrices )
             {
                 // R' = (U·V')' = V·U' = X·T'·W'
-                auto  V_i  = blas::copy( blas::mat_V< value_t >( R ) );
-                auto  U_i  = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  V_i  = blas::copy( R->V() );
+                auto  U_i  = blas::copy( R->U() );
                 auto  Rv_i = blas::matrix< value_t >();
                 auto  Ru_i = blas::matrix< value_t >();
                 auto  k    = R->rank();
@@ -571,8 +571,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
             //          = Un S Vn'  with  S = Un' U V' Vn
             //
 
-            auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
-            auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+            auto  UnU = blas::prod( blas::adjoint( Un ), R->U() );
+            auto  VnV = blas::prod( blas::adjoint( Vn ), R->V() );
             auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
 
             auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
@@ -582,7 +582,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                                                                                       std::move( S ) );
 
             // {
-            //     auto  M1 = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
+            //     auto  M1 = blas::prod( R->U(), blas::adjoint( R->V() ) );
             //     auto  T  = blas::prod( RU->row_basis(), RU->coeff() );
             //     auto  M2 = blas::prod( T, blas::adjoint( RU->col_basis() ) );
 
@@ -616,7 +616,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
     using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
-    using lrmat_map_t   = std::unordered_map< indexset, std::list< const Hpro::TRkMatrix< value_t > * >, indexset_hash >;
+    using lrmat_map_t   = std::unordered_map< indexset, std::list< const lrmatrix< value_t > * >, indexset_hash >;
     using bmat_map_t    = std::unordered_map< Hpro::idx_t, Hpro::TBlockMatrix< value_t > * >;
 
     //
@@ -643,7 +643,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
         auto  children = decltype( matrices )();
         auto  rowmap   = lrmat_map_t();
         auto  colmap   = lrmat_map_t();
-        auto  lrmat    = std::list< const Hpro::TRkMatrix< value_t > * >();
+        auto  lrmat    = std::list< const lrmatrix< value_t > * >();
         
         for ( auto  mat : matrices )
         {
@@ -651,7 +651,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
             
             if ( is_lowrank( mat ) )
             {
-                auto  R = cptrcast( mat, Hpro::TRkMatrix< value_t > );
+                auto  R = cptrcast( mat, lrmatrix< value_t > );
                         
                 rowmap[ R->row_is() ].push_back( R );
                 colmap[ R->col_is() ].push_back( R );
@@ -762,8 +762,8 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
             for ( auto &  R : matrices )
             {
                 // R = U·V' = W·T·X'
-                auto  U_i = blas::mat_U< value_t >( R );
-                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
+                auto  U_i = R->U();
+                auto  V_i = blas::copy( R->V() );
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
@@ -814,8 +814,8 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
             for ( auto &  R : matrices )
             {
                 // R' = (U·V')' = V·U' = X·T'·W'
-                auto  V_i = blas::copy( blas::mat_V< value_t >( R ) );
-                auto  U_i = blas::copy( blas::mat_U< value_t >( R ) );
+                auto  V_i = blas::copy( R->V() );
+                auto  U_i = blas::copy( R->U() );
                 auto  R_i = blas::matrix< value_t >();
                 auto  k   = R->rank();
                 
@@ -853,8 +853,8 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
             //          = Un S Vn'  with  S = Un' U V' Vn
             //
 
-            auto  UnU = blas::prod( blas::adjoint( Un ), blas::mat_U< value_t >( R ) );
-            auto  VnV = blas::prod( blas::adjoint( Vn ), blas::mat_V< value_t >( R ) );
+            auto  UnU = blas::prod( blas::adjoint( Un ), R->U() );
+            auto  VnV = blas::prod( blas::adjoint( Vn ), R->V() );
             auto  S   = blas::prod( UnU, blas::adjoint( VnV ) );
 
             auto  RU  = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(),
@@ -928,9 +928,9 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
                 // form U·V' = W·T·X' with orthogonal W/X
                 //
 
-                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
-                auto  W  = blas::mat_U< value_t >( R );
-                auto  X  = blas::mat_V< value_t >( R );
+                auto  R  = ptrcast( M.get(), lrmatrix< value_t > );
+                auto  W  = R->U();
+                auto  X  = R->V();
                 auto  Rw = blas::matrix< value_t >();
                 auto  Rx = blas::matrix< value_t >();
 
@@ -993,8 +993,8 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
 
             if ( is_dense( *M ) )
             {
-                auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  DD = blas::copy( blas::mat( D ) );
+                auto  D  = cptrcast( M.get(), dense_matrix< value_t > );
+                auto  DD = blas::copy( D.mat() );
 
                 M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
             }// if
@@ -1085,9 +1085,9 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
         // form U·V' = W·T·X' with orthogonal W/X
         //
         
-        auto  R  = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
-        auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  W  = blas::copy( R->U() );
+        auto  X  = blas::copy( R->V() );
         auto  Rw = blas::matrix< value_t >();
         auto  Rx = blas::matrix< value_t >();
             
@@ -1183,8 +1183,8 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
 
         // M = A.copy();
 
-        auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
-        auto  DD = blas::copy( blas::mat( D ) );
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
+        auto  DD = blas::copy( D.mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
@@ -1266,7 +1266,7 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
 // Also set up structure of cluster bases.
 // 
 template < typename value_t >
-using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const Hpro::TRkMatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
+using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
 
 template < typename value_t >
 void
@@ -1291,9 +1291,9 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         // (see "build_cluster_basis" for more details)
         //
         
-        auto  R  = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
-        auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  W  = blas::copy( R->U() );
+        auto  X  = blas::copy( R->V() );
         auto  Cw = blas::matrix< value_t >();
         auto  Cx = blas::matrix< value_t >();
         
@@ -1413,7 +1413,7 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
 
         for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
         {
-            auto  X_i   = blas::prod( blas::mat_U( R_i, op ), blas::adjoint( C_i ) );
+            auto  X_i   = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
             auto  X_sub = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
             blas::copy( X_i, X_sub );
@@ -1463,9 +1463,9 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         // with cluster basis W and X
         //
         
-        auto  R  = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), blas::mat_U( R ) );
-        auto  SV = blas::prod( blas::adjoint( colcb.basis() ), blas::mat_V( R ) );
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), R->U() );
+        auto  SV = blas::prod( blas::adjoint( colcb.basis() ), R->V() );
         auto  S  = blas::prod( SU, blas::adjoint( SV ) );
 
         M = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
@@ -1508,8 +1508,8 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
 
         // M = A.copy();
 
-        auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
-        auto  DD = blas::copy( blas::mat( D ) );
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
+        auto  DD = blas::copy( D.mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
@@ -1529,10 +1529,10 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
 // Also set up structure of cluster bases.
 // 
 template < typename value_t >
-using  lr_mat_map_t   = std::unordered_map< indexset, std::list< const Hpro::TRkMatrix< value_t > * >, indexset_hash >;
+using  lr_mat_map_t   = std::unordered_map< indexset, std::list< const lrmatrix< value_t > * >, indexset_hash >;
 
 template < typename value_t >
-using  coupling_map_t = std::unordered_map< const Hpro::TRkMatrix< value_t > *, blas::matrix< value_t > >;
+using  coupling_map_t = std::unordered_map< const lrmatrix< value_t > *, blas::matrix< value_t > >;
 
 template < typename value_t >
 void
@@ -1559,9 +1559,9 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         // (see "build_cluster_basis" for more details)
         //
         
-        auto  R  = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
-        auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  W  = blas::copy( R->U() );
+        auto  X  = blas::copy( R->V() );
         auto  Cw = blas::matrix< value_t >();
         auto  Cx = blas::matrix< value_t >();
         
@@ -1639,7 +1639,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
 // in block row/columns
 //
 template < typename value_t >
-using  lr_mat_list_t  = std::list< const Hpro::TRkMatrix< value_t > * >;
+using  lr_mat_list_t  = std::list< const lrmatrix< value_t > * >;
 
 template < typename value_t,
            typename basisapx_t >
@@ -1722,7 +1722,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
         for ( const auto  M_i : mat_list )
         {
             const auto  C_i   = coupling_map.at( M_i );
-            auto        U_i   = blas::mat_U( M_i, op );
+            auto        U_i   = M_i->U( op );
             auto        U_sub = blas::matrix< value_t >( U_i, cb.is() - M_i->row_ofs( op ), blas::range::all );
             auto        X_i   = blas::prod( U_sub, blas::adjoint( C_i ) );
             auto        X_sub = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
@@ -1778,7 +1778,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             //
 
             auto  list_i  = lr_mat_list_t< value_t >( mat_list.begin(), mat_list.end() );
-            auto  mat_idx = std::unordered_map< const Hpro::TRkMatrix< value_t > *, idx_t >();
+            auto  mat_idx = std::unordered_map< const lrmatrix< value_t > *, idx_t >();
 
             if ( lrmat_map.find( cb_i->is() ) != lrmat_map.end() )
             {
@@ -1878,9 +1878,9 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         // with cluster basis W and X
         //
         
-        auto  R = cptrcast( &A, Hpro::TRkMatrix< value_t > );
-        auto  W = rowcb.transform_forward( blas::mat_U( R ) );
-        auto  X = colcb.transform_forward( blas::mat_V( R ) );
+        auto  R = cptrcast( &A, lrmatrix< value_t > );
+        auto  W = rowcb.transform_forward( R->U() );
+        auto  X = colcb.transform_forward( R->V() );
         auto  S = blas::prod( W, blas::adjoint( X ) );
 
         M = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
@@ -1923,8 +1923,8 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
         // M = A.copy();
 
-        auto  D  = cptrcast( &A, Hpro::TDenseMatrix< value_t > );
-        auto  DD = blas::copy( blas::mat( D ) );
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
+        auto  DD = blas::copy( D.mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if

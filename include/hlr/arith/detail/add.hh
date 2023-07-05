@@ -17,7 +17,7 @@ namespace hlr
 {
 
 #if defined(NDEBUG)
-#  define HLR_ADD_PRINT( msg )   HLR_LOG( 4, msg )
+#  define HLR_ADD_PRINT( msg )   
 #else
 #  define HLR_ADD_PRINT( msg )   HLR_LOG( 4, msg )
 #endif
@@ -474,8 +474,10 @@ add ( const value_t                        alpha,
     auto              VA = A.V();
 
     HLR_ASSERT( ! C.is_compressed() );
+
+    auto  Cm = C.mat();
     
-    blas::prod( alpha, UA, blas::adjoint( VA ), value_t(1), C.mat() );
+    blas::prod( alpha, UA, blas::adjoint( VA ), value_t(1), Cm );
 }
 
 template < typename value_t >
@@ -517,9 +519,9 @@ add ( const value_t                            alpha,
     C.decompress();
     
     // C = C + α A
-    auto  DC = C.mat();
+    auto  Cm = C.mat();
     
-    blas::add( alpha, A.mat(), DC );
+    blas::add( alpha, A.mat(), Cm );
 
     if ( was_compressed )
         C.compress( acc );
@@ -538,9 +540,9 @@ add ( const value_t                            alpha,
     HLR_ASSERT( ! C.is_compressed() );
     
     // C = C + α A
-    auto  DC = C.mat();
+    auto  Cm = C.mat();
 
-    blas::add( alpha, A.mat(), DC );
+    blas::add( alpha, A.mat(), Cm );
 }
 
 }// namespace hlr

@@ -178,7 +178,7 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
         {
             M = coeff.build( rowis, colis );
 
-            if ( is_dense( *M ) )
+            if ( Hpro::is_dense( *M ) )
             {
                 auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
                 auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
@@ -252,7 +252,7 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
             
             M = coeff.build( row_is, col_is );
 
-            if ( is_dense( *M ) )
+            if ( Hpro::is_dense( *M ) )
             {
                 auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
 
@@ -1512,11 +1512,11 @@ clear ( Hpro::TMatrix< value_t > &  M )
         R->set_lrmat( std::move( blas::matrix< value_t >() ),
                       std::move( blas::matrix< value_t >() ) );
     }// if
-    else if ( is_dense( & M ) )
+    else if ( matrix::is_dense( & M ) )
     {
-        auto  D = ptrcast( & M, Hpro::TDenseMatrix< value_t > );
+        auto  D = ptrcast( & M, matrix::lrmatrix< value_t > );
 
-        blas::fill( Hpro::blas_mat< value_t >( D ), value_t(0) );
+        blas::fill( D->mat_direct(), value_t(0) );
     }// if
     else
         HLR_ASSERT( false );

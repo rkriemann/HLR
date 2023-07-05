@@ -138,7 +138,7 @@ program_main ()
                 // "H+dag",
                 // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
-                // "zH+rec",
+                "zH+rec",
                 // "zH+rec+accu",
                 // "zH+dag",
                 // "zH+dag+accu+lazy"

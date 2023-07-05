@@ -11,6 +11,7 @@ from datetime import datetime
 #
 ######################################################################
 
+BUILD_TYPES  = [ 'debug', 'dbg', 'release', 'rel', 'release-debug', 'reldbg' ]
 fullmsg      = False
 buildtype    = 'debug'
 warn         = False
@@ -23,8 +24,10 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
-OPTFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
-OPTFLAGS     = '-O2 -march=native -g'
+DBGFLAGS     = '-g -march=native'
+RELDBGFLAGS  = '-g -O2 -march=native'
+RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
+OPTFLAGS     = RELFLAGS
 WARNFLAGS    = '' # '-Wall'
 LINKFLAGS    = '-g'
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
@@ -288,7 +291,7 @@ opts.Add( EnumVariable( 'compressor',    'defined compressor',                 '
 opts.Add( EnumVariable( 'apcompressor',  'defined AP compressor',              'none', allowed_values = APCOMPRESSORS, ignorecase = 2 ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
-opts.Add( EnumVariable( 'buildtype', 'how to build the binaries (debug/release)', buildtype, allowed_values = [ 'debug', 'release' ], ignorecase = 2 ) )
+opts.Add( EnumVariable( 'buildtype', 'how to build the binaries (debug/release)', buildtype, allowed_values = BUILD_TYPES, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'warn',      'enable building with compiler warnings',    warn ) )
 opts.Add( BoolVariable( 'color',     'use colored output during compilation',     color ) )
 
@@ -440,10 +443,17 @@ else :
 #
 ######################################################################
 
-if buildtype == 'debug' :
-    OPTFLAGS  = '-g -march=native'
+if buildtype in [ 'debug', 'dbg' ] :
+    OPTFLAGS  = DBGFLAGS
     LINKFLAGS = '-g'
     DEFINES   = ''
+elif buildtype in [ 'release-debug', 'reldbg' ] :
+    OPTFLAGS  = RELDBGFLAGS
+    LINKFLAGS = '-g'
+    DEFINES   = ''
+elif buildtype in [ 'release', 'rel' ] :
+    OPTFLAGS  = RELDBGFLAGS
+    DEFINES   = DEFINES + ' NDEBUG'
 
 if warn :
     WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
@@ -469,10 +479,6 @@ if not fullmsg :
     env.Replace( LINKCOMSTR   = ' %sLink%s   %s$TARGET%s'  % ( colors['cyan']   + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
     env.Replace( ARCOMSTR     = ' %sAR%s     %s$TARGET%s'  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
     env.Replace( RANLIBCOMSTR = ' %sIndex%s  %s$TARGET%s'  % ( colors['yellow'] + colors['bold'], colors['reset'], colors['bold'], colors['reset'] ) )
-
-# ensure NDEBUG is set in optimization mode
-if buildtype == 'release' :
-    env.Append(  CPPDEFINES = [ 'NDEBUG' ] )
 
 # add internal paths and libraries
 env.Append(  CPPPATH = [ '#include' ] )
@@ -707,13 +713,13 @@ def show_help ( target, source, env ):
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
-    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}Option{1}       │ {0}Description{1}                   │ {0}Values{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
 
     parts = split_str_array( PROGRAMS, 40 )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    print( '  {0}programs{1}     │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
     for i in range( 1, len(parts) ) :
-        print( '             │                               │', parts[i] )
+        print( '               │                               │', parts[i] )
     
     print( '  {0}frameworks{1}   │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
@@ -747,7 +753,7 @@ def show_help ( target, source, env ):
     print( '  {0}zlib{1}         │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}zstd{1}         │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), 'debug/release' )
+    print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), ', '.join( BUILD_TYPES ) )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}fullmsg{1}      │ full command line output      │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}color{1}        │ use colored output            │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -780,53 +786,53 @@ def show_options ( target, source, env ):
     print() 
     print( 'Type  \'scons <option>=<value> ...\'  where <option> is one of' )
     print()
-    print( '  {0}Option{1}     │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}cxx{1}        │ C++ compiler                  │'.format( colors['bold'], colors['reset'] ), CXX )
-    print( '  {0}cxxflags{1}   │ C++ compiler flags            │'.format( colors['bold'], colors['reset'] ), CXXFLAGS )
-    print( '  {0}optflags{1}   │ compiler optimization flags   │'.format( colors['bold'], colors['reset'] ), OPTFLAGS )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}Option{1}       │ {0}Description{1}                   │ {0}Value{1}'.format( colors['bold'], colors['reset'] ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}cxx{1}          │ C++ compiler                  │'.format( colors['bold'], colors['reset'] ), CXX )
+    print( '  {0}cxxflags{1}     │ C++ compiler flags            │'.format( colors['bold'], colors['reset'] ), CXXFLAGS )
+    print( '  {0}optflags{1}     │ compiler optimization flags   │'.format( colors['bold'], colors['reset'] ), OPTFLAGS )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
 
     # split "programs" into smaller pieces
     parts = split_str_array( programs, 40 )
-    print( '  {0}programs{1}   │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
+    print( '  {0}programs{1}     │ programs to build             │'.format( colors['bold'], colors['reset'] ), parts[0] )
     for i in range( 1, len(parts) ) :
-        print( '             │                               │', parts[i] )
+        print( '               │                               │', parts[i] )
         
-    print( '  {0}frameworks{1} │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}hpro{1}       │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
-    print( '  {0}tbb{1}        │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
-    print( '  {0}tf{1}         │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
-    print( '  {0}hpx{1}        │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
-    print( '  {0}gpi2{1}       │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
-    print( '  {0}mkl{1}        │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
-    print( '  {0}cuda{1}       │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}lapack{1}     │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), lapack )
+    print( '  {0}frameworks{1}   │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}hpro{1}         │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
+    print( '  {0}tbb{1}          │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
+    print( '  {0}tf{1}           │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
+    print( '  {0}hpx{1}          │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ), HPX_DIR )
+    print( '  {0}gpi2{1}         │ base directory of GPI2        │'.format( colors['bold'], colors['reset'] ), GPI2_DIR )
+    print( '  {0}mkl{1}          │ base directory of Intel MKL   │'.format( colors['bold'], colors['reset'] ), MKL_DIR )
+    print( '  {0}cuda{1}         │ base directory of CUDA        │'.format( colors['bold'], colors['reset'] ), CUDA_DIR )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}lapack{1}       │ BLAS/LAPACK library to use    │'.format( colors['bold'], colors['reset'] ), lapack )
     if lapack == 'user' :
-        print( '  {0}lapackflags{1}│ user provided link flags      │ {2}'.format( colors['bold'], colors['reset'], LAPACK_FLAGS ) )
-    print( '  {0}malloc{1}     │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
+        print( '  {0}lapackflags{1}  │ user provided link flags      │ {2}'.format( colors['bold'], colors['reset'], LAPACK_FLAGS ) )
+    print( '  {0}malloc{1}       │ malloc library to use         │ {2}'.format( colors['bold'], colors['reset'], malloc ),
            pathstr( JEMALLOC_DIR if malloc == 'jemalloc' else MIMALLOC_DIR if malloc == 'mimalloc' else TCMALLOC_DIR if malloc == 'tcmalloc' else '' ) )
-    print( '  {0}hdf5{1}       │ use HDF5 library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ hdf5 ] ),       pathstr( HDF5_DIR      if hdf5      else '' ) )
-    print( '  {0}likwid{1}     │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}compressor{1} │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
+    print( '  {0}hdf5{1}         │ use HDF5 library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ hdf5 ] ),       pathstr( HDF5_DIR      if hdf5      else '' ) )
+    print( '  {0}likwid{1}       │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
     print( '  {0}apcompressor{1} │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], apcompressor ) )
-    print( '  {0}zfp{1}        │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
-    print( '  {0}sz{1}         │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
-    print( '  {0}sz3{1}        │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
-    print( '  {0}mgard{1}      │ use MGARD compression library │ {2}'.format( colors['bold'], colors['reset'], bool_str[ mgard ] ),      pathstr( MGARD_DIR     if mgard     else '' ) )
-    print( '  {0}universal{1}  │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
-    print( '  {0}half{1}       │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
-    print( '  {0}lz4{1}        │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
-    print( '  {0}zlib{1}       │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
-    print( '  {0}zstd{1}       │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
-    print( ' ────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}buildtype{1}  │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
-    print( '  {0}warn{1}       │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
-    print( '  {0}fullmsg{1}    │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
-    print( '  {0}color{1}      │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
+    print( '  {0}zfp{1}          │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
+    print( '  {0}sz{1}           │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
+    print( '  {0}sz3{1}          │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
+    print( '  {0}mgard{1}        │ use MGARD compression library │ {2}'.format( colors['bold'], colors['reset'], bool_str[ mgard ] ),      pathstr( MGARD_DIR     if mgard     else '' ) )
+    print( '  {0}universal{1}    │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
+    print( '  {0}half{1}         │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
+    print( '  {0}lz4{1}          │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
+    print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
+    print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
+    print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
+    print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
+    print( '  {0}fullmsg{1}      │ full command line output      │'.format( colors['bold'], colors['reset'] ), bool_str[ fullmsg ] )
+    print( '  {0}color{1}        │ use colored output            │'.format( colors['bold'], colors['reset'] ), bool_str[ color ] )
     print() 
 
 options_cmd = env.Command( 'phony-target-options', None, show_options )

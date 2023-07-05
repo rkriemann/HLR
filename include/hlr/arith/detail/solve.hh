@@ -14,7 +14,7 @@ namespace hlr
 {
 
 #if defined(NDEBUG)
-#  define HLR_SOLVE_PRINT( msg )   HLR_LOG( 4, msg )
+#  define HLR_SOLVE_PRINT( msg )   
 #else
 #  define HLR_SOLVE_PRINT( msg )   HLR_LOG( 4, msg )
 #endif
@@ -544,22 +544,17 @@ solve_lower_tri ( const eval_side_t                      side,
 {
     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
 
+    auto  lock = std::scoped_lock( M.mutex() );
+    auto  DM   = M.mat();
+        
     if ( side == from_left )
     {
-        auto  lock           = std::scoped_lock( M.mutex() );
-        auto  was_compressed = M.is_compressed();
-
-        if ( was_compressed )
-            M.decompress();
-        
         //
         // from top to bottom in L
         // - solve in current block row
         // - update matrices in remaining block rows
         //
 
-        auto  DM = M.mat_dbg();
-        
         for ( uint j = 0; j < L.nblock_cols(); ++j )
         {
             const auto  L_jj = L.block( j, j );
@@ -567,9 +562,8 @@ solve_lower_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( L_jj ) );
 
             auto  M_j = blas::matrix< value_t >( DM, L_jj->col_is() - L.col_ofs(), blas::range::all );
-            auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
 
-            solve_lower_tri< value_t >( side, diag, *L_jj, D_j );
+            solve_lower_tri< value_t >( side, diag, *L_jj, M_j );
 
             for ( uint  k = j+1; k < L.nblock_rows(); ++k )
             {
@@ -578,23 +572,19 @@ solve_lower_tri ( const eval_side_t                      side,
                 if ( ! is_null( L_kj ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, L_kj->row_is() - L.row_ofs(), blas::range::all );
-                    auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
                     
-                    multiply< value_t >( value_t(-1),
-                                         apply_normal, *L_kj,
-                                         apply_normal, D_j,
-                                         D_k );
+                    multiply< value_t >( value_t(-1), apply_normal, *L_kj, M_j, M_k );
                 }// for
             }// for
         }// for
-
-        if ( was_compressed )
-            M.compress( acc );
     }// if
     else
     {
         HLR_ASSERT( false );
     }// else
+
+    if ( M.is_compressed() )
+        M.set_matrix( std::move( DM ), acc );
 }
 
 template < typename value_t >
@@ -607,18 +597,17 @@ solve_lower_tri ( const eval_side_t                      side,
     HLR_SOLVE_PRINT( Hpro::to_string( "solve_lower_tri( B %d, D %d )", L.id(), M.id() ) );
     HLR_ASSERT( ! M.is_compressed() );
 
+    auto  lock = std::scoped_lock( M.mutex() );
+    auto  DM   = M.mat();
+
     if ( side == from_left )
     {
-        auto  lock = std::scoped_lock( M.mutex() );
-
         //
         // from top to bottom in L
         // - solve in current block row
         // - update matrices in remaining block rows
         //
 
-        auto  DM = M.mat_dbg();
-        
         for ( uint j = 0; j < L.nblock_cols(); ++j )
         {
             const auto  L_jj = L.block( j, j );
@@ -626,9 +615,8 @@ solve_lower_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( L_jj ) );
 
             auto  M_j = blas::matrix< value_t >( DM, L_jj->col_is() - L.col_ofs(), blas::range::all );
-            auto  D_j = matrix::dense_matrix< value_t >( L_jj->col_is(), M.col_is(), M_j );
 
-            solve_lower_tri< value_t >( side, diag, *L_jj, D_j );
+            solve_lower_tri< value_t >( side, diag, *L_jj, M_j );
 
             for ( uint  k = j+1; k < L.nblock_rows(); ++k )
             {
@@ -637,12 +625,8 @@ solve_lower_tri ( const eval_side_t                      side,
                 if ( ! is_null( L_kj ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, L_kj->row_is() - L.row_ofs(), blas::range::all );
-                    auto  D_k = matrix::dense_matrix< value_t >( L_kj->row_is(), M.col_is(), M_k );
                     
-                    multiply< value_t >( value_t(-1),
-                                         apply_normal, *L_kj,
-                                         apply_normal, D_j,
-                                         D_k );
+                    multiply< value_t >( value_t(-1), apply_normal, *L_kj, M_j, M_k );
                 }// for
             }// for
         }// for
@@ -1060,13 +1044,8 @@ solve_upper_tri ( const eval_side_t                      side,
 {
     HLR_SOLVE_PRINT( Hpro::to_string( "solve_upper_tri( B %d, D %d )", U.id(), M.id() ) );
 
-    auto  lock           = std::scoped_lock( M.mutex() );
-    auto  was_compressed = M.is_compressed();
-
-    if ( was_compressed )
-        M.decompress();
-
-    auto  DM = M.mat_dbg();
+    auto  lock = std::scoped_lock( M.mutex() );
+    auto  DM   = M.mat();
     
     if ( side == from_left )
     {
@@ -1083,9 +1062,8 @@ solve_upper_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( U_jj ) );
 
             auto  M_j = blas::matrix< value_t >( DM, U_jj->col_is( op_U ) - U.col_ofs( op_U ), blas::range::all );
-            auto  D_j = matrix::dense_matrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
             
-            solve_upper_tri< value_t >( side, diag, *U_jj, D_j );
+            solve_upper_tri< value_t >( side, diag, *U_jj, M_j );
             
             for ( uint  k = j+1; k < U.nblock_rows( op_U ); ++k )
             {
@@ -1094,9 +1072,8 @@ solve_upper_tri ( const eval_side_t                      side,
                 if ( ! is_null( U_kj ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, U_kj->row_is( op_U ) - U.row_ofs( op_U ), blas::range::all );
-                    auto  D_k = matrix::dense_matrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
             
-                    multiply< value_t >( value_t(-1), op_U, *U_kj, apply_normal, D_j, D_k );
+                    multiply< value_t >( value_t(-1), op_U, *U_kj, M_j, M_k );
                 }// if
             }// for
         }// for
@@ -1110,9 +1087,8 @@ solve_upper_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( U_ii ) );
 
             auto  M_i = blas::matrix< value_t >( DM, blas::range::all, U_ii->row_is() - U.row_ofs() );
-            auto  D_i = matrix::dense_matrix< value_t >( M.row_is(), U_ii->row_is(), M_i );
             
-            solve_upper_tri< value_t >( side, diag, *U_ii, D_i );
+            solve_upper_tri< value_t >( side, diag, *U_ii, M_i );
             
             for ( uint  k = i+1; k < U.nblock_cols(); ++k )
             {
@@ -1121,16 +1097,15 @@ solve_upper_tri ( const eval_side_t                      side,
                 if ( ! is_null( U_ik ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, blas::range::all, U_ik->col_is() - U.col_ofs() );
-                    auto  D_k = matrix::dense_matrix< value_t >( M.row_is(), U_ik->col_is(), M_k );
-            
-                    multiply< value_t >( value_t(-1), apply_normal, D_i, apply_normal, *U_ik, D_k );
+
+                    multiply< value_t >( value_t(-1), M_i, apply_normal, *U_ik, M_k );
                 }// if
             }// for
         }// for
     }// else
 
-    if ( was_compressed )
-        M.compress( acc );
+    if ( M.is_compressed() )
+        M.set_matrix( std::move( DM ), acc );
 }
 
 template < typename value_t >
@@ -1144,7 +1119,7 @@ solve_upper_tri ( const eval_side_t                      side,
     HLR_ASSERT( ! M.is_compressed() );
     
     auto  lock = std::scoped_lock( M.mutex() );
-    auto  DM   = M.mat_dbg();
+    auto  DM   = M.mat();
         
     if ( side == from_left )
     {
@@ -1161,9 +1136,8 @@ solve_upper_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( U_jj ) );
 
             auto  M_j = blas::matrix< value_t >( DM, U_jj->col_is( op_U ) - U.col_ofs( op_U ), blas::range::all );
-            auto  D_j = matrix::dense_matrix< value_t >( U_jj->col_is( op_U ), M.col_is(), M_j );
             
-            solve_upper_tri< value_t >( side, diag, *U_jj, D_j );
+            solve_upper_tri< value_t >( side, diag, *U_jj, M_j );
             
             for ( uint  k = j+1; k < U.nblock_rows( op_U ); ++k )
             {
@@ -1172,9 +1146,8 @@ solve_upper_tri ( const eval_side_t                      side,
                 if ( ! is_null( U_kj ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, U_kj->row_is( op_U ) - U.row_ofs( op_U ), blas::range::all );
-                    auto  D_k = matrix::dense_matrix< value_t >( U_kj->row_is( op_U ), M.col_is(), M_k );
             
-                    multiply< value_t >( value_t(-1), op_U, *U_kj, apply_normal, D_j, D_k );
+                    multiply< value_t >( value_t(-1), op_U, *U_kj, M_j, M_k );
                 }// if
             }// for
         }// for
@@ -1188,9 +1161,8 @@ solve_upper_tri ( const eval_side_t                      side,
             HLR_ASSERT( ! is_null( U_ii ) );
 
             auto  M_i = blas::matrix< value_t >( DM, blas::range::all, U_ii->row_is() - U.row_ofs() );
-            auto  D_i = matrix::dense_matrix< value_t >( M.row_is(), U_ii->row_is(), M_i );
             
-            solve_upper_tri< value_t >( side, diag, *U_ii, D_i );
+            solve_upper_tri< value_t >( side, diag, *U_ii, M_i );
             
             for ( uint  k = i+1; k < U.nblock_cols(); ++k )
             {
@@ -1199,9 +1171,8 @@ solve_upper_tri ( const eval_side_t                      side,
                 if ( ! is_null( U_ik ) )
                 {
                     auto  M_k = blas::matrix< value_t >( DM, blas::range::all, U_ik->col_is() - U.col_ofs() );
-                    auto  D_k = matrix::dense_matrix< value_t >( M.row_is(), U_ik->col_is(), M_k );
             
-                    multiply< value_t >( value_t(-1), apply_normal, D_i, apply_normal, *U_ik, D_k );
+                    multiply< value_t >( value_t(-1), M_i, apply_normal, *U_ik, M_k );
                 }// if
             }// for
         }// for

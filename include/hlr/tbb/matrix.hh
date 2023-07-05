@@ -76,10 +76,26 @@ build ( const hpro::TBlockCluster *  bct,
         {
             // auto  T = lrapx.build( bct, hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
             M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
+
+            if ( Hpro::is_lowrank( *M ) )
+            {
+                auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                     std::move( blas::mat_U( R ) ),
+                                                                                     std::move( blas::mat_V( R ) ) ) );
+            }// if
         }// if
         else
         {
             M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+            }// if
         }// else
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
@@ -190,7 +206,7 @@ build_compressed ( const hpro::TBlockCluster *  bct,
             if ( Hpro::is_dense( *M ) )
             {
                 auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
 
                 zD->compress( lacc );
                 M = std::move( zD );
@@ -274,6 +290,13 @@ build_nearfield ( const hpro::TBlockCluster *  bct,
         else
         {
             M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+            }// if
         }// else
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )

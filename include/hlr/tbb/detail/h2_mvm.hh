@@ -65,7 +65,7 @@ mul_vec ( const value_t                              alpha,
                 }// for
             } );
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
@@ -171,7 +171,7 @@ mul_vec2 ( const value_t                              alpha,
                 }// for
             } );
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );

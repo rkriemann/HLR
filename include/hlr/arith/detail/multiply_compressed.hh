@@ -438,14 +438,14 @@ multiply ( const value_t                            alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const Hpro::TBlockMatrix< value_t > &    B,
+           matrix::lrmatrix< value_t > &            C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     HLR_ERROR( "todo" );
 }
@@ -456,14 +456,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           Hpro::TBlockMatrix< value_t > &                 C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           Hpro::TBlockMatrix< value_t > &          C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     HLR_MULT_PRINT;
 
@@ -480,13 +480,13 @@ multiply ( const value_t                                   alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &        C,
+           const Hpro::TTruncAcc &                  acc )
 {
     HLR_MULT_PRINT;
 
@@ -509,12 +509,12 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &        C )
 {
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
@@ -536,33 +536,29 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::lrmatrix< value_t > &            C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     HLR_MULT_PRINT;
-    std::cout << "0" << std::endl;
     
     // [ U(C), V(C) ] = approx( C - A B )
     auto  AxB = blas::prod( alpha,
                             blas::mat_view( op_A, A.mat() ),
                             blas::mat_view( op_B, B.mat() ) );
-    std::cout << "1" << std::endl;
+    
     std::scoped_lock  lock( C.mutex() );
 
     blas::prod( value_t(1), C.U(), blas::adjoint( C.V() ), value_t(1), AxB );
-    std::cout << "2" << std::endl;
     
     auto [ U, V ] = approx( AxB, acc );
-    std::cout << "3" << std::endl;
         
     C.set_lrmat( std::move( U ), std::move( V ), acc );
-    std::cout << "4" << std::endl;
 }
 
 //
@@ -571,14 +567,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           Hpro::TBlockMatrix< value_t > &                 C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::lrmatrix< value_t > &      B,
+           Hpro::TBlockMatrix< value_t > &          C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     // C = C + ( A U(B) ) V(B)^H
     auto  DA = A.mat();
@@ -595,13 +591,13 @@ multiply ( const value_t                                   alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::lrmatrix< value_t > &      B,
+           matrix::dense_matrix< value_t > &        C,
+           const Hpro::TTruncAcc &                  acc )
 {
     HLR_MULT_PRINT;
     
@@ -626,12 +622,12 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::lrmatrix< value_t > &      B,
+           matrix::dense_matrix< value_t > &        C )
 {
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
@@ -651,13 +647,13 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrsvmatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::lrsvmatrix< value_t > &    B,
+           matrix::dense_matrix< value_t > &        C,
+           const Hpro::TTruncAcc &                  acc )
 {
     HLR_MULT_PRINT;
     
@@ -686,14 +682,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::dense_matrix< value_t > &         A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::dense_matrix< value_t > &  A,
+           const Hpro::matop_t                      op_B,
+           const matrix::lrmatrix< value_t > &      B,
+           matrix::lrmatrix< value_t > &            C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     HLR_MULT_PRINT;
     
@@ -745,13 +741,13 @@ multiply ( const value_t                          alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                          alpha,
+           const Hpro::matop_t                    op_A,
+           const matrix::lrmatrix< value_t > &    A,
+           const Hpro::matop_t                    op_B,
+           const Hpro::TBlockMatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &      C,
+           const Hpro::TTruncAcc &                acc )
 {
     HLR_MULT_PRINT;
 
@@ -777,12 +773,12 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C )
+multiply ( const value_t                          alpha,
+           const Hpro::matop_t                    op_A,
+           const matrix::lrmatrix< value_t > &    A,
+           const Hpro::matop_t                    op_B,
+           const Hpro::TBlockMatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &      C )
 {
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
@@ -803,13 +799,13 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrsvmatrix< value_t > &           A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                          alpha,
+           const Hpro::matop_t                    op_A,
+           const matrix::lrsvmatrix< value_t > &  A,
+           const Hpro::matop_t                    op_B,
+           const Hpro::TBlockMatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &      C,
+           const Hpro::TTruncAcc &                acc )
 {
     HLR_MULT_PRINT;
 
@@ -842,14 +838,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const Hpro::TBlockMatrix< value_t > &           B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                          alpha,
+           const Hpro::matop_t                    op_A,
+           const matrix::lrmatrix< value_t > &    A,
+           const Hpro::matop_t                    op_B,
+           const Hpro::TBlockMatrix< value_t > &  B,
+           matrix::lrmatrix< value_t > &          C,
+           const Hpro::TTruncAcc &                acc,
+           const approx_t &                       approx )
 {
     HLR_MULT_PRINT;
 
@@ -874,14 +870,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           Hpro::TBlockMatrix< value_t > &                 C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::lrmatrix< value_t > &      A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           Hpro::TBlockMatrix< value_t > &          C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     // C = C + U(A) ( B^H V(A) )^H
     auto  UA = A.U( op_A );
@@ -898,13 +894,13 @@ multiply ( const value_t                                   alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::lrmatrix< value_t > &      A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &        C,
+           const Hpro::TTruncAcc &                  acc )
 {
     HLR_MULT_PRINT;
     
@@ -929,12 +925,12 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::lrmatrix< value_t > &      A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &        C )
 {
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
@@ -954,13 +950,13 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrsvmatrix< value_t > &           A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::lrsvmatrix< value_t > &    A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &        C,
+           const Hpro::TTruncAcc &                  acc )
 {
     HLR_MULT_PRINT;
     
@@ -992,14 +988,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::dense_matrix< value_t > &         B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                            alpha,
+           const Hpro::matop_t                      op_A,
+           const matrix::lrmatrix< value_t > &      A,
+           const Hpro::matop_t                      op_B,
+           const matrix::dense_matrix< value_t > &  B,
+           matrix::lrmatrix< value_t > &            C,
+           const Hpro::TTruncAcc &                  acc,
+           const approx_t &                         approx )
 {
     HLR_MULT_PRINT;
     
@@ -1023,14 +1019,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           Hpro::TBlockMatrix< value_t > &                 C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                        alpha,
+           const Hpro::matop_t                  op_A,
+           const matrix::lrmatrix< value_t > &  A,
+           const Hpro::matop_t                  op_B,
+           const matrix::lrmatrix< value_t > &  B,
+           Hpro::TBlockMatrix< value_t > &      C,
+           const Hpro::TTruncAcc &              acc,
+           const approx_t &                     approx )
 {
     HLR_MULT_PRINT;
     
@@ -1052,13 +1048,13 @@ multiply ( const value_t                                   alpha,
 //
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                        alpha,
+           const Hpro::matop_t                  op_A,
+           const matrix::lrmatrix< value_t > &  A,
+           const Hpro::matop_t                  op_B,
+           const matrix::lrmatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &    C,
+           const Hpro::TTruncAcc &              acc )
 {
     HLR_MULT_PRINT;
     
@@ -1087,12 +1083,12 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::dense_matrix< value_t > &               C )
+multiply ( const value_t                        alpha,
+           const Hpro::matop_t                  op_A,
+           const matrix::lrmatrix< value_t > &  A,
+           const Hpro::matop_t                  op_B,
+           const matrix::lrmatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &    C )
 {
     HLR_MULT_PRINT;
     HLR_ASSERT( ! C.is_compressed() );
@@ -1116,13 +1112,13 @@ multiply ( const value_t                                   alpha,
 
 template < typename value_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrsvmatrix< value_t > &           A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrsvmatrix< value_t > &           B,
-           matrix::dense_matrix< value_t > &               C,
-           const Hpro::TTruncAcc &                         acc )
+multiply ( const value_t                          alpha,
+           const Hpro::matop_t                    op_A,
+           const matrix::lrsvmatrix< value_t > &  A,
+           const Hpro::matop_t                    op_B,
+           const matrix::lrsvmatrix< value_t > &  B,
+           matrix::dense_matrix< value_t > &      C,
+           const Hpro::TTruncAcc &                acc )
 {
     HLR_MULT_PRINT;
     
@@ -1161,14 +1157,14 @@ multiply ( const value_t                                   alpha,
 template < typename value_t,
            typename approx_t >
 void
-multiply ( const value_t                                   alpha,
-           const Hpro::matop_t                             op_A,
-           const matrix::lrmatrix< value_t > &             A,
-           const Hpro::matop_t                             op_B,
-           const matrix::lrmatrix< value_t > &             B,
-           matrix::lrmatrix< value_t > &                   C,
-           const Hpro::TTruncAcc &                         acc,
-           const approx_t &                                approx )
+multiply ( const value_t                        alpha,
+           const Hpro::matop_t                  op_A,
+           const matrix::lrmatrix< value_t > &  A,
+           const Hpro::matop_t                  op_B,
+           const matrix::lrmatrix< value_t > &  B,
+           matrix::lrmatrix< value_t > &        C,
+           const Hpro::TTruncAcc &              acc,
+           const approx_t &                     approx )
 {
     HLR_MULT_PRINT;
     

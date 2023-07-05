@@ -24,7 +24,7 @@ namespace hlr {
 // #define HLR_LU_TESTS
 
 #if defined(NDEBUG)
-#  define HLR_LU_PRINT   HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) )
+#  define HLR_LU_PRINT   
 #else
 #  define HLR_LU_PRINT   HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) )
 #endif
@@ -91,13 +91,12 @@ lu ( Hpro::TMatrix< value_t > &  A,
     }// if
     else if ( matrix::is_dense( A ) )
     {
-        auto  D              = ptrcast( &A, matrix::dense_matrix< value_t > );
-        auto  DD             = D->mat();
-        auto  was_compressed = D->is_compressed();
+        auto  D  = ptrcast( &A, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
 
         blas::invert( DD );
         
-        if ( was_compressed )
+        if ( D->is_compressed() )
             D->set_matrix( std::move( DD ), acc );
     }// if
     else if ( matrix::is_sparse_eigen( A ) )

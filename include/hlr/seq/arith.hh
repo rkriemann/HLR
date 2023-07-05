@@ -9,8 +9,6 @@
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>
-#include <hpro/matrix/TRkMatrix.hh>
-#include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
 #include <hlr/arith/defaults.hh>
@@ -111,17 +109,17 @@ gauss_elim ( Hpro::TMatrix< value_t > &  A,
         // hlr::log( 0, Hpro::to_string( "                               %d = %.8e", MA(0,0)->id(), norm_F( MA(0,0) ) ) );
 
         // T_01 = A_00⁻¹ · A_01
-        // Hpro::multiply( 1.0, Hpro::apply_normal, MA(0,0), Hpro::apply_normal, MA(0,1), 0.0, MT(0,1), acc );
+        // Hpro::multiply( 1.0, apply_normal, MA(0,0), apply_normal, MA(0,1), 0.0, MT(0,1), acc );
         seq::matrix::clear( *MT(0,1) );
         multiply< value_t >( value_t(1), apply_normal, *MA(0,0), apply_normal, *MA(0,1), *MT(0,1), acc, apx );
         
         // T_10 = A_10 · A_00⁻¹
-        // Hpro::multiply( 1.0, Hpro::apply_normal, MA(1,0), Hpro::apply_normal, MA(0,0), 0.0, MT(1,0), acc );
+        // Hpro::multiply( 1.0, apply_normal, MA(1,0), apply_normal, MA(0,0), 0.0, MT(1,0), acc );
         seq::matrix::clear( *MT(1,0) );
         multiply< value_t >( value_t(1), apply_normal, *MA(1,0), apply_normal, *MA(0,0), *MT(1,0), acc, apx );
 
         // A_11 = A_11 - T_10 · A_01
-        // Hpro::multiply( -1.0, Hpro::apply_normal, MT(1,0), Hpro::apply_normal, MA(0,1), 1.0, MA(1,1), acc );
+        // Hpro::multiply( -1.0, apply_normal, MT(1,0), apply_normal, MA(0,1), 1.0, MA(1,1), acc );
         multiply< value_t >( value_t(-1), apply_normal, *MT(1,0), apply_normal, *MA(0,1), *MA(1,1), acc, apx );
     
         // A_11 = A_11⁻¹
@@ -129,24 +127,28 @@ gauss_elim ( Hpro::TMatrix< value_t > &  A,
         // hlr::log( 0, Hpro::to_string( "                               %d = %.8e", MA(1,1)->id(), norm_F( MA(1,1) ) ) );
 
         // A_01 = - T_01 · A_11
-        // Hpro::multiply( -1.0, Hpro::apply_normal, MT(0,1), Hpro::apply_normal, MA(1,1), 0.0, MA(0,1), acc );
+        // Hpro::multiply( -1.0, apply_normal, MT(0,1), apply_normal, MA(1,1), 0.0, MA(0,1), acc );
         seq::matrix::clear( *MA(0,1) );
         multiply( value_t(-1), apply_normal, *MT(0,1), apply_normal, *MA(1,1), *MA(0,1), acc, apx );
             
         // A_10 = - A_11 · T_10
-        // Hpro::multiply( -1.0, Hpro::apply_normal, MA(1,1), Hpro::apply_normal, MT(1,0), 0.0, MA(1,0), acc );
+        // Hpro::multiply( -1.0, apply_normal, MA(1,1), apply_normal, MT(1,0), 0.0, MA(1,0), acc );
         seq::matrix::clear( *MA(1,0) );
         multiply< value_t >( value_t(-1), apply_normal, *MA(1,1), apply_normal, *MT(1,0), *MA(1,0), acc, apx );
 
         // A_00 = T_00 - A_01 · T_10
-        // Hpro::multiply( -1.0, Hpro::apply_normal, MA(0,1), Hpro::apply_normal, MT(1,0), 1.0, MA(0,0), acc );
+        // Hpro::multiply( -1.0, apply_normal, MA(0,1), apply_normal, MT(1,0), 1.0, MA(0,0), acc );
         multiply< value_t >( value_t(-1), apply_normal, *MA(0,1), apply_normal, *MT(1,0), *MA(0,0), acc, apx );
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  D  = ptrcast( &A, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        blas::invert( DD );
         
-        blas::invert( blas::mat< value_t >( DA ) );
+        if ( D->is_compressed() )
+            D->set_matrix( std::move( DD ), acc );
     }// if
     else
         HLR_ASSERT( false );
@@ -183,7 +185,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
 
     for ( uint  i = 0; i < nbr; ++i )
     {
-        auto  A_ii = ptrcast( BA->block( i, i ), Hpro::TDenseMatrix< value_t > );
+        auto  A_ii = ptrcast( BA->block( i, i ), matrix::dense_matrix< value_t > );
             
         blas::invert( Hpro::blas_mat< value_t >( A_ii ) );
 
@@ -199,8 +201,8 @@ lu ( Hpro::TMatrix< value_t > &  A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 hlr::seq::multiply< value_t >( value_t(-1),
-                                               Hpro::apply_normal, *BA->block( j, i ),
-                                               Hpro::apply_normal, *BA->block( i, l ),
+                                               apply_normal, *BA->block( j, i ),
+                                               apply_normal, *BA->block( i, l ),
                                                *BA->block( j, l ), acc, approx );
             }// for
         }// for
@@ -216,7 +218,7 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
 {
     HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) );
     
-    assert( is_blocked( A ) );
+    HLR_ASSERT( is_blocked( A ) );
 
     auto  BA  = ptrcast( & A, Hpro::TBlockMatrix< value_t > );
     auto  nbr = BA->nblock_rows();
@@ -230,13 +232,15 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
         
         for ( int  k = 0; k < int(i); k++ )
             hlr::seq::multiply< value_t >( value_t(-1),
-                                           Hpro::apply_normal, *BA->block( i, k ),
-                                           Hpro::apply_normal, *BA->block( k, i ),
+                                           apply_normal, *BA->block( i, k ),
+                                           apply_normal, *BA->block( k, i ),
                                            *BA->block( i, i ), acc, approx );
         
-        auto  A_ii = ptrcast( BA->block( i, i ), Hpro::TDenseMatrix< value_t > );
-        auto  D_ii = blas::mat< value_t >( A_ii );
+        auto  A_ii = ptrcast( BA->block( i, i ), matrix::dense_matrix< value_t > );
+        auto  D_ii = A_ii->mat();
             
+        HLR_ASSERT( ! A_ii->is_compressed() );
+        
         blas::invert( D_ii );
 
         //
@@ -250,8 +254,8 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
             // only update block as L = I
             for ( int  k = 0; k < int(i); k++ )
                 hlr::seq::multiply< value_t >( value_t(-1),
-                                               Hpro::apply_normal, *BA->block( i, k ),
-                                               Hpro::apply_normal, *BA->block( k, j ),
+                                               apply_normal, *BA->block( i, k ),
+                                               apply_normal, *BA->block( k, j ),
                                                *A_ij, acc, approx );
         }// for
         
@@ -265,8 +269,8 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
 
             for ( int  k = 0; k < int(i); k++ )
                 hlr::seq::multiply< value_t >( value_t(-1),
-                                               Hpro::apply_normal, *BA->block( j, k ),
-                                               Hpro::apply_normal, *BA->block( k, i ),
+                                               apply_normal, *BA->block( j, k ),
+                                               apply_normal, *BA->block( k, i ),
                                                *A_ji, acc, approx );
 
             if ( matrix::is_lowrank( A_ji ) )
@@ -278,10 +282,10 @@ lu_lazy ( Hpro::TMatrix< value_t > &  A,
 
                 R_ji->set_V( std::move( V_ji ), acc );
             }// if
-            else if ( is_dense( A_ji ) )
+            else if ( matrix::is_dense( A_ji ) )
             {
-                auto  D_ji = ptrcast( A_ji, Hpro::TDenseMatrix< value_t > );
-                auto  T_ji = blas::copy( blas::mat< value_t >( D_ji ) );
+                auto  D_ji = ptrcast( A_ji, matrix::dense_matrix< value_t > );
+                auto  T_ji = blas::copy( D_ji->mat() );
 
                 blas::prod( value_t(1), T_ji, D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
             }// if
@@ -315,12 +319,14 @@ ldu ( Hpro::TMatrix< value_t > &  A,
         // invert diagonal block
         //
         
-        auto  A_ii = ptrcast( BA->block( i, i ), Hpro::TDenseMatrix< value_t > );
+        HLR_ASSERT( matrix::is_dense( BA->block( i, i ) ) );
+        
+        auto  A_ii = ptrcast( BA->block( i, i ), matrix::dense_matrix< value_t > );
 
-        HLR_ASSERT( is_dense( A_ii ) );
+        HLR_ASSERT( ! A_ii.is_compressed() );
         
         auto  T_ii = A_ii->copy(); // need original for matrix updates below
-        auto  D_ii = blas::mat< value_t >( ptrcast( A_ii, Hpro::TDenseMatrix< value_t > ) );
+        auto  D_ii = A_ii->mat_direct();
             
         blas::invert( D_ii );
 
@@ -337,16 +343,18 @@ ldu ( Hpro::TMatrix< value_t > &  A,
                 // L_ji = W·X' = U·V'·D_ii^-1 = A_ji·D_ii^-1
                 // ⟶ W = U, X = D_ii^-T·V
                 auto  R_ji = ptrcast( L_ji, matrix::lrmatrix< value_t > );
-                auto  V_ji = blas::prod( blas::adjoint( D_ii ), R_ji->V() );
+                auto  V_ji = blas::prod( blas::adjoint( D_ii ), R_ji->V_direct() );
 
-                R_ji->set_V( std::move( V_ji ), acc );
+                if ( R_ji.is_compressed() )
+                    R_ji->set_V( std::move( V_ji ), acc );
             }// if
-            else if ( is_dense( L_ji ) )
+            else if ( matrix::is_dense( L_ji ) )
             {
-                auto  D_ji = ptrcast( L_ji, Hpro::TDenseMatrix< value_t > );
-                auto  T_ji = blas::copy( blas::mat< value_t >( D_ji ) );
+                auto  D_ji  = ptrcast( L_ji, matrix::dense_matrix< value_t > );
+                auto  DD_ji = D_ji->mat_direct();
+                auto  T_ji  = blas::copy( DD_ji );
 
-                blas::prod( value_t(1), T_ji, D_ii, value_t(0), blas::mat< value_t >( D_ji ) );
+                blas::prod( value_t(1), T_ji, D_ii, value_t(0), DD_ji );
             }// else
         }// for
 
@@ -358,21 +366,21 @@ ldu ( Hpro::TMatrix< value_t > &  A,
         {
             auto  U_ij = BA->block( i, j );
 
-            if ( is_lowrank( U_ij ) )
+            if ( matrix::is_lowrank( U_ij ) )
             {
                 // U_ij = W·X' = D_ii^-1·U·V' = D_ii^-1·A_ij
                 // ⟶ W = D_ii^-1·U, X = V
-                auto  R_ij = ptrcast( U_ij, Hpro::TRkMatrix< value_t > );
-                auto  U    = blas::copy( blas::mat_U< value_t >( R_ij ) );
+                auto  R_ij = ptrcast( U_ij, matrix::lrmatrix< value_t > );
+                auto  U    = blas::copy( R_ij->U_direct() );
 
-                blas::prod( value_t(1), D_ii, U, value_t(0), blas::mat_U< value_t >( R_ij ) );
+                blas::prod( value_t(1), D_ii, U, value_t(0), R_ij->U_direct() );
             }// if
-            else if ( is_dense( U_ij ) )
+            else if ( matrix::is_dense( U_ij ) )
             {
-                auto  D_ij = ptrcast( U_ij, Hpro::TDenseMatrix< value_t > );
-                auto  T_ij = blas::copy( blas::mat< value_t >( D_ij ) );
+                auto  D_ij = ptrcast( U_ij, matrix::dense_matrix< value_t > );
+                auto  T_ij = blas::copy( D_ij->mat_direct() );
 
-                blas::prod( value_t(1), D_ii, T_ij, value_t(0), blas::mat< value_t >( D_ij ) );
+                blas::prod( value_t(1), D_ii, T_ij, value_t(0), D_ij->mat_direct() );
             }// else
         }// for
 
@@ -385,9 +393,9 @@ ldu ( Hpro::TMatrix< value_t > &  A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 hlr::seq::multiply< value_t >( value_t(-1),
-                                               Hpro::apply_normal, *BA->block( j, i ),
-                                               Hpro::apply_normal, *T_ii,
-                                               Hpro::apply_normal, *BA->block( i, l ),
+                                               apply_normal, *BA->block( j, i ),
+                                               apply_normal, *T_ii,
+                                               apply_normal, *BA->block( i, l ),
                                                *BA->block( j, l ), acc, approx );
             }// for
         }// for
@@ -420,17 +428,17 @@ trsml ( const Hpro::TMatrix< value_t > &  L,
     {
         auto  BL  = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  L00 = BL->block( 0, 0 );
-        auto  L10 = cptrcast( BL->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
+        auto  L10 = cptrcast( BL->block( 1, 0 ), matrix::lrmatrix< value_t > );
         auto  L11 = BL->block( 1, 1 );
 
-        blas::matrix< value_t >  X0( X, L00->row_is() - L.row_ofs(), blas::range::all );
-        blas::matrix< value_t >  X1( X, L11->row_is() - L.row_ofs(), blas::range::all );
+        auto  X0 = blas::matrix< value_t >( X, L00->row_is() - L.row_ofs(), blas::range::all );
+        auto  X1 = blas::matrix< value_t >( X, L11->row_is() - L.row_ofs(), blas::range::all );
             
         trsml( *L00, X0 );
 
-        auto  T = blas::prod( value_t(1), blas::adjoint( Hpro::blas_mat_B< value_t >( L10 ) ), X0 );
+        auto  T = blas::prod( value_t(1), blas::adjoint( L10->V_direct() ), X0 );
         
-        blas::prod( value_t(-1), Hpro::blas_mat_A< value_t >( L10 ), T, value_t(1), X1 );
+        blas::prod( value_t(-1), L10->U_direct(), T, value_t(1), X1 );
 
         trsml( *L11, X1 );
     }// if
@@ -440,7 +448,7 @@ trsml ( const Hpro::TMatrix< value_t > &  L,
         // UNIT DIAGONAL !!!
         //
         
-        // auto  DL = cptrcast( L, TDenseMatrix< value_t > );
+        // auto  DL = cptrcast( L, matrix::dense_matrix< value_t > );
         
         // blas::matrix< value_t >  Y( X, copy_value );
 
@@ -463,7 +471,7 @@ trsmuh ( const Hpro::TMatrix< value_t > &  U,
     {
         auto  BU  = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
         auto  U00 = BU->block( 0, 0 );
-        auto  U01 = cptrcast( BU->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
+        auto  U01 = cptrcast( BU->block( 0, 1 ), matrix::lrmatrix< value_t > );
         auto  U11 = BU->block( 1, 1 );
 
         blas::matrix< value_t >  X0( X, U00->col_is() - U.col_ofs(), blas::range::all );
@@ -471,19 +479,19 @@ trsmuh ( const Hpro::TMatrix< value_t > &  U,
             
         trsmuh( *U00, X0 );
 
-        auto  T = blas::prod( value_t(1), blas::adjoint( Hpro::blas_mat_A< value_t >( U01 ) ), X0 );
+        auto  T = blas::prod( value_t(1), blas::adjoint( U01->U_direct() ), X0 );
         
-        blas::prod( value_t(-1), Hpro::blas_mat_B< value_t >( U01 ), T, value_t(1), X1 );
+        blas::prod( value_t(-1), U01->V_direct(), T, value_t(1), X1 );
 
         trsmuh( *U11, X1 );
     }// if
     else
     {
-        auto  DU = cptrcast( &U, Hpro::TDenseMatrix< value_t > );
+        auto  DU = cptrcast( &U, matrix::dense_matrix< value_t > );
         
-        blas::matrix< value_t >  Y( X, Hpro::copy_value );
+        auto  Y = blas::copy( X );
 
-        blas::prod( value_t(1), blas::adjoint( Hpro::blas_mat< value_t >( DU ) ), Y, value_t(0), X );
+        blas::prod( value_t(1), blas::adjoint( DU->mat_direct() ), Y, value_t(0), X );
     }// else
 }
 
@@ -505,8 +513,8 @@ addlr ( blas::matrix< value_t > &   U,
     {
         auto  BA  = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), matrix::lrmatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), matrix::lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
         blas::matrix< value_t >  U0( U, A00->row_is() - A.row_ofs(), blas::range::all );
@@ -518,25 +526,25 @@ addlr ( blas::matrix< value_t > &   U,
         addlr( U1, V1, *A11, acc, approx );
 
         {
-            auto [ U01, V01 ] = approx( { Hpro::blas_mat_A< value_t >( A01 ), U0 },
-                                        { Hpro::blas_mat_B< value_t >( A01 ), V1 },
+            auto [ U01, V01 ] = approx( { A01->U_direct(), U0 },
+                                        { A01->V_direct(), V1 },
                                         acc );
 
             A01->set_lrmat( U01, V01 );
         }
 
         {
-            auto [ U10, V10 ] = approx( { Hpro::blas_mat_A< value_t >( A10 ), U1 },
-                                        { Hpro::blas_mat_B< value_t >( A10 ), V0 },
+            auto [ U10, V10 ] = approx( { A10->U_direct(), U1 },
+                                        { A10->V_direct(), V0 },
                                         acc );
             A10->set_lrmat( U10, V10 );
         }
     }// if
     else
     {
-        auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  DA = ptrcast( &A, matrix::dense_matrix< value_t > );
 
-        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), Hpro::blas_mat< value_t >( DA ) );
+        blas::prod( value_t(1), U, blas::adjoint( V ), value_t(1), DA->mat_direct() );
     }// else
 }
 
@@ -556,28 +564,28 @@ lu ( Hpro::TMatrix< value_t > &  A,
     {
         auto  BA  = ptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto  A00 = BA->block( 0, 0 );
-        auto  A01 = ptrcast( BA->block( 0, 1 ), Hpro::TRkMatrix< value_t > );
-        auto  A10 = ptrcast( BA->block( 1, 0 ), Hpro::TRkMatrix< value_t > );
+        auto  A01 = ptrcast( BA->block( 0, 1 ), matrix::lrmatrix< value_t > );
+        auto  A10 = ptrcast( BA->block( 1, 0 ), matrix::lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
         seq::hodlr::lu< value_t >( *A00, acc, approx );
         
-        trsml(  *A00, Hpro::blas_mat_A< value_t >( A01 ) );
-        trsmuh( *A00, Hpro::blas_mat_B< value_t >( A10 ) );
+        trsml(  *A00, A01->U_direct() );
+        trsmuh( *A00, A10->V_direct() );
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = blas::prod(  value_t(1), blas::adjoint( Hpro::blas_mat_B< value_t >( A10 ) ), Hpro::blas_mat_A< value_t >( A01 ) ); 
-        auto  UT = blas::prod( value_t(-1), Hpro::blas_mat_A< value_t >( A10 ), T );
+        auto  T  = blas::prod(  value_t(1), blas::adjoint( A10->V_direct() ), A01->U_direct() ); 
+        auto  UT = blas::prod( value_t(-1), A10->U_direct(), T );
 
-        seq::hodlr::addlr< value_t >( UT, Hpro::blas_mat_B< value_t >( A01 ), *A11, acc, approx );
+        seq::hodlr::addlr< value_t >( UT, A01->V_direct(), *A11, acc, approx );
         
         seq::hodlr::lu< value_t >( *A11, acc, approx );
     }// if
     else
     {
-        auto  DA = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  DA = ptrcast( &A, matrix::dense_matrix< value_t > );
         
-        blas::invert( Hpro::blas_mat< value_t >( DA ) );
+        blas::invert( DA->mat_direct() );
     }// else
 }
 
@@ -629,8 +637,8 @@ lu ( Hpro::TMatrix< value_t > &  A,
             for ( uint  l = i+1; l < nbc; ++l )
             {
                 hlr::multiply( value_t(-1),
-                               Hpro::apply_normal, *BA->block( j, i ),
-                               Hpro::apply_normal, *BA->block( i, l ),
+                               apply_normal, *BA->block( j, i ),
+                               apply_normal, *BA->block( i, l ),
                                *BA->block( j, l ), acc, approx );
             }// for
         }// for

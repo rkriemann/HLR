@@ -12,8 +12,6 @@
 #include <tbb/blocked_range2d.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
-#include <hpro/matrix/TRkMatrix.hh>
-#include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
 #include "hlr/utils/tensor.hh"
@@ -235,13 +233,13 @@ struct accumulator
             else
             {
                 // has to be low-rank: truncate
-                auto  R1       = ptrcast( T1.get(), Hpro::TRkMatrix< value_t > );
-                auto  R2       = ptrcast( T2.get(), Hpro::TRkMatrix< value_t > );
-                auto  [ U, V ] = approx( { blas::mat_U< value_t >( R1 ), blas::mat_U< value_t >( R2 ) },
-                                         { blas::mat_V< value_t >( R1 ), blas::mat_V< value_t >( R2 ) },
+                auto  R1       = ptrcast( T1.get(), matrix::lrmatrix< value_t > );
+                auto  R2       = ptrcast( T2.get(), matrix::lrmatrix< value_t > );
+                auto  [ U, V ] = approx( { R1->U_direct(), R2->U_direct() },
+                                         { R1->V_direct(), R2->V_direct() },
                                          acc );
 
-                return std::make_unique< Hpro::TRkMatrix< value_t > >( T1->row_is(), T1->col_is(), std::move( U ), std::move( V ) );
+                return std::make_unique< matrix::lrmatrix< value_t > >( T1->row_is(), T1->col_is(), std::move( U ), std::move( V ) );
             }// else
         }// else
     }// if
