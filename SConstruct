@@ -24,8 +24,9 @@ CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
 OPTFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
+OPTFLAGS     = '-O2 -march=native -g'
 WARNFLAGS    = '' # '-Wall'
-LINKFLAGS    = ''
+LINKFLAGS    = '-g'
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries

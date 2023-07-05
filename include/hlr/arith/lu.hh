@@ -23,6 +23,12 @@ namespace hlr {
 // to enable accuracy tests
 // #define HLR_LU_TESTS
 
+#if defined(NDEBUG)
+#  define HLR_LU_PRINT   HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) )
+#else
+#  define HLR_LU_PRINT   HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) )
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // general H-LU factorization
@@ -36,9 +42,13 @@ lu ( Hpro::TMatrix< value_t > &  A,
      const Hpro::TTruncAcc &     acc,
      const approx_t &            approx )
 {
+    HLR_LU_PRINT;
+    
+    #if defined(HLR_LU_TESTS)
     auto  TA = matrix::convert_to_hpro( A );
 
     Hpro::LU::factorise( TA.get(), acc, Hpro::fac_options_t{ Hpro::block_wise, Hpro::store_inverse, false } );
+    #endif
     
     if ( is_blocked( A ) )
     {
@@ -141,7 +151,7 @@ lu ( Hpro::TMatrix< value_t > &         A,
      const Hpro::TTruncAcc &            acc,
      const approx_t &                   approx )
 {
-    // DBG::printf( "lu( %d )", A.id() );
+    HLR_LU_PRINT;
 
     ///////////////////////////////////////////////////////////////
     //
@@ -258,6 +268,8 @@ lu ( matrix::level_matrix< value_t > &  A,
      const Hpro::TTruncAcc &            acc,
      const approx_t &                   approx )
 {
+    HLR_LU_PRINT;
+
     const uint  nbrows = A.nblock_rows();
     const uint  nbcols = A.nblock_cols();
 

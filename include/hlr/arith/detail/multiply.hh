@@ -9,7 +9,10 @@
 //
 
 #if defined(NDEBUG)
-#  define HLR_MULT_PRINT
+#  define HLR_MULT_PRINT   HLR_LOG( 4, Hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
+                                                        A.typestr().c_str(), A.id(), \
+                                                        B.typestr().c_str(), B.id(), \
+                                                        C.typestr().c_str(), C.id() ) )
 #else
 #  define HLR_MULT_PRINT   HLR_LOG( 4, Hpro::to_string( "multiply( %s %d, %s %d, %s %d )", \
                                                         A.typestr().c_str(), A.id(), \

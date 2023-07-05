@@ -97,7 +97,10 @@ log ( const int            lvl,
 // logging enabled/disabled via NDEBUG
 //
 #ifdef NDEBUG
-#  define HLR_LOG( lvl, msg ) 
+#  define HLR_LOG( lvl, msg )                                           \
+    if ( HLIB::verbose( lvl ) ) {                                       \
+        hlr::log( lvl,                                                  \
+                  std::string( "                                          " ) + msg ); }
 #else
 #  define HLR_LOG( lvl, msg )                                           \
     if ( HLIB::verbose( lvl ) ) {                                       \

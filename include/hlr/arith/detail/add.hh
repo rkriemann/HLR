@@ -17,7 +17,7 @@ namespace hlr
 {
 
 #if defined(NDEBUG)
-#  define HLR_ADD_PRINT( msg )
+#  define HLR_ADD_PRINT( msg )   HLR_LOG( 4, msg )
 #else
 #  define HLR_ADD_PRINT( msg )   HLR_LOG( 4, msg )
 #endif

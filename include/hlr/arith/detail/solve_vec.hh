@@ -30,7 +30,7 @@ solve_lower_tri ( const Hpro::matop_t               op_L,
                   Hpro::TScalarVector< value_t > &  v,
                   const Hpro::diag_type_t           diag_mode )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( %d )", L.id() ) );
+    // HLR_LOG( 4, Hpro::to_string( "solve_lower_tri( %d )", L.id() ) );
         
     if ( is_blocked( L ) )
     {
@@ -139,7 +139,7 @@ solve_upper_tri ( const Hpro::matop_t               op_U,
                   Hpro::TScalarVector< value_t > &  v,
                   const Hpro::diag_type_t           diag_mode )
 {
-    HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( %d )", U.id() ) );
+    // HLR_LOG( 4, Hpro::to_string( "solve_upper_tri( %d )", U.id() ) );
         
     if ( is_blocked( U ) )
     {

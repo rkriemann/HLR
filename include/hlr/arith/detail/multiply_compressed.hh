@@ -546,21 +546,23 @@ multiply ( const value_t                                   alpha,
            const approx_t &                                approx )
 {
     HLR_MULT_PRINT;
+    std::cout << "0" << std::endl;
     
     // [ U(C), V(C) ] = approx( C - A B )
-    auto  DA = A.mat();
-    auto  DB = B.mat();
-    auto  AB = blas::prod( alpha,
-                           blas::mat_view( op_A, DA ),
-                           blas::mat_view( op_B, DB ) );
-
+    auto  AxB = blas::prod( alpha,
+                            blas::mat_view( op_A, A.mat() ),
+                            blas::mat_view( op_B, B.mat() ) );
+    std::cout << "1" << std::endl;
     std::scoped_lock  lock( C.mutex() );
 
-    blas::prod( value_t(1), C.U(), blas::adjoint( C.V() ), value_t(1), AB );
+    blas::prod( value_t(1), C.U(), blas::adjoint( C.V() ), value_t(1), AxB );
+    std::cout << "2" << std::endl;
     
-    auto [ U, V ] = approx( AB, acc );
+    auto [ U, V ] = approx( AxB, acc );
+    std::cout << "3" << std::endl;
         
     C.set_lrmat( std::move( U ), std::move( V ), acc );
+    std::cout << "4" << std::endl;
 }
 
 //
@@ -1004,8 +1006,7 @@ multiply ( const value_t                                   alpha,
     // [ U(C), V(C) ] = truncate( [ U(C), U(A) ] , [ V(C), (V(A)^H B)^H ] )
     auto  UA = A.U( op_A );
     auto  VA = A.V( op_A );
-    auto  DB = B.mat();
-    auto  VB = blas::prod( alpha, blas::adjoint( blas::mat_view( op_B, DB ) ), VA );
+    auto  VB = blas::prod( alpha, blas::adjoint( blas::mat_view( op_B, B.mat() ) ), VA );
 
     std::scoped_lock  lock( C.mutex() );
 

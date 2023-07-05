@@ -170,44 +170,50 @@ public:
     // access low-rank data
     //
 
-    blas::matrix< value_t >  U () const
+    blas::matrix< value_t > &  U ()
     {
-        #if HLR_HAS_COMPRESSION == 1
-        if ( is_compressed() )
-        {
-            auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        // #if HLR_HAS_COMPRESSION == 1
+        // if ( is_compressed() )
+        // {
+        //     auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
     
-            compress::decompress< value_t >( _zdata.U, dU );
+        //     compress::decompress< value_t >( _zdata.U, dU );
 
-            return dU;
-        }// if
-        #endif
+        //     return dU;
+        // }// if
+        // #endif
         
         return _U;
     }
     
-    blas::matrix< value_t >  V () const
+    blas::matrix< value_t > &  V ()
     {
-        #if HLR_HAS_COMPRESSION == 1
-        if ( is_compressed() )
-        {
-            auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
+        // #if HLR_HAS_COMPRESSION == 1
+        // if ( is_compressed() )
+        // {
+        //     auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
     
-            compress::decompress< value_t >( _zdata.V, dV );
+        //     compress::decompress< value_t >( _zdata.V, dV );
 
-            return dV;
-        }// if
-        #endif
+        //     return dV;
+        // }// if
+        // #endif
 
         return _V;
     }
 
+    const blas::matrix< value_t > & U () const { return _U; }
+    const blas::matrix< value_t > & V () const { return _V; }
+    
     //
     // access low-rank factors with matrix operator
     //
     
-    blas::matrix< value_t >  U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
-    blas::matrix< value_t >  V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
+    blas::matrix< value_t > & U ( const Hpro::matop_t  op ) { return ( op == apply_normal ? U() : V() ); }
+    blas::matrix< value_t > & V ( const Hpro::matop_t  op ) { return ( op == apply_normal ? V() : U() ); }
+
+    const blas::matrix< value_t > & U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
+    const blas::matrix< value_t > & V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
 
     //
     // directly set low-rank factors
