@@ -10,8 +10,10 @@
 
 #include <list>
 
+#include <hlr/utils/traits.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/accuracy.hh>
 #include <hlr/approx/traits.hh>
 #include <hlr/approx/pairwise.hh>
 
@@ -22,13 +24,15 @@ namespace hpro = HLIB;
 using Hpro::idx_t;
 
 //
-// return low-rank approximation of M with accuracy <acc>
+// return low-rank approximation U·S·V' of M with accuracy <acc>,
+// orthogonal U/V and diagonal S
 //
 template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-svd ( blas::matrix< value_t > &  M,
-      const Hpro::TTruncAcc &    acc )
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+svd_ortho ( blas::matrix< value_t > &  M,
+            const accuracy &           acc )
 {
     using  real_t  = Hpro::real_type_t< value_t >;
 
@@ -55,30 +59,43 @@ svd ( blas::matrix< value_t > &  M,
     // scale smaller one of A and B by S
     //
 
-    const auto  Uk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
-    const auto  Vk = blas::matrix< value_t >( V, blas::range::all, blas::range( 0, k-1 ) );
+    auto        rk = blas::range( 0, k-1 );
+    const auto  Uk = blas::matrix< value_t >( M, blas::range::all, rk );
+    const auto  Vk = blas::matrix< value_t >( V, blas::range::all, rk );
+    const auto  Sk = blas::vector< value_t >( S, rk );
     auto        A = blas::copy( Uk );
     auto        B = blas::copy( Vk );
+    auto        T = blas::copy( Sk );
 
-    if ( nrows_M < ncols_M )
-        prod_diag( A, S, k );
-    else
-        prod_diag( B, S, k );
+    return { std::move( A ), std::move( T ), std::move( B ) };
+}
 
-    return { std::move( A ), std::move( B ) };
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( blas::matrix< value_t > &  M,
+      const accuracy &           acc )
+{
+    auto  [ U, S, V ] = svd_ortho( M, acc );
+    
+    if ( U.nrows() < V.nrows() ) blas::prod_diag_ip( U, S );
+    else                         blas::prod_diag_ip( V, S );
+
+    return { std::move( U ), std::move( V ) };
 }
 
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
 template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-svd ( const blas::matrix< value_t > &  U,
-      const blas::matrix< value_t > &  V,
-      const Hpro::TTruncAcc &          acc )
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+svd_ortho ( const blas::matrix< value_t > &  U,
+            const blas::matrix< value_t > &  V,
+            const accuracy &                 acc )
 {
-    using  real_t  = typename Hpro::real_type< value_t >::type_t;
+    using  real_t = real_type_t< value_t >;
 
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -94,10 +111,8 @@ svd ( const blas::matrix< value_t > &  U,
 
     if ( in_rank == 0 )
         return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::vector< real_t >( 0 ) ),
                  std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
-
-    if ( in_rank <= acc_rank )
-        return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
 
     //
     // truncate given low-rank matrix
@@ -115,15 +130,13 @@ svd ( const blas::matrix< value_t > &  U,
         if ( acc_rank > 0 )
             lacc.set_max_rank( acc_rank );
 
-        return svd( M, lacc );
+        return svd_ortho( M, lacc );
     }// if
     else
     {
         // for update statistics
         HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
     
-        #if 1
-
         //////////////////////////////////////////////////////////////
         //
         // QR-factorisation of U and V with explicit Q
@@ -159,136 +172,174 @@ svd ( const blas::matrix< value_t > &  U,
         const auto  orank = idx_t( acc.trunc_rank( Ss ) );
 
         //
-        // only build new vectors, if rank is decreased
+        // build new matrices U and V
         //
         
-        if ( orank < in_rank )
-        {
-            //
-            // build new matrices U and V
-            //
-
-            const blas::range  in_rank_is( 0, in_rank-1 );
-            const blas::range  orank_is( 0, orank-1 );
-
-            // U := Q_U · U
-            blas::matrix< value_t >  Urank( Us, in_rank_is, orank_is );
-            
-            // U := U·S
-            blas::prod_diag( Urank, Ss, orank );
-
-            auto  OU = blas::prod( value_t(1), QU, Urank );
-            
-            // V := Q_V · conj(V)
-            blas::matrix< value_t >  Vrank( Vs, in_rank_is, orank_is );
-
-            auto  OV = blas::prod( value_t(1), QV, Vrank );
-
-            return { std::move( OU ), std::move( OV ) };
-        }// if
-        else
-        {
-            // rank has not changed, so return original matrices
-            return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
-        }// else
-
-        #else
-
-        //////////////////////////////////////////////////////////////
-        //
-        // QR-factorisation of U and V with implicit Q
-        //
+        const blas::range  in_rank_is( 0, in_rank-1 );
+        const blas::range  orank_is( 0, orank-1 );
         
-        auto  QU = blas::copy( U );
-        auto  RU = blas::matrix< value_t >( in_rank, in_rank );
-        auto  TU = std::vector< value_t >();
+        // U := Q_U · U
+        auto  Uk = blas::matrix< value_t >( Us, in_rank_is, orank_is );
+        auto  OU = blas::prod( value_t(1), QU, Uk );
         
-        blas::qr_impl( QU, RU, TU );
+        // V := Q_V · conj(V)
+        auto  Vk = blas::matrix< value_t >( Vs, in_rank_is, orank_is );
+        auto  OV = blas::prod( value_t(1), QV, Vk );
         
-        auto  QV = blas::copy( V );
-        auto  RV = blas::matrix< value_t >( in_rank, in_rank );
-        auto  TV = std::vector< value_t >();
+        // restrict S
+        auto  Sk = blas::vector( Ss, orank_is );
+        auto  OS = blas::copy( Sk );
         
-        blas::qr_impl( QV, RV, TV );
-
-        //
-        // R = R_U · upper_triangular(QV)^H = R_V^H
-        //
-        
-        auto  R = blas::prod( value_t(1), RU, adjoint(RV) );
-        
-        //
-        // SVD(R) = U S V^H
-        //
-            
-        blas::vector< real_t >   Ss( in_rank );
-        blas::matrix< value_t >  Us( std::move( R ) ); // reuse storage
-        blas::matrix< value_t >  Vs( std::move( RV ) );
-            
-        blas::svd( Us, Ss, Vs );
-        
-        // determine truncated rank based on singular values
-        const auto  orank = idx_t( acc.trunc_rank( Ss ) );
-
-        //
-        // only build new vectors, if rank is decreased
-        //
-        
-        if ( orank < in_rank )
-        {
-            //
-            // build new matrices U and V
-            //
-
-            const blas::range  in_rank_is( 0, in_rank-1 );
-            const blas::range  orank_is( 0, orank-1 );
-
-            // U := U·S
-            auto  Urank = blas::matrix< value_t >( Us, in_rank_is, orank_is );
-            
-            blas::prod_diag( Urank, Ss, orank );
-
-            // U := Q_U · U
-            auto  OU     = blas::matrix< value_t >( nrows_U, orank );
-            auto  OU_sub = blas::matrix< value_t >( OU, in_rank_is, orank_is );
-
-            blas::copy( Urank, OU_sub );
-            blas::prod_Q( blas::from_left, Hpro::apply_normal, QU, TU, OU );
-
-            // V := Q_V · conj(V)
-            auto  Vrank  = blas::matrix< value_t >( Vs, in_rank_is, orank_is );
-            auto  OV     = blas::matrix< value_t >( nrows_V, orank );
-            auto  OV_sub = blas::matrix< value_t >( OV, in_rank_is, orank_is );
-
-            blas::copy( Vrank, OV_sub );
-            blas::prod_Q( blas::from_left, Hpro::apply_normal, QV, TV, OV );
-
-            return { std::move( OU ), std::move( OV ) };
-        }// if
-        else
-        {
-            // rank has not changed, so return original matrices
-            return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
-        }// else
-
-        #endif
+        return { std::move( OU ), std::move( OS ), std::move( OV ) };
     }// else
+}
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( const blas::matrix< value_t > &  U,
+      const blas::matrix< value_t > &  V,
+      const accuracy &                 acc )
+{
+    auto  [ W, T, X ] = svd_ortho( U, V, acc );
+    
+    if ( W.nrows() < X.nrows() ) blas::prod_diag_ip( W, T );
+    else                         blas::prod_diag_ip( X, T );
+
+    return { std::move( W ), std::move( X ) };
+
+    // using  real_t  = typename Hpro::real_type< value_t >::type_t;
+
+    // HLR_ASSERT( U.ncols() == V.ncols() );
+
+    // const idx_t  nrows_U = idx_t( U.nrows() );
+    // const idx_t  nrows_V = idx_t( V.nrows() );
+    // const idx_t  in_rank = idx_t( V.ncols() );
+
+    // //
+    // // don't increase rank
+    // //
+
+    // const idx_t  acc_rank = idx_t( acc.rank() );
+
+    // if ( in_rank == 0 )
+    //     return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+    //              std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
+
+    // if ( in_rank <= acc_rank )
+    //     return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
+
+    // //
+    // // truncate given low-rank matrix
+    // //
+    
+    // if ( std::max( in_rank, acc_rank ) >= std::min( nrows_U, nrows_V ) )
+    // {
+    //     //
+    //     // since rank is too large, build U = U·V^T and do full-SVD
+    //     //
+            
+    //     auto  M    = blas::prod( value_t(1), U, adjoint(V) );
+    //     auto  lacc = Hpro::TTruncAcc( acc );
+
+    //     if ( acc_rank > 0 )
+    //         lacc.set_max_rank( acc_rank );
+
+    //     return svd( M, lacc );
+    // }// if
+    // else
+    // {
+    //     // for update statistics
+    //     HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
+    //     //////////////////////////////////////////////////////////////
+    //     //
+    //     // QR-factorisation of U and V with explicit Q
+    //     //
+
+    //     auto  QU = blas::copy( U );
+    //     auto  RU = blas::matrix< value_t >( in_rank, in_rank );
+        
+    //     blas::qr( QU, RU );
+        
+    //     auto  QV = blas::copy( V );
+    //     auto  RV = std::move( blas::matrix< value_t >( in_rank, in_rank ) );
+        
+    //     blas::qr( QV, RV );
+
+    //     //
+    //     // R = R_U · upper_triangular(QV)^H = R_V^H
+    //     //
+        
+    //     auto  R = blas::prod( value_t(1), RU, adjoint(RV) );
+        
+    //     //
+    //     // SVD(R) = U S V^H
+    //     //
+            
+    //     blas::vector< real_t >   Ss( in_rank );
+    //     blas::matrix< value_t >  Us( std::move( R ) );  // reuse storage
+    //     blas::matrix< value_t >  Vs( std::move( RV ) );
+            
+    //     blas::svd( Us, Ss, Vs );
+        
+    //     // determine truncated rank based on singular values
+    //     const auto  orank = idx_t( acc.trunc_rank( Ss ) );
+
+    //     //
+    //     // only build new vectors, if rank is decreased
+    //     //
+        
+    //     if ( orank < in_rank )
+    //     {
+    //         //
+    //         // build new matrices U and V
+    //         //
+
+    //         const blas::range  in_rank_is( 0, in_rank-1 );
+    //         const blas::range  orank_is( 0, orank-1 );
+
+    //         // U := Q_U · U
+    //         blas::matrix< value_t >  Urank( Us, in_rank_is, orank_is );
+            
+    //         // U := U·S
+    //         blas::prod_diag( Urank, Ss, orank );
+
+    //         auto  OU = blas::prod( value_t(1), QU, Urank );
+            
+    //         // V := Q_V · conj(V)
+    //         blas::matrix< value_t >  Vrank( Vs, in_rank_is, orank_is );
+
+    //         auto  OV = blas::prod( value_t(1), QV, Vrank );
+
+    //         return { std::move( OU ), std::move( OV ) };
+    //     }// if
+    //     else
+    //     {
+    //         // rank has not changed, so return original matrices
+    //         return { std::move( blas::copy( U ) ), std::move( blas::copy( V ) ) };
+    //     }// else
+    // }// else
 }
 
 //
 // compute low-rank approximation of a sum Σ_i U_i V_i^H using SVD
 //
 template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-svd ( const std::list< blas::matrix< value_t > > &  U,
-      const std::list< blas::matrix< value_t > > &  V,
-      const Hpro::TTruncAcc &                       acc )
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+svd_ortho ( const std::list< blas::matrix< value_t > > &  U,
+            const std::list< blas::matrix< value_t > > &  V,
+            const accuracy &                              acc )
 {
+    using  real_t = real_type_t< value_t >;
+    
     HLR_ASSERT( U.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::vector< real_t >() ),
                  std::move( blas::matrix< value_t >() ) };
 
     //
@@ -324,7 +375,7 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         for ( ; u_i != U.cend(); ++u_i, ++v_i )
             blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
 
-        return svd( M, acc );
+        return svd_ortho( M, acc );
     }// if
     else
     {
@@ -358,8 +409,27 @@ svd ( const std::list< blas::matrix< value_t > > &  U,
         // truncate and return result
         //
     
-        return svd( U_all, V_all, acc );
+        return svd_ortho( U_all, V_all, acc );
     }// else
+}
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+svd ( const std::list< blas::matrix< value_t > > &  U,
+      const std::list< blas::matrix< value_t > > &  V,
+      const accuracy &                              acc )
+{
+    if ( U.empty() )
+        return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::matrix< value_t >() ) };
+
+    auto  [ W, T, X ] = svd_ortho( U, V, acc );
+    
+    if ( W.nrows() < X.nrows() ) blas::prod_diag_ip( W, T );
+    else                         blas::prod_diag_ip( X, T );
+
+    return { std::move( W ), std::move( X ) };
 }
 
 //
@@ -371,7 +441,7 @@ std::pair< blas::matrix< value_t >,
 svd ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  T,
       const std::list< blas::matrix< value_t > > &  V,
-      const Hpro::TTruncAcc &                       acc )
+      const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -471,7 +541,7 @@ struct SVD
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::svd( M, acc );
     }
@@ -480,7 +550,7 @@ struct SVD
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -489,7 +559,7 @@ struct SVD
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -499,9 +569,42 @@ struct SVD
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::svd( U, T, V, acc );
+    }
+
+    //
+    // matrix approximation routines
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::svd_ortho( M, acc );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::svd_ortho( U, V, acc );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::svd_ortho( U, V, acc );
     }
 
     //
@@ -510,7 +613,7 @@ struct SVD
     
     blas::matrix< value_t >
     column_basis ( const blas::matrix< value_t > &  M,
-                   const Hpro::TTruncAcc &          acc,
+                   const accuracy &                 acc,
                    blas::vector< real_t > *         sv = nullptr ) const
     {
         if ( M.ncols() > 2 * M.nrows() )
@@ -700,7 +803,7 @@ struct PairSVD
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::svd( M, acc );
     }
@@ -709,7 +812,7 @@ struct PairSVD
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::svd( U, V, acc );
     }
@@ -718,7 +821,7 @@ struct PairSVD
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         auto  approx = SVD< value_t >();
         
@@ -730,7 +833,7 @@ struct PairSVD
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::svd( U, T, V, acc );
     }

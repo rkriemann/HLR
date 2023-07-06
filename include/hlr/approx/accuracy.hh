@@ -8,9 +8,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <hpro/base/TTruncAcc.hh>
+#include <hpro/cluster/TIndexSet.hh>
+
 namespace hlr
 {
 
+using indexset = Hpro::TIndexSet;
 using accuracy = Hpro::TTruncAcc;
 
 using Hpro::fixed_prec;

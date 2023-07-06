@@ -26,6 +26,18 @@ concept with_value_type = requires ( T a )
     typename T::value_t;
 };
 
+// access value type
+template < typename T > struct value_type { using  type_t = typename T::value_t; };
+template < typename T > using  value_type_t = typename value_type< T >::type_t;
+
+//
+// give access to underlying real valued type of T
+//
+template < typename T > struct real_type                       { using  type_t = T; };
+template < typename T > struct real_type< std::complex< T > >  { using  type_t = T; };
+
+template < typename T > using real_type_t = typename real_type< T >::type_t;
+
 }// namespace hlr
 
 #endif // __HLR_UTILS_TRAITS_HH

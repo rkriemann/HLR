@@ -71,8 +71,8 @@ program_main ()
         A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
 
-        if ( verbose( 2 ) )
-            io::hpro::write< value_t >( *A, "A.hm" );
+        // if ( verbose( 2 ) )
+        //     io::hpro::write< value_t >( *A, "A.hm" );
     }// if
     else
     {
@@ -80,7 +80,7 @@ program_main ()
                   << "    matrix = " << matrixfile
                   << std::endl;
 
-        A = io::hpro::read< value_t >( matrixfile );
+        // A = io::hpro::read< value_t >( matrixfile );
     }// else
     
     const auto  mem_A  = A->byte_size();
@@ -138,8 +138,9 @@ program_main ()
 
     std::cout << term::bullet << term::bold << "H-LU" << term::reset << std::endl;
     
-    auto  apx    = approx::SVD< value_t >();
-    auto  mem_LU = std::unordered_map< std::string, size_t >();
+    auto  apx     = approx::SVD< value_t >();
+    auto  mem_LU  = std::unordered_map< std::string, size_t >();
+    auto  time_LU = std::unordered_map< std::string, double >();
 
     // define methods to execute
     const auto methods = std::set< std::string >{
@@ -182,7 +183,8 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         
-        mem_LU["H+rec"] = LU->byte_size();
+        mem_LU["H+rec"]  = LU->byte_size();
+        time_LU["H+rec"] = min( runtime );
         std::cout << "    mem    = " << format_mem( mem_LU["H+rec"] ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
@@ -221,12 +223,15 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
         
+        if ( time_LU.contains( "H+rec" ) )
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+rec"]) ) << std::endl;
+        
         const auto  mem_zLU = LU->byte_size();
 
         std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
 
         if ( mem_LU.contains( "H+rec" ) )
-            std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec"]) ) << std::endl;
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec"]) ) << std::endl;
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU", prnopt );

@@ -488,6 +488,21 @@ convert_to_hpro ( const Hpro::TMatrix< value_t > &  M )
 
         return R;
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  RM = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+        auto  U  = blas::copy( RM->U() );
+        auto  S  = RM->S();
+        auto  V  = blas::copy( RM->V() );
+
+        blas::prod_diag( U, S );
+        
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
     else if ( matrix::is_dense( M ) )
     {
         auto  DM = cptrcast( &M, matrix::dense_matrix< value_t > );
