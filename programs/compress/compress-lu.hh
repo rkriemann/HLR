@@ -12,7 +12,7 @@
 #include <hlr/approx/randsvd.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
-#include "hlr/dag/lu.hh"
+#include <hlr/dag/lu.hh>
 #include <hlr/matrix/luinv_eval.hh>
 
 #include "common.hh"
@@ -135,13 +135,13 @@ program_main ()
             // define methods to execute
             const auto methods = std::set< std::string >{
                 "H+rec",
-                // "H+rec+accu",
-                // "H+dag",
+                "H+rec+accu",
+                "H+dag",
                 // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
                 "zH+rec",
-                // "zH+rec+accu",
-                // "zH+dag",
+                "zH+rec+accu",
+                "zH+dag",
                 // "zH+dag+accu+lazy"
             };
 

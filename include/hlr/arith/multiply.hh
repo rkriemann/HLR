@@ -499,6 +499,47 @@ multiply ( const value_t                     alpha,
 
         return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
+    else if ( matrix::is_lowrank( A ) )
+    {
+        //
+        // U·S·V' × B = W·T·X'
+        //
+
+        auto  RA = cptrcast( &A, matrix::lrsvmatrix< value_t > );
+        auto  U  = RA->U( op_A );
+        auto  S  = RA->S();
+        auto  V  = RA->V( op_A );
+        auto  k  = RA->rank();
+        
+        auto  W  = blas::prod_diag( U, S );
+        auto  X  = blas::matrix< value_t >( B.ncols( op_B ), k );
+
+        multiply( alpha, blas::adjoint( op_B ), B, V, X );
+
+        if ( op_A == apply_transposed )
+        {
+            blas::conj( W );
+            blas::conj( X );
+        }// if
+        
+        return std::make_unique< matrix::lrsvmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
+    else if ( matrix::is_lowrank( B ) )
+    {
+        //
+        // A × U·S·V' = W·T·X'
+        //
+
+        auto  RB = cptrcast( &B, matrix::lrmatrix< value_t > );
+        auto  U  = std::move( RB->U( op_B ) );
+        auto  k  = RB->rank();
+        auto  X  = std::move( blas::copy( RB->V( op_B ) ) );
+        auto  W  = blas::matrix< value_t >( A.nrows( op_A ), k );
+        
+        multiply( alpha, op_A, A, U, W );
+
+        return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
     else if ( matrix::is_dense_any( A, B ) )
     {
         C = std::make_unique< matrix::dense_matrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ) );

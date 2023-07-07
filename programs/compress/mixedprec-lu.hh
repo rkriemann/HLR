@@ -6,19 +6,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <fstream>
-#include <limits>
-
-#include <half.hpp>
-
 #include "hlr/arith/norm.hh"
 #include "hlr/approx/accuracy.hh"
 #include "hlr/bem/aca.hh"
+#include <hlr/dag/lu.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/utils/io.hh>
-
-#include <hlr/utils/eps_printer.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -145,13 +139,13 @@ program_main ()
     // define methods to execute
     const auto methods = std::set< std::string >{
         "H+rec",
-        // "H+rec+accu",
-        // "H+dag",
+        "H+rec+accu",
+        "H+dag",
         // "H+dag+accu+lazy",
         // "H+dag+accu+eager",
         "zH+rec",
-        // "zH+rec+accu",
-        // "zH+dag",
+        "zH+rec+accu",
+        "zH+dag",
         // "zH+dag+accu+lazy"
     };
     
@@ -195,6 +189,91 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
+    if ( methods.contains( "H+rec+accu" ) )
+    {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
+
+        auto  LU = impl::matrix::copy( *A );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::accu::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        mem_LU["H+rec+accu"]  = LU->byte_size();
+        time_LU["H+rec+accu"] = min(runtime);
+        std::cout << "    mem    = " << format_mem( mem_LU["H+rec+accu"] ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }// if
+
+    if ( methods.contains( "H+dag" ) )
+    {
+        std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
+
+        auto  LU  = impl::matrix::copy( *A );
+        auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
+
+        // io::dot::print( dag, "LU.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *A, *LU );
+        }// for
+
+        // io::hpro::write( *LU, "LU.hm" );
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        mem_LU["H+dag"]  = LU->byte_size();
+        time_LU["H+dag"] = min(runtime);
+        std::cout << "    mem    = " << format_mem( mem_LU["H+dag"] ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "HLU2", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }// if
+    
     if ( methods.contains( "zH+rec" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (recursive, " << hlr::compress::provider << ")" << term::reset << std::endl;
@@ -235,6 +314,103 @@ program_main ()
 
         if ( hpro::verbose( 3 ) )
             io::eps::print( *LU, "zHLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        impl::matrix::decompress( *LU );
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }// if
+
+    if ( methods.contains( "zH+rec+accu" ) )
+    {
+        std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, " << hlr::compress::provider << ")" << term::reset << std::endl;
+
+        auto  LU = impl::matrix::copy( *zA );
+                
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+                
+            impl::accu::lu< value_t >( *LU, acc, apx );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+        
+        if ( time_LU.contains( "H+rec+accu" ) )
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+rec+accu"]) ) << std::endl;
+        
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+
+        if ( mem_LU.contains( "H+rec+accu" ) )
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec+accu"]) ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "zHLU", prnopt );
+                
+        auto  A_inv = matrix::luinv_eval( *LU );
+                    
+        impl::matrix::decompress( *LU );
+        std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
+    }// if
+
+    if ( methods.contains( "zH+dag" ) )
+    {
+        std::cout << "  " << term::bullet << term::bold << "compressed (DAG, " << hlr::compress::provider << ")" << term::reset << std::endl;
+
+        auto  LU  = impl::matrix::copy( *zA );
+        auto  dag = hlr::dag::gen_dag_lu( *LU, nseq, impl::dag::refine, apx );
+
+        // io::dot::print( dag, "zLU.dot" );
+
+        runtime.clear();
+
+        for ( int i = 0; i < nbench; ++i )
+        {
+            tic = timer::now();
+
+            impl::dag::run( dag, acc );
+                
+            toc = timer::since( tic );
+            runtime.push_back( toc.seconds() );
+            
+            std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+            if ( i < nbench-1 )
+                impl::matrix::copy_to( *zA, *LU );
+        }// for
+        
+        if ( nbench > 1 )
+            std::cout << "  runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                      << std::endl;
+
+        if ( time_LU.contains( "H+dag" ) )
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+dag"]) ) << std::endl;
+        
+        const auto  mem_zLU = LU->byte_size();
+
+        std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
+
+        if ( mem_LU.contains( "H+dag" ) )
+            std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag"]) ) << std::endl;
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *LU, "zHLU2", prnopt );
                 
         auto  A_inv = matrix::luinv_eval( *LU );
                     
