@@ -247,6 +247,15 @@ convert_to_dense ( const Hpro::TMatrix< value_t > &  M )
         
         return DM;
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R  = cptrcast( &M, lrsvmatrix< value_t > );
+        auto  US = blas::prod_diag( R->U(), R->S() );
+        auto  D  = blas::prod( US, blas::adjoint( R->V() ) );
+        auto  DM = std::make_unique< dense_matrix< value_t > >( M.row_is(), M.col_is(), std::move( D ) );
+        
+        return DM;
+    }// if
     else if ( matrix::is_lowrankS( M ) )
     {
         auto  R  = cptrcast( &M, matrix::lrsmatrix< value_t > );

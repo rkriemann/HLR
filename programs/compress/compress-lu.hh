@@ -135,12 +135,12 @@ program_main ()
             // define methods to execute
             const auto methods = std::set< std::string >{
                 "H+rec",
-                "H+rec+accu",
+                // "H+rec+accu",
                 "H+dag",
                 // "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
                 "zH+rec",
-                "zH+rec+accu",
+                // "zH+rec+accu",
                 "zH+dag",
                 // "zH+dag+accu+lazy"
             };
