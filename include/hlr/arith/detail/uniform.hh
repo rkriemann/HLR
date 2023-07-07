@@ -75,14 +75,14 @@ mul_vec ( const value_t                                              alpha,
             }// for
         }// for
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
         
         M.apply_add( alpha, x_i, y_j, op_M );
     }// if
-    else if ( is_uniform_lowrank( M ) )
+    else if ( matrix::is_uniform_lowrank( M ) )
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
 
@@ -231,7 +231,7 @@ mul_vec2 ( const value_t                         alpha,
                         HLR_ERROR( "unsupported matrix operator" );
                 }// switch
             }// if
-            else if ( Hpro::is_dense( M ) )
+            else if ( matrix::is_dense( M ) )
             {
                 auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
 
@@ -292,7 +292,7 @@ add ( const uniform_lrmatrix< value_t > &  M,
       const blas::matrix< value_t > &      W,
       const blas::matrix< value_t > &      T,
       const blas::matrix< value_t > &      X,
-      const Hpro::TTruncAcc &              acc,
+      const accuracy &                     acc,
       const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -458,7 +458,7 @@ std::tuple< blas::matrix< value_t >,   // new row basis
 add_row ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      W,
           const blas::matrix< value_t > &      T,
-          const Hpro::TTruncAcc &              acc,
+          const accuracy &                     acc,
           const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -568,7 +568,7 @@ std::tuple< blas::matrix< value_t >,   // new coupling
 add_col ( const uniform_lrmatrix< value_t > &  M,
           const blas::matrix< value_t > &      T,
           const blas::matrix< value_t > &      X,
-          const Hpro::TTruncAcc &              acc,
+          const accuracy &                     acc,
           const approx_t &                     approx )
 {
     auto  U = M.row_cb().basis();
@@ -688,7 +688,7 @@ add ( Hpro::TMatrix< value_t > &          M,
       const blas::matrix< value_t > &     U,
       const blas::matrix< value_t > &     S,
       const blas::matrix< value_t > &     V,
-      const Hpro::TTruncAcc &             acc,
+      const accuracy &                    acc,
       const approx_t &                    approx,
       const is_matrix_map_t< value_t > &  rowmap,
       const is_matrix_map_t< value_t > &  colmap )
@@ -730,12 +730,16 @@ add ( Hpro::TMatrix< value_t > &          M,
         
         update_row_col_basis( *R, Un, Sn, Vn, acc, approx, rowmap, colmap );
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
-        auto  D  = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  Dm = D->mat();
         auto  US = blas::prod( U, S );
 
-        blas::prod( value_t(1), US, blas::adjoint( V ), value_t(1), blas::mat( D ) );
+        blas::prod( value_t(1), US, blas::adjoint( V ), value_t(1), Dm );
+
+        if ( D->is_compressed() )
+            D->compress( acc );
     }// if
 }
 
@@ -747,7 +751,7 @@ template < typename value_t,
 void
 add ( Hpro::TMatrix< value_t > &          M,
       const blas::matrix< value_t > &     D,
-      const Hpro::TTruncAcc &             acc,
+      const accuracy &                    acc,
       const approx_t &                    approx,
       const is_matrix_map_t< value_t > &  rowmap,
       const is_matrix_map_t< value_t > &  colmap )
@@ -790,11 +794,15 @@ add ( Hpro::TMatrix< value_t > &          M,
         
         update_row_col_basis( *R, Un, Sn, Vn, acc, approx, rowmap, colmap );
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
-        auto  DM = ptrcast( &M, Hpro::TDenseMatrix< value_t > );
+        auto  DM = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  Dm = DM->mat();
 
-        blas::add( value_t(1), D, blas::mat( DM ) );
+        blas::add( value_t(1), D, Dm );
+
+        if ( DM->is_compressed() )
+            DM->compress( acc );
     }// if
 }
 
@@ -811,7 +819,7 @@ multiply ( const value_t                       alpha,
            const Hpro::matop_t                 op_B,
            const Hpro::TMatrix< value_t > &    B,
            Hpro::TMatrix< value_t > &          C,
-           const Hpro::TTruncAcc &             acc,
+           const accuracy &                    acc,
            const approx_t &                    approx,
            const is_matrix_map_t< value_t > &  rowmap,
            const is_matrix_map_t< value_t > &  colmap );
@@ -828,7 +836,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const Hpro::TBlockMatrix< value_t > & B,
            Hpro::TBlockMatrix< value_t > &       C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -864,7 +872,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const Hpro::TBlockMatrix< value_t > & B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -932,9 +940,9 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
            const Hpro::TBlockMatrix< value_t > & A,
            const Hpro::matop_t                   op_B,
-           const Hpro::TDenseMatrix< value_t > & B,
+           const matrix::dense_matrix< value_t > & B,
            matrix::uniform_lrmatrix< value_t > & C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -967,7 +975,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const uniform_lrmatrix< value_t > &   B,
            Hpro::TBlockMatrix< value_t > &       C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -993,7 +1001,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const uniform_lrmatrix< value_t > &   B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap )
 {
@@ -1021,11 +1029,11 @@ template < typename value_t,
 void
 multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
-           const Hpro::TDenseMatrix< value_t > & A,
+           const matrix::dense_matrix< value_t > & A,
            const Hpro::matop_t                   op_B,
            const Hpro::TBlockMatrix< value_t > & B,
            matrix::uniform_lrmatrix< value_t > & C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -1058,7 +1066,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const Hpro::TBlockMatrix< value_t > & B,
            Hpro::TBlockMatrix< value_t > &       C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
@@ -1084,7 +1092,7 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_B,
            const Hpro::TBlockMatrix< value_t > & B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    colmap )
 {
@@ -1112,11 +1120,11 @@ template < typename value_t,
 void
 multiply ( const value_t                                   alpha,
            const Hpro::matop_t                             op_A,
-           const Hpro::TDenseMatrix< value_t > &           A,
+           const matrix::dense_matrix< value_t > &           A,
            const Hpro::matop_t                             op_B,
            const matrix::uniform_lrmatrix< value_t > &     B,
            Hpro::TBlockMatrix< value_t > &                 C,
-           const Hpro::TTruncAcc &                         acc,
+           const accuracy &                                acc,
            const approx_t &                                approx,
            const is_matrix_map_t< value_t > &              rowmap,
            const is_matrix_map_t< value_t > &              colmap )
@@ -1125,7 +1133,7 @@ multiply ( const value_t                                   alpha,
     auto  S = B.coeff();
     auto  V = B.col_basis( op_B );
 
-    auto  AU = blas::prod( alpha, blas::mat_view( op_A, blas::mat( A ) ), U );
+    auto  AU = blas::prod( alpha, blas::mat_view( op_A, A->mat() ), U );
     auto  R  = blas::matrix< value_t >();
 
     blas::qr( AU, R );
@@ -1147,7 +1155,7 @@ multiply ( const value_t                        alpha,
            const Hpro::matop_t                  op_B,
            const uniform_lrmatrix< value_t > &  B,
            Hpro::TBlockMatrix< value_t > &      C,
-           const Hpro::TTruncAcc &              acc,
+           const accuracy &                     acc,
            const approx_t &                     approx,
            const is_matrix_map_t< value_t > &   rowmap,
            const is_matrix_map_t< value_t > &   colmap )
@@ -1194,9 +1202,9 @@ multiply ( const value_t                               alpha,
            const Hpro::matop_t                         op_A,
            const matrix::uniform_lrmatrix< value_t > & A,
            const Hpro::matop_t                         op_B,
-           const Hpro::TDenseMatrix< value_t > &       B,
+           const matrix::dense_matrix< value_t > &       B,
            Hpro::TBlockMatrix< value_t > &             C,
-           const Hpro::TTruncAcc &                     acc,
+           const accuracy &                            acc,
            const approx_t &                            approx,
            const is_matrix_map_t< value_t > &          rowmap,
            const is_matrix_map_t< value_t > &          colmap )
@@ -1205,7 +1213,7 @@ multiply ( const value_t                               alpha,
     auto  S = A.coeff();
     auto  V = A.col_basis( op_A );
 
-    auto  VB = blas::prod( alpha, blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ), V );
+    auto  VB = blas::prod( alpha, blas::mat_view( blas::adjoint( op_B ), B->mat() ), V );
     auto  R  = blas::matrix< value_t >();
 
     blas::qr( VB, R );
@@ -1225,15 +1233,15 @@ multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
            const uniform_lrmatrix< value_t > &   A,
            const Hpro::matop_t                   op_B,
-           const Hpro::TDenseMatrix< value_t > & B,
+           const matrix::dense_matrix< value_t > & B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    colmap )
 {
     // A×B + C = U·S·(V' × B) + U·T·X' = U·S·(B' × V)' + U·T·X'
     auto  BV = blas::prod( alpha,
-                           blas::mat_view( blas::adjoint( op_B ), blas::mat( B ) ),
+                           blas::mat_view( blas::adjoint( op_B ), B->mat() ),
                            A.col_cb( op_A ).basis() );
 
     auto  R = blas::matrix< value_t >();
@@ -1254,17 +1262,17 @@ template < typename value_t,
 void
 multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
-           const Hpro::TDenseMatrix< value_t > & A,
+           const matrix::dense_matrix< value_t > & A,
            const Hpro::matop_t                   op_B,
            const uniform_lrmatrix< value_t > &   B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap )
 {
     // A×B + C = (A × U)·T·V' + W·S·V'
     auto  AU = blas::prod( alpha,
-                           blas::mat_view( op_A, blas::mat( A ) ),
+                           blas::mat_view( op_A, A->mat() ),
                            B.row_cb( op_B ).basis() );
 
     auto  R = blas::matrix< value_t >();
@@ -1285,18 +1293,18 @@ template < typename value_t,
 void
 multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
-           const Hpro::TDenseMatrix< value_t > & A,
+           const matrix::dense_matrix< value_t > & A,
            const Hpro::matop_t                   op_B,
-           const Hpro::TDenseMatrix< value_t > & B,
+           const matrix::dense_matrix< value_t > & B,
            Hpro::TBlockMatrix< value_t > &       C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
 {
     auto  AB = blas::prod( alpha,
-                           blas::mat_view( op_A, Hpro::blas_mat( A ) ),
-                           blas::mat_view( op_B, Hpro::blas_mat( B ) ) );
+                           blas::mat_view( op_A, A->mat() ),
+                           blas::mat_view( op_B, B->mat() ) );
 
     add( C, AB, acc, approx, rowmap, colmap );
 }
@@ -1309,18 +1317,18 @@ template < typename value_t,
 void
 multiply ( const value_t                         alpha,
            const Hpro::matop_t                   op_A,
-           const Hpro::TDenseMatrix< value_t > & A,
+           const matrix::dense_matrix< value_t > & A,
            const Hpro::matop_t                   op_B,
-           const Hpro::TDenseMatrix< value_t > & B,
+           const matrix::dense_matrix< value_t > & B,
            uniform_lrmatrix< value_t > &         C,
-           const Hpro::TTruncAcc &               acc,
+           const accuracy &                      acc,
            const approx_t &                      approx,
            const is_matrix_map_t< value_t > &    rowmap,
            const is_matrix_map_t< value_t > &    colmap )
 {
     auto  AB       = blas::prod( alpha,
-                                 blas::mat_view( op_A, Hpro::blas_mat( A ) ),
-                                 blas::mat_view( op_B, Hpro::blas_mat( B ) ) );
+                                 blas::mat_view( op_A, A->mat() ),
+                                 blas::mat_view( op_B, B->mat() ) );
     auto  [ U, V ] = approx( AB, acc );
     auto  RU       = blas::matrix< value_t >();
     auto  RV       = blas::matrix< value_t >();
@@ -1347,7 +1355,7 @@ multiply ( const value_t                       alpha,
            const Hpro::matop_t                 op_B,
            const Hpro::TMatrix< value_t > &    B,
            Hpro::TMatrix< value_t > &          C,
-           const Hpro::TTruncAcc &             acc,
+           const accuracy &                    acc,
            const approx_t &                    approx,
            const is_matrix_map_t< value_t > &  rowmap,
            const is_matrix_map_t< value_t > &  colmap )
@@ -1362,69 +1370,35 @@ multiply ( const value_t                       alpha,
     
     if ( is_blocked( A ) )
     {
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        
         if ( is_blocked( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha, 
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * BA, op_B, * BB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * BA, op_B, * BB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( matrix::is_dense( C ) )   hlr::multiply( alpha, op_A, * BA, op_B, * BB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  UB = cptrcast( &B, uniform_lrmatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * BA, op_B, * UB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * BA, op_B, * UB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap );
+            else if ( matrix::is_dense( C ) )   hlr::multiply( alpha, op_A, * BA, op_B, * UB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense(   B ) )
+        else if ( matrix::is_dense( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TBlockMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  DB = cptrcast( &B, matrix::dense_matrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * BA, op_B, * DB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * BA, op_B, * DB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( matrix::is_dense( C ) )   hlr::multiply( alpha, op_A, * BA, op_B, * DB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -1433,139 +1407,72 @@ multiply ( const value_t                       alpha,
     }// if
     else if ( is_uniform_lowrank( A ) )
     {
+        auto  UA = cptrcast( &A, uniform_lrmatrix< value_t > );
+        
         if ( is_blocked( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * UA, op_B, * BB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * UA, op_B, * BB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, colmap );
+            else if ( matrix::is_dense(   C ) ) hlr::multiply( alpha, op_A, * UA, op_B, * BB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ) );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                          op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  UB = cptrcast( &B, uniform_lrmatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * UA, op_B, * UB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * UA, op_B, * UB, * ptrcast( &C, uniform_lrmatrix< value_t > ) ); 
+            else if ( matrix::is_dense( C ) )   hlr::multiply( alpha, op_A, * UA, op_B, * UB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense(   B ) )
+        else if ( matrix::is_dense( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, uniform_lrmatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  DB = cptrcast( &B, matrix::dense_matrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * UA, op_B, * DB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * UA, op_B, * DB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, colmap );
+            else if ( matrix::is_dense( C ) )   hlr::multiply( alpha, op_A, * UA, op_B, * DB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + B.typestr() );
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
+        auto  DA = cptrcast( &A, matrix::dense_matrix< value_t > );
+        
         if ( is_blocked( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TBlockMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * DA, op_B, * BB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * DA, op_B, * BB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( matrix::is_dense(   C ) ) hlr::multiply( alpha, op_A, * DA, op_B, * BB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
         else if ( is_uniform_lowrank( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, uniform_lrmatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  UB = cptrcast( &B, uniform_lrmatrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * DA, op_B, * UB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * DA, op_B, * UB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap );
+            else if ( matrix::is_dense(   C ) ) hlr::multiply( alpha, op_A, * DA, op_B, * UB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
-        else if ( is_dense(   B ) )
+        else if ( matrix::is_dense( B ) )
         {
-            if ( is_blocked( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, Hpro::TBlockMatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_uniform_lowrank( C ) )
-                multiply( alpha,
-                                     op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                     op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                     * ptrcast( &C, uniform_lrmatrix< value_t > ),
-                                     acc, approx, rowmap, colmap );
-            else if ( is_dense(   C ) )
-                hlr::multiply( alpha,
-                                          op_A, * cptrcast( &A, Hpro::TDenseMatrix< value_t > ),
-                                          op_B, * cptrcast( &B, Hpro::TDenseMatrix< value_t > ),
-                                          * ptrcast( &C, Hpro::TDenseMatrix< value_t > ) );
+            auto  DB = cptrcast( &B, matrix::dense_matrix< value_t > );
+            
+            if      ( is_blocked( C ) )         multiply( alpha, op_A, * DA, op_B, * DB, * ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( is_uniform_lowrank( C ) ) multiply( alpha, op_A, * DA, op_B, * DB, * ptrcast( &C, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+            else if ( matrix::is_dense(   C ) ) hlr::multiply( alpha, op_A, * DA, op_B, * DB, * ptrcast( &C, matrix::dense_matrix< value_t > ) );
             else
                 HLR_ERROR( "unsupported matrix type : " + C.typestr() );
         }// if
@@ -1597,7 +1504,7 @@ solve_lower_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    L,
                   Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  rowmap,
                   const is_matrix_map_t< value_t > &  colmap );
@@ -1609,7 +1516,7 @@ solve_lower_tri ( const eval_side_t                     side,
                   const diag_type_t                     diag,
                   const Hpro::TBlockMatrix< value_t > & L,
                   Hpro::TBlockMatrix< value_t > &       M,
-                  const Hpro::TTruncAcc &               acc,
+                  const accuracy &                      acc,
                   const approx_t &                      approx,
                   const is_matrix_map_t< value_t > &    rowmap,
                   const is_matrix_map_t< value_t > &    colmap )
@@ -1669,12 +1576,12 @@ solve_lower_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    L,
                   uniform_lrmatrix< value_t > &       M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  rowmap,
                   const is_matrix_map_t< value_t > &  /* colmap */ )
 {
-    if ( is_dense( L ) && ( diag == unit_diag ))
+    if ( matrix::is_dense( L ) && ( diag == unit_diag ))
         return;
     
     if ( side == from_left )
@@ -1684,7 +1591,7 @@ solve_lower_tri ( const eval_side_t                   side,
         //
 
         auto  W = blas::copy( M.row_cb().basis() );
-        auto  D = Hpro::TDenseMatrix< value_t >( M.row_is(), Hpro::is( 0, W.ncols()-1 ), W );
+        auto  D = matrix::dense_matrix< value_t >( M.row_is(), Hpro::is( 0, W.ncols()-1 ), W );
 
         hlr::solve_lower_tri( side, diag, L, D );
 
@@ -1710,7 +1617,7 @@ solve_lower_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    L,
                   Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  rowmap,
                   const is_matrix_map_t< value_t > &  colmap )
@@ -1724,21 +1631,20 @@ solve_lower_tri ( const eval_side_t                   side,
     
     if ( is_blocked( L ) )
     {
-        if ( is_blocked( M ) )
-            solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_uniform_lowrank( M ) )
-            solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_dense( M ) )
-            hlr::solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        auto  BL = cptrcast( & L, Hpro::TBlockMatrix< value_t > );
+        
+        if      ( is_blocked( M ) )         solve_lower_tri( side, diag, * BL, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( is_uniform_lowrank( M ) ) solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( matrix::is_dense( M ) )   hlr::solve_lower_tri( side, diag, * BL, * ptrcast( & M, matrix::dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
     }// if
-    else if ( is_dense( L ) )
+    else if ( matrix::is_dense( L ) )
     {
-        if ( is_uniform_lowrank( M ) )
-            solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_dense( M ) )
-            hlr::solve_lower_tri( side, diag, * cptrcast( & L, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        auto  DL = cptrcast( & L, matrix::dense_matrix< value_t > );
+        
+        if      ( is_uniform_lowrank( M ) ) solve_lower_tri( side, diag, L, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( matrix::is_dense( M ) )   hlr::solve_lower_tri( side, diag, * DL, * ptrcast( & M, matrix::dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + L.typestr() );
     }// if
@@ -1766,7 +1672,7 @@ solve_upper_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    U,
                   Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  rowmap,
                   const is_matrix_map_t< value_t > &  colmap );
@@ -1778,7 +1684,7 @@ solve_upper_tri ( const eval_side_t                     side,
                   const diag_type_t                     diag,
                   const Hpro::TBlockMatrix< value_t > & U,
                   Hpro::TBlockMatrix< value_t > &       M,
-                  const Hpro::TTruncAcc &               acc,
+                  const accuracy &                      acc,
                   const approx_t &                      approx,
                   const is_matrix_map_t< value_t > &    rowmap,
                   const is_matrix_map_t< value_t > &    colmap )
@@ -1832,12 +1738,12 @@ solve_upper_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    U,
                   uniform_lrmatrix< value_t > &       M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  /* rowmap */,
                   const is_matrix_map_t< value_t > &  colmap )
 {
-    if ( is_dense( U ) && ( diag == unit_diag ))
+    if ( matrix::is_dense( U ) && ( diag == unit_diag ))
         return;
     
     if ( side == from_left )
@@ -1851,7 +1757,7 @@ solve_upper_tri ( const eval_side_t                   side,
         //
 
         auto  X = blas::copy( M.col_cb().basis() );
-        auto  D = Hpro::TDenseMatrix< value_t >( M.col_is(), Hpro::is( 0, X.ncols()-1 ), X );
+        auto  D = matrix::dense_matrix< value_t >( M.col_is(), Hpro::is( 0, X.ncols()-1 ), X );
 
         hlr::solve_upper_tri( from_left, diag, U, D );
 
@@ -1873,7 +1779,7 @@ solve_upper_tri ( const eval_side_t                   side,
                   const diag_type_t                   diag,
                   const Hpro::TMatrix< value_t > &    U,
                   Hpro::TMatrix< value_t > &          M,
-                  const Hpro::TTruncAcc &             acc,
+                  const accuracy &                    acc,
                   const approx_t &                    approx,
                   const is_matrix_map_t< value_t > &  rowmap,
                   const is_matrix_map_t< value_t > &  colmap )
@@ -1887,21 +1793,20 @@ solve_upper_tri ( const eval_side_t                   side,
     
     if ( is_blocked( U ) )
     {
-        if ( is_blocked( M ) )
-            solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_uniform_lowrank( M ) )
-            solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_dense( M ) )
-            hlr::solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TBlockMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        auto  BU = cptrcast( & U, Hpro::TBlockMatrix< value_t > );
+        
+        if      ( is_blocked( M ) )         solve_upper_tri( side, diag, * BU, * ptrcast( & M, Hpro::TBlockMatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( is_uniform_lowrank( M ) ) solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( matrix::is_dense( M ) )   hlr::solve_upper_tri( side, diag, * BU, * ptrcast( & M, matrix::dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
-    else if ( is_dense( U ) )
+    else if ( matrix::is_dense( U ) )
     {
-        if ( is_uniform_lowrank( M ) )
-            solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
-        else if ( is_dense( M ) )
-            hlr::solve_upper_tri( side, diag, * cptrcast( & U, Hpro::TDenseMatrix< value_t > ), * ptrcast( & M, Hpro::TDenseMatrix< value_t > ) );
+        auto  DU = cptrcast( & U, matrix::dense_matrix< value_t > );
+        
+        if      ( is_uniform_lowrank( M ) ) solve_upper_tri( side, diag, U, * ptrcast( & M, uniform_lrmatrix< value_t > ), acc, approx, rowmap, colmap );
+        else if ( matrix::is_dense( M ) )   hlr::solve_upper_tri( side, diag, * DU, * ptrcast( & M, matrix::dense_matrix< value_t > ) );
         else
             HLR_ERROR( "unsupported matrix type for M : " + M.typestr() );
     }//if
@@ -1925,7 +1830,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &          A,
-     const Hpro::TTruncAcc &             acc,
+     const accuracy &                    acc,
      const approx_t &                    approx,
      const is_matrix_map_t< value_t > &  rowmap,
      const is_matrix_map_t< value_t > &  colmap )
@@ -2007,11 +1912,15 @@ lu ( Hpro::TMatrix< value_t > &          A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( matrix::is_dense( A ) )
     {
-        auto  D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  D  = ptrcast( &A, matrix::dense_matrix< value_t > );
+        auto  Dm = D->mat();
 
-        invert( *D );
+        blas::invert( Dm );
+
+        if ( D->is_compressed() )
+            D->set_matrix( Dm, acc );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );

@@ -17,13 +17,13 @@
 #if defined(HLR_HAS_H2)
 
 #include <hpro/cluster/TClusterBasis.hh>
-#include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TUniformMatrix.hh>
 #include <hpro/vector/convert.hh>
 
 #endif
 
 #include <hlr/matrix/nested_cluster_basis.hh>
+#include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/vector/scalar_vector.hh>
@@ -75,7 +75,7 @@ mul_vec ( const value_t                              alpha,
             }// for
         }// for
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );

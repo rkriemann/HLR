@@ -149,7 +149,7 @@ struct accumulator
             U_ij = hlr::matrix::restrict( *matrix, M.block( i, j )->block_is() );
 
             // prefer dense if destination is dense
-            if ( check_dense( *M.block( i, j ) ) && ! is_dense( *U_ij ) )
+            if ( check_dense( *M.block( i, j ) ) && ! hlr::matrix::is_dense( *U_ij ) )
                 U_ij = std::move( hlr::matrix::convert_to_dense< value_t >( *U_ij ) );
         }// if
 
@@ -216,9 +216,9 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_dense_all( A, B ) ||
-                 ( is_blocked( A ) && is_dense(   B ) ) ||
-                 ( is_dense(   A ) && is_blocked( B ) ))
+            if ( hlr::matrix::is_dense_all( A, B ) ||
+                 ( is_blocked( A ) && hlr::matrix::is_dense(   B ) ) ||
+                 ( hlr::matrix::is_dense(   A ) && is_blocked( B ) ))
             {
                 handle_dense = true;
                 break;
@@ -497,11 +497,11 @@ struct accumulator
                         HLR_ASSERT( ! is_null_any( BA->block( i, 0, op_A ), BB->block( 0, j, op_B ) ) );
                         
                         if ( handle_dense )
-                            BC->set_block( i, j, new Hpro::TDenseMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                                    BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                            BC->set_block( i, j, new matrix::dense_matrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                      BB->block( 0, j, op_B )->col_is( op_B ) ) );
                         else
-                            BC->set_block( i, j, new Hpro::TRkMatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
-                                                                                 BB->block( 0, j, op_B )->col_is( op_B ) ) );
+                            BC->set_block( i, j, new matrix::lrmatrix< value_t >( BA->block( i, 0, op_A )->row_is( op_A ),
+                                                                                  BB->block( 0, j, op_B )->col_is( op_B ) ) );
                     }// for
                 }// for
             }// if
@@ -514,14 +514,14 @@ struct accumulator
                 auto  T = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
                 if ( handle_dense ||
-                     is_dense_all( A, B ) ||
-                     ( is_blocked( A ) && is_dense(   B ) ) ||
-                     ( is_dense(   A ) && is_blocked( B ) ))
-                    T = std::make_unique< Hpro::TDenseMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
+                     hlr::matrix::is_dense_all( A, B ) ||
+                     ( is_blocked( A ) && hlr::matrix::is_dense(   B ) ) ||
+                     ( hlr::matrix::is_dense(   A ) && is_blocked( B ) ))
+                    T = std::make_unique< matrix::dense_matrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
                 else
                 {
                     std::cout << "!!! : " << M.id() << " : " << A->typestr() << " x " << B->typestr() << std::endl;
-                    T = std::make_unique< Hpro::TRkMatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
+                    T = std::make_unique< matrix::lrmatrix< value_t > >( A->row_is( op_A ), B->col_is( op_B ) );
                 }// else
 
                 hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B, *T, acc, approx );
@@ -532,8 +532,8 @@ struct accumulator
                         
                 //     // check error when representing in local basis
                 //     auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
-                //     auto  U  = blas::copy( blas::mat_U< value_t >( R ) );
-                //     auto  V  = blas::copy( blas::mat_V< value_t >( R ) );
+                //     auto  U  = blas::copy( R->U() );
+                //     auto  V  = blas::copy( R->V() );
 
                 //     io::matlab::write( U, "U" );
                 //     io::matlab::write( V, "V" );
@@ -554,7 +554,7 @@ struct accumulator
                 //     auto  S2  = blas::prod( TU, S1 );
                 //     auto  S   = blas::prod( S2, blas::adjoint( TV ) );
 
-                //     auto  M1  = blas::prod( blas::mat_U< value_t >( R ), blas::adjoint( blas::mat_V< value_t >( R ) ) );
+                //     auto  M1  = blas::prod( R->U(), blas::adjoint( R->V() ) );
                 //     auto  T2  = blas::prod( row_basis, S );
                 //     auto  M2  = blas::prod( T2, blas::adjoint( col_basis ) );
 
@@ -574,7 +574,7 @@ struct accumulator
                 {
                     matrix = std::move( T );
                 }// if
-                else if ( ! is_dense( *matrix ) && is_dense( *T ) )
+                else if ( ! hlr::matrix::is_dense( *matrix ) && hlr::matrix::is_dense( *T ) )
                 {
                     // prefer dense format to avoid unnecessary truncations
                     hlr::add( value_t(1), *matrix, *T, acc, approx );
@@ -646,7 +646,7 @@ struct accumulator
     check_dense ( const Hpro::TMatrix< value_t > &  M ) const
     {
         // return false;
-        if ( is_dense( M ) )
+        if ( hlr::matrix::is_dense( M ) )
         {
             return true;
         }// if
@@ -662,7 +662,7 @@ struct accumulator
             {
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    if ( ! is_null( B->block( i, j ) ) && ! is_dense( B->block( i, j ) ) )
+                    if ( ! is_null( B->block( i, j ) ) && ! hlr::matrix::is_dense( B->block( i, j ) ) )
                          return false;
                 }// for
             }// for
@@ -746,8 +746,8 @@ multiply ( const value_t                     alpha,
 
         trace::region_start( "basis" );
         
-        auto  W  = blas::mat_U< value_t >( R );
-        auto  X  = blas::mat_V< value_t >( R );
+        auto  W  = R->U();
+        auto  X  = R->V();
         auto  RW = blas::matrix< value_t >();
         auto  RX = blas::matrix< value_t >();
 
@@ -888,8 +888,8 @@ solve_lower_tri ( const eval_side_t                 side,
 
         trace::region_start( "basis" );
         
-        auto  W  = blas::mat_U< value_t >( R );
-        auto  X  = blas::mat_V< value_t >( R );
+        auto  W  = R->U();
+        auto  X  = R->V();
         auto  RW = blas::matrix< value_t >();
         auto  RX = blas::matrix< value_t >();
 
@@ -1018,8 +1018,8 @@ solve_upper_tri ( const eval_side_t                 side,
 
         trace::region_start( "basis" );
         
-        auto  W  = blas::mat_U< value_t >( *R );
-        auto  X  = blas::mat_V< value_t >( *R );
+        auto  W  = R->U();
+        auto  X  = R->V();
         auto  RW = blas::matrix< value_t >();
         auto  RX = blas::matrix< value_t >();
 
@@ -1127,14 +1127,19 @@ lu ( Hpro::TMatrix< value_t > &        A,
                         sub_accu(j,l).add_update( *BA->block( j, i ), *BA->block( i, l ) );
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( hlr::matrix::is_dense( A ) )
     {
-        auto  D = ptrcast( &A, Hpro::TDenseMatrix< value_t > );
+        auto  D = ptrcast( &A, matrix::dense_matrix< value_t > );
 
         accu.apply( value_t(-1), A, acc, approx );
         
-        invert< value_t >( *D );
+        auto  Dm = D->mat();
+        
+        blas::invert( Dm );
 
+        if ( D->is_compressed() )
+            D->set_matrix( std::move( Dm ), acc );
+        
         // // DEBUG {
         // {
         //     auto  D1 = matrix::convert_to_dense< value_t >( A );

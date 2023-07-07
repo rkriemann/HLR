@@ -89,7 +89,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                 {
                     M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( node, acc ) );
 
-                    if ( is_lowrank( *M ) )
+                    if ( hlr::matrix::is_lowrank( *M ) )
                     {
                         auto  R = ptrcast( M.get(), lrmatrix< value_t > );
                         
@@ -625,7 +625,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
     //
 
     // TODO: handle case of global lowrank matrix
-    HLR_ASSERT( ! is_lowrank( A ) );
+    HLR_ASSERT( ! hlr::matrix::is_lowrank( A ) );
     
     auto  rowcb_map = basis_map_t();
     auto  colcb_map = basis_map_t();
@@ -649,7 +649,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
         {
             auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
             
-            if ( is_lowrank( mat ) )
+            if ( hlr::matrix::is_lowrank( mat ) )
             {
                 auto  R = cptrcast( mat, lrmatrix< value_t > );
                         
@@ -657,7 +657,7 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
                 colmap[ R->col_is() ].push_back( R );
                 lrmat.push_back( R );
             }// if
-            else if ( is_dense( mat ) )
+            else if ( hlr::matrix::is_dense( mat ) )
             {
                 M = mat->copy();
             }// if
@@ -675,7 +675,9 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
 
                 // remember all block matrices for setting up hierarchy
                 bmat_map[ mat->id() ] = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
-            }// else
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type: " + mat->typestr() );
 
             //
             // set up hierarchy (parent <-> M)
@@ -922,13 +924,15 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
         {
             M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc ) );
 
-            if ( is_lowrank( *M ) )
+            HLR_ASSERT( ! hlr::matrix::is_lowrank( *M ) );
+            
+            if ( Hpro::is_lowrank( *M ) )
             {
                 //
                 // form U·V' = W·T·X' with orthogonal W/X
                 //
 
-                auto  R  = ptrcast( M.get(), lrmatrix< value_t > );
+                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
                 auto  W  = R->U();
                 auto  X  = R->V();
                 auto  Rw = blas::matrix< value_t >();
@@ -991,10 +995,12 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
         {
             M = coeff.build( bct->is().row_is(), bct->is().col_is() );
 
-            if ( is_dense( *M ) )
+            HLR_ASSERT( ! hlr::matrix::is_dense( *M ) );
+            
+            if ( Hpro::is_dense( *M ) )
             {
-                auto  D  = cptrcast( M.get(), dense_matrix< value_t > );
-                auto  DD = blas::copy( D.mat() );
+                auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  DD = blas::copy( D.blas_mat() );
 
                 M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
             }// if
@@ -1079,7 +1085,7 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
 
     std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // form U·V' = W·T·X' with orthogonal W/X
@@ -1177,21 +1183,15 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
-        auto  DD = blas::copy( D.mat() );
+        auto  DD = blas::copy( D->mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
-    {
-        M = A.copy();
-    }// else
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
 
     M->set_id( A.id() );
     M->set_procs( A.procs() );
@@ -1284,7 +1284,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
     
     auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // compute semi-coupling, e.g. QR factorization of U/V
@@ -1456,7 +1456,7 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
 
     std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // compute coupling matrix as W'·U·(X'·V)'
@@ -1502,21 +1502,15 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
-        auto  DD = blas::copy( D.mat() );
+        auto  DD = blas::copy( D->mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
-    {
-        M = A.copy();
-    }// else
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
 
     M->set_id( A.id() );
     M->set_procs( A.procs() );
@@ -1552,7 +1546,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
     
     auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // compute semi-coupling, e.g. QR factorization of U/V
@@ -1871,7 +1865,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
     std::unique_ptr< Hpro::TMatrix< value_t > >  M;
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // compute coupling matrix as W'·U·(X'·V)'
@@ -1917,21 +1911,15 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
             }// for
         }// for
     }// if
-    else if ( is_dense( A ) )
+    else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
-        auto  DD = blas::copy( D.mat() );
+        auto  DD = blas::copy( D->mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
-    {
-        M = A.copy();
-    }// else
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
 
     M->set_id( A.id() );
     M->set_procs( A.procs() );

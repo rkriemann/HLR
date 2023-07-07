@@ -76,10 +76,6 @@ construct_from_H ( const cluster_tree &              rowct,
 namespace detail
 {
 
-using hlr::seq::matrix::indexset;
-using hlr::seq::matrix::detail::U;
-using hlr::seq::matrix::detail::V;
-
 //
 // construct cluster basis for each cluster (block rows)
 //
@@ -91,6 +87,7 @@ construct_basis ( const cluster_tree &         ct,
                   const bool                   adjoint )
 {
     auto  cb = std::make_unique< shared_cluster_basis< value_t > >( ct );
+    auto  op = ( adjoint ? apply_adjoint : apply_normal );
 
     //
     // compute row basis for all blocks
@@ -110,7 +107,7 @@ construct_basis ( const cluster_tree &         ct,
         {
             if ( M->rank() > 0 )
             {
-                auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
+                auto  [ Q, C ] = blas::factorise_ortho( M->V( op ) );
 
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
@@ -137,7 +134,7 @@ construct_basis ( const cluster_tree &         ct,
 
                 if ( M->rank() > 0 )
                 {
-                    auto  X_i    = blas::prod( value_t(1), U< value_t >( M, adjoint ), blas::adjoint( C ) );
+                    auto  X_i    = blas::prod( value_t(1), M->U( op ), blas::adjoint( C ) );
                     auto  cols_i = blas::range( pos, pos + X_i.ncols() - 1 );
                     auto  X_sub  = blas::matrix< value_t >( Xt, blas::range::all, cols_i );
 

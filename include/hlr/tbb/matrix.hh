@@ -1328,7 +1328,7 @@ copy_ll ( const hpro::TMatrix< value_t > &  M,
 
                 auto  D = ptrcast( T.get(), matrix::dense_matrix< value_t > );
 
-                D->set_mat( blas::identity< value_t >( D->nrows() ) );
+                D->set_matrix( blas::identity< value_t >( D->nrows() ) );
             }// if
         }// if
 
@@ -1385,7 +1385,7 @@ copy_ur ( const hpro::TMatrix< value_t > &    M,
 
                 auto  D = ptrcast( T.get(), matrix::dense_matrix< value_t > );
 
-                D->set_mat( blas::identity< value_t >( D->nrows() ) );
+                D->set_matrix( blas::identity< value_t >( D->nrows() ) );
             }// if
         }// if
 

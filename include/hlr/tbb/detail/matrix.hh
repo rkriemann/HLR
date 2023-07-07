@@ -2300,7 +2300,7 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
 
         for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
         {
-            auto  U_i = blas::prod( blas::mat_U( R_i, op ), blas::adjoint( C_i ) );
+            auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
             auto  X_i = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
             blas::copy( U_i, X_i );
@@ -2617,7 +2617,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
         for ( const auto  M_i : mat_list )
         {   // std::cout << "  " << cb.is() << ", " << M_i->block_is() << ", " << pos << std::endl;
             const auto  C_i   = coupling_map.at( M_i );
-            auto        U_i   = blas::mat_U( M_i, op );
+            auto        U_i   = M_i->U( op );
             auto        U_sub = blas::matrix< value_t >( U_i, cb.is() - M_i->row_ofs( op ), blas::range::all );
             auto        X_i   = blas::prod( U_sub, blas::adjoint( C_i ) );
             auto        X_sub = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
