@@ -76,19 +76,39 @@ public:
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {}
 
-    lrsvmatrix ( const indexset                   arow_is,
-                 const indexset                   acol_is,
-                 hlr::blas::matrix< value_t > &   aU,
-                 hlr::blas::matrix< value_t > &   aV )
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &   aU,
+                 blas::vector< value_t > &   aS,
+                 blas::matrix< value_t > &   aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+    {
+        set_lrmat( aU, aS, aV );
+    }
+
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &&  aU,
+                 blas::vector< value_t > &&  aS,
+                 blas::matrix< value_t > &&  aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+    {
+        set_lrmat( std::move( aU ), std::move( aS ), std::move( aV ) );
+    }
+
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &   aU,
+                 blas::matrix< value_t > &   aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {
         set_lrmat( aU, aV );
     }
 
-    lrsvmatrix ( const indexset                   arow_is,
-                 const indexset                   acol_is,
-                 hlr::blas::matrix< value_t > &&  aU,
-                 hlr::blas::matrix< value_t > &&  aV )
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &&  aU,
+                 blas::matrix< value_t > &&  aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {
         set_lrmat( std::move( aU ), std::move( aV ) );

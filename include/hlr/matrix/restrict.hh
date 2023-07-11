@@ -52,6 +52,26 @@ restrict ( const Hpro::TMatrix< value_t > &  M,
 
             return R;
         }// if
+        else if ( matrix::is_lowrank_sv( M ) )
+        {
+            auto  RM = cptrcast( &M, lrsvmatrix< value_t > );
+            auto  R  = std::make_unique< lrsvmatrix< value_t > >( bis.row_is(), bis.col_is() );
+            auto  MU = RM->U();
+            auto  MV = RM->V();
+            auto  RU = blas::matrix< value_t >( MU,
+                                                bis.row_is() - M.row_ofs(),
+                                                blas::range::all,
+                                                Hpro::copy_value );
+            auto  RS = blas::copy( RM->S() );
+            auto  RV = blas::matrix< value_t >( MV,
+                                                bis.col_is() - M.col_ofs(),
+                                                blas::range::all,
+                                                Hpro::copy_value );
+        
+            R->set_lrmat( std::move( RU ), std::move( RS ), std::move( RV ) );
+
+            return R;
+        }// if
         else if ( matrix::is_dense( M ) )
         {
             auto  DM = cptrcast( &M, dense_matrix< value_t > );

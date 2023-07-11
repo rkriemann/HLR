@@ -211,7 +211,7 @@ struct accumulator
            const accuracy &                  acc,
            const approx_t &                  approx )
     {
-        std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
+        auto  BC = std::unique_ptr< Hpro::TBlockMatrix< value_t > >(); // for recursive handling
 
         //
         // handle all, actually computable updates, i.e., one factor is a leaf block
@@ -223,7 +223,7 @@ struct accumulator
         {
             if ( is_null( D ) )
             {
-                if ( ! is_blocked_all( A, B ) && ! matrix::is_lowrank_any( A, B ) )
+                if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -231,7 +231,7 @@ struct accumulator
             }// if
             else
             {
-                if ( ! is_blocked_all( A, B, D ) && ! matrix::is_lowrank_any( A, B ) )
+                if ( ! is_blocked_all( A, B, D ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -255,7 +255,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                HLR_ASSERT( matrix::is_lowrank( M ) );
+                HLR_ASSERT( matrix::is_lowrank( M ) || matrix::is_lowrank_sv( M ) );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                 auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
@@ -790,7 +790,7 @@ lu ( Hpro::TMatrix< value_t > &  M,
             blas::invert( DD );
 
             if ( was_compressed )
-                D->compress( acc );
+                D->set_matrix( std::move( DD ), acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );

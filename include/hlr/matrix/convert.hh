@@ -77,6 +77,15 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         
         return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R        = cptrcast( &M, lrsvmatrix< value_t > );
+        auto  U        = blas::prod_diag( R->U(), R->S() );
+        auto  V        = R->V();
+        auto  [ W, X ] = approx( U, V, acc );
+        
+        return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
+    }// if
     else if ( Hpro::is_lowrank( M ) )
     {
         auto  R        = cptrcast( &M, lrmatrix< value_t > );

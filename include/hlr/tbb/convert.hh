@@ -91,23 +91,10 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
 
         return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
-    else if ( matrix::is_dense( M ) )
+    else 
     {
-        auto  D        = cptrcast( &M, matrix::dense_matrix< value_t > );
-        auto  T        = blas::copy( D->mat() );
-        auto  [ U, V ] = approx( T, acc );
-
-        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+        return hlr::matrix::convert_to_lowrank( M, acc, approx );
     }// if
-    else if ( matrix::is_lowrank( M ) )
-    {
-        auto  R        = cptrcast( &M, matrix::lrmatrix< value_t > );
-        auto  [ U, V ] = approx( R->U(), R->V(), acc );
-        
-        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
 //
@@ -118,24 +105,7 @@ template < typename value_t >
 std::unique_ptr< matrix::lrmatrix< value_t > >
 convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
 {
-    if ( matrix::is_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, matrix::lrmatrix< value_t > );
-        
-        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                std::move( blas::copy( R->U() ) ),
-                                                                std::move( blas::copy( R->V() ) ) );
-    }// if
-    else if ( matrix::is_uniform_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
-        auto  U = blas::prod( R->row_basis(), R->coeff() );
-        auto  V = blas::copy( R->col_basis() );
-        
-        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type : " + M.typestr() );
+    return hlr::matrix::convert_to_lowrank( M );
 }
 
 //
@@ -189,29 +159,10 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
 
         return BC;
     }// if
-    else if ( matrix::is_lowrank( A ) )
-    {
-        auto  RA = cptrcast( &A, matrix::lrmatrix< src_value_t > );
-        auto  U  = blas::convert< dest_value_t >( RA->U() );
-        auto  V  = blas::convert< dest_value_t >( RA->V() );
-        auto  RC = std::make_unique< matrix::lrmatrix< dest_value_t > >( RA->row_is(), RA->col_is(), std::move( U ), std::move( V ) );
-
-        copy_struct( *RA, *RC );
-        
-        return RC;
-    }// if
-    else if ( matrix::is_dense( A ) )
-    {
-        auto  DA = cptrcast( &A, matrix::dense_matrix< src_value_t > );
-        auto  D  = blas::convert< dest_value_t >( DA->mat() );
-        auto  DC = std::make_unique< matrix::dense_matrix< dest_value_t > >( DA->row_is(), DA->col_is(), std::move( D ) );
-
-        copy_struct( *DA, *DC );
-        
-        return DC;
-    }// if
     else
-        HLR_ERROR( "unsupported matrix type " + A.typestr() );
+    {
+        return hlr::matrix::convert< dest_value_t, src_value_t >( A );
+    }// else
 }
 
 //

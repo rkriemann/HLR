@@ -38,7 +38,7 @@ void
 add ( const value_t                     alpha,
       const Hpro::TMatrix< value_t > &  A,
       Hpro::TMatrix< value_t > &        C,
-      const Hpro::TTruncAcc &           acc,
+      const accuracy &                  acc,
       const approx_t &                  approx );
 
 template < typename value_t >
@@ -56,7 +56,7 @@ void
 add ( const value_t                          alpha,
       const Hpro::TBlockMatrix< value_t > &  A,
       Hpro::TBlockMatrix< value_t > &        C,
-      const Hpro::TTruncAcc &                acc,
+      const accuracy &                       acc,
       const approx_t &                       approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -90,7 +90,7 @@ void
 add ( const value_t                          alpha,
       const Hpro::TBlockMatrix< value_t > &  A,
       matrix::lrmatrix< value_t > &          C,
-      const Hpro::TTruncAcc &                acc,
+      const accuracy &                       acc,
       const approx_t &                       approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -194,7 +194,7 @@ void
 add ( const value_t                          alpha,
       const Hpro::TBlockMatrix< value_t > &  A,
       matrix::lrsvmatrix< value_t > &        C,
-      const Hpro::TTruncAcc &                acc,
+      const accuracy &                       acc,
       const approx_t &                       approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -327,7 +327,7 @@ void
 add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       Hpro::TBlockMatrix< value_t > &      C,
-      const Hpro::TTruncAcc &              acc,
+      const accuracy &                     acc,
       const approx_t &                     approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -359,6 +359,45 @@ add ( const value_t                        alpha,
     }// for
 }
 
+template < typename value_t,
+           typename approx_t >
+void
+add ( const value_t                          alpha,
+      const matrix::lrsvmatrix< value_t > &  A,
+      Hpro::TBlockMatrix< value_t > &        C,
+      const accuracy &                       acc,
+      const approx_t &                       approx )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+
+    if (( alpha == value_t(0) ) || ( A.rank() == 0 ))
+        return;
+    
+    //
+    // restrict low-rank matrix to sub blocks and recurse
+    //
+
+    auto  UA = A.U();
+    auto  SA = A.S();
+    auto  VA = A.V();
+
+    for ( uint  i = 0; i < C.nblock_rows(); ++i )
+    {
+        for ( uint  j = 0; j < C.nblock_cols(); ++j )
+        {
+            const auto  C_ij = C.block( i, j );
+
+            HLR_ASSERT( ! is_null( C_ij ) );
+
+            auto  U_i  = blas::matrix< value_t >( UA, C_ij->row_is() - C.row_ofs(), blas::range::all );
+            auto  V_j  = blas::matrix< value_t >( VA, C_ij->col_is() - C.col_ofs(), blas::range::all );
+            auto  A_ij = matrix::lrsvmatrix< value_t >( C_ij->row_is(), C_ij->col_is(), U_i, SA, V_j );
+
+            add( alpha, A_ij, *C_ij, acc, approx );
+        }// for
+    }// for
+}
+
 //
 // blocked + dense
 //
@@ -367,7 +406,7 @@ void
 add ( const value_t                          alpha,
       const Hpro::TBlockMatrix< value_t > &  A,
       matrix::dense_matrix< value_t > &      C,
-      const Hpro::TTruncAcc &                acc )
+      const accuracy &                       acc )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
@@ -379,10 +418,9 @@ add ( const value_t                          alpha,
     //
 
     auto        lock           = std::scoped_lock( C.mutex() );
+    auto        Cm             = C.mat();
     const auto  was_compressed = C.is_compressed();
 
-    C.decompress();
-    
     for ( uint  i = 0; i < A.nblock_rows(); ++i )
     {
         for ( uint  j = 0; j < A.nblock_cols(); ++j )
@@ -392,7 +430,7 @@ add ( const value_t                          alpha,
             if ( is_null( A_ij ) )
                 continue;
 
-            auto  D_ij = blas::matrix< value_t >( C.mat(),
+            auto  D_ij = blas::matrix< value_t >( Cm,
                                                   A_ij->row_is() - C.row_ofs(), 
                                                   A_ij->col_is() - C.col_ofs() );
             auto  C_ij = matrix::dense_matrix( A_ij->row_is(), A_ij->col_is(), D_ij );
@@ -402,7 +440,7 @@ add ( const value_t                          alpha,
     }// for
 
     if ( was_compressed )
-        C.compress( acc );
+        C.set_matrix( std::move( Cm ), acc );
 }
 
 //
@@ -414,7 +452,7 @@ void
 add ( const value_t                            alpha,
       const matrix::dense_matrix< value_t > &  A,
       Hpro::TBlockMatrix< value_t > &          C,
-      const Hpro::TTruncAcc &                  acc,
+      const accuracy &                         acc,
       const approx_t &                         approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -455,7 +493,7 @@ void
 add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       matrix::lrmatrix< value_t > &        C,
-      const Hpro::TTruncAcc &              acc,
+      const accuracy &                     acc,
       const approx_t &                     approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -496,7 +534,7 @@ void
 add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       matrix::lrsvmatrix< value_t > &      C,
-      const Hpro::TTruncAcc &              acc,
+      const accuracy &                     acc,
       const approx_t &                     approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -535,10 +573,93 @@ add ( const value_t                        alpha,
 template < typename value_t,
            typename approx_t >
 void
+add ( const value_t                          alpha,
+      const matrix::lrsvmatrix< value_t > &  A,
+      matrix::lrmatrix< value_t > &          C,
+      const accuracy &                       acc,
+      const approx_t &                       approx )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    if ( alpha == value_t(0) )
+        return;
+    
+    auto  lock = std::scoped_lock( C.mutex() );
+    auto  UA   = blas::prod_diag( A.U(), A.S() );
+    auto  VA   = A.V();
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
+    if ( alpha != value_t(1) )
+    {
+        auto  sUA = blas::copy( UA );
+
+        blas::scale( alpha, sUA );
+
+        auto [ U, V ] = approx( { sUA, C.U() },
+                                { VA,  C.V() },
+                                acc );
+        
+        C.set_lrmat( std::move( U ), std::move( V ), acc );
+    }// if
+    else
+    {
+        auto [ U, V ] = approx( { UA, C.U() },
+                                { VA, C.V() },
+                                acc );
+        
+        C.set_lrmat( std::move( U ), std::move( V ), acc );
+    }// else
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+add ( const value_t                          alpha,
+      const matrix::lrsvmatrix< value_t > &  A,
+      matrix::lrsvmatrix< value_t > &        C,
+      const accuracy &                       acc,
+      const approx_t &                       approx )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    if ( alpha == value_t(0) )
+        return;
+    
+    auto  lock = std::scoped_lock( C.mutex() );
+    auto  CUS  = blas::prod_diag( C.U(), C.S() );
+    auto  UA   = blas::prod_diag( A.U(), A.S() );
+    auto  VA   = A.V();
+    
+    // [ U(C), V(C) ] = truncate( [ U(C), α U(A) ] , [ V(C), V(A) ] )
+    if ( alpha != value_t(1) )
+    {
+        auto  sUA = blas::copy( UA );
+
+        blas::scale( alpha, sUA );
+
+        auto [ U, S, V ] = approx.approx_ortho( { sUA, CUS },
+                                                { VA,  C.V() },
+                                                acc );
+        
+        C.set_lrmat( std::move( U ), std::move( S ), std::move( V ), acc );
+    }// if
+    else
+    {
+        auto [ U, S, V ] = approx.approx_ortho( { UA, CUS },
+                                                { VA, C.V() },
+                                                acc );
+        
+        C.set_lrmat( std::move( U ), std::move( S ), std::move( V ), acc );
+    }// else
+}
+
+template < typename value_t,
+           typename approx_t >
+void
 add ( const value_t                         alpha,
       const matrix::lrsmatrix< value_t > &  A,
       matrix::lrmatrix< value_t > &         C,
-      const Hpro::TTruncAcc &               acc,
+      const accuracy &                      acc,
       const approx_t &                      approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -566,7 +687,7 @@ void
 add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       matrix::lrsmatrix< value_t > &       C,
-      const Hpro::TTruncAcc &              acc,
+      const accuracy &                     acc,
       const approx_t &                     approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -612,7 +733,7 @@ void
 add ( const value_t                            alpha,
       const matrix::dense_matrix< value_t > &  A,
       matrix::lrmatrix< value_t > &            C,
-      const Hpro::TTruncAcc &                  acc,
+      const accuracy &                         acc,
       const approx_t &                         approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -635,8 +756,33 @@ template < typename value_t,
 void
 add ( const value_t                            alpha,
       const matrix::dense_matrix< value_t > &  A,
+      matrix::lrsvmatrix< value_t > &          C,
+      const accuracy &                         acc,
+      const approx_t &                         approx )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    if ( alpha == value_t(0) )
+        return;
+    
+    auto  lock = std::scoped_lock( C.mutex() );
+    auto  TA   = blas::copy( A.mat() );
+    auto  US   = blas::prod_diag( C.U(), C.S() );
+
+    blas::prod( value_t(1), US, blas::adjoint( C.V() ), alpha, TA );
+
+    auto [ U, S, V ] = approx.approx_ortho( TA, acc );
+        
+    C.set_lrmat( std::move( U ), std::move( S ), std::move( V ), acc );
+}
+
+template < typename value_t,
+           typename approx_t >
+void
+add ( const value_t                            alpha,
+      const matrix::dense_matrix< value_t > &  A,
       matrix::lrsmatrix< value_t > &           C,
-      const Hpro::TTruncAcc &                  acc,
+      const accuracy &                         acc,
       const approx_t &                         approx )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
@@ -683,23 +829,63 @@ void
 add ( const value_t                        alpha,
       const matrix::lrmatrix< value_t > &  A,
       matrix::dense_matrix< value_t > &    C,
-      const Hpro::TTruncAcc &              acc )
+      const accuracy &                     acc )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
     auto        lock = std::scoped_lock( C.mutex() );
     auto        UA   = A.U();
     auto        VA   = A.V();
+    auto        Cm   = C.mat();
     const auto  was_compressed = C.is_compressed();
     
-    C.decompress();
+    blas::prod( alpha, UA, blas::adjoint( VA ), value_t(1), Cm );
 
+    if ( was_compressed )
+        C.set_matrix( std::move( Cm ), acc );
+}
+
+template < typename value_t >
+void
+add ( const value_t                          alpha,
+      const matrix::lrsvmatrix< value_t > &  A,
+      matrix::dense_matrix< value_t > &      C )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    auto  UA   = blas::prod_diag( A.U(), A.S() );
+    auto  VA   = A.V();
+
+    auto  lock = std::scoped_lock( C.mutex() );
+
+    HLR_ASSERT( ! C.is_compressed() );
+
+    auto  Cm = C.mat();
+    
+    blas::prod( alpha, UA, blas::adjoint( VA ), value_t(1), Cm );
+}
+
+template < typename value_t >
+void
+add ( const value_t                          alpha,
+      const matrix::lrsvmatrix< value_t > &  A,
+      matrix::dense_matrix< value_t > &      C,
+      const accuracy &                       acc )
+{
+    HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
+    
+    auto        UA   = blas::prod_diag( A.U(), A.S() );
+    auto        VA   = A.V();
+
+    auto        lock = std::scoped_lock( C.mutex() );
+    const auto  was_compressed = C.is_compressed();
+    
     auto  Cm = C.mat();
     
     blas::prod( alpha, UA, blas::adjoint( VA ), value_t(1), Cm );
 
     if ( was_compressed )
-        C.compress( acc );
+        C.set_matrix( std::move( Cm ), acc );
 }
 
 //
@@ -710,22 +896,20 @@ void
 add ( const value_t                            alpha,
       const matrix::dense_matrix< value_t > &  A,
       matrix::dense_matrix< value_t > &        C,
-      const Hpro::TTruncAcc &                  acc )
+      const accuracy &                         acc )
 {
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
     
-    auto        lock           = std::scoped_lock( C.mutex() );
+    auto        lock = std::scoped_lock( C.mutex() );
+    auto        Cm   = C.mat();
     const auto  was_compressed = C.is_compressed();
     
-    C.decompress();
-    
     // C = C + α A
-    auto  Cm = C.mat();
     
     blas::add( alpha, A.mat(), Cm );
 
     if ( was_compressed )
-        C.compress( acc );
+        C.set_matrix( std::move( Cm ), acc );
 }
 
 template < typename value_t >
@@ -737,12 +921,11 @@ add ( const value_t                            alpha,
     HLR_ADD_PRINT( Hpro::to_string( "add( %d, %d )", A.id(), C.id() ) );
 
     auto  lock = std::scoped_lock( C.mutex() );
+    auto  Cm   = C.mat();
 
     HLR_ASSERT( ! C.is_compressed() );
     
     // C = C + α A
-    auto  Cm = C.mat();
-
     blas::add( alpha, A.mat(), Cm );
 }
 

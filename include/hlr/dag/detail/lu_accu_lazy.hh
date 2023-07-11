@@ -119,7 +119,7 @@ struct accumulator
                  const matop_t                     op_B,
                  const Hpro::TMatrix< value_t > &  B,
                  const Hpro::TMatrix< value_t > &  C,
-                 const Hpro::TTruncAcc &           acc )
+                 const accuracy &                  acc )
     {
         // if ( is_blocked_all( A, B ) )
         {
@@ -238,7 +238,7 @@ struct accumulator
     void
     eval ( const value_t                     alpha,
            const Hpro::TMatrix< value_t > &  M,
-           const Hpro::TTruncAcc &           acc,
+           const accuracy &                  acc,
            const approx_t &                  approx )
     {
         std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
@@ -251,7 +251,7 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( ! is_blocked_all( A, B ) && ! matrix::is_lowrank_any( A, B ) )
+            if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
             {
                 handle_dense = true;
                 break;
@@ -275,7 +275,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                HLR_ASSERT( is_lowrank( M ) );
+                HLR_ASSERT( matrix::is_lowrank( M ) || matrix::is_lowrank_sv( M ) );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                 auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
@@ -382,8 +382,9 @@ struct accumulator
         
         if ( use_compressed && ! compress::is_compressed( *matrix ) )
         {
-            if      ( matrix::is_lowrank( *matrix ) ) ptrcast( matrix.get(), matrix::lrmatrix< value_t > )->compress( acc );
-            else if ( matrix::is_dense(   *matrix ) ) ptrcast( matrix.get(), matrix::dense_matrix< value_t > )->compress( acc );
+            if      ( matrix::is_lowrank(    *matrix ) ) ptrcast( matrix.get(), matrix::lrmatrix< value_t > )->compress( acc );
+            else if ( matrix::is_dense(      *matrix ) ) ptrcast( matrix.get(), matrix::dense_matrix< value_t > )->compress( acc );
+            else if ( matrix::is_lowrank_sv( *matrix ) ) ptrcast( matrix.get(), matrix::lrsvmatrix< value_t > )->compress( acc );
             else
                 HLR_ERROR( "unsupported matrix type: " + matrix->typestr() );
         }// if
@@ -397,7 +398,7 @@ struct accumulator
     shift ( Hpro::TBlockMatrix< value_t > &  M,
             accumulator_map_t &              accu_map,
             std::mutex &                     accu_mtx,
-            const Hpro::TTruncAcc &          acc,
+            const accuracy &                 acc,
             const approx_t &                 approx )
     {
         //
@@ -450,7 +451,7 @@ struct accumulator
     void
     apply ( const value_t               alpha,
             Hpro::TMatrix< value_t > &  M,
-            const Hpro::TTruncAcc &     acc,
+            const accuracy &            acc,
             const approx_t &            approx )
     {
         if ( ! is_null( matrix ) )
@@ -539,7 +540,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
     
@@ -580,7 +581,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
         
@@ -621,7 +622,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
         
@@ -670,7 +671,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_ACCU, C->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         apply->add( apply_normal, *A,
                     apply_normal, *B,
@@ -707,7 +708,7 @@ struct apply_node : public node
                 const Hpro::TMatrix< value_t > &  A,
                 const matop_t                     op_B,
                 const Hpro::TMatrix< value_t > &  B,
-                const Hpro::TTruncAcc &           acc )
+                const accuracy &                  acc )
     {
         accumulator< value_t > *  accu = nullptr;
         
@@ -734,7 +735,7 @@ private:
         else                return { { ID_ACCU, M->block_is() } };
     }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t            apx;
         accumulator< value_t > *  accu = nullptr;
