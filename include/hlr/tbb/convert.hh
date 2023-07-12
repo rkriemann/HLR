@@ -20,6 +20,8 @@
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/utils/compression.hh>
 
+#include <hlr/seq/convert.hh>
+
 namespace hlr { namespace tbb { namespace matrix {
 
 using namespace hlr::matrix;
@@ -161,7 +163,7 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
     }// if
     else
     {
-        return hlr::matrix::convert< dest_value_t, src_value_t >( A );
+        return hlr::seq::matrix::convert< dest_value_t, src_value_t >( A );
     }// else
 }
 
