@@ -2399,11 +2399,7 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
-        auto  D  = cptrcast( &A, hlr::matrix::dense_matrix< value_t > );
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
@@ -2814,10 +2810,6 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
         auto  D  = cptrcast( &A, hlr::matrix::dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 

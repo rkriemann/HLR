@@ -1464,11 +1464,15 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         //
         
         auto  R  = cptrcast( &A, lrmatrix< value_t > );
-        auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), R->U() );
-        auto  SV = blas::prod( blas::adjoint( colcb.basis() ), R->V() );
+        auto  SU = rowcb.transform_forward( R->U() );
+        auto  SV = colcb.transform_forward( R->V() );
         auto  S  = blas::prod( SU, blas::adjoint( SV ) );
+        auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
 
-        M = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+        HLR_ASSERT( UR->row_rank() == rowcb.rank() );
+        HLR_ASSERT( UR->col_rank() == colcb.rank() );
+
+        M = std::move( UR );
     }// if
     else if ( is_blocked( A ) )
     {

@@ -187,13 +187,9 @@ public:
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
             #if HLR_USE_APCOMPRESSION == 1
-
             compress::ap::decompress_lr< value_t >( _zV, V );
-
             #else
-            
             compress::decompress< value_t >( _zV, V );
-
             #endif
             
             return V;
@@ -240,10 +236,8 @@ public:
         _rank = _V.ncols();
 
         #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
-        
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
-
         #endif
     }
     
@@ -259,10 +253,8 @@ public:
         _rank = _V.ncols();
 
         #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
-        
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );
-
         #endif
     }
 
@@ -520,7 +512,6 @@ public:
         cb->_rank = _rank;
         
         #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             cb->_zV = _zV;
@@ -699,7 +690,6 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
         #if HLR_USE_APCOMPRESSION == 1
-
         {
             //
             // use adaptive precision per basis vector
@@ -732,7 +722,6 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
             return;
         }// if
-    
         #endif
 
         //

@@ -100,6 +100,9 @@ public:
             , _col_cb( &acol_cb )
             , _S( blas::copy( aS ) )
     {
+        HLR_ASSERT( _row_cb->rank() == _S.nrows() );
+        HLR_ASSERT( _col_cb->rank() == _S.ncols() );
+        
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
@@ -115,8 +118,28 @@ public:
             , _col_cb( &acol_cb )
             , _S( std::move( aS ) )
     {
+        HLR_ASSERT( _row_cb->rank() == _S.nrows() );
+        HLR_ASSERT( _col_cb->rank() == _S.ncols() );
+        
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
+
+    #if HLR_HAS_COMPRESSION == 1
+    uniform_lrmatrix ( const indexset       arow_is,
+                       const indexset       acol_is,
+                       cluster_basis_t &    arow_cb,
+                       cluster_basis_t &    acol_cb,
+                       compress::zarray &&  azS )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _row_cb( &arow_cb )
+            , _col_cb( &acol_cb )
+            , _zS( std::move( azS ) )
+    {
+        this->set_ofs( _row_is.first(), _col_is.first() );
+    }
+    #endif
 
     // dtor
     virtual ~uniform_lrmatrix ()
@@ -219,9 +242,9 @@ public:
     }
     
     void
-    set_matrix_data ( cluster_basis_t &       arow_cb,
+    set_matrix_data ( cluster_basis_t &                arow_cb,
                       const blas::matrix< value_t > &  aS,
-                      cluster_basis_t &       acol_cb )
+                      cluster_basis_t &                acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -288,7 +311,8 @@ public:
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
     {
-        blas::scale( alpha, _S );
+        if ( is_compressed() ) { HLR_ERROR( "TODO" ); }
+        else                   blas::scale( alpha, _S );
     }
 
     //
@@ -521,21 +545,25 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 uniform_lrmatrix< value_t >::copy () const
 {
-    auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
-
-    M->copy_struct_from( this );
-
     #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
-        M->_zS = compress::zarray( _zS.size() );
-        std::copy( _zS.begin(), _zS.end(), M->_zS.begin() );
-    }// if
+        auto  zM = compress::zarray( _zS.size() );
+        std::copy( _zS.begin(), _zS.end(), zM.begin() );
 
+        auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( zM ) );
+
+        M->copy_struct_from( this );
+        return M;
+    }// if
+    else
     #endif
-    
-    return M;
+    {
+        auto  M = std::make_unique< uniform_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
+
+        M->copy_struct_from( this );
+        return M;
+    }// else
 }
 
 //

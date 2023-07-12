@@ -224,10 +224,9 @@ mul_vec ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    auto &  cb = ( op_M == Hpro::apply_normal ? colcb : rowcb );
-    auto    ux = detail::scalar_to_uniform( cb, x );
-    auto    uy = hlr::vector::make_uniform< value_t, cluster_basis_t >( cb );
-    auto    s  = blas::vector< value_t >();
+    auto  ux = detail::scalar_to_uniform( ( op_M == Hpro::apply_normal ? colcb : rowcb ), x );
+    auto  uy = hlr::vector::make_uniform< value_t, cluster_basis_t >( ( op_M == Hpro::apply_normal ? rowcb : colcb ) );
+    auto  s  = blas::vector< value_t >();
 
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y, s );
