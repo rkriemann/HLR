@@ -72,10 +72,16 @@ compress ( const config &   config,
     zfp_field *  field = nullptr;
     zfp_type     type;
 
+    // stop if data is empty
+    if ( dim0 == 0 )
+        return zarray();
+    
     if      constexpr ( std::is_same_v< value_t, double > ) type = zfp_type_double;
     else if constexpr ( std::is_same_v< value_t, float >  ) type = zfp_type_float;
     else
         HLR_ERROR( "unsupported type" );
+
+    size_t  nsize = 0;
     
     switch ( ndims )
     {
@@ -189,6 +195,10 @@ decompress ( const uchar *   zdata,
     zfp_field *  field = nullptr;
     zfp_type     type;
 
+    // stop if data is empty
+    if ( dim0 == 0 )
+        return;
+    
     if      constexpr ( std::is_same_v< value_t, double > ) type = zfp_type_double;
     else if constexpr ( std::is_same_v< value_t, float >  ) type = zfp_type_float;
     else
