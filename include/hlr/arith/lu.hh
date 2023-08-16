@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hpro/algebra/mat_fac.hh> // DEBUG
+// #include <hpro/algebra/mat_fac.hh> // DEBUG
 
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>

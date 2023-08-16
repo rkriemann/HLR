@@ -17,6 +17,7 @@
 #include <hpro/blas/Algebra.hh>
 #include <hpro/matrix/TRkMatrix.hh>
 
+#include <hlr/utils/traits.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 #include <hlr/utils/math.hh>
@@ -1110,7 +1111,19 @@ using Hpro::BLAS::prod;
 //
 template < matrix_type matrix_t,
            vector_type vector_t >
-requires ( std::same_as< typename matrix_t::value_t, typename vector_t::value_t > )
+requires ( std::convertible_to< value_type_t< vector_t >, value_type_t< matrix_t > > )
+void
+prod_diag_ip ( matrix_t &        M,
+               const vector_t &  D )
+{
+    HLR_DBG_ASSERT( M.ncols() == D.length() );
+    
+    Hpro::BLAS::prod_diag( M, D, M.ncols() );
+}
+
+template < matrix_type matrix_t,
+           vector_type vector_t >
+requires ( std::convertible_to< value_type_t< vector_t >, value_type_t< matrix_t > > )
 matrix< typename matrix_t::value_t >    
 prod_diag ( const matrix_t &  M,
             const vector_t &  D )
@@ -1131,18 +1144,28 @@ prod_diag ( const matrix_t &  M,
 //
 template < vector_type vector_t,
            matrix_type matrix_t >
-requires ( std::same_as< typename matrix_t::value_t, typename vector_t::value_t > )
+requires ( std::convertible_to< value_type_t< vector_t >, value_type_t< matrix_t > > )
+void
+prod_diag_ip ( const vector_t &  D,
+               matrix_t &        M )
+{
+    HLR_DBG_ASSERT( M.nrows() == D.length() );
+    
+    Hpro::BLAS::prod_diag( D, M, M.nrows() );
+}
+
+template < vector_type vector_t,
+           matrix_type matrix_t >
+requires ( std::convertible_to< value_type_t< vector_t >, value_type_t< matrix_t > > )
 matrix< typename matrix_t::value_t >    
 prod_diag ( const vector_t &  D,
             const matrix_t &  M )
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
-    using  value_t = typename matrix_t::value_t;
-
     auto  T = copy( M );
 
-    Hpro::BLAS::prod_diag( D, T, T.ncols() );
+    Hpro::BLAS::prod_diag( D, T, T.nrows() );
 
     return T;
 }

@@ -41,28 +41,29 @@ template < typename value_t >
 struct accumulator
 {
     using  accumulator_map_t  = std::unordered_map< Hpro::id_t, accumulator >;
+    using  matrix_t           = Hpro::TMatrix< value_t >;
 
     //
     // represents an update, i.e., matrix product
     //
     struct update
     {
-        const matop_t                     op_A;
-        const Hpro::TMatrix< value_t > *  A;
-        const matop_t                     op_B;
-        const Hpro::TMatrix< value_t > *  B;
+        const matop_t     op_A;
+        const matrix_t *  A;
+        const matop_t     op_B;
+        const matrix_t *  B;
     };
     
     // represents set of updates
     using  update_list = std::list< update >;
 
     // computed updates
-    std::unique_ptr< Hpro::TMatrix< value_t > >   matrix;
-    std::mutex                                    mtx_matrix;
+    std::unique_ptr< matrix_t >   matrix;
+    std::mutex                    mtx_matrix;
 
     // pending (recursive) updates
-    update_list                                   pending;
-    std::mutex                                    mtx_pending;
+    update_list                   pending;
+    std::mutex                    mtx_pending;
 
     //
     // ctors
@@ -76,13 +77,13 @@ struct accumulator
             , pending( std::move( aaccu.pending ) )
     {}
     
-    accumulator ( std::unique_ptr< Hpro::TMatrix< value_t > > &&  amatrix,
-                  update_list &&                                  apending )
+    accumulator ( std::unique_ptr< matrix_t > &&  amatrix,
+                  update_list &&                  apending )
             : matrix( std::move( amatrix ) )
             , pending( std::move( apending ) )
     {}
 
-    accumulator &  operator = ( accumulator && aaccu )
+    accumulator &  operator = ( accumulator &&  aaccu )
     {
         matrix  = std::move( aaccu.matrix );
         pending = std::move( aaccu.pending );
@@ -102,7 +103,7 @@ struct accumulator
     //
     // release matrix
     //
-    Hpro::TMatrix< value_t > *
+    matrix_t *
     release_matrix ()
     {
         return matrix.release();
@@ -114,12 +115,12 @@ struct accumulator
 
     template < typename approx_t >
     void
-    add_update ( const matop_t                     op_A,
-                 const Hpro::TMatrix< value_t > &  A,
-                 const matop_t                     op_B,
-                 const Hpro::TMatrix< value_t > &  B,
-                 const Hpro::TMatrix< value_t > &  C,
-                 const Hpro::TTruncAcc &           acc )
+    add_update ( const matop_t     op_A,
+                 const matrix_t &  A,
+                 const matop_t     op_B,
+                 const matrix_t &  B,
+                 const matrix_t &  C,
+                 const accuracy &  acc )
     {
         // if ( is_blocked_all( A, B ) )
         {
@@ -176,7 +177,7 @@ struct accumulator
                const uint                             j,
                const Hpro::TBlockMatrix< value_t > &  M ) const
     {
-        auto  U_ij = std::unique_ptr< Hpro::TMatrix< value_t > >();
+        auto  U_ij = std::unique_ptr< matrix_t >();
         auto  P_ij = update_list();
         
         if ( ! is_null( matrix ) )
@@ -237,11 +238,11 @@ struct accumulator
     template < typename approx_t >
     void
     eval ( const value_t                     alpha,
-           const Hpro::TMatrix< value_t > &  M,
-           const Hpro::TTruncAcc &           acc,
+           const matrix_t &  M,
+           const accuracy &                  acc,
            const approx_t &                  approx )
     {
-        std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
+        auto  BC = std::unique_ptr< Hpro::TBlockMatrix< value_t > >(); // for recursive handling
 
         //
         // handle all, actually computable updates, i.e., one factor is a leaf block
@@ -251,7 +252,7 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( ! is_blocked_all( A, B ) && ! matrix::is_lowrank_any( A, B ) )
+            if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
             {
                 handle_dense = true;
                 break;
@@ -275,7 +276,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                HLR_ASSERT( is_lowrank( M ) );
+                HLR_ASSERT( matrix::is_lowrank( M ) || matrix::is_lowrank_sv( M ) );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                 auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
@@ -382,8 +383,9 @@ struct accumulator
         
         if ( use_compressed && ! compress::is_compressed( *matrix ) )
         {
-            if      ( matrix::is_lowrank( *matrix ) ) ptrcast( matrix.get(), matrix::lrmatrix< value_t > )->compress( acc );
-            else if ( matrix::is_dense(   *matrix ) ) ptrcast( matrix.get(), matrix::dense_matrix< value_t > )->compress( acc );
+            if      ( matrix::is_lowrank(    *matrix ) ) ptrcast( matrix.get(), matrix::lrmatrix< value_t > )->compress( acc );
+            else if ( matrix::is_dense(      *matrix ) ) ptrcast( matrix.get(), matrix::dense_matrix< value_t > )->compress( acc );
+            else if ( matrix::is_lowrank_sv( *matrix ) ) ptrcast( matrix.get(), matrix::lrsvmatrix< value_t > )->compress( acc );
             else
                 HLR_ERROR( "unsupported matrix type: " + matrix->typestr() );
         }// if
@@ -397,7 +399,7 @@ struct accumulator
     shift ( Hpro::TBlockMatrix< value_t > &  M,
             accumulator_map_t &              accu_map,
             std::mutex &                     accu_mtx,
-            const Hpro::TTruncAcc &          acc,
+            const accuracy &                 acc,
             const approx_t &                 approx )
     {
         //
@@ -448,10 +450,10 @@ struct accumulator
     //
     template < typename approx_t >
     void
-    apply ( const value_t               alpha,
-            Hpro::TMatrix< value_t > &  M,
-            const Hpro::TTruncAcc &     acc,
-            const approx_t &            approx )
+    apply ( const value_t     alpha,
+            matrix_t &        M,
+            const accuracy &  acc,
+            const approx_t &  approx )
     {
         if ( ! is_null( matrix ) )
             hlr::add( alpha, *matrix, M, acc, approx );
@@ -463,7 +465,7 @@ struct accumulator
     // return true if given matrix is dense
     //
     bool
-    check_dense ( const Hpro::TMatrix< value_t > &  M ) const
+    check_dense ( const matrix_t &  M ) const
     {
         // return false;
         if ( matrix::is_dense( M ) )
@@ -539,7 +541,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() }, { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
     
@@ -580,7 +582,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_U, U->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_L, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
         
@@ -621,7 +623,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, L->block_is() }, { ID_A, A->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_U, A->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t  apx;
         
@@ -670,7 +672,7 @@ private:
     virtual const block_list_t  in_blocks_   () const { return { { ID_L, A->block_is() }, { ID_U, B->block_is() } }; }
     virtual const block_list_t  out_blocks_  () const { return { { ID_ACCU, C->block_is() } }; }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         apply->add( apply_normal, *A,
                     apply_normal, *B,
@@ -707,7 +709,7 @@ struct apply_node : public node
                 const Hpro::TMatrix< value_t > &  A,
                 const matop_t                     op_B,
                 const Hpro::TMatrix< value_t > &  B,
-                const Hpro::TTruncAcc &           acc )
+                const accuracy &                  acc )
     {
         accumulator< value_t > *  accu = nullptr;
         
@@ -734,7 +736,7 @@ private:
         else                return { { ID_ACCU, M->block_is() } };
     }
 
-    virtual void  run_  ( const Hpro::TTruncAcc &  acc )
+    virtual void  run_  ( const accuracy &  acc )
     {
         const approx_t            apx;
         accumulator< value_t > *  accu = nullptr;

@@ -11,8 +11,8 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
-#include <hpro/matrix/convert.hh>
-#include <hpro/algebra/solve_tri.hh>
+// #include <hpro/matrix/convert.hh>    // DEBUG
+// #include <hpro/algebra/solve_tri.hh> // DEBUG
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/mulvec.hh>

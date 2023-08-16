@@ -203,8 +203,17 @@ program_main ()
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
+
+        // //
+        // // preserve for MVM
+        // //
+
+        // A_uni     = std::move( A2 );
+        // rowcb_uni = std::move( rowcb );
+        // colcb_uni = std::move( colcb );
     }
 
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "uniform H-matrix (rec2)" << term::reset << std::endl;
     

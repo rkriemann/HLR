@@ -8,8 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hpro/algebra/mat_mul.hh> // DEBUG
-#include <hpro/matrix/convert.hh> // DEBUG
+// #include <hpro/algebra/mat_mul.hh> // DEBUG
+// #include <hpro/matrix/convert.hh> // DEBUG
 
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
@@ -459,8 +459,6 @@ multiply ( const value_t                     alpha,
 {
     std::unique_ptr< Hpro::TMatrix< value_t > >  C;
 
-    HLR_ASSERT( ! matrix::is_lowrank_sv_any( A, B ) );
-    
     if ( matrix::is_lowrank( A ) )
     {
         //
@@ -498,6 +496,50 @@ multiply ( const value_t                     alpha,
         multiply( alpha, op_A, A, U, W );
 
         return std::make_unique< matrix::lrmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
+    else if ( matrix::is_lowrank_sv( A ) )
+    {
+        //
+        // (U·S)·(V' × B) = W·T·X'
+        //
+
+        auto  RA = cptrcast( &A, matrix::lrsvmatrix< value_t > );
+        auto  U  = RA->U( op_A );
+        auto  S  = RA->S();
+        auto  V  = RA->V( op_A );
+        auto  k  = RA->rank();
+        
+        auto  W  = blas::prod_diag( U, S );
+        auto  X  = blas::matrix< value_t >( B.ncols( op_B ), k );
+
+        multiply( alpha, blas::adjoint( op_B ), B, V, X );
+
+        if ( op_A == apply_transposed )
+        {
+            blas::conj( W );
+            blas::conj( X );
+        }// if
+        
+        return std::make_unique< matrix::lrsvmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
+    }// if
+    else if ( matrix::is_lowrank_sv( B ) )
+    {
+        //
+        // (A × U)·(S·V') = W·T·X'
+        //
+
+        auto  RB = cptrcast( &B, matrix::lrsvmatrix< value_t > );
+        auto  U  = RB->U( op_B );
+        auto  S  = RB->S();
+        auto  V  = RB->V( op_B );
+        auto  k  = RB->rank();
+        
+        auto  W  = blas::matrix< value_t >( A.nrows( op_A ), k );
+        auto  X  = blas::prod_diag( V, S );
+        
+        multiply( alpha, op_A, A, U, W );
+
+        return std::make_unique< matrix::lrsvmatrix< value_t > >( A.row_is( op_A ), B.col_is( op_B ), std::move( W ), std::move( X ) );
     }// if
     else if ( matrix::is_dense_any( A, B ) )
     {

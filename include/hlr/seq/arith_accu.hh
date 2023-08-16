@@ -33,27 +33,29 @@ namespace detail
 template < typename value_t >
 struct accumulator
 {
+    using  matrix_t = Hpro::TMatrix< value_t >;
+    
     //
     // represents an update, i.e., matrix product
     //
     struct update
     {
-        const matop_t                     op_A;
-        const Hpro::TMatrix< value_t > *  A;
-        const matop_t                     op_B;
-        const Hpro::TMatrix< value_t > *  B;
-        const matop_t                     op_D;
-        const Hpro::TMatrix< value_t > *  D;
+        const matop_t     op_A;
+        const matrix_t *  A;
+        const matop_t     op_B;
+        const matrix_t *  B;
+        const matop_t     op_D;
+        const matrix_t *  D;
     };
     
     // represents set of updates
     using  update_list = std::list< update >;
 
     // accumulated computed updates
-    std::unique_ptr< Hpro::TMatrix< value_t > >   matrix;
+    std::unique_ptr< matrix_t >   matrix;
 
     // accumulated pending (recursive) updates
-    update_list                                   pending;
+    update_list                   pending;
 
     //
     // ctors
@@ -62,8 +64,8 @@ struct accumulator
     accumulator ()
     {}
     
-    accumulator ( std::unique_ptr< Hpro::TMatrix< value_t > > &&  amatrix,
-                  update_list &&                                  apending )
+    accumulator ( std::unique_ptr< matrix_t > &&  amatrix,
+                  update_list &&                  apending )
             : matrix(  std::move( amatrix  ) )
             , pending( std::move( apending ) )
     {}
@@ -80,7 +82,7 @@ struct accumulator
     //
     // release matrix
     //
-    Hpro::TMatrix< value_t > *
+    matrix_t *
     release_matrix ()
     {
         return matrix.release();
@@ -90,25 +92,25 @@ struct accumulator
     // add update A×B
     //
     void
-    add_update ( const Hpro::TMatrix< value_t > &  A,
-                 const Hpro::TMatrix< value_t > &  B )
+    add_update ( const matrix_t &  A,
+                 const matrix_t &  B )
     {
         pending.push_back( { apply_normal, &A, apply_normal, &B, apply_normal, nullptr } );
     }
 
     void
-    add_update ( const matop_t                     op_A,
-                 const Hpro::TMatrix< value_t > &  A,
-                 const matop_t                     op_B,
-                 const Hpro::TMatrix< value_t > &  B )
+    add_update ( const matop_t     op_A,
+                 const matrix_t &  A,
+                 const matop_t     op_B,
+                 const matrix_t &  B )
     {
         pending.push_back( { op_A, &A, op_B, &B, apply_normal, nullptr } );
     }
     
     void
-    add_update ( const Hpro::TMatrix< value_t > &  A,
-                 const Hpro::TMatrix< value_t > &  D,
-                 const Hpro::TMatrix< value_t > &  B )
+    add_update ( const matrix_t &  A,
+                 const matrix_t &  D,
+                 const matrix_t &  B )
     {
         pending.push_back( { apply_normal, &A, apply_normal, &B, apply_normal, &D } );
     }
@@ -118,10 +120,10 @@ struct accumulator
     //
     template < typename approx_t >
     void
-    apply ( const value_t               alpha,
-            Hpro::TMatrix< value_t > &  M,
-            const accuracy &            acc,
-            const approx_t &            approx )
+    apply ( const value_t     alpha,
+            matrix_t &        M,
+            const accuracy &  acc,
+            const approx_t &  approx )
     {
         if ( ! is_null( matrix ) )
             hlr::add( alpha, *matrix, M, acc, approx );
@@ -137,7 +139,7 @@ struct accumulator
                const uint                             j,
                const Hpro::TBlockMatrix< value_t > &  M ) const
     {
-        auto  U_ij = std::unique_ptr< Hpro::TMatrix< value_t > >();
+        auto  U_ij = std::unique_ptr< matrix_t >();
         auto  P_ij = update_list();
         
         if ( ! is_null( matrix ) )
@@ -206,12 +208,12 @@ struct accumulator
     //
     template < typename approx_t >
     void
-    eval ( const value_t                     alpha,
-           const Hpro::TMatrix< value_t > &  M,
-           const accuracy &                  acc,
-           const approx_t &                  approx )
+    eval ( const value_t     alpha,
+           const matrix_t &  M,
+           const accuracy &  acc,
+           const approx_t &  approx )
     {
-        std::unique_ptr< Hpro::TBlockMatrix< value_t > >  BC; // for recursive handling
+        auto  BC = std::unique_ptr< Hpro::TBlockMatrix< value_t > >(); // for recursive handling
 
         //
         // handle all, actually computable updates, i.e., one factor is a leaf block
@@ -223,7 +225,7 @@ struct accumulator
         {
             if ( is_null( D ) )
             {
-                if ( ! is_blocked_all( A, B ) && ! matrix::is_lowrank_any( A, B ) )
+                if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -231,7 +233,7 @@ struct accumulator
             }// if
             else
             {
-                if ( ! is_blocked_all( A, B, D ) && ! matrix::is_lowrank_any( A, B ) )
+                if ( ! is_blocked_all( A, B, D ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -255,7 +257,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                HLR_ASSERT( matrix::is_lowrank( M ) );
+                HLR_ASSERT( matrix::is_lowrank( M ) || matrix::is_lowrank_sv( M ) );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                 auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
@@ -285,7 +287,7 @@ struct accumulator
                 // compute update (either A or B is a leaf)
                 //
 
-                auto  T = std::unique_ptr< Hpro::TMatrix< value_t > >();
+                auto  T = std::unique_ptr< matrix_t >();
 
                 if ( is_null( D ) )
                     T = hlr::multiply< value_t >( alpha, op_A, *A, op_B, *B );
@@ -366,7 +368,7 @@ struct accumulator
     // return true if given matrix is dense
     //
     bool
-    check_dense ( const Hpro::TMatrix< value_t > &  M ) const
+    check_dense ( const matrix_t &  M ) const
     {
         // return false;
         if ( matrix::is_dense( M ) )
@@ -790,7 +792,7 @@ lu ( Hpro::TMatrix< value_t > &  M,
             blas::invert( DD );
 
             if ( was_compressed )
-                D->compress( acc );
+                D->set_matrix( std::move( DD ), acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );

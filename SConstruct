@@ -452,7 +452,7 @@ elif buildtype in [ 'release-debug', 'reldbg' ] :
     LINKFLAGS = '-g'
     DEFINES   = ''
 elif buildtype in [ 'release', 'rel' ] :
-    OPTFLAGS  = RELDBGFLAGS
+    OPTFLAGS  = RELFLAGS
     DEFINES   = DEFINES + ' NDEBUG'
 
 if warn :

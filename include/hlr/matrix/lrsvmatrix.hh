@@ -76,19 +76,39 @@ public:
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {}
 
-    lrsvmatrix ( const indexset                   arow_is,
-                 const indexset                   acol_is,
-                 hlr::blas::matrix< value_t > &   aU,
-                 hlr::blas::matrix< value_t > &   aV )
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &   aU,
+                 blas::vector< value_t > &   aS,
+                 blas::matrix< value_t > &   aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+    {
+        set_lrmat( aU, aS, aV );
+    }
+
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &&  aU,
+                 blas::vector< value_t > &&  aS,
+                 blas::matrix< value_t > &&  aV )
+            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+    {
+        set_lrmat( std::move( aU ), std::move( aS ), std::move( aV ) );
+    }
+
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &   aU,
+                 blas::matrix< value_t > &   aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {
         set_lrmat( aU, aV );
     }
 
-    lrsvmatrix ( const indexset                   arow_is,
-                 const indexset                   acol_is,
-                 hlr::blas::matrix< value_t > &&  aU,
-                 hlr::blas::matrix< value_t > &&  aV )
+    lrsvmatrix ( const indexset              arow_is,
+                 const indexset              acol_is,
+                 blas::matrix< value_t > &&  aU,
+                 blas::matrix< value_t > &&  aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {
         set_lrmat( std::move( aU ), std::move( aV ) );
@@ -108,37 +128,45 @@ public:
     blas::matrix< value_t >  U ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
     blas::matrix< value_t >  V ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
 
-    blas::vector< value_t >  S () const { return _S; }
+    blas::vector< real_t > &        S ()       { return _S; }
+    const blas::vector< real_t > &  S () const { return _S; }
     
     //
     // directly set low-rank factors
     //
     
-    virtual void
-    set_lrmat ( const blas::matrix< value_t > &  aU,
-                const blas::matrix< value_t > &  aV );
+    void  set_lrmat  ( const blas::matrix< value_t > &  aU,
+                       const blas::matrix< value_t > &  aV );
     
-    virtual void
-    set_lrmat ( blas::matrix< value_t > &&  aU,
-                blas::matrix< value_t > &&  aV );
+    void  set_lrmat  ( blas::matrix< value_t > &&       aU,
+                       blas::matrix< value_t > &&       aV );
 
     // assuming U/V are orthogonal!!!
-    virtual void
-    set_lrmat ( const blas::matrix< value_t > &  aU,
-                const blas::vector< value_t > &  aS,
-                const blas::matrix< value_t > &  aV );
+    void  set_lrmat  ( const blas::matrix< value_t > &  aU,
+                       const blas::vector< real_t > &   aS,
+                       const blas::matrix< value_t > &  aV );
     
-    virtual void
-    set_lrmat ( blas::matrix< value_t > &&  aU,
-                blas::vector< value_t > &&  aS,
-                blas::matrix< value_t > &&  aV );
+    void  set_lrmat  ( blas::matrix< value_t > &&       aU,
+                       blas::vector< real_t > &&        aS,
+                       blas::matrix< value_t > &&       aV );
+
+    // same but recompress if compressed before
+    void  set_lrmat  ( const blas::matrix< value_t > &  aU,
+                       const blas::vector< real_t > &   aS,
+                       const blas::matrix< value_t > &  aV,
+                       const accuracy &                 acc );
+    
+    void  set_lrmat  ( blas::matrix< value_t > &&       aU,
+                       blas::vector< real_t > &&        aS,
+                       blas::matrix< value_t > &&       aV,
+                       const accuracy &                 acc );
 
     // set U/V and recompress if currently compressed
     //  - neither U nor V are assumed to be orthogonal, so also reorthogonalize 
-    void set_U ( blas::matrix< value_t > && aU,
-                 const accuracy &           acc );
-    void set_V ( blas::matrix< value_t > && aV,
-                 const accuracy &           acc );
+    void  set_U      ( blas::matrix< value_t > &&       aU,
+                       const accuracy &                 acc );
+    void  set_V      ( blas::matrix< value_t > &&       aV,
+                       const accuracy &                 acc );
         
     //
     // matrix data
@@ -458,7 +486,7 @@ lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
 template < typename value_t >
 void
 lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
-                                   const blas::vector< value_t > &  aS,
+                                   const blas::vector< real_t > &   aS,
                                    const blas::matrix< value_t > &  aV )
 {
     HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
@@ -478,7 +506,7 @@ lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
 template < typename value_t >
 void
 lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
-                                   blas::vector< value_t > &&  aS,
+                                   blas::vector< real_t > &&   aS,
                                    blas::matrix< value_t > &&  aV )
 {
     HLR_ASSERT(( this->nrows() == aU.nrows() ) &&
@@ -495,12 +523,42 @@ lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
     this->_rank  = _S.length();
 }
 
+template < typename value_t >
+void
+lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
+                                   const blas::vector< real_t > &   aS,
+                                   const blas::matrix< value_t > &  aV,
+                                   const accuracy &                 acc )
+{
+    const auto  was_compressed = is_compressed();
+
+    set_lrmat( aU, aS, aV );
+
+    if ( was_compressed )
+        compress( acc );
+}
+    
+template < typename value_t >
+void
+lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
+                                   blas::vector< real_t > &&   aS,
+                                   blas::matrix< value_t > &&  aV,
+                                   const accuracy &            acc )
+{
+    const auto  was_compressed = is_compressed();
+
+    set_lrmat( std::move( aU ), std::move( aS ), std::move( aV ) );
+
+    if ( was_compressed )
+        compress( acc );
+}
+
 // set U/V and recompress if currently compressed
 //  - neither U nor V are assumed to be orthogonal, so also reorthogonalize 
 template < typename value_t >
 void
-lrsvmatrix< value_t >::set_U ( blas::matrix< value_t > && aU,
-                               const accuracy &           acc )
+lrsvmatrix< value_t >::set_U ( blas::matrix< value_t > &&  aU,
+                               const accuracy &            acc )
 {
     HLR_ASSERT( aU.ncols() == _S.length() );
     

@@ -60,9 +60,9 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 
         return { min_rank, sum_rank, max_rank, nnodes };
     }// if
-    else if ( is_lowrank( M ) )
+    else if ( matrix::is_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
+        auto  R = cptrcast( &M, matrix::lrmatrix< value_t > );
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if

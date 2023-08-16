@@ -77,6 +77,15 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         
         return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R        = cptrcast( &M, lrsvmatrix< value_t > );
+        auto  U        = blas::prod_diag( R->U(), R->S() );
+        auto  V        = R->V();
+        auto  [ W, X ] = approx( U, V, acc );
+        
+        return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
+    }// if
     else if ( Hpro::is_lowrank( M ) )
     {
         auto  R        = cptrcast( &M, lrmatrix< value_t > );
@@ -243,6 +252,15 @@ convert_to_dense ( const Hpro::TMatrix< value_t > &  M )
     {
         auto  R  = cptrcast( &M, lrmatrix< value_t > );
         auto  D  = blas::prod( R->U(), blas::adjoint( R->V() ) );
+        auto  DM = std::make_unique< dense_matrix< value_t > >( M.row_is(), M.col_is(), std::move( D ) );
+        
+        return DM;
+    }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R  = cptrcast( &M, lrsvmatrix< value_t > );
+        auto  US = blas::prod_diag( R->U(), R->S() );
+        auto  D  = blas::prod( US, blas::adjoint( R->V() ) );
         auto  DM = std::make_unique< dense_matrix< value_t > >( M.row_is(), M.col_is(), std::move( D ) );
         
         return DM;
@@ -482,6 +500,21 @@ convert_to_hpro ( const Hpro::TMatrix< value_t > &  M )
         auto  RM = cptrcast( &M, matrix::lrmatrix< value_t > );
         auto  U  = blas::copy( RM->U() );
         auto  V  = blas::copy( RM->V() );
+        auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
+
+        R->set_id( M.id() );
+
+        return R;
+    }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  RM = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+        auto  U  = blas::copy( RM->U() );
+        auto  S  = RM->S();
+        auto  V  = blas::copy( RM->V() );
+
+        blas::prod_diag( U, S );
+        
         auto  R  = std::make_unique< Hpro::TRkMatrix< value_t > >( RM->row_is(), RM->col_is(), std::move( U ), std::move( V ) );
 
         R->set_id( M.id() );

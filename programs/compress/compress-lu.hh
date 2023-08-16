@@ -12,7 +12,7 @@
 #include <hlr/approx/randsvd.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
-#include "hlr/dag/lu.hh"
+#include <hlr/dag/lu.hh>
 #include <hlr/matrix/luinv_eval.hh>
 
 #include "common.hh"
@@ -129,19 +129,20 @@ program_main ()
     auto  comp_lu =
         [&] ( const auto  apx, const std::string &  apxname )
         {
-            auto  mem_LU = std::unordered_map< std::string, size_t >();
+            auto  mem_LU  = std::unordered_map< std::string, size_t >();
+            auto  time_LU = std::unordered_map< std::string, double >();
 
             // define methods to execute
             const auto methods = std::set< std::string >{
-                "H+rec",
+                // "H+rec",
                 // "H+rec+accu",
                 // "H+dag",
-                // "H+dag+accu+lazy",
+                "H+dag+accu+lazy",
                 // "H+dag+accu+eager",
-                "zH+rec",
+                // "zH+rec",
                 // "zH+rec+accu",
                 // "zH+dag",
-                // "zH+dag+accu+lazy"
+                "zH+dag+accu+lazy"
             };
 
             std::cout << term::bullet << term::bold << "H-LU (" << apxname << ")" << term::reset << std::endl;
@@ -174,7 +175,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                mem_LU["H+rec"] = LU->byte_size();
+                mem_LU["H+rec"]  = LU->byte_size();
+                time_LU["H+rec"] = min(runtime);
                 std::cout << "    mem    = " << format_mem( mem_LU["H+rec"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
@@ -213,7 +215,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                mem_LU["H+rec+accu"] = LU->byte_size();
+                mem_LU["H+rec+accu"]  = LU->byte_size();
+                time_LU["H+rec+accu"] = min(runtime);
                 std::cout << "    mem    = " << format_mem( mem_LU["H+rec+accu"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
@@ -257,7 +260,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
 
-                mem_LU["H+dag"] = LU->byte_size();
+                mem_LU["H+dag"]  = LU->byte_size();
+                time_LU["H+dag"] = min(runtime);
                 std::cout << "    mem    = " << format_mem( mem_LU["H+dag"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
@@ -301,7 +305,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                mem_LU["H+dag+accy+lazy"] = LU->byte_size();
+                mem_LU["H+dag+accy+lazy"]  = LU->byte_size();
+                time_LU["H+dag+accy+lazy"] = min(runtime);
                 std::cout << "    mem    = " << format_mem( mem_LU["H+dag+accy+lazy"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
@@ -345,7 +350,8 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
-                mem_LU["H+dag+accy+eager"] = LU->byte_size();
+                mem_LU["H+dag+accy+eager"]  = LU->byte_size();
+                time_LU["H+dag+accy+eager"] = min(runtime);
                 std::cout << "    mem    = " << format_mem( mem_LU["H+dag+accy+eager"] ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
@@ -384,12 +390,15 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
+                if ( time_LU.contains( "H+rec" ) )
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+rec"]) ) << std::endl;
+        
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
 
                 if ( mem_LU.contains( "H+rec" ) )
-                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec"]) ) << std::endl;
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU", prnopt );
@@ -428,12 +437,15 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
+                if ( time_LU.contains( "H+rec+accu" ) )
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+rec+accu"]) ) << std::endl;
+        
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
 
                 if ( mem_LU.contains( "H+rec+accu" ) )
-                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec+accu"]) ) << std::endl;
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+rec+accu"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU", prnopt );
@@ -475,12 +487,15 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
 
+                if ( time_LU.contains( "H+dag" ) )
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+dag"]) ) << std::endl;
+        
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
 
                 if ( mem_LU.contains( "H+dag" ) )
-                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag"]) ) << std::endl;
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU2", prnopt );
@@ -522,12 +537,15 @@ program_main ()
                               << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                               << std::endl;
         
+                if ( time_LU.contains( "H+dag+accu+lazy" ) )
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(min(runtime)) / double(time_LU["H+dag+accu+lazy"]) ) << std::endl;
+        
                 const auto  mem_zLU = LU->byte_size();
 
                 std::cout << "    mem    = " << format_mem( mem_zLU ) << std::endl;
 
                 if ( mem_LU.contains( "H+dag+accu+lazy" ) )
-                    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag+accu+lazy"]) ) << std::endl;
+                    std::cout << "      vs H   " << boost::format( "%.3f" ) % ( double(mem_zLU) / double(mem_LU["H+dag+accu+lazy"]) ) << std::endl;
 
                 if ( hpro::verbose( 3 ) )
                     io::eps::print( *LU, "zHLU2", prnopt );

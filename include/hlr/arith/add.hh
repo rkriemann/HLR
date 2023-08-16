@@ -8,8 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hpro/algebra/mat_add.hh> // DEBUG
-#include <hpro/matrix/convert.hh> // DEBUG
+// #include <hpro/algebra/mat_add.hh> // DEBUG
+// #include <hpro/matrix/convert.hh> // DEBUG
 
 #include "hlr/arith/detail/add.hh"
 #include "hlr/matrix/lrsmatrix.hh"
@@ -46,9 +46,10 @@ add ( const value_t                     alpha,
     {
         auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         
-        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *BA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )            add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank(    C ) ) add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( C ) ) add< value_t, approx_t >( alpha, *BA, *ptrcast( &C, matrix::lrsvmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(      C ) ) add< value_t >(           alpha, *BA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
@@ -56,9 +57,21 @@ add ( const value_t                     alpha,
     {
         auto  RA = cptrcast( &A, matrix::lrmatrix< value_t > );
         
-        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *RA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )            add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank(    C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrsvmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(      C ) ) add< value_t >(           alpha, *RA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
+        else
+            HLR_ERROR( "unsupported matrix type : " + C.typestr() );
+    }// if
+    else if ( matrix::is_lowrank_sv( A ) )
+    {
+        auto  RA = cptrcast( &A, matrix::lrsvmatrix< value_t > );
+        
+        if      ( is_blocked( C ) )            add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank(    C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( C ) ) add< value_t, approx_t >( alpha, *RA, *ptrcast( &C, matrix::lrsvmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(      C ) ) add< value_t >(           alpha, *RA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
@@ -66,9 +79,10 @@ add ( const value_t                     alpha,
     {
         auto  DA = cptrcast( &A, matrix::dense_matrix< value_t > );
         
-        if      ( is_blocked( C ) )         add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
-        else if ( matrix::is_lowrank( C ) ) add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
-        else if ( matrix::is_dense(   C ) ) add< value_t >(           alpha, *DA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
+        if      ( is_blocked( C ) )            add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, Hpro::TBlockMatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank(    C ) ) add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, matrix::lrmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_lowrank_sv( C ) ) add< value_t, approx_t >( alpha, *DA, *ptrcast( &C, matrix::lrsvmatrix< value_t > ), acc, approx );
+        else if ( matrix::is_dense(      C ) ) add< value_t >(           alpha, *DA, *ptrcast( &C, matrix::dense_matrix< value_t > ), acc );
         else
             HLR_ERROR( "unsupported matrix type : " + C.typestr() );
     }// if
@@ -114,8 +128,9 @@ add ( const value_t                     alpha,
 
     auto  DC = ptrcast( &C, matrix::dense_matrix< value_t > );
     
-    if      ( matrix::is_dense(   A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::dense_matrix< value_t > ), *DC );
-    else if ( matrix::is_lowrank( A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::lrmatrix< value_t > ),     *DC );
+    if      ( matrix::is_dense(      A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::dense_matrix< value_t > ), *DC );
+    else if ( matrix::is_lowrank(    A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::lrmatrix< value_t > ),     *DC );
+    else if ( matrix::is_lowrank_sv( A ) ) add< value_t >( alpha, *cptrcast( &A, matrix::lrsvmatrix< value_t > ),   *DC );
     else
         HLR_ERROR( "unsupported matrix type : " + A.typestr() );
 

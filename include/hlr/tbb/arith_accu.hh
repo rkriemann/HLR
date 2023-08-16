@@ -732,7 +732,7 @@ lu ( Hpro::TMatrix< value_t > &  M,
             blas::invert( DD );
 
             if ( was_compressed )
-                D->compress( acc );
+                D->set_matrix( std::move( DD ), acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );

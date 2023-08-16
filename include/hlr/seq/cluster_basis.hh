@@ -141,7 +141,7 @@ build_lrmatrix_map ( const cluster_tree &              ct,
         // std::cout << ct.to_string() << " : " << M.block_is().to_string() << std::endl;
         mat_map[ ct ].push_back( cptrcast( &M, matrix::lrmatrix< value_t > ) );
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         //
         // nearfield is ignored
@@ -177,6 +177,7 @@ construct_basis ( const cluster_tree &         ct,
                   const bool                   adjoint )
 {
     auto  cb = std::make_unique< shared_cluster_basis< value_t > >( ct );
+    auto  op = ( adjoint ? apply_adjoint : apply_normal );
 
     //
     // compute row basis for all blocks
@@ -196,7 +197,7 @@ construct_basis ( const cluster_tree &         ct,
         {
             if ( M->rank() > 0 )
             {
-                auto  [ Q, C ] = blas::factorise_ortho( V< value_t >( M, adjoint ) );
+                auto  [ Q, C ] = blas::factorise_ortho( M->V( op ) );
 
                 condensed_mat.push_back( std::move( C ) );
                 rank_sum += M->rank();
@@ -224,7 +225,7 @@ construct_basis ( const cluster_tree &         ct,
 
                 if ( M->rank() > 0 )
                 {
-                    auto  X_i   = blas::prod( U< value_t >( M, adjoint ), blas::adjoint( C ) );
+                    auto  X_i   = blas::prod( M->U( op ), blas::adjoint( C ) );
                     auto  X_sub = blas::matrix< value_t >( Xt,
                                                            blas::range::all,
                                                            blas::range( pos, pos + X_i.ncols() - 1 ) );

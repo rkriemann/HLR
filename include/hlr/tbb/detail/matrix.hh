@@ -2300,7 +2300,7 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
 
         for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
         {
-            auto  U_i = blas::prod( blas::mat_U( R_i, op ), blas::adjoint( C_i ) );
+            auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
             auto  X_i = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
             blas::copy( U_i, X_i );
@@ -2399,11 +2399,7 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
-        auto  D  = cptrcast( &A, hlr::matrix::dense_matrix< value_t > );
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
         return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
@@ -2617,7 +2613,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
         for ( const auto  M_i : mat_list )
         {   // std::cout << "  " << cb.is() << ", " << M_i->block_is() << ", " << pos << std::endl;
             const auto  C_i   = coupling_map.at( M_i );
-            auto        U_i   = blas::mat_U( M_i, op );
+            auto        U_i   = M_i->U( op );
             auto        U_sub = blas::matrix< value_t >( U_i, cb.is() - M_i->row_ofs( op ), blas::range::all );
             auto        X_i   = blas::prod( U_sub, blas::adjoint( C_i ) );
             auto        X_sub = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
@@ -2814,10 +2810,6 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else if ( hlr::matrix::is_dense( A ) )
     {
-        HLR_ASSERT( ! compress::is_compressible( A ) );
-
-        // M = A.copy();
-
         auto  D  = cptrcast( &A, hlr::matrix::dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 

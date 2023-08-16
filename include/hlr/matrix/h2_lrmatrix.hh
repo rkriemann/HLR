@@ -44,23 +44,23 @@ public:
     // export local types
     //
 
-    // value type
-    using  value_t = T_value;
+    using  value_t         = T_value;
+    using  cluster_basis_t = nested_cluster_basis< value_t >;
     
 private:
     // local index set of matrix
-    indexset                           _row_is, _col_is;
+    indexset                 _row_is, _col_is;
     
     // low-rank factors in uniform storage
-    nested_cluster_basis< value_t > *  _row_cb;
-    nested_cluster_basis< value_t > *  _col_cb;
+    cluster_basis_t *        _row_cb;
+    cluster_basis_t *        _col_cb;
 
     // local coupling matrix
-    blas::matrix< value_t >            _S;
+    blas::matrix< value_t >  _S;
     
     #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
-    compress::zarray                   _zS;
+    compress::zarray         _zS;
     #endif
     
 public:
@@ -89,8 +89,8 @@ public:
 
     h2_lrmatrix ( const indexset                     arow_is,
                   const indexset                     acol_is,
-                  nested_cluster_basis< value_t > &  arow_cb,
-                  nested_cluster_basis< value_t > &  acol_cb,
+                  cluster_basis_t &  arow_cb,
+                  cluster_basis_t &  acol_cb,
                   hlr::blas::matrix< value_t > &     aS )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
@@ -99,13 +99,16 @@ public:
             , _col_cb( &acol_cb )
             , _S( blas::copy( aS ) )
     {
+        HLR_ASSERT( _row_cb->rank() == _S.nrows() );
+        HLR_ASSERT( _col_cb->rank() == _S.ncols() );
+        
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
     h2_lrmatrix ( const indexset                     arow_is,
                   const indexset                     acol_is,
-                  nested_cluster_basis< value_t > &  arow_cb,
-                  nested_cluster_basis< value_t > &  acol_cb,
+                  cluster_basis_t &  arow_cb,
+                  cluster_basis_t &  acol_cb,
                   hlr::blas::matrix< value_t > &&    aS )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
@@ -114,9 +117,29 @@ public:
             , _col_cb( &acol_cb )
             , _S( std::move( aS ) )
     {
+        HLR_ASSERT( _row_cb->rank() == _S.nrows() );
+        HLR_ASSERT( _col_cb->rank() == _S.ncols() );
+        
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
+    #if HLR_HAS_COMPRESSION == 1
+    h2_lrmatrix ( const indexset       arow_is,
+                  const indexset       acol_is,
+                  cluster_basis_t &    arow_cb,
+                  cluster_basis_t &    acol_cb,
+                  compress::zarray &&  azS )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _row_cb( &arow_cb )
+            , _col_cb( &acol_cb )
+            , _zS( std::move( azS ) )
+    {
+        this->set_ofs( _row_is.first(), _col_is.first() );
+    }
+    #endif
+    
     // dtor
     virtual ~h2_lrmatrix ()
     {}
@@ -133,15 +156,15 @@ public:
     uint                               row_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_rank() : col_rank(); }
     uint                               col_rank ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_rank() : row_rank(); }
 
-    nested_cluster_basis< value_t > &  row_cb   () const { return *_row_cb; }
-    nested_cluster_basis< value_t > &  col_cb   () const { return *_col_cb; }
+    cluster_basis_t &  row_cb   () const { return *_row_cb; }
+    cluster_basis_t &  col_cb   () const { return *_col_cb; }
 
-    nested_cluster_basis< value_t > &  row_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_cb() : col_cb(); }
-    nested_cluster_basis< value_t > &  col_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_cb() : row_cb(); }
+    cluster_basis_t &  row_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? row_cb() : col_cb(); }
+    cluster_basis_t &  col_cb   ( const Hpro::matop_t  op ) const { return op == Hpro::apply_normal ? col_cb() : row_cb(); }
 
     void
-    set_cluster_bases ( nested_cluster_basis< value_t > &  arow_cb,
-                        nested_cluster_basis< value_t > &  acol_cb )
+    set_cluster_bases ( cluster_basis_t &  arow_cb,
+                        cluster_basis_t &  acol_cb )
     {
         HLR_ASSERT(( row_rank() == arow_cb.rank() ) &&
                    ( col_rank() == acol_cb.rank() ));
@@ -204,9 +227,9 @@ public:
     }
     
     void
-    set_matrix_data ( nested_cluster_basis< value_t > &  arow_cb,
+    set_matrix_data ( cluster_basis_t &  arow_cb,
                       const blas::matrix< value_t > &    aS,
-                      nested_cluster_basis< value_t > &  acol_cb )
+                      cluster_basis_t &  acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -217,9 +240,9 @@ public:
     }
 
     void
-    set_matrix_data ( nested_cluster_basis< value_t > &  arow_cb,
+    set_matrix_data ( cluster_basis_t &  arow_cb,
                       blas::matrix< value_t > &&         aS,
-                      nested_cluster_basis< value_t > &  acol_cb )
+                      cluster_basis_t &  acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -505,21 +528,27 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 h2_lrmatrix< value_t >::copy () const
 {
-    auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
-
-    M->copy_struct_from( this );
-
     #if HLR_HAS_COMPRESSION == 1
 
     if ( is_compressed() )
     {
-        M->_zS = compress::zarray( _zS.size() );
-        std::copy( _zS.begin(), _zS.end(), M->_zS.begin() );
-    }// if
+        auto  zM = compress::zarray( _zS.size() );
+        
+        std::copy( _zS.begin(), _zS.end(), zM.begin() );
+        
+        auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( zM ) );
 
+        M->copy_struct_from( this );
+        return M;
+    }// if
+    else
     #endif
-    
-    return M;
+    {
+        auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
+
+        M->copy_struct_from( this );
+        return M;
+    }// else
 }
 
 //
