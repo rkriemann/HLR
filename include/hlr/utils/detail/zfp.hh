@@ -34,11 +34,7 @@ inline
 uint
 eps_to_rate ( const double eps )
 {
-    #if defined(HLR_COMPRESS_RATE_ARITH)
-    return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 8;
-    #else
     return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 2; // correction needed
-    #endif
 }
 
 //
