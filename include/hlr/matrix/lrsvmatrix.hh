@@ -30,7 +30,7 @@ DECLARE_TYPE( lrsvmatrix );
 namespace matrix
 {
 
-#define HLR_USE_APCOMPRESSION  1
+#define HLR_USE_APLR  1
 
 //
 // Represents a low-rank matrix in factorised form: U·S·V^H
@@ -50,8 +50,8 @@ private:
     //
     struct mp_storage
     {
-        #if HLR_USE_APCOMPRESSION == 1
-        compress::ap::zarray      zU, zV;
+        #if HLR_USE_APLR == 1
+        compress::aplr::zarray      zU, zV;
         #endif
     };
 
@@ -279,7 +279,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
         return _mpdata.zU.size() > 0;
         #else
         return false;
@@ -300,10 +300,10 @@ public:
 
         size += _S.byte_size();
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
 
-        size += compress::ap::byte_size( _mpdata.zU );
-        size += compress::ap::byte_size( _mpdata.zV );
+        size += compress::aplr::byte_size( _mpdata.zU );
+        size += compress::aplr::byte_size( _mpdata.zV );
         
         #endif
         
@@ -332,10 +332,10 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
 
-        _mpdata.zU = compress::ap::zarray();
-        _mpdata.zV = compress::ap::zarray();
+        _mpdata.zU = compress::aplr::zarray();
+        _mpdata.zV = compress::aplr::zarray();
         
         #endif
     }
@@ -374,9 +374,9 @@ lrsvmatrix< value_t >::U () const
         auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
         uint  k  = 0;
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
             
-        compress::ap::decompress_lr( _mpdata.zU, dU );
+        compress::aplr::decompress_lr( _mpdata.zU, dU );
 
         // for ( uint  l = 0; l < dU.ncols(); ++l )
         // {
@@ -403,9 +403,9 @@ lrsvmatrix< value_t >::V () const
     {
         auto        dV  = blas::matrix< value_t >( this->ncols(), this->rank() );
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
             
-        compress::ap::decompress_lr( _mpdata.zV, dV );
+        compress::aplr::decompress_lr( _mpdata.zV, dV );
             
         #endif
             
@@ -683,10 +683,10 @@ lrsvmatrix< value_t >::copy () const
 
     if ( is_compressed() )
     {
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
 
-        R->_mpdata.zU = compress::ap::zarray( _mpdata.zU.size() );
-        R->_mpdata.zV = compress::ap::zarray( _mpdata.zV.size() );
+        R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
+        R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
             
         std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
         std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -716,10 +716,10 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
             
     if ( is_compressed() )
     {
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR == 1
 
-        R->_mpdata.zU = compress::ap::zarray( _mpdata.zU.size() );
-        R->_mpdata.zV = compress::ap::zarray( _mpdata.zV.size() );
+        R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
+        R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
             
         std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
         std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
@@ -776,7 +776,7 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
     const auto  k = this->rank();
 
-    #if HLR_USE_APCOMPRESSION == 1
+    #if HLR_USE_APLR == 1
 
     //
     // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
@@ -787,10 +787,10 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     for ( uint  l = 0; l < k; ++l )
         S_tol(l) = tol / _S(l);
 
-    auto          zU     = compress::ap::compress_lr( oU, S_tol );
-    auto          zV     = compress::ap::compress_lr( oV, S_tol );
+    auto          zU     = compress::aplr::compress_lr( oU, S_tol );
+    auto          zV     = compress::aplr::compress_lr( oV, S_tol );
     const size_t  mem_lr = sizeof(value_t) * k * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_mp = compress::ap::byte_size( zU ) + compress::ap::byte_size( zV ) + sizeof(real_t) * k;
+    const size_t  mem_mp = compress::aplr::byte_size( zU ) + compress::aplr::byte_size( zV ) + sizeof(real_t) * k;
 
     // // DEBUG
     // {
@@ -799,8 +799,8 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
     //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
 
-    //     compress::ap::decompress_lr( zU, dU );
-    //     compress::ap::decompress_lr( zV, dV );
+    //     compress::aplr::decompress_lr( zU, dU );
+    //     compress::aplr::decompress_lr( zV, dV );
 
     //     for ( uint  l = 0; l < dU.ncols(); ++l )
     //     {

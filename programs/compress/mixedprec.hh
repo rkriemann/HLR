@@ -107,7 +107,7 @@ program_main ()
               << term::bullet << term::bold
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
-              << ", " << hlr::compress::provider << " + " << hlr::compress::ap::provider << ")"
+              << ", " << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
               << term::reset << std::endl;
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
 

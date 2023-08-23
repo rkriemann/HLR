@@ -75,7 +75,7 @@ private:
     #if HLR_HAS_COMPRESSION == 1
     #if HLR_USE_APCOMPRESSION == 1
     // basis and corresponding singular values
-    compress::ap::zarray                    _zV;
+    compress::aplr::zarray                  _zV;
     blas::vector< real_t >                  _sv;
     #else
     // just basis with standard compression
@@ -187,7 +187,7 @@ public:
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
             #if HLR_USE_APCOMPRESSION == 1
-            compress::ap::decompress_lr< value_t >( _zV, V );
+            compress::aplr::decompress_lr< value_t >( _zV, V );
             #else
             compress::decompress< value_t >( _zV, V );
             #endif
@@ -558,7 +558,7 @@ public:
         
         #if HLR_HAS_COMPRESSION == 1
         #if HLR_USE_APCOMPRESSION  == 1
-        n += compress::ap::byte_size( _zV );
+        n += compress::aplr::byte_size( _zV );
         n += _sv.byte_size();
         #else
         n += hlr::compress::byte_size( _zV );
@@ -625,7 +625,7 @@ protected:
     {
         #if HLR_HAS_COMPRESSION == 1
         #if HLR_USE_APCOMPRESSION  == 1
-        _zV = compress::ap::zarray();
+        _zV = compress::aplr::zarray();
         #else
         _zV = compress::zarray();
         #endif
@@ -703,18 +703,18 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             for ( uint  l = 0; l < S.length(); ++l )
                 S(l) = tol / S(l);
         
-            auto  zV = compress::ap::compress_lr< value_t >( _V, S );
+            auto  zV = compress::aplr::compress_lr< value_t >( _V, S );
 
             // {
             //     auto  T = blas::copy( _V );
 
-            //     compress::ap::decompress_lr< value_t >( zV, T );
+            //     compress::aplr::decompress_lr< value_t >( zV, T );
 
             //     blas::add( value_t(-1), _V, T );
             //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
             // }
         
-            if ( compress::ap::byte_size( zV ) < mem_dense )
+            if ( compress::aplr::byte_size( zV ) < mem_dense )
             {
                 _zV = std::move( zV );
                 _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank

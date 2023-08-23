@@ -604,11 +604,11 @@ is_compressed ( const T *  ptr )
 // define implementation for adaptive precision compression
 // for lowrank matrices
 //
-#if HLR_AP_COMPRESSOR == HLR_COMPRESSOR_MP
+#if HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MP
 
 #include <hlr/utils/detail/mixedprec.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::mixedprec::zarray;
 using hlr::compress::mixedprec::compress_lr;
@@ -617,13 +617,13 @@ using hlr::compress::mixedprec::byte_size;
 
 static const char provider[] = "mixedprec";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_ZFP
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 #include <hlr/utils/detail/zfp.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::zfp::zarray;
 using hlr::compress::zfp::compress_lr;
@@ -632,13 +632,13 @@ using hlr::compress::zfp::byte_size;
 
 static const char provider[] = "zfp";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_SZ3
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_SZ3
 
 #include <hlr/utils/detail/sz3.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::sz3::zarray;
 using hlr::compress::sz3::compress_lr;
@@ -647,13 +647,13 @@ using hlr::compress::sz3::byte_size;
 
 static const char provider[] = "sz3";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_MGARD
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
 #include <hlr/utils/detail/mgard.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::mgard::zarray;
 using hlr::compress::mgard::compress_lr;
@@ -662,13 +662,13 @@ using hlr::compress::mgard::byte_size;
 
 static const char provider[] = "mgard";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_BFL
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_BFL
 
 #include <hlr/utils/detail/bfl.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::bfl::zarray;
 using hlr::compress::bfl::compress_lr;
@@ -677,13 +677,13 @@ using hlr::compress::bfl::byte_size;
 
 static const char provider[] = "bfl";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_DFL
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_DFL
 
 #include <hlr/utils/detail/dfl.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::dfl::zarray;
 using hlr::compress::dfl::compress_lr;
@@ -692,13 +692,13 @@ using hlr::compress::dfl::byte_size;
 
 static const char provider[] = "dfl";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_AFLP
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
 
 #include <hlr/utils/detail/aflp.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::aflp::zarray;
 using hlr::compress::aflp::compress_lr;
@@ -707,13 +707,13 @@ using hlr::compress::aflp::byte_size;
 
 static const char provider[] = "aflp";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
-#elif HLR_AP_COMPRESSOR == HLR_COMPRESSOR_AFL
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_AFL
 
 #include <hlr/utils/detail/afl.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::afl::zarray;
 using hlr::compress::afl::compress_lr;
@@ -722,13 +722,13 @@ using hlr::compress::afl::byte_size;
 
 static const char provider[] = "afl";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
 #else
 
 #include <hlr/utils/detail/mixedprec.hh>
 
-namespace hlr { namespace compress { namespace ap {
+namespace hlr { namespace compress { namespace aplr {
 
 using zarray = hlr::compress::mixedprec::zarray;
 using hlr::compress::mixedprec::compress_lr;
@@ -737,7 +737,7 @@ using hlr::compress::mixedprec::byte_size;
 
 static const char provider[] = "mixedprec";
 
-}// namespace hlr::compress::ap
+}// namespace hlr::compress::aplr
 
 #endif
 
