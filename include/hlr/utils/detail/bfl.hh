@@ -1,9 +1,9 @@
-#ifndef __HLR_UTILS_DETAIL_BFLOAT_HH
-#define __HLR_UTILS_DETAIL_BFLOAT_HH
+#ifndef __HLR_UTILS_DETAIL_BFL_HH
+#define __HLR_UTILS_DETAIL_BFL_HH
 //
 // Project     : HLR
-// Module      : utils/detail/bfloat
-// Description : bfloat related functions
+// Module      : utils/detail/bfl
+// Description : bfl related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
@@ -14,12 +14,12 @@
 
 ////////////////////////////////////////////////////////////
 //
-// compression using general bfloat format
+// compression using general bfl format
 // - use FP32 exponent size and precision dependend mantissa size (1+8+X bits)
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace bfloat {
+namespace hlr { namespace compress { namespace bfl {
 
 using byte_t = uint8_t;
 
@@ -707,6 +707,6 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     HLR_ERROR( "TODO" );
 }
 
-}}}// namespace hlr::compress::bfloat
+}}}// namespace hlr::compress::bfl
 
-#endif // __HLR_UTILS_DETAIL_BFLOAT_HH
+#endif // __HLR_UTILS_DETAIL_BFL_HH

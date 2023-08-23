@@ -20,28 +20,6 @@
 
 namespace hlr { namespace compress { namespace posits {
 
-#if defined(HLR_COMPRESS_RATE_ARITH)
-
-inline
-uint
-eps_to_rate ( const double eps )
-{
-    if      ( eps >= 1e-2  ) return 16;
-    else if ( eps >= 1e-3  ) return 20;
-    else if ( eps >= 1e-4  ) return 24;
-    else if ( eps >= 1e-5  ) return 28;
-    else if ( eps >= 1e-6  ) return 30;
-    else if ( eps >= 1e-7  ) return 34;
-    else if ( eps >= 1e-8  ) return 36;
-    else if ( eps >= 1e-9  ) return 40;
-    else if ( eps >= 1e-10 ) return 42;
-    else if ( eps >= 1e-12 ) return 44;
-    else if ( eps >= 1e-14 ) return 54;
-    else                     return 64;
-}
-
-#else
-
 inline
 uint
 eps_to_rate ( const double eps )
@@ -59,8 +37,6 @@ eps_to_rate ( const double eps )
     else if ( eps >= 1e-14 ) return 54;
     else                     return 64;
 }
-
-#endif
 
 struct config
 {

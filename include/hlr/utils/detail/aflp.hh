@@ -1,8 +1,8 @@
-#ifndef __HLR_UTILS_DETAIL_APFLOAT_HH
-#define __HLR_UTILS_DETAIL_APFLOAT_HH
+#ifndef __HLR_UTILS_DETAIL_AFLP_HH
+#define __HLR_UTILS_DETAIL_AFLP_HH
 //
 // Project     : HLR
-// Module      : utils/detail/apfloat
+// Module      : utils/detail/aflp
 // Description : functions for adaptive padded floating points
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -25,7 +25,7 @@
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace apfloat {
+namespace hlr { namespace compress { namespace aflp {
 
 using byte_t = uint8_t;
 
@@ -1070,6 +1070,6 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     HLR_ERROR( "TODO" );
 }
 
-}}}// namespace hlr::compress::apfloat
+}}}// namespace hlr::compress::aflp
 
-#endif // __HLR_UTILS_DETAIL_APFLOAT_HH
+#endif // __HLR_UTILS_DETAIL_AFLP_HH

@@ -16,14 +16,13 @@
 #include <hpro/blas/MemBlock.hh>
 
 #include <hlr/approx/traits.hh>
+#include <hlr/approx/accuracy.hh>
 #include <hlr/approx/svd.hh>
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/detail/afloat.hh>
 
 namespace hlr
 {
 
-using accuracy = Hpro::TTruncAcc;
 using Hpro::idx_t;
 
 namespace blas

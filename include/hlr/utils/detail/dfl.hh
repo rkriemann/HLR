@@ -1,9 +1,9 @@
-#ifndef __HLR_UTILS_DETAIL_DFLOAT_HH
-#define __HLR_UTILS_DETAIL_DFLOAT_HH
+#ifndef __HLR_UTILS_DETAIL_DFL_HH
+#define __HLR_UTILS_DETAIL_DFL_HH
 //
 // Project     : HLR
-// Module      : utils/detail/dfloat
-// Description : dfloat related functions
+// Module      : utils/detail/dfl
+// Description : dfl related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
@@ -12,12 +12,12 @@
 
 ////////////////////////////////////////////////////////////
 //
-// compression using general dfloat format
+// compression using general dfl format
 // - use FP64 exponent size and precision dependend mantissa size (1+11+X bits)
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace dfloat {
+namespace hlr { namespace compress { namespace dfl {
 
 using byte_t = uint8_t;
 
@@ -676,6 +676,6 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     HLR_ERROR( "TODO" );
 }
 
-}}}// namespace hlr::compress::dfloat
+}}}// namespace hlr::compress::dfl
 
-#endif // __HLR_UTILS_DETAIL_DFLOAT_HH
+#endif // __HLR_UTILS_DETAIL_DFL_HH

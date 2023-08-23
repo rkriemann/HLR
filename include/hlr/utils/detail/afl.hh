@@ -1,8 +1,8 @@
-#ifndef __HLR_UTILS_DETAIL_AFLOAT_HH
-#define __HLR_UTILS_DETAIL_AFLOAT_HH
+#ifndef __HLR_UTILS_DETAIL_AFL_HH
+#define __HLR_UTILS_DETAIL_AFL_HH
 //
 // Project     : HLR
-// Module      : utils/detail/afloat
+// Module      : utils/detail/afl
 // Description : functions for adaptive floating points
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -24,7 +24,7 @@
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace afloat {
+namespace hlr { namespace compress { namespace afl {
 
 using byte_t = uint8_t;
 
@@ -1085,6 +1085,6 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     HLR_ERROR( "TODO" );
 }
 
-}}}// namespace hlr::compress::afloat
+}}}// namespace hlr::compress::afl
 
-#endif // __HLR_UTILS_DETAIL_AFLOAT_HH
+#endif // __HLR_UTILS_DETAIL_AFL_HH
