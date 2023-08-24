@@ -628,44 +628,44 @@ elif compressor == 'bf24' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
 if aplr == 'default'  :
-    if   compressor == 'afl'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=1' )
-    elif compressor == 'aflp'  : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=2' )
-    elif compressor == 'bfl'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=3' )
-    elif compressor == 'dfl'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=4' )
-    elif compressor == 'zfp'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=5' )
-    elif compressor == 'sz'    : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=6' )
-    elif compressor == 'sz3'   : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=7' )
-    elif compressor == 'mgard' : env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=8' )
+    if   compressor == 'afl'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
+    elif compressor == 'aflp'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=2' )
+    elif compressor == 'bfl'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
+    elif compressor == 'dfl'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
+    elif compressor == 'zfp'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=5' )
+    elif compressor == 'sz'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=6' )
+    elif compressor == 'sz3'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
+    elif compressor == 'mgard' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
 elif aplr == 'mixedprec'  :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=18' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
 elif aplr == 'afl'  :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=1' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
 elif aplr == 'aflp' :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=2' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=2' )
 elif aplr == 'bfl'  :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=3' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
 elif aplr == 'dfl'  :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=4' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
 elif aplr == 'zfp'  :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=5' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=5' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zfp' ] )
 elif aplr == 'sz'      :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=6' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=6' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'SZ' ] )
 elif aplr == 'sz3'     :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=7' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
     env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
 elif aplr == 'mgard'   :
-    env.Append( CPPDEFINES = 'HLR_AP_COMPRESSOR=8' )
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
     env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
