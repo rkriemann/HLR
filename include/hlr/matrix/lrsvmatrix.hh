@@ -878,6 +878,9 @@ lrsvmatrix< value_t >::decompress ()
     remove_compressed();
 }
 
+// to not confuse other modules
+#undef HLR_USE_APLR
+
 }} // namespace hlr::matrix
 
 #endif // __HLR_MATRIX_LRSVMATRIX_HH

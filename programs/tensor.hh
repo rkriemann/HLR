@@ -253,41 +253,41 @@ program_main ()
 {
     using value_t = double;
 
-    if ( false )
-    {
-        blas::matrix< double >  M( 3, 2 );
+    // if ( false )
+    // {
+    //     blas::matrix< double >  M( 3, 2 );
 
-        M( 0, 0 ) = 1;
-        M( 0, 1 ) = 2;
-        M( 1, 0 ) = 3;
-        M( 1, 1 ) = 4;
-        M( 2, 0 ) = 5;
-        M( 2, 1 ) = 6;
+    //     M( 0, 0 ) = 1;
+    //     M( 0, 1 ) = 2;
+    //     M( 1, 0 ) = 3;
+    //     M( 1, 1 ) = 4;
+    //     M( 2, 0 ) = 5;
+    //     M( 2, 1 ) = 6;
 
-        io::hdf5::write( M, "M" );
+    //     io::hdf5::write( M, "M" );
         
-        auto  M2 = blas::copy( blas::adjoint( M ) );
+    //     auto  M2 = blas::copy( blas::adjoint( M ) );
         
-        io::hdf5::write( M2, "M2" );
+    //     io::hdf5::write( M2, "M2" );
         
-        return;
-    }
+    //     return;
+    // }
     
-    {
-        blas::tensor3< double >  M( 4, 3, 2 );
-        uint  val = 1;
+    // {
+    //     blas::tensor3< double >  M( 4, 3, 2 );
+    //     uint  val = 1;
 
-        for ( uint l = 0; l < 2; ++l )
-            for ( uint j = 0; j < 3; ++j )
-                for ( uint i = 0; i < 4; ++i )
-                    M( i, j, l ) = val++;
+    //     for ( uint l = 0; l < 2; ++l )
+    //         for ( uint j = 0; j < 3; ++j )
+    //             for ( uint i = 0; i < 4; ++i )
+    //                 M( i, j, l ) = val++;
 
-        std::cout << M << std::endl;
+    //     std::cout << M << std::endl;
         
-        io::hdf5::write( M, "M" );
+    //     io::hdf5::write( M, "M" );
         
-        return;
-    }
+    //     return;
+    // }
     
     if ( false )
     {
@@ -410,7 +410,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 2 )
+        switch ( 1 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
@@ -604,9 +604,12 @@ program_main ()
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
         std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
 
-        std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
+        std::cout << "  "
+                  << term::bullet << term::bold << "compression via "
+                  << compress::provider << " + " << compress::aplr::provider
+                  << term::reset << std::endl;
 
-        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
+        Z.compress( relative_prec( cmdline::eps ) );
 
         error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
 

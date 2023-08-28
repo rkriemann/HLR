@@ -10,6 +10,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
+#include <hlr/arith/hosvd.hh>
 #include <hlr/approx/traits.hh>
 #include <hlr/approx/accuracy.hh>
 

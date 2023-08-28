@@ -10,14 +10,12 @@
 
 #include <type_traits>
 #include <vector>
-#include <numeric>
-#include <algorithm>
+// #include <numeric>
+// #include <algorithm>
 
 #include <hpro/blas/MemBlock.hh>
 
 #include <hlr/approx/traits.hh>
-#include <hlr/approx/accuracy.hh>
-#include <hlr/approx/svd.hh>
 #include <hlr/arith/blas.hh>
 
 namespace hlr
@@ -451,133 +449,26 @@ operator << ( std::ostream &            os,
 // BLAS functions
 //
 
-//
-// d-mode unfolding
-//
-template < typename value_t >
-matrix< value_t >
-tensor3< value_t >::unfold ( const uint  d ) const
-{
-    HLR_ASSERT( d < 3 );
-    
-    if ( d == 0 )
-    {
-        auto    M   = matrix< value_t >( size(0), size(1) * size(2) );
-        size_t  col = 0;
-
-        for ( size_t  l = 0; l < size(2); ++l )
-        {
-            for ( size_t  j = 0; j < size(1); ++j )
-            {
-                auto  t_jl = fiber( d, j, l );
-                auto  m_c  = M.column( col++ );
-                    
-                blas::copy( t_jl, m_c );
-            }// for
-        }// for
-            
-        return M;
-    }// if
-    else if ( d == 1 )
-    {
-        auto    M   = matrix< value_t >( size(1), size(0) * size(2) );
-        size_t  col = 0;
-
-        for ( size_t  l = 0; l < size(2); ++l )
-        {
-            for ( size_t  i = 0; i < size(0); ++i )
-            {
-                auto  t_il = fiber( d, i, l );
-                auto  m_c  = M.column( col++ );
-                
-                blas::copy( t_il, m_c );
-            }// for
-        }// for
-        
-        return M;
-    }// if
-    else
-    {
-        auto    M   = matrix< value_t >( size(2), size(0) * size(1) );
-        size_t  col = 0;
-        
-        for ( size_t  j = 0; j < size(1); ++j )
-        {
-            for ( size_t  i = 0; i < size(0); ++i )
-            {
-                auto  t_ij = fiber( d, i, j );
-                auto  m_c  = M.column( col++ );
-                
-                blas::copy( t_ij, m_c );
-            }// for
-        }// for
-        
-        return M;
-    }// else
-}
-
-////////////////////////////////////////////////////////////////
-//
-// BLAS functions
-//
-
 template < typename value_t >
 void
 copy ( const tensor3< value_t > &  src,
-       tensor3< value_t > &        dest )
-{
-    HLR_DBG_ASSERT( ( src.size(0) == dest.size(0) ) &&
-                    ( src.size(1) == dest.size(1) ) &&
-                    ( src.size(2) == dest.size(2) ) );
-
-    for ( size_t  l = 0; l < src.size(2); l++ )
-        for ( size_t  j = 0; j < src.size(1); j++ )
-            for ( size_t  i = 0; i < src.size(0); i++ )
-                dest(i,j,l) = src(i,j,l);
-}
+       tensor3< value_t > &        dest );
 using Hpro::BLAS::copy;
 
 template < typename value_t >
 value_t
 dot ( const tensor3< value_t > &  t1,
-      const tensor3< value_t > &  t2 )
-{
-    HLR_DBG_ASSERT( ( t1.size(0) == t2.size(0) ) &&
-                    ( t1.size(1) == t2.size(1) ) &&
-                    ( t1.size(2) == t2.size(2) ) );
-
-    auto  d = value_t(0);
-
-    for ( size_t  l = 0; l < t1.size(2); l++ )
-        for ( size_t  j = 0; j < t1.size(1); j++ )
-            for ( size_t  i = 0; i < t1.size(0); i++ )
-                d += t1(i,j,l) * t2(i,j,l);
-
-    return d;
-}
+      const tensor3< value_t > &  t2 );
 using Hpro::BLAS::dot;
 
 template < typename value_t >
 real_type_t< value_t >
-norm_F ( const tensor3< value_t > &  t )
-{
-    return std::sqrt( std::abs( dot( t, t ) ) );
-}
+norm_F ( const tensor3< value_t > &  t );
 using Hpro::BLAS::norm_F;
 
 template < typename value_t >
 real_type_t< value_t >
-max_abs_val ( const tensor3< value_t > &  t )
-{
-    auto  v = real_type_t< value_t >(0);
-
-    for ( size_t  l = 0; l < t.size(2); l++ )
-        for ( size_t  j = 0; j < t.size(1); j++ )
-            for ( size_t  i = 0; i < t.size(0); i++ )
-                v += std::max( std::abs( t(i,j,l) ), v );
-
-    return v;
-}
+max_abs_val ( const tensor3< value_t > &  t );
 
 //
 // compute B := α A + β B (element wise)
@@ -588,17 +479,7 @@ requires ( std::convertible_to< alpha_t, value_t > )
 void
 add ( const alpha_t               alpha,
       const tensor3< value_t > &  A,
-      tensor3< value_t > &        B )
-{
-    HLR_DBG_ASSERT( ( A.size(0) == B.size(0) ) &&
-                    ( A.size(1) == B.size(1) ) &&
-                    ( A.size(2) == B.size(2) ) );
-    
-    for ( size_t  l = 0; l < A.size(2); l++ )
-        for ( size_t  j = 0; j < A.size(1); j++ )
-            for ( size_t  i = 0; i < A.size(0); i++ )
-                B(i,j,l) += value_t(alpha) * A(i,j,l);
-}
+      tensor3< value_t > &        B );
 
 template < typename alpha_t,
            typename beta_t,
@@ -609,17 +490,7 @@ void
 add ( const alpha_t               alpha,
       const tensor3< value_t > &  A,
       const beta_t                beta,
-      tensor3< value_t > &        B )
-{
-    HLR_DBG_ASSERT( ( A.size(0) == B.size(0) ) &&
-                    ( A.size(1) == B.size(1) ) &&
-                    ( A.size(2) == B.size(2) ) );
-    
-    for ( size_t  l = 0; l < A.size(2); l++ )
-        for ( size_t  j = 0; j < A.size(1); j++ )
-            for ( size_t  i = 0; i < A.size(0); i++ )
-                B(i,j,l) = value_t(alpha) * A(i,j,l) + value_t(beta) * B(i,j,l);
-}
+      tensor3< value_t > &        B );
 using Hpro::BLAS::add;
 
 //
@@ -630,99 +501,7 @@ template < typename     value_t,
 tensor3< value_t >
 tensor_product ( const tensor3< value_t > &  X,
                  const matrix_t &            M,
-                 const uint                  mode )
-{
-    HLR_ASSERT( X.size(mode) == M.ncols() );
-
-    auto  Y = tensor3< value_t >( ( mode == 0 ? M.nrows() : X.size(0) ),
-                                  ( mode == 1 ? M.nrows() : X.size(1) ),
-                                  ( mode == 2 ? M.nrows() : X.size(2) ) );
-
-    #if 0
-
-    if ( mode == 0 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
-        {
-            auto  Xl = X.slice( 2, l );
-            auto  Yl = Y.slice( 2, l );
-
-            prod( value_t(1), M, Xl, value_t(0), Yl );
-        }// for
-    }// if
-    else if ( mode == 1 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, l );
-                auto  y_ij = Y.fiber( mode, i, l );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-    else if ( mode == 2 )
-    {
-        for ( size_t  j = 0; j < X.size(1); ++j )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, j );
-                auto  y_ij = Y.fiber( mode, i, j );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-    
-    #else
-    
-    if ( mode == 0 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
-        {
-            for ( size_t  j = 0; j < X.size(1); ++j )
-            {
-                auto  x_ij = X.fiber( mode, j, l );
-                auto  y_ij = Y.fiber( mode, j, l );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-    else if ( mode == 1 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, l );
-                auto  y_ij = Y.fiber( mode, i, l );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-    else if ( mode == 2 )
-    {
-        for ( size_t  j = 0; j < X.size(1); ++j )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, j );
-                auto  y_ij = Y.fiber( mode, i, j );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-
-    #endif
-
-    return Y;
-}
+                 const uint                  mode );
 
 //
 // element-wise multiplication X2 := X1 * X2
@@ -730,312 +509,10 @@ tensor_product ( const tensor3< value_t > &  X,
 template < typename value_t >
 tensor3< value_t >
 hadamard_product ( const tensor3< value_t > &  X1,
-                   tensor3< value_t > &        X2 )
-{
-    HLR_ASSERT( ( X1.size(0) == X2.size(0) ) &&
-                ( X1.size(1) == X2.size(1) ) &&
-                ( X1.size(2) == X2.size(2) ) );
-
-    for ( size_t  l = 0; l < X1.size(2); l++ )
-        for ( size_t  j = 0; j < X1.size(1); j++ )
-            for ( size_t  i = 0; i < X2.size(0); i++ )
-                X2(i,j,l) *= X1(i,j,l);
-}
-
-////////////////////////////////////////////////////////////////
-//
-// truncation
-//
-
-template < typename                    value_t,
-           approx::approximation_type  approx_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-hosvd ( const tensor3< value_t > &  X,
-        const accuracy &            acc,
-        const approx_t &            apx )
-{
-    auto  X0 = X.unfold( 0 );
-    auto  U0 = apx.column_basis( X0, acc );
-
-    auto  X1 = X.unfold( 1 );
-    auto  U1 = apx.column_basis( X1, acc );
-
-    auto  X2 = X.unfold( 2 );
-    auto  U2 = apx.column_basis( X2, acc );
-
-    auto  Y0 = tensor_product( X,  adjoint( U0 ), 0 );
-    auto  Y1 = tensor_product( Y0, adjoint( U1 ), 1 );
-    auto  G  = tensor_product( Y1, adjoint( U2 ), 2 );
-
-    return { std::move(G), std::move(U0), std::move(U1), std::move(U2) };
-}
-
-template < typename  value_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-hosvd ( const tensor3< value_t > &  X,
-        const accuracy &            acc )
-{
-    const auto  apx = approx::SVD< value_t >();
-
-    return hosvd( X, acc, apx );
-}
-
-template < typename                    value_t,
-           approx::approximation_type  approx_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-sthosvd ( const tensor3< value_t > &  X,
-          const accuracy &            acc,
-          const approx_t &            apx )
-{
-    auto  Y  = copy( X );
-    auto  U0 = blas::matrix< value_t >();
-    auto  U1 = blas::matrix< value_t >();
-    auto  U2 = blas::matrix< value_t >();
-    
-    for ( uint  d = 0; d < 3; ++d )
-    {
-        auto  Yd = Y.unfold( d );
-        auto  Ud = apx.column_basis( Yd, acc );
-        auto  T  = tensor_product( Y, adjoint( Ud ), d );
-
-        Y = std::move( T );
-
-        switch ( d )
-        {
-            case 0 : U0 = std::move( Ud ); break;
-            case 1 : U1 = std::move( Ud ); break;
-            case 2 : U2 = std::move( Ud ); break;
-        }// switch
-    }// for
-
-    return { std::move(Y), std::move(U0), std::move(U1), std::move(U2) };
-}
-
-template < typename  value_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-sthosvd ( const tensor3< value_t > &  X,
-          const accuracy &            acc )
-{
-    const auto  apx = approx::SVD< value_t >();
-
-    return sthosvd( X, acc, apx );
-}
-
-template < typename                    value_t,
-           approx::approximation_type  approx_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-greedy_hosvd ( const tensor3< value_t > &  X,
-               const accuracy &            acc,
-               const approx_t &            apx )
-{
-    //
-    // compute full column bases for unfolded matrices
-    // for all dimensions
-    //
-    
-    auto  X0         = X.unfold( 0 );
-    auto  [ U0, S0 ] = apx.column_basis( X0 );
-
-    auto  X1         = X.unfold( 1 );
-    auto  [ U1, S1 ] = apx.column_basis( X1 );
-
-    auto  X2         = X.unfold( 2 );
-    auto  [ U2, S2 ] = apx.column_basis( X2 );
-
-    // for index-based access
-    matrix< value_t >  U[3] = { U0, U1, U2 };
-    vector< value_t >  S[3] = { S0, S1, S2 };
-
-    //
-    // iterate until error is met increasing rank of
-    // dimension with highest error contribution, i.e.,
-    // largest _next_ singular value
-    //
-    // error = √( Σ_d Σ_i>k_i σ²_d,i )
-    //
-
-    const auto  tol      = acc.abs_eps() * acc.abs_eps();
-    value_t     error[3] = { 0, 0, 0 };
-    size_t      k[3]     = { 1, 1, 1 }; // start with at least one rank per dimension
-
-    // initial error
-    for ( uint  d = 0; d < 3; ++d )
-        for ( uint  i = k[d]; i < S[d].length(); ++i )
-            error[d] += S[d](i) * S[d](i);
-
-    // iteration
-    while ( error[0] + error[1] + error[2] > tol )
-    {
-        int      max_dim = -1; // to signal error
-        value_t  max_sig = 0;
-
-        // look for maximal σ in all dimensions
-        for ( uint  d = 0; d < 3; ++d )
-        {
-            // skip fully exhausted dimensions
-            if ( k[d] == S[d].length() )
-                continue;
-            
-            if ( S[d](k[d]) > max_sig )
-            {
-                max_sig = S[d](k[d]);
-                max_dim = d;
-            }// if
-        }// for
-
-        if ( max_dim < 0 )
-        {
-            // no unused singular values left; error should be zero
-            break;
-        }// if
-
-        error[ max_dim ] -= max_sig * max_sig;
-        k[ max_dim ]     += 1;
-        
-        // std::cout << "  max_dim " << max_dim << ", error = " << std::sqrt( error[0] + error[1] + error[2] ) << std::flush;
-    }// while
-
-    auto  U0k = matrix< value_t >( U0, range::all, range( 0, k[0]-1 ) );
-    auto  U1k = matrix< value_t >( U1, range::all, range( 0, k[1]-1 ) );
-    auto  U2k = matrix< value_t >( U2, range::all, range( 0, k[2]-1 ) );
-
-    auto  W0  = blas::copy( U0k );
-    auto  W1  = blas::copy( U1k );
-    auto  W2  = blas::copy( U2k );
-    
-    auto  Y0 = tensor_product( X,  adjoint( W0 ), 0 );
-    auto  Y1 = tensor_product( Y0, adjoint( W1 ), 1 );
-    auto  G  = tensor_product( Y1, adjoint( W2 ), 2 );
-
-    // // print compressed memory
-    // if ( false )
-    // {
-    //     size_t  mem  = 0;
-    //     size_t  zmem = 0;
-
-    //     {
-    //         auto    zconf = compress::afloat::get_config( zacc.rel_eps() );
-    //         auto    Zc    = compress::afloat::compress( zconf, G.data(), G.size(0), G.size(1), G.size(2) );
-    //         size_t  memc  = sizeof(value_t) * G.size(0) * G.size(1) * G.size(2);
-    //         auto    zmemc = compress::afloat::byte_size( Zc );
-
-    //         mem  += memc;
-    //         zmem += zmemc;
-    //     }
-        
-    //     {
-    //         auto  S0k   = vector< value_t >( S0, range( 0, k[0]-1 ) );
-    //         auto  norm0 = std::accumulate( S0k.data(), S0k.data() + k[0], value_t(0), std::plus< value_t >() );
-    //         auto  tol0  = norm0 * zacc.rel_eps();
-
-    //         std::for_each( S0k.data(), S0k.data() + k[0], [tol0] ( auto & f ) { f *= tol0; } );
-        
-    //         auto  Z0    = compress::afloat::compress_lr( W0, S0k );
-    //         auto  mem0  = sizeof(value_t) * W0.nrows() * W0.ncols();
-    //         auto  zmem0 = compress::afloat::byte_size( Z0 );
-
-    //         mem  += mem0;
-    //         zmem += zmem0;
-    //     }
-        
-    //     {
-    //         auto  S1k   = vector< value_t >( S1, range( 0, k[1]-1 ) );
-    //         auto  norm1 = std::accumulate( S1k.data(), S1k.data() + k[1], value_t(0), std::plus< value_t >() );
-    //         auto  tol1  = norm1 * zacc.rel_eps();
-
-    //         std::for_each( S1k.data(), S1k.data() + k[1], [tol1] ( auto & f ) { f *= tol1; } );
-        
-    //         auto  Z1    = compress::afloat::compress_lr( W1, S1k );
-    //         auto  mem1  = sizeof(value_t) * W1.nrows() * W1.ncols();
-    //         auto  zmem1 = compress::afloat::byte_size( Z1 );
-
-    //         mem  += mem1;
-    //         zmem += zmem1;
-    //     }
-        
-    //     {
-    //         auto  S2k   = vector< value_t >( S2, range( 0, k[2]-1 ) );
-    //         auto  norm2 = std::accumulate( S2k.data(), S2k.data() + k[2], value_t(0), std::plus< value_t >() );
-    //         auto  tol2  = norm2 * zacc.rel_eps();
-
-    //         std::for_each( S2k.data(), S2k.data() + k[2], [tol2] ( auto & f ) { f *= tol2; } );
-        
-    //         auto  Z2    = compress::afloat::compress_lr( W2, S2k );
-    //         auto  mem2  = sizeof(value_t) * W2.nrows() * W2.ncols();
-    //         auto  zmem2 = compress::afloat::byte_size( Z2 );
-
-    //         mem  += mem2;
-    //         zmem += zmem2;
-    //     }
-
-    //     std::cout << mem << " / " << zmem << std::endl;
-    // }
-    
-    return { std::move(G), std::move(W0), std::move(W1), std::move(W2) };
-}
-
-//
-// recompress given tucker tensor
-//
-template < typename                    value_t,
-           approx::approximation_type  approx_t,
-           typename                    hosvd_func_t >
-std::tuple< tensor3< value_t >,
-            matrix< value_t >,
-            matrix< value_t >,
-            matrix< value_t > >
-recompress ( tensor3< value_t > &  G,
-             matrix< value_t > &   X0,
-             matrix< value_t > &   X1,
-             matrix< value_t > &   X2,
-             const accuracy &      acc,
-             const approx_t &      apx,
-             hosvd_func_t &&       func )
-{
-    auto  [ G2, Y0, Y1, Y2 ] = func( G, acc, apx );
-
-    auto  W0 = blas::prod( X0, Y0 );
-    auto  W1 = blas::prod( X1, Y1 );
-    auto  W2 = blas::prod( X2, Y2 );
-
-    return { std::move(G2), std::move(W0), std::move(W1), std::move(W2) };
-}
-    
-//
-// error of Tucker decomposition D - G ×₀ X₀ ×₁ X₁ ×₂ X₂ 
-//
-template < typename value_t >
-Hpro::real_type_t< value_t >
-tucker_error ( const tensor3< value_t > &  D,
-               const tensor3< value_t > &  G,
-               const matrix< value_t > &   X0,
-               const matrix< value_t > &   X1,
-               const matrix< value_t > &   X2 )
-{
-    auto  T0 = tensor_product( G,  X0, 0 );
-    auto  T1 = tensor_product( T0, X1, 1 );
-    auto  Y  = tensor_product( T1, X2, 2 );
-        
-    add( -1, D, Y );
-
-    return norm_F( Y );
-}
+                   tensor3< value_t > &        X2 );
 
 }}// namespace hlr::blas
+
+#include <hlr/arith/detail/tensor.hh>
 
 #endif  // __HPRO_BLAS_TENSOR_HH
