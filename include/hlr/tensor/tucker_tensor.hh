@@ -20,7 +20,7 @@
 
 namespace hlr { namespace tensor {
 
-#define HLR_USE_APLR  1
+#define HLR_USE_APLR  0
 
 //
 // implements tensor using Tucker decomposition
@@ -406,7 +406,7 @@ tucker_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
     
     for ( uint  i = 0; i < dimension; ++i )
     {
-        zX[i] = std::move( compress::compress_lr( zconfig, _X[i] ) );
+        zX[i] = std::move( compress::compress( zconfig, _X[i] ) );
         zmem += compress::byte_size( zX[i] );
     }// for
     

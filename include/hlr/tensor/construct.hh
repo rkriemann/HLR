@@ -51,7 +51,7 @@ merge_all ( const indexset &                  is0,
             hosvd_func_t &&                   hosvd )
 {
     // verbosity level
-    constexpr int verbosity = 0;
+    constexpr int verbosity = 1;
     
     //
     // determine ranks (and memory)
@@ -209,7 +209,7 @@ merge_all ( const indexset &                  is0,
                                                  Y2.nrows() * Y2.ncols() );
 
     if constexpr ( verbosity >= 1 )
-        std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (memory)       : " << mem_sub << " / " << mem_coarse << " / " << mem_full << std::endl;
+        std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (memory S/C/F) : " << mem_sub << " / " << mem_coarse << " / " << mem_full << std::endl;
             
     if ( mem_coarse < std::min( mem_sub, mem_full ) )
     {
@@ -250,7 +250,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                             const size_t                      ntile )
 {
     // verbosity level
-    constexpr int verbosity = 0;
+    constexpr int verbosity = 1;
     
     // choose one to be used below
     // auto  hosvd = blas::hosvd< value_t, approx_t >;
@@ -269,12 +269,14 @@ build_hierarchical_tucker ( const indexset &                  is0,
         {
             auto  Dc                = blas::copy( D );  // do not modify D (!)
             auto  [ G, X0, X1, X2 ] = hosvd( Dc, lacc, apx );
+            auto  mem_tucker        = G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size();
             
-            if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
+            if ( mem_tucker < Dc.byte_size() )
             {
                 if constexpr ( verbosity >= 1 )
                     std::cout << "TUCKER: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
                               << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
+                              << " ( " << mem_tucker << " / " << Dc.byte_size() << " )"
                               << std::endl;
 
                 if constexpr ( verbosity >= 2 )

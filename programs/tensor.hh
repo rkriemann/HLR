@@ -244,6 +244,134 @@ tca_full ( blas::tensor3< value_t > &  X,
     std::cout << "rank : " << C.size() << std::endl;
 }
 
+template < typename value_t >
+void
+test_compression ( const blas::tensor3< value_t > &  X,
+                   const blas::tensor3< value_t > &  G,
+                   const blas::matrix< value_t > &   X0,
+                   const blas::matrix< value_t > &   X1,
+                   const blas::matrix< value_t > &   X2 )
+{
+    auto          norm_X = blas::norm_F( X );
+    auto          norm_G = blas::norm_F( G );
+    const size_t  mem = sizeof(value_t) * ( G.size(0) * G.size(1) * G.size(2) +
+                                            X0.nrows() + X0.ncols() +
+                                            X1.nrows() + X1.ncols() +
+                                            X2.nrows() + X2.ncols() );
+    
+    auto  T0     = tensor_product( G,  X0, 0 );
+    auto  T1     = tensor_product( T0, X1, 1 );
+    auto  Y      = tensor_product( T1, X2, 2 );
+    auto  norm_Y = blas::norm_F( Y );
+            
+    for ( double  tol = 1e-2; tol >= eps; tol /= 10 )
+    {
+        size_t  zmem = 0;
+        
+        std::cout << term::bullet << term::bold << "ε = " << tol << term::reset << std::endl;
+
+        #if 1
+        auto  zX0 = compress::aplr::zarray();
+        auto  zX1 = compress::aplr::zarray();
+        auto  zX2 = compress::aplr::zarray();
+
+        {
+            auto  Gi    = G.unfold( 0 );
+            auto  S_tol = blas::sv( Gi );
+
+            for ( uint  l = 0; l < S_tol.length(); ++l )
+                S_tol(l) = ( tol ) / S_tol(l);
+
+            zX0   = std::move( compress::aplr::compress_lr( X0, S_tol ) );
+            zmem += compress::aplr::byte_size( zX0 );
+        }
+        {
+            auto  Gi    = G.unfold( 1 );
+            auto  S_tol = blas::sv( Gi );
+
+            for ( uint  l = 0; l < S_tol.length(); ++l )
+                S_tol(l) = ( tol ) / S_tol(l);
+
+            zX1 = std::move( compress::aplr::compress_lr( X1, S_tol ) );
+            zmem += compress::aplr::byte_size( zX1 );
+        }
+        {
+            auto  Gi    = G.unfold( 2 );
+            auto  S_tol = blas::sv( Gi );
+
+            for ( uint  l = 0; l < S_tol.length(); ++l )
+                S_tol(l) = ( tol ) / S_tol(l);
+
+            zX2 = std::move( compress::aplr::compress_lr( X2, S_tol ) );
+            zmem += compress::aplr::byte_size( zX2 );
+        }
+        #else
+        auto  zX0 = compress::compress< value_t >( compress::get_config( tol ), X0 );
+        auto  zX1 = compress::compress< value_t >( compress::get_config( tol ), X1 );
+        auto  zX2 = compress::compress< value_t >( compress::get_config( tol ), X2 );
+
+        zmem += compress::byte_size( zX0 );
+        zmem += compress::byte_size( zX1 );
+        zmem += compress::byte_size( zX2 );
+        #endif
+        
+        auto  zG = compress::compress< value_t >( compress::get_config( tol ), G );
+
+        zmem += compress::byte_size( zG );
+
+        {
+            auto  dG  = blas::tensor3< value_t >( G.size(0), G.size(1), G.size(2) );
+            auto  dX0 = blas::matrix< value_t >( X0.nrows(), X0.ncols() );
+            auto  dX1 = blas::matrix< value_t >( X1.nrows(), X1.ncols() );
+            auto  dX2 = blas::matrix< value_t >( X2.nrows(), X2.ncols() );
+
+            compress::decompress( zG, dG );
+            #if 1
+            compress::aplr::decompress_lr( zX0, dX0 );
+            compress::aplr::decompress_lr( zX1, dX1 );
+            compress::aplr::decompress_lr( zX2, dX2 );
+            #else
+            compress::decompress( zX0, dX0 );
+            compress::decompress( zX1, dX1 );
+            compress::decompress( zX2, dX2 );
+            #endif
+
+            auto  errorY = blas::tucker_error( Y, dG, dX0, dX1, dX2 );
+            auto  errorX = blas::tucker_error( X, dG, dX0, dX1, dX2 );
+
+            blas::add( -1, G, dG );
+            blas::add( -1, X0, dX0 );
+            blas::add( -1, X1, dX1 );
+            blas::add( -1, X2, dX2 );
+
+            std::cout << "    rate    " << double(mem) / double(zmem) << std::endl;
+            std::cout << "    error G / X0 / X1 / X2"
+                      << " : " 
+                      << boost::format( "%.4e" ) % ( blas::norm_F( dG ) / blas::norm_F( G ) )
+                      << " / "
+                      << boost::format( "%.4e" ) % ( blas::norm_F( dX0 ) / blas::norm_F( X0 ) )
+                      << " / "
+                      << boost::format( "%.4e" ) % ( blas::norm_F( dX1 ) / blas::norm_F( X1 ) )
+                      << " / "
+                      << boost::format( "%.4e" ) % ( blas::norm_F( dX2 ) / blas::norm_F( X2 ) )
+                      << std::endl;
+
+            std::cout << "    error X "
+                      << " : " 
+                      << boost::format( "%.4e" ) % ( errorX )
+                      << " / "
+                      << boost::format( "%.4e" ) % ( errorX / norm_X )
+                      << std::endl;
+            std::cout << "    error Y "
+                      << " : " 
+                      << boost::format( "%.4e" ) % ( errorY )
+                      << " / "
+                      << boost::format( "%.4e" ) % ( errorY / norm_Y )
+                      << std::endl;
+        }
+    }// for
+}
+
 //
 // main function
 //
@@ -410,7 +538,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 1 )
+        switch ( 0 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
@@ -592,6 +720,15 @@ program_main ()
             
         //     std::cout << "      error  = " << format_error( error, error / norm_X ) << std::endl;
         // }
+
+        {
+            auto  error = blas::tucker_error( X, G, X0, X1, X2 );
+
+            std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
+            
+            test_compression( X, G, X0, X1, X2 );
+            return;
+        }
         
         auto  Z     = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
                                                          std::move( G ),

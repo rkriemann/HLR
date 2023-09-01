@@ -398,7 +398,7 @@ compress_fp64 ( const double *  data,
             sign[j] = ( aval != val );
             fbuf[j] = scale * aval + 1;
 
-            HLR_DBG_ASSERT( fbuf[j] >= double(2) );
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
         }// for
 
         // convert to compressed format
