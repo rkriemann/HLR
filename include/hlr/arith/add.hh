@@ -174,7 +174,7 @@ add_diag ( Hpro::TMatrix< value_t > &       M,
             add_diag( *B_ii, d_i );
         }// for
     }// if
-    else if ( is_dense( M ) )
+    else if ( matrix::is_dense( M ) )
     {
         auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
         auto  DD = D->mat();

@@ -388,7 +388,7 @@ eigen_ipt ( matrix< value_t > &                                M,
     }// for
 
     //
-    // compute I - Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
+    // compute I + Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
     //
     auto  hmul_theta =  [&diag_M] ( matrix< value_t > &  A )
                         {
@@ -396,9 +396,9 @@ eigen_ipt ( matrix< value_t > &                                M,
                                 for ( size_t  i = 0; i < A.nrows(); ++i )
                                 {
                                     if ( i == j )
-                                        A(i,j)  =   value_t(1);
+                                        A(i,j) += value_t(1);
                                     else
-                                        A(i,j) *= - value_t(1) / ( diag_M(i) - diag_M(j) );
+                                        A(i,j) *= value_t(1) / ( diag_M(i) - diag_M(j) );
                                 }// for
                         };
 
@@ -417,8 +417,8 @@ eigen_ipt ( matrix< value_t > &                                M,
         // T = Δ·V
         blas::prod( value_t(1), Delta, V, value_t(0), T );
         
-        // T = Δ·V - V·diag(Δ·V) = T - V·diag(T) 
-        // computed as T(i,:) = T(i,:) - T(i,i) · V(i,:)
+        // T = V·diag(Δ·V) - Δ·V = V·diag(T) - T
+        // computed as T(i,:) = T(i,i) · V(:,i) - T(:,i)
         for ( size_t  i = 0; i < nrows; ++i )
             diag_T(i) = T(i,i);
         
@@ -427,10 +427,11 @@ eigen_ipt ( matrix< value_t > &                                M,
             auto  V_i = V.column(i);
             auto  T_i = T.column(i);
 
-            blas::add( -diag_T(i), V_i, T_i );
+            blas::scale( value_t(-1), T_i );
+            blas::add( diag_T(i), V_i, T_i );
         }// for
 
-        // I - Θ ∗ (Δ·V - V·diag(Δ·V)) = I - Θ ∗ T
+        // I - Θ ∗ (V·diag(Δ·V) - Δ·V) = I - Θ ∗ T
         hmul_theta( T );
 
         //

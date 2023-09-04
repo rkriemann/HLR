@@ -897,6 +897,50 @@ copy ( const Hpro::TMatrix< value_t > &  M )
 }
 
 //
+// return structural copy of matrix (no data)
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+copy_struct ( const Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = hlr::seq::matrix::copy_struct( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else
+    {
+        // assuming non-structured block
+        auto  N = M.copy_struct();
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// else
+}
+
+//
 // return truncated copy of matrix
 //
 template < typename value_t >

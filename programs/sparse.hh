@@ -11,6 +11,7 @@
 
 #include <hpro/io/TMatrixIO.hh>
 
+#include <hlr/arith/multiply.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/utils/io.hh>
@@ -48,17 +49,22 @@ read_csv ( const std::string &  filename )
         std::getline( in, line );
         Hpro::split( line, ",", parts );
 
+        if ( line.size() == 0 )
+            continue;
+        
         if ( parts.size() != 3 )
             HLR_ERROR( "expected r,c,v" );
 
-        auto  row = atoi( parts[0].c_str() );
-        auto  col = atoi( parts[1].c_str() );
+        auto  row = atoi( parts[0].c_str() )-1;
+        auto  col = atoi( parts[1].c_str() )-1;
 
-        rows[row-1]++;
-        ncols = std::max< int >( ncols, col );
+        rows[row]++;
+        ncols = std::max< int >( ncols, col+1 );
         nnz++;
     }// while
 
+    std::cout << nrows << " × " << ncols << std::endl;
+    
     //
     // read data as CSV matrix
     //
@@ -74,7 +80,10 @@ read_csv ( const std::string &  filename )
         ofs += rows[i];
         rows[i] = 0; // reset for later usage
     }// for
+
+    S->rowptr(nrows) = nnz;
     
+    in.clear();
     in.seekg( fpos );
     
     while ( in.good() )
@@ -82,14 +91,15 @@ read_csv ( const std::string &  filename )
         std::getline( in, line );
         Hpro::split( line, ",", parts );
 
+        if ( line.size() == 0 )
+            continue;
+        
         if ( parts.size() != 3 )
             HLR_ERROR( "expected r,c,v" );
 
-        auto  row = atoi( parts[0].c_str() );
-        auto  col = atoi( parts[1].c_str() );
+        auto  row = atoi( parts[0].c_str() )-1;
+        auto  col = atoi( parts[1].c_str() )-1;
         auto  val = atof( parts[2].c_str() );
-
-        --row; --col;
 
         ofs = S->rowptr(row) + rows[row];
 
@@ -149,13 +159,18 @@ build_G ( const Hpro::TMatrix< value_t > &  M,
             
         for ( uint  j = 0; j < DD.ncols(); ++j )
         {
-            auto  d_j = d( M.col_ofs() + j );
+            auto  pj  = M.col_ofs() + j;
+            auto  d_j = d( pj );
             
             for ( uint  i = 0; i < DD.nrows(); ++i )
             {
-                auto  d_i = d( M.row_ofs() + i );
-                
-                DD(i,j) = value_t(1) / ( d_i - d_j );
+                auto  pi  = M.row_ofs() + i;
+                auto  d_i = d( pi );
+
+                if ( pi == pj )
+                    DD(i,j) = value_t(0);
+                else
+                    DD(i,j) = value_t(1) / ( d_i - d_j );
             }// for
         }// for
         
@@ -208,9 +223,9 @@ program_main ()
               << "    sparse matrix = " << sparsefile
               << std::endl;
 
-    // auto  M = Hpro::read_matrix< value_t >( sparsefile );
-    // auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
-    auto  S = read_csv< value_t >( sparsefile );
+    auto  M = Hpro::read_matrix< value_t >( sparsefile );
+    // auto  M = read_csv< value_t >( sparsefile );
+    auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
 
     std::cout << "    dims   = " << S->nrows() << " × " << S->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( S->byte_size() ) << std::endl;
@@ -237,8 +252,8 @@ program_main ()
     auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
     // auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
     // auto  cl            = nd_ct_builder.build( S );
-    auto  cl            = ct_builder.build( S.get() );
-    auto  adm_cond      = Hpro::TWeakAlgAdmCond( S.get(), cl->perm_i2e() );
+    auto  cl            = ct_builder.build( S );
+    auto  adm_cond      = Hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
     auto  bct_builder   = Hpro::TBCBuilder( 0, Hpro::cluster_level_any );
     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
 
@@ -295,10 +310,12 @@ program_main ()
         auto  M    = matrix::convert_to_dense( *A );
         auto  stat = blas::eigen_stat();
         auto  M2   = blas::copy( M->mat() );
+
+        io::matlab::write( M->mat(), "M" );
         
         tic = timer::now();
             
-        auto [ E, V ] = blas::eigen_ipt( M2, 1e-14, 1000, "frobenius", cmdline::verbosity, & stat );
+        auto [ E, V ] = blas::eigen_ipt( M2, 1000, cmdline::eps, "frobenius", cmdline::verbosity, & stat );
 
         toc = timer::since( tic );
             
@@ -323,29 +340,54 @@ program_main ()
         //   Z = I
         //
 
-        auto  apx = approx::SVD< value_t >();
+        using approx_t = approx::SVD< value_t >;
+        
+        auto  apx = approx_t();
             
         auto  M = std::move( A );
         auto  d = impl::matrix::diagonal( *M );
         auto  Δ = impl::matrix::copy( *M );
         auto  G = build_G( *M, d, acc, apx );
         auto  Z = impl::matrix::identity( *M );
+        auto  T = impl::matrix::copy_struct( *M );
 
         blas::scale( value_t(-1), d );
         hlr::add_diag( *Δ, d );
         
-        // do
-        // {
-        //     //
-        //     // iteration step:
-        //     //
-        //     //   F(Z) := I + G ⊗ ( Z·diag(Δ·Z) - Δ·Z )
-        //     //         = I + G ⊗ ( Z·diag(T) - T )   with T = Δ·Z
-        //     //
-            
-        //     // T = Δ·V
-        //     prod( value_t(1), Delta, V, value_t(0), T );
+        {
+            auto  DΔ = matrix::convert_to_dense( *Δ );
+            auto  DG = matrix::convert_to_dense( *G );
+            auto  DZ = matrix::convert_to_dense( *Z );
+
+            io::matlab::write( DΔ->mat(), "D" );
+            io::matlab::write( DG->mat(), "G" );
+            io::matlab::write( DZ->mat(), "Z" );
+        }
+
+        //
+        // iteration
+        //
+
+        uint  sweep      = 0;
+        uint  max_sweeps = 10;
         
+        do
+        {
+            //
+            // iteration step:
+            //
+            //   F(Z) := I + G ⊗ ( Z·diag(Δ·Z) - Δ·Z )
+            //         = I + G ⊗ ( Z·diag(T) - T )   with T = Δ·Z
+            //
+            
+            // T = Δ·V
+            impl::multiply( value_t(1),
+                            apply_normal, *Δ,
+                            apply_normal, *Z,
+                            *T, acc, apx );
+
+            auto  dT = impl::matrix::diagonal( *T );
+            
         //     // T = Δ·V - V·diag(Δ·V) = T - V·diag(T) 
         //     // computed as T(i,:) = T(i,:) - T(i,i) · V(i,:)
         //     for ( size_t  i = 0; i < nrows; ++i )
@@ -439,10 +481,12 @@ program_main ()
         //     if ( ! std::isnormal( error ) )
         //         break;
         
-        // } while ( sweep < max_sweeps );
+        } while ( sweep < max_sweeps );
 
         // reset afterwards
         A = std::move( M );
+
+        return;
     }
     
     //
