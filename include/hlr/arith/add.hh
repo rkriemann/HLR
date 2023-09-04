@@ -151,6 +151,43 @@ add ( const value_t                     alpha,
     #endif
 }
 
+//
+// compute M := M + d with d representing entries of diagonal matrix
+//
+template < typename value_t >
+void
+add_diag ( Hpro::TMatrix< value_t > &       M,
+           const blas::vector< value_t > &  d )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            auto  B_ii = B->block( i, i );
+            
+            HLR_ASSERT( ! is_null( B_ii ) );
+
+            auto  d_i = blas::vector< value_t >( d, B_ii->row_is() - M.row_ofs() );
+                
+            add_diag( *B_ii, d_i );
+        }// for
+    }// if
+    else if ( is_dense( M ) )
+    {
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        HLR_ASSERT( ! D->is_compressed() );
+
+        for ( uint  i = 0; i < std::min( DD.nrows(), DD.ncols() ); ++i )
+            DD(i,i) += d(i);
+    }// if
+    else
+        HLR_ERROR( "todo" );
+}
+
 }// namespace hlr
 
 #endif // __HLR_ARITH_ADD_HH

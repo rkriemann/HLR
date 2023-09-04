@@ -20,8 +20,16 @@ namespace hlr { namespace blas {
 
 struct eigen_stat
 {
-    uint  nsweeps   = 0;
-    bool  converged = false;
+    uint    nsweeps   = 0;
+    bool    converged = false;
+    double  error     = -1;
+
+    void reset ()
+    {
+        nsweeps   = 0;
+        converged = false;
+        error     = -1;
+    }
 };
 
 //
@@ -228,7 +236,7 @@ make_diag_dom ( matrix< value_t > &                                M,
 
     while ( ! converged && ( sweep < max_sweeps ))
     {
-        real_t  max_err = 0.0;
+        real_t  max_err = real_t(0);
         
         sweep++;
         converged = true;
@@ -279,8 +287,8 @@ make_diag_dom ( matrix< value_t > &                                M,
         //
         
         const auto  xi = (b - a) / ( value_t(2) * c );
-        const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( 1.0 + xi*xi ) ) );
-        const auto  cs = value_t(1) / std::sqrt( 1.0 + t*t );
+        const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( value_t(1) + xi*xi ) ) );
+        const auto  cs = value_t(1) / std::sqrt( value_t(1) + t*t );
         const auto  sn = cs * t;
         
         M(i,i) = a - c * t;
@@ -342,13 +350,12 @@ make_diag_dom ( matrix< value_t > &                                M,
 }
 
 //
-// compute eigenvalues and eigenvectors of M using DPT iteration.
-// - algorithm from "Lapack Working Notes 15"
+// compute eigenvalues and eigenvectors of M using IPT iteration.
 //
 template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
-eigen_dpt ( matrix< value_t > &                                M,
+eigen_ipt ( matrix< value_t > &                                M,
             const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
             const std::string &                                error_type  = "frobenius",
@@ -359,6 +366,9 @@ eigen_dpt ( matrix< value_t > &                                M,
 
     // assumption
     HLR_ASSERT( M.nrows() == M.ncols() );
+    
+    if ( ! is_null( stat ) )
+        stat->reset();
     
     const auto    nrows      = M.nrows();
     const real_t  tolerance  = ( atolerance  > 0 ? atolerance : real_t(10) * std::numeric_limits< real_t >::epsilon() );
@@ -400,10 +410,7 @@ eigen_dpt ( matrix< value_t > &                                M,
     uint    sweep     = 0;
 
     if ( ! is_null( stat ) )
-    {
-        stat->nsweeps   = 0;
-        stat->converged = false;
-    }// if
+        stat->reset();
     
     do
     {
@@ -457,7 +464,7 @@ eigen_dpt ( matrix< value_t > &                                M,
             // for ( int  i = 0; i < n; ++i )
             // {
             //     axpy( n, -E[i], T.data() + i*n, 1, V.data() + i*n, 1 );
-            //     M[ i*n+i ] = 0.0; // reset diagonal for Delta
+            //     M[ i*n+i ] = value_t(0); // reset diagonal for Delta
             // }// for
             
             // error = normF( n, n, V ) / ( M_norm * norm1( n, n, T ) );
@@ -481,7 +488,7 @@ eigen_dpt ( matrix< value_t > &                                M,
             std::cout << std::endl;
         }// if
 
-        if (( sweep > 0 ) && ( error / old_error > 10.0 ))
+        if (( sweep > 0 ) && ( error / old_error > real_t(10) ))
             return { vector< value_t >(), matrix< value_t >() };
         
         old_error = error;
@@ -550,7 +557,7 @@ svd_jac ( matrix< value_t > &                                      M,
         V = std::move( matrix< value_t >( minrc, ncols ) );
     
     for ( size_t  i = 0; i < minrc; i++ )
-        V(i,i) = 1.0;
+        V(i,i) = value_t(1);
 
     while ( ! converged and (( max_sweeps > 0 ) && ( sweep < max_sweeps )) )
     {
@@ -582,8 +589,8 @@ svd_jac ( matrix< value_t > &                                      M,
                 //
 
                 const auto  xi = (b - a) / ( value_t(2) * c );
-                const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( 1.0 + xi*xi ) ) );
-                const auto  cs = value_t(1) / std::sqrt( 1.0 + t*t );
+                const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( value_t(1) + xi*xi ) ) );
+                const auto  cs = value_t(1) / std::sqrt( value_t(1) + t*t );
                 const auto  sn = cs * t;
 
                 //
@@ -634,7 +641,7 @@ svd_jac ( matrix< value_t > &                                      M,
         }// if
         else
         {
-            S(i) = 0.0;
+            S(i) = real_t(0);
             fill( value_t(0), m_i );
 
             auto  v_i = V.column(i);

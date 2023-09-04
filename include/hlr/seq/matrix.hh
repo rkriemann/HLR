@@ -785,6 +785,74 @@ assign_cluster ( Hpro::TMatrix< value_t > &   M,
 }
 
 //
+// return identity matrix with same structure as M
+//
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+identity ( const Hpro::TMatrix< value_t > &  M )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BM );
+        
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( BM->block( i, j ) != nullptr )
+                {
+                    auto  B_ij = hlr::seq::matrix::identity( * BM->block( i, j ) );
+                    
+                    B_ij->set_parent( B );
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  N = M.copy();
+
+        N->scale( 0 );
+        
+        if ( M.row_is() == M.col_is() )
+        {
+            //
+            // fill identity to diagonal
+            //
+            
+            auto  D  = ptrcast( N.get(), matrix::dense_matrix< value_t > );
+            auto  DD = D->mat();
+            
+            HLR_ASSERT( ! D->is_compressed() );
+            
+            for ( uint  i = 0; i < DD.nrows(); ++i )
+                DD(i,i) = 1;
+        }// if
+        
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( matrix::is_lowrank( M ) )
+    {
+        HLR_ASSERT( M.row_is() != M.col_is() );
+        
+        return M.copy_struct();
+    }// if
+    else
+        HLR_ERROR( "todo" );
+}
+
+//
 // return copy of matrix
 //
 template < typename value_t >
@@ -1201,6 +1269,52 @@ copy_diag ( const Hpro::TMatrix< value_t > &  M )
     {
         return M.copy();
     }// else
+}
+
+//
+// return diagonal of M
+//
+namespace detail
+{
+
+template < typename value_t >
+void
+diagonal ( const Hpro::TMatrix< value_t > &  M,
+           blas::vector< value_t > &         d )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            if ( ! is_null( B->block( i, i ) ) )
+                diagonal( * B->block( i, i ), d );
+        }// for
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  D  = cptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        for ( uint  i = 0; i < std::min( DD.nrows(), DD.ncols() ); ++i )
+            d( M.row_ofs() + i ) = DD(i,i);
+    }// if
+    else
+        HLR_ERROR( "todo" );
+}
+
+}// namespace detail
+
+template < typename value_t >
+blas::vector< value_t >
+diagonal ( const Hpro::TMatrix< value_t > &  M )
+{
+    auto  d = blas::vector< value_t >( std::min( M.nrows(), M.ncols() ) );
+
+    detail::diagonal( M, d );
+
+    return d;
 }
 
 //
