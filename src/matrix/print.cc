@@ -90,7 +90,45 @@ const uint colors[] = {
     0x204A87,   // id (SkyBlue3)
     0x000000    // pattern
 };
+
+//
+// print singular values
+//
+template < typename value_t >
+void
+print_sv ( eps_printer &                                    prn,
+           const Hpro::TMatrix< value_t > &                 M,
+           const blas::vector< real_type_t< value_t > > &   S )
+{
+    const auto  k = S.length();
+
+    if ( k == 0 )
+        return;
     
+    const auto  max_k  = std::log10( S(0) );
+    const auto  min_k  = std::log10( S(k-1) / 5.0 );
+    const auto  rbrd   = std::min( 75.0, M.nrows() * 0.1 );
+    const auto  cbrd   = std::min( 75.0, M.ncols() * 0.1 );
+    
+    prn.save();
+    
+    prn.translate( M.col_ofs()             + cbrd,
+                   M.row_ofs() + M.nrows() - rbrd );
+
+    prn.scale(  ( M.ncols() - 2 * cbrd ) / double(k),
+               -( M.nrows() - 2 * rbrd ) / ( max_k - min_k + 1.0 ) );
+        
+    for ( uint  i = 0; i < k; i++ )
+    {
+        const auto  y = std::log10( S(i) ) - min_k + 1;
+
+        if ( y > 0.0 )
+            prn.fill_rect( 0, 0, i+1, y );
+    }// for
+
+    prn.restore();
+}
+
 //
 // actual print function
 //
@@ -214,6 +252,20 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                                M.row_ofs(),
                                M.col_ofs() + M.ncols(),
                                M.row_ofs() + M.nrows() );
+
+                if ( contains( options, "sv" ) )
+                {
+                    auto  U = R->U();
+                    auto  V = R->V();
+
+                    if ( U.ncols() > 0 )
+                    {
+                        auto  S = blas::sv( U, V );
+                    
+                        prn.set_gray( 128 );
+                        print_sv( prn, M, S );
+                    }// if
+                }// if
 
                 if ( ! contains( options, "norank" ) )
                 {

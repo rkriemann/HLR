@@ -1960,15 +1960,17 @@ sv ( const matrix< value_t > &  M )
 // compute singular values of U·V'
 //
 template < typename value_t >
-vector< value_t >
+vector< real_type_t< value_t > >
 sv ( const matrix< value_t > &  U,
      const matrix< value_t > &  V )
 {
+    using  real_t = real_type_t< value_t >;
+    
     const auto   nrows_U = U.nrows();
     const auto   nrows_V = V.nrows();
     const auto   rank    = U.ncols();
     const auto   minrc   = std::min( nrows_U, nrows_V );
-    auto         S       = vector< value_t >( minrc );
+    auto         S       = vector< real_t >( minrc );
 
     if ( rank >= minrc )
     {

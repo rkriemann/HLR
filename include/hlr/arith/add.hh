@@ -152,6 +152,41 @@ add ( const value_t                     alpha,
 }
 
 //
+// compute M := M + λI
+//
+template < typename value_t >
+void
+add_identity ( Hpro::TMatrix< value_t > &  M,
+               const value_t &             λ )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            auto  B_ii = B->block( i, i );
+            
+            if ( ! is_null( B_ii ) )
+                add_identity( *B_ii, λ );
+        }// for
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        HLR_ASSERT( M.row_is() == M.col_is() );
+        HLR_ASSERT( ! D->is_compressed() );
+
+        for ( uint  i = 0; i < std::min( DD.nrows(), DD.ncols() ); ++i )
+            DD(i,i) += λ;
+    }// if
+    else
+        HLR_ERROR( "todo" );
+}
+
+//
 // compute M := M + d with d representing entries of diagonal matrix
 //
 template < typename value_t >

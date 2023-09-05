@@ -253,6 +253,8 @@ program_main ()
     // auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
     // auto  cl            = nd_ct_builder.build( S );
     auto  cl            = ct_builder.build( S );
+
+    
     auto  adm_cond      = Hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
     auto  bct_builder   = Hpro::TBCBuilder( 0, Hpro::cluster_level_any );
     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
@@ -321,6 +323,9 @@ program_main ()
             
         std::cout << "IPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
                 
+        io::matlab::write( V, "V1" );
+        io::matlab::write( E, "E1" );
+        
         if ( stat.converged )
             std::cout << "    error = " << format_error( blas::everror( M->mat(), E, V ) ) << std::endl;
     }
@@ -340,11 +345,13 @@ program_main ()
         //   Z = I
         //
 
+        tic = timer::now();
+        
         using approx_t = approx::SVD< value_t >;
         
         auto  apx = approx_t();
             
-        auto  M = std::move( A );
+        auto  M = impl::matrix::copy( *A );
         auto  d = impl::matrix::diagonal( *M );
         auto  Δ = impl::matrix::copy( *M );
         auto  G = build_G( *M, d, acc, apx );
@@ -354,22 +361,16 @@ program_main ()
         blas::scale( value_t(-1), d );
         hlr::add_diag( *Δ, d );
         
-        {
-            auto  DΔ = matrix::convert_to_dense( *Δ );
-            auto  DG = matrix::convert_to_dense( *G );
-            auto  DZ = matrix::convert_to_dense( *Z );
-
-            io::matlab::write( DΔ->mat(), "D" );
-            io::matlab::write( DG->mat(), "G" );
-            io::matlab::write( DZ->mat(), "Z" );
-        }
-
         //
         // iteration
         //
 
+        using  real_t = real_type_t< value_t >;
+
         uint  sweep      = 0;
-        uint  max_sweeps = 10;
+        uint  max_sweeps = M->nrows();
+        auto  tolerance  = cmdline::eps;
+        auto  old_error  = real_t(1);
         
         do
         {
@@ -380,111 +381,157 @@ program_main ()
             //         = I + G ⊗ ( Z·diag(T) - T )   with T = Δ·Z
             //
             
-            // T = Δ·V
+            // T = Δ·Z
             impl::multiply( value_t(1),
                             apply_normal, *Δ,
                             apply_normal, *Z,
                             *T, acc, apx );
 
+            // {
+            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
+            //     auto  DT = impl::matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( DT->mat(), Hpro::to_string( "Ra%d", sweep ) );
+            // }
+            // {
+            //     auto  T1 = matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( T1->mat(), "T" );
+            // }
+
             auto  dT = impl::matrix::diagonal( *T );
+
+            //
+            // T := Z·diag(T) - T
+            //
             
-        //     // T = Δ·V - V·diag(Δ·V) = T - V·diag(T) 
-        //     // computed as T(i,:) = T(i,:) - T(i,i) · V(i,:)
-        //     for ( size_t  i = 0; i < nrows; ++i )
-        //         diag_T(i) = T(i,i);
-        
-        //     for ( size_t  i = 0; i < nrows; ++i )
-        //     {
-        //         auto  V_i = V.column(i);
-        //         auto  T_i = T.column(i);
-
-        //         add( -diag_T(i), V_i, T_i );
-        //     }// for
-
-        //     // I - Θ ∗ (Δ·V - V·diag(Δ·V)) = I - Θ ∗ T
-        //     // compute I - Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
-        //     hmul_theta( T );
-
-        //     //
-        //     // compute error ||V-T||_F
-        //     //
-
-        //     real_t  error = 0;
-
-        //     if (( error_type == "frobenius" ) || ( error_type == "fro" ))
-        //     {
-        //         add( value_t(-1), T, V );
-        //         error = norm_F( V );
-        //     }// if
-        //     else if (( error_type == "maximum" ) || ( error_type == "max" ))
-        //     {
-        //         add( value_t(-1), T, V );
-        //         error = norm_max( V );
-        //     }// if
-        //     else if (( error_type == "residual" ) || ( error_type == "res" ))
-        //     {
-        //         // // extract eigenvalues as diag( M + Δ·V ) and eigenvectors as V
-        //         // // (T holds new V)
-        //         // std::vector< value_t >  E( n );
-
-        //         // for ( int  i = 0; i < n; ++i )
-        //         //     E[i] = diag_M[ i ] + dot( n, Delta + i, n, T.data() + i*n, 1 );
-
-        //         // // copy diagonal back to M
-        //         // copy( n, diag_M.data(), 1, M.data(), n+1 );
-        //         // gemm( 'N', 'N', n, n, n, value_t(1), M.data(), n, T.data(), n, value_t(0), V.data(), n );
-        //         // for ( int  i = 0; i < n; ++i )
-        //         // {
-        //         //     axpy( n, -E[i], T.data() + i*n, 1, V.data() + i*n, 1 );
-        //         //     M[ i*n+i ] = value_t(0); // reset diagonal for Delta
-        //         // }// for
+            // • ZT := Z·diag(T)
+            auto  ZT = impl::matrix::copy( *Z );
             
-        //         // error = normF( n, n, V ) / ( M_norm * norm1( n, n, T ) );
-        //     }// if
-        //     else
-        //         HLR_ERROR( "unknown error type" );
-
-        //     //
-        //     // test stop criterion
-        //     //
-
-        //     copy( T, V );
-
-        //     if ( verbosity >= 1 )
-        //     {
-        //         std::cout << "    sweep " << sweep << " : error = " << error;
-
-        //         if ( sweep > 0 )
-        //             std::cout << ", reduction = " << error / old_error;
+            hlr::multiply_diag( *ZT, dT );
             
-        //         std::cout << std::endl;
-        //     }// if
+            // {
+            //     auto  T1 = matrix::convert_to_dense( *ZT );
 
-        //     if (( sweep > 0 ) && ( error / old_error > real_t(10) ))
-        //         return { vector< value_t >(), matrix< value_t >() };
-        
-        //     old_error = error;
-        
-        //     ++sweep;
+            //     io::matlab::write( T1->mat(), "ZT" );
+            // }
 
-        //     if ( ! is_null( stat ) )
-        //         stat->nsweeps = sweep;
-        
-        //     if ( error < tolerance )
-        //     {
-        //         if ( ! is_null( stat ) )
-        //             stat->converged = true;
+            // • T := - T + ZT
+            T->scale( value_t(-1) );
+            impl::add( value_t(1), *ZT, *T, acc, apx );
+
+            // {
+            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
+            //     auto  DT = impl::matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( DT->mat(), Hpro::to_string( "Rb%d", sweep ) );
+            // }
+
+            // {
+            //     auto  T1 = matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( T1->mat(), "T" );
+            // }
+
+            //
+            // T := I + G ⊗ T
+            //
             
-        //         break;
-        //     }// if
+            // • T := G ⊗ T
+            impl::multiply_hadamard( value_t(1), *T, *G, acc, apx );
+                                     
+            // {
+            //     auto  T1 = matrix::convert_to_dense( *T );
 
-        //     if ( ! std::isnormal( error ) )
-        //         break;
+            //     io::matlab::write( T1->mat(), "T" );
+            // }
+
+            // • T := I - T
+            hlr::add_identity( *T, value_t(1) );
+
+            // {
+            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
+            //     auto  DT = impl::matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( DT->mat(), Hpro::to_string( "Rc%d", sweep ) );
+            // }
+
+            // {
+            //     auto  T1 = matrix::convert_to_dense( *T );
+
+            //     io::matlab::write( T1->mat(), "T" );
+            // }
+
+            //
+            // compute error ||Z-T||_F
+            //
+
+            impl::add( value_t(-1), *T, *Z, acc, apx );
+
+            auto  error = impl::norm::frobenius( *Z );
+
+            //
+            // test stop criterion
+            //
+
+            impl::matrix::copy_to( *T, *Z );
+
+            // {
+            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
+            //     auto  DZ = impl::matrix::convert_to_dense( *Z );
+
+            //     io::matlab::write( DZ->mat(), Hpro::to_string( "Z%d", sweep ) );
+            // }
+
+            if ( verbosity >= 1 )
+            {
+                std::cout << "    sweep " << sweep << " : error = " << error;
+
+                if ( sweep > 0 )
+                    std::cout << ", reduction = " << error / old_error;
+            
+                std::cout << std::endl;
+            }// if
+
+            if (( sweep > 0 ) && ( error / old_error > real_t(10) ))
+                break;
+        
+            old_error = error;
+        
+            ++sweep;
+
+            if ( error < tolerance )
+                break;
+
+            if ( ! std::isnormal( error ) )
+                break;
         
         } while ( sweep < max_sweeps );
 
-        // reset afterwards
-        A = std::move( M );
+        io::eps::print( *Z, "V", "noid,sv" );
+            
+        auto  T2 = impl::matrix::copy( *M );
+            
+        impl::multiply( value_t(1),
+                        apply_normal, *Δ,
+                        apply_normal, *Z,
+                        *T2, acc, apx );
+
+        auto  E = impl::matrix::diagonal( *T2 );
+
+        toc = timer::since( tic );
+
+        std::cout << "H-IPT in    " << format_time( toc ) << " (" << sweep << " sweeps)" << std::endl;
+                
+        {
+            auto  DM = matrix::convert_to_dense( *M );
+            auto  V  = matrix::convert_to_dense( *Z );
+
+            io::matlab::write( V->mat(), "V2" );
+            io::matlab::write( E, "E2" );
+
+            std::cout << "    error = " << format_error( blas::everror( DM->mat(), E, V->mat() ) ) << std::endl;
+        }
 
         return;
     }

@@ -388,17 +388,15 @@ eigen_ipt ( matrix< value_t > &                                M,
     }// for
 
     //
-    // compute I + Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
+    // compute I + Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj ), i ≠ j
     //
     auto  hmul_theta =  [&diag_M] ( matrix< value_t > &  A )
                         {
                             for ( size_t  j = 0; j < A.ncols(); ++j )
                                 for ( size_t  i = 0; i < A.nrows(); ++i )
                                 {
-                                    if ( i == j )
-                                        A(i,j) += value_t(1);
-                                    else
-                                        A(i,j) *= value_t(1) / ( diag_M(i) - diag_M(j) );
+                                    if ( i == j ) A(i,j)  = value_t(1); // Θ_ii = 0 ⇒ (Θ⊗M)_ii = 0
+                                    else          A(i,j) *= value_t(1) / ( diag_M(i) - diag_M(j) );
                                 }// for
                         };
 
@@ -416,6 +414,8 @@ eigen_ipt ( matrix< value_t > &                                M,
     {
         // T = Δ·V
         blas::prod( value_t(1), Delta, V, value_t(0), T );
+
+        // io::matlab::write( T, Hpro::to_string( "Ta%d", sweep ) );
         
         // T = V·diag(Δ·V) - Δ·V = V·diag(T) - T
         // computed as T(i,:) = T(i,i) · V(:,i) - T(:,i)
@@ -431,9 +431,13 @@ eigen_ipt ( matrix< value_t > &                                M,
             blas::add( diag_T(i), V_i, T_i );
         }// for
 
+        // io::matlab::write( T, Hpro::to_string( "Tb%d", sweep ) );
+        
         // I - Θ ∗ (V·diag(Δ·V) - Δ·V) = I - Θ ∗ T
         hmul_theta( T );
 
+        // io::matlab::write( T, Hpro::to_string( "Tc%d", sweep ) );
+        
         //
         // compute error ||V-T||_F
         //
@@ -479,6 +483,8 @@ eigen_ipt ( matrix< value_t > &                                M,
 
         copy( T, V );
 
+        // io::matlab::write( V, Hpro::to_string( "V%d", sweep ) );
+        
         if ( verbosity >= 1 )
         {
             std::cout << "    sweep " << sweep << " : error = " << error;

@@ -377,6 +377,16 @@ print ( const Hpro::TBlockCluster &  cl,
 //
 // print matrix <M> to file <filename>
 //
+// options:  nosize    - do not print size information in blocks
+//           pattern   - print non-zero coefficient pattern
+//           norank    - do not print rank of blocks
+//           nonempty  - only print nonempty blocks
+//           indexset  - print index set data per block
+//           noid      - do not print id of block
+//           noinnerid - do not print id of non-leaf blocks
+//
+// Multiple options need to be comma separated.
+//
 template < typename value_t >
 void
 print ( const Hpro::TMatrix< value_t > &  M,
