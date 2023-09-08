@@ -395,7 +395,7 @@ struct lazy_accumulator
                         else
                             HLR_ERROR( "unsupported matrix type: " + B->typestr() );
                     }// if
-                    else if ( matrix::matrix::is_lowrankS( A ) )
+                    else if ( matrix::is_lowrankS( A ) )
                     {
                         auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
 

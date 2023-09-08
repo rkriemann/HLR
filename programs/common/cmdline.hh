@@ -128,7 +128,7 @@ parse ( int argc, char ** argv )
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
-        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -316,14 +316,15 @@ parse ( int argc, char ** argv )
                   << "  - tlr/blr : flat clustering, i.e., without hierarchy" << std::endl
                   << "  - mblr    : MBLR clustering with <nlvl> level" << std::endl
                   << "  - tileh   : Tile-H / LatticeH for first level and BSP for rest" << std::endl
-                  << "  - bsp/h   : binary space partitioning" << std::endl;
+                  << "  - bsp/h   : binary space partitioning" << std::endl
+                  << "  - sfc     : Hilber curve base partitioning (optional: -binary/-blr)" << std::endl;
 
         std::exit( 0 );
     }// if
     
     if ( adm == "help" )
     {
-        std::cout << "Clustering Techniques:" << std::endl
+        std::cout << "Admissibility Conditions:" << std::endl
                   << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
                   << "  - weak          : weak geometric admissibility" << std::endl
                   << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
