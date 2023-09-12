@@ -16,7 +16,8 @@
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/utils/io.hh>
 #include <hlr/arith/blas_eigen.hh>
-#include <hlr/arith/ipt.hh>
+
+#include <hlr/seq/ipt.hh>
 
 using namespace hlr;
 
@@ -239,13 +240,13 @@ program_main ()
         tic = timer::now();
         
         auto  apx      = approx_t();
-        auto  [ V, E ] = ipt( *A, cmdline::eps, apx );
+        auto  [ V, E ] = impl::ipt( *A, cmdline::eps, acc, apx );
         
         io::eps::print( *V, "V", "noid,sv" );
             
         toc = timer::since( tic );
 
-        std::cout << "H-IPT in    " << format_time( toc ) << " (" << sweep << " sweeps)" << std::endl;
+        std::cout << "H-IPT in    " << format_time( toc ) << std::endl;
                 
         {
             auto  DM = matrix::convert_to_dense( *M );

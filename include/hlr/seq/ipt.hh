@@ -1,5 +1,5 @@
-#ifndef __HLR_ARITH_IPT_HH
-#define __HLR_ARITH_IPT_HH
+#ifndef __HLR_SEQ_IPT_HH
+#define __HLR_SEQ_IPT_HH
 //
 // Project     : HLR
 // Module      : ipt.hh
@@ -12,9 +12,9 @@
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/norm.hh>
+#include <hlr/seq/matrix.hh>
 
-namespace hlr
-{
+namespace hlr { namespace seq {
 
 namespace detail
 {
@@ -43,11 +43,14 @@ std::pair< std::unique_ptr< Hpro::TMatrix< value_t > >,
            blas::vector< value_t > >
 ipt ( const Hpro::TMatrix< value_t > &  M,
       const double                      tolerance,
+      const accuracy &                  acc,
       const approx_t &                  apx,
       const uint                        verbosity = 0 )
 {
     using  real_t = real_type_t< value_t >;
 
+    namespace impl = hlr::seq;
+    
     //
     // initial setup:
     //
@@ -62,11 +65,11 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
     //   Z = I
     //
 
-    auto  d = matrix::diagonal( M );
-    auto  Δ = matrix::copy( M );
+    auto  d = impl::matrix::diagonal( M );
+    auto  Δ = impl::matrix::copy( M );
     auto  G = detail::build_G( M, d, acc, apx );
-    auto  Z = matrix::identity( M );
-    auto  T = matrix::copy_struct( M );
+    auto  Z = impl::matrix::identity( M );
+    auto  T = impl::matrix::copy_struct( M );
 
     blas::scale( value_t(-1), d );
     hlr::add_diag( *Δ, d );
@@ -89,10 +92,10 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
         //
             
         // T = Δ·Z
-        multiply( value_t(1),
-                  apply_normal, *Δ,
-                  apply_normal, *Z,
-                  *T, acc, apx );
+        impl::multiply( value_t(1),
+                        apply_normal, *Δ,
+                        apply_normal, *Z,
+                        *T, acc, apx );
 
         // {
         //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
@@ -106,14 +109,14 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
         //     io::matlab::write( T1->mat(), "T" );
         // }
 
-        auto  dT = matrix::diagonal( *T );
+        auto  dT = impl::matrix::diagonal( *T );
 
         //
         // T := Z·diag(T) - T
         //
             
         // • ZT := Z·diag(T)
-        auto  ZT = matrix::copy( *Z );
+        auto  ZT = impl::matrix::copy( *Z );
             
         hlr::multiply_diag( *ZT, dT );
             
@@ -125,7 +128,7 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
 
         // • T := - T + ZT
         T->scale( value_t(-1) );
-        add( value_t(1), *ZT, *T, acc, apx );
+        impl::add( value_t(1), *ZT, *T, acc, apx );
 
         // {
         //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
@@ -145,7 +148,7 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
         //
             
         // • T := G ⊗ T
-        multiply_hadamard( value_t(1), *T, *G, acc, apx );
+        impl::multiply_hadamard( value_t(1), *T, *G, acc, apx );
                                      
         // {
         //     auto  T1 = matrix::convert_to_dense( *T );
@@ -173,7 +176,7 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
         // compute error ||Z-T||_F
         //
 
-        add( value_t(-1), *T, *Z, acc, apx );
+        impl::add( value_t(-1), *T, *Z, acc, apx );
 
         auto  error = norm::frobenius( *Z );
 
@@ -181,7 +184,7 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
         // test stop criterion
         //
 
-        matrix::copy_to( *T, *Z );
+        impl::matrix::copy_to( *T, *Z );
 
         // {
         //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
@@ -222,7 +225,7 @@ ipt ( const Hpro::TMatrix< value_t > &  M,
                     apply_normal, *Z,
                     *T2, acc, apx );
 
-    auto  E = matrix::diagonal( *T2 );
+    auto  E = impl::matrix::diagonal( *T2 );
 
     return { std::move( Z ), std::move( E ) };
 }
@@ -234,7 +237,7 @@ namespace detail
 // compute matrix G for IPT iteration
 //
 template < typename value_t,
-           approximation_type approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_G ( const Hpro::TMatrix< value_t > &  M,
           const blas::vector< value_t > &   d,
@@ -330,6 +333,6 @@ build_G ( const Hpro::TMatrix< value_t > &  M,
 
 }// namespace detail
 
-}// namespace hlr
+}}// namespace hlr::seq
 
-#endif // __HLR_ARITH_IPT_HH
+#endif // __HLR_SEQ_IPT_HH
