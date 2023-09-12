@@ -16,6 +16,7 @@
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/utils/io.hh>
 #include <hlr/arith/blas_eigen.hh>
+#include <hlr/arith/ipt.hh>
 
 using namespace hlr;
 
@@ -110,104 +111,6 @@ read_csv ( const std::string &  filename )
     }// while
 
     return S;
-}
-
-//
-// see IPT iteration below
-//
-template < typename value_t,
-           typename approx_t >
-std::unique_ptr< Hpro::TMatrix< value_t > >
-build_G ( const Hpro::TMatrix< value_t > &  M,
-          const blas::vector< value_t > &   d,
-          const accuracy &                  acc,
-          const approx_t &                  apx )
-{
-    if ( is_blocked( M ) )
-    {
-        auto  BM = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
-        auto  N  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
-        auto  B  = ptrcast( N.get(), Hpro::TBlockMatrix< value_t > );
-
-        B->copy_struct_from( BM );
-        
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                if ( BM->block( i, j ) != nullptr )
-                {
-                    auto  B_ij = build_G( * BM->block( i, j ), d, acc, apx );
-                    
-                    B_ij->set_parent( B );
-                    B->set_block( i, j, B_ij.release() );
-                }// if
-            }// for
-        }// for
-
-        N->set_id( M.id() );
-        
-        return N;
-    }// if
-    else if ( matrix::is_dense( M ) )
-    {
-        auto  N  = M.copy();
-        auto  D  = ptrcast( N.get(), matrix::dense_matrix< value_t > );
-        auto  DD = D->mat();
-            
-        HLR_ASSERT( ! D->is_compressed() );
-            
-        for ( uint  j = 0; j < DD.ncols(); ++j )
-        {
-            auto  pj  = M.col_ofs() + j;
-            auto  d_j = d( pj );
-            
-            for ( uint  i = 0; i < DD.nrows(); ++i )
-            {
-                auto  pi  = M.row_ofs() + i;
-                auto  d_i = d( pi );
-
-                if ( pi == pj )
-                    DD(i,j) = value_t(0);
-                else
-                    DD(i,j) = value_t(1) / ( d_i - d_j );
-            }// for
-        }// for
-        
-        N->set_id( M.id() );
-        
-        return N;
-    }// if
-    else if ( matrix::is_lowrank( M ) )
-    {
-        HLR_ASSERT( M.row_is() != M.col_is() );
-        
-        auto  N = M.copy_struct();
-        auto  R = ptrcast( N.get(), matrix::lrmatrix< value_t > );
-
-        // TODO: make efficient!
-        auto  D = blas::matrix< value_t >( M.nrows(), M.ncols() );
-        
-        for ( uint  j = 0; j < D.ncols(); ++j )
-        {
-            auto  d_j = d( M.col_ofs() + j );
-            
-            for ( uint  i = 0; i < D.nrows(); ++i )
-            {
-                auto  d_i = d( M.row_ofs() + i );
-                
-                D(i,j) = value_t(1) / ( d_i - d_j );
-            }// for
-        }// for
-
-        auto  [ U, V ] = apx( D, acc );
-
-        R->set_lrmat( std::move( U ), std::move( V ) );
-
-        return  N;
-    }// if
-    else
-        HLR_ERROR( "todo" );
 }
 
 //
@@ -331,206 +234,27 @@ program_main ()
     }
     
     {
-        //
-        // initial setup:
-        //
-        //   D = diag(M)
-        //
-        //   Δ = M - D
-        //
-        //       ⎧ 1 / ( d_ii - d_jj ) , i ≠ j
-        //   G = ⎨ 
-        //       ⎩ 0                   , i = j
-        //
-        //   Z = I
-        //
-
-        tic = timer::now();
-        
         using approx_t = approx::SVD< value_t >;
         
-        auto  apx = approx_t();
-            
-        auto  M = impl::matrix::copy( *A );
-        auto  d = impl::matrix::diagonal( *M );
-        auto  Δ = impl::matrix::copy( *M );
-        auto  G = build_G( *M, d, acc, apx );
-        auto  Z = impl::matrix::identity( *M );
-        auto  T = impl::matrix::copy_struct( *M );
-
-        blas::scale( value_t(-1), d );
-        hlr::add_diag( *Δ, d );
+        tic = timer::now();
         
-        //
-        // iteration
-        //
-
-        using  real_t = real_type_t< value_t >;
-
-        uint  sweep      = 0;
-        uint  max_sweeps = M->nrows();
-        auto  tolerance  = cmdline::eps;
-        auto  old_error  = real_t(1);
+        auto  apx      = approx_t();
+        auto  [ V, E ] = ipt( *A, cmdline::eps, apx );
         
-        do
-        {
-            //
-            // iteration step:
-            //
-            //   F(Z) := I + G ⊗ ( Z·diag(Δ·Z) - Δ·Z )
-            //         = I + G ⊗ ( Z·diag(T) - T )   with T = Δ·Z
-            //
+        io::eps::print( *V, "V", "noid,sv" );
             
-            // T = Δ·Z
-            impl::multiply( value_t(1),
-                            apply_normal, *Δ,
-                            apply_normal, *Z,
-                            *T, acc, apx );
-
-            // {
-            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
-            //     auto  DT = impl::matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( DT->mat(), Hpro::to_string( "Ra%d", sweep ) );
-            // }
-            // {
-            //     auto  T1 = matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( T1->mat(), "T" );
-            // }
-
-            auto  dT = impl::matrix::diagonal( *T );
-
-            //
-            // T := Z·diag(T) - T
-            //
-            
-            // • ZT := Z·diag(T)
-            auto  ZT = impl::matrix::copy( *Z );
-            
-            hlr::multiply_diag( *ZT, dT );
-            
-            // {
-            //     auto  T1 = matrix::convert_to_dense( *ZT );
-
-            //     io::matlab::write( T1->mat(), "ZT" );
-            // }
-
-            // • T := - T + ZT
-            T->scale( value_t(-1) );
-            impl::add( value_t(1), *ZT, *T, acc, apx );
-
-            // {
-            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
-            //     auto  DT = impl::matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( DT->mat(), Hpro::to_string( "Rb%d", sweep ) );
-            // }
-
-            // {
-            //     auto  T1 = matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( T1->mat(), "T" );
-            // }
-
-            //
-            // T := I + G ⊗ T
-            //
-            
-            // • T := G ⊗ T
-            impl::multiply_hadamard( value_t(1), *T, *G, acc, apx );
-                                     
-            // {
-            //     auto  T1 = matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( T1->mat(), "T" );
-            // }
-
-            // • T := I - T
-            hlr::add_identity( *T, value_t(1) );
-
-            // {
-            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
-            //     auto  DT = impl::matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( DT->mat(), Hpro::to_string( "Rc%d", sweep ) );
-            // }
-
-            // {
-            //     auto  T1 = matrix::convert_to_dense( *T );
-
-            //     io::matlab::write( T1->mat(), "T" );
-            // }
-
-            //
-            // compute error ||Z-T||_F
-            //
-
-            impl::add( value_t(-1), *T, *Z, acc, apx );
-
-            auto  error = impl::norm::frobenius( *Z );
-
-            //
-            // test stop criterion
-            //
-
-            impl::matrix::copy_to( *T, *Z );
-
-            // {
-            //     // auto  DV = io::matlab::read( Hpro::to_string( "V%d", sweep ) );
-            //     auto  DZ = impl::matrix::convert_to_dense( *Z );
-
-            //     io::matlab::write( DZ->mat(), Hpro::to_string( "Z%d", sweep ) );
-            // }
-
-            if ( verbosity >= 1 )
-            {
-                std::cout << "    sweep " << sweep << " : error = " << error;
-
-                if ( sweep > 0 )
-                    std::cout << ", reduction = " << error / old_error;
-            
-                std::cout << std::endl;
-            }// if
-
-            if (( sweep > 0 ) && ( error / old_error > real_t(10) ))
-                break;
-        
-            old_error = error;
-        
-            ++sweep;
-
-            if ( error < tolerance )
-                break;
-
-            if ( ! std::isnormal( error ) )
-                break;
-        
-        } while ( sweep < max_sweeps );
-
-        io::eps::print( *Z, "V", "noid,sv" );
-            
-        auto  T2 = impl::matrix::copy( *M );
-            
-        impl::multiply( value_t(1),
-                        apply_normal, *Δ,
-                        apply_normal, *Z,
-                        *T2, acc, apx );
-
-        auto  E = impl::matrix::diagonal( *T2 );
-
         toc = timer::since( tic );
 
         std::cout << "H-IPT in    " << format_time( toc ) << " (" << sweep << " sweeps)" << std::endl;
                 
         {
             auto  DM = matrix::convert_to_dense( *M );
-            auto  V  = matrix::convert_to_dense( *Z );
+            auto  DV = matrix::convert_to_dense( *V );
 
-            io::matlab::write( V->mat(), "V2" );
+            io::matlab::write( DV->mat(), "V2" );
             io::matlab::write( E, "E2" );
 
-            std::cout << "    error = " << format_error( blas::everror( DM->mat(), E, V->mat() ) ) << std::endl;
+            std::cout << "    error = " << format_error( blas::everror( DM->mat(), E, DV->mat() ) ) << std::endl;
         }
 
         return;
