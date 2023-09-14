@@ -902,9 +902,13 @@ lu ( Hpro::TMatrix< value_t > &     M,
     {
         accu.apply_leaf( value_t(-1), M, acc, approx );
         
-        auto  D = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        blas::invert( DD );
         
-        invert< value_t >( *D );
+        if ( D->is_compressed() )
+            D->set_matrix( std::move( DD ), acc );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );

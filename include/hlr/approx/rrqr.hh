@@ -62,6 +62,32 @@ trunc_rank ( const blas::matrix< value_t > &  R,
     return acc.trunc_rank( S );
 }
 
+//
+// convert U·V' into W·S·X' with
+// orthogonal W, X and singular values S
+//
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+make_ortho ( blas::matrix< value_t > &  U,
+             blas::matrix< value_t > &  V )
+{
+    // U is orthonormal, so factorize V only
+    // U·V' = U (Us·Ss·Vs')
+    //      = (U·Vs) • Ss • Us
+    //      =:  W    • Ss • X'
+    auto  Us = V;
+    auto  Vs = blas::matrix< value_t >();
+    auto  Ss = blas::vector< real_type_t< value_t > >();
+
+    blas::svd( Us, Ss, Vs );
+
+    auto  W = blas::prod( U, Vs );
+
+    return { std::move( W ), std::move( Ss ), std::move( Us ) };
+}
+
 }// namespace detail
 
 //
@@ -140,10 +166,22 @@ rrqr ( blas::matrix< value_t > &  M,
     return { std::move( U ), std::move( V ) };
 }
 
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( blas::matrix< value_t > &  M,
+             const Hpro::TTruncAcc &    acc )
+{
+    auto [ U, V ] = rrqr( M, acc );
+
+    return make_ortho( U, V );
+}
+
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
-template <typename T>
+template < typename T >
 std::pair< blas::matrix< T >, blas::matrix< T > >
 rrqr ( const blas::matrix< T > &  U,
        const blas::matrix< T > &  V,
@@ -226,6 +264,19 @@ rrqr ( const blas::matrix< T > &  U,
     }// else
 }
 
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( const blas::matrix< value_t > &  U,
+             const blas::matrix< value_t > &  V,
+             const Hpro::TTruncAcc &          acc )
+{
+    auto [ TU, TV ] = rrqr( U, V, acc );
+
+    return make_ortho( U, V );
+}
+
 //
 // compute low-rank approximation of a sum Σ_i U_i V_i^H using RRQR
 //
@@ -299,6 +350,19 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     
         return rrqr( U_all, V_all, acc );
     }// else
+}
+
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( const std::list< blas::matrix< value_t > > &  U,
+             const std::list< blas::matrix< value_t > > &  V,
+             const Hpro::TTruncAcc &                       acc )
+{
+    auto [ TU, TV ] = rrqr( U, V, acc );
+
+    return make_ortho( U, V );
 }
 
 //
@@ -439,6 +503,39 @@ struct RRQR
                   const Hpro::TTruncAcc &                       acc ) const
     {
         return hlr::approx::rrqr( U, T, V, acc );
+    }
+
+    //
+    // matrix approximation routines (orthogonal version)
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::rrqr_ortho( M, acc );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::rrqr_ortho( U, V, acc );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::rrqr_ortho( U, V, acc );
     }
 
     //

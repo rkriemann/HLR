@@ -575,7 +575,7 @@ struct SVD
     }
 
     //
-    // matrix approximation routines
+    // matrix approximation routines (orthogonal version)
     //
     
     std::tuple< blas::matrix< value_t >,
