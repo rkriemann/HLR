@@ -12,9 +12,10 @@
 #include <deque>
 #include <random>
 
-#include <hlr/approx/traits.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/traits.hh>
+#include <hlr/approx/tools.hh>
 
 namespace hlr { namespace approx {
 
@@ -30,11 +31,11 @@ namespace detail
 //
 template < typename operator_t >
 blas::matrix< typename operator_t::value_t >
-rand_column_basis ( const operator_t &       M,
-                    const Hpro::TTruncAcc &  acc,
-                    const uint               block_size,
-                    const uint               power_steps,
-                    const uint               oversampling )
+rand_column_basis ( const operator_t &  M,
+                    const accuracy &    acc,
+                    const uint          block_size,
+                    const uint          power_steps,
+                    const uint          oversampling )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -213,7 +214,7 @@ template < typename value_t >
 blas::matrix< value_t >
 rand_column_basis ( const blas::matrix< value_t > &  U,
                     const blas::matrix< value_t > &  V,
-                    const Hpro::TTruncAcc &          acc,
+                    const accuracy &                 acc,
                     const uint                       block_size,
                     const uint                       power_steps,
                     const uint                       oversampling )
@@ -369,13 +370,14 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 randlr  ( const operator_t &       M,
-          const Hpro::TTruncAcc &  acc )
+          const accuracy &         acc )
 {
     using  value_t = typename operator_t::value_t;
     
     auto  W = rand_column_basis( M, acc, 2, 0, 0 );
     auto  X = blas::matrix< value_t >( ncols( M ), W.ncols() );
 
+    // W·W'·M ≈ M ⇒ W·(M'·W)' =: W·X' ≈ M
     prod( value_t(1), Hpro::apply_adjoint, M, W, X );
 
     return { std::move( W ), std::move( X ) };
@@ -490,7 +492,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( blas::matrix< value_t > &  M,
-         const Hpro::TTruncAcc &    acc )
+         const accuracy &           acc )
 {
     // for update statistics
     HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), M.ncols() ) );
@@ -499,11 +501,23 @@ randlr ( blas::matrix< value_t > &  M,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+randlr_ortho ( blas::matrix< value_t > &  M,
+               const accuracy &           acc )
+{
+    auto  [ U, V ] = randlr( M, acc );
+
+    return detail::make_ortho( U, V );
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( const blas::matrix< value_t > &  U,
          const blas::matrix< value_t > &  V,
-         const Hpro::TTruncAcc &          acc )
+         const accuracy &                 acc )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -556,11 +570,24 @@ randlr ( const blas::matrix< value_t > &  U,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+randlr_ortho ( const blas::matrix< value_t > &  U,
+               const blas::matrix< value_t > &  V,
+               const accuracy &                 acc )
+{
+    auto  [ TU, TV ] = randlr( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( const std::list< blas::matrix< value_t > > &  U,
          const std::list< blas::matrix< value_t > > &  V,
-         const Hpro::TTruncAcc &                       acc )
+         const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == V.size() );
 
@@ -606,12 +633,25 @@ randlr ( const std::list< blas::matrix< value_t > > &  U,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+randlr_ortho ( const std::list< blas::matrix< value_t > > &  U,
+               const std::list< blas::matrix< value_t > > &  V,
+               const accuracy &                              acc )
+{
+    auto  [ TU, TV ] = randlr( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 randlr ( const std::list< blas::matrix< value_t > > &  U,
          const std::list< blas::matrix< value_t > > &  T,
          const std::list< blas::matrix< value_t > > &  V,
-         const Hpro::TTruncAcc &                       acc )
+         const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -676,10 +716,14 @@ struct RandLR
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = true;
     
+    //
+    // matrix approximation routines
+    //
+    
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::randlr( M, acc );
     }
@@ -688,7 +732,7 @@ struct RandLR
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::randlr( U, V, acc );
     }
@@ -697,7 +741,7 @@ struct RandLR
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::randlr( U, V, acc );
     }
@@ -707,7 +751,7 @@ struct RandLR
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::randlr( U, T, V, acc );
     }
@@ -716,9 +760,42 @@ struct RandLR
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const Hpro::TTruncAcc &  acc ) const
+                  const accuracy &         acc ) const
     {
         return detail::randlr< operator_t >( op, acc );
+    }
+
+    //
+    // matrix approximation routines (orthogonal version)
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::randlr_ortho( M, acc );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::randlr_ortho( U, V, acc );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::randlr_ortho( U, V, acc );
     }
 
     //
@@ -728,7 +805,7 @@ struct RandLR
     template < typename operator_t >
     blas::matrix< typename operator_t::value_t >
     column_basis ( const operator_t &       op,
-                   const Hpro::TTruncAcc &  acc ) const
+                   const accuracy &         acc ) const
     {
         return detail::rand_column_basis< operator_t >( op, acc, 2, 0, 0 );
     }
