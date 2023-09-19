@@ -20,12 +20,13 @@ using Hpro::idx_t;
 // return low-rank approximation of M with accuracy <acc>
 //
 template < typename operator_t >
-std::pair< blas::matrix< typename operator_t::value_t >,
-           blas::matrix< typename operator_t::value_t > >
-randsvd ( const operator_t &       M,
-          const Hpro::TTruncAcc &  acc,
-          const uint               power_steps,
-          const uint               oversampling )
+std::tuple< blas::matrix< typename operator_t::value_t >,
+            blas::vector< real_type_t< typename operator_t::value_t > >,
+            blas::matrix< typename operator_t::value_t > >
+randsvd_ortho ( const operator_t &       M,
+                const Hpro::TTruncAcc &  acc,
+                const uint               power_steps,
+                const uint               oversampling )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -61,29 +62,45 @@ randsvd ( const operator_t &       M,
     // A = Y · V_k, B = B^T · U_k
     auto  Uk = blas::matrix< value_t >( R_B, blas::range::all, blas::range( 0, k-1 ) );
     auto  Vk = blas::matrix< value_t >( V,   blas::range::all, blas::range( 0, k-1 ) );
+    auto  Sk = blas::vector< value_t >( S, k );
     
     auto  OU = blas::prod( value_t(1), Q,  Vk );
     auto  OV = blas::prod( value_t(1), BT, Uk );
 
-    if ( nrows_M < ncols_M )
-        blas::prod_diag( OU, S, k );
-    else
-        blas::prod_diag( OV, S, k );
+    return { std::move( OU ), std::move( blas::copy( Sk ) ), std::move( OV ) };
+}
 
-    return { std::move( OU ), std::move( OV ) };
+//
+// return low-rank approximation of M with accuracy <acc>
+//
+template < typename operator_t >
+std::pair< blas::matrix< typename operator_t::value_t >,
+           blas::matrix< typename operator_t::value_t > >
+randsvd ( const operator_t &       M,
+          const Hpro::TTruncAcc &  acc,
+          const uint               power_steps,
+          const uint               oversampling )
+{
+    auto  [ U, S, V ] = randsvd_ortho( M, acc );
+    
+    if ( U.nrows() < V.nrows() ) blas::prod_diag_ip( U, S );
+    else                         blas::prod_diag_ip( V, S );
+
+    return { std::move( U ), std::move( V ) };
 }
 
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
 template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-randsvd ( const blas::matrix< value_t > &  U,
-          const blas::matrix< value_t > &  V,
-          const Hpro::TTruncAcc &          acc,
-          const uint                       power_steps,
-          const uint                       oversampling )
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+randsvd_ortho ( const blas::matrix< value_t > &  U,
+                const blas::matrix< value_t > &  V,
+                const Hpro::TTruncAcc &          acc,
+                const uint                       power_steps,
+                const uint                       oversampling )
 {
     using  real_t  = typename Hpro::real_type< value_t >::type_t;
 
@@ -100,11 +117,13 @@ randsvd ( const blas::matrix< value_t > &  U,
     if ( in_rank == 0 )
     {
         return { std::move( blas::matrix< value_t >( nrows_U, 0 ) ),
+                 std::move( blas::vector< real_t >( 0 ) ),
                  std::move( blas::matrix< value_t >( nrows_V, 0 ) ) };
     }// if
 
     if ( in_rank <= idx_t(acc.rank()) )
     {
+        HLR_ERROR( "TODO" );
         return { std::move( blas::copy( U ) ),
                  std::move( blas::copy( V ) ) };
     }// if
@@ -119,7 +138,7 @@ randsvd ( const blas::matrix< value_t > &  U,
     {
         auto  M = blas::prod( value_t(1), U, blas::adjoint(V) );
 
-        return randsvd( M, acc, power_steps, oversampling );
+        return randsvd_ortho( M, acc, power_steps, oversampling );
     }// if
     else
     {
@@ -153,35 +172,52 @@ randsvd ( const blas::matrix< value_t > &  U,
         // A = Y · V_k, B = B^T · U_k
         auto  Uk = blas::matrix< value_t >( U_svd, blas::range::all, blas::range( 0, out_rank-1 ) );
         auto  Vk = blas::matrix< value_t >( V_svd, blas::range::all, blas::range( 0, out_rank-1 ) );
+        auto  Sk = blas::vector< value_t >( S, out_rank );
 
         auto  OU = blas::prod( value_t(1), Q,    Vk );
         auto  OV = blas::prod( value_t(1), VUtQ, Uk );
 
-        if ( nrows_U < nrows_V )
-            blas::prod_diag( OU, S, out_rank );
-        else
-            blas::prod_diag( OV, S, out_rank );
-
-        return { std::move( OU ), std::move( OV ) };
+        return { std::move( OU ), std::move( blas::copy( Sk ) ), std::move( OV ) };
     }// else
+}
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+randsvd ( const blas::matrix< value_t > &  U,
+          const blas::matrix< value_t > &  V,
+          const accuracy &                 acc,
+          const uint                       power_steps,
+          const uint                       oversampling )
+{
+    auto  [ W, T, X ] = randsvd_ortho( U, V, acc, power_steps, oversampling );
+    
+    if ( W.nrows() < X.nrows() ) blas::prod_diag_ip( W, T );
+    else                         blas::prod_diag_ip( X, T );
+
+    return { std::move( W ), std::move( X ) };
 }
 
 //
 // compute low-rank approximation of a sum Σ_i U_i V_i^H using SVD
 //
 template < typename value_t >
-std::pair< blas::matrix< value_t >,
-           blas::matrix< value_t > >
-randsvd ( const std::list< blas::matrix< value_t > > &  U,
-          const std::list< blas::matrix< value_t > > &  V,
-          const Hpro::TTruncAcc &                       acc,
-          const uint                                    power_steps,
-          const uint                                    oversampling )
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+randsvd_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                const std::list< blas::matrix< value_t > > &  V,
+                const Hpro::TTruncAcc &                       acc,
+                const uint                                    power_steps,
+                const uint                                    oversampling )
 {
+    using real_t = real_type_t< value_t >;
+    
     HLR_ASSERT( U.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::vector< real_t >() ),
                  std::move( blas::matrix< value_t >() ) };
     
     //
@@ -242,8 +278,29 @@ randsvd ( const std::list< blas::matrix< value_t > > &  U,
         // truncate and return result
         //
     
-        return randsvd( U_all, V_all, acc, power_steps, oversampling );
+        return randsvd_ortho( U_all, V_all, acc, power_steps, oversampling );
     }// else
+}
+
+template < typename value_t >
+std::pair< blas::matrix< value_t >,
+           blas::matrix< value_t > >
+randsvd ( const std::list< blas::matrix< value_t > > &  U,
+          const std::list< blas::matrix< value_t > > &  V,
+          const accuracy &                              acc,
+          const uint                                    power_steps,
+          const uint                                    oversampling )
+{
+    if ( U.empty() )
+        return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::matrix< value_t >() ) };
+
+    auto  [ W, T, X ] = randsvd_ortho( U, V, acc, power_steps, oversampling );
+    
+    if ( W.nrows() < X.nrows() ) blas::prod_diag_ip( W, T );
+    else                         blas::prod_diag_ip( X, T );
+
+    return { std::move( W ), std::move( X ) };
 }
 
 //
@@ -405,6 +462,39 @@ struct RandSVD
                   const Hpro::TTruncAcc &  acc ) const
     {
         return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
+    }
+
+    //
+    // matrix approximation routines (orthogonal version)
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::randsvd_ortho( M, acc, power_steps, oversampling );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::randsvd_ortho( U, V, acc, power_steps, oversampling );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::randsvd_ortho( U, V, acc, power_steps, oversampling );
     }
 
     //

@@ -15,6 +15,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/tools.hh>
 
 namespace hlr { namespace approx {
 
@@ -427,6 +428,18 @@ aca ( blas::matrix< value_t > &  M,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+aca_ortho ( blas::matrix< value_t > &  M,
+            const Hpro::TTruncAcc &    acc )
+{
+    auto  [ U, V ] = aca( M, acc );
+
+    return detail::make_ortho( U, V );
+}
+
+template < typename value_t >
 std::list< std::pair< idx_t, idx_t > >
 aca_pivots ( blas::matrix< value_t > &  M,
              const Hpro::TTruncAcc &    acc )
@@ -496,6 +509,19 @@ aca ( const blas::matrix< value_t > &  U,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+aca_ortho ( const blas::matrix< value_t > &  U,
+            const blas::matrix< value_t > &  V,
+            const Hpro::TTruncAcc &          acc )
+{
+    auto  [ TU, TV ] = aca( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const std::list< blas::matrix< value_t > > &  U,
@@ -544,6 +570,19 @@ aca ( const std::list< blas::matrix< value_t > > &  U,
         
         return aca( op, pivot_search, acc, nullptr );
     }// else
+}
+
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+aca_ortho ( const std::list< blas::matrix< value_t > > &  U,
+            const std::list< blas::matrix< value_t > > &  V,
+            const Hpro::TTruncAcc &                       acc )
+{
+    auto  [ TU, TV ] = aca( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
 }
 
 template < typename value_t >
@@ -663,6 +702,39 @@ struct ACA
         auto  pivot_search = aca_pivot< operator_t >( op );
 
         return std::move( aca( op, pivot_search, acc, nullptr ) );
+    }
+
+    //
+    // matrix approximation routines (orthogonal version)
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::aca_ortho( M, acc );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::aca_ortho( U, V, acc );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::aca_ortho( U, V, acc );
     }
 };
 
