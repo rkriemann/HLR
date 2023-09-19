@@ -299,7 +299,9 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
 
             // background
-            prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -322,7 +324,9 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         {
             auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
-            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_H2_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
