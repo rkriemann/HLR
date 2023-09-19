@@ -26,14 +26,13 @@ namespace detail
 // Lanczos bidiagonalization for generic operator
 //
 template < typename operator_t >
-std::pair< blas::matrix< typename operator_t::value_t >,
-           blas::matrix< typename operator_t::value_t > >
-lanczos_base ( const operator_t &       M,
-               const Hpro::TTruncAcc &  acc,
+void
+lanczos_base ( const operator_t &                                            M,
+               const accuracy &                                              acc,
                std::deque< blas::vector< typename operator_t::value_t > > &  U,
                std::deque< blas::vector< typename operator_t::value_t > > &  V,
-               std::deque< real_type_t< typename operator_t::value_t > > &    alpha,
-               std::deque< real_type_t< typename operator_t::value_t > > &    beta )
+               std::deque< real_type_t< typename operator_t::value_t > > &   alpha,
+               std::deque< real_type_t< typename operator_t::value_t > > &   beta )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -135,7 +134,7 @@ template < typename operator_t >
 std::pair< blas::matrix< typename operator_t::value_t >,
            blas::matrix< typename operator_t::value_t > >
 lanczos ( const operator_t &       M,
-          const Hpro::TTruncAcc &  acc,
+          const accuracy &         acc,
           const bool               with_svd = false )
 {
     using  value_t = typename operator_t::value_t;
@@ -243,10 +242,11 @@ lanczos ( const operator_t &       M,
 }
 
 template < typename operator_t >
-std::pair< blas::matrix< typename operator_t::value_t >,
-           blas::matrix< typename operator_t::value_t > >
+std::tuple< blas::matrix< typename operator_t::value_t >,
+            blas::vector< real_type_t< typename operator_t::value_t > >,
+            blas::matrix< typename operator_t::value_t > >
 lanczos_ortho ( const operator_t &       M,
-                const Hpro::TTruncAcc &  acc,
+                const accuracy &         acc,
                 const bool               with_svd = false )
 {
     using  value_t = typename operator_t::value_t;
@@ -288,11 +288,12 @@ lanczos_ortho ( const operator_t &       M,
         auto  [ Usvd, Ssvd, Vsvd ] = blas::bdsvd( D, E );
         auto  k                    = acc.trunc_rank( Ssvd );
         
-        auto  Uk  = blas::matrix< real_t >( Usvd, blas::range::all, blas::range( 0, k-1 ) );
+        auto  rk  = blas::range( 0, k-1 );
+        auto  Uk  = blas::matrix< real_t >( Usvd, blas::range::all, rk );
         auto  Ukv = blas::copy< value_t, real_t >( Uk );
-        auto  Vk  = blas::matrix< real_t >( Vsvd, blas::range::all, blas::range( 0, k-1 ) );
+        auto  Vk  = blas::matrix< real_t >( Vsvd, blas::range::all, rk );
         auto  Vkv = blas::copy< value_t, real_t >( Vk );
-        auto  Sk  = blas::vector< value_t >( Ssvd, k );
+        auto  Sk  = blas::vector< value_t >( Ssvd, rk );
         
         //
         // form final low-rank matrices: U·U_k , V·V_k
@@ -358,7 +359,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( blas::matrix< value_t > &  M,
-          const Hpro::TTruncAcc &    acc,
+          const accuracy &           acc,
           const bool                 with_svd = false )
 {
     // for update statistics
@@ -372,7 +373,7 @@ std::tuple< blas::matrix< value_t >,
             blas::vector< real_type_t< value_t > >,
             blas::matrix< value_t > >
 lanczos_ortho ( blas::matrix< value_t > &  M,
-                const Hpro::TTruncAcc &    acc,
+                const accuracy &           acc,
                 const bool                 with_svd = false )
 {
     // for update statistics
@@ -389,7 +390,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const blas::matrix< value_t > &  U,
           const blas::matrix< value_t > &  V,
-          const Hpro::TTruncAcc &          acc,
+          const accuracy &                 acc,
           const bool                       with_svd = false )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
@@ -443,7 +444,7 @@ std::tuple< blas::matrix< value_t >,
             blas::matrix< value_t > >
 lanczos_ortho ( const blas::matrix< value_t > &  U,
                 const blas::matrix< value_t > &  V,
-                const Hpro::TTruncAcc &          acc,
+                const accuracy &                 acc,
                 const bool                       with_svd = false )
 {
     using  real_t = real_type_t< value_t >;
@@ -502,68 +503,13 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  V,
-          const Hpro::TTruncAcc &                       acc,
+          const accuracy &                              acc,
           const bool                                    with_svd = false )
 {
     assert( U.size() == V.size() );
 
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
-                 std::move( blas::matrix< value_t >() ) };
-    
-    //
-    // determine maximal rank
-    //
-
-    const size_t  nrows_U = U.front().nrows();
-    const size_t  nrows_V = V.front().nrows();
-    uint          in_rank = 0;
-
-    for ( auto &  U_i : U )
-        in_rank += U_i.ncols();
-
-    if ( in_rank >= std::min( nrows_U, nrows_V ) )
-    {
-        //
-        // perform dense approximation
-        //
-
-        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
-        auto  u_i = U.cbegin();
-        auto  v_i = V.cbegin();
-        
-        for ( ; u_i != U.cend(); ++u_i, ++v_i )
-            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
-
-        return detail::lanczos_ortho( M, acc, with_svd );
-    }// if
-    else
-    {
-        // for update statistics
-        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
-    
-        auto  op = operator_wrapper( U, V );
-
-        return detail::lanczos_ortho( op, acc, with_svd );
-    }// else
-}
-
-template < typename value_t >
-std::tuple< blas::matrix< value_t >,
-            blas::vector< real_type_t< value_t > >,
-            blas::matrix< value_t > >
-lanczos_ortho ( const std::list< blas::matrix< value_t > > &  U,
-                const std::list< blas::matrix< value_t > > &  V,
-                const Hpro::TTruncAcc &                       acc,
-                const bool                                    with_svd = false )
-{
-    using  real_t = real_type_t< value_t >;
-    
-    assert( U.size() == V.size() );
-
-    if ( U.empty() )
-        return { std::move( blas::matrix< value_t >() ),
-                 std::move( blas::vector< real_t >( 0 ) ),
                  std::move( blas::matrix< value_t >() ) };
     
     //
@@ -604,12 +550,67 @@ lanczos_ortho ( const std::list< blas::matrix< value_t > > &  U,
 }
 
 template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+lanczos_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                const std::list< blas::matrix< value_t > > &  V,
+                const accuracy &                              acc,
+                const bool                                    with_svd = false )
+{
+    using  real_t = real_type_t< value_t >;
+    
+    assert( U.size() == V.size() );
+
+    if ( U.empty() )
+        return { std::move( blas::matrix< value_t >() ),
+                 std::move( blas::vector< real_t >( 0 ) ),
+                 std::move( blas::matrix< value_t >() ) };
+    
+    //
+    // determine maximal rank
+    //
+
+    const size_t  nrows_U = U.front().nrows();
+    const size_t  nrows_V = V.front().nrows();
+    uint          in_rank = 0;
+
+    for ( auto &  U_i : U )
+        in_rank += U_i.ncols();
+
+    if ( in_rank >= std::min( nrows_U, nrows_V ) )
+    {
+        //
+        // perform dense approximation
+        //
+
+        auto  M   = blas::matrix< value_t >( nrows_U, nrows_V );
+        auto  u_i = U.cbegin();
+        auto  v_i = V.cbegin();
+        
+        for ( ; u_i != U.cend(); ++u_i, ++v_i )
+            blas::prod( value_t(1), *u_i, blas::adjoint( *v_i ), value_t(1), M );
+
+        return detail::lanczos_ortho( M, acc, with_svd );
+    }// if
+    else
+    {
+        // for update statistics
+        HLR_APPROX_RANK_STAT( "lowrank " << std::min( nrows_U, nrows_V ) << " " << in_rank );
+    
+        auto  op = operator_wrapper( U, V );
+
+        return detail::lanczos_ortho( op, acc, with_svd );
+    }// else
+}
+
+template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 lanczos ( const std::list< blas::matrix< value_t > > &  U,
           const std::list< blas::matrix< value_t > > &  T,
           const std::list< blas::matrix< value_t > > &  V,
-          const Hpro::TTruncAcc &                       acc,
+          const accuracy &                              acc,
           const bool                                    with_svd = false )
 {
     HLR_ASSERT( U.size() == T.size() );
@@ -685,7 +686,7 @@ struct Lanczos
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::lanczos( M, acc, with_svd );
     }
@@ -694,7 +695,7 @@ struct Lanczos
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::lanczos( U, V, acc, with_svd );
     }
@@ -703,7 +704,7 @@ struct Lanczos
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::lanczos( U, V, acc, with_svd );
     }
@@ -713,7 +714,7 @@ struct Lanczos
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::lanczos( U, T, V, acc, with_svd );
     }
@@ -722,7 +723,7 @@ struct Lanczos
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const Hpro::TTruncAcc &  acc ) const
+                  const accuracy &         acc ) const
     {
         return detail::lanczos< operator_t >( op, acc );
     }

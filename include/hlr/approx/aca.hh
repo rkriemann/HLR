@@ -310,7 +310,7 @@ std::pair< blas::matrix< typename pivotsearch_t::operator_t::value_t >,
            blas::matrix< typename pivotsearch_t::operator_t::value_t > >
 aca  ( const typename pivotsearch_t::operator_t &  M,
        pivotsearch_t &                             pivot_search,
-       const Hpro::TTruncAcc &                     acc,
+       const accuracy &                            acc,
        std::list< std::pair< idx_t, idx_t > > *    pivots )
 {
     using  value_t = typename pivotsearch_t::operator_t::value_t;
@@ -417,7 +417,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( blas::matrix< value_t > &  M,
-      const Hpro::TTruncAcc &    acc )
+      const accuracy &           acc )
 {
     auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
 
@@ -432,7 +432,7 @@ std::tuple< blas::matrix< value_t >,
             blas::vector< real_type_t< value_t > >,
             blas::matrix< value_t > >
 aca_ortho ( blas::matrix< value_t > &  M,
-            const Hpro::TTruncAcc &    acc )
+            const accuracy &           acc )
 {
     auto  [ U, V ] = aca( M, acc );
 
@@ -442,7 +442,7 @@ aca_ortho ( blas::matrix< value_t > &  M,
 template < typename value_t >
 std::list< std::pair< idx_t, idx_t > >
 aca_pivots ( blas::matrix< value_t > &  M,
-             const Hpro::TTruncAcc &    acc )
+             const accuracy &           acc )
 {
     auto  pivot_search = aca_pivot< blas::matrix< value_t > >( M );
 
@@ -460,7 +460,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const blas::matrix< value_t > &  U,
       const blas::matrix< value_t > &  V,
-      const Hpro::TTruncAcc &          acc )
+      const accuracy &                 acc )
 {
     HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -514,7 +514,7 @@ std::tuple< blas::matrix< value_t >,
             blas::matrix< value_t > >
 aca_ortho ( const blas::matrix< value_t > &  U,
             const blas::matrix< value_t > &  V,
-            const Hpro::TTruncAcc &          acc )
+            const accuracy &                 acc )
 {
     auto  [ TU, TV ] = aca( U, V, acc );
 
@@ -526,7 +526,7 @@ std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  V,
-      const Hpro::TTruncAcc &                       acc )
+      const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == V.size() );
 
@@ -578,7 +578,7 @@ std::tuple< blas::matrix< value_t >,
             blas::matrix< value_t > >
 aca_ortho ( const std::list< blas::matrix< value_t > > &  U,
             const std::list< blas::matrix< value_t > > &  V,
-            const Hpro::TTruncAcc &                       acc )
+            const accuracy &                              acc )
 {
     auto  [ TU, TV ] = aca( U, V, acc );
 
@@ -591,7 +591,7 @@ std::pair< blas::matrix< value_t >,
 aca ( const std::list< blas::matrix< value_t > > &  U,
       const std::list< blas::matrix< value_t > > &  T,
       const std::list< blas::matrix< value_t > > &  V,
-      const Hpro::TTruncAcc &                       acc )
+      const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -660,7 +660,7 @@ struct ACA
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::aca( M, acc );
     }
@@ -669,7 +669,7 @@ struct ACA
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::aca( U, V, acc );
     }
@@ -678,7 +678,7 @@ struct ACA
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::aca( U, V, acc );
     }
@@ -688,7 +688,7 @@ struct ACA
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::aca( U, T, V, acc );
     }
@@ -697,7 +697,7 @@ struct ACA
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
     operator () ( const operator_t &       op,
-                  const Hpro::TTruncAcc &  acc ) const
+                  const accuracy &         acc ) const
     {
         auto  pivot_search = aca_pivot< operator_t >( op );
 
@@ -742,7 +742,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 aca_full ( blas::matrix< value_t > &  M,
-           const Hpro::TTruncAcc &    acc )
+           const accuracy &           acc )
 {
     auto  pivot_search = aca_pivot_full< blas::matrix< value_t > >( M );
 
@@ -763,7 +763,7 @@ struct ACAFull
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         auto  pivot_search = aca_pivot_full< blas::matrix< value_t > >( M );
 
@@ -777,7 +777,7 @@ struct ACAFull
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         HLR_ASSERT( U.ncols() == V.ncols() );
 
@@ -829,7 +829,7 @@ struct ACAFull
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::aca( U, V, acc );
     }
@@ -839,7 +839,7 @@ struct ACAFull
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::aca( U, T, V, acc );
     }
@@ -847,8 +847,8 @@ struct ACAFull
     template < typename operator_t >
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
-    operator () ( const operator_t &       op,
-                  const Hpro::TTruncAcc &  acc ) const
+    operator () ( const operator_t &  op,
+                  const accuracy &    acc ) const
     {
         auto  pivot_search = aca_pivot< operator_t >( op );
 

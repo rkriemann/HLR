@@ -56,7 +56,7 @@ singular_values ( const blas::matrix< value_t > &  R )
 template < typename value_t >
 int
 trunc_rank ( const blas::matrix< value_t > &  R,
-             const Hpro::TTruncAcc &          acc )
+             const accuracy &                 acc )
 {
     auto  S = singular_values( R );
 
