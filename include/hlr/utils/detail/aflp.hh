@@ -597,7 +597,7 @@ compress< float > ( const config &   config,
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == double(0) ? fp32_infinity : d_i );
+        const auto  val = ( d_i == float(0) ? fp32_infinity : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );

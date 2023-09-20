@@ -76,7 +76,8 @@ template < typename value_t,
 void
 to_cfloat ( byte_t *         cptr,
             const value_t *  data,
-            const size_t     nsize )
+            const size_t     nsize,
+            const value_t    scale )
 {
     if constexpr ( expsize == 1 )
     {
@@ -85,7 +86,7 @@ to_cfloat ( byte_t *         cptr,
         auto  ptr = reinterpret_cast< cfloat_t * >( cptr );
     
         for ( size_t  i = 0; i < nsize; ++i )
-            ptr[i] = cfloat_t( data[i] );
+            ptr[i] = cfloat_t( scale * data[i] );
     }// if
     else
     {
@@ -94,7 +95,7 @@ to_cfloat ( byte_t *         cptr,
         auto  ptr = reinterpret_cast< cfloat_t * >( cptr );
     
         for ( size_t  i = 0; i < nsize; ++i )
-            ptr[i] = cfloat_t( data[i] );
+            ptr[i] = cfloat_t( scale * data[i] );
     }// else
 }
 
@@ -105,7 +106,8 @@ template < typename value_t,
 void
 from_cfloat ( const byte_t *  cptr,
               value_t *       data,
-              const size_t    nsize )
+              const size_t    nsize,
+              const value_t   scale )
 {
     if constexpr ( expsize == 1 )
     {
@@ -114,7 +116,7 @@ from_cfloat ( const byte_t *  cptr,
         auto  ptr = reinterpret_cast< const cfloat_t * >( cptr );
     
         for ( size_t  i = 0; i < nsize; ++i )
-            data[i] = value_t( ptr[i] );
+            data[i] = value_t( ptr[i] ) / scale;
     }// if
     else
     {
@@ -123,7 +125,7 @@ from_cfloat ( const byte_t *  cptr,
         auto  ptr = reinterpret_cast< const cfloat_t * >( cptr );
     
         for ( size_t  i = 0; i < nsize; ++i )
-            data[i] = value_t( ptr[i] );
+            data[i] = value_t( ptr[i] ) / scale;
     }// else
 }
 
@@ -160,32 +162,35 @@ compress< float > ( const config &   config,
     // look for min/max value (> 0!)
     //
     
-    float  vmin = fp32_infinity;
-    float  vmax = 0;
+    value_t  vmin = fp32_infinity;
+    value_t  vmax = 0;
 
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == double(0) ? fp32_infinity : d_i );
+        const auto  val = ( d_i == value_t(0) ? fp32_infinity : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
     }// for
 
-    HLR_DBG_ASSERT( vmin > float(0) );
+    HLR_DBG_ASSERT( vmin > value_t(0) );
     
     
-    const float     scale      = 1.0 / vmin;                                                                 // scale all values v_i such that |v_i| >= 1
-    const uint32_t  exp_bits   = std::max< float >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
-    const uint32_t  nbits      = byte_pad( 1 + exp_bits + config.bitrate );                                  // total no. of bits per value
+    const value_t   scale      = 1.0 / vmax;                                                                   // scale all values v_i such that |v_i| >= 1
+    const uint32_t  exp_bits   = std::max< value_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
+    const uint32_t  nbits      = byte_pad( 1 + exp_bits + config.bitrate );                                    // total no. of bits per value
     const uint32_t  nbyte      = nbits / 8;
-    const uint32_t  prec_bits  = nbits - 1 - exp_bits;                                                       // actual number of precision bits
-    auto            zdata      = std::vector< byte_t >( 1 + 1 + nsize * nbyte );                             // array storing compressed data
+    const uint32_t  prec_bits  = nbits - 1 - exp_bits;                                                         // actual number of precision bits
+    const auto      ofs        = 1 + 1 + sizeof(value_t);                                                      // offset in zdata for real data
+    auto            zdata      = std::vector< byte_t >();                                                      // array storing compressed data
 
     HLR_ASSERT( nbits <= 32 );
 
+    zdata.resize( ofs + nsize * nbyte );
     zdata[0] = exp_bits;
     zdata[1] = prec_bits;
+    memcpy( zdata.data() + 2, & scale, sizeof(value_t) );
     
     switch ( nbits )
     {
@@ -195,12 +200,12 @@ compress< float > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 8, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 8, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 8, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 8, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 8, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 8, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 8, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 8, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 8, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 8, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 8, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 8, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -212,14 +217,14 @@ compress< float > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 16, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 16, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 16, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 16, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 16, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 16, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 16, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 16, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 16, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 16, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 16, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 16, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 16, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 16, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 16, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 16, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -231,14 +236,14 @@ compress< float > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 24, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 24, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 24, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 24, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 24, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 24, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 24, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 24, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 24, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 24, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 24, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 24, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 24, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 24, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 24, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 24, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -250,14 +255,14 @@ compress< float > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 32, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 32, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 32, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 32, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 32, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 32, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 32, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 32, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 32, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 32, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 32, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 32, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 32, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 32, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 32, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 32, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -287,33 +292,35 @@ compress< double > ( const config &   config,
     // look for min/max value (> 0!)
     //
     
-    double  vmin = fp64_infinity;
-    double  vmax = 0;
+    value_t  vmin = fp64_infinity;
+    value_t  vmax = 0;
 
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == double(0) ? fp64_infinity : d_i );
+        const auto  val = ( d_i == value_t(0) ? fp64_infinity : d_i );
             
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
     }// for
 
-    HLR_DBG_ASSERT( vmin > double(0) );
+    HLR_DBG_ASSERT( vmin > value_t(0) );
     
     
-    const double    scale      = 1.0 / vmin;                                                                  // scale all values v_i such that |v_i| >= 1
-    const uint32_t  exp_bits   = std::max< double >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
-    const uint32_t  nbits      = byte_pad( 1 + exp_bits + config.bitrate );                                   // total no. of bits per value
-    const uint32_t  nbyte      = nbits / 8;
-    const uint32_t  prec_bits  = nbits - 1 - exp_bits;                                                        // actual number of precision bits
-    auto            zdata      = std::vector< byte_t >();                                                     // array storing compressed data
+    const value_t   scale     = 1.0 / vmax;                                                                   // scale all values v_i such that |v_i| >= 1
+    const uint32_t  exp_bits  = std::max< value_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
+    const uint32_t  nbits     = byte_pad( 1 + exp_bits + config.bitrate );                                    // total no. of bits per value
+    const uint32_t  nbyte     = nbits / 8;
+    const uint32_t  prec_bits = nbits - 1 - exp_bits;                                                         // actual number of precision bits
+    const auto      ofs       = 1 + 1 + sizeof(value_t);                                                      // offset in zdata for real data
+    auto            zdata     = std::vector< byte_t >();                                                      // array storing compressed data
 
     HLR_ASSERT( nbits <= 64 );
 
-    zdata.resize( 1 + 1 + nsize * nbyte );
+    zdata.resize( ofs + nsize * nbyte );
     zdata[0] = exp_bits;
     zdata[1] = prec_bits;
+    memcpy( zdata.data() + 2, & scale, sizeof(value_t) );
 
     switch ( nbits )
     {
@@ -323,12 +330,12 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 8, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 8, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 8, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 8, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 8, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 8, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 8, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 8, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 8, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 8, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 8, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 8, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -340,14 +347,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 16, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 16, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 16, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 16, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 16, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 16, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 16, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 16, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 16, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 16, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 16, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 16, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 16, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 16, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 16, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 16, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -359,14 +366,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 24, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 24, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 24, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 24, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 24, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 24, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 24, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 24, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 24, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 24, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 24, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 24, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 24, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 24, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 24, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 24, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -378,14 +385,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 32, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 32, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 32, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 32, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 32, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 32, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 32, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 32, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 32, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 32, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 32, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 32, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 32, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 32, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 32, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 32, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -397,14 +404,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 40, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 40, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 40, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 40, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 40, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 40, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 40, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 40, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 40, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 40, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 40, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 40, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 40, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 40, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 40, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 40, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -416,14 +423,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 48, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 48, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 48, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 48, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 48, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 48, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 48, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 48, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 48, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 48, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 48, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 48, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 48, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 48, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 48, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 48, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -435,14 +442,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 56, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 56, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 56, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 56, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 56, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 56, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 56, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 56, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 56, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 56, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 56, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 56, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 56, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 56, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 56, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 56, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -454,14 +461,14 @@ compress< double > ( const config &   config,
             
             switch ( exp_bits )
             {
-                case 1  : to_cfloat< value_t, 64, 1, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 2  : to_cfloat< value_t, 64, 2, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 3  : to_cfloat< value_t, 64, 3, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 4  : to_cfloat< value_t, 64, 4, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 5  : to_cfloat< value_t, 64, 5, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 6  : to_cfloat< value_t, 64, 6, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 7  : to_cfloat< value_t, 64, 7, storage_t >( zdata.data() + 2, data, nsize ); break;
-                case 8  : to_cfloat< value_t, 64, 8, storage_t >( zdata.data() + 2, data, nsize ); break;
+                case 1  : to_cfloat< value_t, 64, 1, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 2  : to_cfloat< value_t, 64, 2, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 3  : to_cfloat< value_t, 64, 3, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 4  : to_cfloat< value_t, 64, 4, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 5  : to_cfloat< value_t, 64, 5, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 6  : to_cfloat< value_t, 64, 6, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 7  : to_cfloat< value_t, 64, 7, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
+                case 8  : to_cfloat< value_t, 64, 8, storage_t >( zdata.data() + ofs, data, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -542,6 +549,10 @@ decompress< float > ( const zarray &  zdata,
     const uint32_t  exp_bits  = zdata[0];
     const uint32_t  prec_bits = zdata[1];
     const uint32_t  nbits     = 1 + exp_bits + prec_bits;
+    auto            scale     = value_t(0);
+    const auto      ofs       = 1 + 1 + sizeof(value_t);
+
+    memcpy( & scale, zdata.data() + 2, sizeof(value_t) );
     
     switch ( nbits )
     {
@@ -551,12 +562,12 @@ decompress< float > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 8, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 8, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 8, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 8, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 8, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 8, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 8, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 8, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 8, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 8, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 8, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 8, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -568,14 +579,14 @@ decompress< float > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 16, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 16, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 16, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 16, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 16, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 16, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 16, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 16, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 16, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 16, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 16, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 16, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 16, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 16, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 16, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 16, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -587,14 +598,14 @@ decompress< float > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 24, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 24, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 24, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 24, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 24, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 24, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 24, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 24, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 24, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 24, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 24, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 24, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 24, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 24, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 24, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 24, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -606,14 +617,14 @@ decompress< float > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 32, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 32, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 32, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 32, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 32, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 32, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 32, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 32, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 32, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 32, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 32, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 32, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 32, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 32, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 32, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 32, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -645,6 +656,10 @@ decompress< double > ( const zarray &  zdata,
     const uint32_t  exp_bits  = zdata[0];
     const uint32_t  prec_bits = zdata[1];
     const uint32_t  nbits     = 1 + exp_bits + prec_bits;
+    auto            scale     = value_t(0);
+    const auto      ofs       = 1 + 1 + sizeof(value_t);
+
+    memcpy( & scale, zdata.data() + 2, sizeof(value_t) );
     
     switch ( nbits )
     {
@@ -654,12 +669,12 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 8, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 8, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 8, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 8, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 8, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 8, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 8, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 8, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 8, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 8, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 8, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 8, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -671,14 +686,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 16, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 16, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 16, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 16, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 16, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 16, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 16, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 16, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 16, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 16, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 16, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 16, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 16, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 16, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 16, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 16, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -690,14 +705,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 24, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 24, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 24, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 24, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 24, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 24, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 24, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 24, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 24, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 24, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 24, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 24, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 24, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 24, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 24, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 24, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -709,14 +724,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 32, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 32, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 32, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 32, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 32, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 32, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 32, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 32, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 32, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 32, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 32, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 32, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 32, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 32, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 32, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 32, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -728,14 +743,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 40, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 40, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 40, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 40, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 40, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 40, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 40, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 40, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 40, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 40, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 40, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 40, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 40, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 40, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 40, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 40, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -747,14 +762,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 48, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 48, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 48, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 48, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 48, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 48, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 48, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 48, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 48, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 48, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 48, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 48, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 48, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 48, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 48, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 48, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -766,14 +781,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 56, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 56, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 56, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 56, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 56, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 56, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 56, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 56, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 56, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 56, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 56, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 56, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 56, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 56, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 56, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 56, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
@@ -785,14 +800,14 @@ decompress< double > ( const zarray &  zdata,
             
             switch ( exp_bits )
             {
-                case 1  : from_cfloat< value_t, 64, 1, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 2  : from_cfloat< value_t, 64, 2, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 3  : from_cfloat< value_t, 64, 3, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 4  : from_cfloat< value_t, 64, 4, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 5  : from_cfloat< value_t, 64, 5, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 6  : from_cfloat< value_t, 64, 6, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 7  : from_cfloat< value_t, 64, 7, storage_t >( zdata.data() + 2, dest, nsize ); break;
-                case 8  : from_cfloat< value_t, 64, 8, storage_t >( zdata.data() + 2, dest, nsize ); break;
+                case 1  : from_cfloat< value_t, 64, 1, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 2  : from_cfloat< value_t, 64, 2, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 3  : from_cfloat< value_t, 64, 3, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 4  : from_cfloat< value_t, 64, 4, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 5  : from_cfloat< value_t, 64, 5, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 6  : from_cfloat< value_t, 64, 6, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 7  : from_cfloat< value_t, 64, 7, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
+                case 8  : from_cfloat< value_t, 64, 8, storage_t >( zdata.data() + ofs, dest, nsize, scale ); break;
                 default : HLR_ERROR( "TODO" );
             }// switch
         }
