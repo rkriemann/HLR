@@ -743,7 +743,6 @@ decompress< float > ( const zarray &  zdata,
     
     const uint32_t  exp_bits  = zdata[0];
     const uint32_t  prec_bits = zdata[1];
-    const uint32_t  nbits     = 1 + exp_bits + prec_bits;
     
     decompress_fp32( dest, nsize, zdata.data() + 2, exp_bits, prec_bits );
 }

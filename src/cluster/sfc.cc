@@ -23,7 +23,7 @@ cluster ( const part_type_t  part_type,
           coordinates &      coords,
           const size_t       ntile )
 {
-    Hpro::TSFCCTBuilder  ct_builder( part_type, ntile );
+    Hpro::TSFCCTBuilder  ct_builder( part_type, Hpro::TSFCCTBuilder::cardinality, ntile );
 
     return ct_builder.build( & coords );
 }

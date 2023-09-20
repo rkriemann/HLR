@@ -118,6 +118,7 @@ COMPRESSORS   = [ 'none',
                   'bf24',
                   'zfp',
                   'posits',
+                  'cfloat',
                   'sz',
                   'sz3',
                   'mgard',
@@ -614,6 +615,10 @@ elif compressor == 'zstd' :
     env.Append( LIBS       = [ 'zstd' ] )
 elif compressor == 'posits' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif compressor == 'cfloat' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=19' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif compressor == 'fp32' :

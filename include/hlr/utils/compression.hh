@@ -31,6 +31,7 @@
 #define HLR_COMPRESSOR_TF32     16
 #define HLR_COMPRESSOR_BF24     17
 #define HLR_COMPRESSOR_MP       18
+#define HLR_COMPRESSOR_CFLOAT   19
 
 #if defined(HLR_COMPRESSOR)
 
@@ -129,6 +130,31 @@ using hlr::compress::posits::compress;
 using hlr::compress::posits::decompress;
 using hlr::compress::posits::get_config;
 using hlr::compress::posits::byte_size;
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_CFLOAT
+
+#  if !defined(HLR_HAS_UNIVERSAL)
+#    error "Universal library not available"
+#  endif
+
+#include <hlr/utils/detail/cfloat.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "cfloat";
+
+using  zconfig_t = hlr::compress::cfloat::config;
+using  zarray    = hlr::compress::cfloat::zarray;
+
+using hlr::compress::cfloat::compress;
+using hlr::compress::cfloat::decompress;
+using hlr::compress::cfloat::get_config;
+using hlr::compress::cfloat::byte_size;
 
 }} // namespace hlr::compress
 
