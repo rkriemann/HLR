@@ -292,6 +292,10 @@ struct lazy_accumulator
                         else if ( matrix::is_lowrank( B ) )
                         {
                             auto  RB = cptrcast( B, matrix::lrmatrix< value_t > );
+                            auto  BU = RB->U();
+                            auto  BV = RB->V();
+
+                            HLR_ASSERT( ! RB->is_compressed() );
 
                             for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                             {
@@ -301,8 +305,8 @@ struct lazy_accumulator
                                 auto  col_k = A_ik->col_is();
 
                                 // restrict B to col_k × col_j
-                                auto  U_k = blas::matrix< value_t >( RB->U(), col_k - B->row_ofs(), blas::range::all );
-                                auto  V_j = blas::matrix< value_t >( RB->V(), col_j - B->col_ofs(), blas::range::all );
+                                auto  U_k  = blas::matrix< value_t >( BU, col_k - B->row_ofs(), blas::range::all );
+                                auto  V_j  = blas::matrix< value_t >( BV, col_j - B->col_ofs(), blas::range::all );
                                 auto  B_kj = std::make_unique< matrix::lrmatrix< value_t > >( col_k, col_j, U_k, V_j );
                                 
                                 sub_accu(i,j).add_update( A_ik, B_kj.get(), acc, approx );
@@ -314,6 +318,8 @@ struct lazy_accumulator
                         {
                             auto  DB = cptrcast( B, matrix::dense_matrix< value_t > );
 
+                            HLR_ASSERT( ! DB->is_compressed() );
+                            
                             for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                             {
                                 HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
@@ -353,8 +359,8 @@ struct lazy_accumulator
                                 auto  col_k = B_kj->row_is();
                                 
                                 // restrict A to row_i × col_k
-                                auto  U_i  = blas::matrix< value_t >( RA->U(), row_i - A->row_ofs(), blas::range::all );
-                                auto  V_k  = blas::matrix< value_t >( RA->V(), col_k - A->col_ofs(), blas::range::all );
+                                auto  U_i  = blas::matrix< value_t >( AU, row_i - A->row_ofs(), blas::range::all );
+                                auto  V_k  = blas::matrix< value_t >( AV, col_k - A->col_ofs(), blas::range::all );
                                 auto  A_ik = std::make_unique< matrix::lrmatrix< value_t > >( row_i, col_k, U_i, V_k );
                                 
                                 sub_accu(i,j).add_update( A_ik.get(), B_kj, acc, approx );
