@@ -234,16 +234,16 @@ lu_accu_dag ( const Hpro::TMatrix< value_t > &  A,
     auto  toc = timer::since( tic );
     auto  C   = impl::matrix::copy( A );
 
-    auto  [ lu_dag, accu_map, accu_mtx ] = hlr::dag::gen_dag_lu_accu_lazy( *C, nseq, impl::dag::refine, apx );
-
-    if ( Hpro::verbose( 3 ) )
-        lu_dag.print_dot( "lu.dot" );
+    // if ( Hpro::verbose( 3 ) )
+    //     lu_dag.print_dot( "lu.dot" );
     
     auto  tstart = timer::now();
         
     for ( int i = 0; i < nbench; ++i )
     {
         impl::matrix::copy_to( A, *C );
+
+        auto  [ lu_dag, accu_map, accu_mtx ] = hlr::dag::gen_dag_lu_accu_lazy( *C, nseq, impl::dag::refine, apx );
 
         blas::reset_flops();
 

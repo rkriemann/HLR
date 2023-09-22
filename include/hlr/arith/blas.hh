@@ -1196,7 +1196,7 @@ prod_diag ( const vector_t &  D,
     return T;
 }
 
-// using Hpro::BLAS::prod_diag;
+using Hpro::BLAS::prod_diag;
 
 //////////////////////////////////////////////////////////////////////
 //
