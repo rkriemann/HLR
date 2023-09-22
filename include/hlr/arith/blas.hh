@@ -1118,7 +1118,14 @@ prod_diag_ip ( matrix_t &        M,
 {
     HLR_DBG_ASSERT( M.ncols() == D.length() );
     
-    Hpro::BLAS::prod_diag( M, D, M.ncols() );
+    using  value_t = typename matrix_t::value_t;
+    
+    for ( Hpro::idx_t  i = 0; i < M.ncols(); ++i )
+    {
+        auto  Mi = M.column( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < matrix_type matrix_t,
@@ -1133,8 +1140,13 @@ prod_diag ( const matrix_t &  M,
     using  value_t = typename matrix_t::value_t;
 
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.ncols(); ++i )
+    {
+        auto  Ti = T.column( i );
 
-    Hpro::BLAS::prod_diag( T, D, T.ncols() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
@@ -1151,7 +1163,14 @@ prod_diag_ip ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
-    Hpro::BLAS::prod_diag( D, M, M.nrows() );
+    using  value_t = value_type_t< matrix_t >;
+    
+    for ( Hpro::idx_t  i = 0; i < M.nrows(); ++i )
+    {
+        auto  Mi = M.row( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < vector_type vector_t,
@@ -1163,14 +1182,21 @@ prod_diag ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
+    using  value_t = value_type_t< matrix_t >;
+    
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.nrows(); ++i )
+    {
+        auto  Ti = T.row( i );
 
-    Hpro::BLAS::prod_diag( D, T, T.nrows() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
 
-using Hpro::BLAS::prod_diag;
+// using Hpro::BLAS::prod_diag;
 
 //////////////////////////////////////////////////////////////////////
 //

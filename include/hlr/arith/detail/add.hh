@@ -10,6 +10,7 @@
 
 #include "hlr/matrix/lrmatrix.hh"
 #include "hlr/matrix/lrsmatrix.hh"
+#include "hlr/matrix/lrsvmatrix.hh"
 #include "hlr/matrix/dense_matrix.hh"
 #include "hlr/utils/log.hh"
 
