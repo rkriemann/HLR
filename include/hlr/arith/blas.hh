@@ -826,6 +826,7 @@ using Hpro::BLAS::mulvec;
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -899,6 +900,7 @@ mulvec_lr ( const T_alpha                    alpha,
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -973,15 +975,17 @@ mulvec_lr ( const T_alpha                    alpha,
 // compute op(U·S·V')·x = y with diagonal S
 //
 template < typename T_alpha,
-           typename T_value >
+           typename T_value,
+           typename T_value_S >
+requires ( std::convertible_to< T_value_S, T_value > && std::convertible_to< T_alpha, T_value > )
 void
-mulvec_lr ( const T_alpha                    alpha,
-            const blas::matrix< T_value > &  U,
-            const blas::vector< T_value > &  S,
-            const blas::matrix< T_value > &  V,
-            const matop_t                    op,
-            const blas::vector< T_value > &  x,
-            blas::vector< T_value > &        y )
+mulvec_lr ( const T_alpha                      alpha,
+            const blas::matrix< T_value > &    U,
+            const blas::vector< T_value_S > &  S,
+            const blas::matrix< T_value > &    V,
+            const matop_t                      op,
+            const blas::vector< T_value > &    x,
+            blas::vector< T_value > &          y )
 {
     using  value_t = T_value;
 

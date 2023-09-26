@@ -750,6 +750,21 @@ static const char provider[] = "afl";
 
 }// namespace hlr::compress::aplr
 
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_POSITS
+
+#include <hlr/utils/detail/posits.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::posits::zarray;
+using hlr::compress::posits::compress_lr;
+using hlr::compress::posits::decompress_lr;
+using hlr::compress::posits::byte_size;
+
+static const char provider[] = "posits";
+
+}// namespace hlr::compress::aplr
+
 #else
 
 #include <hlr/utils/detail/mixedprec.hh>

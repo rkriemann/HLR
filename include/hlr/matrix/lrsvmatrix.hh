@@ -57,10 +57,10 @@ private:
 
 private:
     // singular values
-    blas::vector< real_t >   _S;
+    blas::vector< real_t >  _S;
 
     // compressed storage
-    mp_storage               _mpdata;
+    mp_storage              _mpdata;
 
 public:
     //

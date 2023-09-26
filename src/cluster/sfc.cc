@@ -19,11 +19,11 @@ namespace hlr { namespace cluster { namespace sfc {
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< cluster_tree >
-cluster ( const part_type_t  part_type,
-          coordinates &      coords,
-          const size_t       ntile )
+cluster ( const cluster_type_t  cl_type,
+          coordinates &         coords,
+          const size_t          ntile )
 {
-    Hpro::TSFCCTBuilder  ct_builder( part_type, Hpro::TSFCCTBuilder::cardinality, ntile );
+    Hpro::TSFCCTBuilder  ct_builder( cl_type, Hpro::TSFCCTBuilder::cardinality, ntile );
 
     return ct_builder.build( & coords );
 }

@@ -19,7 +19,7 @@ namespace hlr { namespace cluster { namespace sfc {
 using  Hpro::TSFCCTBuilder::binary;
 using  Hpro::TSFCCTBuilder::blr;
 
-using  part_type_t       = Hpro::TSFCCTBuilder::partition_type_t;
+using  cluster_type_t    = Hpro::TSFCCTBuilder::cluster_type_t;
 using  coordinates       = Hpro::TCoordinate;
 using  cluster_tree      = Hpro::TClusterTree;
 using  blockcluster_tree = Hpro::TBlockClusterTree;
@@ -29,9 +29,9 @@ using  admissibility     = Hpro::TAdmCondition;
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< cluster_tree >
-cluster      ( const part_type_t  part_type,
-               coordinates &      coords,
-               const size_t       ntile );
+cluster      ( const cluster_type_t  cl_type,
+               coordinates &         coords,
+               const size_t          ntile );
 
 //
 // build block cluster tree based on given row/column cluster trees
