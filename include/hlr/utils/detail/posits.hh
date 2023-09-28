@@ -20,27 +20,34 @@ namespace hlr { namespace compress { namespace posits {
 
 using byte_t = uint8_t;
 
-// return byte padded value of <n>
-inline size_t byte_pad ( size_t  n )
-{
-    return ( n % 8 != 0 ) ? n + (8 - n%8) : n;
-}
+// fixed number of exponent bits
+constexpr uint8_t  ES = 2;
 
+//
+// number of bits for given precision
+//
 inline
 uint8_t
-eps_to_rate ( const double  eps )
+eps_to_nbits ( const double  eps )
 {
     // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
     return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
 }
 
+//
+// number of bits for tolerance in APLR
+//
 inline
 uint8_t
-tol_to_rate ( const double  tol )
+tol_to_nbits ( const double  tol )
 {
-    return eps_to_rate( tol );
+    return eps_to_nbits( tol ) + 2;
 }
 
+//
+// compression configuration
+// (just precision bitsize)
+//
 struct config
 {
     uint  bitsize;
@@ -51,7 +58,7 @@ using  zarray = std::vector< byte_t >;
 
 inline size_t  byte_size  ( const zarray &  v )  { return v.size(); }
 
-inline config  get_config ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
+inline config  get_config ( const double  eps  ) { return config{ eps_to_nbits( eps ) }; }
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -64,10 +71,10 @@ inline config  get_config ( const double  eps  ) { return config{ eps_to_rate( e
 //
 // convert given array <data> into posits and store results in <cptr>
 //
-template < typename value_t, int bitsize, typename storage_t >
+template < typename value_t, int nbits, typename storage_t >
 struct convert
 {
-    static constexpr uint64_t  mask = ( 1ul << bitsize ) - 1ul;
+    static constexpr uint64_t  mask = ( 1ul << nbits ) - 1ul;
     
     static void
     to_posit ( byte_t *         cptr,
@@ -75,7 +82,7 @@ struct convert
                const size_t     nsize,
                const value_t    scale )
     {
-        using  posit_t = sw::universal::posit< bitsize, 2 >;
+        using  posit_t = sw::universal::posit< nbits, ES >;
         
         auto  ptr = reinterpret_cast< storage_t * >( cptr );
         
@@ -94,8 +101,8 @@ struct convert
                  const size_t    nsize,
                  const value_t   scale )
     {
-        using  posit_t    = sw::universal::posit< bitsize, 2 >;
-        using  bitblock_t = sw::universal::bitblock< bitsize >;
+        using  posit_t    = sw::universal::posit< nbits, ES >;
+        using  bitblock_t = sw::universal::bitblock< nbits >;
 
         auto  ptr = reinterpret_cast< const storage_t * >( cptr );
         
@@ -149,7 +156,7 @@ compress ( const config &   config,
     HLR_DBG_ASSERT( vmin > value_t(0) );
     
     const value_t  scale = 1.0 / vmax;
-    const auto     nbits = 1 + 2 + config.bitsize; // sign bit + two exponent bits
+    const auto     nbits = 1 + ES + config.bitsize; // sign bit + exponent bits
     const auto     pbits = byte_pad( nbits );
     const auto     ofs   = 1 + sizeof(value_t);
     zarray         zdata( ofs + nsize * pbits / 8 );
@@ -339,10 +346,10 @@ decompress< std::complex< double > > ( const zarray &            zdata,
 //
 // convert given array <data> into posits and store results in <cptr>
 //
-template < typename value_t, int bitsize >
+template < typename value_t, int nbits >
 struct convert
 {
-    static constexpr uint64_t  mask = ( 1ul << bitsize ) - 1ul;
+    static constexpr uint64_t  mask = ( 1ul << nbits ) - 1ul;
     
     static void
     to_posit ( byte_t *         ptr,
@@ -350,7 +357,7 @@ struct convert
                const size_t     nsize,
                const value_t    scale )
     {
-        using  posit_t = sw::universal::posit< bitsize, 2 >;
+        using  posit_t = sw::universal::posit< nbits, ES >;
         
         uint32_t  bpos = 0; // start bit position in current byte
         size_t    pos  = 0; // byte position in <ptr>
@@ -364,7 +371,7 @@ struct convert
             do
             {
                 const uint32_t  crest = 8 - bpos;         // remaining bits in current byte
-                const uint32_t  zrest = bitsize - sbits;  // remaining bits in zval
+                const uint32_t  zrest = nbits - sbits;  // remaining bits in zval
                 const byte_t    zbyte = zval & 0xff;      // lowest byte of zval
                     
                 // HLR_DBG_ASSERT( pos < zsize );
@@ -375,7 +382,7 @@ struct convert
             
                 if ( crest <= zrest ) { bpos  = 0; ++pos; }
                 else                  { bpos += zrest; }
-            } while ( sbits < bitsize );
+            } while ( sbits < nbits );
         }// if
     }// for
 
@@ -385,8 +392,8 @@ struct convert
                  const size_t    nsize,
                  const value_t   scale )
     {
-        using  posit_t    = sw::universal::posit< bitsize, 2 >;
-        using  bitblock_t = sw::universal::bitblock< bitsize >;
+        using  posit_t    = sw::universal::posit< nbits, ES >;
+        using  bitblock_t = sw::universal::bitblock< nbits >;
 
         size_t    count = 0;
         uint32_t  bpos = 0; // start bit position in current byte
@@ -402,7 +409,7 @@ struct convert
                 // HLR_DBG_ASSERT( pos < zdata );
         
                 const uint32_t  crest = 8 - bpos;                               // remaining bits in current byte
-                const uint32_t  zrest = bitsize - sbits;                        // remaining bits to read for zval
+                const uint32_t  zrest = nbits - sbits;                          // remaining bits to read for zval
                 const byte_t    zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
                 const byte_t    data  = (ptr[pos] >> bpos) & zmask;             // part of zval in current byte
                 
@@ -411,7 +418,7 @@ struct convert
 
                 if ( crest <= zrest ) { bpos  = 0; ++pos; }
                 else                  { bpos += zrest; }
-            } while ( sbits < bitsize );
+            } while ( sbits < nbits );
 
             bitblock_t  bits;
             posit_t     p;
@@ -451,7 +458,7 @@ compress ( const config &   config,
         vmax = std::max( vmax, std::abs( data[i] ) );
 
     const value_t  scale    = 1.0 / vmax;
-    const auto     nbits    = 1 + 2 + config.bitsize;  // sign bit + two exponent bits
+    const auto     nbits    = 1 + ES + config.bitsize;  // sign bit + exponent bits
     const auto     ntotbits = byte_pad( nsize * nbits );
     const auto     nbytes   = ntotbits / 8;
     const auto     ofs      = 1 + sizeof(value_t);
@@ -670,11 +677,11 @@ compress_lr ( const blas::matrix< value_t > &                 U,
             vmax = std::max( vmax, std::abs( U(i,l) ) );
 
         s[l] = real_t(1) / vmax;
-        b[l] = 1 + 2 + tol_to_rate( S(l) ); // sign + exponent + (regime + significand)
+        b[l] = 1 + ES + tol_to_nbits( S(l) ); // sign + exponent bits
 
-        zsize += 1;                         // for nbits
-        zsize += sizeof(real_t);            // for scaling factor
-        zsize += byte_pad( n * b[l] ) / 8;  // for data
+        zsize += 1;                          // for nbits
+        zsize += sizeof(real_t);             // for scaling factor
+        zsize += byte_pad( n * b[l] ) / 8;   // for data
     }// for
 
     //
