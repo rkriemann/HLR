@@ -144,27 +144,28 @@ program_main ()
               << "compression ("
               << "ε = " << boost::format( "%.2e" ) % cmdline::eps
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::ap::provider << ')'
+              << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ')'
               << term::reset << std::endl;
 
     {
-        auto  lacc = absolute_prec( cmdline::eps );
+        auto  lacc  = absolute_prec( cmdline::eps );
+        auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
             impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *zrowcb, lacc );
             impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *zcolcb, lacc );
-            impl::matrix::compress( *zA,     lacc );
+            impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
+            if ( i < niter-1 )
             {
                 zA     = std::move( impl::matrix::copy( *A ) );
                 zrowcb = std::move( zrowcb->copy() );

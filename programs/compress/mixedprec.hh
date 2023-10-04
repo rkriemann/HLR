@@ -113,11 +113,12 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc = relative_prec( delta );
+        auto  lacc  = relative_prec( delta );
+        auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             auto  B = impl::matrix::copy( *zA );
         
@@ -129,7 +130,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == std::max( nbench, 1u )-1 )
+            if ( i == niter-1 )
                 zA = std::move( B );
         }// for
 
