@@ -113,6 +113,13 @@ format_norm ( const double  e )
     return hlr::term::italic( str( boost::format( "%.4e" ) % e ) );
 }
 
+template < typename... T >
+std::string
+format_norm ( const double  e, const T... es )
+{
+    return hlr::term::italic( str( boost::format( "%.4e" ) % e ) ) + " / " + format_norm( es... );
+}
+
 // return default formated string for FLOPs
 inline
 std::string

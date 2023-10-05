@@ -68,9 +68,6 @@ program_main ()
         tic = timer::now();
         A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
-
-        if ( verbose( 2 ) )
-            io::hpro::write< value_t >( *A, "A.hm" );
     }// if
     else
     {
@@ -95,6 +92,72 @@ program_main ()
     if ( hpro::verbose( 3 ) )
         io::eps::print( *A, "A", "noid" );
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // coarsen matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    if ( cmdline::coarsen )
+    {
+        std::cout << term::bullet << term::bold << "coarsening" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Ac = impl::matrix::coarsen( *A, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Ac = Ac->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Ac ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Ac) / double(mem_A) ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Ac, "Ac", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *A, -1, *Ac );
+        auto  norm_A = impl::norm::spectral( *A );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        A = std::move( Ac );
+    }// if
+    
+    if ( cmdline::tohodlr )
+    {
+        std::cout << term::bullet << term::bold << "converting to HODLR" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Ac = impl::matrix::convert_to_hodlr( *A, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Ac = Ac->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Ac ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Ac) / double(mem_A) ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Ac, "Ac", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *A, -1, *Ac );
+        auto  norm_A = impl::norm::spectral( *A );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        A = std::move( Ac );
+    }// if
+    
     //////////////////////////////////////////////////////////////////////
     //
     // convert to mixed precision format
@@ -163,11 +226,13 @@ program_main ()
               << term::reset << std::endl;
 
     {
+        auto  niter = std::max( nbench, 1u );
+        
         runtime.clear();
         
         auto  zB = impl::matrix::copy( *zA );
         
-        for ( uint  i = 0; i < nbench; ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
@@ -177,7 +242,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < std::max( nbench, 1u )-1 )
+            if ( i < niter-1 )
                 zB = std::move( impl::matrix::copy( *zA ) );
         }// for
         

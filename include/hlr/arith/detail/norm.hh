@@ -337,7 +337,20 @@ frobenius_squared ( const alpha_t                     alpha,
     }// if
     else
     {
-        HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
+        if ( matrix::is_dense( A ) && matrix::is_lowrank( B ) )
+        {
+            auto  DB = matrix::convert_to_dense( B );
+
+            return frobenius_squared( alpha, A, beta, *DB );
+        }// if
+        else if ( matrix::is_dense( B ) && matrix::is_lowrank( A ) )
+        {
+            auto  DA = matrix::convert_to_dense( A );
+
+            return frobenius_squared( alpha, *DA, beta, B );
+        }// if
+        else
+            HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
     }// else
 
     return 0;

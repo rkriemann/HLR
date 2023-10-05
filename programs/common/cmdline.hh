@@ -46,6 +46,8 @@ bool    ip_lu      = false;        // use in-place task graph
 bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
+bool    coarsen    = false;        // coarsen matrix structure
+bool    tohodlr    = false;        // convert matrix to HODLR format
 int     coarse     = 0;            // use coarse sparse graph
 uint    nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
@@ -138,6 +140,8 @@ parse ( int argc, char ** argv )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
         ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
+        ( "coarsen",                      ": coarsen matrix structure" )
+        ( "tohodlr",                      ": convert matrix to HODLR format" )
         ;
 
     ari_opts.add_options()
@@ -230,6 +234,8 @@ parse ( int argc, char ** argv )
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
+    if ( vm.count( "coarsen"    ) ) coarsen    = true;
+    if ( vm.count( "tohodlr"    ) ) tohodlr    = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<uint>();
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
