@@ -23,14 +23,14 @@ namespace hlr { namespace compress { namespace bfl {
 
 using byte_t = uint8_t;
 
-constexpr uint32_t  fp32_exp_mask  = 0x7f800000;
+constexpr uint32_t  fp32_mant_bits = 23;
 
 constexpr uint64_t  fp64_sign_mask = (1ul << 63);
 constexpr uint32_t  fp64_mant_bits = 52;
 constexpr uint64_t  fp64_mant_mask = 0x000fffffffffffff;
 constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
 
-constexpr uint32_t  bf_header_ofs  = 1;
+constexpr uint32_t  bfl_header_ofs = 1;
 
 inline
 byte_t
@@ -58,286 +58,177 @@ inline config  get_config ( const double    eps ) { return config{ eps_to_rate( 
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// compress data as float
+// convert to float and simply shift bits to the left, 
+// thereby reducing mantissa size
 //
-template < typename value_t >
-void
-compress_fp32 ( const value_t *  data,
-                const size_t     nsize,
-                byte_t *         zdata,
-                const uint32_t   nbyte )
+template < typename  value_t,
+           typename  storage_t >
+struct bfl32
 {
-    if ( nbyte == 2 )
+    static constexpr uint32_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
+    static constexpr uint32_t  bfl_mant_shift = fp32_mant_bits - bfl_mant_bits;
+    
+    static
+    void
+    compress ( const value_t *  data,
+               const size_t     nsize,
+               byte_t *         zdata )
     {
-        //
-        // BF16
-        //
+        auto  zptr = reinterpret_cast< storage_t * >( zdata );
+        
+        for ( size_t  i = 0; i < nsize; ++i )
+        {
+            const float     fval  = float(data[i]);
+            const uint32_t  ival = (*reinterpret_cast< const uint32_t * >( & fval ) );
+            const uint32_t  zval  = ival >> bfl_mant_shift;
+            
+            zptr[i] = zval;
+        }// for
+    }
 
-        auto  zptr = reinterpret_cast< byte2_t * >( zdata );
+    static
+    void
+    decompress ( value_t *       data,
+                 const size_t    nsize,
+                 const byte_t *  zdata )
+    {
+        auto  zptr = reinterpret_cast< const storage_t * >( zdata );
         
         for ( size_t  i = 0; i < nsize; ++i )
         {
-            const float     fval  = data[i];
-            const uint16_t  ival = (*reinterpret_cast< const uint32_t * >( & fval ) ) >> 16;
+            const uint32_t  zval = zptr[i];
+            const uint32_t  ztmp = zval << bfl_mant_shift;
+            const float     fval = * reinterpret_cast< const float * >( & ztmp );
             
-            zptr[i] = ival;
+            data[i] = value_t(fval);
         }// for
-    }// if
-    else if ( nbyte == 3 )
+    }
+};
+
+//
+// specialization for 4 bytes: just convert to float
+//
+template < typename  value_t >
+struct bfl32< value_t, byte4_t >
+{
+    static
+    void
+    compress ( const value_t *  data,
+               const size_t     nsize,
+               byte_t *         zdata )
     {
-        //
-        // BF24
-        //
-        
-        auto  zptr = reinterpret_cast< byte3_t * >( zdata );
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const float     fval  = data[i];
-            const uint32_t  ival = (*reinterpret_cast< const uint32_t * >( & fval ) ) >> 8;
-            
-            zptr[i] = ival;
-        }// for
-    }// else
-    else if ( nbyte == 4 )
-    {
-        //
-        // BF32 == FP32
-        //
-        
         auto  zptr = reinterpret_cast< float * >( zdata );
-
-        for ( size_t  i = 0; i < nsize; ++i )
-            zptr[i] = data[i];
-    }// if
-    else
-        HLR_ERROR( "unsupported storage size" );
-}
-
-template < typename value_t >
-void
-compress_fp64 ( const value_t *  data,
-                const size_t     nsize,
-                byte_t *         zdata,
-                const uint32_t   nbyte )
-{
-    if ( nbyte == 5 )
-    {
-        //
-        // BF40 = 1 + 8 + 31 bits
-        //
-
-        constexpr uint32_t  bf_mant_bits  = 31;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        
-        auto  zptr = reinterpret_cast< byte5_t * >( zdata );
-
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const double    fval  = data[i];
-            const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
-            const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
-            const uint64_t  mant = (ival & fp64_mant_mask) >> bf_mant_shift;
-            const uint64_t  sign = (ival & fp64_sign_mask) >> bf_sign_shift;
-            const uint64_t  zval = sign | (uint64_t(exp - 0x381u) << bf_mant_bits) | mant;
-
-            zptr[i] = zval;
-        }// for
-    }// if
-    else if ( nbyte == 6 )
-    {
-        //
-        // BF48 = 1 + 8 + 39 bits
-        //
-
-        constexpr uint32_t  bf_mant_bits  = 39;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        
-        auto  zptr = reinterpret_cast< byte6_t * >( zdata );
-
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const double    fval  = data[i];
-            const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
-            const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
-            const uint64_t  mant = (ival & fp64_mant_mask) >> bf_mant_shift;
-            const uint64_t  sign = (ival & fp64_sign_mask) >> bf_sign_shift;
-            const uint64_t  zval = sign | (uint64_t(exp - 0x381u) << bf_mant_bits) | mant;
-
-            zptr[i] = zval;
-        }// for
-    }// if
-    else if ( nbyte == 7 )
-    {
-        //
-        // BF56 = 1 + 8 + 47 bits
-        //
-
-        constexpr uint32_t  bf_mant_bits  = 47;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        
-        auto  zptr = reinterpret_cast< byte7_t * >( zdata );
-
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const double    fval  = data[i];
-            const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
-            const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
-            const uint64_t  mant = (ival & fp64_mant_mask) >> bf_mant_shift;
-            const uint64_t  sign = (ival & fp64_sign_mask) >> bf_sign_shift;
-            const uint64_t  zval = sign | (uint64_t(exp - 0x381u) << bf_mant_bits) | mant;
-
-            zptr[i] = zval;
-        }// for
-    }// if
-    else if ( nbyte == 8 )
-    {
-        //
-        // BF64 -> higher precision than FP64, so leave data untouched
-        //
-        
-        std::copy( reinterpret_cast< const double * >( data ),
-                   reinterpret_cast< const double * >( data + nsize ),
-                   zdata );
-    }// if
-    else
-        HLR_ERROR( "unsupported storage size" );
-}
-
-template < typename value_t >
-void
-decompress_fp32 ( value_t *       data,
-                  const size_t    nsize,
-                  const byte_t *  zdata,
-                  const size_t    nbyte )
-{
-    if ( nbyte == 2 )
-    {
-        auto  zptr = reinterpret_cast< const byte2_t * >( zdata );
         
         for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const uint32_t   ival = zptr[i] << 16;
-            const float  fval = * reinterpret_cast< const float * >( & ival );
-        
-            data[i] = fval;
-        }// for
-    }// if
-    else if ( nbyte == 3 )
-    {
-        auto  zptr = reinterpret_cast< const byte3_t * >( zdata );
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const uint32_t   ival = zptr[i] << 8;
-            const float  fval = * reinterpret_cast< const float * >( & ival );
-        
-            data[i] = fval;
-        }// for
-    }// if
-    else if ( nbyte == 4 )
+            zptr[i] = float(data[i]);
+    }
+
+    static
+    void
+    decompress ( value_t *       data,
+                 const size_t    nsize,
+                 const byte_t *  zdata )
     {
         auto  zptr = reinterpret_cast< const float * >( zdata );
         
         for ( size_t  i = 0; i < nsize; ++i )
-            data[i] = zptr[i];
-    }// if
-    else
-        HLR_ERROR( "unsupported storage size" );
-}
+            data[i] = value_t(zptr[i]);
+    }
+};
 
-template < typename value_t >
-void
-decompress_fp64 ( value_t *       data,
-                  const size_t    nsize,
-                  const byte_t *  zdata,
-                  const size_t    nbyte )
+//
+// extract sign, exponent and mantissa, then reduce exponent to 8 bits
+// and shorten mantissa
+//
+template < typename  value_t,
+           typename  storage_t >
+struct bfl64
 {
-    if ( nbyte == 5 )
+    static constexpr uint32_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
+    static constexpr uint32_t  bfl_sign_bit   = bfl_mant_bits + 8;
+    static constexpr uint32_t  bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
+    static constexpr uint32_t  bfl_sign_shift = 63 - bfl_sign_bit;
+    static constexpr uint64_t  bfl_sign_mask  = (1ul    << bfl_sign_bit);
+    static constexpr uint64_t  bfl_exp_mask   = (0xfful << bfl_mant_bits);
+    static constexpr uint64_t  bfl_mant_mask  = (1ul    << bfl_mant_bits) - 1;
+        
+    static
+    void
+    compress ( const value_t *  data,
+               const size_t     nsize,
+               byte_t *         zdata )
     {
-        constexpr uint32_t  bf_mant_bits  = 31;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        constexpr uint64_t  bf_sign_mask  = (1ul    << bf_sign_bit);
-        constexpr uint64_t  bf_exp_mask   = (0xfful << bf_mant_bits);
-        constexpr uint64_t  bf_mant_mask  = (1ul    << bf_mant_bits) - 1;
-        
-        auto  zptr = reinterpret_cast< const byte5_t * >( zdata );
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const uint64_t  zval = zptr[i];
-            const uint64_t  sign = (zval & bf_sign_mask) << bf_sign_shift;
-            const uint64_t  exp  = (zval & bf_exp_mask ) >> bf_mant_bits;
-            const uint64_t  mant = (zval & bf_mant_mask) << bf_mant_shift;
-            const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
-            const double    fval = * reinterpret_cast< const double * >( & ival );
-        
-            data[i] = fval;
-        }// for
-    }// if
-    else if ( nbyte == 6 )
-    {
-        constexpr uint32_t  bf_mant_bits  = 39;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        constexpr uint64_t  bf_sign_mask  = (1ul    << bf_sign_bit);
-        constexpr uint64_t  bf_exp_mask   = (0xfful << bf_mant_bits);
-        constexpr uint64_t  bf_mant_mask  = (1ul    << bf_mant_bits) - 1;
+        auto  zptr = reinterpret_cast< storage_t * >( zdata );
 
-        auto  zptr = reinterpret_cast< const byte6_t * >( zdata );
-        
         for ( size_t  i = 0; i < nsize; ++i )
         {
-            const uint64_t  zval = zptr[i];
-            const uint64_t  sign = (zval & bf_sign_mask) << bf_sign_shift;
-            const uint64_t  exp  = (zval & bf_exp_mask ) >> bf_mant_bits;
-            const uint64_t  mant = (zval & bf_mant_mask) << bf_mant_shift;
-            const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
-            const double    fval = * reinterpret_cast< const double * >( & ival );
-        
-            data[i] = fval;
-        }// for
-    }// if
-    else if ( nbyte == 7 )
-    {
-        constexpr uint32_t  bf_mant_bits  = 47;
-        constexpr uint32_t  bf_sign_bit   = bf_mant_bits + 8;
-        constexpr uint32_t  bf_mant_shift = fp64_mant_bits - bf_mant_bits;
-        constexpr uint32_t  bf_sign_shift = 63 - bf_sign_bit;
-        constexpr uint64_t  bf_sign_mask  = (1ul    << bf_sign_bit);
-        constexpr uint64_t  bf_exp_mask   = (0xfful << bf_mant_bits);
-        constexpr uint64_t  bf_mant_mask  = (1ul    << bf_mant_bits) - 1;
+            const double    fval  = data[i];
+            const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
+            const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
+            const uint64_t  mant = (ival & fp64_mant_mask) >> bfl_mant_shift;
+            const uint64_t  sign = (ival & fp64_sign_mask) >> bfl_sign_shift;
+            const uint64_t  zval = sign | (uint64_t(exp - 0x381u) << bfl_mant_bits) | mant;
 
-        auto  zptr = reinterpret_cast< const byte7_t * >( zdata );
-        
+            zptr[i] = zval;
+        }// for
+    }
+
+    static
+    void
+    decompress ( value_t *       data,
+                 const size_t    nsize,
+                 const byte_t *  zdata )
+    {
+    
+        auto  zptr = reinterpret_cast< const storage_t * >( zdata );
+    
         for ( size_t  i = 0; i < nsize; ++i )
         {
             const uint64_t  zval = zptr[i];
-            const uint64_t  sign = (zval & bf_sign_mask) << bf_sign_shift;
-            const uint64_t  exp  = (zval & bf_exp_mask ) >> bf_mant_bits;
-            const uint64_t  mant = (zval & bf_mant_mask) << bf_mant_shift;
+            const uint64_t  sign = (zval & bfl_sign_mask) << bfl_sign_shift;
+            const uint64_t  exp  = (zval & bfl_exp_mask ) >> bfl_mant_bits;
+            const uint64_t  mant = (zval & bfl_mant_mask) << bfl_mant_shift;
             const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
             const double    fval = * reinterpret_cast< const double * >( & ival );
         
             data[i] = fval;
         }// for
-    }// if
-    else if ( nbyte == 8 )
+    }
+};
+
+//
+// specialization when using 8 bytes: just stick to double
+//
+template <>
+struct bfl64< float, byte8_t >
+{
+    static void compress   ( const float *, const size_t, byte_t * ) { HLR_ERROR( "FP32 with 8 bytes???" ); }
+    static void decompress ( float *, const size_t, const byte_t * ) { HLR_ERROR( "FP32 with 8 bytes???" ); }
+};
+
+template <>
+struct bfl64< double, byte8_t >
+{
+    static
+    void
+    compress ( const double *  data,
+               const size_t    nsize,
+               byte_t *        zdata )
+    {
+        std::copy( data, data + nsize, reinterpret_cast< double * >( zdata ) );
+    }
+
+    static
+    void
+    decompress ( double *        data,
+                 const size_t    nsize,
+                 const byte_t *  zdata )
     {
         std::copy( reinterpret_cast< const double * >( zdata ),
-                   reinterpret_cast< const double * >( zdata + nsize ),
+                   reinterpret_cast< const double * >( zdata ) + nsize,
                    data );
-    }// if
-}
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -352,51 +243,25 @@ compress ( const config &   config,
            const size_t     dim0,
            const size_t     dim1 = 0,
            const size_t     dim2 = 0,
-           const size_t     dim3 = 0 );
-
-template <>
-inline
-zarray
-compress< float > ( const config &   config,
-                    float *          data,
-                    const size_t     dim0,
-                    const size_t     dim1,
-                    const size_t     dim2,
-                    const size_t     dim3 )
+           const size_t     dim3 = 0 )
 {
-    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t    nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
-    const uint32_t    nbyte = nbits / 8;
-    zarray        zdata( bf_header_ofs + nbyte * nsize );
+    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint32_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
+    const uint32_t  nbyte = nbits / 8;
+    zarray          zdata( bfl_header_ofs + nbyte * nsize );
 
     zdata[0] = nbyte;
 
-    compress_fp32( data, nsize, zdata.data() + bf_header_ofs, nbyte );
-
-    return zdata;
-}
-
-template <>
-inline
-zarray
-compress< double > ( const config &   config,
-                     double *         data,
-                     const size_t     dim0,
-                     const size_t     dim1,
-                     const size_t     dim2,
-                     const size_t     dim3 )
-{
-    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t    nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
-    const uint32_t    nbyte = nbits / 8;
-    zarray        zdata( bf_header_ofs + nbyte * nsize );
-
-    zdata[0] = nbyte;
-
-    if ( nbyte <= 4 )
-        compress_fp32( data, nsize, zdata.data() + bf_header_ofs, nbyte );
-    else
-        compress_fp64( data, nsize, zdata.data() + bf_header_ofs, nbyte );
+    switch ( nbyte )
+    {
+        case 2  : bfl32< value_t, byte2_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl32< value_t, byte3_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl32< value_t, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 5  : bfl64< value_t, byte5_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 6  : bfl64< value_t, byte6_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 7  : bfl64< value_t, byte7_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl64< value_t, byte8_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+    }// switch
         
     return zdata;
 }
@@ -411,14 +276,10 @@ compress< std::complex< float > > ( const config &           config,
                                     const size_t             dim2,
                                     const size_t             dim3 )
 {
-    if ( dim1 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
-    else
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 template <>
@@ -431,14 +292,10 @@ compress< std::complex< double > > ( const config &            config,
                                      const size_t              dim2,
                                      const size_t              dim3 )
 {
-    if ( dim1 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
-    else
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -449,46 +306,26 @@ compress< std::complex< double > > ( const config &            config,
 
 template < typename value_t >
 void
-decompress ( const zarray &  v,
+decompress ( const zarray &  zdata,
              value_t *       dest,
              const size_t    dim0,
              const size_t    dim1 = 0,
              const size_t    dim2 = 0,
-             const size_t    dim3 = 0 );
-
-template <>
-inline
-void
-decompress< float > ( const zarray &  zdata,
-                      float *         dest,
-                      const size_t    dim0,
-                      const size_t    dim1,
-                      const size_t    dim2,
-                      const size_t    dim3 )
+             const size_t    dim3 = 0 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t    nbyte = zdata[0];
+    const auto    nbyte = zdata[0];
 
-    decompress_fp32( dest, nsize, zdata.data() + bf_header_ofs, nbyte );
-}
-
-template <>
-inline
-void
-decompress< double > ( const zarray &  zdata,
-                       double *        dest,
-                       const size_t    dim0,
-                       const size_t    dim1,
-                       const size_t    dim2,
-                       const size_t    dim3 )
-{
-    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t    nbyte = zdata[0];
-
-    if ( nbyte <= 4 )
-        decompress_fp32( dest, nsize, zdata.data() + bf_header_ofs, nbyte );
-    else
-        decompress_fp64( dest, nsize, zdata.data() + bf_header_ofs, nbyte );
+    switch ( nbyte )
+    {
+        case 2  : bfl32< value_t, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl32< value_t, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl32< value_t, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 5  : bfl64< value_t, byte5_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 6  : bfl64< value_t, byte6_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 7  : bfl64< value_t, byte7_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl64< value_t, byte8_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+    }// switch
 }
 
 template <>
@@ -501,14 +338,10 @@ decompress< std::complex< float > > ( const zarray &           zdata,
                                       const size_t             dim2,
                                       const size_t             dim3 )
 {
-    if ( dim1 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
-    else
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
     
 template <>
@@ -521,14 +354,10 @@ decompress< std::complex< double > > ( const zarray &            zdata,
                                        const size_t              dim2,
                                        const size_t              dim3 )
 {
-    if ( dim1 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
-    else
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -540,18 +369,7 @@ decompress< std::complex< double > > ( const zarray &            zdata,
 template < typename value_t >
 zarray
 compress_lr ( const blas::matrix< value_t > &                       U,
-              const blas::vector< Hpro::real_type_t< value_t > > &  S );
-
-template < typename value_t >
-void
-decompress_lr ( const zarray &             zdata,
-                blas::matrix< value_t > &  U );
-
-template <>
-inline
-zarray
-compress_lr< float > ( const blas::matrix< float > &  U,
-                       const blas::vector< float > &  S )
+              const blas::vector< Hpro::real_type_t< value_t > > &  S )
 {
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -581,61 +399,21 @@ compress_lr< float > ( const blas::matrix< float > &  U,
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  nbyte = b[l];
-
-        zdata[pos] = nbyte;
-        pos += 1;
-        
-        compress_fp32( U.data() + l*n, n, zdata.data() + pos, nbyte );
-        pos += n*nbyte;
-    }// for
-
-    return zdata;
-}
-
-template <>
-inline
-zarray
-compress_lr< double > ( const blas::matrix< double > &  U,
-                        const blas::vector< double > &  S )
-{
-    //
-    // first, determine exponent bits and mantissa bits for all columns
-    //
-
-    const size_t  n     = U.nrows();
-    const size_t  k     = U.ncols();
-    auto          b     = std::vector< uint32_t >( k );
-    size_t        zsize = 0;
-
-    for ( uint32_t  l = 0; l < k; ++l )
-    {
-        const auto  nprecbits = eps_to_rate( S(l) );
-        const uint32_t  nbits     = byte_pad( 1 + 8 + nprecbits );
-        const uint32_t  nbyte     = nbits / 8;
-
-        b[l]   = nbyte;
-        zsize += 1 + nbyte * n;
-    }// for
-
-    //
-    // convert each column to compressed form
-    //
-
-    auto    zdata = std::vector< byte_t >( zsize );
-    size_t  pos   = 0;
-        
-    for ( uint32_t  l = 0; l < k; ++l )
-    {
-        const uint32_t  nbyte = b[l];
+        const auto  nbyte = b[l];
 
         zdata[pos] = nbyte;
         pos += 1;
 
-        if ( nbyte <= 4 )
-            compress_fp32( U.data() + l*n, n, zdata.data() + pos, nbyte );
-        else
-            compress_fp64( U.data() + l*n, n, zdata.data() + pos, nbyte );
+        switch ( nbyte )
+        {
+            case  2 : bfl32< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  3 : bfl32< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  4 : bfl32< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  5 : bfl64< value_t, byte5_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  6 : bfl64< value_t, byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  7 : bfl64< value_t, byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : bfl64< value_t, byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+        }// switch
         
         pos += n*nbyte;
     }// for
@@ -643,11 +421,10 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     return zdata;
 }
 
-template <>
-inline
+template < typename value_t >
 void
-decompress_lr< float > ( const zarray &           zdata,
-                         blas::matrix< float > &  U )
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U )
 {
     const size_t    n   = U.nrows();
     const uint32_t  k   = U.ncols();
@@ -655,13 +432,41 @@ decompress_lr< float > ( const zarray &           zdata,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  nbyte = zdata[ pos ];
+        const auto  nbyte = zdata[ pos ];
 
         pos += 1;
 
-        decompress_fp32( U.data() + l * n, n, zdata.data() + pos, nbyte );
+        switch ( nbyte )
+        {
+            case  2 : bfl32< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  3 : bfl32< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  4 : bfl32< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  5 : bfl64< value_t, byte5_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  6 : bfl64< value_t, byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  7 : bfl64< value_t, byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : bfl64< value_t, byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+        }// switch
+        
         pos += nbyte * n;
     }// for
+}
+
+template <>
+inline
+zarray
+compress_lr< std::complex< float > > ( const blas::matrix< std::complex< float > > &  U,
+                                       const blas::vector< float > &                  S )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+zarray
+compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
+                                        const blas::vector< double > &                  S )
+{
+    HLR_ERROR( "TODO" );
 }
 
 template <>
@@ -671,31 +476,6 @@ decompress_lr< std::complex< float > > ( const zarray &                         
                                          blas::matrix< std::complex< float > > &  U )
 {
     HLR_ERROR( "TODO" );
-}
-
-template <>
-inline
-void
-decompress_lr< double > ( const zarray &            zdata,
-                          blas::matrix< double > &  U )
-{
-    const size_t    n   = U.nrows();
-    const uint32_t  k   = U.ncols();
-    size_t          pos = 0;
-
-    for ( uint32_t  l = 0; l < k; ++l )
-    {
-        const uint32_t  nbyte = zdata[ pos ];
-
-        pos += 1;
-
-        if ( nbyte <= 4 )
-            decompress_fp32( U.data() + l * n, n, zdata.data() + pos, nbyte );
-        else
-            decompress_fp64( U.data() + l * n, n, zdata.data() + pos, nbyte );
-        
-        pos += nbyte * n;
-    }// for
 }
 
 template <>
