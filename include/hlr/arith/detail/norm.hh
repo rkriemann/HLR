@@ -286,72 +286,65 @@ frobenius_squared ( const alpha_t                     alpha,
         
         return std::abs( sqn );
     }// if
-    else if ( matrix::is_uniform_lowrank_all( A, B ) )
+    else if ( matrix::is_uniform_lowrank( A ) )
     {
-        //
-        // assumption: different cluster basis but same block cluster
-        // => convert to lowrank and compute norm
-        //
-        
         auto  RA = matrix::convert_to_lowrank( A );
-        auto  RB = matrix::convert_to_lowrank( B );
 
-        return frobenius_squared( alpha, *RA, beta, *RB );
+        return frobenius_squared( alpha, *RA, beta, B );
     }// if
-    else if ( matrix::is_h2_lowrank_all( A, B ) )
+    else if ( matrix::is_uniform_lowrank( B ) )
     {
-        //
-        // assumption: different cluster basis but same block cluster
-        // => convert to lowrank and compute norm
-        //
-        
-        auto  RA = matrix::convert_to_lowrank( A );
         auto  RB = matrix::convert_to_lowrank( B );
 
-        return frobenius_squared( alpha, *RA, beta, *RB );
+        return frobenius_squared( alpha, A, beta, *RB );
+    }// if
+    else if ( matrix::is_h2_lowrank( A ) )
+    {
+        auto  RA = matrix::convert_to_lowrank( A );
+
+        return frobenius_squared( alpha, *RA, beta, B );
+    }// if
+    else if ( matrix::is_h2_lowrank( B ) )
+    {
+        auto  RB = matrix::convert_to_lowrank( B );
+
+        return frobenius_squared( alpha, A, beta, *RB );
     }// if
     else if ( matrix::is_dense_all( A, B ) )
     {
-        auto  comp_dense = [alpha,beta] ( const blas::matrix< value_t > &  MA,
-                                          const blas::matrix< value_t > &  MB )
-        {
-            result_t     val = 0;
-            const idx_t  n   = idx_t(MA.nrows());
-            const idx_t  m   = idx_t(MA.ncols());
+        auto  MA = cptrcast( &A, matrix::dense_matrix< value_t > )->mat();
+        auto  MB = cptrcast( &B, matrix::dense_matrix< value_t > )->mat();
+        
+        result_t     val = 0;
+        const idx_t  n   = idx_t(MA.nrows());
+        const idx_t  m   = idx_t(MA.ncols());
     
-            for ( idx_t j = 0; j < m; ++j )
+        for ( idx_t j = 0; j < m; ++j )
+        {
+            for ( idx_t i = 0; i < n; ++i )
             {
-                for ( idx_t i = 0; i < n; ++i )
-                {
-                    const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
-                    
-                    val += std::abs( math::square( a_ij ) );
-                }// for
+                const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                
+                val += std::abs( math::square( a_ij ) );
             }// for
+        }// for
             
-            return val;
-        };
-
-        return comp_dense( cptrcast( &A, matrix::dense_matrix< value_t > )->mat(),
-                           cptrcast( &B, matrix::dense_matrix< value_t > )->mat() );
+        return val;
+    }// if
+    else if ( matrix::is_dense( A ) && matrix::is_lowrank( B ) )
+    {
+        auto  DB = matrix::convert_to_dense( B );
+        
+        return frobenius_squared( alpha, A, beta, *DB );
+    }// if
+    else if ( matrix::is_dense( B ) && matrix::is_lowrank( A ) )
+    {
+        auto  DA = matrix::convert_to_dense( A );
+        
+        return frobenius_squared( alpha, *DA, beta, B );
     }// if
     else
-    {
-        if ( matrix::is_dense( A ) && matrix::is_lowrank( B ) )
-        {
-            auto  DB = matrix::convert_to_dense( B );
-
-            return frobenius_squared( alpha, A, beta, *DB );
-        }// if
-        else if ( matrix::is_dense( B ) && matrix::is_lowrank( A ) )
-        {
-            auto  DA = matrix::convert_to_dense( A );
-
-            return frobenius_squared( alpha, *DA, beta, B );
-        }// if
-        else
-            HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
-    }// else
+        HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
 
     return 0;
 }
