@@ -190,21 +190,21 @@ greedy_hosvd ( const tensor3< value_t > &  X,
     auto  Y1 = tensor_product( Y0, adjoint( W1 ), 1 );
     auto  G  = tensor_product( Y1, adjoint( W2 ), 2 );
 
-    io::matlab::write( W0, "W0" );
-    io::matlab::write( W1, "W1" );
-    io::matlab::write( W2, "W2" );
+    // io::matlab::write( W0, "W0" );
+    // io::matlab::write( W1, "W1" );
+    // io::matlab::write( W2, "W2" );
 
-    io::matlab::write( S0, "S0" );
-    io::matlab::write( S1, "S1" );
-    io::matlab::write( S2, "S2" );
+    // io::matlab::write( S0, "S0" );
+    // io::matlab::write( S1, "S1" );
+    // io::matlab::write( S2, "S2" );
 
-    auto  G0 = G.unfold( 0 );
-    auto  G1 = G.unfold( 1 );
-    auto  G2 = G.unfold( 2 );
+    // auto  G0 = G.unfold( 0 );
+    // auto  G1 = G.unfold( 1 );
+    // auto  G2 = G.unfold( 2 );
 
-    io::matlab::write( G0, "G0" );
-    io::matlab::write( G1, "G1" );
-    io::matlab::write( G2, "G2" );
+    // io::matlab::write( G0, "G0" );
+    // io::matlab::write( G1, "G1" );
+    // io::matlab::write( G2, "G2" );
     
     // // print compressed memory
     // if ( false )

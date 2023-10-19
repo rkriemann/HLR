@@ -575,6 +575,23 @@ program_main ()
     
     std::cout << "    |X|_F  = " << format_norm( norm_X ) << std::endl;
         
+    // {
+    //     //
+    //     // copy some part
+    //     //
+
+    //     auto  Y = blas::tensor3< value_t >( 256, 256, 256 );
+
+    //     for ( uint l = 0; l < 256; l++ )
+    //         for ( uint j = 0; j < 256; j++ )
+    //             for ( uint i = 0; i < 256; i++ )
+    //                 Y(i,j,l) = X(i + 1024,j,l);
+
+    //     io::vtk::print( Y, "Y.vtk" );
+    //     io::hdf5::write( Y, "Y" );
+    //     return;
+    // }
+
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
     if ( verbose(2) ) io::hdf5::write( X, "X" );
 
