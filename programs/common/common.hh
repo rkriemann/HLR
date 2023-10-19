@@ -32,6 +32,7 @@ using Hpro::verbose;
 #include <hlr/cluster/mblr.hh>
 #include <hlr/cluster/tileh.hh>
 #include <hlr/cluster/h.hh>
+#include <hlr/cluster/sfc.hh>
 
 #include <hlr/utils/timer.hh>
 
@@ -110,6 +111,13 @@ std::string
 format_norm ( const double  e )
 {
     return hlr::term::italic( str( boost::format( "%.4e" ) % e ) );
+}
+
+template < typename... T >
+std::string
+format_norm ( const double  e, const T... es )
+{
+    return hlr::term::italic( str( boost::format( "%.4e" ) % e ) ) + " / " + format_norm( es... );
 }
 
 // return default formated string for FLOPs
@@ -201,6 +209,19 @@ gen_ct ( hpro::TCoordinate &  coord )
     else if (( cluster == "bsp" ) || ( cluster == "h" ))
     {
         return hlr::cluster::h::cluster( coord, hlr::cmdline::ntile );
+    }// if
+    else if (( cluster == "sfc" ) ||
+             (( cluster.size() > 3 ) && ( cluster.substr( 0, 4 ) == "sfc-" )))
+    {
+        auto  part_type = hlr::cluster::sfc::binary;
+
+        if  ( cluster.size() >= 4 )
+        {
+            if      ( cluster.substr( 3, cluster.size() ) == "-binary" ) part_type = hlr::cluster::sfc::binary;
+            else if ( cluster.substr( 3, cluster.size() ) == "-blr"    ) part_type = hlr::cluster::sfc::blr;
+        }// if
+        
+        return hlr::cluster::sfc::cluster( part_type, coord, hlr::cmdline::ntile );
     }// if
     else
         HLR_ERROR( "unsupported clustering : " + cluster );

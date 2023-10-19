@@ -57,10 +57,10 @@ private:
 
 private:
     // singular values
-    blas::vector< real_t >   _S;
+    blas::vector< real_t >  _S;
 
     // compressed storage
-    mp_storage               _mpdata;
+    mp_storage              _mpdata;
 
 public:
     //
@@ -79,7 +79,7 @@ public:
     lrsvmatrix ( const indexset              arow_is,
                  const indexset              acol_is,
                  blas::matrix< value_t > &   aU,
-                 blas::vector< value_t > &   aS,
+                 blas::vector< real_t > &    aS,
                  blas::matrix< value_t > &   aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {
@@ -89,7 +89,7 @@ public:
     lrsvmatrix ( const indexset              arow_is,
                  const indexset              acol_is,
                  blas::matrix< value_t > &&  aU,
-                 blas::vector< value_t > &&  aS,
+                 blas::vector< real_t > &&   aS,
                  blas::matrix< value_t > &&  aV )
             : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
     {

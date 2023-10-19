@@ -62,7 +62,7 @@ svd_ortho ( blas::matrix< value_t > &  M,
     auto        rk = blas::range( 0, k-1 );
     const auto  Uk = blas::matrix< value_t >( M, blas::range::all, rk );
     const auto  Vk = blas::matrix< value_t >( V, blas::range::all, rk );
-    const auto  Sk = blas::vector< value_t >( S, rk );
+    const auto  Sk = blas::vector< real_t >(  S, rk );
     auto        A = blas::copy( Uk );
     auto        B = blas::copy( Vk );
     auto        T = blas::copy( Sk );
@@ -575,7 +575,7 @@ struct SVD
     }
 
     //
-    // matrix approximation routines
+    // matrix approximation routines (orthogonal version)
     //
     
     std::tuple< blas::matrix< value_t >,

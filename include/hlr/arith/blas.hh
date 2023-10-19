@@ -826,6 +826,7 @@ using Hpro::BLAS::mulvec;
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -899,6 +900,7 @@ mulvec_lr ( const T_alpha                    alpha,
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -973,15 +975,17 @@ mulvec_lr ( const T_alpha                    alpha,
 // compute op(U·S·V')·x = y with diagonal S
 //
 template < typename T_alpha,
-           typename T_value >
+           typename T_value,
+           typename T_value_S >
+requires ( std::convertible_to< T_value_S, T_value > && std::convertible_to< T_alpha, T_value > )
 void
-mulvec_lr ( const T_alpha                    alpha,
-            const blas::matrix< T_value > &  U,
-            const blas::vector< T_value > &  S,
-            const blas::matrix< T_value > &  V,
-            const matop_t                    op,
-            const blas::vector< T_value > &  x,
-            blas::vector< T_value > &        y )
+mulvec_lr ( const T_alpha                      alpha,
+            const blas::matrix< T_value > &    U,
+            const blas::vector< T_value_S > &  S,
+            const blas::matrix< T_value > &    V,
+            const matop_t                      op,
+            const blas::vector< T_value > &    x,
+            blas::vector< T_value > &          y )
 {
     using  value_t = T_value;
 
@@ -1118,7 +1122,14 @@ prod_diag_ip ( matrix_t &        M,
 {
     HLR_DBG_ASSERT( M.ncols() == D.length() );
     
-    Hpro::BLAS::prod_diag( M, D, M.ncols() );
+    using  value_t = typename matrix_t::value_t;
+    
+    for ( Hpro::idx_t  i = 0; i < M.ncols(); ++i )
+    {
+        auto  Mi = M.column( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < matrix_type matrix_t,
@@ -1133,8 +1144,13 @@ prod_diag ( const matrix_t &  M,
     using  value_t = typename matrix_t::value_t;
 
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.ncols(); ++i )
+    {
+        auto  Ti = T.column( i );
 
-    Hpro::BLAS::prod_diag( T, D, T.ncols() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
@@ -1151,7 +1167,14 @@ prod_diag_ip ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
-    Hpro::BLAS::prod_diag( D, M, M.nrows() );
+    using  value_t = value_type_t< matrix_t >;
+    
+    for ( Hpro::idx_t  i = 0; i < M.nrows(); ++i )
+    {
+        auto  Mi = M.row( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < vector_type vector_t,
@@ -1163,9 +1186,16 @@ prod_diag ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
+    using  value_t = value_type_t< matrix_t >;
+    
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.nrows(); ++i )
+    {
+        auto  Ti = T.row( i );
 
-    Hpro::BLAS::prod_diag( D, T, T.nrows() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
@@ -1960,15 +1990,17 @@ sv ( const matrix< value_t > &  M )
 // compute singular values of U·V'
 //
 template < typename value_t >
-vector< value_t >
+vector< real_type_t< value_t > >
 sv ( const matrix< value_t > &  U,
      const matrix< value_t > &  V )
 {
+    using  real_t = real_type_t< value_t >;
+    
     const auto   nrows_U = U.nrows();
     const auto   nrows_V = V.nrows();
     const auto   rank    = U.ncols();
     const auto   minrc   = std::min( nrows_U, nrows_V );
-    auto         S       = vector< value_t >( minrc );
+    auto         S       = vector< real_t >( minrc );
 
     if ( rank >= minrc )
     {

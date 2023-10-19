@@ -395,11 +395,11 @@ compress_fp64 ( const double *  data,
         // write to destination buffer
         switch ( nbyte )
         {
-            case  4 : { auto ptr = reinterpret_cast< uint32_t * >(    & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = uint32_t(ibuf[j]); } break;
-            case  5 : { auto ptr = reinterpret_cast< byte5_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  6 : { auto ptr = reinterpret_cast< byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  7 : { auto ptr = reinterpret_cast< byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  8 : { auto ptr = reinterpret_cast< uint64_t * >(   & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  4 : { auto ptr = reinterpret_cast< uint32_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = uint32_t(ibuf[j]); } break;
+            case  5 : { auto ptr = reinterpret_cast< byte5_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  6 : { auto ptr = reinterpret_cast< byte6_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  7 : { auto ptr = reinterpret_cast< byte7_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  8 : { auto ptr = reinterpret_cast< uint64_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
             default : HLR_ERROR( "unsupported storage size" );
         }// switch
 
@@ -492,11 +492,11 @@ decompress_fp64 ( double *        data,
         // read data
         switch ( nbyte )
         {
-            case  4 : { auto ptr = reinterpret_cast< const uint32_t * >(    & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  5 : { auto ptr = reinterpret_cast< const byte5_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  8 : { auto ptr = reinterpret_cast< const uint64_t * >(   & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  4 : { auto ptr = reinterpret_cast< const uint32_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  5 : { auto ptr = reinterpret_cast< const byte5_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  6 : { auto ptr = reinterpret_cast< const byte6_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  7 : { auto ptr = reinterpret_cast< const byte7_t * >(  & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  8 : { auto ptr = reinterpret_cast< const uint64_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
             default : HLR_ERROR( "unsupported storage size" );
         }// switch
             
@@ -597,7 +597,7 @@ compress< float > ( const config &   config,
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == double(0) ? fp32_infinity : d_i );
+        const auto  val = ( d_i == float(0) ? fp32_infinity : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
@@ -743,7 +743,6 @@ decompress< float > ( const zarray &  zdata,
     
     const uint32_t  exp_bits  = zdata[0];
     const uint32_t  prec_bits = zdata[1];
-    const uint32_t  nbits     = 1 + exp_bits + prec_bits;
     
     decompress_fp32( dest, nsize, zdata.data() + 2, exp_bits, prec_bits );
 }

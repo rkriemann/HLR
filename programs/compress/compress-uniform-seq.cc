@@ -9,6 +9,7 @@
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_uniform.hh"
 #include "hlr/seq/norm.hh"
+#include "hlr/seq/convert.hh"
 
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";

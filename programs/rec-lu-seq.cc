@@ -1,15 +1,16 @@
 //
 // Project     : HLR
+// File        : rec-lu.hh
+// Description : recursive LU factorization
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2021. All Rights Reserved.
 //
 
 #include "hlr/seq/matrix.hh"
 #include "hlr/seq/arith.hh"
-#include "hlr/seq/norm.hh"
 
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "sparse.hh"
+#include "rec-lu.hh"
 #include "seq.hh"

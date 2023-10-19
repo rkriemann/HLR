@@ -1437,7 +1437,7 @@ multiply_diag ( const value_t                     alpha,
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// compute Hadamard product A = α A*B 
+// compute Hadamard product A = α A ⊗ B 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1472,8 +1472,8 @@ multiply_hadamard ( const value_t                     alpha,
     {
         auto        DA     = ptrcast( &A,  matrix::dense_matrix< value_t > );
         auto        DB     = cptrcast( &B, matrix::dense_matrix< value_t > );
-        auto        blas_A = blas::copy( DA.mat() );
-        auto        blas_B = DB.mat();
+        auto        blas_A = blas::copy( DA->mat() );
+        auto        blas_B = DB->mat();
         const auto  nrows  = DA->nrows();
         const auto  ncols  = DA->ncols();
 
@@ -1507,10 +1507,10 @@ multiply_hadamard ( const value_t                     alpha,
         auto  nrows = RA->nrows();
         auto  ncols = RA->ncols();
 
-        auto  U = blas::mat_U( RA );
-        auto  V = blas::mat_V( RA );
-        auto  W = blas::mat_U( RB );
-        auto  X = blas::mat_V( RB );
+        auto  U = RA->U();
+        auto  V = RA->V();
+        auto  W = RB->U();
+        auto  X = RB->V();
         auto  Y = blas::matrix< value_t >( nrows, rank );
         auto  Z = blas::matrix< value_t >( ncols, rank );
 
@@ -1544,6 +1544,96 @@ multiply_hadamard ( const value_t                     alpha,
         
         RA->set_lrmat( std::move( Y_acc ), std::move( Z_acc ), acc );
     }// if
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// compute with diagonal matrix
+//
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// compute from left: A = D·A
+//
+template < typename value_t,
+           typename approx_t >
+void
+multiply_diag ( const blas::vector< value_t > &  D,
+                Hpro::TMatrix< value_t > &       A )
+{
+    HLR_ERROR( "todo" );
+}
+
+//
+// compute from right: A = A·D
+//
+template < typename value_t >
+void
+multiply_diag ( Hpro::TMatrix< value_t > &       A,
+                const blas::vector< value_t > &  diag )
+{
+    if ( is_blocked( A ) )
+    {
+        auto  B = ptrcast( &A,  Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        {
+            auto  diag_j = blas::vector< value_t >();
+            
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                auto  A_ij = B->block( i, j );
+                
+                if ( is_null( A_ij ) )
+                    continue;
+
+                if ( diag_j.length() == 0 )
+                {
+                    //
+                    // initialize sub diagonal
+                    //
+
+                    diag_j = std::move( blas::vector< value_t >( diag, A_ij->col_is() - A.col_ofs() ) );
+                }// if
+                
+                multiply_diag( *A_ij, diag_j );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_dense( A ) )
+    {
+        auto  D  = ptrcast( &A,  matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        HLR_ASSERT( ! D->is_compressed() );
+        
+        for ( size_t  j = 0; j < DD.ncols(); ++j )
+        {
+            auto  A_j = DD.column( j );
+
+            blas::scale( diag(j), A_j );
+        }// for
+    }// if
+    else if ( matrix::is_lowrank( A ) )
+    {
+        //
+        // A·D = U (V' · D), so scale rows of V
+        //
+        
+        auto  R = ptrcast( &A,  matrix::lrmatrix< value_t > );
+        auto  V = R->V();
+
+        HLR_ASSERT( ! R->is_compressed() );
+        
+        for ( size_t  i = 0; i < V.nrows(); ++i )
+        {
+            auto  V_i = V.row( i );
+
+            blas::scale( diag(i), V_i );
+        }// for
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
 }
 
 }// namespace hlr

@@ -421,7 +421,7 @@ compress_fp64 ( const double *  data,
         // write into data buffer
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            auto  zval  = ibuf[j];
+            auto      zval  = ibuf[j];
             uint32_t  sbits = 0; // number of already stored bits of zval
             
             do

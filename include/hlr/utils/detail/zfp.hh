@@ -174,9 +174,6 @@ compress< std::complex< double > > ( const config &            config,
 //
 // decompression function
 //
-//
-// decompression function
-//
 template < typename value_t >
 void
 decompress ( const uchar *   zdata,

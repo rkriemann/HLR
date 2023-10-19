@@ -46,6 +46,8 @@ bool    ip_lu      = false;        // use in-place task graph
 bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
+bool    coarsen    = false;        // coarsen matrix structure
+bool    tohodlr    = false;        // convert matrix to HODLR format
 int     coarse     = 0;            // use coarse sparse graph
 uint    nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
@@ -128,7 +130,7 @@ parse ( int argc, char ** argv )
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
-        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -138,6 +140,8 @@ parse ( int argc, char ** argv )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
         ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
+        ( "coarsen",                      ": coarsen matrix structure" )
+        ( "tohodlr",                      ": convert matrix to HODLR format" )
         ;
 
     ari_opts.add_options()
@@ -230,6 +234,8 @@ parse ( int argc, char ** argv )
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
+    if ( vm.count( "coarsen"    ) ) coarsen    = true;
+    if ( vm.count( "tohodlr"    ) ) tohodlr    = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<uint>();
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
@@ -316,14 +322,15 @@ parse ( int argc, char ** argv )
                   << "  - tlr/blr : flat clustering, i.e., without hierarchy" << std::endl
                   << "  - mblr    : MBLR clustering with <nlvl> level" << std::endl
                   << "  - tileh   : Tile-H / LatticeH for first level and BSP for rest" << std::endl
-                  << "  - bsp/h   : binary space partitioning" << std::endl;
+                  << "  - bsp/h   : binary space partitioning" << std::endl
+                  << "  - sfc     : Hilber curve base partitioning (optional: -binary/-blr)" << std::endl;
 
         std::exit( 0 );
     }// if
     
     if ( adm == "help" )
     {
-        std::cout << "Clustering Techniques:" << std::endl
+        std::cout << "Admissibility Conditions:" << std::endl
                   << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
                   << "  - weak          : weak geometric admissibility" << std::endl
                   << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl

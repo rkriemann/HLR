@@ -31,6 +31,7 @@
 #define HLR_COMPRESSOR_TF32     16
 #define HLR_COMPRESSOR_BF24     17
 #define HLR_COMPRESSOR_MP       18
+#define HLR_COMPRESSOR_CFLOAT   19
 
 #if defined(HLR_COMPRESSOR)
 
@@ -45,7 +46,7 @@
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "FP32";
+static const char provider[] = "fp32";
 
 using  zconfig_t = hlr::compress::fp32::config;
 using  zarray    = hlr::compress::fp32::zarray;
@@ -70,7 +71,7 @@ using hlr::compress::fp32::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "FP16";
+static const char provider[] = "fp16";
 
 using  zconfig_t = hlr::compress::fp16::config;
 using  zarray    = hlr::compress::fp16::zarray;
@@ -95,7 +96,7 @@ using hlr::compress::fp16::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "ZFP";
+static const char provider[] = "zfp";
 
 using  zconfig_t = hlr::compress::zfp::config;
 using  zarray    = hlr::compress::zfp::zarray;
@@ -120,7 +121,7 @@ using hlr::compress::zfp::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "Posits";
+static const char provider[] = "posits";
 
 using  zconfig_t = hlr::compress::posits::config;
 using  zarray    = hlr::compress::posits::zarray;
@@ -129,6 +130,31 @@ using hlr::compress::posits::compress;
 using hlr::compress::posits::decompress;
 using hlr::compress::posits::get_config;
 using hlr::compress::posits::byte_size;
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_CFLOAT
+
+#  if !defined(HLR_HAS_UNIVERSAL)
+#    error "Universal library not available"
+#  endif
+
+#include <hlr/utils/detail/cfloat.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "cfloat";
+
+using  zconfig_t = hlr::compress::cfloat::config;
+using  zarray    = hlr::compress::cfloat::zarray;
+
+using hlr::compress::cfloat::compress;
+using hlr::compress::cfloat::decompress;
+using hlr::compress::cfloat::get_config;
+using hlr::compress::cfloat::byte_size;
 
 }} // namespace hlr::compress
 
@@ -145,7 +171,7 @@ using hlr::compress::posits::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "SZ";
+static const char provider[] = "sz";
 
 using  zconfig_t = hlr::compress::sz::config;
 using  zarray    = hlr::compress::sz::zarray;
@@ -170,7 +196,7 @@ using hlr::compress::sz::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "SZ3";
+static const char provider[] = "sz3";
 
 using  zconfig_t = hlr::compress::sz3::config;
 using  zarray    = hlr::compress::sz3::zarray;
@@ -195,7 +221,7 @@ using hlr::compress::sz3::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "LZ4";
+static const char provider[] = "lz4";
 
 using  zconfig_t = hlr::compress::lz4::config;
 using  zarray    = hlr::compress::lz4::zarray;
@@ -245,7 +271,7 @@ using hlr::compress::zlib::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "Zstd";
+static const char provider[] = "zstd";
 
 using  zconfig_t = hlr::compress::zstd::config;
 using  zarray    = hlr::compress::zstd::zarray;
@@ -266,7 +292,7 @@ using hlr::compress::zstd::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "BF16";
+static const char provider[] = "bf16";
 
 using  zconfig_t = hlr::compress::bf16::config;
 using  zarray    = hlr::compress::bf16::zarray;
@@ -287,7 +313,7 @@ using hlr::compress::bf16::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "TF32";
+static const char provider[] = "tf32";
 
 using  zconfig_t = hlr::compress::tf32::config;
 using  zarray    = hlr::compress::tf32::zarray;
@@ -308,7 +334,7 @@ using hlr::compress::tf32::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "BF24";
+static const char provider[] = "bf24";
 
 using  zconfig_t = hlr::compress::bf24::config;
 using  zarray    = hlr::compress::bf24::zarray;
@@ -721,6 +747,21 @@ using hlr::compress::afl::decompress_lr;
 using hlr::compress::afl::byte_size;
 
 static const char provider[] = "afl";
+
+}// namespace hlr::compress::aplr
+
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_POSITS
+
+#include <hlr/utils/detail/posits.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::posits::zarray;
+using hlr::compress::posits::compress_lr;
+using hlr::compress::posits::decompress_lr;
+using hlr::compress::posits::byte_size;
+
+static const char provider[] = "posits";
 
 }// namespace hlr::compress::aplr
 

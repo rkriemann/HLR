@@ -9,6 +9,7 @@
 #include "hlr/tbb/arith.hh"
 #include "hlr/tbb/arith_h2.hh"
 #include "hlr/tbb/norm.hh"
+#include "hlr/tbb/convert.hh"
 
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";

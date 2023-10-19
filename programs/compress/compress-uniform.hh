@@ -63,9 +63,6 @@ program_main ()
         tic = timer::now();
         H   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
         toc = timer::since( tic );
-
-        if ( verbose( 2 ) )
-            io::hpro::write< value_t >( *H, "A.hm" );
     }// if
     else
     {
@@ -87,7 +84,43 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::print( *H, "H" );
+        io::eps::print( *H, "H", "noid,nosize" );
+    
+    //////////////////////////////////////////////////////////////////////
+    //
+    // coarsen matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    if ( cmdline::coarsen )
+    {
+        std::cout << term::bullet << term::bold << "coarsening" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Hc = impl::matrix::coarsen( *H, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Hc = Hc->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Hc ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Hc) / double(mem_H) ) << std::endl;
+
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Hc, "Hc", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *H, -1, *Hc );
+        auto  norm_A = impl::norm::spectral( *H );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        H = std::move( Hc );
+    }// if
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -144,15 +177,16 @@ program_main ()
               << "compression ("
               << "ε = " << boost::format( "%.2e" ) % cmdline::eps
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::ap::provider << ')'
+              << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ')'
               << term::reset << std::endl;
 
     {
-        auto  lacc = absolute_prec( cmdline::eps );
+        auto  lacc  = absolute_prec( cmdline::eps );
+        auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
@@ -164,7 +198,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
+            if ( i < niter-1 )
             {
                 zA     = std::move( impl::matrix::copy( *A ) );
                 zrowcb = std::move( zrowcb->copy() );
@@ -208,6 +242,8 @@ program_main ()
               << term::reset << std::endl;
 
     {
+        auto  niter = std::max( nbench, 1u );
+        
         runtime.clear();
         
         auto  zA2     = impl::matrix::copy( *zA );
@@ -216,7 +252,7 @@ program_main ()
         
         matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
         
-        for ( uint  i = 0; i < nbench; ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
@@ -228,7 +264,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
-            if ( i < nbench-1 )
+            if ( i < niter-1 )
             {
                 zA2     = std::move( impl::matrix::copy( *zA ) );
                 zrowcb2 = std::move( zrowcb->copy() );

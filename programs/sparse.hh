@@ -11,11 +11,108 @@
 
 #include <hpro/io/TMatrixIO.hh>
 
+#include <hlr/arith/multiply.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/matrix/luinv_eval.hh>
 #include <hlr/utils/io.hh>
+#include <hlr/arith/blas_eigen.hh>
+
+#include <hlr/seq/ipt.hh>
 
 using namespace hlr;
+
+template < typename value_t >
+std::unique_ptr< Hpro::TSparseMatrix< value_t > >
+read_csv ( const std::string &  filename )
+{
+    auto  in   = std::ifstream( filename );
+    auto  line = std::string();
+
+    // skip first line
+    std::getline( in, line );
+
+    // number of rows
+    std::getline( in, line );
+
+    size_t  nrows = atoi( line.c_str() );
+    
+    //
+    // read number of rows/cols
+    //
+    
+    auto    fpos  = in.tellg();
+    size_t  ncols = 0;
+    size_t  nnz   = 0;
+    auto    rows = std::vector< uint >( nrows+1, 0 );
+    auto    parts = std::vector< std::string >();
+    
+    while ( in.good() )
+    {
+        std::getline( in, line );
+        Hpro::split( line, ",", parts );
+
+        if ( line.size() == 0 )
+            continue;
+        
+        if ( parts.size() != 3 )
+            HLR_ERROR( "expected r,c,v" );
+
+        auto  row = atoi( parts[0].c_str() )-1;
+        auto  col = atoi( parts[1].c_str() )-1;
+
+        rows[row]++;
+        ncols = std::max< int >( ncols, col+1 );
+        nnz++;
+    }// while
+
+    std::cout << nrows << " × " << ncols << std::endl;
+    
+    //
+    // read data as CSV matrix
+    //
+
+    auto    S   = std::make_unique< Hpro::TSparseMatrix< value_t > >( Hpro::is( 0, nrows-1 ), Hpro::is( 0, ncols-1 ) );
+    size_t  ofs = 0;
+
+    S->init( nnz );
+
+    for ( uint i = 0; i < nrows; i++ )
+    {
+        S->rowptr(i) = ofs;
+        ofs += rows[i];
+        rows[i] = 0; // reset for later usage
+    }// for
+
+    S->rowptr(nrows) = nnz;
+    
+    in.clear();
+    in.seekg( fpos );
+    
+    while ( in.good() )
+    {
+        std::getline( in, line );
+        Hpro::split( line, ",", parts );
+
+        if ( line.size() == 0 )
+            continue;
+        
+        if ( parts.size() != 3 )
+            HLR_ERROR( "expected r,c,v" );
+
+        auto  row = atoi( parts[0].c_str() )-1;
+        auto  col = atoi( parts[1].c_str() )-1;
+        auto  val = atof( parts[2].c_str() );
+
+        ofs = S->rowptr(row) + rows[row];
+
+        S->colind(ofs) = col;
+        S->coeff(ofs)  = value_t(val);
+        
+        rows[row]++;
+    }// while
+
+    return S;
+}
 
 //
 // main function
@@ -31,6 +128,7 @@ program_main ()
               << std::endl;
 
     auto  M = Hpro::read_matrix< value_t >( sparsefile );
+    // auto  M = read_csv< value_t >( sparsefile );
     auto  S = ptrcast( M.get(), Hpro::TSparseMatrix< value_t > );
 
     std::cout << "    dims   = " << S->nrows() << " × " << S->ncols() << std::endl;
@@ -53,10 +151,14 @@ program_main ()
     
     tic = timer::now();
     
-    auto  part_strat    = Hpro::TMongooseAlgPartStrat();
+    // auto  part_strat    = Hpro::TMongooseAlgPartStrat();
+    auto  part_strat    = Hpro::TMETISAlgPartStrat();
     auto  ct_builder    = Hpro::TAlgCTBuilder( & part_strat, ntile );
-    auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
-    auto  cl            = nd_ct_builder.build( S );
+    // auto  nd_ct_builder = Hpro::TAlgNDCTBuilder( & ct_builder, ntile );
+    // auto  cl            = nd_ct_builder.build( S );
+    auto  cl            = ct_builder.build( S );
+
+    
     auto  adm_cond      = Hpro::TWeakAlgAdmCond( S, cl->perm_i2e() );
     auto  bct_builder   = Hpro::TBCBuilder( 0, Hpro::cluster_level_any );
     auto  bcl           = bct_builder.build( cl.get(), cl.get(), & adm_cond );
@@ -102,6 +204,63 @@ program_main ()
         std::cout << "    error  = " << format_error( error, error / normS ) << std::endl;
     }
 
+    //
+    // compute eigenvalues via IPT
+    //
+
+    {
+        //
+        // first as dense matrix
+        //
+
+        auto  M    = matrix::convert_to_dense( *A );
+        auto  stat = blas::eigen_stat();
+        auto  M2   = blas::copy( M->mat() );
+
+        io::matlab::write( M->mat(), "M" );
+        
+        tic = timer::now();
+            
+        auto [ E, V ] = blas::eigen_ipt( M2, 1000, cmdline::eps, "frobenius", cmdline::verbosity, & stat );
+
+        toc = timer::since( tic );
+            
+        std::cout << "IPT in    " << format_time( toc ) << " (" << stat.nsweeps << " sweeps)" << std::endl;
+                
+        io::matlab::write( V, "V1" );
+        io::matlab::write( E, "E1" );
+        
+        if ( stat.converged )
+            std::cout << "    error = " << format_error( blas::everror( M->mat(), E, V ) ) << std::endl;
+    }
+    
+    {
+        using approx_t = approx::SVD< value_t >;
+        
+        tic = timer::now();
+        
+        auto  apx      = approx_t();
+        auto  [ V, E ] = impl::ipt( *A, cmdline::eps, acc, apx );
+        
+        io::eps::print( *V, "V", "noid,sv" );
+            
+        toc = timer::since( tic );
+
+        std::cout << "H-IPT in    " << format_time( toc ) << std::endl;
+                
+        {
+            auto  DM = matrix::convert_to_dense( *M );
+            auto  DV = matrix::convert_to_dense( *V );
+
+            io::matlab::write( DV->mat(), "V2" );
+            io::matlab::write( E, "E2" );
+
+            std::cout << "    error = " << format_error( blas::everror( DM->mat(), E, DV->mat() ) ) << std::endl;
+        }
+
+        return;
+    }
+    
     //
     // factorize
     //
