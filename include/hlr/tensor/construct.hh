@@ -265,7 +265,8 @@ merge_greedy ( const indexset &                  is0,
     //
 
     size_t  mem_sub = 0;
-    auto    S = hlr::tensor3< std::array< blas::vector< real_t >, 3 > >( 2, 2, 2 );
+    auto    S       = hlr::tensor3< std::array< blas::vector< real_t >, 3 > >( 2, 2, 2 );
+    auto    maxrank = std::vector< uint >( 3, 0 );
 
     for ( uint  l = 0; l < 2; ++l )
     {
@@ -273,12 +274,16 @@ merge_greedy ( const indexset &                  is0,
         {
             for ( uint  i = 0; i < 2; ++i )
             {
-                auto  D_ijl = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
-                uint  rank[3];
+                auto  D_ijl   = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
+                uint  rank[3] = { 0, 0, 0 };
                 
                 rank[0] += D_ijl->rank(0);
                 rank[1] += D_ijl->rank(1);
                 rank[2] += D_ijl->rank(2);
+
+                maxrank[0] += rank[0];
+                maxrank[1] += rank[1];
+                maxrank[2] += rank[2];
 
                 mem_sub += sizeof(value_t) * ( rank[0] * rank[1] * rank[2] +
                                                rank[0] * D_ijl->is(0).size() +
@@ -305,13 +310,15 @@ merge_greedy ( const indexset &                  is0,
         }// for
     }// for
 
+    std::cout << "max ranks : " << maxrank[0] << " / " << maxrank[1] << " / " << maxrank[2] << std::endl;
+    
     //
     // greedily choose next largest singular value in all sub blocks
     // until error is met
     //
     
-    auto    R     = hlr::tensor3< std::array< uint, 3 > >( 2, 2, 2 );
-    real_t  error = 0;
+    auto    R      = hlr::tensor3< std::array< uint, 3 > >( 2, 2, 2 );
+    real_t  sqnorm = 0;
 
     for ( uint  l = 0; l < 2; ++l )
         for ( uint  j = 0; j < 2; ++j )
@@ -321,18 +328,19 @@ merge_greedy ( const indexset &                  is0,
                     R(i,j,l)[d] = 0;
                     
                     for ( uint  k = 0; k < S(i,j,l)[d].length(); ++k )
-                        error += S(i,j,l)[d](k) * S(i,j,l)[d](k);
+                        sqnorm += S(i,j,l)[d](k) * S(i,j,l)[d](k);
                 }// for
 
-    std::cout << "e_0 = " << error << std::endl;
+    std::cout << "|T|² = " << sqnorm << std::endl;
 
-    const auto  tol = acc.abs_eps() * acc.abs_eps();
+    const auto  sqtol = acc.abs_eps() * acc.abs_eps() * sqnorm;
 
-    std::cout << "tol = " << tol << std::endl;
+    std::cout << "tol² = " << sqtol << std::endl;
 
-    uint  ranks[3] = { 0, 0, 0 };
+    uint    ranks[3] = { 0, 0, 0 };
+    real_t  sqerror  = sqnorm;
         
-    while ( error > tol )
+    while ( sqerror > sqtol )
     {
         auto  max_pos = std::array< uint, 5 >();
         auto  max_sv  = real_t(0);
@@ -356,28 +364,30 @@ merge_greedy ( const indexset &                  is0,
                         {
                             max_sv  = S(i,j,l)[d](k);
                             max_pos = { i, j, l, d, k };
-
-                            ranks[d]++;
                         }// if
                     }// for
                 }// for
             }// for
         }// for
 
-        //
-        // if a sv was chosen from a new subblock, use all
-        // first singular values from all modes for initial
-        // start (to have full tensor representation)
-        //
-
-        
-        // update squared error
-        error -= max_sv * max_sv;
-
         // remember which singular value was consumed
         R( max_pos[0], max_pos[1], max_pos[2] )[ max_pos[3] ] += 1;
+        ranks[max_pos[3]]++;
         
-        std::cout << max_pos[0] << " / " << max_pos[1] << " / " << max_pos[2] << " / " << max_pos[3] << " / " << max_pos[4] << " : " << max_sv << " / " << error << std::endl;
+        // update squared error
+        sqerror = real_t(0);
+        
+        for ( uint  l = 0; l < 2; ++l )
+            for ( uint  j = 0; j < 2; ++j )
+                for ( uint  i = 0; i < 2; ++i )
+                    for ( uint  d = 0; d < 3; ++d )
+                        for ( uint  k = R(i,j,l)[d]; k < S(i,j,l)[d].length(); ++k )
+                            sqerror += S(i,j,l)[d](k) * S(i,j,l)[d](k);
+        
+        // error -= max_sv * max_sv;
+
+        std::cout << max_pos[0] << " / " << max_pos[1] << " / " << max_pos[2] << " / " << max_pos[3] << " / " << max_pos[4] << " : "
+                  << max_sv << " / " << max_sv*max_sv << " / " << sqerror << std::endl;
     }// while
 
     std::cout << ranks[0] << " / " << ranks[1] << " / " << ranks[2] << std::endl;
@@ -386,6 +396,7 @@ merge_greedy ( const indexset &                  is0,
     // construct new tensor from all collected singular values in all subblocks
     //
     
+    std::exit( 0 );
     
     //
     // don't merge => empty tensor as result
