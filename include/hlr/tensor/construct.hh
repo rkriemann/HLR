@@ -238,6 +238,162 @@ merge_all ( const indexset &                  is0,
     return std::unique_ptr< base_tensor3< value_t > >();
 }
 
+//
+// grredy merge of sub blocks
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t,
+           typename                    hosvd_func_t >
+std::unique_ptr< base_tensor3< value_t > >
+merge_greedy ( const indexset &                  is0,
+               const indexset &                  is1,
+               const indexset &                  is2,
+               const blas::tensor3< value_t > &  D,
+               tensor3_container_t< value_t > &  sub_D,
+               const tensor_accuracy &           acc,
+               const approx_t &                  apx,
+               hosvd_func_t &&                   hosvd )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    // verbosity level
+    constexpr int verbosity = 1;
+    
+    //
+    // determine memory of partitioning
+    // - also compute singular values for all mode matrices
+    //
+
+    size_t  mem_sub = 0;
+    auto    S = hlr::tensor3< std::array< blas::vector< real_t >, 3 > >( 2, 2, 2 );
+
+    for ( uint  l = 0; l < 2; ++l )
+    {
+        for ( uint  j = 0; j < 2; ++j )
+        {
+            for ( uint  i = 0; i < 2; ++i )
+            {
+                auto  D_ijl = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
+                uint  rank[3];
+                
+                rank[0] += D_ijl->rank(0);
+                rank[1] += D_ijl->rank(1);
+                rank[2] += D_ijl->rank(2);
+
+                mem_sub += sizeof(value_t) * ( rank[0] * rank[1] * rank[2] +
+                                               rank[0] * D_ijl->is(0).size() +
+                                               rank[1] * D_ijl->is(1).size() +
+                                               rank[2] * D_ijl->is(2).size() );
+
+                //
+                // compute singular values for all mode matrices
+                //
+
+                auto  X0 = D_ijl->G().unfold( 0 );
+                auto  S0 = blas::sv( X0 );
+
+                auto  X1 = D_ijl->G().unfold( 1 );
+                auto  S1 = blas::sv( X1 );
+
+                auto  X2 = D_ijl->G().unfold( 2 );
+                auto  S2 = blas::sv( X2 );
+                
+                S(i,j,l)[0] = std::move( S0 );
+                S(i,j,l)[1] = std::move( S1 );
+                S(i,j,l)[2] = std::move( S2 );
+            }// for
+        }// for
+    }// for
+
+    //
+    // greedily choose next largest singular value in all sub blocks
+    // until error is met
+    //
+    
+    auto    R     = hlr::tensor3< std::array< uint, 3 > >( 2, 2, 2 );
+    real_t  error = 0;
+
+    for ( uint  l = 0; l < 2; ++l )
+        for ( uint  j = 0; j < 2; ++j )
+            for ( uint  i = 0; i < 2; ++i )
+                for ( uint  d = 0; d < 3; ++d )
+                {
+                    R(i,j,l)[d] = 0;
+                    
+                    for ( uint  k = 0; k < S(i,j,l)[d].length(); ++k )
+                        error += S(i,j,l)[d](k) * S(i,j,l)[d](k);
+                }// for
+
+    std::cout << "e_0 = " << error << std::endl;
+
+    const auto  tol = acc.abs_eps() * acc.abs_eps();
+
+    std::cout << "tol = " << tol << std::endl;
+
+    uint  ranks[3] = { 0, 0, 0 };
+        
+    while ( error > tol )
+    {
+        auto  max_pos = std::array< uint, 5 >();
+        auto  max_sv  = real_t(0);
+            
+        for ( uint  l = 0; l < 2; ++l )
+        {
+            for ( uint  j = 0; j < 2; ++j )
+            {
+                for ( uint  i = 0; i < 2; ++i )
+                {
+                    auto  D_ijl = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
+
+                    for ( uint  d = 0; d < 3; ++d )
+                    {
+                        const auto  k = R(i,j,l)[d];
+                            
+                        if ( k > S(i,j,l)[d].length() )
+                            continue;
+                        
+                        if ( S(i,j,l)[d](k) > max_sv )
+                        {
+                            max_sv  = S(i,j,l)[d](k);
+                            max_pos = { i, j, l, d, k };
+
+                            ranks[d]++;
+                        }// if
+                    }// for
+                }// for
+            }// for
+        }// for
+
+        //
+        // if a sv was chosen from a new subblock, use all
+        // first singular values from all modes for initial
+        // start (to have full tensor representation)
+        //
+
+        
+        // update squared error
+        error -= max_sv * max_sv;
+
+        // remember which singular value was consumed
+        R( max_pos[0], max_pos[1], max_pos[2] )[ max_pos[3] ] += 1;
+        
+        std::cout << max_pos[0] << " / " << max_pos[1] << " / " << max_pos[2] << " / " << max_pos[3] << " / " << max_pos[4] << " : " << max_sv << " / " << error << std::endl;
+    }// while
+
+    std::cout << ranks[0] << " / " << ranks[1] << " / " << ranks[2] << std::endl;
+    
+    //
+    // construct new tensor from all collected singular values in all subblocks
+    //
+    
+    
+    //
+    // don't merge => empty tensor as result
+    //
+
+    return std::unique_ptr< base_tensor3< value_t > >();
+}
+
 template < typename                    value_t,
            approx::approximation_type  approx_t >
 std::unique_ptr< base_tensor3< value_t > >
@@ -342,7 +498,8 @@ build_hierarchical_tucker ( const indexset &                  is0,
         auto  T = std::unique_ptr< base_tensor3< value_t > >();
         
         if ( all_tucker )
-            T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
+            // T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
+            T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
 
         if ( ! is_null( T ) )
             return T;
