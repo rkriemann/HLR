@@ -183,18 +183,19 @@ program_main ()
         
         for ( uint  i = 0; i < niter; ++i )
         {
-            auto  B = impl::matrix::copy( *zA );
-        
             tic = timer::now();
     
-            impl::matrix::compress( *B, lacc );
+            impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
             if ( i == niter-1 )
-                zA.reset( B.release() );
+            {
+                zA.reset( nullptr );
+                zA = std::move( impl::matrix::copy_mixedprec( *A ) );
+            }// if
         }// for
 
         if ( nbench > 1 )
