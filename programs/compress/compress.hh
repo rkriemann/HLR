@@ -193,7 +193,7 @@ program_main ()
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
             if ( i == niter-1 )
-                zA = std::move( B );
+                zA.reset( B.release() );
         }// for
 
         if ( nbench > 1 )
@@ -211,8 +211,7 @@ program_main ()
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
 
     {
-        auto  B     = impl::matrix::convert_to_h( *zA );
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *B );
+        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
@@ -239,7 +238,10 @@ program_main ()
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
             if ( i < niter-1 )
+            {
+                zB.reset( nullptr );
                 zB = std::move( impl::matrix::copy( *zA ) );
+            }// if
         }// for
         
         if ( nbench > 1 )

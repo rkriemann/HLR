@@ -181,8 +181,7 @@ program_main ()
         matrix::print_eps( *A, "A", "noid,nosize" );
 
     {
-        auto  B     = impl::matrix::convert_to_h( *A );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -230,6 +229,10 @@ program_main ()
 
             if ( i < niter-1 )
             {
+                zA.reset( nullptr );
+                zrowcb.reset( nullptr );
+                zcolcb.reset( nullptr );
+                
                 zA     = std::move( impl::matrix::copy( *A ) );
                 zrowcb = std::move( zrowcb->copy() );
                 zcolcb = std::move( zcolcb->copy() );
@@ -260,8 +263,7 @@ program_main ()
     // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     {
-        auto  B     = impl::matrix::convert_to_h( *zA );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -296,6 +298,10 @@ program_main ()
 
             if ( i < niter-1 )
             {
+                zA2.reset( nullptr );
+                zrowcb2.reset( nullptr );
+                zcolcb2.reset( nullptr );
+
                 zA2     = std::move( impl::matrix::copy( *zA ) );
                 zrowcb2 = std::move( zrowcb->copy() );
                 zcolcb2 = std::move( zcolcb->copy() );
@@ -312,8 +318,7 @@ program_main ()
         // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
         {
-            auto  B     = impl::matrix::convert_to_h( *zA2 );
-            auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+            auto  error = impl::norm::frobenius( 1, *H, -1, *zA2 );
 
             std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
         }

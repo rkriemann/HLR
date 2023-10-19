@@ -194,7 +194,7 @@ program_main ()
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
             if ( i == niter-1 )
-                zA = std::move( B );
+                zA.reset( B.release() );
         }// for
 
         if ( nbench > 1 )
@@ -243,7 +243,10 @@ program_main ()
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
             if ( i < niter-1 )
+            {
+                zB.reset( nullptr );
                 zB = std::move( impl::matrix::copy( *zA ) );
+            }// if
         }// for
         
         if ( nbench > 1 )
