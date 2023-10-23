@@ -200,7 +200,7 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 template < typename hca_impl_t >
-class hca_lrapx : public TLowRankApx
+class hca_lrapx : public Hpro::TLowRankApx< typename hca_impl_t::value_t >
 {
 public:
     using  value_t = typename hca_impl_t::value_t;
@@ -225,21 +225,21 @@ public:
     // build low rank matrix for block cluster bct with
     // rank defined by accuracy acc
     virtual
-    std::unique_ptr< TMatrix< value_t > >
-    build ( const TBlockCluster *  bc,
-            const TTruncAcc &      acc ) const
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockCluster *  bc,
+            const Hpro::TTruncAcc &      acc ) const
     {
-        HLR_ASSERT( IS_TYPE( bc->rowcl(), TGeomCluster ) && IS_TYPE( bc->colcl(), TGeomCluster ) );
+        HLR_ASSERT( Hpro::is_geom_cluster( bc->rowcl() ) && Hpro::is_geom_cluster( bc->colcl() ) );
         
-        return _hca.approx( * cptrcast( bc->rowcl(), TGeomCluster ),
-                            * cptrcast( bc->colcl(), TGeomCluster ),
+        return _hca.approx( * cptrcast( bc->rowcl(), Hpro::TGeomCluster ),
+                            * cptrcast( bc->colcl(), Hpro::TGeomCluster ),
                             acc );
     }
 
     virtual
-    std::unique_ptr< TMatrix< value_t > >
-    build ( const TBlockIndexSet & ,
-            const TTruncAcc & ) const
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockIndexSet & ,
+            const Hpro::TTruncAcc & ) const
     {
         HLR_ERROR( "hca_lrapx::build : block index set not supported" );
     }
