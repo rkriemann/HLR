@@ -29,10 +29,13 @@ public:
     // signal support for HCA based construction
     static constexpr bool supports_hca = true;
 
+    // function space
+    using  fnspace_t = Hpro::TConstFnSpace< double >;
+    
 private:
     // BEM data
     std::unique_ptr< Hpro::TGrid >                     _grid;
-    std::unique_ptr< Hpro::TFnSpace< double > >        _fnspace;
+    std::unique_ptr< fnspace_t >                       _fnspace;
     std::unique_ptr< Hpro::TBilinearForm< value_t > >  _bf;
 
 public:
@@ -54,13 +57,9 @@ public:
     auto // std::unique_ptr< Hpro::THCA< value_t >::TGeneratorFn >
     hca_gen_func ( const Hpro::TClusterTree &  ct )
     {
-        return std::make_unique< Hpro::TLaplaceSLPGenFn< Hpro::TFnSpace< double >,
-                                                         Hpro::TFnSpace< double >,
-                                                         value_t > >( _fnspace.get(),
-                                                                      _fnspace.get(),
-                                                                      ct.perm_i2e(),
-                                                                      ct.perm_i2e(),
-                                                                      5 );
+        using  gen_func_t = Hpro::TLaplaceSLPGenFn< fnspace_t, fnspace_t, value_t >;
+        
+        return std::make_unique< gen_func_t >( _fnspace.get(), _fnspace.get(), ct.perm_i2e(), ct.perm_i2e(), 5 );
     }
 };
 

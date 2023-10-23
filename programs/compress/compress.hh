@@ -76,9 +76,9 @@ program_main ()
         {
             std::cout << "    using ACA" << std::endl;
 
-            auto  acalr = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( pcoeff );
+            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, *acalr, acc, nseq );
+            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
         }// else
         
         toc = timer::since( tic );
