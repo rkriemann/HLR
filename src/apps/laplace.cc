@@ -26,8 +26,8 @@ laplace_slp::laplace_slp ( const std::string &  grid )
 {
     _grid = Hpro::make_grid( grid );
         
-    auto  fnspace = std::make_unique< Hpro::TConstFnSpace< double > >( _grid.get() );
-    auto  bf      = std::make_unique< Hpro::TLaplaceSLPBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double > > >( fnspace.get(), fnspace.get(), 5 );
+    auto  fnspace = std::make_unique< fnspace_t >( _grid.get() );
+    auto  bf      = std::make_unique< Hpro::TLaplaceSLPBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double > > >( fnspace.get(), fnspace.get(), 4 );
 
     log( 1, Hpro::to_string( "    no. of indices = %d", fnspace->n_indices() ) );
     
