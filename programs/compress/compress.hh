@@ -11,6 +11,7 @@
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/bem/hca.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -57,11 +58,29 @@ program_main ()
         auto  ct      = gen_ct( *coord );
         auto  bct     = gen_bct( *ct, *ct );
         auto  coeff   = problem->coeff_func();
-        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
-        
+        auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+
         tic = timer::now();
-        A   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        
+        if constexpr ( problem_t::supports_hca )
+        {
+            std::cout << "    using HCA" << std::endl;
+
+            auto  hcagen = problem->hca_gen_func( *ct );
+            auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+            auto  hcalr  = bem::hca_lrapx( hca );
+
+            A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+        }// if
+        else
+        {
+            std::cout << "    using ACA" << std::endl;
+
+            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+        }// else
+        
         toc = timer::since( tic );
     }// if
     else
@@ -181,19 +200,20 @@ program_main ()
         
         for ( uint  i = 0; i < niter; ++i )
         {
-            auto  B = impl::matrix::copy( *zA );
-        
             tic = timer::now();
     
             // impl::matrix::compress( *B, Hpro::fixed_prec( norm_A * acc.rel_eps() ) );
-            impl::matrix::compress( *B, lacc );
+            impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == niter-1 )
-                zA = std::move( B );
+            if ( i < niter-1 )
+            {
+                zA.reset( nullptr );
+                zA = std::move( impl::matrix::copy_compressible( *A ) );
+            }// if
         }// for
 
         if ( nbench > 1 )
@@ -211,8 +231,7 @@ program_main ()
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
 
     {
-        auto  B     = impl::matrix::convert_to_h( *zA );
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *B );
+        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
@@ -239,7 +258,10 @@ program_main ()
             std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
 
             if ( i < niter-1 )
+            {
+                zB.reset( nullptr );
                 zB = std::move( impl::matrix::copy( *zA ) );
+            }// if
         }// for
         
         if ( nbench > 1 )

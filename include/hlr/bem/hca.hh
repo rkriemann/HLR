@@ -53,10 +53,10 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     // - <acc> only used for recompression
     //
     virtual
-    std::unique_ptr< TMatrix< value_t > >
-    approx ( const TGeomCluster &  rowcl,
-             const TGeomCluster &  colcl,
-             const TTruncAcc &     acc ) const 
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    approx ( const Hpro::TGeomCluster &  rowcl,
+             const Hpro::TGeomCluster &  colcl,
+             const Hpro::TTruncAcc &     acc ) const 
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
@@ -101,13 +101,13 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     //
 
     blas::matrix< value_t >
-    compute_U  ( const TIndexSet &                rowis,
+    compute_U  ( const Hpro::TIndexSet &          rowis,
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
                  const tensor_grid< real_t > &    col_grid,
                  const blas::matrix< value_t > &  G ) const
     {
-        std::vector< T3Point >  y_pts( rank );
+        std::vector< Hpro::T3Point >  y_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
@@ -121,12 +121,12 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     }
 
     blas::matrix< value_t >
-    compute_V  ( const TIndexSet &              colis,
+    compute_V  ( const Hpro::TIndexSet &        colis,
                  const size_t                   rank,
                  const pivot_arr_t &            pivots,
                  const tensor_grid< real_t > &  row_grid ) const
     {
-        std::vector< T3Point >  x_pts( rank );
+        std::vector< Hpro::T3Point >  x_pts( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );

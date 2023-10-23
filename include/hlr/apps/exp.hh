@@ -31,6 +31,9 @@ public:
     
     using  value_t = double;
 
+    // signal support for HCA based construction
+    static constexpr bool supports_hca = false;
+    
 private:
     // BEM data
     std::unique_ptr< Hpro::TGrid >                     _grid;

@@ -11,6 +11,7 @@
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/bem/hca.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -57,11 +58,29 @@ program_main ()
         auto  ct      = gen_ct( *coord );
         auto  bct     = gen_bct( *ct, *ct );
         auto  coeff   = problem->coeff_func();
-        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+        auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         
         tic = timer::now();
-        H   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
+        
+        if constexpr ( problem_t::supports_hca )
+        {
+            std::cout << "    using HCA" << std::endl;
+
+            auto  hcagen = problem->hca_gen_func( *ct );
+            auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+            auto  hcalr  = bem::hca_lrapx( hca );
+
+            H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+        }// if
+        else
+        {
+            std::cout << "    using ACA" << std::endl;
+
+            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+        }// else
+        
         toc = timer::since( tic );
     }// if
     else
@@ -151,8 +170,7 @@ program_main ()
         matrix::print_eps( *A, "A", "noid,nosize" );
 
     {
-        auto  B     = impl::matrix::convert_to_h( *A );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -200,6 +218,10 @@ program_main ()
 
             if ( i < niter-1 )
             {
+                zA.reset( nullptr );
+                zrowcb.reset( nullptr );
+                zcolcb.reset( nullptr );
+                
                 zA     = std::move( impl::matrix::copy( *A ) );
                 zrowcb = std::move( zrowcb->copy() );
                 zcolcb = std::move( zcolcb->copy() );
@@ -230,8 +252,7 @@ program_main ()
     // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     {
-        auto  B     = impl::matrix::convert_to_h( *zA );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -266,6 +287,10 @@ program_main ()
 
             if ( i < niter-1 )
             {
+                zA2.reset( nullptr );
+                zrowcb2.reset( nullptr );
+                zcolcb2.reset( nullptr );
+                
                 zA2     = std::move( impl::matrix::copy( *zA ) );
                 zrowcb2 = std::move( zrowcb->copy() );
                 zcolcb2 = std::move( zcolcb->copy() );
@@ -282,8 +307,7 @@ program_main ()
         // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
         {
-            auto  B     = impl::matrix::convert_to_h( *zA2 );
-            auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+            auto  error = impl::norm::frobenius( 1, *H, -1, *zA2 );
 
             std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
         }
