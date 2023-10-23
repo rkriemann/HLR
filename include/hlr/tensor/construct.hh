@@ -311,10 +311,9 @@ merge_greedy ( const indexset &                  is0,
     }// for
 
     std::cout << "max ranks : " << maxrank[0] << " / " << maxrank[1] << " / " << maxrank[2] << std::endl;
-    
+
     //
-    // greedily choose next largest singular value in all sub blocks
-    // until error is met
+    // compute norm of merged tensor and set relative tolerance
     //
     
     auto    R      = hlr::tensor3< std::array< uint, 3 > >( 2, 2, 2 );
@@ -323,23 +322,29 @@ merge_greedy ( const indexset &                  is0,
     for ( uint  l = 0; l < 2; ++l )
         for ( uint  j = 0; j < 2; ++j )
             for ( uint  i = 0; i < 2; ++i )
+            {
                 for ( uint  d = 0; d < 3; ++d )
-                {
                     R(i,j,l)[d] = 0;
-                    
-                    for ( uint  k = 0; k < S(i,j,l)[d].length(); ++k )
-                        sqnorm += S(i,j,l)[d](k) * S(i,j,l)[d](k);
-                }// for
 
-    std::cout << "|T|² = " << sqnorm << std::endl;
+                // only count for first dimension as sum of sv in other dimensions is identical
+                for ( uint  k = 0; k < S(i,j,l)[0].length(); ++k )
+                    sqnorm += S(i,j,l)[0](k) * S(i,j,l)[0](k);
+            }// for
+
+    std::cout << "|T|  = " << std::sqrt( sqnorm ) << std::endl;
 
     const auto  sqtol = acc.abs_eps() * acc.abs_eps() * sqnorm;
 
     std::cout << "tol² = " << sqtol << std::endl;
 
+    //
+    // greedily choose next largest singular value in all sub blocks
+    // until error is met
+    //
+    
     uint    ranks[3] = { 0, 0, 0 };
     real_t  sqerror  = sqnorm;
-        
+
     while ( sqerror > sqtol )
     {
         auto  max_pos = std::array< uint, 5 >();
@@ -357,7 +362,7 @@ merge_greedy ( const indexset &                  is0,
                     {
                         const auto  k = R(i,j,l)[d];
                             
-                        if ( k > S(i,j,l)[d].length() )
+                        if ( k >= S(i,j,l)[d].length() )
                             continue;
                         
                         if ( S(i,j,l)[d](k) > max_sv )
@@ -373,8 +378,13 @@ merge_greedy ( const indexset &                  is0,
         // remember which singular value was consumed
         R( max_pos[0], max_pos[1], max_pos[2] )[ max_pos[3] ] += 1;
         ranks[max_pos[3]]++;
+
+        //
+        // update squared error (recompute to avoid floating point issues)
+        // - iterate over all dimensions to really catch reduction
+        //   in error, e.g., if sv in dimension != 0 was consumed
+        //
         
-        // update squared error
         sqerror = real_t(0);
         
         for ( uint  l = 0; l < 2; ++l )
@@ -383,6 +393,7 @@ merge_greedy ( const indexset &                  is0,
                     for ( uint  d = 0; d < 3; ++d )
                         for ( uint  k = R(i,j,l)[d]; k < S(i,j,l)[d].length(); ++k )
                             sqerror += S(i,j,l)[d](k) * S(i,j,l)[d](k);
+        sqerror /= real_t(3); // correct for multiple (x dims) summation 
         
         // error -= max_sv * max_sv;
 
@@ -395,14 +406,83 @@ merge_greedy ( const indexset &                  is0,
     //
     // construct new tensor from all collected singular values in all subblocks
     //
-    
-    std::exit( 0 );
-    
+
+    auto  G      = blas::tensor3< value_t >( ranks[0], ranks[1], ranks[2] );
+    auto  X0     = blas::matrix< value_t >( is0.size(), ranks[0] );
+    auto  X1     = blas::matrix< value_t >( is1.size(), ranks[1] );
+    auto  X2     = blas::matrix< value_t >( is2.size(), ranks[2] );
+    uint  ofs[3] = { 0, 0, 0 };
+            
+    for ( uint  l = 0; l < 2; ++l )
+    {
+        for ( uint  j = 0; j < 2; ++j )
+        {
+            for ( uint  i = 0; i < 2; ++i )
+            {
+                auto  D_ijl  = cptrcast( sub_D(i,j,l).get(), tucker_tensor3< value_t > );
+                auto  G_ijl  = D_ijl->G();
+                auto  X0_ijl = D_ijl->X( 0 );
+                auto  X1_ijl = D_ijl->X( 1 );
+                auto  X2_ijl = D_ijl->X( 2 );
+
+                // get left singular vectors of unfolded core tensor
+                auto  GX0            = G_ijl.unfold( 0 );
+                auto  [ U0, S0, V0 ] = blas::svd( GX0 );  // TODO: only U_i is needed !!!
+                auto  GX1            = G_ijl.unfold( 1 );
+                auto  [ U1, S1, V1 ] = blas::svd( GX1 );
+                auto  GX2            = G_ijl.unfold( 2 );
+                auto  [ U2, S2, V2 ] = blas::svd( GX2 );
+
+                // ranges needed to be copied
+                auto  k0 = blas::range( ofs[0], ofs[0] + R(i,j,l)[0] - 1 );
+                auto  k1 = blas::range( ofs[1], ofs[1] + R(i,j,l)[1] - 1 );
+                auto  k2 = blas::range( ofs[2], ofs[2] + R(i,j,l)[2] - 1 );
+
+                // selected parts of mode matrices
+                auto  TU0 = blas::matrix< value_t >( U0, blas::range::all, blas::range( 0, R(i,j,l)[0] - 1 ) );
+                auto  TU1 = blas::matrix< value_t >( U1, blas::range::all, blas::range( 0, R(i,j,l)[1] - 1 ) );
+                auto  TU2 = blas::matrix< value_t >( U2, blas::range::all, blas::range( 0, R(i,j,l)[2] - 1 ) );
+
+                // reduced core tensor
+                auto  TY0 = tensor_product( G_ijl, adjoint( TU0 ), 0 );
+                auto  TY1 = tensor_product( TY0,   adjoint( TU1 ), 1 );
+                auto  TG  = tensor_product( TY1,   adjoint( TU2 ), 2 );
+
+                // reduced mode matrices
+                auto  TX0 = blas::prod( X0_ijl, TU0 );
+                auto  TX1 = blas::prod( X1_ijl, TU1 );
+                auto  TX2 = blas::prod( X2_ijl, TU2 );
+                                        
+                // parts in global tensor data
+                auto  G_sub  = blas::tensor3< value_t >( G, k0, k1, k2 );
+                auto  X0_sub = blas::matrix< value_t >( X0, D_ijl->is(0) - is0.first(), k0 );
+                auto  X1_sub = blas::matrix< value_t >( X1, D_ijl->is(1) - is1.first(), k1 );
+                auto  X2_sub = blas::matrix< value_t >( X2, D_ijl->is(2) - is2.first(), k2 );
+
+                blas::copy( TG,  G_sub );
+                blas::copy( TX0, X0_sub );
+                blas::copy( TX1, X1_sub );
+                blas::copy( TX2, X2_sub );
+
+                ofs[0] += R(i,j,l)[0];
+                ofs[1] += R(i,j,l)[1];
+                ofs[2] += R(i,j,l)[2];
+            }// for
+        }// for
+    }// for
+
+    std::cout << "error = " << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl;
+    std::cout << "        " << blas::tucker_error( D, G, X0, X1, X2 ) / blas::norm_F( D ) << std::endl;
+
     //
     // don't merge => empty tensor as result
     //
 
-    return std::unique_ptr< base_tensor3< value_t > >();
+    return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
+                                                          std::move( G ),
+                                                          std::move( X0 ),
+                                                          std::move( X1 ),
+                                                          std::move( X2 ) );
 }
 
 template < typename                    value_t,
