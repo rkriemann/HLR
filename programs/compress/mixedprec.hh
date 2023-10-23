@@ -211,7 +211,7 @@ program_main ()
             runtime.push_back( toc.seconds() );
             std::cout << "      compressed in   " << format_time( toc ) << std::endl;
 
-            if ( i == niter-1 )
+            if ( i < niter-1 )
             {
                 zA.reset( nullptr );
                 zA = std::move( impl::matrix::copy_mixedprec( *A ) );
