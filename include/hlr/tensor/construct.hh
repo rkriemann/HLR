@@ -51,7 +51,7 @@ merge_all ( const indexset &                  is0,
             hosvd_func_t &&                   hosvd )
 {
     // verbosity level
-    constexpr int verbosity = 1;
+    constexpr int verbosity = 0;
     
     //
     // determine ranks (and memory)
@@ -239,6 +239,253 @@ merge_all ( const indexset &                  is0,
 }
 
 //
+// merge two given tensors
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t,
+           typename                    hosvd_func_t >
+std::unique_ptr< base_tensor3< value_t > >
+merge ( const indexset &                  is0,
+        const indexset &                  is1,
+        const indexset &                  is2,
+        const blas::tensor3< value_t > &  D,
+        tucker_tensor3< value_t > &       T0,
+        tucker_tensor3< value_t > &       T1,
+        const tensor_accuracy &           acc,
+        const approx_t &                  apx,
+        hosvd_func_t &&                   hosvd )
+{
+    // verbosity level
+    constexpr int verbosity = 0;
+    
+    //
+    // determine ranks (and memory)
+    //
+
+    const uint    rank[3] = { T0.rank(0) + T1.rank(0),
+                              T0.rank(1) + T1.rank(1),
+                              T0.rank(2) + T1.rank(2) };
+    const size_t  mem_sub = sizeof(value_t) * ( T0.rank(0) * T0.rank(1) * T0.rank(2) +
+                                                T0.rank(0) * T0.is(0).size() + T0.rank(1) * T0.is(1).size() + T0.rank(2) * T0.is(2).size() +
+                                                T1.rank(0) * T1.rank(1) * T1.rank(2) +
+                                                T1.rank(0) * T1.is(0).size() + T1.rank(1) * T1.is(1).size() + T1.rank(2) * T1.is(2).size() );
+
+    //
+    // decide how to proceed based on merged ranks
+    //
+            
+    auto  G3 = blas::tensor3< value_t >();
+    auto  Y0 = blas::matrix< value_t >();
+    auto  Y1 = blas::matrix< value_t >();
+    auto  Y2 = blas::matrix< value_t >();
+        
+    if constexpr ( verbosity >= 1 )
+        std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (merged ranks) : "
+                  << rank[0] << " / " << rank[1] << " / " << rank[2] << std::endl;
+            
+    if ( std::min({ rank[0], rank[1], rank[2] }) >= std::min({ D.size(0), D.size(1), D.size(2) }) )
+    {
+        //
+        // directly use HOSVD on D as merged ranks are too large
+        //
+                
+        auto        Dc   = blas::copy( D );  // do not modify D (!)
+        const auto  lacc = acc( is0, is1, is2 );
+
+        std::tie( G3, Y0, Y1, Y2 ) = std::move( hosvd( Dc, lacc, apx ) );
+
+        if constexpr ( verbosity >= 1 )
+            std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (hosvd)        : "
+                      << G3.size(0) << " / " << G3.size(1) << " / " << G3.size(2) << std::endl;
+            
+        if constexpr ( verbosity >= 2 )
+            std::cout << "hosvd          : " << blas::tucker_error( D, G3, Y0, Y1, Y2 ) << std::endl;
+    }// if
+    else
+    {
+        //
+        // construct merged tucker representation
+        //
+
+        auto  G      = blas::tensor3< value_t >( rank[0], rank[1], rank[2] );
+        auto  X0     = blas::matrix< value_t >( is0.size(), rank[0] );
+        auto  X1     = blas::matrix< value_t >( is1.size(), rank[1] );
+        auto  X2     = blas::matrix< value_t >( is2.size(), rank[2] );
+        uint  ofs[3] = { 0, 0, 0 };
+
+        {
+            auto  k0     = blas::range( ofs[0], ofs[0] + T0.rank(0) - 1 );
+            auto  k1     = blas::range( ofs[1], ofs[1] + T0.rank(1) - 1 );
+            auto  k2     = blas::range( ofs[2], ofs[2] + T0.rank(2) - 1 );
+            auto  G_ijl  = blas::tensor3< value_t >( G, k0, k1, k2 );
+            auto  X0_ijl = blas::matrix< value_t >( X0, T0.is(0) - is0.first(), k0 );
+            auto  X1_ijl = blas::matrix< value_t >( X1, T0.is(1) - is1.first(), k1 );
+            auto  X2_ijl = blas::matrix< value_t >( X2, T0.is(2) - is2.first(), k2 );
+        
+            blas::copy( T0.G_decompressed(), G_ijl );
+            blas::copy( T0.X_decompressed( 0 ), X0_ijl );
+            blas::copy( T0.X_decompressed( 1 ), X1_ijl );
+            blas::copy( T0.X_decompressed( 2 ), X2_ijl );
+        
+            ofs[0] += T0.rank(0);
+            ofs[1] += T0.rank(1);
+            ofs[2] += T0.rank(2);
+        }
+        
+        {
+            auto  k0     = blas::range( ofs[0], ofs[0] + T1.rank(0) - 1 );
+            auto  k1     = blas::range( ofs[1], ofs[1] + T1.rank(1) - 1 );
+            auto  k2     = blas::range( ofs[2], ofs[2] + T1.rank(2) - 1 );
+            auto  G_ijl  = blas::tensor3< value_t >( G, k0, k1, k2 );
+            auto  X0_ijl = blas::matrix< value_t >( X0, T1.is(0) - is0.first(), k0 );
+            auto  X1_ijl = blas::matrix< value_t >( X1, T1.is(1) - is1.first(), k1 );
+            auto  X2_ijl = blas::matrix< value_t >( X2, T1.is(2) - is2.first(), k2 );
+        
+            blas::copy( T1.G_decompressed(), G_ijl );
+            blas::copy( T1.X_decompressed( 0 ), X0_ijl );
+            blas::copy( T1.X_decompressed( 1 ), X1_ijl );
+            blas::copy( T1.X_decompressed( 2 ), X2_ijl );
+        
+            ofs[0] += T1.rank(0);
+            ofs[1] += T1.rank(1);
+            ofs[2] += T1.rank(2);
+        }
+        
+        // io::hdf5::write( D, "D" );
+        // io::hdf5::write( G, "G" );
+        // io::matlab::write( X0, "X0" );
+        // io::matlab::write( X1, "X1" );
+        // io::matlab::write( X2, "X2" );
+
+        if constexpr ( verbosity >= 2 )
+            std::cout << "merged         : " << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl;
+
+        //
+        // orthogonalize merged Tucker tensor
+        //
+
+        auto  R0 = blas::matrix< value_t >();
+        auto  R1 = blas::matrix< value_t >();
+        auto  R2 = blas::matrix< value_t >();
+            
+        blas::qr( X0, R0 );
+        blas::qr( X1, R1 );
+        blas::qr( X2, R2 );
+
+        auto  W0 = blas::tensor_product( G,  R0, 0 );
+        auto  W1 = blas::tensor_product( W0, R1, 1 );
+        auto  G2 = blas::tensor_product( W1, R2, 2 );
+            
+        if constexpr ( verbosity >= 2 )
+            std::cout << "orthogonalized : " << blas::tucker_error( D, G2, X0, X1, X2 ) << std::endl;
+
+        //
+        // compress with respect to local accuracy
+        //
+            
+        const auto  lacc = acc( is0, is1, is2 );
+
+        std::tie( G3, Y0, Y1, Y2 ) = std::move( blas::recompress( G2, X0, X1, X2, lacc, apx, hosvd ) );
+
+        if constexpr ( verbosity >= 1 )
+            std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (recompressed) : "
+                      << G3.size(0) << " / " << G3.size(1) << " / " << G3.size(2) << std::endl;
+            
+        if constexpr ( verbosity >= 2 )
+            std::cout << "recompressed   : " << blas::tucker_error( D, G3, Y0, Y1, Y2 ) << std::endl;
+    }// if
+            
+    // io::matlab::write( Y0, "Y0" );
+    // io::matlab::write( Y1, "Y1" );
+    // io::matlab::write( Y2, "Y2" );
+            
+    //
+    // return coarse tucker tensor if more memory efficient
+    //
+
+    const auto  mem_full   = sizeof(value_t) * ( D.size(0) * D.size(1) * D.size(2) );
+    const auto  mem_coarse = sizeof(value_t) * ( G3.size(0) * G3.size(1) * G3.size(2) +
+                                                 Y0.nrows() * Y0.ncols() +
+                                                 Y1.nrows() * Y1.ncols() +
+                                                 Y2.nrows() * Y2.ncols() );
+
+    if constexpr ( verbosity >= 1 )
+        std::cout << "        " << is0 << " × " << is1 << " × " << is2 << " (memory S/C/F) : " << mem_sub << " / " << mem_coarse << " / " << mem_full << std::endl;
+            
+    if ( mem_coarse < std::min( mem_sub, mem_full ) )
+    {
+        if constexpr ( verbosity >= 1 )
+            std::cout << "TUCKER: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
+                
+        return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
+                                                              std::move( G3 ),
+                                                              std::move( Y0 ),
+                                                              std::move( Y1 ),
+                                                              std::move( Y2 ) );
+    }// if
+            
+    if ( mem_full < mem_sub )
+    {
+        if constexpr ( verbosity >= 1 )
+            std::cout << "DENSE : " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
+                
+        return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
+    }// if
+
+    //
+    // don't merge => empty tensor as result
+    //
+
+    return std::unique_ptr< base_tensor3< value_t > >();
+}
+
+//
+// merge sub blocks per dimension
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t,
+           typename                    hosvd_func_t >
+std::unique_ptr< base_tensor3< value_t > >
+merge_dim ( const indexset &                  is0,
+            const indexset &                  is1,
+            const indexset &                  is2,
+            const blas::tensor3< value_t > &  D,
+            tensor3_container_t< value_t > &  sub_D,
+            const tensor_accuracy &           acc,
+            const approx_t &                  apx,
+            hosvd_func_t &&                   hosvd )
+{
+    // verbosity level
+    constexpr int verbosity = 0;
+
+    //
+    // merge dimension 0
+    //
+
+    auto  T_l = std::array< std::unique_ptr< tucker_tensor3< value_t > >, 2 >();
+    
+    for ( uint  l = 0; l < 2; ++l )
+    {
+        auto  T_jl = std::array< std::unique_ptr< tucker_tensor3< value_t > >, 2 >();
+        
+        for ( uint  j = 0; j < 2; ++j )
+        {
+            auto  T_0jl = cptrcast( sub_D(0,j,l).get(), tucker_tensor3< value_t > );
+            auto  T_1jl = cptrcast( sub_D(1,j,l).get(), tucker_tensor3< value_t > );
+            auto  D_jl  = blas::tensor3< value_t >( D, is0, T_0jl->is(1) - is1.first(), T_0jl->is(2).first() );
+            
+            T_jl[j] = std::move( merge( is0, D_jl, T_0jl->is(1), T_0jl->is(2), T_0jl, T_1jl, acc, apx, hosvd ) );
+        }// for
+
+        auto  D_l  = blas::tensor3< value_t >( D, is0, is1, T_jl[0]->is(2).first() );
+        
+        T_l[l] = std::move( merge( is0, is1, T_jl[0]->is(2), D_l, *(T_jl[0]), *(T_jl[1]), acc, apx, hosvd ) );
+    }// for
+
+    return merge( is0, is1, is2, D, *(T_l[0]), *(T_l[1]), acc, apx, hosvd ) );
+}
+
+//
 // grredy merge of sub blocks
 //
 template < typename                    value_t,
@@ -257,7 +504,7 @@ merge_greedy ( const indexset &                  is0,
     using  real_t = Hpro::real_type_t< value_t >;
     
     // verbosity level
-    constexpr int verbosity = 1;
+    constexpr int verbosity = 0;
     
     //
     // determine memory of partitioning
@@ -310,7 +557,8 @@ merge_greedy ( const indexset &                  is0,
         }// for
     }// for
 
-    std::cout << "max ranks : " << maxrank[0] << " / " << maxrank[1] << " / " << maxrank[2] << std::endl;
+    if constexpr ( verbosity >= 1 )
+        std::cout << "max ranks : " << maxrank[0] << " / " << maxrank[1] << " / " << maxrank[2] << std::endl;
 
     //
     // compute norm of merged tensor and set relative tolerance
@@ -331,11 +579,13 @@ merge_greedy ( const indexset &                  is0,
                     sqnorm += S(i,j,l)[0](k) * S(i,j,l)[0](k);
             }// for
 
-    std::cout << "|T|  = " << std::sqrt( sqnorm ) << std::endl;
+    if constexpr ( verbosity >= 1 )
+        std::cout << "|T|  = " << std::sqrt( sqnorm ) << std::endl;
 
     const auto  sqtol = acc.abs_eps() * acc.abs_eps() * sqnorm;
 
-    std::cout << "tol² = " << sqtol << std::endl;
+    if constexpr ( verbosity >= 1 )
+        std::cout << "tol² = " << sqtol << std::endl;
 
     //
     // greedily choose next largest singular value in all sub blocks
@@ -397,11 +647,17 @@ merge_greedy ( const indexset &                  is0,
         
         // error -= max_sv * max_sv;
 
-        std::cout << max_pos[0] << " / " << max_pos[1] << " / " << max_pos[2] << " / " << max_pos[3] << " / " << max_pos[4] << " : "
-                  << max_sv << " / " << max_sv*max_sv << " / " << sqerror << std::endl;
+        if constexpr ( verbosity >= 1 )
+            std::cout << max_pos[0] << " / " << max_pos[1] << " / " << max_pos[2] << " / " << max_pos[3] << " / " << max_pos[4] << " : "
+                      << max_sv << " / " << max_sv*max_sv << " / " << sqerror << std::endl;
     }// while
 
-    std::cout << ranks[0] << " / " << ranks[1] << " / " << ranks[2] << std::endl;
+    if constexpr ( verbosity >= 1 )
+        std::cout << ranks[0] << " / " << ranks[1] << " / " << ranks[2] << std::endl;
+
+    //
+    // decide what to do based on ranks (and memory size)
+    //
     
     //
     // construct new tensor from all collected singular values in all subblocks
@@ -471,8 +727,9 @@ merge_greedy ( const indexset &                  is0,
         }// for
     }// for
 
-    std::cout << "error = " << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl;
-    std::cout << "        " << blas::tucker_error( D, G, X0, X1, X2 ) / blas::norm_F( D ) << std::endl;
+    if constexpr ( verbosity >= 1 )
+        std::cout << "error = " << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl
+                  << "        " << blas::tucker_error( D, G, X0, X1, X2 ) / blas::norm_F( D ) << std::endl;
 
     //
     // don't merge => empty tensor as result
@@ -589,8 +846,8 @@ build_hierarchical_tucker ( const indexset &                  is0,
         auto  T = std::unique_ptr< base_tensor3< value_t > >();
         
         if ( all_tucker )
-            // T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-            T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
+            T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
+            // T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
 
         if ( ! is_null( T ) )
             return T;
