@@ -1968,6 +1968,26 @@ svd ( const matrix_t &  M )
     return { std::move( U ), std::move( S ), std::move( V ) };
 }
 
+//
+// compute singular values and left/right singular vectors of M
+//
+template < matrix_type  matrix_t >
+std::tuple< matrix< typename matrix_t::value_t >,
+            vector< Hpro::real_type_t< typename matrix_t::value_t > > >
+svd ( const matrix_t &  M,
+      const bool        left )
+{
+    using  value_t = typename matrix_t::value_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
+    
+    auto  U = copy( M );
+    auto  S = vector< real_t >( std::min( U.nrows(), U.ncols() ) );
+
+    Hpro::BLAS::svd( U, S, left );
+
+    return { std::move( U ), std::move( S ) };
+}
+
 // but use also all other SVD functions
 using Hpro::BLAS::svd;
 

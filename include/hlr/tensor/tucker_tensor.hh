@@ -411,72 +411,72 @@ tucker_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
     }// for
     
     // DEBUG
-    {
-        auto  dG  = blas::tensor3< value_t >( _G.size(0), _G.size(1), _G.size(2) );
-        auto  dX0 = blas::matrix< value_t >( _X[0].nrows(), _X[0].ncols() );
-        auto  dX1 = blas::matrix< value_t >( _X[1].nrows(), _X[1].ncols() );
-        auto  dX2 = blas::matrix< value_t >( _X[2].nrows(), _X[2].ncols() );
+    // {
+    //     auto  dG  = blas::tensor3< value_t >( _G.size(0), _G.size(1), _G.size(2) );
+    //     auto  dX0 = blas::matrix< value_t >( _X[0].nrows(), _X[0].ncols() );
+    //     auto  dX1 = blas::matrix< value_t >( _X[1].nrows(), _X[1].ncols() );
+    //     auto  dX2 = blas::matrix< value_t >( _X[2].nrows(), _X[2].ncols() );
 
-        compress::decompress( zG, dG );
-        compress::decompress( zX[0], dX0 );
-        compress::decompress( zX[1], dX1 );
-        compress::decompress( zX[2], dX2 );
+    //     compress::decompress( zG, dG );
+    //     compress::decompress( zX[0], dX0 );
+    //     compress::decompress( zX[1], dX1 );
+    //     compress::decompress( zX[2], dX2 );
 
-        Hpro::DBG::write( _X[0], "X0.mat", "X0" );
-        Hpro::DBG::write( _X[1], "Y0.mat", "Y0" );
-        Hpro::DBG::write( _X[2], "Z0.mat", "Z0" );
+    //     Hpro::DBG::write( _X[0], "X0.mat", "X0" );
+    //     Hpro::DBG::write( _X[1], "Y0.mat", "Y0" );
+    //     Hpro::DBG::write( _X[2], "Z0.mat", "Z0" );
         
-        Hpro::DBG::write( dX0, "X1.mat", "X1" );
-        Hpro::DBG::write( dX1, "Y1.mat", "Y1" );
-        Hpro::DBG::write( dX2, "Z1.mat", "Z1" );
+    //     Hpro::DBG::write( dX0, "X1.mat", "X1" );
+    //     Hpro::DBG::write( dX1, "Y1.mat", "Y1" );
+    //     Hpro::DBG::write( dX2, "Z1.mat", "Z1" );
         
-        // io::hdf5::write( _G, "G1" );
-        // io::hdf5::write( dG, "G2" );
-        // io::hdf5::write( _X[0], "X1" );
-        // io::hdf5::write( dX0,   "X2" );
-        // io::hdf5::write( _X[1], "Y1" );
-        // io::hdf5::write( dX1,   "Y2" );
-        // io::hdf5::write( _X[2], "Z1" );
-        // io::hdf5::write( dX2,   "Z2" );
+    //     // io::hdf5::write( _G, "G1" );
+    //     // io::hdf5::write( dG, "G2" );
+    //     // io::hdf5::write( _X[0], "X1" );
+    //     // io::hdf5::write( dX0,   "X2" );
+    //     // io::hdf5::write( _X[1], "Y1" );
+    //     // io::hdf5::write( dX1,   "Y2" );
+    //     // io::hdf5::write( _X[2], "Z1" );
+    //     // io::hdf5::write( dX2,   "Z2" );
         
-        blas::add( -1, _G, dG );
-        blas::add( -1, _X[0], dX0 );
-        blas::add( -1, _X[1], dX1 );
-        blas::add( -1, _X[2], dX2 );
+    //     blas::add( -1, _G, dG );
+    //     blas::add( -1, _X[0], dX0 );
+    //     blas::add( -1, _X[1], dX1 );
+    //     blas::add( -1, _X[2], dX2 );
 
-        std::cout << "R "
-                  << this->is(0) << " × " 
-                  << this->is(1) << " × " 
-                  << this->is(2)
-                  << " : " 
-                  << blas::norm_F( dG ) / blas::norm_F( _G )
-                  << " / "
-                  << blas::norm_F( dX0 ) / blas::norm_F( _X[0] )
-                  << " / "
-                  << blas::norm_F( dX1 ) / blas::norm_F( _X[1] )
-                  << " / "
-                  << blas::norm_F( dX2 ) / blas::norm_F( _X[2] )
-                  << std::endl;
+    //     std::cout << "R "
+    //               << this->is(0) << " × " 
+    //               << this->is(1) << " × " 
+    //               << this->is(2)
+    //               << " : " 
+    //               << blas::norm_F( dG ) / blas::norm_F( _G )
+    //               << " / "
+    //               << blas::norm_F( dX0 ) / blas::norm_F( _X[0] )
+    //               << " / "
+    //               << blas::norm_F( dX1 ) / blas::norm_F( _X[1] )
+    //               << " / "
+    //               << blas::norm_F( dX2 ) / blas::norm_F( _X[2] )
+    //               << std::endl;
             
-        // auto  T0 = tensor_product( _G, _X[0], 0 );
-        // auto  T1 = tensor_product( T0, _X[1], 1 );
-        // auto  M  = tensor_product( T1, _X[2], 2 );
+    //     // auto  T0 = tensor_product( _G, _X[0], 0 );
+    //     // auto  T1 = tensor_product( T0, _X[1], 1 );
+    //     // auto  M  = tensor_product( T1, _X[2], 2 );
         
-        // auto  R0 = tensor_product( dG, dX0, 0 );
-        // auto  R1 = tensor_product( R0, dX1, 1 );
-        // auto  dM = tensor_product( R1, dX2, 2 );
+    //     // auto  R0 = tensor_product( dG, dX0, 0 );
+    //     // auto  R1 = tensor_product( R0, dX1, 1 );
+    //     // auto  dM = tensor_product( R1, dX2, 2 );
         
-        // for ( size_t  i = 0; i < M.size(0) * M.size(1) * M.size(2); ++i )
-        // {
-        //     const auto  error = std::abs( (M.data()[i] - dM.data()[i]) / M.data()[i] );
+    //     // for ( size_t  i = 0; i < M.size(0) * M.size(1) * M.size(2); ++i )
+    //     // {
+    //     //     const auto  error = std::abs( (M.data()[i] - dM.data()[i]) / M.data()[i] );
 
-        //     std::cout << "D " << i << " : "
-        //               << M.data()[i] << " / "
-        //               << dM.data()[i] << " / "
-        //               << std::abs( error )
-        //               << std::endl;
-        // }// for
-    }
+    //     //     std::cout << "D " << i << " : "
+    //     //               << M.data()[i] << " / "
+    //     //               << dM.data()[i] << " / "
+    //     //               << std::abs( error )
+    //     //               << std::endl;
+    //     // }// for
+    // }
 
     if ( zmem < mem )
     {
