@@ -1,8 +1,8 @@
-#ifndef __HLR_TENSOR_DETAIL_CONSTRUCT_HH
-#define __HLR_TENSOR_DETAIL_CONSTRUCT_HH
+#ifndef __HLR_TBB_DETAIL_TENSOR_HH
+#define __HLR_TBB_DETAIL_TENSOR_HH
 //
 // Project     : HLR
-// Module      : tensor/construct
+// Module      : tbb/tensor
 // Description : adaptive construction of an hierarchical tensor
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -10,13 +10,14 @@
 
 #include <hlr/arith/hosvd.hh>
 
-#include <hlr/tensor/dense_tensor.hh>
-#include <hlr/tensor/tucker_tensor.hh>
-#include <hlr/tensor/structured_tensor.hh>
-
 #include <hlr/utils/io.hh>
 
-namespace hlr { namespace tensor {
+namespace hlr { namespace tbb { namespace tensor {
+
+using hlr::tensor::base_tensor3;
+using hlr::tensor::tucker_tensor3;
+using hlr::tensor::dense_tensor3;
+using hlr::tensor::structured_tensor3;
 
 //
 // build hierarchical tensor representation from given dense tensor, starting
@@ -781,146 +782,6 @@ merge_greedy ( const indexset &                  is0,
                                                           std::move( X2 ) );
 }
 
-template < typename                    value_t,
-           approx::approximation_type  approx_t >
-std::unique_ptr< base_tensor3< value_t > >
-build_hierarchical_tucker ( const indexset &                  is0,
-                            const indexset &                  is1,
-                            const indexset &                  is2,
-                            const blas::tensor3< value_t > &  D,
-                            const tensor_accuracy &           acc,
-                            const approx_t &                  apx,
-                            const size_t                      ntile )
-{
-    // verbosity level
-    constexpr int verbosity = 0;
-    
-    // choose one to be used below
-    // auto  hosvd = blas::hosvd< value_t, approx_t >;
-    // auto  hosvd = blas::sthosvd< value_t, approx_t >;
-    auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
-        
-    if ( std::min( D.size(0), std::min( D.size(1), D.size(2) ) ) <= ntile )
-    {
-        //
-        // build leaf
-        //
+}}}}// namespace hlr::tbb::tensor::detail
 
-        const auto  lacc = acc( is0, is1, is2 );
-        
-        if ( ! lacc.is_exact() )
-        {
-            auto  Dc                = blas::copy( D );  // do not modify D (!)
-            auto  [ G, X0, X1, X2 ] = hosvd( Dc, lacc, apx );
-            auto  mem_tucker        = G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size();
-            
-            if ( mem_tucker < Dc.byte_size() )
-            {
-                if constexpr ( verbosity >= 1 )
-                    std::cout << "TUCKER: " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 )
-                              << " : " << G.size(0) << " / " << G.size(1) << " / " << G.size(2)
-                              << " ( " << mem_tucker << " / " << Dc.byte_size() << " )"
-                              << std::endl;
-
-                if constexpr ( verbosity >= 2 )
-                    std::cout << "hosvd          : " << blas::tucker_error( D, G, X0, X1, X2 ) << std::endl;
-
-                return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
-                                                                      std::move( G ),
-                                                                      std::move( X0 ),
-                                                                      std::move( X1 ),
-                                                                      std::move( X2 ) );
-            }// if
-        }// if
-
-        if constexpr ( verbosity >= 1 )
-            std::cout << "DENSE : " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
-
-        return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
-    }// if
-    else
-    {
-        //
-        // Recursion
-        //
-
-        const auto  mid0 = ( is0.first() + is0.last() + 1 ) / 2;
-        const auto  mid1 = ( is1.first() + is1.last() + 1 ) / 2;
-        const auto  mid2 = ( is2.first() + is2.last() + 1 ) / 2;
-
-        indexset    sub_is0[2] = { indexset( is0.first(), mid0-1 ), indexset( mid0, is0.last() ) };
-        indexset    sub_is1[2] = { indexset( is1.first(), mid1-1 ), indexset( mid1, is1.last() ) };
-        indexset    sub_is2[2] = { indexset( is2.first(), mid2-1 ), indexset( mid2, is2.last() ) };
-        auto        sub_D      = hlr::tensor3< std::unique_ptr< base_tensor3< value_t > > >( 2, 2, 2 );
-        bool        all_tucker = true;
-        bool        all_dense  = true;
-
-        for ( uint  l = 0; l < 2; ++l )
-        {
-            for ( uint  j = 0; j < 2; ++j )
-            {
-                for ( uint  i = 0; i < 2; ++i )
-                {
-                    const auto  D_sub = D( sub_is0[i] - is0.first(),
-                                           sub_is1[j] - is1.first(),
-                                           sub_is2[l] - is2.first() );
-                    
-                    sub_D(i,j,l) = build_hierarchical_tucker( sub_is0[i], sub_is1[j], sub_is2[l], D_sub, acc, apx, ntile );
-                    
-                    HLR_ASSERT( sub_D(i,j,l).get() != nullptr );
-
-                    if ( ! is_tucker( *sub_D(i,j,l) ) )
-                        all_tucker = false;
-
-                    if ( ! is_dense( *sub_D(i,j,l) ) )
-                        all_dense = false;
-                }// for
-            }// for
-        }// for
-
-        //
-        // if all sub blocks are Tucker tensors, try to merge
-        //
-
-        auto  T = std::unique_ptr< base_tensor3< value_t > >();
-        
-        if ( all_tucker )
-        {
-            // T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-            T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-            // T = std::move( merge_dim( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-        }// if
-
-        if ( ! is_null( T ) )
-            return T;
-        
-        //
-        // also return full tensor if all sub blocks are dense
-        //
-
-        if ( all_dense )
-            return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
-        
-        //
-        // construct structured tensor
-        //
-
-        if constexpr ( verbosity >= 1 )
-            std::cout << "BLOCK : " << to_string( is0 ) << " × " << to_string( is1 ) << " × " << to_string( is2 ) << std::endl;
-        
-        auto  B = std::make_unique< structured_tensor3< value_t > >( is0, is1, is2 );
-
-        B->set_structure( 2, 2, 2 );
-        
-        for ( uint  l = 0; l < 2; ++l )
-            for ( uint  i = 0; i < 2; ++i )
-                for ( uint  j = 0; j < 2; ++j )
-                    B->set_block( i, j, l, sub_D(i,j,l).release() );
-            
-        return B;
-    }// else
-}
-
-}}}// namespace hlr::tensor::detail
-
-#endif // __HLR_TENSOR_DETAIL_CONSTRUCT_HH
+#endif // __HLR_DETAIL_TENSOR_HH
