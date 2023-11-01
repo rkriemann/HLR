@@ -27,7 +27,7 @@ public:
     using  value_t = double;
 
     // signal support for HCA based construction
-    static constexpr bool supports_hca = true;
+    static constexpr bool supports_hca = false;
 
     // function space
     using  fnspace_t = Hpro::TConstFnSpace< double >;
@@ -40,7 +40,8 @@ private:
 
 public:
     // ctor with grid name (plus refinement levels)
-    laplace_slp ( const std::string &  grid );
+    laplace_slp ( const std::string &  grid,
+                  const double         quad_error );
     
     // dtor
     virtual ~laplace_slp () {}

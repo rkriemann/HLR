@@ -62,7 +62,7 @@ gen_problem< hlr::apps::laplace_slp > ()
 
     HLR_ASSERT( gridfile != "" );
     
-    return std::make_unique< hlr::apps::laplace_slp >( gridfile );
+    return std::make_unique< hlr::apps::laplace_slp >( gridfile, cmdline::eps );
 }
 
 template <>
