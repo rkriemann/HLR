@@ -32,6 +32,7 @@
 #define HLR_COMPRESSOR_BF24     17
 #define HLR_COMPRESSOR_MP       18
 #define HLR_COMPRESSOR_CFLOAT   19
+#define HLR_COMPRESSOR_BLOSC    20
 
 #if defined(HLR_COMPRESSOR)
 
@@ -155,6 +156,27 @@ using hlr::compress::cfloat::compress;
 using hlr::compress::cfloat::decompress;
 using hlr::compress::cfloat::get_config;
 using hlr::compress::cfloat::byte_size;
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BLOSC
+
+#include <hlr/utils/detail/blosc.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "blosc";
+
+using  zconfig_t = hlr::compress::blosc::config;
+using  zarray    = hlr::compress::blosc::zarray;
+
+using hlr::compress::blosc::compress;
+using hlr::compress::blosc::decompress;
+using hlr::compress::blosc::get_config;
+using hlr::compress::blosc::byte_size;
 
 }} // namespace hlr::compress
 
@@ -762,6 +784,21 @@ using hlr::compress::posits::decompress_lr;
 using hlr::compress::posits::byte_size;
 
 static const char provider[] = "posits";
+
+}// namespace hlr::compress::aplr
+
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_BLOSC
+
+#include <hlr/utils/detail/blosc.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::blosc::zarray;
+using hlr::compress::blosc::compress_lr;
+using hlr::compress::blosc::decompress_lr;
+using hlr::compress::blosc::byte_size;
+
+static const char provider[] = "blosc";
 
 }// namespace hlr::compress::aplr
 
