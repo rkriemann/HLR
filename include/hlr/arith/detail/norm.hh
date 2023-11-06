@@ -64,8 +64,30 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
     }// if
     else if ( matrix::is_lowrank( A ) )
     {
-        return blas::sqnorm_F( cptrcast( &A, matrix::lrmatrix< value_t > )->U(),
-                               cptrcast( &A, matrix::lrmatrix< value_t > )->V() );
+        auto  R = cptrcast( & A, hlr::matrix::lrmatrix< value_t > );
+        
+        //
+        // version 1: compute singular values and sum up
+        //
+
+        auto  U = blas::copy( R->U() );
+        auto  V = blas::copy( R->V() );
+        auto  S = blas::vector< real_type_t< value_t > >( U.ncols() );
+
+        blas::sv( U, V, S );
+        
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < S.length(); ++i )
+            val += math::square( S(i) );
+
+        return val;
+
+        //
+        // version 2: use special lowrank method (has problems below 1e-8)
+        //
+        
+        // return blas::sqnorm_F( R->U(), R->V() );
     }// if
     else if ( matrix::is_lowrank_sv( A ) )
     {
@@ -278,13 +300,68 @@ frobenius_squared ( const alpha_t                     alpha,
             UB = std::move( U );
             VB = cptrcast( &B, matrix::lrsvmatrix< value_t > )->V();
         }// if
+
+        //
+        // version 1: compute singular values and sum up
+        //
         
-        const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
-                            alpha * beta  * lrdot( UA, VA, UB, VB ) +
-                            alpha * beta  * lrdot( UB, VB, UA, VA ) +
-                            beta  * beta  * lrdot( UB, VB, UB, VB ) );
+        auto  k1 = UA.ncols();
+        auto  k2 = UB.ncols();
+        auto  U  = blas::matrix< value_t >( UA.nrows(), k1 + k2 );
+        auto  V  = blas::matrix< value_t >( VA.nrows(), k1 + k2 );
+
+        auto  U_1 = blas::matrix< value_t >( U, blas::range::all, blas::range( 0, k1-1 ) );
+        auto  V_1 = blas::matrix< value_t >( V, blas::range::all, blas::range( 0, k1-1 ) );
+        auto  U_2 = blas::matrix< value_t >( U, blas::range::all, blas::range( k1, k1+k2-1 ) );
+        auto  V_2 = blas::matrix< value_t >( V, blas::range::all, blas::range( k1, k1+k2-1 ) );
+
+        blas::copy( UA, U_1 );
+        blas::copy( VA, V_1 );
+        blas::scale( alpha, U_1 );
+
+        blas::copy( UB, U_2 );
+        blas::copy( VB, V_2 );
+        blas::scale( beta, U_2 );
+
+        auto  S = blas::vector< real_type_t< value_t > >( k1 + k2 );
+
+        blas::sv( U, V, S );
         
-        return std::abs( sqn );
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < S.length(); ++i )
+            val += math::square( S(i) );
+
+        return val;
+
+        //
+        // version 2: use "lrdot" above (has problems below 1e-8)
+        //
+        
+        // const auto  sqn = ( alpha * alpha * lrdot( UA, VA, UA, VA ) +
+        //                     alpha * beta  * lrdot( UA, VA, UB, VB ) +
+        //                     alpha * beta  * lrdot( UB, VB, UA, VA ) +
+        //                     beta  * beta  * lrdot( UB, VB, UB, VB ) );
+        
+        // return std::abs( sqn );
+
+        //
+        // version 3: convert to dense (for debugging)
+        //
+        
+        // auto  M1 = blas::prod( UA, blas::adjoint( VA ) );
+        // auto  M2 = blas::prod( UB, blas::adjoint( VB ) );
+
+        // blas::scale( value_t(alpha), M1 );
+        // blas::add( beta, M2, M1 );
+
+        // auto  val = result_t(0);
+
+        // for ( size_t  i = 0; i < M1.nrows()*M1.ncols(); ++i )
+        //     val += math::square( M1.data()[ i ] );
+
+        // return val;
+        
     }// if
     else if ( matrix::is_uniform_lowrank( A ) )
     {
