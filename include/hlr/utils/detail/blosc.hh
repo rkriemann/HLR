@@ -40,7 +40,7 @@ inline
 byte_t
 tol_to_rate ( const double  tol )
 {
-    return uint32_t( std::max< double >( 1, -std::log2( tol ) ) );
+    return uint32_t( std::max< double >( 1, -std::log2( tol ) + 1 ) );
 }
 
 //
@@ -223,7 +223,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = get_config( 0.1 * S(l) ); // correction to achieve desired precision
+        auto  zconf = config{ tol_to_rate( S(l) ) };
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();

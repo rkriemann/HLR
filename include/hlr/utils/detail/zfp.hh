@@ -10,6 +10,8 @@
 
 #if defined(HLR_HAS_ZFP)
 
+#include <cstring>
+
 #include <zfp.h>
 
 #include <hlr/arith/blas.hh>
@@ -34,7 +36,14 @@ inline
 uint
 eps_to_rate ( const double eps )
 {
-    return uint( std::ceil( std::abs( std::log2( eps ) ) ) ) + 2; // correction needed
+    return uint( std::max< double >( 1, std::ceil( - std::log2( eps ) ) + 2 ) );
+}
+
+inline
+uint
+tol_to_rate ( const double tol )
+{
+    return uint( std::max< double >( 1, std::ceil( -1.1 * std::log2( tol ) ) + 5 ) );
 }
 
 //
@@ -141,14 +150,10 @@ compress< std::complex< float > > ( const config &           config,
                                     const size_t             dim2,
                                     const size_t             dim3 )
 {
-    if ( dim1 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
-    else
-        return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 template <>
@@ -161,14 +166,10 @@ compress< std::complex< double > > ( const config &            config,
                                      const size_t              dim2,
                                      const size_t              dim3 )
 {
-    if ( dim1 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
-    else
-        return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 //
@@ -263,14 +264,10 @@ decompress< std::complex< float > > ( const zarray &           zdata,
                                       const size_t             dim2,
                                       const size_t             dim3 )
 {
-    if ( dim1 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
-    else
-        decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
     
 template <>
@@ -283,14 +280,10 @@ decompress< std::complex< double > > ( const zarray &            zdata,
                                        const size_t              dim2,
                                        const size_t              dim3 )
 {
-    if ( dim1 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
-    else if ( dim2 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
-    else if ( dim3 == 0 )
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
-    else
-        decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+    if      ( dim1 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +309,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = get_config( 0.1 * S(l) ); // correction to achieve desired precision
+        auto  zconf = fixed_rate( tol_to_rate( S(l) ) );
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();
