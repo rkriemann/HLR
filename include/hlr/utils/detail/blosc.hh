@@ -33,14 +33,14 @@ inline
 byte_t
 eps_to_rate ( const double eps )
 {
-    return uint( std::ceil( std::abs( std::log2( eps ) ) ) );
+    return byte_t( std::ceil( std::abs( std::log2( eps ) ) ) );
 }
 
 inline
 byte_t
 tol_to_rate ( const double  tol )
 {
-    return uint32_t( std::max< double >( 1, -std::log2( tol ) + 1 ) );
+    return byte_t( std::max< double >( 1, -std::log2( tol ) + 1 ) );
 }
 
 //
@@ -68,14 +68,16 @@ compress ( const config &   config,
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
+    const auto      lastpos = BLOSC2_MAX_FILTERS - 1;
     blosc2_cparams  cparams = BLOSC2_CPARAMS_DEFAULTS;
     
-    cparams.typesize        = sizeof( value_t );
-    cparams.compcode        = BLOSC_LZ4;
-    cparams.clevel          = 9;
-    cparams.filters[0]      = BLOSC_TRUNC_PREC; // truncate precision bits
-    cparams.filters_meta[0] = config.bitrate;   // number of precision bits
-    cparams.nthreads        = 1;                // sequential!
+    cparams.typesize         = sizeof( value_t );
+    cparams.compcode         = BLOSC_LZ4HC;
+    cparams.clevel           = 9;
+    cparams.filters[0]       = BLOSC_TRUNC_PREC; // truncate precision bits
+    cparams.filters_meta[0]  = config.bitrate;   // number of precision bits
+    cparams.filters[lastpos] = BLOSC_BITSHUFFLE; // use bit shuffling
+    cparams.nthreads         = 1;                // sequential!
 
     auto  cctx   = blosc2_create_cctx( cparams );
     auto  buffer = std::vector< byte_t >( nsize * sizeof(value_t) );
@@ -83,10 +85,8 @@ compress ( const config &   config,
 
     blosc2_free_ctx( cctx );
 
-    if ( zsize == 0 )
-        return zarray(); // not compressed
-    else if ( zsize < 0 )
-    { HLR_ERROR( "internal error in blosc" ); }
+    if      ( zsize == 0 ) return zarray(); // not compressed
+    else if ( zsize < 0 )  { HLR_ERROR( "internal error in blosc" ); }
 
     auto  result = zarray( zsize );
 
@@ -230,15 +230,15 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         zlist[l] = std::move( z_i );
     }// for
 
-    zarray  zdata( zsize + sizeof(uint) * k );
+    zarray  zdata( zsize + sizeof(size_t) * k );
     size_t  pos = 0;
 
     for ( auto &  z_i : zlist )
     {
-        const uint  s_i = z_i.size();
+        const size_t  s_i = z_i.size();
         
-        memcpy( zdata.data() + pos, & s_i, sizeof(uint) );
-        pos += sizeof(uint);
+        memcpy( zdata.data() + pos, & s_i, sizeof(size_t) );
+        pos += sizeof(size_t);
         
         memcpy( zdata.data() + pos, z_i.data(), s_i );
         pos += s_i;
@@ -258,10 +258,10 @@ decompress_lr ( const zarray &             zdata,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        uint  s_i = 0;
+        size_t  s_i = 0;
 
-        memcpy( & s_i, zdata.data() + pos, sizeof(uint) );
-        pos += sizeof(uint);
+        memcpy( & s_i, zdata.data() + pos, sizeof(size_t) );
+        pos += sizeof(size_t);
         
         decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
         pos += s_i;
