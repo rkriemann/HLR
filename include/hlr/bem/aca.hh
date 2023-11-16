@@ -3,7 +3,7 @@
 //
 // Project     : HLR
 // Module      : aca.hh
-// Description : various ACA algorithms
+// Description : ACA based lowrank block construction
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //

@@ -767,6 +767,40 @@ using Hpro::BLAS::norm_F;
 
 //////////////////////////////////////////////////////////////////////
 //
+// enhanced versions regarding scalar parameters
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename     alpha_t,
+           vector_type  vector_t >
+requires ( std::convertible_to< alpha_t, typename vector_t::value_t > )
+void
+scale ( const alpha_t  alpha,
+        vector_t &     v )
+{
+    const auto  n = Hpro::idx_t(v.length());
+    
+    for ( Hpro::idx_t  i = 0; i < n; ++i )
+        v(i) *= alpha;
+}
+
+template < typename     alpha_t,
+           matrix_type  matrix_t >
+requires ( std::convertible_to< alpha_t, typename matrix_t::value_t > )
+void
+scale ( const alpha_t  alpha,
+        matrix_t &     M )
+{
+    const auto  n = Hpro::idx_t(M.nrows());
+    const auto  m = Hpro::idx_t(M.ncols());
+    
+    for ( Hpro::idx_t  j = 0; j < m; ++j )
+        for ( Hpro::idx_t  i = 0; i < n; ++i )
+            M(i,j) *= alpha;
+}
+
+//////////////////////////////////////////////////////////////////////
+//
 // various simplified forms of matrix addition, multiplication
 //
 //////////////////////////////////////////////////////////////////////

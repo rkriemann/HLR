@@ -41,7 +41,7 @@ inline
 uint8_t
 tol_to_nbits ( const double  tol )
 {
-    return eps_to_nbits( tol ) + 2;
+    return std::max< double >( 1, std::ceil( -std::log2( eps / 4.0 ) ) );
 }
 
 //

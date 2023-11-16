@@ -33,6 +33,8 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/matrix/print.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
+#include <hlr/matrix/nested_cluster_basis.hh>
 #include <hlr/dag/graph.hh>
 #include <hlr/tensor/base_tensor.hh>
 #include <hlr/tensor/dense_tensor.hh>

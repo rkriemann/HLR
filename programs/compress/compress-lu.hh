@@ -557,9 +557,9 @@ program_main ()
             }
         };
 
-    if      ( cmdline::approx == "default" ) comp_lu( approx::SVD< value_t >(),  "SVD" );
-    else if ( cmdline::approx == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
-    else if ( cmdline::approx == "rrqr"    ) comp_lu( approx::RRQR< value_t >(), "RRQR" );
-    else if ( cmdline::approx == "randsvd" ) comp_lu( approx::RandSVD< value_t >(), "RandSVD" );
+    if      ( cmdline::aapprox == "default" ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    else if ( cmdline::aapprox == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    else if ( cmdline::aapprox == "rrqr"    ) comp_lu( approx::RRQR< value_t >(), "RRQR" );
+    else if ( cmdline::aapprox == "randsvd" ) comp_lu( approx::RandSVD< value_t >(), "RandSVD" );
 }
     

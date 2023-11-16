@@ -55,7 +55,8 @@ string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
 string  adm        = "weak";       // admissibility (std,weak,hodlr)
 double  eta        = 2.0;          // admissibility parameter
-string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
+string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
+string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
 string  arith      = "std";        // which kind of arithmetic to use
 double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
@@ -142,11 +143,12 @@ parse ( int argc, char ** argv )
         ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
         ( "coarsen",                      ": coarsen matrix structure" )
         ( "tohodlr",                      ": convert matrix to HODLR format" )
+        ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
         ;
 
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
-        ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
+        ( "aapprox",     value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
         ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
         ( "nbench",      value<uint>(),   ": (maximal) number of benchmark iterations" )
@@ -208,7 +210,8 @@ parse ( int argc, char ** argv )
     
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
-    if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
+    if ( vm.count( "capprox"    ) ) capprox    = vm["capprox"].as<string>();
+    if ( vm.count( "aapprox"    ) ) aapprox    = vm["aapprox"].as<string>();
     if ( vm.count( "tapprox"    ) ) tapprox    = vm["tapprox"].as<string>();
     if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
@@ -261,9 +264,20 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( approx == "help" )
+    if ( capprox == "help" )
     {
-        std::cout << "Low-rank approximation methods:" << std::endl
+        std::cout << "Construction low-rank approximation methods:" << std::endl
+                  << "  - aca     : adaptive cross approximation" << std::endl
+                  << "  - hca     : hybrid cross approximation" << std::endl
+                  << "  - dense   : no approximation" << std::endl
+                  << "  - default : use default approximation (ACA)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( aapprox == "help" )
+    {
+        std::cout << "Arithmetic low-rank approximation methods:" << std::endl
                   << "  - svd     : low-rank singular value decomposition (best approximation)" << std::endl
                   << "  - rrqr    : rank-revealing QR" << std::endl
                   << "  - randsvd : randomized SVD" << std::endl
@@ -354,10 +368,14 @@ parse ( int argc, char ** argv )
              ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
-    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||
-             ( approx == "randlr" ) || ( approx == "aca"  ) || ( approx == "lanczos" ) ||
-             ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
-        HLR_ERROR( "unknown approximation : " + approx );
+    if ( ! ( ( capprox == "aca" ) || ( capprox == "dense"   ) ||
+             ( capprox == "hca" ) || ( capprox == "default" ) ) )
+        HLR_ERROR( "unknown construction LR approximation : " + capprox );
+
+    if ( ! ( ( aapprox == "svd"    ) || ( aapprox == "rrqr" ) || ( aapprox == "randsvd" ) ||
+             ( aapprox == "randlr" ) || ( aapprox == "aca"  ) || ( aapprox == "lanczos" ) ||
+             ( aapprox == "hpro"   ) || ( aapprox == "all"  ) || ( aapprox == "default" ) ) )
+        HLR_ERROR( "unknown arithmetic LR approximation : " + aapprox );
 
     for ( auto &  entry : split( cmdline::tapprox, "," ) )
         if ( ! ( ( entry == "hosvd"  ) || ( entry == "sthosvd" ) || ( entry == "ghosvd" ) ||

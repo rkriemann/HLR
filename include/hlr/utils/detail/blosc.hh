@@ -1,59 +1,53 @@
-#ifndef __HLR_UTILS_DETAIL_ZFP_HH
-#define __HLR_UTILS_DETAIL_ZFP_HH
+#ifndef __HLR_UTILS_DETAIL_BLOSC_HH
+#define __HLR_UTILS_DETAIL_BLOSC_HH
 //
 // Project     : HLR
-// Module      : utils/detail/zfp
-// Description : ZFP related functions
+// Module      : utils/detail/blosc
+// Description : BLOSC related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#if defined(HLR_HAS_ZFP)
+#if defined(HLR_HAS_BLOSC)
 
 #include <cstring>
-
-#include <zfp.h>
+#include <blosc2.h>
 
 #include <hlr/arith/blas.hh>
 
-namespace hlr { namespace compress { namespace zfp {
+namespace hlr { namespace compress { namespace blosc {
+
+using byte_t = uint8_t;
 
 //
 // define compression mode
 //
 struct config
 {
-    zfp_mode  mode;
-    double    accuracy;
-    uint      precision;
-    uint      rate;
+    byte_t  bitrate;
 };
 
 //
 // convert precision to bitrate
 //
 inline
-uint
+byte_t
 eps_to_rate ( const double eps )
 {
-    return uint( std::max< double >( 1, std::ceil( - std::log2( eps ) ) + 2 ) );
+    return byte_t( std::ceil( std::abs( std::log2( eps ) ) ) );
 }
 
 inline
-uint
-tol_to_rate ( const double tol )
+byte_t
+tol_to_rate ( const double  tol )
 {
-    return uint( std::max< double >( 1, std::ceil( -1.1 * std::log2( tol ) ) + 5 ) );
+    return byte_t( std::max< double >( 1, -std::log2( tol ) + 1 ) );
 }
 
 //
 // define various compression modes
 //
-inline config  reversible        ()                     { return config{ zfp_mode_reversible, 0.0, 0, 0 }; }
-inline config  fixed_rate        ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }
-inline config  absolute_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
-inline config  get_config        ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-// inline config  get_config        ( const double  acc  ) { return absolute_accuracy( acc ); }
+inline config  get_config  ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
 
 // holds compressed data
 using  byte_t = unsigned char;
@@ -73,70 +67,35 @@ compress ( const config &   config,
            const size_t     dim2 = 0,
            const size_t     dim3 = 0 )
 {
-    const uint   ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
-    zfp_field *  field = nullptr;
-    zfp_type     type;
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
-    // stop if data is empty
-    if ( dim0 == 0 )
+    if ( nsize == 0 )
         return zarray();
-    
-    if      constexpr ( std::is_same_v< value_t, double > ) type = zfp_type_double;
-    else if constexpr ( std::is_same_v< value_t, float >  ) type = zfp_type_float;
-    else
-        HLR_ERROR( "unsupported type" );
-
-    size_t  nsize = 0;
-    
-    switch ( ndims )
-    {
-        case  1 : field = zfp_field_1d( data, type, dim0 ); break;
-        case  2 : field = zfp_field_2d( data, type, dim0, dim1 ); break;
-        case  3 : field = zfp_field_3d( data, type, dim0, dim1, dim2 ); break;
-        case  4 : field = zfp_field_4d( data, type, dim0, dim1, dim2, dim3 ); break;
-        default :
-            HLR_ASSERT( "unsupported number of ZFP dimensions" );
-    }// switch
-
-    auto  zfp = zfp_stream_open( nullptr );
-
-    switch ( config.mode )
-    {
-        case zfp_mode_fixed_rate      : zfp_stream_set_rate( zfp, config.rate, type, ndims, zfp_false ); break;
-        case zfp_mode_fixed_precision : zfp_stream_set_precision( zfp, config.precision ); break;
-        case zfp_mode_fixed_accuracy  : zfp_stream_set_accuracy( zfp, config.accuracy ); break;
-        case zfp_mode_reversible      : zfp_stream_set_reversible( zfp ); break;
             
-        default :
-            HLR_ASSERT( "unsupported ZFP mode" );
-    }// switch
-
-    // parallelism via hierarchy not within ZFP
-    zfp_stream_set_execution( zfp, zfp_exec_serial );
-
-    auto  bufsize = zfp_stream_maximum_size( zfp, field );
-    auto  buffer  = zarray( bufsize );
-    auto  stream  = stream_open( buffer.data(), bufsize );
-
-    zfp_stream_set_bit_stream( zfp, stream );
-    zfp_stream_rewind( zfp );
-
-    if ( ! zfp_write_header( zfp, field, ZFP_HEADER_FULL ) )
-        HLR_ERROR( "error in zfp_write_header" );
-
-    auto  c_size = zfp_compress( zfp, field );
-
-    if ( c_size == 0 )
-        HLR_ERROR( "error in zfp_compress" );
+    const auto      lastpos = BLOSC2_MAX_FILTERS - 1;
+    blosc2_cparams  cparams = BLOSC2_CPARAMS_DEFAULTS;
     
-    auto  result = zarray( c_size );
+    cparams.typesize         = sizeof( value_t );
+    cparams.compcode         = BLOSC_LZ4HC;
+    cparams.clevel           = 9;
+    cparams.filters[0]       = BLOSC_TRUNC_PREC; // truncate precision bits
+    cparams.filters_meta[0]  = config.bitrate;   // number of precision bits
+    cparams.filters[lastpos] = BLOSC_BITSHUFFLE; // use bit shuffling
+    cparams.nthreads         = 1;                // sequential!
 
-    std::copy( buffer.begin(), buffer.begin() + c_size, result.begin() );
+    auto  cctx   = blosc2_create_cctx( cparams );
+    auto  buffer = std::vector< byte_t >( nsize * sizeof(value_t) );
+    auto  zsize  = blosc2_compress_ctx( cctx, data, sizeof(value_t) * nsize, buffer.data(), buffer.size() );
 
-    zfp_field_free( field );    
-    zfp_stream_close( zfp );
-    stream_close( stream );
-    
+    blosc2_free_ctx( cctx );
+
+    if      ( zsize == 0 ) return zarray(); // not compressed
+    else if ( zsize <  0 ) { HLR_ERROR( "internal error in blosc" ); }
+
+    auto  result = zarray( zsize );
+
+    std::copy( buffer.begin(), buffer.begin() + zsize, result.begin() );
+
     return result;
 }
 
@@ -177,7 +136,7 @@ compress< std::complex< double > > ( const config &            config,
 //
 template < typename value_t >
 void
-decompress ( const uchar *   zdata,
+decompress ( const byte_t *  zdata,
              const size_t    zsize,
              value_t *       dest,
              const size_t    dim0,
@@ -185,61 +144,20 @@ decompress ( const uchar *   zdata,
              const size_t    dim2 = 0,
              const size_t    dim3 = 0 )
 {
-    const uint   ndims = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? 1 : 2 ) : 3 ) : 4 );
-    zfp_field *  field = nullptr;
-    zfp_type     type;
-
-    // stop if data is empty
-    if ( dim0 == 0 )
-        return;
+    const size_t    nsize   = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    blosc2_dparams  dparams = BLOSC2_DPARAMS_DEFAULTS;
     
-    if      constexpr ( std::is_same_v< value_t, double > ) type = zfp_type_double;
-    else if constexpr ( std::is_same_v< value_t, float >  ) type = zfp_type_float;
-    else
-        HLR_ERROR( "unsupported type" );
+    dparams.nthreads = 1;
+
+    auto  dctx  = blosc2_create_dctx( dparams );
+    auto  dsize = blosc2_decompress_ctx( dctx, zdata, zsize, dest, nsize * sizeof(double) );
+
+    blosc2_free_ctx( dctx );
     
-    switch ( ndims )
-    {
-        case  1 : field = zfp_field_1d( dest, type, dim0 ); break;
-        case  2 : field = zfp_field_2d( dest, type, dim0, dim1 ); break;
-        case  3 : field = zfp_field_3d( dest, type, dim0, dim1, dim2 ); break;
-        case  4 : field = zfp_field_4d( dest, type, dim0, dim1, dim2, dim3 ); break;
-        default :
-            HLR_ASSERT( "unsupported number of ZFP dimensions" );
-    }// switch
-
-    auto  zfp = zfp_stream_open( nullptr );
-
-    // zfp_field_set_type( field, type );
-    // zfp_field_set_pointer( field, dest );
-
-    switch ( ndims )
-    {
-        case  1 : zfp_field_set_size_1d( field, dim0 ); break;
-        case  2 : zfp_field_set_size_2d( field, dim0, dim1 ); break;
-        case  3 : zfp_field_set_size_3d( field, dim0, dim1, dim2 ); break;
-        case  4 : zfp_field_set_size_4d( field, dim0, dim1, dim2, dim3 ); break;
-        default:
-            HLR_ASSERT( "unsupported number of ZFP dimensions" );
-    }// switch
-
-    // parallelism via hierarchy not within ZFP
-    zfp_stream_set_execution( zfp, zfp_exec_serial );
-
-    auto  stream  = stream_open( const_cast< byte_t * >( zdata ), zsize );
-
-    zfp_stream_set_bit_stream( zfp, stream );
-    zfp_stream_rewind( zfp );
-
-    if ( ! zfp_read_header( zfp, field, ZFP_HEADER_FULL ) )
-        HLR_ERROR( "error in zfp_read_header" );
-    
-    if ( ! zfp_decompress( zfp, field ) )
-        HLR_ERROR( "error in zfp_decompress" );
-
-    zfp_field_free( field );    
-    zfp_stream_close( zfp );
-    stream_close( stream );
+    if ( dsize < 0 )
+    {  HLR_ERROR( "internal error in blosc" ); }
+    else if ( dsize < nsize * sizeof(value_t) )
+    { HLR_ERROR( "insufficient decompression" ); }
 }
 
 template < typename value_t >
@@ -309,7 +227,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = fixed_rate( tol_to_rate( S(l) ) );
+        auto  zconf = config{ tol_to_rate( S(l) ) };
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();
@@ -354,8 +272,8 @@ decompress_lr ( const zarray &             zdata,
     }// for
 }
 
-}}}// namespace hlr::compress::zfp
+}}}// namespace hlr::compress::blosc
 
-#endif // HLR_HAS_ZFP
+#endif // HLR_HAS_BLOSC
 
-#endif // __HLR_UTILS_DETAIL_ZFP_HH
+#endif // __HLR_UTILS_DETAIL_BLOSC_HH

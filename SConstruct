@@ -77,6 +77,8 @@ zstd          = False
 ZSTD_DIR      = '/'
 universal     = False
 UNIVERSAL_DIR = '/'
+blosc         = False
+BLOSC_DIR     = '/'
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -128,7 +130,8 @@ COMPRESSORS   = [ 'none',
                   'afl',
                   'aflp',
                   'bfl',
-                  'dfl' ]
+                  'dfl',
+                  'blosc' ]
 compressor    = 'none'
 
 # supported and active adaptive precision lowrank compressor
@@ -143,7 +146,8 @@ APLR_COMPRESSORS = [ 'none',
                      'bfl',
                      'dfl',
                      'mixedprec',
-                     'posits' ]
+                     'posits',
+                     'blosc' ]
 aplr = 'none'
 
 ######################################################################
@@ -289,6 +293,8 @@ opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       z
 opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
+opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
 opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',            'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
 
@@ -370,6 +376,8 @@ zstd          = opt_env['zstd']
 ZSTD_DIR      = opt_env['zstd_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
+blosc         = opt_env['blosc']
+BLOSC_DIR     = opt_env['blosc_dir']
 compressor    = opt_env['compressor']
 aplr          = opt_env['aplr']
 
@@ -622,6 +630,12 @@ elif compressor == 'cfloat' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=19' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif compressor == 'blosc' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
+    env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
+    env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'blosc2' ] )
 elif compressor == 'fp32' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
 elif compressor == 'fp16' :
@@ -643,6 +657,7 @@ if aplr == 'default'  :
     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
     elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
+    elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
 elif aplr == 'mixedprec'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
 elif aplr == 'afl'  :
@@ -681,6 +696,12 @@ elif aplr == 'posits'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif aplr == 'blosc'   :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
+    env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
+    env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'blosc2' ] )
 
 ######################################################################
 #
