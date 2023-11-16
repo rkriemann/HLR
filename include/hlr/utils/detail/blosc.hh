@@ -10,6 +10,7 @@
 
 #if defined(HLR_HAS_BLOSC)
 
+#include <cstring>
 #include <blosc2.h>
 
 #include <hlr/arith/blas.hh>
@@ -68,6 +69,9 @@ compress ( const config &   config,
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
+    if ( nsize == 0 )
+        return zarray();
+            
     const auto      lastpos = BLOSC2_MAX_FILTERS - 1;
     blosc2_cparams  cparams = BLOSC2_CPARAMS_DEFAULTS;
     
@@ -86,7 +90,7 @@ compress ( const config &   config,
     blosc2_free_ctx( cctx );
 
     if      ( zsize == 0 ) return zarray(); // not compressed
-    else if ( zsize < 0 )  { HLR_ERROR( "internal error in blosc" ); }
+    else if ( zsize <  0 ) { HLR_ERROR( "internal error in blosc" ); }
 
     auto  result = zarray( zsize );
 
