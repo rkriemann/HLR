@@ -22,12 +22,13 @@ namespace hlr { namespace apps {
 //
 // ctor
 //
-exp::exp ( const std::string &  grid )
+exp::exp ( const std::string &  grid,
+           const double         quad_error )
 {
     _grid = Hpro::make_grid( grid );
         
     auto  fnspace = std::make_unique< Hpro::TConstFnSpace< double > >( _grid.get() );
-    auto  bf      = std::make_unique< Hpro::TExpBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double >, value_t > >( fnspace.get(), fnspace.get(), 5 );
+    auto  bf      = std::make_unique< Hpro::TExpBF< Hpro::TConstFnSpace< double >, Hpro::TConstFnSpace< double >, value_t > >( fnspace.get(), fnspace.get(), quad_error );
 
     log( 1, Hpro::to_string( "    no. of indices = %d", fnspace->n_indices() ) );
     

@@ -36,7 +36,8 @@ private:
 public:
     // ctor with grid name (plus refinement levels)
     helmholtz_slp ( const std::complex< double >  kappa,
-                    const std::string &           grid );
+                    const std::string &           grid,
+                    const double                  quad_error );
     
     // dtor
     virtual ~helmholtz_slp () {}

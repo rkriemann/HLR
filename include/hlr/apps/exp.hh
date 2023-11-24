@@ -44,7 +44,8 @@ public:
     //
     // ctor with grid name (plus refinement levels)
     //
-    exp ( const std::string &  grid );
+    exp ( const std::string &  grid,
+          const double         quad_error );
     
     //
     // dtor
