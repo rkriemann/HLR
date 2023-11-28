@@ -2662,17 +2662,20 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         uint  nrows    = 0;
         auto  son_data = std::vector< std::pair< nested_cluster_basis< value_t > *, blas::matrix< value_t > > >( cb.nsons() );
-        
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-        {
-            if ( ! is_null( cb.son( i ) ) )
-            {
-                auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed );
 
-                nrows += R_i.nrows();
-                son_data[i]  = { cb.son(i), std::move( R_i ) };
-            }// if
-        }// for
+        // for ( uint  i = 0; i < cb.nsons(); ++i )
+        ::tbb::parallel_for< size_t >(
+            size_t(0), cb.nsons(),
+            [&,transposed] ( const size_t  i )
+            {
+                if ( ! is_null( cb.son( i ) ) )
+                {
+                    auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed );
+                    
+                    nrows += R_i.nrows();
+                    son_data[i]  = { cb.son(i), std::move( R_i ) };
+                }// if
+            } );
 
         // check for empty basis
         if ( mat_list.empty() )
@@ -2809,27 +2812,33 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
         B->copy_struct_from( BA );
 
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            auto  rowcb_i = rowcb.son( i );
-
-            HLR_ASSERT( ! is_null( rowcb_i ) );
-
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,BA,B] ( const ::tbb::blocked_range2d< uint > &  r )
             {
-                auto  colcb_j = colcb.son( j );
-                auto  A_ij    = BA->block( i, j );
-                
-                HLR_ASSERT( ! is_null( colcb_j ) );
-
-                if ( ! is_null( A_ij ) )
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
-                    auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j );
+                    auto  rowcb_i = rowcb.son( i );
+                    
+                    HLR_ASSERT( ! is_null( rowcb_i ) );
 
-                    B->set_block( i, j, B_ij.release() );
-                }// if
-            }// for
-        }// for
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  colcb_j = colcb.son( j );
+                        auto  A_ij    = BA->block( i, j );
+                
+                        HLR_ASSERT( ! is_null( colcb_j ) );
+
+                        if ( ! is_null( A_ij ) )
+                        {
+                            auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j );
+                            
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
     }// if
     else if ( hlr::matrix::is_dense( A ) )
     {
