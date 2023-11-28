@@ -13,6 +13,8 @@
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_invoke.h>
 #include <tbb/task_arena.h>
+#include <tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_queue.h>
 
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TBlockMatrix.hh>
@@ -2126,8 +2128,20 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
 // together with computing QR factorization of each.
 // Also set up structure of cluster bases.
 // 
+// template < typename value_t >
+// using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
+
 template < typename value_t >
-using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
+using cond_mat_t = std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > >;
+
+template < typename value_t >
+using cond_mat_list_t = std::list< cond_mat_t< value_t > >;
+
+template < typename value_t >
+using  lr_coupling_map_t  = ::tbb::concurrent_hash_map< indexset, cond_mat_list_t< value_t >, indexset_hash >;
+
+template < typename value_t >
+using  accessor_t = typename lr_coupling_map_t< value_t >::accessor;
 
 template < typename value_t >
 void
@@ -2167,18 +2181,25 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         
         HLR_ASSERT( Cu.ncols() != 0 );
         HLR_ASSERT( Cv.ncols() != 0 );
-        
-        // add matrix to block row/column together with other(!) semi-coupling
-        { 
-            auto  lock = std::scoped_lock( row_mtx );
 
-            row_map[ A.row_is() ].push_back( { R, std::move( Cv ) } );
+        //
+        // add matrix to block row/column together with respectively other(!) semi-coupling
+        //
+        
+        {
+            auto  accessor = accessor_t< value_t >();
+            auto  entry    = cond_mat_t{ R, std::move( Cv ) };
+
+            row_map.insert( accessor, A.row_is() );
+            accessor->second.push_back( std::move( entry ) );
         }
 
         {
-            auto  lock = std::scoped_lock( col_mtx );
+            auto  accessor = accessor_t< value_t >();
+            auto  entry    = cond_mat_t{ R, std::move( Cu ) };
 
-            col_map[ A.col_is() ].push_back( { R, std::move( Cu ) } );
+            col_map.insert( accessor, A.col_is() );
+            accessor->second.push_back( std::move( entry ) );
         }
     }// if
     else if ( is_blocked( A ) )
@@ -2270,7 +2291,9 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
     // construct cluster basis for all precollected blocks
     //
 
-    if ( mat_map.find( cb.is() ) != mat_map.end() )
+    auto  accessor = accessor_t< value_t >();
+    
+    if ( mat_map.find( accessor, cb.is() ) )
     {
         //
         // compute column basis for block row
@@ -2291,14 +2314,14 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
         uint        ncols = 0;
 
         // determine total number of columns
-        for ( const auto  [ M_i, C_i ] : mat_map.at( cb.is() ) )
+        for ( const auto  [ M_i, C_i ] : accessor->second )
             ncols += C_i.nrows();
 
         // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
         auto  X   = blas::matrix< value_t >( nrows, ncols );
         uint  pos = 0;
 
-        for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
+        for ( const auto  [ R_i, C_i ] : accessor->second )
         {
             auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
             auto  X_i = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );

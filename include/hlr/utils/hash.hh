@@ -20,9 +20,23 @@ using block_indexset = hpro::TBlockIndexSet;
 // hash function for index sets
 struct indexset_hash
 {
-    size_t operator () ( const indexset &  is ) const
+    size_t
+    hash ( const indexset &  is ) const
     {
         return ( std::hash< hpro::idx_t >()( is.first() ) ^ std::hash< hpro::idx_t >()( is.last()  ) );
+    }
+
+    size_t
+    operator () ( const indexset &  is ) const
+    {
+        return hash( is );
+    }
+
+    bool
+    equal ( const indexset &  is1,
+            const indexset &  is2 ) const
+    {
+        return is1 == is2;
     }
 };
 
