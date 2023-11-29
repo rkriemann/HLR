@@ -31,6 +31,8 @@
 
 #include <hlr/tbb/detail/matrix.hh>
 
+#include <hlr/utils/timer.hh> // DEBUG
+
 namespace hlr { namespace tbb { namespace matrix {
 
 namespace hpro = HLIB;
@@ -751,24 +753,42 @@ build_uniform_rec2 ( const hpro::TMatrix< typename basisapx_t::value_t > &    A,
     auto  col_map = detail::lr_coupling_map_t< value_t >();
     auto  row_mtx = std::mutex();
     auto  col_mtx = std::mutex();
-    
+
+    auto  tic     = timer::now();
+
     detail::build_mat_map( A, *rowcb, *colcb, row_map, row_mtx, col_map, col_mtx );
+    
+    auto  toc     = timer::since( tic );
+
+    std::cout << "build_mat_map       " << toc << std::endl;
     
     //
     // build cluster bases
     //
 
+    tic = timer::now();
+    
     ::tbb::parallel_invoke(
         [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false ); },
         [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );  }
     );
 
+    toc = timer::since( tic );
+    
+    std::cout << "build_cluster_basis " << toc << std::endl;
+
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
+    tic = timer::now();
+
     auto  M = detail::build_uniform( A, *rowcb, *colcb );
     
+    toc = timer::since( tic );
+    
+    std::cout << "build_uniform       " << toc << std::endl;
+
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
@@ -802,7 +822,13 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     auto  col_map      = detail::lr_mat_map_t< value_t >();
     auto  col_coupling = detail::coupling_map_t< value_t >();
     
+    auto  tic     = timer::now();
+
     detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
+    
+    auto  toc     = timer::since( tic );
+
+    std::cout << "build_mat_map       " << toc << std::endl;
     
     //
     // build cluster bases
@@ -810,14 +836,26 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
+    tic = timer::now();
+    
     detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false );
     detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true );
+
+    toc = timer::since( tic );
+    
+    std::cout << "build_cluster_basis " << toc << std::endl;
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
+    tic = timer::now();
+
     auto  M = detail::build_h2( A, *rowcb, *colcb );
+    
+    toc = timer::since( tic );
+    
+    std::cout << "build_h2            " << toc << std::endl;
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }

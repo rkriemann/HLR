@@ -41,7 +41,7 @@ inline
 uint8_t
 tol_to_nbits ( const double  tol )
 {
-    return std::max< double >( 1, std::ceil( -std::log2( eps / 4.0 ) ) );
+    return std::max< double >( 1, std::ceil( -std::log2( tol / 4.0 ) ) );
 }
 
 //
@@ -370,9 +370,9 @@ struct convert
             
             do
             {
-                const uint32_t  crest = 8 - bpos;         // remaining bits in current byte
+                const uint32_t  crest = 8 - bpos;       // remaining bits in current byte
                 const uint32_t  zrest = nbits - sbits;  // remaining bits in zval
-                const byte_t    zbyte = zval & 0xff;      // lowest byte of zval
+                const byte_t    zbyte = zval & 0xff;    // lowest byte of zval
                     
                 // HLR_DBG_ASSERT( pos < zsize );
                     

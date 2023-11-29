@@ -203,32 +203,35 @@ frobenius_squared ( const alpha_t                     alpha,
     using  result_t = long double;
 
     HLR_ASSERT( A.block_is() == B.block_is() );
-    
-    auto  lrdot = [] ( const auto &  U1,
-                       const auto &  V1,
-                       const auto &  U2,
-                       const auto &  V2 )
-    {
-        const auto  rank1 = U1.ncols();
-        const auto  rank2 = U2.ncols();
-        result_t    val   = 0.0;
-                              
-        for ( size_t  l = 0; l < rank1; l++ )
-        {
-            const auto  U1_l = U1.column( l );
-            const auto  V1_l = V1.column( l );
-                                  
-            for ( size_t  k = 0; k < rank2; k++ )
-            {
-                const auto  U2_k = U2.column( k );
-                const auto  V2_k = V2.column( k );
-                                      
-                val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
-            }// for
-        }// for
 
-        return val;
-    };
+    //
+    // special lowrank function (see below)
+    //
+    // auto  lrdot = [] ( const auto &  U1,
+    //                    const auto &  V1,
+    //                    const auto &  U2,
+    //                    const auto &  V2 )
+    // {
+    //     const auto  rank1 = U1.ncols();
+    //     const auto  rank2 = U2.ncols();
+    //     result_t    val   = 0.0;
+                              
+    //     for ( size_t  l = 0; l < rank1; l++ )
+    //     {
+    //         const auto  U1_l = U1.column( l );
+    //         const auto  V1_l = V1.column( l );
+                                  
+    //         for ( size_t  k = 0; k < rank2; k++ )
+    //         {
+    //             const auto  U2_k = U2.column( k );
+    //             const auto  V2_k = V2.column( k );
+                                      
+    //             val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
+    //         }// for
+    //     }// for
+
+    //     return val;
+    // };
 
     if ( is_blocked_all( A, B ) )
     {
@@ -261,6 +264,12 @@ frobenius_squared ( const alpha_t                     alpha,
             }// for
         }// for
 
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(B) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(B) nan value for " << A.block_is() << std::endl;
+        }// if
+        
         return std::abs( val );
     }// if
     else if (( matrix::is_lowrank(    A ) && matrix::is_lowrank(    B ) ) ||
@@ -331,6 +340,12 @@ frobenius_squared ( const alpha_t                     alpha,
 
         for ( size_t  i = 0; i < S.length(); ++i )
             val += math::square( S(i) );
+
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(R) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(R) nan value for " << A.block_is() << std::endl;
+        }// if
 
         return val;
 
@@ -405,6 +420,12 @@ frobenius_squared ( const alpha_t                     alpha,
                 val += std::abs( math::square( a_ij ) );
             }// for
         }// for
+
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(D) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(D) nan value for " << A.block_is() << std::endl;
+        }// if
             
         return val;
     }// if

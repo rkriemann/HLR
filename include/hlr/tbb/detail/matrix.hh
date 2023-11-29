@@ -2443,7 +2443,10 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
 // Also set up structure of cluster bases.
 // 
 template < typename value_t >
-using  lr_mat_map_t   = std::unordered_map< indexset, std::list< const hlr::matrix::lrmatrix< value_t > * >, indexset_hash >;
+using  lr_list_t      = std::list< const hlr::matrix::lrmatrix< value_t > * >;
+
+template < typename value_t >
+using  lr_mat_map_t   = std::unordered_map< indexset, lr_list_t< value_t >, indexset_hash >;
 
 template < typename value_t >
 using  coupling_map_t = std::unordered_map< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > >;
@@ -2488,7 +2491,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         // add matrix to block row/column
         row_map[ A.row_is() ].push_back( R );
         col_map[ A.col_is() ].push_back( R );
-
+            
         // also remember the semi-coupling (see "build_cluster_basis" why the "other")
         row_coupling[ R ] = std::move( Cx );
         col_coupling[ R ] = std::move( Cw );
@@ -2497,15 +2500,19 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
     {
         auto  B = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
 
+        //
+        // build (empty) cluster bases objects
+        //
+        
         for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
             auto  rowcb_i = rowcb.son( i );
-            
+        
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 auto  colcb_j = colcb.son( j );
                 auto  M_ij    = B->block( i, j );
-                
+            
                 if ( ! is_null( M_ij ) )
                 {
                     if ( is_null( rowcb_i ) )
@@ -2513,16 +2520,16 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
                         rowcb_i = new nested_cluster_basis< value_t >( M_ij->row_is() );
                         rowcb.set_son( i, rowcb_i );
                     }// if
-            
+        
                     if ( is_blocked( M_ij ) && ( rowcb_i->nsons() == 0 ))
                         rowcb_i->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
-                        
+                    
                     if ( is_null( colcb_j ) )
                     {
                         colcb_j = new nested_cluster_basis< value_t >( M_ij->col_is() );
                         colcb.set_son( j, colcb_j );
                     }// if
-            
+        
                     if ( is_blocked( M_ij ) && ( colcb_j->nsons() == 0 ))
                         colcb_j->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
                 }// if
