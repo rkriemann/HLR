@@ -223,8 +223,8 @@ program_main ()
                 zcolcb.reset( nullptr );
                 
                 zA     = std::move( impl::matrix::copy( *A ) );
-                zrowcb = std::move( zrowcb->copy() );
-                zcolcb = std::move( zcolcb->copy() );
+                zrowcb = std::move( rowcb->copy() );
+                zcolcb = std::move( colcb->copy() );
         
                 matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
             }// if
