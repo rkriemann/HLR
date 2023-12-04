@@ -40,8 +40,9 @@ struct config
 // holds compressed data
 using  zarray = std::vector< byte_t >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size(); }
-inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
+inline size_t  byte_size       ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+inline size_t  compressed_size ( const zarray &  v   ) { return v.size(); }
+inline config  get_config      ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
 
 ////////////////////////////////////////////////////////////////////////////////
 //

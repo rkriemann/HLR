@@ -520,6 +520,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     auto          M         = _mat;
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
+    const auto    zmem      = compress::compressed_size( zM );
 
     // // DEBUG
     // {
@@ -539,7 +540,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //               << std::endl;
     // }
     
-    if ( compress::byte_size( zM ) < mem_dense )
+    if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         _zM  = std::move( zM );
         _mat = std::move( blas::matrix< value_t >( 0, 0 ) );

@@ -106,6 +106,7 @@ using hlr::compress::zfp::compress;
 using hlr::compress::zfp::decompress;
 using hlr::compress::zfp::get_config;
 using hlr::compress::zfp::byte_size;
+using hlr::compress::zfp::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -131,6 +132,7 @@ using hlr::compress::posits::compress;
 using hlr::compress::posits::decompress;
 using hlr::compress::posits::get_config;
 using hlr::compress::posits::byte_size;
+using hlr::compress::posits::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -177,6 +179,7 @@ using hlr::compress::blosc::compress;
 using hlr::compress::blosc::decompress;
 using hlr::compress::blosc::get_config;
 using hlr::compress::blosc::byte_size;
+using hlr::compress::blosc::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -386,6 +389,7 @@ using hlr::compress::afl::compress;
 using hlr::compress::afl::decompress;
 using hlr::compress::afl::get_config;
 using hlr::compress::afl::byte_size;
+using hlr::compress::afl::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -407,6 +411,7 @@ using hlr::compress::aflp::compress;
 using hlr::compress::aflp::decompress;
 using hlr::compress::aflp::get_config;
 using hlr::compress::aflp::byte_size;
+using hlr::compress::aflp::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -428,6 +433,7 @@ using hlr::compress::bfl::compress;
 using hlr::compress::bfl::decompress;
 using hlr::compress::bfl::get_config;
 using hlr::compress::bfl::byte_size;
+using hlr::compress::bfl::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -449,6 +455,7 @@ using hlr::compress::dfl::compress;
 using hlr::compress::dfl::decompress;
 using hlr::compress::dfl::get_config;
 using hlr::compress::dfl::byte_size;
+using hlr::compress::dfl::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -662,6 +669,7 @@ using zarray = hlr::compress::mixedprec::zarray;
 using hlr::compress::mixedprec::compress_lr;
 using hlr::compress::mixedprec::decompress_lr;
 using hlr::compress::mixedprec::byte_size;
+using hlr::compress::mixedprec::compressed_size;
 
 static const char provider[] = "mixedprec";
 
@@ -677,6 +685,7 @@ using zarray = hlr::compress::zfp::zarray;
 using hlr::compress::zfp::compress_lr;
 using hlr::compress::zfp::decompress_lr;
 using hlr::compress::zfp::byte_size;
+using hlr::compress::zfp::compressed_size;
 
 static const char provider[] = "zfp";
 
@@ -722,6 +731,7 @@ using zarray = hlr::compress::bfl::zarray;
 using hlr::compress::bfl::compress_lr;
 using hlr::compress::bfl::decompress_lr;
 using hlr::compress::bfl::byte_size;
+using hlr::compress::bfl::compressed_size;
 
 static const char provider[] = "bfl";
 
@@ -737,6 +747,7 @@ using zarray = hlr::compress::dfl::zarray;
 using hlr::compress::dfl::compress_lr;
 using hlr::compress::dfl::decompress_lr;
 using hlr::compress::dfl::byte_size;
+using hlr::compress::dfl::compressed_size;
 
 static const char provider[] = "dfl";
 
@@ -752,6 +763,7 @@ using zarray = hlr::compress::aflp::zarray;
 using hlr::compress::aflp::compress_lr;
 using hlr::compress::aflp::decompress_lr;
 using hlr::compress::aflp::byte_size;
+using hlr::compress::aflp::compressed_size;
 
 static const char provider[] = "aflp";
 
@@ -767,6 +779,7 @@ using zarray = hlr::compress::afl::zarray;
 using hlr::compress::afl::compress_lr;
 using hlr::compress::afl::decompress_lr;
 using hlr::compress::afl::byte_size;
+using hlr::compress::afl::compressed_size;
 
 static const char provider[] = "afl";
 
@@ -782,6 +795,7 @@ using zarray = hlr::compress::posits::zarray;
 using hlr::compress::posits::compress_lr;
 using hlr::compress::posits::decompress_lr;
 using hlr::compress::posits::byte_size;
+using hlr::compress::posits::compressed_size;
 
 static const char provider[] = "posits";
 
@@ -797,6 +811,7 @@ using zarray = hlr::compress::blosc::zarray;
 using hlr::compress::blosc::compress_lr;
 using hlr::compress::blosc::decompress_lr;
 using hlr::compress::blosc::byte_size;
+using hlr::compress::blosc::compressed_size;
 
 static const char provider[] = "blosc";
 
@@ -812,6 +827,7 @@ using zarray = hlr::compress::mixedprec::zarray;
 using hlr::compress::mixedprec::compress_lr;
 using hlr::compress::mixedprec::decompress_lr;
 using hlr::compress::mixedprec::byte_size;
+using hlr::compress::mixedprec::compressed_size;
 
 static const char provider[] = "mixedprec";
 

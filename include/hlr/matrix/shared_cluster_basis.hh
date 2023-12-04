@@ -411,9 +411,10 @@ shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig
     
     #endif
     
-    auto  zV = compress::compress< value_t >( zconfig, _V );
+    auto        zV   = compress::compress< value_t >( zconfig, _V );
+    const auto  zmem = compress::compressed_size( zV );
 
-    if ( compress::byte_size( zV ) < mem_dense )
+    if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         _zV = std::move( zV );
         _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
@@ -460,7 +461,8 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
 
-        auto  zV = compress::aplr::compress_lr< value_t >( _V, S );
+        auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
+        auto  zmem = compress::aplr::compressed_size( zV );
 
         // {
         //     auto  T = blas::copy( _V );
@@ -471,7 +473,7 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
         // }
         
-        if ( compress::aplr::byte_size( zV ) < mem_dense )
+        if (( zmem > 0 ) && ( zmem < mem_dense ))
         {
             _zV = std::move( zV );
             _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
@@ -488,8 +490,9 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     
     auto  zconfig = compress::get_config( acc.abs_eps() );
     auto  zV      = compress::compress< value_t >( zconfig, _V );
+    auto  zmem    = compress::compressed_size( zV );
 
-    if ( compress::byte_size( zV ) < mem_dense )
+    if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         _zV = std::move( zV );
         _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank

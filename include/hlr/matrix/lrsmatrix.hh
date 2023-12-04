@@ -599,10 +599,10 @@ lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     auto          oS       = this->S();
     auto          zS       = compress::compress< value_t >( zconfig, oS.data(), oS.nrows(), oS.ncols() );
     const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() + orowrank * ocolrank );
-    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV ) + compress::byte_size( zS );
+    const size_t  mem_z    = compress::compressed_size( zU ) + compress::compressed_size( zV ) + compress::compressed_size( zS );
     #else
     const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() );
-    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV );
+    const size_t  mem_z    = compress::compressed_size( zU ) + compress::compressed_size( zV );
     #endif
 
     // const auto  vmin = blas::min_abs_val( oU );

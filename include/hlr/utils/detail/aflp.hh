@@ -67,7 +67,8 @@ struct config
 using  zarray = std::vector< byte_t >;
 
 // return actual memory size of compressed data
-inline size_t  byte_size  ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+inline size_t  byte_size       ( const zarray &  v ) { return sizeof(v) + v.size(); }
+inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 
 // return compression configuration for desired accuracy eps
 inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }

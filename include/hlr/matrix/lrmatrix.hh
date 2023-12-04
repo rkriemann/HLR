@@ -757,6 +757,8 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
     auto          zU     = compress::compress< value_t >( zconfig, oU );
     auto          zV     = compress::compress< value_t >( zconfig, oV );
+    const auto    zmem_U = compress::compressed_size( zU );
+    const auto    zmem_V = compress::compressed_size( zV );
 
     // {
     //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
@@ -790,7 +792,7 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //               << std::endl;
     // }
     
-    if ( compress::byte_size( zU ) + compress::byte_size( zV ) < mem_lr )
+    if (( zmem_U > 0 ) && ( zmem_V > 0 ) && ( zmem_U + zmem_V < mem_lr ))
     {
         _zdata.U = std::move( zU );
         _zdata.V = std::move( zV );

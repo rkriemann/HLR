@@ -790,7 +790,7 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     auto          zU     = compress::aplr::compress_lr( oU, S_tol );
     auto          zV     = compress::aplr::compress_lr( oV, S_tol );
     const size_t  mem_lr = sizeof(value_t) * k * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_mp = compress::aplr::byte_size( zU ) + compress::aplr::byte_size( zV ) + sizeof(real_t) * k;
+    const size_t  mem_mp = compress::aplr::compressed_size( zU ) + compress::aplr::compressed_size( zV ) + sizeof(real_t) * k;
 
     // // DEBUG
     // {

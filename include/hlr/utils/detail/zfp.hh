@@ -59,7 +59,8 @@ inline config  get_config        ( const double  acc  ) { return fixed_rate( eps
 using  byte_t = unsigned char;
 using  zarray = std::vector< byte_t >;
 
-inline size_t  byte_size ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
+inline size_t  byte_size       ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
+inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 
 //
 // compression function
