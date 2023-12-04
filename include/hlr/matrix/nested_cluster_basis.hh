@@ -38,7 +38,7 @@ DECLARE_TYPE( nested_cluster_basis );
 namespace matrix
 {
 
-#define HLR_USE_APCOMPRESSION  1
+#define HLR_USE_APLR_NESTED_CB  1
 
 //
 // represents cluster basis for single cluster with
@@ -73,7 +73,7 @@ private:
     std::mutex                              _mtx;
 
     #if HLR_HAS_COMPRESSION == 1
-    #if HLR_USE_APCOMPRESSION == 1
+    #if HLR_USE_APLR_NESTED_CB == 1
     // basis and corresponding singular values
     compress::aplr::zarray                  _zV;
     blas::vector< real_t >                  _sv;
@@ -186,7 +186,7 @@ public:
         {
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-            #if HLR_USE_APCOMPRESSION == 1
+            #if HLR_USE_APLR_NESTED_CB == 1
             compress::aplr::decompress_lr< value_t >( _zV, V );
             #else
             compress::decompress< value_t >( _zV, V );
@@ -235,7 +235,7 @@ public:
 
         _rank = _V.ncols();
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_NESTED_CB == 1
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
         #endif
@@ -252,7 +252,7 @@ public:
 
         _rank = _V.ncols();
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_NESTED_CB == 1
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );
         #endif
@@ -520,7 +520,7 @@ public:
                 cb->_zE[i] = _zE[i];
         }// if
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR_NESTED_CB == 1
         cb->_sv = std::move( blas::copy( _sv ) );
         #endif
         #endif
@@ -557,7 +557,7 @@ public:
             n += _E[i].byte_size();
         
         #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APCOMPRESSION  == 1
+        #if HLR_USE_APLR_NESTED_CB  == 1
         n += compress::aplr::byte_size( _zV );
         n += _sv.byte_size();
         #else
@@ -624,7 +624,7 @@ protected:
     virtual void   remove_compressed ()
     {
         #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APCOMPRESSION  == 1
+        #if HLR_USE_APLR_NESTED_CB  == 1
         _zV = compress::aplr::zarray();
         #else
         _zV = compress::zarray();
@@ -689,7 +689,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
         const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR_NESTED_CB == 1
         {
             //
             // use adaptive precision per basis vector
@@ -819,7 +819,7 @@ rank_info ( const Hpro::TClusterBasis< value_t > &  cb )
 
 #endif
 
-#undef HLR_USE_APCOMPRESSION
+#undef HLR_USE_APLR_NESTED_CB
 
 }} // namespace hlr::matrix
 

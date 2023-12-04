@@ -204,48 +204,6 @@ program_main ()
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
 
-        // //
-        // // preserve for MVM
-        // //
-
-        // A_uni     = std::move( A2 );
-        // rowcb_uni = std::move( rowcb );
-        // colcb_uni = std::move( colcb );
-    }
-
-    if ( true )
-    {
-        std::cout << term::bullet << term::bold << "uniform H-matrix (rec2)" << term::reset << std::endl;
-    
-        tic = timer::now();
-    
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec2( *A, apx, acc, nseq );
-
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
-
-        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
-        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
-
-        std::cout << "    ranks  = "
-                  << row_min << " … " << row_avg << " … " << row_max << " / "
-                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
-        
-        if ( hpro::verbose( 3 ) )
-        {
-            io::eps::print( *A2, "A2", "noid" );
-            io::eps::print( *rowcb, "rowcb2" );
-            io::eps::print( *colcb, "colcb2" );
-        }// if
-        
-        {
-            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
-            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
-        
-            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-        }
-
         //
         // preserve for MVM
         //

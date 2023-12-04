@@ -29,7 +29,7 @@ DECLARE_TYPE( shared_cluster_basis );
 namespace matrix
 {
 
-#define HLR_USE_APCOMPRESSION  1
+#define HLR_USE_APLR_SHARED_CB  1
 
 //
 // represents cluster basis for single cluster with
@@ -58,7 +58,7 @@ private:
     std::mutex               _mtx;
 
     #if HLR_HAS_COMPRESSION == 1
-    #if HLR_USE_APCOMPRESSION == 1
+    #if HLR_USE_APLR_SHARED_CB == 1
     // stores compressed data
     compress::aplr::zarray   _zV;
 
@@ -138,7 +138,7 @@ public:
         {
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-            #if HLR_USE_APCOMPRESSION == 1
+            #if HLR_USE_APLR_SHARED_CB == 1
 
             compress::aplr::decompress_lr< value_t >( _zV, V );
 
@@ -179,7 +179,7 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( blas::copy( aV ) );
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_SHARED_CB == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
@@ -194,7 +194,7 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( aV );
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APCOMPRESSION == 1
+        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_SHARED_CB == 1
         
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );
@@ -265,7 +265,7 @@ public:
         if ( is_compressed() )
             cb->_zV = _zV;
 
-        #if HLR_USE_APCOMPRESSION == 1
+        #if HLR_USE_APLR_SHARED_CB == 1
         cb->_sv = std::move( blas::copy( _sv ) );
         #endif
         #endif
@@ -299,7 +299,7 @@ public:
         size_t  n = ( sizeof(_is) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
 
         #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APCOMPRESSION  == 1
+        #if HLR_USE_APLR_SHARED_CB  == 1
         n += compress::aplr::byte_size( _zV );
         n += _sv.byte_size();
         #else
@@ -360,7 +360,7 @@ protected:
     virtual void   remove_compressed ()
     {
         #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APCOMPRESSION  == 1
+        #if HLR_USE_APLR_SHARED_CB  == 1
         _zV = compress::aplr::zarray();
         #else
         _zV = compress::zarray();
@@ -405,7 +405,7 @@ shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig
 
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-    #if HLR_USE_APCOMPRESSION == 1
+    #if HLR_USE_APLR_SHARED_CB == 1
 
     HLR_ASSERT( false );
     
@@ -438,7 +438,7 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-    #if HLR_USE_APCOMPRESSION == 1
+    #if HLR_USE_APLR_SHARED_CB == 1
 
     {
         //
@@ -561,7 +561,7 @@ rank_info ( const shared_cluster_basis< value_t > &  cb )
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
 
-#undef HLR_USE_APCOMPRESSION
+#undef HLR_USE_APLR_SHARED_CB
 
 }} // namespace hlr::matrix
 
