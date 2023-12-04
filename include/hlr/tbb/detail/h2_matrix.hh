@@ -118,10 +118,11 @@ template < typename value_t >
 using  lr_list_t      = std::list< const hlr::matrix::lrmatrix< value_t > * >;
 
 template < typename value_t >
-using  lr_mat_map_t   = std::unordered_map< indexset, lr_list_t< value_t >, indexset_hash >;
+// using  lr_mat_map_t   = std::unordered_map< indexset, lr_list_t< value_t >, indexset_hash >;
+using  lr_mat_map_t   = ::tbb::concurrent_hash_map< indexset, lr_list_t< value_t >, indexset_hash >;
 
 template < typename value_t >
-using  coupling_map_t = std::unordered_map< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > >;
+using  coupling_map_t = ::tbb::concurrent_hash_map< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > >;
 
 template < typename value_t >
 void
@@ -165,19 +166,53 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         // add matrix to block row/column
         // and remember the semi-coupling (see "build_cluster_basis" why the "other")
 
+        using  laccessor_t = lr_mat_map_t< value_t >::accessor;
+        using  caccessor_t = coupling_map_t< value_t >::accessor;
 
         {
-            auto  lock = std::scoped_lock( row_mtx );
-            
-            row_map[ A.row_is() ].push_back( R );
-            row_coupling[ R ] = std::move( Cx );
+            auto  access = laccessor_t();
+
+            row_map.insert( access, A.row_is() );
+            access->second.push_back( R );
         }
-            
+        
         {
-            auto  lock = std::scoped_lock( col_mtx );
+            auto  access = laccessor_t();
+
+            col_map.insert( access, A.col_is() );
+            access->second.push_back( R );
+        }
+        
+        {
+            auto  access = caccessor_t();
+
+            row_coupling.insert( access, R );
+            access->second = std::move( Cx );
+        }
+        
+        {
+            auto  access = caccessor_t();
+
+            col_coupling.insert( access, R );
+            access->second = std::move( Cw );
+        }
+        
+        // {
+        //     auto  lock = std::scoped_lock( row_mtx );
             
-            col_map[ A.col_is() ].push_back( R );
-            col_coupling[ R ] = std::move( Cw );
+        //     row_map[ A.row_is() ].push_back( R );
+        //     row_coupling[ R ] = std::move( Cx );
+        // }
+            
+        // {
+        //     auto  lock = std::scoped_lock( col_mtx );
+            
+        //     col_map[ A.col_is() ].push_back( R );
+        //     col_coupling[ R ] = std::move( Cw );
+        // }
+
+        {
+            
         }
     }// if
     else if ( is_blocked( A ) )
@@ -296,6 +331,9 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 {
     using  real_t  = Hpro::real_type_t< value_t >;
 
+    using  laccessor_t = lr_mat_map_t< value_t >::accessor;
+    using  caccessor_t = coupling_map_t< value_t >::accessor;
+
     const matop_t  op = ( transposed ? apply_transposed : apply_normal );
 
     //
@@ -305,12 +343,19 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
     auto  mat_list = lr_mat_list_t< value_t >( parent_matrices );
     auto  is_sort  = [op] ( auto  M1, auto  M2 ) { return M1->row_is( op ).is_strictly_left_of( M2->row_is( op ) ); };
 
-    if ( lrmat_map.find( cb.is() ) != lrmat_map.end() )
     {
-        const auto  local_mats = lrmat_map.at( cb.is() );
+        auto  access  = laccessor_t();
+
+        if ( lrmat_map.find( access, cb.is() ) )
+            mat_list.insert( mat_list.end(), access->second.begin(), access->second.end() );
+    }
+    
+    // if ( lrmat_map.find( cb.is() ) != lrmat_map.end() )
+    // {
+    //     const auto  local_mats = lrmat_map.at( cb.is() );
         
-        mat_list.insert( mat_list.end(), local_mats.begin(), local_mats.end() );
-    }// if
+    //     mat_list.insert( mat_list.end(), local_mats.begin(), local_mats.end() );
+    // }// if
 
     mat_list.sort( is_sort );
     
@@ -325,10 +370,17 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
     // determine total number of columns
     for ( const auto  R_i : mat_list )
     {
-        const auto  C_i = coupling_map.at( R_i );
-                
-        ncols += C_i.nrows();
+        auto  access = caccessor_t();
+
+        coupling_map.find( access, R_i );
+        ncols += access->second.nrows();
     }// for
+    // for ( const auto  R_i : mat_list )
+    // {
+    //     const auto  C_i = coupling_map.at( R_i );
+                
+    //     ncols += C_i.nrows();
+    // }// for
     
     //
     //
@@ -363,7 +415,13 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         for ( const auto  M_i : mat_list )
         {   // std::cout << "  " << cb.is() << ", " << M_i->block_is() << ", " << pos << std::endl;
-            const auto  C_i   = coupling_map.at( M_i );
+            auto  access = caccessor_t();
+
+            coupling_map.find( access, M_i );
+            
+            const auto  C_i   = access->second;
+            // const auto  C_i   = coupling_map.at( M_i );
+            
             auto        U_i   = M_i->U( op );
             auto        U_sub = blas::matrix< value_t >( U_i, cb.is() - M_i->row_ofs( op ), blas::range::all );
             auto        X_i   = blas::prod( U_sub, blas::adjoint( C_i ) );
@@ -424,13 +482,20 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
             auto  list_i  = lr_mat_list_t< value_t >( mat_list.begin(), mat_list.end() );
             auto  mat_idx = std::unordered_map< const hlr::matrix::lrmatrix< value_t > *, idx_t >();
-            
-            if ( lrmat_map.find( cb_i->is() ) != lrmat_map.end() )
+
             {
-                auto  map_i = lrmat_map.at( cb_i->is() );
+                auto  access = laccessor_t();
+
+                if ( lrmat_map.find( access, cb_i->is() ) )
+                    list_i.insert( list_i.end(), access->second.begin(), access->second.end() );
+            }
+            
+            // if ( lrmat_map.find( cb_i->is() ) != lrmat_map.end() )
+            // {
+            //     auto  map_i = lrmat_map.at( cb_i->is() );
                 
-                list_i.insert( list_i.end(), map_i.begin(), map_i.end() );
-            }// if
+            //     list_i.insert( list_i.end(), map_i.begin(), map_i.end() );
+            // }// if
 
             list_i.sort( is_sort );
 
@@ -439,7 +504,12 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             
             for ( auto  M_j : list_i )
             {
-                const auto  C_j = coupling_map.at( M_j );
+                auto  access = caccessor_t();
+
+                coupling_map.find( access, M_j );
+                
+                const auto  C_j = access->second;
+                // const auto  C_j = coupling_map.at( M_j );
 
                 mat_idx[ M_j ] = idx;
                 idx           += C_j.nrows();
@@ -452,7 +522,12 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             // ... but we use only those also within local list
             for ( auto  M_j : mat_list )
             {
-                const auto  C_j      = coupling_map.at( M_j );
+                auto  access = caccessor_t();
+
+                coupling_map.find( access, M_j );
+                
+                const auto  C_j      = access->second;
+                // const auto  C_j      = coupling_map.at( M_j );
                 const auto  ncols_j  = C_j.nrows(); // always used as C'
                 const auto  ofs_j    = mat_idx[ M_j ];
                 const auto  crange_R = blas::range( ofs_j, ofs_j + ncols_j - 1 );
