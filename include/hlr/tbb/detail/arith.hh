@@ -111,6 +111,49 @@ mul_vec_chunk ( const value_t                    alpha,
     }// else
 }
 
+//
+// mat-vec with parallel execution only along row clusters
+//
+using hlr::vector::scalar_vector;
+
+template < typename value_t >
+void
+mul_vec_row ( const value_t                     alpha,
+              const Hpro::matop_t               op_M,
+              const Hpro::TMatrix< value_t > &  M,
+              const scalar_vector< value_t > &  sx,
+              scalar_vector< value_t > &        sy )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        ::tbb::parallel_for< size_t >( 0, B->nblock_rows( op_M ) ),
+              [&,alpha,op_M] ( const auto &  i )
+              {
+                  for ( size_t  j = 0; j < B->nblock_cols( op_M ); ++j )
+                  {
+                      auto  B_ij = B->block( i, j );
+                      
+                      if ( ! is_null( B_ij ) )
+                          mul_vec_row( alpha, op_M, *B_ij, sx, sy );
+                  }// for
+              }
+        );
+    }// if
+    else
+    {
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  yt  = blas::vector< value_t >( y_is.length() );
+        
+        M.apply_add( alpha, x_i, y_j, op_M );
+    }// else
+}
+
 ///////////////////////////////////////////////////////////////////////
 //
 // matrix-vector with reductions

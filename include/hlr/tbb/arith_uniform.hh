@@ -84,9 +84,23 @@ mul_vec2 ( const value_t                                   alpha,
     // construct uniform representation of x and y
     //
 
+    #if 0
+    
     auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
     auto  uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb );
 
+    #else
+
+    auto  ux = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+    auto  uy = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+
+    ::tbb::parallel_invoke(
+        [&] () { ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x ); },
+        [&] () { uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb ); }
+    );
+
+    #endif
+    
     detail::mul_vec2( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y );
 }

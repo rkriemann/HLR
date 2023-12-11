@@ -75,6 +75,21 @@ mul_vec ( const value_t                             alpha,
 
 template < typename value_t >
 void
+mul_vec_row ( const value_t                             alpha,
+              const matop_t                             op_M,
+              const Hpro::TMatrix< value_t > &          M,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y )
+{
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
+
+    detail::mul_vec_row( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+}
+
+template < typename value_t >
+void
 mul_vec_reduce ( const value_t                             alpha,
                  const matop_t                             op_M,
                  const Hpro::TMatrix< value_t > &          M,
