@@ -347,7 +347,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::uniform::mul_vec2< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
+                    impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -386,7 +386,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < 50; ++j )
-                    impl::uniform::mul_vec2< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
+                    impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );

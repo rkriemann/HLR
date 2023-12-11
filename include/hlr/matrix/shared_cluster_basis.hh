@@ -448,13 +448,6 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
         HLR_ASSERT( _sv.length() == _V.ncols() );
 
-        // auto  norm = real_t(0);
-
-        // for ( uint  i = 0; i < _sv.length(); ++i )
-        //     norm += _sv(0) * _sv(0);
-
-        // norm = std::sqrt( norm );
-                
         real_t  tol  = acc.abs_eps() * _sv(0);
         auto    S    = blas::copy( _sv );
 
@@ -464,15 +457,6 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
         auto  zmem = compress::aplr::compressed_size( zV );
 
-        // {
-        //     auto  T = blas::copy( _V );
-
-        //     compress::aplr::decompress_lr< value_t >( zV, T );
-
-        //     blas::add( value_t(-1), _V, T );
-        //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
-        // }
-        
         if (( zmem > 0 ) && ( zmem < mem_dense ))
         {
             _zV = std::move( zV );
