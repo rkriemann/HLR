@@ -38,44 +38,23 @@ mul_vec ( const value_t                             alpha,
     // construct uniform representation of x and y
     //
 
-    auto  mtx_map = detail::mutex_map_t();
-    
     auto  ux = detail::scalar_to_uniform( op_M == Hpro::apply_normal ? colcb : rowcb, x );
     auto  uy = detail::make_uniform< value_t, cluster_basis_t >( op_M == Hpro::apply_normal ? rowcb : colcb );
     auto  s  = blas::vector< value_t >();
 
-    detail::build_mutex_map( rowcb, mtx_map );
-    detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
-    detail::add_uniform_to_scalar( *uy, y, s );
-}
-
-template < typename value_t,
-           typename cluster_basis_t >
-void
-mul_vec2 ( const value_t                             alpha,
-           const matop_t                             op_M,
-           const Hpro::TMatrix< value_t > &          M,
-           const vector::scalar_vector< value_t > &  x,
-           vector::scalar_vector< value_t > &        y,
-           cluster_basis_t &                         rowcb,
-           cluster_basis_t &                         colcb )
-{
-    if ( alpha == value_t(0) )
-        return;
-
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    #if 0
     
-    //
-    // construct uniform representation of x and y
-    //
+    auto  mtx_map = detail::mutex_map_t();
+    
+    detail::build_mutex_map( rowcb, mtx_map );
+    detail::mul_vec_mtx( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
 
-    auto  ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x );
-    auto  uy = detail::make_uniform< value_t, cluster_basis_t >( op_M == hpro::apply_normal ? rowcb : colcb );
-    auto  s  = blas::vector< value_t >();
+    #else
 
-    detail::mul_vec2( alpha, op_M, M, *ux, *uy, x, y );
+    detail::mul_vec_row( alpha, op_M, M, *ux, *uy, x, y );
+    
+    #endif
+    
     detail::add_uniform_to_scalar( *uy, y, s );
 }
 

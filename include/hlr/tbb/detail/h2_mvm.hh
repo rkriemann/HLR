@@ -26,14 +26,14 @@ using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >
 template < typename value_t,
            typename cluster_basis_t >
 void
-mul_vec ( const value_t                              alpha,
-          const Hpro::matop_t                        op_M,
-          const Hpro::TMatrix< value_t > &           M,
-          const uniform_vector< cluster_basis_t > &  x,
-          uniform_vector< cluster_basis_t > &        y,
-          const scalar_vector< value_t > &           sx,
-          scalar_vector< value_t > &                 sy,
-          mutex_map_t &                              mtx_map )
+mul_vec_mtx ( const value_t                              alpha,
+              const Hpro::matop_t                        op_M,
+              const Hpro::TMatrix< value_t > &           M,
+              const uniform_vector< cluster_basis_t > &  x,
+              uniform_vector< cluster_basis_t > &        y,
+              const scalar_vector< value_t > &           sx,
+              scalar_vector< value_t > &                 sy,
+              mutex_map_t &                              mtx_map )
 {
     if ( is_blocked( M ) )
     {
@@ -59,7 +59,7 @@ mul_vec ( const value_t                              alpha,
                             auto  x_j = x.block( j );
                             auto  y_i = y.block( i );
                             
-                            mul_vec( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy, mtx_map );
+                            mul_vec_mtx( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy, mtx_map );
                         }// if
                     }// for
                 }// for
@@ -133,13 +133,13 @@ mul_vec ( const value_t                              alpha,
 template < typename value_t,
            typename cluster_basis_t >
 void
-mul_vec2 ( const value_t                              alpha,
-           const Hpro::matop_t                        op_M,
-           const Hpro::TMatrix< value_t > &           M,
-           const uniform_vector< cluster_basis_t > &  x,
-           uniform_vector< cluster_basis_t > &        y,
-           const scalar_vector< value_t > &           sx,
-           scalar_vector< value_t > &                 sy )
+mul_vec_row ( const value_t                              alpha,
+              const Hpro::matop_t                        op_M,
+              const Hpro::TMatrix< value_t > &           M,
+              const uniform_vector< cluster_basis_t > &  x,
+              uniform_vector< cluster_basis_t > &        y,
+              const scalar_vector< value_t > &           sx,
+              scalar_vector< value_t > &                 sy )
 {
     if ( is_blocked( M ) )
     {
@@ -166,7 +166,7 @@ mul_vec2 ( const value_t                              alpha,
                     {
                         auto  x_j = x.block( j );
                         
-                        mul_vec2( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
+                        mul_vec_row( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
                     }// if
                 }// for
             } );
@@ -224,6 +224,12 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
         // s ≔ V'·v = (∑_i V_i E_i)' v = ∑_i E_i' V_i' v
         //
 
+        #if 0
+
+        //
+        // summation of coefficients via mutex
+        //
+        
         auto  s     = blas::vector< value_t >( cb.rank() );
         auto  s_mtx = std::mutex();
         
@@ -242,6 +248,32 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
                 
                 u->set_block( i, u_i.release() );
             } );
+
+        #else
+
+        //
+        // lock free with sequential summation of coefficients
+        //
+        
+        auto  s  = blas::vector< value_t >( cb.rank() );
+        auto  Si = std::vector< blas::vector< value_t > >( cb.nsons() );
+        
+        ::tbb::parallel_for< uint >(
+            uint(0), cb.nsons(),
+            [&] ( const uint  i )
+            {
+                auto  u_i = scalar_to_uniform( *cb.son(i), v );
+                
+                if ( cb.rank() > 0 )
+                    Si[i] = std::move( blas::mulvec( blas::adjoint( cb.transfer_mat(i) ), u_i->coeffs() ) );
+                
+                u->set_block( i, u_i.release() );
+            } );
+
+        for ( auto  si : Si )
+            blas::add( 1, si, s );
+        
+        #endif
         
         u->set_coeffs( std::move( s ) );
     }// else

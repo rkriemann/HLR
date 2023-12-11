@@ -30,14 +30,14 @@ using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                                              alpha,
-          const Hpro::matop_t                                        op_M,
-          const Hpro::TMatrix< value_t > &                           M,
-          const uniform_vector< shared_cluster_basis< value_t > > &  x,
-          uniform_vector< shared_cluster_basis< value_t > > &        y,
-          const scalar_vector< value_t > &                           sx,
-          scalar_vector< value_t > &                                 sy,
-          mutex_map_t &                                              mtx_map )
+mul_vec_mtx ( const value_t                                              alpha,
+              const Hpro::matop_t                                        op_M,
+              const Hpro::TMatrix< value_t > &                           M,
+              const uniform_vector< shared_cluster_basis< value_t > > &  x,
+              uniform_vector< shared_cluster_basis< value_t > > &        y,
+              const scalar_vector< value_t > &                           sx,
+              scalar_vector< value_t > &                                 sy,
+              mutex_map_t &                                              mtx_map )
 {
     if ( is_blocked( M ) )
     {
@@ -62,7 +62,7 @@ mul_vec ( const value_t                                              alpha,
                             auto  x_j = x.block( j );
                             auto  y_i = y.block( i );
                             
-                            mul_vec( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy, mtx_map );
+                            mul_vec_mtx( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy, mtx_map );
                         }// if
                     }// for
                 }// for
@@ -105,13 +105,13 @@ mul_vec ( const value_t                                              alpha,
 
 template < typename value_t >
 void
-mul_vec2 ( const value_t                                              alpha,
-           const Hpro::matop_t                                        op_M,
-           const Hpro::TMatrix< value_t > &                           M,
-           const uniform_vector< shared_cluster_basis< value_t > > &  x,
-           uniform_vector< shared_cluster_basis< value_t > > &        y,
-           const scalar_vector< value_t > &                           sx,
-           scalar_vector< value_t > &                                 sy )
+mul_vec_row ( const value_t                                              alpha,
+              const Hpro::matop_t                                        op_M,
+              const Hpro::TMatrix< value_t > &                           M,
+              const uniform_vector< shared_cluster_basis< value_t > > &  x,
+              uniform_vector< shared_cluster_basis< value_t > > &        y,
+              const scalar_vector< value_t > &                           sx,
+              scalar_vector< value_t > &                                 sy )
 {
     if ( is_blocked( M ) )
     {
@@ -138,7 +138,7 @@ mul_vec2 ( const value_t                                              alpha,
                     {
                         auto  x_j = x.block( j );
                         
-                        mul_vec2( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
+                        mul_vec_row( alpha, op_M, *B_ij, *x_j, *y_i, sx, sy );
                     }// if
                 }// for
             } );
@@ -189,11 +189,13 @@ scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
         {
             if ( cb.nsons() > 0 )
             {
-                ::tbb::parallel_for( uint(0), cb.nsons(),
-                                     [&] ( const uint  i )
-                                     {
-                                         u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
-                                     } );
+                ::tbb::parallel_for(
+                    uint(0), cb.nsons(),
+                    [&] ( const uint  i )
+                    {
+                        u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
+                    }
+                );
             }// if
         } );
 
@@ -211,11 +213,13 @@ make_uniform ( const shared_cluster_basis< value_t > &  cb )
 
     if ( cb.nsons() > 0 )
     {
-        ::tbb::parallel_for( uint(0), cb.nsons(),
-                             [&] ( const uint  i )
-                             {
-                                 u->set_block( i, make_uniform( *cb.son(i) ).release() );
-                             } );
+        ::tbb::parallel_for(
+            uint(0), cb.nsons(),
+            [&] ( const uint  i )
+            {
+                u->set_block( i, make_uniform( *cb.son(i) ).release() );
+            }
+        );
     }// if
 
     return u;
@@ -239,11 +243,13 @@ add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > 
 
     if ( u.nblocks() > 0 )
     {
-        ::tbb::parallel_for( uint(0), u.nblocks(),
-                             [&] ( const uint  i )
-                             {
-                                 add_uniform_to_scalar( *u.block(i), v );
-                             } );
+        ::tbb::parallel_for(
+            uint(0), u.nblocks(),
+            [&] ( const uint  i )
+            {
+                add_uniform_to_scalar( *u.block(i), v );
+            }
+        );
     }// if
 }
 

@@ -396,7 +396,7 @@ program_main ()
             tic = timer::now();
     
             for ( int j = 0; j < 50; ++j )
-                impl::mul_vec_row< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
+                impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -479,7 +479,7 @@ program_main ()
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-            impl::uniform::mul_vec2( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
+            impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
@@ -495,7 +495,7 @@ program_main ()
             tic = timer::now();
             
             for ( int j = 0; j < 50; ++j )
-                impl::uniform::mul_vec2( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
+                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -527,7 +527,7 @@ program_main ()
         {
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
             
-            impl::h2::mul_vec2< value_t >( 2.0, apply_normal, *A_h2, *x_ref, *y, *rowcb_h2, *colcb_h2 );
+            impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x_ref, *y, *rowcb_h2, *colcb_h2 );
             
             y->axpy( -1.0, y_ref.get() );
             std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
@@ -544,7 +544,7 @@ program_main ()
     
             for ( int j = 0; j < 50; ++j )
                 // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
-                impl::h2::mul_vec2< value_t >( 2.0, apply_normal, *A_h2, *x, *y, *rowcb_h2, *colcb_h2 );
+                impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x, *y, *rowcb_h2, *colcb_h2 );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
