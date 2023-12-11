@@ -85,7 +85,7 @@ mul_vec_row ( const value_t                             alpha,
     HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
     HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
 
-    detail::mul_vec_row( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+    detail::mul_vec_row( alpha, op_M, M, x, y );
 }
 
 template < typename value_t >
