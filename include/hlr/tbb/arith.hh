@@ -43,11 +43,11 @@ namespace hlr { namespace tbb {
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                    alpha,
-          const Hpro::matop_t              op_M,
-          const Hpro::TMatrix< value_t > & M,
-          const blas::vector< value_t > &  x,
-          blas::vector< value_t > &        y )
+mul_vec ( const value_t                     alpha,
+          const Hpro::matop_t               op_M,
+          const Hpro::TMatrix< value_t > &  M,
+          const blas::vector< value_t > &   x,
+          blas::vector< value_t > &         y )
 {
     auto        mtx_map = detail::mutex_map_t();
     const auto  is      = M.row_is( op_M );
@@ -60,11 +60,11 @@ mul_vec ( const value_t                    alpha,
 
 template < typename value_t >
 void
-mul_vec ( const value_t                             alpha,
-          const matop_t                             op_M,
-          const Hpro::TMatrix< value_t > &          M,
-          const vector::scalar_vector< value_t > &  x,
-          vector::scalar_vector< value_t > &        y )
+mul_vec_chunk ( const value_t                             alpha,
+                const matop_t                             op_M,
+                const Hpro::TMatrix< value_t > &          M,
+                const vector::scalar_vector< value_t > &  x,
+                vector::scalar_vector< value_t > &        y )
 {
     HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
     HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
@@ -104,6 +104,19 @@ mul_vec_reduce ( const value_t                             alpha,
     HLR_ASSERT( op_M == apply_normal );
     
     detail::mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+}
+
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const matop_t                             op_M,
+          const Hpro::TMatrix< value_t > &          M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    // mul_vec_chunk( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+    mul_vec_row( alpha, op_M, M, x, y );
+    // mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
 //

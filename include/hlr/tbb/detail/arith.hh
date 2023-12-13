@@ -98,16 +98,96 @@ mul_vec_chunk ( const value_t                    alpha,
                 }// for
             } );
     }// if
+    // else if ( matrix::is_lowrank( M ) && cptrcast( & M, matrix::lrmatrix< value_t > )->is_compressed() )
+    // {
+    //     auto  R    = cptrcast( & M, matrix::lrmatrix< value_t > );
+    //     auto  U    = blas::matrix< value_t >();
+    //     auto  V    = blas::matrix< value_t >();
+    //     auto  t    = blas::vector< value_t >();
+    //     auto  row_is = M.row_is( op_M );
+    //     auto  x_is = x( M.col_is( op_M ) - ofs_cols );
+    //     auto  y_is = y( row_is - ofs_rows );
+    //     auto  yt   = blas::vector< value_t >( y_is.length() );
+        
+    //     switch ( op_M )
+    //     {
+    //         case Hpro::apply_normal :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     V = std::move( R->V() );
+    //                     t = std::move( blas::mulvec( blas::adjoint( V ), x_is ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                 },
+                    
+    //                 [&] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                 }
+    //             );
+            
+    //             blas::mulvec( U, t, yt );
+    //         }
+    //         break;
+
+    //         case Hpro::apply_transposed :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                     t = std::move( blas::mulvec( blas::transposed( U ), x_is ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                     blas::conj( t );
+    //                 },
+
+    //                 [&] ()
+    //                 {
+    //                     V = std::move( R->V() );
+    //                 }
+    //             );
+                
+    //             blas::mulvec( V, t, yt );
+    //             blas::conj( yt );
+    //         }
+    //         break;
+            
+    //         case Hpro::apply_adjoint :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                     t = std::move( blas::mulvec( blas::adjoint( U ), x_is ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                 },
+
+    //                 [&] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                 }
+    //             );
+            
+    //             blas::mulvec( V, t, yt );
+    //         }
+    //         break;
+
+    //         default:
+    //             HLR_ERROR( "unsupported matrix op" )
+    //     }// switch
+        
+    //     update( row_is, yt, y_is, mtx_map );
+    // }// if
     else
     {
         const auto  row_is = M.row_is( op_M );
-        const auto  col_is = M.col_is( op_M );
-        auto        x_is   = x( col_is - ofs_cols );
+        auto        x_is   = x( M.col_is( op_M ) - ofs_cols );
         auto        y_is   = y( row_is - ofs_rows );
         auto        yt     = blas::vector< value_t >( y_is.length() );
         
         M.apply_add( alpha, x_is, yt, op_M );
-        update( M.row_is( op_M ), yt, y_is, mtx_map );
+        update( row_is, yt, y_is, mtx_map );
     }// else
 }
 
@@ -145,12 +225,94 @@ mul_vec_row ( const value_t                     alpha,
             }
         );
     }// if
+    else if ( matrix::is_lowrank( M ) && cptrcast( & M, matrix::lrmatrix< value_t > )->is_compressed() )
+    {
+        auto  R   = cptrcast( & M, matrix::lrmatrix< value_t > );
+        auto  U   = blas::matrix< value_t >();
+        auto  V   = blas::matrix< value_t >();
+        auto  t   = blas::vector< value_t >();
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
+        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  yt  = blas::vector< value_t >( y_j.length() );
+        
+        switch ( op_M )
+        {
+            case Hpro::apply_normal :
+            {
+                ::tbb::parallel_invoke(
+                    [&,alpha] ()
+                    {
+                        V = std::move( R->V() );
+                        t = std::move( blas::mulvec( blas::adjoint( V ), x_i ) );
+                        blas::scale( value_t(alpha), t );
+                    },
+                    
+                    [&] ()
+                    {
+                        U = std::move( R->U() );
+                    }
+                );
+            
+                blas::mulvec( U, t, yt );
+            }
+            break;
+
+            case Hpro::apply_transposed :
+            {
+                ::tbb::parallel_invoke(
+                    [&,alpha] ()
+                    {
+                        U = std::move( R->U() );
+                        t = std::move( blas::mulvec( blas::transposed( U ), x_i ) );
+                        blas::scale( value_t(alpha), t );
+                        blas::conj( t );
+                    },
+
+                    [&] ()
+                    {
+                        V = std::move( R->V() );
+                    }
+                );
+                
+                blas::mulvec( V, t, yt );
+                blas::conj( yt );
+            }
+            break;
+            
+            case Hpro::apply_adjoint :
+            {
+                ::tbb::parallel_invoke(
+                    [&,alpha] ()
+                    {
+                        U = std::move( R->U() );
+                        t = std::move( blas::mulvec( blas::adjoint( U ), x_i ) );
+                        blas::scale( value_t(alpha), t );
+                    },
+
+                    [&] ()
+                    {
+                        U = std::move( R->U() );
+                    }
+                );
+            
+                blas::mulvec( V, t, yt );
+            }
+            break;
+
+            default:
+                HLR_ERROR( "unsupported matrix op" )
+        }// switch
+
+        blas::add( 1, yt, y_j );
+    }// if
     else
     {
         auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  yt  = blas::vector< value_t >( y_j.length() );
         
-        M.apply_add( alpha, x_i, y_j, op_M );
+        M.apply_add( alpha, x_i, yt, op_M );
+        blas::add( 1, yt, y_j );
     }// else
 }
 
