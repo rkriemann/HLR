@@ -129,8 +129,8 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
                     const auto  U_k = (*U_i).second.column( k );
                     const auto  V_k = (*V_i).second.column( k );
                     
-                    dot_U += blas::dot( U_l, U_k );
-                    dot_V += blas::dot( V_l, V_k );
+                    dot_U += std::abs( blas::dot( U_l, U_k ) );
+                    dot_V += std::abs( blas::dot( V_l, V_k ) );
                 }// for
 
                 val += dot_U * dot_V;
@@ -150,7 +150,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
-            val += math::square( C.data()[ i ] );
+            val += std::abs( math::square( C.data()[ i ] ) );
 
         return val;
     }// if
@@ -165,7 +165,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
-            val += math::square( C.data()[ i ] );
+            val += std::abs( math::square( C.data()[ i ] ) );
 
         return val;
     }// if
@@ -175,7 +175,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < M.nrows()*M.ncols(); ++i )
-            val += math::square( M.data()[ i ] );
+            val += std::abs( math::square( M.data()[ i ] ) );
 
         return val;
     }// if
@@ -415,7 +415,7 @@ frobenius_squared ( const alpha_t                     alpha,
         {
             for ( idx_t i = 0; i < n; ++i )
             {
-                const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                const auto  a_ij = value_t(alpha) * MA(i,j) + value_t(beta) * MB(i,j);
                 
                 val += std::abs( math::square( a_ij ) );
             }// for

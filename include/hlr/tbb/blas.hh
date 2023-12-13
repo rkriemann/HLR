@@ -66,7 +66,7 @@ dot ( const tensorA_t &  A,
 // Frobenius norm
 //
 template < tensor_type  tensor_t >
-real_type_t< typename tensor_t::value_t >
+hlr::real_type_t< typename tensor_t::value_t >
 norm_F ( const tensor_t &  t )
 {
     return std::sqrt( std::abs( dot( t, t ) ) );

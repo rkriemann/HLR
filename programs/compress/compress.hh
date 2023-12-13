@@ -123,7 +123,7 @@ program_main ()
     const auto  norm_A = impl::norm::frobenius( *A );
     
     std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
-    
+
     //////////////////////////////////////////////////////////////////////
     //
     // coarsen matrix
@@ -247,7 +247,7 @@ program_main ()
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
 
     {
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
+        auto  error = impl::norm::frobenius( 1, *A, -1, *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
@@ -285,7 +285,7 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zB );
+        auto  error = impl::norm::frobenius( 1, *A, -1, *zB );
         
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }

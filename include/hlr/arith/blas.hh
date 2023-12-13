@@ -747,7 +747,7 @@ sqnorm_F ( const matrix< value_t > &  U,
             auto  u_l = U.column( l );
             auto  v_l = V.column( l );
 
-            res += dot( u_k, u_l ) * dot( v_k, v_l );
+            res += std::abs( dot( u_k, u_l ) * dot( v_k, v_l ) );
         }// for
     }// for
 
@@ -2086,12 +2086,13 @@ using Hpro::BLAS::eigen;
 //
 template < matrix_type matrix_t >
 std::pair< matrix< typename matrix_t::value_t >,
-           vector< typename matrix_t::value_t > >
+           vector< real_type_t< typename matrix_t::value_t > > >
 eigen_herm ( matrix_t &  M )
 {
     using value_t = typename matrix_t::value_t;
+    using real_t  = real_type_t< typename matrix_t::value_t >;
     
-    auto  E = vector< value_t >();
+    auto  E = vector< real_t >();
     auto  V = matrix< value_t >();
 
     Hpro::BLAS::eigen_herm( M, E, V );
