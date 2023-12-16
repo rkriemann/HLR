@@ -313,6 +313,11 @@ frobenius_squared ( const alpha_t                     alpha,
         //
         // version 1: compute singular values and sum up
         //
+
+        HLR_ASSERT(( UA.nrows() > 0 ) && ( UA.ncols() > 0 ) &&
+                   ( VA.nrows() > 0 ) && ( VA.ncols() > 0 ) &&
+                   ( UB.nrows() > 0 ) && ( UB.ncols() > 0 ) &&
+                   ( VB.nrows() > 0 ) && ( VB.ncols() > 0 ) );
         
         auto  k1 = UA.ncols();
         auto  k2 = UB.ncols();
