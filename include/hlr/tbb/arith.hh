@@ -114,8 +114,8 @@ mul_vec ( const value_t                             alpha,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y )
 {
-    // mul_vec_chunk( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
-    mul_vec_row( alpha, op_M, M, x, y );
+    mul_vec_chunk( alpha, op_M, M, x, y );
+    // mul_vec_row( alpha, op_M, M, x, y );
     // mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
