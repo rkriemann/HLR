@@ -40,6 +40,13 @@ struct byte3_t
         data[2] = (n & 0xff0000) >> 16;
     }
 
+    void operator = ( const uint64_t  n )
+    {
+        data[0] = (n & 0x0000ff);
+        data[1] = (n & 0x00ff00) >> 8;
+        data[2] = (n & 0xff0000) >> 16;
+    }
+
     operator uint32_t () const { return ( data[2] << 16 ) | ( data[1] << 8 ) | data[0]; }
 };
 

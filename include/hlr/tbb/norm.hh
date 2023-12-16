@@ -43,6 +43,8 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
                         {
                             const auto  val_ij = frobenius_squared( * B->block( i, j ) );
 
+                            HLR_ASSERT( std::isfinite( val_ij ) );
+                            
                             {
                                 auto  lock = std::scoped_lock( mtx );
                                 
@@ -110,6 +112,8 @@ frobenius_squared ( const alpha_t                     alpha,
                                                             beta,  * BB->block( i, j ) );
                         }// else
 
+                        HLR_ASSERT( std::isfinite( val_ij ) );
+                        
                         {
                             auto  lock = std::scoped_lock( mtx );
 
