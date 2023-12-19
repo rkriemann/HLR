@@ -29,6 +29,24 @@ namespace hlr { namespace compress { namespace aflp {
 
 using byte_t = uint8_t;
 
+//
+// shared float/int types
+//
+union fp32int_t
+{
+    uint32_t u;
+    float    f;
+};
+
+union fp64int_t
+{
+    uint64_t  u;
+    double    f;
+};
+
+//
+// floating point data
+//
 template < typename real_t >
 struct fp_info
 {};
@@ -47,16 +65,16 @@ struct fp_info< double >
     constexpr static double    infinity    = std::numeric_limits< double >::infinity();
 };
     
-constexpr byte_t    fp32_mant_bits   = 23;
-constexpr byte_t    fp32_exp_bits    = 8;
-constexpr byte_t    fp32_sign_bit    = 31;
-constexpr uint64_t  fp32_exp_highbit = 0b10000000;
+constexpr uint8_t   fp32_mant_bits   = 23;
+constexpr uint8_t   fp32_exp_bits    = 8;
+constexpr uint8_t   fp32_sign_bit    = 31;
+constexpr uint32_t  fp32_exp_highbit = 0b10000000;
 constexpr uint32_t  fp32_zero_val    = 0xffffffff;
 constexpr float     fp32_infinity    = std::numeric_limits< float >::infinity();
 
-constexpr uint32_t  fp64_mant_bits   = 52;
-constexpr uint32_t  fp64_exp_bits    = 11;
-constexpr uint32_t  fp64_sign_bit    = 63;
+constexpr uint8_t   fp64_mant_bits   = 52;
+constexpr uint8_t   fp64_exp_bits    = 11;
+constexpr uint8_t   fp64_sign_bit    = 63;
 constexpr uint64_t  fp64_exp_highbit = 0b10000000000;
 constexpr uint64_t  fp64_zero_val    = 0xffffffffffffffff;
 constexpr double    fp64_infinity    = std::numeric_limits< double >::infinity();
@@ -278,13 +296,17 @@ decompress ( float *         data,
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             const auto      zval  = ibuf[j];
-            const uint32_t  mant  = zval & prec_mask;
-            const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
-            const bool      sign  = zval >> sign_shift;
-            const uint32_t  irval = (uint32_t(exp | fp32_exp_highbit) << fp32_mant_bits) | (uint32_t(mant) << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = value_t( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1.f ) / scale );
+            
+            const uint32_t  mant  = zval & prec_mask;
+            const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
+            const uint32_t  sign  = ( zval >> sign_shift ) << fp32_sign_bit;
+            fp32int_t       fival = { ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs) };
+
+            fival.f  = ( fival.f - 1.f ) / scale;
+            fival.u |= sign;
+            fbuf[j]  = fival.f;
         }// for
 
         // correct zeroes
@@ -319,10 +341,12 @@ decompress ( float *         data,
         {
             const uint32_t  mant  = zval & prec_mask;
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
-            const bool      sign  = zval >> sign_shift;
-            const uint32_t  irval = ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs);
-                
-            data[i] = value_t( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+            const uint32_t  sign  = ( zval >> sign_shift ) << fp32_sign_bit;
+            fp32int_t       fival = { ((exp | fp32_exp_highbit) << fp32_mant_bits) | (mant << prec_ofs) };
+
+            fival.f  = ( fival.f - 1.f ) / scale;
+            fival.u |= sign;
+            data[i]  = fival.f;
         }// else
 
         pos += nbyte;
@@ -444,7 +468,7 @@ compress ( const double *  data,
         if ( std::abs( val ) != double(0) )
         {
             const bool      zsign = ( val < 0 );
-            const double    sval  = scale * std::abs(val) + 1;
+            const double    sval  = scale * std::abs(val) + 1.0;
             const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & sval ) );
             const uint64_t  sexp  = ( isval >> fp64_mant_bits ) & fp64_exp_mask;
             const uint64_t  smant = ( isval & fp64_mant_mask );
@@ -534,13 +558,17 @@ decompress ( double *        data,
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             const auto      zval  = ibuf[j];
-            const uint64_t  mant  = zval & prec_mask;
-            const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-            const bool      sign  = (zval >> sign_shift);
-            const uint64_t  irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = ( sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+            
+            const uint64_t  mant  = zval & prec_mask;
+            const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
+            const uint64_t  sign  = (zval >> sign_shift) << fp64_sign_bit;
+            fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+
+            fival.f  = ( fival.f - 1.0 ) / scale;
+            fival.u |= sign;
+            fbuf[j]  = fival.f;
         }// for
 
         // correct zeroes
@@ -579,11 +607,12 @@ decompress ( double *        data,
         {
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-            const bool      sign  = zval >> sign_shift;
-            const uint64_t  irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
-            const double    rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
-
-            data[i] = rval;
+            const uint64_t  sign  = (zval >> sign_shift) << fp64_sign_bit;
+            fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+            
+            fival.f  = ( fival.f - 1.0 ) / scale;
+            fival.u |= sign;
+            data[i]  = fival.f;
         }// else
 
         pos += nbyte;
