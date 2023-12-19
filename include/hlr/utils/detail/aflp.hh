@@ -102,21 +102,21 @@ inline config  get_config ( const double    eps ) { return config{ eps_to_rate( 
 //
 inline
 void
-compress ( const float *   data,
-           const size_t    nsize,
-           byte_t *        zdata,
-           const float     scale,
-           const uint32_t  exp_bits,
-           const uint32_t  prec_bits )
+compress ( const float *  data,
+           const size_t   nsize,
+           byte_t *       zdata,
+           const float    scale,
+           const uint8_t  exp_bits,
+           const uint8_t  prec_bits )
 {
     using value_t = float;
     
     constexpr uint32_t  fp32_exp_mask  = ((1u << fp32_exp_bits)  - 1);
     constexpr uint32_t  fp32_mant_mask = ((1u << fp32_mant_bits) - 1);
-    const uint32_t      nbits          = 1 + exp_bits + prec_bits;
-    const uint32_t      nbyte          = nbits / 8;
+    const uint8_t       nbits          = 1 + exp_bits + prec_bits;
+    const uint8_t       nbyte          = nbits / 8;
     const uint32_t      exp_mask       = ( 1 << exp_bits ) - 1;                  // bit mask for exponent
-    const uint32_t      prec_ofs       = fp32_mant_bits - prec_bits;
+    const uint8_t       prec_ofs       = fp32_mant_bits - prec_bits;
     const uint32_t      zero_val       = fp32_zero_val & (( 1 << nbits) - 1 );
         
     //
@@ -133,8 +133,8 @@ compress ( const float *   data,
         
     constexpr size_t  nbuf   = 64;
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    bool              zero[ nbuf ];                   // mark zero entries
-    bool              sign[ nbuf ];                   // holds sign per entry
+    uint8_t           zero[ nbuf ];                   // mark zero entries
+    uint8_t           sign[ nbuf ];                   // holds sign per entry
     float             fbuf[ nbuf ];                   // holds rescaled value
     uint32_t          ibuf[ nbuf ];                   // holds value in compressed format
     size_t            pos = 6;
@@ -151,12 +151,12 @@ compress ( const float *   data,
         // scale/shift data to [2,...]
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const float  val  = data[i+j];
-            const auto   aval = std::abs( val );
+            const auto  val  = data[i+j];
+            const auto  aval = std::abs( val );
 
             zero[j] = ( aval == float(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = std::max( scale * aval + 1, 2.f ); // prevent rounding issues when converting from fp64
+            fbuf[j] = scale * aval + 1.f;
 
             HLR_DBG_ASSERT( fbuf[j] >= float(2) );
         }// for
@@ -181,10 +181,10 @@ compress ( const float *   data,
         // write to destination buffer
         switch ( nbyte )
         {
-            case  4 : { auto ptr = reinterpret_cast< uint32_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< byte3_t *  >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< uint16_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = uint16_t( ibuf[j] & 0xffff ); } break;
-            case  1 : { auto ptr = & zdata[pos];                                   for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = byte_t( ibuf[j] & 0xff   ); } break;
+            case  4 : { auto ptr = reinterpret_cast< byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  3 : { auto ptr = reinterpret_cast< byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
+            case  2 : { auto ptr = reinterpret_cast< byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = uint16_t( ibuf[j] & 0xffff ); } break;
+            case  1 : { auto ptr = & zdata[pos];                                  for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = byte_t( ibuf[j] & 0xff   ); } break;
             default : HLR_ERROR( "unsupported storage size" );
         }// switch
 
@@ -200,7 +200,10 @@ compress ( const float *   data,
         if ( std::abs( val ) != float(0) )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = std::max( scale * std::abs(val) + 1, 2.f );
+            const float     sval  = scale * std::abs(val) + 1.f;
+            
+            HLR_DBG_ASSERT( sval >= float(2) );
+            
             const uint32_t  isval = (*reinterpret_cast< const uint32_t * >( & sval ) );
             const uint32_t  sexp  = ( isval >> fp32_mant_bits ) & fp32_exp_mask;
             const uint32_t  smant = ( isval & fp32_mant_mask );
@@ -227,20 +230,20 @@ compress ( const float *   data,
 
 inline
 void
-decompress ( float *          data,
-             const size_t     nsize,
-             const byte_t *   zdata,
-             const uint32_t   exp_bits,
-             const uint32_t   prec_bits )
+decompress ( float *         data,
+             const size_t    nsize,
+             const byte_t *  zdata,
+             const uint8_t   exp_bits,
+             const uint8_t   prec_bits )
 {
     using  value_t = float;
     
-    const uint32_t  nbits      = 1 + exp_bits + prec_bits;
-    const uint32_t  nbyte      = nbits / 8;
+    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
+    const uint8_t   nbyte      = nbits / 8;
     const uint32_t  prec_mask  = ( 1 << prec_bits ) - 1;
-    const uint32_t  prec_ofs   = fp32_mant_bits - prec_bits;
+    const uint8_t   prec_ofs   = fp32_mant_bits - prec_bits;
     const uint32_t  exp_mask   = ( 1 << exp_bits ) - 1;
-    const uint32_t  sign_shift = exp_bits + prec_bits;
+    const uint8_t   sign_shift = exp_bits + prec_bits;
     const uint32_t  zero_val   = fp32_zero_val & (( 1 << nbits) - 1 );
     float           scale;
 
@@ -253,7 +256,7 @@ decompress ( float *          data,
         
     constexpr size_t  nbuf   = 64;
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    bool              zero[ nbuf ]; // mark zero entries
+    uint8_t           zero[ nbuf ]; // mark zero entries
     uint32_t          ibuf[ nbuf ]; // holds value in compressed format
     float             fbuf[ nbuf ]; // holds uncompressed values
     size_t            pos = 4;
@@ -264,10 +267,10 @@ decompress ( float *          data,
         // read data
         switch ( nbyte )
         {
-            case  4 : { auto ptr = reinterpret_cast< const uint32_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< const byte3_t *  >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< const uint16_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  1 : { auto ptr = & zdata[pos];                                         for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
+            case  1 : { auto ptr = & zdata[pos];                                        for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
             default : HLR_ERROR( "unsupported storage size" );
         }// switch
 
@@ -281,7 +284,7 @@ decompress ( float *          data,
             const uint32_t  irval = (uint32_t(exp | fp32_exp_highbit) << fp32_mant_bits) | (uint32_t(mant) << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = value_t( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+            fbuf[j] = value_t( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1.f ) / scale );
         }// for
 
         // correct zeroes
@@ -335,15 +338,15 @@ compress ( const double *  data,
            const size_t    nsize,
            byte_t *        zdata,
            const double    scale,
-           const uint32_t  exp_bits,
-           const uint32_t  prec_bits )
+           const uint8_t   exp_bits,
+           const uint8_t   prec_bits )
 {
     constexpr uint64_t  fp64_exp_mask  = ((1ul << fp64_exp_bits)  - 1);
     constexpr uint64_t  fp64_mant_mask = ((1ul << fp64_mant_bits) - 1);
-    const uint32_t      nbits          = 1 + exp_bits + prec_bits;
-    const uint32_t      nbyte          = nbits / 8;
+    const uint8_t       nbits          = 1 + exp_bits + prec_bits;
+    const uint8_t       nbyte          = nbits / 8;
     const uint64_t      exp_mask       = ( 1u << exp_bits ) - 1;                 // bit mask for exponent
-    const uint32_t      prec_ofs       = fp64_mant_bits - prec_bits;
+    const uint8_t       prec_ofs       = fp64_mant_bits - prec_bits;
     const uint64_t      zero_val       = fp64_zero_val & (( 1ul << nbits) - 1 );
         
     //
@@ -370,8 +373,8 @@ compress ( const double *  data,
         
     constexpr size_t  nbuf   = 64;
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    bool              zero[ nbuf ]; // mark zero entries
-    bool              sign[ nbuf ]; // holds sign per entry
+    uint8_t           zero[ nbuf ]; // mark zero entries
+    uint8_t           sign[ nbuf ]; // holds sign per entry
     double            fbuf[ nbuf ]; // holds rescaled value
     uint64_t          ibuf[ nbuf ]; // holds value in compressed format
     size_t            pos = 10;
@@ -393,7 +396,7 @@ compress ( const double *  data,
 
             zero[j] = ( aval == double(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = scale * aval + 1;
+            fbuf[j] = scale * aval + 1.0;
 
             HLR_DBG_ASSERT( fbuf[j] >= double(2) );
         }// for
@@ -436,7 +439,7 @@ compress ( const double *  data,
     for ( ; i < nsize; ++i )
     {
         const double  val  = data[i];
-        uint64_t         zval = zero_val;
+        uint64_t      zval = zero_val;
             
         if ( std::abs( val ) != double(0) )
         {
@@ -475,13 +478,13 @@ void
 decompress ( double *        data,
              const size_t    nsize,
              const byte_t *  zdata,
-             const uint32_t  exp_bits,
-             const uint32_t  prec_bits )
+             const uint8_t   exp_bits,
+             const uint8_t   prec_bits )
 {
-    const uint32_t  nbits      = 1 + exp_bits + prec_bits;
-    const uint32_t  nbyte      = nbits / 8;
+    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
+    const uint8_t   nbyte      = nbits / 8;
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
-    const uint32_t  prec_ofs   = fp64_mant_bits - prec_bits;
+    const uint8_t   prec_ofs   = fp64_mant_bits - prec_bits;
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t  sign_shift = exp_bits + prec_bits;
     const uint64_t  zero_val   = fp64_zero_val & (( 1ul << nbits) - 1 );
@@ -505,7 +508,7 @@ decompress ( double *        data,
         
     constexpr size_t  nbuf   = 64;
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    bool              zero[ nbuf ]; // mark zero entries
+    uint8_t           zero[ nbuf ]; // mark zero entries
     uint64_t          ibuf[ nbuf ]; // holds value in compressed format
     double            fbuf[ nbuf ]; // holds uncompressed values
     size_t            pos = 8;
@@ -533,11 +536,11 @@ decompress ( double *        data,
             const auto      zval  = ibuf[j];
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-            const bool      sign  = zval >> sign_shift;
+            const bool      sign  = (zval >> sign_shift);
             const uint64_t  irval = ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+            fbuf[j] = ( sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
         }// for
 
         // correct zeroes
@@ -638,12 +641,12 @@ compress ( const config &   config,
         return zdata;
     }// if
     
-    const auto      scale      = real_t(1) / vmin;                                                            // scale all values v_i such that |v_i| >= 1
-    const uint32_t  exp_bits   = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
-    const uint32_t  nbits      = byte_pad( 1 + exp_bits + config.bitrate );                                   // total no. of bits per value
-    const uint32_t  nbyte      = nbits / 8;
-    const uint32_t  prec_bits  = nbits - 1 - exp_bits;                                                        // actual number of precision bits
-    auto            zdata      = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + nsize * nbyte );             // array storing compressed data
+    const auto     scale     = real_t(1) / vmin;                                                            // scale all values v_i such that |v_i| >= 1
+    const uint8_t  exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
+    const uint8_t  nbits     = byte_pad( 1 + exp_bits + config.bitrate );                                   // total no. of bits per value
+    const uint8_t  nbyte     = nbits / 8;
+    const uint8_t  prec_bits = nbits - 1 - exp_bits;                                                        // actual number of precision bits
+    auto           zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + nsize * nbyte );             // array storing compressed data
 
     HLR_ASSERT( std::isfinite( scale ) );
     HLR_ASSERT( nbits     <= sizeof(real_t) * 8 );
@@ -710,11 +713,10 @@ decompress ( const zarray &  zdata,
     // and then the compressed data
     //
     
-    const uint32_t  exp_bits  = zdata[0];
-    const uint32_t  prec_bits = zdata[1];
-    const uint32_t  nbits     = 1 + exp_bits + prec_bits;
+    const uint8_t  exp_bits  = zdata[0];
+    const uint8_t  prec_bits = zdata[1];
     
-    HLR_ASSERT( nbits     <= sizeof(value_t) * 8 );
+    HLR_ASSERT( 1 + exp_bits + prec_bits <= sizeof(value_t) * 8 );
     HLR_ASSERT( prec_bits <= fp_info< real_t >::n_mant_bits );
 
     if (( exp_bits == 0 ) && ( prec_bits == 0 ))
@@ -778,12 +780,12 @@ compress_lr ( const blas::matrix< value_t > &                       U,
     // first, determine exponent bits and mantissa bits for all columns
     //
 
-    const size_t  n = U.nrows();
-    const size_t  k = U.ncols();
-    auto          m = std::vector< uint32_t >( k );
-    auto          e = std::vector< uint32_t >( k );
-    auto          s = std::vector< real_t >( k );
-    size_t        zsize = 0;
+    const size_t    n = U.nrows();
+    const uint32_t  k = U.ncols();
+    auto            m = std::vector< uint8_t >( k );
+    auto            e = std::vector< uint8_t >( k );
+    auto            s = std::vector< real_t >( k );
+    size_t          zsize = 0;
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -800,7 +802,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         }// for
 
         s[l] = real_t(1) / vmin;
-        e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
+        e[l] = uint8_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
@@ -830,16 +832,16 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  exp_bits  = e[l];
-        const uint32_t  prec_bits = m[l];
-        const real_t    scale     = s[l];
-        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
-        const size_t    nbyte     = nbits / 8;
+        const uint8_t  exp_bits  = e[l];
+        const uint8_t  prec_bits = m[l];
+        const real_t   scale     = s[l];
+        const uint8_t  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const uint8_t  nbyte     = nbits / 8;
 
         compress( U.data() + l*n, n, zdata.data() + pos, scale, exp_bits, prec_bits );
         pos += header_size + n*nbyte;
     }// for
-
+    
     return zdata;
 }
 
@@ -939,10 +941,10 @@ decompress_lr ( const zarray &             zdata,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    const size_t      n           = U.nrows();
-    const uint32_t    k           = U.ncols();
-    size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
+    const size_t       n           = U.nrows();
+    const uint32_t     k           = U.ncols();
+    size_t             pos         = 0;
+    constexpr uint8_t  header_size = sizeof(real_t) + 2;
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -951,10 +953,10 @@ decompress_lr ( const zarray &             zdata,
         // and decompress data
         //
     
-        const uint32_t  exp_bits  = zdata[ pos ];
-        const uint32_t  prec_bits = zdata[ pos+1 ];
-        const uint32_t  nbits     = 1 + exp_bits + prec_bits;
-        const uint32_t  nbyte     = nbits / 8;
+        const uint8_t  exp_bits  = zdata[ pos ];
+        const uint8_t  prec_bits = zdata[ pos+1 ];
+        const uint8_t  nbits     = 1 + exp_bits + prec_bits;
+        const uint8_t  nbyte     = nbits / 8;
 
         decompress( U.data() + l * n, n, zdata.data() + pos + 2, exp_bits, prec_bits );
         pos += header_size + nbyte * n;
