@@ -660,10 +660,48 @@ lrmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
     
-    auto  dU = U();
-    auto  dV = V();
-    
-    blas::mulvec_lr( alpha, dU, dV, op, x, y );
+    if ( is_compressed() )
+    {
+        const auto  nrows = this->nrows();
+        const auto  ncols = this->ncols();
+        auto        t     = blas::vector< value_t >( _rank );
+        
+        if ( op == Hpro::apply_normal )
+        {
+            // t := V^H x
+            compress::aflp::mulvec( ncols, _rank, apply_adjoint, value_t(1), _zdata.V, x.data(), t.data() );
+
+            // t := α·t
+            for ( uint  i = 0; i < _rank; ++i )
+                t(i) *= value_t(alpha);
+        
+            // y := y + U t
+            compress::aflp::mulvec( nrows, _rank, apply_normal, value_t(1), _zdata.U, t.data(), y.data() );
+        }// if
+        else if ( op == Hpro::apply_transposed )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+        else if ( op == Hpro::apply_adjoint )
+        {
+            // t := U^H x
+            compress::aflp::mulvec( nrows, _rank, apply_adjoint, value_t(1), _zdata.U, x.data(), t.data() );
+
+            // t := α·t
+            for ( uint  i = 0; i < _rank; ++i )
+                t(i) *= value_t(alpha);
+        
+            // y := t + V t
+            compress::aflp::mulvec( ncols, _rank, apply_normal, value_t(1), _zdata.V, t.data(), y.data() );
+        }// if
+    }// if
+    else
+    {
+        auto  dU = U();
+        auto  dV = V();
+
+        blas::mulvec_lr( alpha, dU, dV, op, x, y );
+    }// else
 }
 
 template < typename value_t >

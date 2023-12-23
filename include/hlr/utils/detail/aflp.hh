@@ -1033,6 +1033,130 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     }// for
 }
 
+//
+// compressed blas
+//
+
+namespace
+{
+template < typename value_t,
+           typename storage_t >
+void
+mulvec ( const size_t                        nrows,
+         const size_t                        ncols,
+         const matop_t                       op_A,
+         const value_t                       alpha,
+         const Hpro::real_type_t< value_t >  zscale,
+         const storage_t *                   zA,
+         const value_t *                     x,
+         value_t *                           y,
+         const uint8_t   exp_bits,
+         const uint8_t   prec_bits )
+{
+    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
+    const uint8_t   nbyte      = nbits / 8;
+    const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
+    const uint8_t   prec_ofs   = fp64_mant_bits - prec_bits;
+    const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
+    const uint32_t  sign_shift = exp_bits + prec_bits;
+    const uint64_t  zero_val   = fp64_zero_val & (( 1ul << nbits) - 1 );
+    const auto      scale      = alpha / zscale;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = scale * x[j];
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  z_ij  = zA[pos];
+                    const uint64_t  mant  = z_ij & prec_mask;
+                    const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
+                    const uint64_t  sign  = (z_ij >> sign_shift) << fp64_sign_bit;
+                    fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+
+                    fival.f  = ( fival.f - 1.0 );
+                    fival.u |= sign;
+
+                    y[i] += fival.f * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  z_ij  = zA[pos];
+                    const uint64_t  mant  = z_ij & prec_mask;
+                    const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
+                    const uint64_t  sign  = (z_ij >> sign_shift) << fp64_sign_bit;
+                    fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+
+                    fival.f  = ( fival.f - 1.0 );
+                    fival.u |= sign;
+
+                    y_j += fival.f * x[i];
+                }// for
+
+                y[j] += scale * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t  exp_bits  = zA[0];
+    const uint8_t  prec_bits = zA[1];
+    const uint8_t  nbits     = 1 + exp_bits + prec_bits;
+    const uint8_t  nbyte     = nbits / 8;
+    real_t         scale     = * ( reinterpret_cast< const real_t * >( zA.data() + 2 ) );
+    const size_t   data_ofs  = 2 + sizeof( real_t );
+    
+    switch ( nbyte )
+    {
+        case  1 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  2 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  3 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  4 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  5 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  6 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  7 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        case  8 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + data_ofs ), x, y, exp_bits, prec_bits ); break;
+        default :
+            HLR_ERROR( "unsupported byte size" );
+    }// switch
+}
+
 }}}// namespace hlr::compress::aflp
 
 #endif // __HLR_UTILS_DETAIL_AFLP_HH

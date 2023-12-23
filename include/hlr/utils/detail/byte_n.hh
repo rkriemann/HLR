@@ -27,6 +27,7 @@ inline size_t byte_pad ( size_t  n )
 //
 ////////////////////////////////////////////////////////////
 
+using byte1_t = uint8_t;
 using byte2_t = uint16_t;
 
 struct byte3_t
