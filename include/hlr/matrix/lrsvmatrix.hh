@@ -652,11 +652,50 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    const auto  uU = U();
-    const auto  uS = S();
-    const auto  uV = V();
+    if ( is_compressed() )
+    {
+        const auto  nrows = this->nrows();
+        const auto  ncols = this->ncols();
+        const auto  k     = this->rank();
+        auto        t     = blas::vector< value_t >( k );
+        
+        if ( op == Hpro::apply_normal )
+        {
+            // t := V^H x
+            compress::aflp::mulvec_lr( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
+
+            // t := α·t
+            for ( uint  i = 0; i < k; ++i )
+                t(i) *= value_t(alpha) * _S(i);
+        
+            // y := y + U t
+            compress::aflp::mulvec_lr( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
+        }// if
+        else if ( op == Hpro::apply_transposed )
+        {
+            HLR_ERROR( "TODO" );
+        }// if
+        else if ( op == Hpro::apply_adjoint )
+        {
+            // t := U^H x
+            compress::aflp::mulvec_lr( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
+
+            // t := α·t
+            for ( uint  i = 0; i < k; ++i )
+                t(i) *= value_t(alpha) * _S(i);
+        
+            // y := t + V t
+            compress::aflp::mulvec_lr( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
+        }// if
+    }// if
+    else
+    {
+        const auto  uU = U();
+        const auto  uS = S();
+        const auto  uV = V();
     
-    blas::mulvec_lr( alpha, U(), S(), V(), op, x, y );
+        blas::mulvec_lr( alpha, U(), S(), V(), op, x, y );
+    }// else
 }
 
 //
