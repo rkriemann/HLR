@@ -181,11 +181,29 @@ mul_vec_row ( const value_t                              alpha,
     else if ( hlr::matrix::is_h2_lowrank( M ) )
     {
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
-        
-        if      ( op_M == Hpro::apply_normal     ) blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() );
-        else if ( op_M == Hpro::apply_conjugate  ) { HLR_ASSERT( false ); }
-        else if ( op_M == Hpro::apply_transposed ) { HLR_ASSERT( false ); }
-        else if ( op_M == Hpro::apply_adjoint    ) blas::mulvec( alpha, blas::adjoint(R->coupling()), x.coeffs(), value_t(1), y.coeffs() );
+
+        if ( R->is_compressed() )
+        {
+            switch ( op_M )
+            {
+                case apply_normal     : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// if
+        else
+        {
+            switch ( op_M )
+            {
+                case apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : blas::mulvec( alpha, blas::adjoint(R->coupling()), x.coeffs(), value_t(1), y.coeffs() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );

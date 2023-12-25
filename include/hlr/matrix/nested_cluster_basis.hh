@@ -363,30 +363,69 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        if ( nsons() == 0 )
+        if ( is_compressed() )
         {
-            auto  V = basis();
+            const auto  k = this->rank();
+            
+            if ( nsons() == 0 )
+            {
+                auto  t = blas::vector< value_t >( k );
+
+                #if HLR_USE_APLR_NESTED_CB == 1
+                compress::aflp::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                #else
+                compress::aflp::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                #endif
+
+                return t;
+            }// if
+            else
+            {
+                //
+                // compute V'·v = (∑_i V_i E_i)' v = ∑_i E_i' ( V_i' v )
+                //
+
+                blas::vector< value_t >  s( k );
         
-            return blas::mulvec( hlr::blas::adjoint( V ), v );
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+                    auto  s_i   = son_i->transform_forward( v_i );
+                
+                    compress::aflp::mulvec( _E[i].nrows(), k, apply_adjoint, value_t(1), _zE[i], s_i.data(), s.data() );
+                }// for
+
+                return std::move( s );
+            }// else
         }// if
         else
         {
-            //
-            // compute V'·v = (∑_i V_i E_i)' v = ∑_i E_i' ( V_i' v )
-            //
-
-            blas::vector< value_t >  s( rank() );
-        
-            for ( uint  i = 0; i < nsons(); ++i )
+            if ( nsons() == 0 )
             {
-                auto  son_i = son( i );
-                auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
-                auto  s_i   = son_i->transform_forward( v_i );
-                
-                blas::mulvec( value_t(1), blas::adjoint( transfer_mat(i) ), s_i, value_t(1), s );
-            }// for
+                auto  V = basis();
+        
+                return blas::mulvec( hlr::blas::adjoint( V ), v );
+            }// if
+            else
+            {
+                //
+                // compute V'·v = (∑_i V_i E_i)' v = ∑_i E_i' ( V_i' v )
+                //
 
-            return std::move( s );
+                blas::vector< value_t >  s( rank() );
+        
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+                    auto  s_i   = son_i->transform_forward( v_i );
+                
+                    blas::mulvec( value_t(1), blas::adjoint( transfer_mat(i) ), s_i, value_t(1), s );
+                }// for
+
+                return std::move( s );
+            }// else
         }// else
     }
     
@@ -428,31 +467,74 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        if ( nsons() == 0 )
+        if ( is_compressed() )
         {
-            auto  V = basis();
-        
-            return hlr::blas::mulvec( V, s );
+            if ( nsons() == 0 )
+            {
+                const auto  n = _is.size();
+                auto        t = blas::vector< value_t >( n );
+
+                #if HLR_USE_APLR_NESTED_CB == 1
+                compress::aflp::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                #else
+                compress::aflp::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                #endif
+
+                return t;
+            }// if
+            else
+            {
+                //
+                // M ≔ V·s = ∑_i V_i·E_i·s = ∑_i transform_backward( son_i, E_i·s )
+                //
+
+                const auto  k = rank();
+                auto        v = blas::vector< value_t >( is().size() );
+            
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  s_i   = blas::vector< value_t >( _E[i].nrows() );
+                    
+                    compress::aflp::mulvec( _E[i].nrows(), k, apply_normal, value_t(1), _zE[i], s.data(), s_i.data() );
+
+                    auto  t_i   = son_i->transform_backward( s_i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+
+                    blas::copy( t_i, v_i );
+                }// for
+
+                return std::move( v );
+            }// else
         }// if
         else
         {
-            //
-            // M ≔ V·s = ∑_i V_i·E_i·s = ∑_i transform_backward( son_i, E_i·s )
-            //
-
-            auto  v = blas::vector< value_t >( is().size() );
-            
-            for ( uint  i = 0; i < nsons(); ++i )
+            if ( nsons() == 0 )
             {
-                auto  son_i = son( i );
-                auto  s_i   = blas::mulvec( transfer_mat(i), s );
-                auto  t_i   = son_i->transform_backward( s_i );
-                auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+                auto  V = basis();
+        
+                return hlr::blas::mulvec( V, s );
+            }// if
+            else
+            {
+                //
+                // M ≔ V·s = ∑_i V_i·E_i·s = ∑_i transform_backward( son_i, E_i·s )
+                //
 
-                blas::copy( t_i, v_i );
-            }// for
+                auto  v = blas::vector< value_t >( is().size() );
+            
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  s_i   = blas::mulvec( transfer_mat(i), s );
+                    auto  t_i   = son_i->transform_backward( s_i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
 
-            return std::move( v );
+                    blas::copy( t_i, v_i );
+                }// for
+
+                return std::move( v );
+            }// else
         }// else
     }
     

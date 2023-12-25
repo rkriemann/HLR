@@ -215,9 +215,25 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        auto  V = basis();
+        if ( is_compressed() )
+        {
+            const auto  k = this->rank();
+            auto        t = blas::vector< value_t >( k );
+
+            #if HLR_USE_APLR_SHARED_CB == 1
+            compress::aflp::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+            #else
+            compress::aflp::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+            #endif
+
+            return t;
+        }// if
+        else
+        {
+            auto  V = basis();
         
-        return blas::mulvec( hlr::blas::adjoint( V ), v );
+            return blas::mulvec( hlr::blas::adjoint( V ), v );
+        }// else
     }
     
     hlr::blas::matrix< value_t >
@@ -236,9 +252,47 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        auto  V = basis();
+        if ( is_compressed() )
+        {
+            const auto  n = _is.size();
+            auto        t = blas::vector< value_t >( n );
+
+            #if HLR_USE_APLR_SHARED_CB == 1
+            compress::aflp::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+            #else
+            compress::aflp::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+            #endif
+
+            return t;
+        }// if
+        else
+        {
+            auto  V = basis();
         
-        return hlr::blas::mulvec( V, s );
+            return hlr::blas::mulvec( V, s );
+        }// else
+    }
+    
+    void
+    transform_backward  ( const hlr::blas::vector< value_t > &  s,
+                          hlr::blas::vector< value_t > &        v ) const
+    {
+        if ( is_compressed() )
+        {
+            HLR_ASSERT( v.length() == _is.size() );
+            
+            #if HLR_USE_APLR_SHARED_CB == 1
+            compress::aflp::mulvec_lr( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            #else
+            compress::aflp::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            #endif
+        }// if
+        else
+        {
+            auto  V = basis();
+        
+            hlr::blas::mulvec( value_t(1), V, s, value_t(1), v );
+        }// else
     }
     
     hlr::blas::matrix< value_t >

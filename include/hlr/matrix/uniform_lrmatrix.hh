@@ -224,6 +224,9 @@ public:
     void set_coupling ( const blas::matrix< value_t > &  aS ) { set_coeff( aS ); }
     void set_coupling ( blas::matrix< value_t > &&       aS ) { set_coeff( std::move( aS ) ); }
     
+    #if HLR_HAS_COMPRESSION == 1
+    compress::zarray zcoeff () const { return _zS; }
+    #endif
 
     // set coupling matrix without bases consistency check
     // (because cluster bases need to be adjusted later)

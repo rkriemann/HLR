@@ -227,9 +227,9 @@ public:
     }
     
     void
-    set_matrix_data ( cluster_basis_t &  arow_cb,
-                      const blas::matrix< value_t > &    aS,
-                      cluster_basis_t &  acol_cb )
+    set_matrix_data ( cluster_basis_t &                arow_cb,
+                      const blas::matrix< value_t > &  aS,
+                      cluster_basis_t &                acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -240,9 +240,9 @@ public:
     }
 
     void
-    set_matrix_data ( cluster_basis_t &  arow_cb,
-                      blas::matrix< value_t > &&         aS,
-                      cluster_basis_t &  acol_cb )
+    set_matrix_data ( cluster_basis_t &           arow_cb,
+                      blas::matrix< value_t > &&  aS,
+                      cluster_basis_t &           acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -251,6 +251,10 @@ public:
         _row_cb = & arow_cb;
         _col_cb = & acol_cb;
     }
+
+    #if HLR_HAS_COMPRESSION == 1
+    compress::zarray zcoupling () const { return _zS; }
+    #endif
 
     //
     // matrix data

@@ -86,14 +86,28 @@ mul_vec ( const value_t                                              alpha,
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
 
-        switch ( op_M )
+        if ( R->is_compressed() )
         {
-            case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
-            case Hpro::apply_conjugate  : HLR_ASSERT( false );
-            case Hpro::apply_transposed : HLR_ASSERT( false );
-            case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
-            default                     : HLR_ERROR( "unsupported matrix operator" );
-        }// switch
+            switch ( op_M )
+            {
+                case apply_normal     : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// if
+        else
+        {
+            switch ( op_M )
+            {
+                case apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
+                case apply_conjugate  : HLR_ASSERT( false );
+                case apply_transposed : HLR_ASSERT( false );
+                case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -160,10 +174,14 @@ add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > 
 {
     if ( u.basis().rank() > 0 )
     {
-        auto  x   = u.basis().transform_backward( u.coeffs() );
         auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
+
+        u.basis().transform_backward( u.coeffs(), v_u );
+        
+        // auto  x   = u.basis().transform_backward( u.coeffs() );
+        // auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
             
-        blas::add( value_t(1), x, v_u );
+        // blas::add( value_t(1), x, v_u );
     }// if
 
     if ( u.nblocks() > 0 )
