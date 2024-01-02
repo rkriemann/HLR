@@ -652,6 +652,7 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
+    #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
     if ( is_compressed() )
     {
         const auto  nrows = this->nrows();
@@ -689,6 +690,7 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         }// if
     }// if
     else
+    #endif
     {
         const auto  uU = U();
         const auto  uS = S();

@@ -363,6 +363,7 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -400,6 +401,7 @@ public:
             }// else
         }// if
         else
+        #endif
         {
             if ( nsons() == 0 )
             {
@@ -467,6 +469,7 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( is_compressed() )
         {
             if ( nsons() == 0 )
@@ -508,6 +511,7 @@ public:
             }// else
         }// if
         else
+        #endif
         {
             if ( nsons() == 0 )
             {

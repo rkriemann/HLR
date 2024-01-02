@@ -43,6 +43,105 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    // if ( false )
+    // {
+    //     auto  tic     = timer::now();
+    //     auto  toc     = timer::since( tic );
+        
+    //     size_t  n = 4096;
+    //     auto  M = blas::matrix< value_t >( n, n );
+
+    //     for ( int i = 0; i < n*n; ++i )
+    //         M.data()[i] = i+1;
+
+    //     // for ( int i = 0; i < n; ++i )
+    //     // {
+    //     //     for ( int j = 0; j < n; ++j )
+    //     //         std::cout << M(i,j) << ", ";
+    //     //     std::cout << std::endl;
+    //     // }// for
+        
+    //     auto  x = blas::vector< value_t >( M.ncols() );
+    //     auto  y1 = blas::vector< value_t >( M.nrows() );
+    //     auto  y2 = blas::vector< value_t >( M.nrows() );
+    //     auto  y3 = blas::vector< value_t >( M.nrows() );
+
+    //     for ( int i = 0; i < M.ncols(); ++i )
+    //         x(i) = i+1;
+
+    //     auto  zcfg = compress::get_config( 1e-4 );
+    //     auto  zM   = compress::compress( zcfg, M.data(), M.nrows(), M.ncols() );
+
+    //     tic = timer::now();
+    //     blas::mulvec( value_t(1), blas::adjoint( M ), x, value_t(1), y1 );
+    //     toc = timer::since( tic );
+    //     std::cout << toc.seconds() << std::endl;
+        
+    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
+        
+    //     tic = timer::now();
+    //     compress::aflp::mulvec( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
+    //     toc = timer::since( tic );
+    //     std::cout << toc.seconds() << std::endl;
+
+    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
+
+    //     return;
+    // }
+    
+    // if ( false )
+    // {
+    //     auto  tic     = timer::now();
+    //     auto  toc     = timer::since( tic );
+        
+    //     size_t  n = 4;
+    //     size_t  k = 4;
+    //     auto    M = blas::matrix< value_t >( n, k );
+
+    //     for ( int i = 0; i < n*k; ++i )
+    //         M.data()[i] = i+1;
+
+    //     for ( int i = 0; i < M.nrows(); ++i )
+    //     {
+    //         for ( int j = 0; j < M.ncols(); ++j )
+    //             std::cout << M(i,j) << ", ";
+    //         std::cout << std::endl;
+    //     }// for
+        
+    //     auto  x  = blas::vector< value_t >( M.ncols() );
+    //     auto  y1 = blas::vector< value_t >( M.nrows() );
+    //     auto  y2 = blas::vector< value_t >( M.nrows() );
+    //     auto  y3 = blas::vector< value_t >( M.nrows() );
+
+    //     for ( int i = 0; i < x.length(); ++i )
+    //         x(i) = i+1;
+
+    //     auto  S = blas::vector< value_t >( k );
+
+    //     S(0) = 1e-8;
+    //     S(1) = 1e-7;
+    //     S(2) = 1e-6;
+    //     S(3) = 1e-5;
+        
+    //     auto  zM   = compress::aflp::compress_lr( M, S );
+
+    //     blas::mulvec( value_t(1), blas::adjoint( M ), x, value_t(1), y1 );
+
+    //     // for ( uint  i = 0; i < k; ++i )
+    //     //     y1(i) *= S(i);
+        
+    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
+        
+    //     compress::aflp::mulvec_lr( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
+
+    //     // for ( uint  i = 0; i < k; ++i )
+    //     //     y2(i) *= S(i);
+
+    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
+
+    //     return;
+    // }
+    
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();

@@ -182,6 +182,7 @@ mul_vec_row ( const value_t                              alpha,
     {
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( R->is_compressed() )
         {
             switch ( op_M )
@@ -194,6 +195,7 @@ mul_vec_row ( const value_t                              alpha,
             }// switch
         }// if
         else
+        #endif
         {
             switch ( op_M )
             {

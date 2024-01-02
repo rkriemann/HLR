@@ -215,6 +215,7 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -229,6 +230,7 @@ public:
             return t;
         }// if
         else
+        #endif
         {
             auto  V = basis();
         
@@ -252,6 +254,7 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( is_compressed() )
         {
             const auto  n = _is.size();
@@ -266,6 +269,7 @@ public:
             return t;
         }// if
         else
+        #endif
         {
             auto  V = basis();
         
@@ -277,6 +281,7 @@ public:
     transform_backward  ( const hlr::blas::vector< value_t > &  s,
                           hlr::blas::vector< value_t > &        v ) const
     {
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
         if ( is_compressed() )
         {
             HLR_ASSERT( v.length() == _is.size() );
@@ -288,6 +293,7 @@ public:
             #endif
         }// if
         else
+        #endif
         {
             auto  V = basis();
         
