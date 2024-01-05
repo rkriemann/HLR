@@ -1037,8 +1037,58 @@ decompress_lr< std::complex< double > > ( const zarray &                        
 // compressed blas
 //
 
+// template < typename value_t >
+// class accessor
+// {
+//     using  real_t = Hpro::real_type_t< value_t >;
+    
+//     const uint8_t    nexp_bits;
+//     const uint8_t    nprec_bits;
+//     const uint8_t    nbits;
+//     const uint8_t    nbyte;
+//     const uint64_t   prec_mask;
+//     const uint8_t    prec_ofs;
+//     const uint64_t   exp_mask;
+//     const uint32_t   sign_shift;
+//     const uint64_t   zero_val;
+//     const real_t     scale;
+//     const uint8_t *  zptr;
+    
+//     accessor ( const zarray &  zA )
+//             : nexp_bits(  zarray[0] )
+//             , nprec_bits( zarray[1] )
+//             , scale( * reinterpret_cast< real_t >( & zarray[2] ) )
+//             , nbits( 1 + nexp_bits + nprec_bits )
+//             , nbyte( nbits / 8 )
+//             , prec_mask( ( 1ul << nprec_bits ) - 1 )
+//             , prec_ofs( fp64_mant_bits - nprec_bits )
+//             , exp_mask( ( 1ul << nexp_bits  ) - 1 )
+//             , sign_shift( nexp_bits + nprec_bits )
+//             , zero_val( fp64_zero_val & (( 1ul << nbits) - 1 ) )
+//     {}
+
+//     value_t  operator () ( const size_t  i ) const
+//     {
+//         const uint64_t  zval = zptr[ i * nbyte ];
+
+//         if ( zval == zero_val )
+//             return value_t(0);
+                    
+//         const uint64_t  mant  = zval & prec_mask;
+//         const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
+//         const uint64_t  sign  = (zval >> sign_shift) << fp64_sign_bit;
+//         fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+
+//         fival.f  = scale * ( fival.f - 1.0 );
+//         fival.u |= sign;
+
+//         return fival.f;
+//     }
+// };
+
 namespace
 {
+
 template < typename value_t,
            typename storage_t >
 void
@@ -1050,8 +1100,8 @@ mulvec ( const size_t                        nrows,
          const storage_t *                   zA,
          const value_t *                     x,
          value_t *                           y,
-         const uint8_t   exp_bits,
-         const uint8_t   prec_bits )
+         const uint8_t                       exp_bits,
+         const uint8_t                       prec_bits )
 {
     const uint8_t   nbits      = 1 + exp_bits + prec_bits;
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
@@ -1239,7 +1289,6 @@ mulvec_lr ( const size_t     nrows,
         }// case
         break;
     }// switch
-    
 }
 
 }}}// namespace hlr::compress::aflp

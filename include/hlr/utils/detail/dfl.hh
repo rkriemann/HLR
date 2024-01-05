@@ -249,8 +249,8 @@ decompress< double > ( const zarray &  zdata,
                        const size_t    dim2,
                        const size_t    dim3 )
 {
-    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t  nbyte = zdata[0];
+    const size_t   nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint8_t  nbyte = zdata[0];
 
     switch ( nbyte )
     {
@@ -421,6 +421,171 @@ decompress_lr< double > ( const zarray &            zdata,
         
         pos += nbyte * n;
     }// for
+}
+
+//
+// compressed blas
+//
+
+namespace
+{
+
+template < typename value_t,
+           typename storage_t >
+void
+mulvec ( const size_t       nrows,
+         const size_t       ncols,
+         const matop_t      op_A,
+         const value_t      alpha,
+         const storage_t *  zA,
+         const value_t *    x,
+         value_t *          y )
+{
+    static constexpr uint64_t  dfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 11;  // 1 sign bit, 11 exponent bits
+    static constexpr uint64_t  dfl_mant_shift = fp64_mant_bits - dfl_mant_bits;
+    const auto                 scale          = alpha;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  zval = uint64_t( zA[i] ) << dfl_mant_shift;
+                    const double    fval = * reinterpret_cast< const double * >( & zval );
+                    
+                    y[i] += fval * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  zval = uint64_t( zA[i] ) << dfl_mant_shift;
+                    const double    fval = * reinterpret_cast< const double * >( & zval );
+
+                    y_j += fval * x[i];
+                }// for
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t  nbyte = zA[0];
+    
+    switch ( nbyte )
+    {
+        case  2 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  3 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  4 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  5 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  6 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  7 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        case  8 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
+        default :
+            HLR_ERROR( "unsupported byte size" );
+    }// switch
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    size_t  pos = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                switch ( nbyte )
+                {
+                    case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
+                    default :
+                        HLR_ERROR( "unsupported byte size" );
+                }// switch
+
+                pos += dfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                switch ( nbyte )
+                {
+                    case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
+                    default :
+                        HLR_ERROR( "unsupported byte size" );
+                }// switch
+
+                pos += dfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+    }// switch
 }
 
 }}}// namespace hlr::compress::dfl

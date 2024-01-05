@@ -483,10 +483,19 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zM, x.data(), value_t(1), y.data() );
 
     // #else
+
+    #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
+    if ( is_compressed() )
+    {
+        compress::blas::mulvec( nrows(), ncols(), op, value_t(1), _zM, x.data(), y.data() );
+    }// if
+    else
+    #endif
+    {
+        auto  M = mat();
         
-    auto  M = mat();
-        
-    blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
+        blas::mulvec( alpha, blas::mat_view( op, M ), x, value_t(1), y );
+    }// else
 }
 
 template < typename value_t >

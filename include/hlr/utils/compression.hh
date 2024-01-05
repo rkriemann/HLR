@@ -413,6 +413,8 @@ using hlr::compress::aflp::get_config;
 using hlr::compress::aflp::byte_size;
 using hlr::compress::aflp::compressed_size;
 
+namespace blas { using hlr::compress::aflp::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
@@ -456,6 +458,8 @@ using hlr::compress::dfl::decompress;
 using hlr::compress::dfl::get_config;
 using hlr::compress::dfl::byte_size;
 using hlr::compress::dfl::compressed_size;
+
+namespace blas { using hlr::compress::dfl::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -545,7 +549,7 @@ namespace hlr { namespace compress {
 template < typename value_t >
 zarray
 compress ( const zconfig_t &                 config,
-           const blas::tensor3< value_t > &  T )
+           const hlr::blas::tensor3< value_t > &  T )
 {
     return compress< value_t >( config, T.data(), T.size(0), T.size(1), T.size(2) );
 }
@@ -553,7 +557,7 @@ compress ( const zconfig_t &                 config,
 template < typename value_t >
 zarray
 compress ( const zconfig_t &                config,
-           const blas::matrix< value_t > &  M )
+           const hlr::blas::matrix< value_t > &  M )
 {
     return compress< value_t >( config, M.data(), M.nrows(), M.ncols() );
 }
@@ -561,7 +565,7 @@ compress ( const zconfig_t &                config,
 template < typename value_t >
 zarray
 compress ( const zconfig_t &                config,
-           const blas::vector< value_t > &  v )
+           const hlr::blas::vector< value_t > &  v )
 {
     return compress< value_t >( config, v.data(), v.length() );
 }
@@ -569,7 +573,7 @@ compress ( const zconfig_t &                config,
 template < typename value_t >
 void
 decompress ( const zarray &              zdata,
-             blas::tensor3< value_t > &  T )
+             hlr::blas::tensor3< value_t > &  T )
 {
     return decompress< value_t >( zdata, T.data(), T.size(0), T.size(1), T.size(2) );
 }
@@ -577,7 +581,7 @@ decompress ( const zarray &              zdata,
 template < typename value_t >
 void
 decompress ( const zarray &             zdata,
-             blas::matrix< value_t > &  M )
+             hlr::blas::matrix< value_t > &  M )
 {
     return decompress< value_t >( zdata, M.data(), M.nrows(), M.ncols() );
 }
@@ -585,7 +589,7 @@ decompress ( const zarray &             zdata,
 template < typename value_t >
 void
 decompress ( const zarray &             zdata,
-             blas::vector< value_t > &  v )
+             hlr::blas::vector< value_t > &  v )
 {
     return decompress< value_t >( zdata, v.data(), v.length() );
 }
@@ -749,6 +753,8 @@ using hlr::compress::dfl::decompress_lr;
 using hlr::compress::dfl::byte_size;
 using hlr::compress::dfl::compressed_size;
 
+namespace blas { using hlr::compress::dfl::mulvec_lr; }
+
 static const char provider[] = "dfl";
 
 }// namespace hlr::compress::aplr
@@ -764,6 +770,8 @@ using hlr::compress::aflp::compress_lr;
 using hlr::compress::aflp::decompress_lr;
 using hlr::compress::aflp::byte_size;
 using hlr::compress::aflp::compressed_size;
+
+namespace blas { using hlr::compress::aflp::mulvec_lr; }
 
 static const char provider[] = "aflp";
 
