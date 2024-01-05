@@ -86,14 +86,30 @@ mul_vec ( const value_t                              alpha,
     {
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
-        switch ( op_M )
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
+        if ( R->is_compressed() )
         {
-            case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
-            case Hpro::apply_conjugate  : HLR_ASSERT( false );
-            case Hpro::apply_transposed : HLR_ASSERT( false );
-            case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
-            default                     : HLR_ERROR( "unsupported matrix operator" );
-        }// switch
+            switch ( op_M )
+            {
+                case apply_normal     : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// if
+        else
+        #endif
+        {
+            switch ( op_M )
+            {
+                case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
+                case Hpro::apply_conjugate  : HLR_ASSERT( false );
+                case Hpro::apply_transposed : HLR_ASSERT( false );
+                case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
+                default                     : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
     }// if
     #if defined(HLR_HAS_H2)
     else if ( Hpro::is_uniform( &M ) )

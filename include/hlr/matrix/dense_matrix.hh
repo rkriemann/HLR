@@ -477,15 +477,8 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    // #if defined(HAS_UNIVERSAL)
-
-    // // perform mat-vec directly with posits
-    // compress::posits::mulvec( this->nrows(), this->ncols(), op, alpha, _zM, x.data(), value_t(1), y.data() );
-
-    // #else
-
     #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
-    if ( is_compressed() && ( std::min( nrows(), ncols() ) > 64 ) )
+    if ( is_compressed() )
     {
         compress::blas::mulvec( nrows(), ncols(), op, alpha, _zM, x.data(), y.data() );
     }// if

@@ -86,15 +86,15 @@ mul_vec ( const value_t                                              alpha,
     {
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
 
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( R->is_compressed() )
         {
             switch ( op_M )
             {
-                case apply_normal     : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_normal     : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
                 case apply_conjugate  : { HLR_ASSERT( false ); }
                 case apply_transposed : { HLR_ASSERT( false ); }
-                case apply_adjoint    : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_adjoint    : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
                 default               : HLR_ERROR( "unsupported matrix operator" );
             }// switch
         }// if
@@ -179,11 +179,6 @@ add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > 
         auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
 
         u.basis().transform_backward( u.coeffs(), v_u );
-        
-        // auto  x   = u.basis().transform_backward( u.coeffs() );
-        // auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
-            
-        // blas::add( value_t(1), x, v_u );
     }// if
 
     if ( u.nblocks() > 0 )

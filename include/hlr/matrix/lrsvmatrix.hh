@@ -653,7 +653,7 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
     #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
-    if ( is_compressed() && ( std::min( this->nrows(), this->ncols() ) > 128 ) )
+    if ( is_compressed() )
     {
         const auto  nrows = this->nrows();
         const auto  ncols = this->ncols();

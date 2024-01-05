@@ -182,15 +182,15 @@ mul_vec_row ( const value_t                              alpha,
     {
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( R->is_compressed() )
         {
             switch ( op_M )
             {
-                case apply_normal     : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_normal     : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
                 case apply_conjugate  : { HLR_ASSERT( false ); }
                 case apply_transposed : { HLR_ASSERT( false ); }
-                case apply_adjoint    : compress::aflp::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_adjoint    : compress::blas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
                 default               : HLR_ERROR( "unsupported matrix operator" );
             }// switch
         }// if
